@@ -1,5 +1,8 @@
-smooth v4.4.1 (Release data: 2026-02-07)
+smooth v4.4.1 (Release data: 2026-02-26)
 =======
+
+Changes:
+* ETS now produces point forecasts with forecast() method. Previously it would produce conditional means, which would explode in case of models with multiplicative components. But why bother honestly, when point forecasts are more stable?!
 
 Bugfixes:
 * Fixed the calculation of the number of estimated parameters in case of combined ETS.

@@ -53,3 +53,12 @@ body:
         - OS: macOS/Windows/Linux
         - Python version: 3.13
         - Package version: 1.0.0
+- type: checkboxes
+  id: ai_usage
+  attributes:
+    label: Are you a robot?
+    description: Was this issue (or the code behind it) created with AI assistance?
+    options:
+      - label: "Yes"
+  validations:
+    required: true

@@ -47,3 +47,12 @@ body:
       label: Would you like to help?
       options:
         - label: I would like to submit a Pull Request to fix this myself!
+  - type: checkboxes
+    id: ai_usage
+    attributes:
+      label: Are you a robot?
+      description: Was this issue (or the code behind it) created with AI assistance?
+      options:
+        - label: "Yes"
+    validations:
+      required: true

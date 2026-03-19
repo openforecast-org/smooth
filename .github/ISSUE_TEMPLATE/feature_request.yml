@@ -40,3 +40,12 @@ body:
       label: Would you be willing to contribute this feature?
       options:
         - label: Yes, I can submit a Pull Request.
+  - type: checkboxes
+    id: ai_usage
+    attributes:
+      label: Are you a robot?
+      description: Was this issue (or the code behind it) created with AI assistance?
+      options:
+        - label: "Yes"
+    validations:
+      required: true

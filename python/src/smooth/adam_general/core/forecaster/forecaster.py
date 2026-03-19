@@ -688,45 +688,10 @@ def forecaster(
         y_forecast_values, model_type_dict, model_prepared, general_dict
     )
 
-    # 8b. Multiplicative models need simulation-based mean for point forecasts
-    # (matches R adam.R:7875-7894). The C++ forecaster returns the conditional
-    # mode, but for multiplicative models mean != mode due to skewness.
+    # Point forecasts now always come from adam_cpp.forecast(), not simulations.
+    # (matches R commit 7d4d3736: forecast.adam returns $forecast, not sim mean)
     resolved_interval = general_dict["interval"]
     _cached_sim = None
-    needs_sim_mean = (
-        (model_type_dict["ets_model"] or explanatory_checked["xreg_number"] > 0)
-        and (
-            model_type_dict["trend_type"] == "M"
-            or (
-                model_type_dict["season_type"] == "M"
-                and general_dict["h"] > lags_dict["lags_model_min"]
-            )
-        )
-        and resolved_interval != "approximate"
-    )
-    if needs_sim_mean:
-        nsim = general_dict.get("nsim", 10000)
-        ll, lu = ensure_level_format(level, side)
-        sim_lower, sim_upper, sim_scenarios, y_forecast_sim = (
-            generate_simulation_interval(
-                y_forecast_values,
-                model_prepared,
-                general_dict,
-                observations_dict,
-                model_type_dict,
-                lags_dict,
-                components_dict,
-                explanatory_checked,
-                constants_checked,
-                params_info,
-                adam_cpp,
-                ll,
-                lu,
-                nsim=nsim,
-            )
-        )
-        y_forecast_values = y_forecast_sim
-        _cached_sim = (sim_lower, sim_upper, sim_scenarios)
 
     # 9. Process occurrence forecasts
     p_forecast, occurrence_model = _process_occurrence_forecast(
@@ -734,18 +699,14 @@ def forecaster(
     )
 
     # 10. Apply occurrence probabilities and handle cumulative
-    # When needs_sim_mean fired with cumulative=True, y_forecast_values is
-    # already a scalar cumulative mean from generate_simulation_interval.
-    # Skip p_forecast multiply and np.sum to avoid h-fold inflation.
-    if not (needs_sim_mean and general_dict.get("cumulative")):
-        y_forecast_values = y_forecast_values * p_forecast
-        if general_dict.get("cumulative"):
-            y_forecast_values = np.sum(y_forecast_values)
-        # In case of occurrence model use simulations - the cumulative
-        # probability is complex
-        if occurrence_model:
-            general_dict["interval"] = "simulated"
-            resolved_interval = "simulated"
+    y_forecast_values = y_forecast_values * p_forecast
+    if general_dict.get("cumulative"):
+        y_forecast_values = np.sum(y_forecast_values)
+    # In case of occurrence model use simulations - the cumulative
+    # probability is complex
+    if occurrence_model:
+        general_dict["interval"] = "simulated"
+        resolved_interval = "simulated"
 
     # 12. Determine index: single row for cumulative, full horizon otherwise
     is_cumulative = general_dict.get("cumulative", False)

@@ -1,6 +1,11 @@
 # smooth (Python)
 
+[![PyPI version](https://img.shields.io/pypi/v/smooth.svg)](https://pypi.org/project/smooth/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/smooth.svg)](https://pypi.org/project/smooth/)
 [![Python CI](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml)
+[![Python versions](https://img.shields.io/pypi/pyversions/smooth.svg)](https://pypi.org/project/smooth/)
+[![License: LGPL-2.1](https://img.shields.io/badge/License-LGPL--2.1-blue.svg)](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+
 
 Python implementation of the **smooth** package for time series forecasting using Single Source of Error (SSOE) state-space models.
 
@@ -8,6 +13,11 @@ Python implementation of the **smooth** package for time series forecasting usin
 
 
 ## Installation
+
+**Python (PyPI):**
+```bash
+# Not yet available
+```
 
 **From GitHub (source):**
 ```bash

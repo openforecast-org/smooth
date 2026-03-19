@@ -613,13 +613,9 @@ def generate_simulation_interval(
         y_forecast_sim = np.zeros(h)
 
         for i in range(h):
-            if model_type_dict["trend_type"] == "M" or (
-                model_type_dict["season_type"] == "M"
-                and h > lags_dict.get("lags_model_min", 1)
-            ):
-                y_forecast_sim[i] = stats.trim_mean(y_simulated[i, :], 0.01)
-            else:
-                y_forecast_sim[i] = np.mean(y_simulated[i, :])
+            # Point forecasts now always from adam_cpp.forecast(), not sim mean.
+            # (matches R commit 7d4d3736)
+            y_forecast_sim[i] = np.mean(y_simulated[i, :])
 
             y_lower[i, :] = np.quantile(y_simulated[i, :], level_low)
             y_upper[i, :] = np.quantile(y_simulated[i, :], level_up)

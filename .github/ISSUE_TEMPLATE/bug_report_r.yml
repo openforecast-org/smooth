@@ -54,3 +54,12 @@ body:
         - OS: macOS/Windows/Linux
         - R version: 4.5.1
         - Package version: 4.4.0
+- type: checkboxes
+  id: ai_usage
+  attributes:
+    label: Are you a robot?
+    description: Was this issue (or the code behind it) created with AI assistance?
+    options:
+      - label: "Yes"
+  validations:
+    required: true

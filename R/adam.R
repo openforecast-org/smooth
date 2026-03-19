@@ -7872,6 +7872,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     #                xregNumber, length(lagsModelAll),
     #                constantRequired, adamETS);
 
+    ##### Produce point forecasts, not mean forecasts from the model! #####
     # Produce point forecasts for non-multiplicative trend / seasonality
     # Do this for cases, when h<=m as well and prediction /confidence / simulated interval
     # if(Ttype!="M" && (Stype!="M" | (Stype=="M" & h<=lagsModelMin)) ||
@@ -8092,6 +8093,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
         else{
             for(i in 1:h){
+                ##### We now do point forecasts, not mean #####
                 # if(Ttype=="M" || (Stype=="M" & h>lagsModelMin)){
                 #     # Trim 1% of values just to resolve some issues with outliers
                 #     yForecast[i] <- mean(ySimulated[i,],na.rm=TRUE,trim=0.01);

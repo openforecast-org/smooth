@@ -15,8 +15,13 @@
    :template: method.rst
 
    ~ES.fit
+   ~ES.outlierdummy
+   ~ES.plot
    ~ES.predict
    ~ES.predict_intervals
+   ~ES.rmultistep
+   ~ES.rstandard
+   ~ES.rstudent
    ~ES.select_best_model
    ~ES.summary
 
@@ -57,6 +62,7 @@
    ~ES.n_param
    ~ES.nobs
    ~ES.nparam
+   ~ES.om_model
    ~ES.orders
    ~ES.persistence_vector
    ~ES.phi_

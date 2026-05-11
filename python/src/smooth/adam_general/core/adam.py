@@ -1,10 +1,12 @@
 import time
 import warnings
+from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy import stats as scipy_stats
 
 from smooth.adam_general.core.checker import parameters_checker
 from smooth.adam_general.core.creator import architector, creator
@@ -15,6 +17,7 @@ from smooth.adam_general.core.estimator import (
 from smooth.adam_general.core.forecaster import forecaster, preparator
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
+from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT
 
 # Note: adam_cpp instance is stored in self and passed to forecasting functions
 
@@ -57,6 +60,17 @@ INITIAL_OPTIONS = Optional[
         Tuple[str, ...],
     ]
 ]
+
+
+@dataclass
+class OutlierDummy:
+    """Container returned by ADAM.outlierdummy()."""
+
+    outliers: Optional[NDArray]  # (n, m) 0/1 matrix, one column per outlier, or None
+    id: NDArray  # 0-based indices of outlier observations
+    statistic: NDArray  # [lower, upper] quantile bounds
+    level: float
+    type: str  # "rstandard" or "rstudent"
 
 
 class ADAM:
@@ -339,6 +353,7 @@ class ADAM:
         ar_order: Union[int, List[int]] = 0,
         i_order: Union[int, List[int]] = 0,
         ma_order: Union[int, List[int]] = 0,
+        orders: Optional[Dict[str, Any]] = None,
         arima_select: bool = False,
         # end of ARIMA specific parameters
         constant: bool = False,
@@ -347,7 +362,7 @@ class ADAM:
         loss: LOSS_OPTIONS = "likelihood",
         loss_horizon: Optional[int] = None,
         # outlier detection
-        outliers: Literal["ignore", "detect", "use"] = "ignore",
+        outliers: Literal["ignore", "use", "select"] = "ignore",
         outliers_level: float = 0.99,
         # end of outlier detection
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
@@ -369,7 +384,6 @@ class ADAM:
         holdout: bool = False,
         fast: bool = False,
         lambda_param: Optional[float] = None,
-        frequency: Optional[str] = None,
         # Profile parameters
         profiles_recent_provided: bool = False,
         profiles_recent_table: Optional[Any] = None,
@@ -383,7 +397,8 @@ class ADAM:
         # specific to losses or distributions
         reg_lambda: Optional[float] = None,
         gnorm_shape: Optional[float] = None,
-        smoother: Literal["lowess", "ma", "global"] = "lowess",
+        smoother: Literal["lowess", "ma", "global"] = SMOOTHER_DEFAULT,
+        ets: Literal["conventional", "adam"] = "conventional",
         **kwargs,
     ) -> None:
         """
@@ -403,10 +418,33 @@ class ADAM:
             Integration order(s) for ARIMA components.
         ma_order : Union[int, List[int]], default=0
             Moving average order(s) for ARIMA components.
+        orders : Optional[Dict[str, Any]], default=None
+            R-style alternative to ``ar_order``/``i_order``/``ma_order``.
+            A dict with keys ``"ar"``, ``"i"``, ``"ma"`` (each an int or list
+            of ints) and optionally ``"select"`` (bool).  Example::
+
+                orders={"ar": [1, 1], "i": [1, 1], "ma": [2, 2]}
+
+            If ``ar_order``, ``i_order``, or ``ma_order`` are non-zero they
+            take priority over ``orders``.
         arima_select : bool, default=False
             Whether to perform automatic ARIMA order selection.
-        constant : bool, default=False
-            Whether to include a constant term.
+        constant : Union[bool, float], default=False
+            Whether to include a constant (intercept/drift) term.
+
+            - ``True``: estimate the constant as a free parameter.
+            - ``False``: no constant.
+            - A numeric value: fix the constant at that value (not estimated).
+
+            The model name reflects the role of the constant:
+
+            - **"with drift"** — when the model is ETS *or* ARIMA with any
+              integration order > 0 (e.g. ``ETS(ANN) with drift``,
+              ``ARIMA(1,1,1) with drift``).
+            - **"with constant"** — when the model is a pure non-integrated
+              ARIMA (all ``i_order = 0``), e.g. ``ARIMA(1,0,1) with constant``.
+
+            The fitted value is accessible via ``model.constant_value``.
         regressors : Literal["use", "select", "adapt"], default="use"
             How to handle external regressors.
         distribution : Optional[DISTRIBUTION_OPTIONS], default=None
@@ -416,8 +454,11 @@ class ADAM:
             Loss function for parameter estimation.
         loss_horizon : Optional[int], default=None
             Number of steps for multi-step loss functions (e.g., MSEh).
-        outliers : Literal["ignore", "detect", "use"], default="ignore"
-            Outlier handling method.
+        outliers : Literal["ignore", "use", "select"], default="ignore"
+            Outlier handling: ``"ignore"`` skips detection; ``"use"`` detects
+            outliers and includes their dummies as fixed regressors; ``"select"``
+            also expands each dummy with lag/lead columns and lets the regressor
+            selection mechanism choose which matter.
         outliers_level : float, default=0.99
             Confidence level for outlier detection.
         ic : Literal["AIC", "AICc", "BIC", "BICc"], default="AICc"
@@ -448,9 +489,6 @@ class ADAM:
             Whether to use faster, possibly less accurate, estimation methods.
         lambda_param : Optional[float], default=None
             Lambda parameter for Box-Cox transformation or regularization.
-        frequency : Optional[str], default=None
-            Time series frequency (e.g., "D", "M", "Y").
-            Inferred if data is pandas Series with DatetimeIndex.
         profiles_recent_provided : bool, default=False
             Whether recent profiles (e.g., for exogenous variables) are provided.
         profiles_recent_table : Optional[Any], default=None
@@ -496,7 +534,7 @@ class ADAM:
             Regularization parameter specifically for LASSO/RIDGE losses.
         gnorm_shape : Optional[float], default=None
             Shape parameter 's' for the generalized normal distribution.
-        smoother : Literal["lowess", "ma", "global"], default="lowess"
+        smoother : Literal["lowess", "ma", "global"], default="global"
             Smoother type for time series decomposition in initial state estimation.
 
             - "lowess": Uses LOWESS (Locally Weighted Scatterplot Smoothing) for both
@@ -515,6 +553,7 @@ class ADAM:
         self.ar_order = ar_order
         self.i_order = i_order
         self.ma_order = ma_order
+        self._init_orders = orders
         self.arima_select = arima_select
         self.constant = constant
         self.regressors = regressors
@@ -539,6 +578,9 @@ class ADAM:
         self.reg_lambda = reg_lambda
         self.gnorm_shape = gnorm_shape
         self.smoother = smoother
+        if ets not in ("conventional", "adam"):
+            raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
+        self.ets = ets
 
         # Store parameters that were moved from fit
         self.h = h
@@ -557,8 +599,6 @@ class ADAM:
             if self.nlopt_kargs is None:
                 self.nlopt_kargs = {}
             self.nlopt_kargs["print_level"] = kwargs["print_level"]
-
-        self.frequency = frequency
 
         # Store profile parameters
         self.profiles_recent_provided = profiles_recent_provided
@@ -784,7 +824,23 @@ class ADAM:
         # instance attributes
 
         # Check parameters and prepare data
-        self._check_parameters(y)
+        self._check_parameters(y, X)
+
+        # Pure-regression early exit — mirrors R/adam.R:498-629.
+        if getattr(self, "_alm_model", None) is not None:
+            self._populate_from_alm(y, X)
+            return self
+
+        # Fit the occurrence model first if requested (mirrors R adam.R:2160-2195).
+        # p_fitted is held constant while the demand-sizes model is estimated.
+        self._om_model = None
+        if self._occurrence.get("occurrence_model"):
+            ot_logical = self._observations["ot_logical"]
+            self._observations["obs_zero"] = int(np.sum(~ot_logical))
+            self._om_model = self._fit_occurrence_model(y)
+            self._occurrence["p_fitted"] = self._om_model.fitted
+            self._occurrence["oes_model"] = self._occurrence["occurrence"]
+
         # Execute model estimation or selection based on model_do
         if self._model_type["model_do"] == "estimate":
             self._execute_estimation()
@@ -815,11 +871,54 @@ class ADAM:
         # Prepare final results and format output data
         self._prepare_results()
 
+        # Scale demand-sizes fitted by occurrence probability (mirrors R:1973-1975)
+        if self._om_model is not None:
+            import pandas as pd
+
+            p = self._occurrence["p_fitted"]
+            yf = self._prepared["y_fitted"]
+            if isinstance(yf, pd.Series):
+                yf = yf * p
+            else:
+                yf = np.asarray(yf) * np.asarray(p)
+            self._prepared["y_fitted"] = yf
+            self._prepared["residuals"] = np.asarray(
+                self._observations["y_in_sample"]
+            ) - np.asarray(yf)
+            # Include occurrence model params in the total count
+            self._adam_estimated["n_param_estimated"] += self._om_model.nparam
+
         # Store fitted parameters with trailing underscores
         self._set_fitted_attributes()
 
+        # Auto-forecast if h > 0 (before _config consolidation so holdout is accessible)
+        self._auto_predict()
+
         # Compute elapsed time
         self.time_elapsed_ = time.time() - self._start_time
+
+        # Outlier detection and refitting
+        # "ignore" → skip; "use" → include dummies as fixed regressors;
+        # "select" → expand dummies with lag/lead and let selection prune them.
+        _outliers = self.outliers
+        if _outliers in ("use", "select"):
+            _level = self.outliers_level
+            od = self.outlierdummy(level=_level)
+            if len(od.id) > 0:
+                D = (
+                    self._expand_outlier_dummies(od.outliers)
+                    if _outliers == "select"
+                    else od.outliers
+                )
+                h_eff = len(y) - self.nobs
+                if h_eff > 0:
+                    D = np.vstack([D, np.zeros((h_eff, D.shape[1]))])
+                X_new = np.hstack([X, D]) if X is not None else D
+                self.outliers = "ignore"
+                self.regressors = "select" if _outliers == "select" else "use"
+                self.fit(y, X_new)
+                self._config["outliers"] = _outliers
+                return self  # _config already built by the recursive fit()
 
         # Consolidate init params into _config and remove individual attributes
         self._config = {
@@ -827,6 +926,7 @@ class ADAM:
             "ar_order": self.ar_order,
             "i_order": self.i_order,
             "ma_order": self.ma_order,
+            "orders": self._init_orders,
             "arima_select": self.arima_select,
             "constant": self.constant,
             "regressors": self.regressors,
@@ -846,7 +946,6 @@ class ADAM:
             "reg_lambda": self.reg_lambda,
             "gnorm_shape": self.gnorm_shape,
             "lambda_param": self.lambda_param,
-            "frequency": self.frequency,
             "fast": self.fast,
             "holdout": self.holdout,
         }
@@ -902,18 +1001,46 @@ class ADAM:
 
             is_arima = self._model_type.get("arima_model", False)
             if is_arima and self._arima:
-                ar_orders = self._arima.get("ar_orders", [0])
-                i_orders = self._arima.get("i_orders", [0])
-                ma_orders = self._arima.get("ma_orders", [0])
-                ar = sum(ar_orders) if ar_orders else 0
-                i = sum(i_orders) if i_orders else 0
-                ma = sum(ma_orders) if ma_orders else 0
-                model_parts.append(f"ARIMA({ar},{i},{ma})")
+                ar_orders = self._arima.get("ar_orders", [0]) or [0]
+                i_orders = self._arima.get("i_orders", [0]) or [0]
+                ma_orders = self._arima.get("ma_orders", [0]) or [0]
+                lags = self._lags_model.get("lags_original", [1]) or [1]
+                has_xreg_arima = (
+                    self._explanatory.get("xreg_model", False) and not is_ets
+                )
+                seasonal_have_orders = any(
+                    (ar_orders[j] if j < len(ar_orders) else 0) != 0
+                    or (i_orders[j] if j < len(i_orders) else 0) != 0
+                    or (ma_orders[j] if j < len(ma_orders) else 0) != 0
+                    for j, lag in enumerate(lags)
+                    if lag > 1
+                )
+                if all(lag == 1 for lag in lags) or not seasonal_have_orders:
+                    prefix = "ARIMAX" if has_xreg_arima else "ARIMA"
+                    model_parts.append(
+                        f"{prefix}({ar_orders[0]},{i_orders[0]},{ma_orders[0]})"
+                    )
+                else:
+                    prefix = "SARIMAX" if has_xreg_arima else "SARIMA"
+                    arima_str = prefix
+                    for j, lag in enumerate(lags):
+                        p = ar_orders[j] if j < len(ar_orders) else 0
+                        d = i_orders[j] if j < len(i_orders) else 0
+                        q = ma_orders[j] if j < len(ma_orders) else 0
+                        if p == 0 and d == 0 and q == 0:
+                            continue
+                        arima_str += f"({p},{d},{q})[{lag}]"
+                    model_parts.append(arima_str)
 
             if model_parts:
                 self.model = "+".join(model_parts)
             else:
                 self.model = ets_str
+
+            if self._constant and self._constant.get("constant_required", False):
+                i_orders = (self._arima or {}).get("i_orders") or []
+                has_drift = is_ets or any(d != 0 for d in i_orders)
+                self.model += " with " + ("drift" if has_drift else "constant")
 
     # =========================================================================
     # Extraction Properties - R-style accessors implemented as Python properties
@@ -958,7 +1085,7 @@ class ADAM:
         >>> level = states[0, :]  # Level component over time
         """
         self._check_is_fitted()
-        return self._prepared["mat_vt"]
+        return self._prepared["states"]
 
     @property
     def persistence_vector(self) -> Dict[str, Any]:
@@ -1404,7 +1531,7 @@ class ADAM:
         ...     print(f"Constant: {model.constant_value:.4f}")
         """
         self._check_is_fitted()
-        return self._prepared.get("constant_value")
+        return self._prepared.get("constant")
 
     @property
     def distribution_(self) -> str:
@@ -1700,6 +1827,322 @@ class ADAM:
         if getattr(self, "_is_combined", False):
             return self._combined_residuals
         return self._prepared["residuals"]
+
+    def rstandard(self) -> NDArray:
+        """
+        Return standardised residuals.
+
+        Residuals are scaled by distribution-specific estimates of their
+        scale, corrected for degrees of freedom ``df = nobs - nparam``.
+        The standardisation formula depends on the fitted distribution:
+
+        - **dnorm**: ``(e - ē) / (σ √(n/df))``
+        - **dlaplace**: ``e / σ · n/df``
+        - **ds**: ``(e - ē) / (σ · n/df)²``
+        - **dgnorm**: ``(e - ē) / (σ^β · n/df)^(1/β)``, β = shape
+        - **dlnorm**: ``exp((log(e) + σ²/2 - mean(·)) / (σ √(n/df)))``
+        - **dinvgauss / dgamma**: ``e / ē``
+
+        For a correctly specified model the result should be approximately
+        distributed as the standardised version of the fitted distribution.
+        Mirrors R's ``rstandard.adam()``.
+
+        Returns
+        -------
+        NDArray
+            Standardised residuals, length ``nobs``.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been fitted yet.
+
+        See Also
+        --------
+        rstudent : Leave-one-out studentised residuals.
+        outlierdummy : Outlier detection based on standardised residuals.
+
+        Examples
+        --------
+        >>> model = ADAM(model="AAN")
+        >>> model.fit(y)
+        >>> std_res = model.rstandard()
+        >>> # For a well-specified normal model, std_res ≈ N(0, 1)
+        >>> abs(std_res.mean()) < 0.1
+        True
+        """
+        self._check_is_fitted()
+        obs = self.nobs
+        df = obs - self.nparam
+        errors = self.residuals.copy().astype(float)
+        dist = self.distribution_
+        scale = self.sigma
+
+        if dist == "dnorm":
+            mean_e = np.mean(errors)
+            return (errors - mean_e) / (scale * np.sqrt(obs / df))
+        elif dist == "ds":
+            mean_e = np.mean(errors)
+            return (errors - mean_e) / (scale * obs / df) ** 2
+        elif dist == "dgnorm":
+            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            mean_e = np.mean(errors)
+            return (errors - mean_e) / (scale**beta * obs / df) ** (1.0 / beta)
+        elif dist in ("dinvgauss", "dgamma"):
+            return errors / np.mean(errors)
+        elif dist == "dlnorm":
+            log_e = np.log(errors) + scale**2 / 2
+            return np.exp((log_e - np.mean(log_e)) / (scale * np.sqrt(obs / df)))
+        else:  # dlaplace and other additive distributions
+            return errors / scale * obs / df
+
+    def rstudent(self) -> NDArray:
+        """
+        Return studentised (leave-one-out) residuals.
+
+        Each residual is scaled by the distribution-specific scale estimate
+        recomputed *without that observation* (leave-one-out). Compared to
+        ``rstandard()``, the result is more sensitive to individual outliers
+        because no single point inflates the global scale estimate it is
+        judged against.
+
+        The leave-one-out sums are computed in O(n) using identities such as
+        ``Σ e[-i]² = Σ e² − e[i]²``, avoiding an explicit loop.
+        Degrees of freedom: ``df = nobs - nparam - 1``.
+
+        Standardisation by distribution:
+
+        - **dnorm**: ``(e[i] - ē) / √(Σe[-i]² / df)``
+        - **dlaplace**: ``(e[i] - ē) / (Σ|e[-i]| / df)``
+        - **ds**: ``(e[i] - ē) / (Σ√|e[-i]| / (2 df))²``
+        - **dgnorm**: ``(e[i] - ē) / (Σ|e[-i]|^β · β/df)^(1/β)``
+        - **dlnorm**: ``exp(log_e[i] / √(Σlog_e[-i]² / df))``,
+          where ``log_e = log(e) - mean(log e) - σ²/2``
+        - **dinvgauss / dgamma**: ``e[i] / mean(e[-i])``
+
+        Mirrors R's ``rstudent.adam()``.
+
+        Returns
+        -------
+        NDArray
+            Studentised residuals, length ``nobs``.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been fitted yet.
+
+        See Also
+        --------
+        rstandard : Simpler standardised residuals (faster).
+        outlierdummy : Outlier detection based on studentised residuals.
+
+        Examples
+        --------
+        >>> model = ADAM(model="AAN")
+        >>> model.fit(y)
+        >>> stu_res = model.rstudent()
+        >>> # Studentised residuals are slightly more spread than rstandard
+        >>> stu_res.std() >= model.rstandard().std()
+        True
+        """
+        self._check_is_fitted()
+        obs = self.nobs
+        df = obs - self.nparam - 1
+        errors = self.residuals.copy().astype(float)
+        dist = self.distribution_
+
+        if dist == "dnorm":
+            errors -= np.mean(errors)
+            total_sq = np.sum(errors**2)
+            denom = np.sqrt((total_sq - errors**2) / df)
+            return errors / denom
+
+        elif dist == "dlaplace":
+            errors -= np.mean(errors)
+            total_abs = np.sum(np.abs(errors))
+            denom = (total_abs - np.abs(errors)) / df
+            return errors / denom
+
+        elif dist == "ds":
+            errors -= np.mean(errors)
+            total_sqrt_abs = np.sum(np.sqrt(np.abs(errors)))
+            denom = ((total_sqrt_abs - np.sqrt(np.abs(errors))) / (2 * df)) ** 2
+            return errors / denom
+
+        elif dist == "dgnorm":
+            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            errors -= np.mean(errors)
+            total_pow = np.sum(np.abs(errors) ** beta)
+            denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
+            return errors / denom
+
+        elif dist in ("dinvgauss", "dgamma"):
+            total = np.sum(errors)
+            mean_loo = (total - errors) / (obs - 1)
+            return errors / mean_loo
+
+        elif dist == "dlnorm":
+            scale = self.sigma
+            log_e = np.log(errors) - np.mean(np.log(errors)) - scale**2 / 2
+            total_sq = np.sum(log_e**2)
+            denom = np.sqrt((total_sq - log_e**2) / df)
+            return np.exp(log_e / denom)
+
+        else:  # default: treat like normal
+            errors -= np.mean(errors)
+            total_sq = np.sum(errors**2)
+            denom = np.sqrt((total_sq - errors**2) / df)
+            return errors / denom
+
+    def outlierdummy(
+        self,
+        level: float = 0.999,
+        type: str = "rstandard",  # noqa: A002
+    ) -> OutlierDummy:
+        """
+        Detect outliers and return a matrix of indicator dummy variables.
+
+        Computes standardised residuals (via ``rstandard()`` or ``rstudent()``),
+        then derives two-sided quantile bounds ``[q_lo, q_hi]`` for the fitted
+        distribution at the given confidence ``level``. Observations whose
+        standardised residual falls outside these bounds are labelled outliers.
+
+        The quantile bounds are distribution-specific:
+
+        - **dnorm / dlnorm** (log-space): ``scipy.stats.norm.ppf``
+        - **dlaplace**: ``scipy.stats.laplace.ppf``
+        - **ds**: ``scipy.stats.gennorm.ppf(..., beta=0.5)``
+        - **dgnorm**: ``scipy.stats.gennorm.ppf(..., beta=shape)``
+        - **dgamma**: ``scipy.stats.gamma.ppf(..., a=1/σ, scale=σ)``
+        - **dinvgauss**: ``scipy.stats.invgauss.ppf`` with df-corrected dispersion
+
+        Mirrors R's ``outlierdummy.adam()`` from the **greybox** package.
+
+        Parameters
+        ----------
+        level : float, default 0.999
+            Two-sided confidence level for outlier detection.
+            0.99 flags observations in the outer 1 % of the distribution.
+        type : {"rstandard", "rstudent"}, default "rstandard"
+            Which standardised residuals to use. ``"rstudent"`` is more
+            sensitive to individual outliers in small samples.
+
+        Returns
+        -------
+        OutlierDummy
+            Dataclass with fields:
+
+            ``outliers`` : ndarray of shape (n, m) or None
+                Binary dummy matrix, one column per detected outlier.
+                ``None`` when no outliers are found.
+            ``id`` : ndarray of int
+                0-based indices of outlier observations.
+            ``statistic`` : ndarray of shape (2,)
+                ``[lower, upper]`` quantile bounds used for detection.
+            ``level`` : float
+                The confidence level used.
+            ``type`` : str
+                The residual type used (``"rstandard"`` or ``"rstudent"``).
+
+        Raises
+        ------
+        ValueError
+            If ``type`` is not ``"rstandard"`` or ``"rstudent"``.
+        ValueError
+            If the model has not been fitted yet.
+
+        See Also
+        --------
+        rstandard : Standardised residuals.
+        rstudent : Studentised residuals.
+
+        Examples
+        --------
+        >>> model = ADAM(model="AAN")
+        >>> model.fit(y)
+        >>> od = model.outlierdummy(level=0.99)
+        >>> od.id          # 0-based indices of detected outliers
+        >>> od.statistic   # [lower, upper] bounds, e.g. [-2.576, 2.576]
+        >>> if od.outliers is not None:
+        ...     # Refit with outlier dummies as exogenous regressors
+        ...     model2 = ADAM(model="AAN")
+        ...     model2.fit(y, X=od.outliers)
+        """
+        self._check_is_fitted()
+        if type not in ("rstandard", "rstudent"):
+            raise ValueError("type must be 'rstandard' or 'rstudent'")
+
+        errors = self.rstandard() if type == "rstandard" else self.rstudent()
+        dist = self.distribution_
+        p = np.array([(1 - level) / 2, (1 + level) / 2])
+
+        if dist == "dnorm":
+            stat = scipy_stats.norm.ppf(p)
+        elif dist == "dlaplace":
+            stat = scipy_stats.laplace.ppf(p)
+        elif dist == "ds":
+            stat = scipy_stats.gennorm.ppf(p, beta=0.5)
+        elif dist == "dgnorm":
+            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            stat = scipy_stats.gennorm.ppf(p, beta=beta)
+        elif dist == "dlnorm":
+            errors = np.log(errors)
+            stat = scipy_stats.norm.ppf(p)
+        elif dist == "dgamma":
+            scale = self.sigma
+            stat = scipy_stats.gamma.ppf(p, a=1.0 / scale, scale=scale)
+        elif dist == "dinvgauss":
+            nobs, npar = self.nobs, self.nparam
+            disp = float(self.sigma) * nobs / (nobs - npar)
+            stat = scipy_stats.invgauss.ppf(p, mu=disp, scale=1.0 / disp)
+        else:
+            stat = scipy_stats.norm.ppf(p)
+
+        outlier_ids = np.where((errors > stat[1]) | (errors < stat[0]))[0]
+        n_out = len(outlier_ids)
+
+        if n_out > 0:
+            dummy_mat = np.zeros((self.nobs, n_out), dtype=float)
+            dummy_mat[outlier_ids, np.arange(n_out)] = 1.0
+        else:
+            dummy_mat = None
+
+        return OutlierDummy(
+            outliers=dummy_mat,
+            id=outlier_ids,
+            statistic=stat,
+            level=level,
+            type=type,
+        )
+
+    @staticmethod
+    def _expand_outlier_dummies(D: NDArray) -> NDArray:
+        """
+        Expand each outlier dummy column into three columns: lag-1, t, lead+1.
+
+        Used by ``outliers="select"`` to allow the regressor selection
+        mechanism to choose which temporal offset carries the outlier effect.
+
+        Parameters
+        ----------
+        D : NDArray of shape (n, m)
+            Binary dummy matrix from ``outlierdummy()``.
+
+        Returns
+        -------
+        NDArray of shape (n, 3*m)
+            Expanded matrix with columns ordered as
+            ``[lag_1, t, lead_1, lag_2, t_2, lead_2, ...]``.
+        """
+        n, m = D.shape
+        cols = []
+        for j in range(m):
+            col = D[:, j]
+            cols.append(np.concatenate([[0.0], col[:-1]]))  # lag -1
+            cols.append(col.copy())  # t
+            cols.append(np.concatenate([col[1:], [0.0]]))  # lead +1
+        return np.column_stack(cols)
 
     @property
     def nobs(self) -> int:
@@ -2049,6 +2492,47 @@ class ADAM:
         self._check_is_fitted()
         return list(self._lags_model.get("lags", [1]))
 
+    @property
+    def om_model(self):
+        """Fitted occurrence model (OM / OMG / AutoOM), or None."""
+        self._check_is_fitted()
+        return getattr(self, "_om_model", None)
+
+    def rmultistep(self, h: int = 10) -> pd.DataFrame:
+        """Return the (T-h) × h matrix of rolling in-sample multistep forecast errors.
+
+        Translates R's rmultistep.adam() from R/rmultistep.R.
+        Must be called after fit().
+
+        Parameters
+        ----------
+        h : int
+            Forecast horizon (number of steps ahead). Default 10.
+
+        Returns
+        -------
+        pd.DataFrame
+            Shape (T-h, h) where T is obs_in_sample.
+        """
+        from smooth.adam_general.core.forecaster._helpers import (
+            _compute_multistep_errors,
+        )
+
+        self._check_is_fitted()
+        gen = {**self._general, "h": h}
+        mat_wt = np.asfortranarray(self._prepared["measurement"], dtype=np.float64)
+        mat_f = np.asfortranarray(self._prepared["transition"], dtype=np.float64)
+        errors = _compute_multistep_errors(
+            self._adam_cpp,
+            self._prepared,
+            self._observations,
+            self._lags_model,
+            gen,
+            mat_wt,
+            mat_f,
+        )
+        return pd.DataFrame(errors, columns=[f"h={i + 1}" for i in range(h)])
+
     def predict(
         self,
         h: int,
@@ -2153,16 +2637,84 @@ class ADAM:
         if occurrence is not None:
             self._occurrence["occurrence"] = occurrence
 
+        # Store new_xreg for forecast period (used in _generate_point_forecasts)
+        if X is not None and self._explanatory.get("xreg_model"):
+            new_xreg = np.asarray(X)
+            if new_xreg.dtype.names is not None:
+                new_xreg = np.column_stack(
+                    [new_xreg[f].astype(float) for f in new_xreg.dtype.names]
+                )
+            else:
+                new_xreg = new_xreg.astype(float)
+            if new_xreg.ndim == 1:
+                new_xreg = new_xreg.reshape(-1, 1)
+            self._explanatory["new_xreg"] = new_xreg
+        else:
+            self._explanatory.pop("new_xreg", None)
+
         # Validate prediction inputs and prepare data for forecasting
         self._validate_prediction_inputs()
         self._prepare_prediction_data()
 
-        # Execute the prediction
+        # Pre-compute p_forecast so forecaster can use it for both point forecasts
+        # and interval adjustment (R: forecast.adam lines 6134-6172, 6204-6210).
+        p_forecast_arr = None
+        if getattr(self, "_om_model", None) is not None:
+            occ_fc = self._om_model.predict(h=h)
+            p_forecast_arr = np.asarray(occ_fc.mean.values, dtype=float)
+            # Store in occurrence_dict so _process_occurrence_forecast can use it
+            self._occurrence["p_forecast"] = p_forecast_arr
+
+        # Execute the prediction (forecaster handles p scaling + interval adjustment)
         predictions = self._execute_prediction(
             interval=interval,
             level=level,
             side=side,
         )
+
+        # Post-interval NA patch (R/adam.R ~6742-6751)
+        if p_forecast_arr is not None:
+            if predictions.upper is not None:
+                upper_vals = predictions.upper.values
+                mask = np.isnan(upper_vals)
+                if np.any(mask):
+                    fill = (predictions.mean.values / p_forecast_arr).reshape(-1, 1)
+                    predictions.upper = pd.DataFrame(
+                        np.where(mask, fill, upper_vals),
+                        index=predictions.upper.index,
+                        columns=predictions.upper.columns,
+                    )
+            if predictions.lower is not None:
+                lower_vals = predictions.lower.values
+                if np.any(np.isnan(lower_vals)):
+                    predictions.lower = pd.DataFrame(
+                        np.where(np.isnan(lower_vals), 0.0, lower_vals),
+                        index=predictions.lower.index,
+                        columns=predictions.lower.columns,
+                    )
+
+        # Recompute accuracy measures against holdout if available
+        if self._general.get("holdout", False):
+            y_holdout = self._observations.get("y_holdout")
+            y_in_sample = self._observations.get("y_in_sample")
+            if y_holdout is not None and len(y_holdout) > 0:
+                from smooth.adam_general.core.utils.printing import (
+                    _compute_forecast_errors,
+                )
+
+                fc_values = np.asarray(predictions.mean, dtype=float).ravel()
+                y_holdout_arr = np.asarray(y_holdout, dtype=float).ravel()
+                n = min(len(fc_values), len(y_holdout_arr))
+                period = (
+                    max(self._lags_model.get("lags", [1])) if self._lags_model else 1
+                )
+                self.accuracy = _compute_forecast_errors(
+                    y_holdout_arr[:n],
+                    fc_values[:n],
+                    np.asarray(y_in_sample, dtype=float),
+                    period,
+                )
+
         return predictions
 
     def predict_intervals(
@@ -2210,7 +2762,7 @@ class ADAM:
             nsim=nsim,
         )
 
-    def _check_parameters(self, ts):
+    def _check_parameters(self, ts, X=None):
         """
         Check parameters using parameters_checker and store results.
 
@@ -2218,10 +2770,11 @@ class ADAM:
         ----------
         ts : NDArray or pd.Series
             Time series data (numpy array or pandas Series).
+        X : NDArray or pd.DataFrame, optional
+            External regressors, shape (len(ts), n_features).
         """
-        # Convert ar_order, i_order, ma_order to orders format expected by
-        # parameters_checker
-        orders = None
+        # Build orders dict for parameters_checker.
+        # ar_order/i_order/ma_order take priority; fall back to orders dict.
         if any(param != 0 for param in [self.ar_order, self.i_order, self.ma_order]):
             orders = {
                 "ar": self.ar_order,
@@ -2229,22 +2782,15 @@ class ADAM:
                 "ma": self.ma_order,
                 "select": self.arima_select,
             }
+        elif self._init_orders is not None:
+            orders = {
+                **self._init_orders,
+                "select": self._init_orders.get("select", self.arima_select),
+            }
+        else:
+            orders = None
 
-        (
-            self._general,
-            self._observations,
-            self._persistence,
-            self._initials,
-            self._arima,
-            self._constant,
-            self._model_type,
-            self._components,
-            self._lags_model,
-            self._occurrence,
-            self._phi_internal,
-            self._explanatory,
-            self._params_info,
-        ) = parameters_checker(
+        result = parameters_checker(
             ts,
             model=self.model,
             lags=self.lags,
@@ -2266,8 +2812,73 @@ class ADAM:
             silent=(self.verbose == 0),
             fast=self.fast,
             lambda_param=self.lambda_param,
-            frequency=self.frequency,
+            X=X,
+            regressors=self.regressors,
+            arma=self.arma,
         )
+        if not isinstance(result, tuple):
+            self._alm_model = result
+            return
+        self._alm_model = None
+        (
+            self._general,
+            self._observations,
+            self._persistence,
+            self._initials,
+            self._arima,
+            self._constant,
+            self._model_type,
+            self._components,
+            self._lags_model,
+            self._occurrence,
+            self._phi_internal,
+            self._explanatory,
+            self._params_info,
+        ) = result
+
+    def _populate_from_alm(self, y, X):
+        """Populate model attributes from the greybox.ALM early-exit object.
+
+        Mirrors R/adam.R:498-629 where an alm() result is wrapped into the
+        adam object when model="NNN" with regressors but no ETS/ARIMA.
+        """
+        alm = self._alm_model
+        n = int(alm.nobs)
+        y_in_sample = np.asarray(y[:n], dtype=float)
+        fitted = np.asarray(alm.fitted_values_, dtype=float)
+
+        self._observations = {
+            "y_in_sample": y_in_sample,
+            "ot": (y_in_sample != 0).astype(float),
+        }
+        self._model_type = {
+            "model": "NNN",
+            "ets_model": False,
+            "arima_model": False,
+            "xreg_model": True,
+        }
+        self._arima = {"ar_orders": [0], "i_orders": [0], "ma_orders": [0]}
+        self._explanatory = {"xreg_model": True}
+        self._general = {
+            "loss": "likelihood",
+            "h": getattr(self, "h", 0),
+            "holdout": getattr(self, "holdout", False),
+        }
+        self._prepared = {
+            "y_fitted": fitted,
+            "residuals": y_in_sample - fitted,
+        }
+        self._adam_estimated = {
+            "B": np.asarray(alm.coefficients),
+            "n_param_estimated": int(alm.nparam),
+            "log_lik_adam_value": {
+                "value": float(alm.loglik),
+                "nobs": n,
+                "df": int(alm.nparam),
+            },
+        }
+        self.model = "Regression"
+        self.time_elapsed_ = time.time() - self._start_time
 
     def _handle_lasso_ridge_special_case(self):
         """
@@ -2303,6 +2914,37 @@ class ADAM:
 
             self._general["lambda"] = 0
 
+    def _fit_occurrence_model(self, y):
+        """Fit an occurrence model on ``y`` and return it.
+
+        Mirrors R/adam.R:2161-2166 (``omModel <- om(...)``).
+        Occurrence type comes from ``self._occurrence["occurrence"]``.
+        """
+        from smooth.adam_general.core.auto_om import AutoOM
+        from smooth.adam_general.core.om import OM
+
+        occ = self._occurrence["occurrence"]
+        lags = list(self._lags_model.get("lags", [1]))
+        adam_model = self._model_type.get("model", "MNN")
+        common = dict(
+            lags=lags,
+            h=self._general.get("h", 0),
+            holdout=self._general.get("holdout", False),
+            ic=self._general.get("ic", "AICc"),
+            bounds=self._general.get("bounds", "usual"),
+            initial=self._initials.get("initial_type", "backcasting"),
+        )
+        if occ == "auto":
+            m = AutoOM(model=adam_model, **common)
+        elif occ == "general":
+            from smooth.adam_general.core.omg import OMG
+
+            m = OMG(**common)
+        else:
+            m = OM(model=adam_model, occurrence=occ, **common)
+        m.fit(y)
+        return m
+
     def _preset_arima_parameters(self):
         """Set up ARIMA parameters for special cases where estimation is disabled."""
         arma_parameters = []
@@ -2325,6 +2967,18 @@ class ADAM:
         # Estimate the model
         # Note: estimator() handles two-stage initialization internally
         if estimation:
+            # gnorm shape handling: estimate when not given (mirrors R)
+            dist = self._general.get("distribution_new") or self._general.get(
+                "distribution", "dnorm"
+            )
+            other_parameter_estimate = dist == "dgnorm" and self.gnorm_shape is None
+            if dist != "dgnorm":
+                other_value = None
+            elif self.gnorm_shape is None:
+                other_value = 2.0
+            else:
+                other_value = float(self.gnorm_shape)
+
             nlopt_params = self.nlopt_kargs if self.nlopt_kargs else {}
             self._adam_estimated = estimator(
                 general_dict=self._general,
@@ -2343,10 +2997,17 @@ class ADAM:
                 components_dict=self._components,
                 multisteps=self._general.get("multisteps", False),
                 smoother=self.smoother,
+                adam_ets=(self.ets == "adam"),
+                other=other_value,
+                other_parameter_estimate=other_parameter_estimate,
                 **nlopt_params,
             )
             # Extract adam_cpp from estimation results
             self._adam_cpp = self._adam_estimated["adam_cpp"]
+
+            # Store back estimated gnorm shape
+            if other_parameter_estimate and "B" in self._adam_estimated:
+                self.gnorm_shape = float(abs(self._adam_estimated["B"][-1]))
 
         # Build the model structure - architector() returns 6 values including
         # adam_cpp, but we already have adam_cpp from estimation
@@ -2366,6 +3027,7 @@ class ADAM:
             explanatory_checked=self._explanatory,
             profiles_recent_table=self.profiles_recent_table,
             profiles_recent_provided=self.profiles_recent_provided,
+            adam_ets=(self.ets == "adam"),
         )
         # print(self._components)
         # Create the model matrices
@@ -2418,9 +3080,11 @@ class ADAM:
         # Update the n_param table
         if "n_param" in self._general:
             n_param = self._general["n_param"]
-            # The n_param_estimated from optimizer is the total internal params
-            # We need to update it based on what was actually estimated
-            n_param.estimated["internal"] = n_param_estimated
+            # n_param_estimated = len(B) = internal_in_B + xreg_in_B
+            # Subtract xreg (correctly set by build_n_param_table) to get internal
+            n_param.estimated["internal"] = (
+                n_param_estimated - n_param.estimated["xreg"]
+            )
 
             # Handle likelihood loss case - scale parameter is estimated
             if self._general["loss"] == "likelihood":
@@ -2470,8 +3134,6 @@ class ADAM:
 
         This handles model selection and creation of the selected model.
         """
-        # Get nlopt parameters from nlopt_kargs if provided
-        nlopt_params = self.nlopt_kargs if self.nlopt_kargs else {}
         # Run model selection
         self._adam_selected = selector(
             model_type_dict=self._model_type,
@@ -2490,8 +3152,8 @@ class ADAM:
             initials_results=self._initials,
             criterion=self._general["ic"],
             silent=self.verbose == 0,
+            nlopt_kargs=self.nlopt_kargs,
             smoother=self.smoother,
-            **nlopt_params,
         )
         # print(self._adam_selected)
         # print(self._adam_selected["ic_selection"])
@@ -2596,6 +3258,7 @@ class ADAM:
                 explanatory_checked=self._explanatory,
                 profiles_recent_table=self.profiles_recent_table,
                 profiles_recent_provided=self.profiles_recent_provided,
+                adam_ets=(self.ets == "adam"),
             )
 
             # Call creator to build matrices
@@ -2679,6 +3342,7 @@ class ADAM:
                     "prepared": prepared,
                     "explanatory_dict": self._explanatory,
                     "constants_dict": self._constant,
+                    "n_param_estimated": result["adam_estimated"]["n_param_estimated"],
                 }
             )
 
@@ -3000,6 +3664,57 @@ class ADAM:
             other=None,
         )
 
+    def _auto_predict(self):
+        """Run point forecasts automatically if h > 0; compute accuracy if holdout."""
+        h = getattr(self, "h", None)
+        if not h or h <= 0:
+            return
+
+        self._general["h"] = h
+        self._prepare_prediction_data()
+
+        if getattr(self, "_om_model", None) is not None:
+            occ_fc = self._om_model.predict(h=h)
+            self._occurrence["p_forecast"] = np.asarray(occ_fc.mean.values, dtype=float)
+
+        auto_fc = forecaster(
+            model_prepared=self._prepared,
+            observations_dict=self._observations,
+            general_dict=self._general,
+            occurrence_dict=self._occurrence,
+            lags_dict=self._lags_model,
+            model_type_dict=self._model_type,
+            explanatory_checked=self._explanatory,
+            components_dict=self._components,
+            constants_checked=self._constant,
+            params_info=self._params_info,
+            adam_cpp=self._adam_cpp,
+            interval="none",
+            level=0.95,
+            side="both",
+        )
+        self._auto_forecast = auto_fc
+
+        if not getattr(self, "holdout", False):
+            return
+        y_holdout = self._observations.get("y_holdout")
+        y_in_sample = self._observations.get("y_in_sample")
+        if y_holdout is None or len(y_holdout) == 0:
+            return
+
+        from smooth.adam_general.core.utils.printing import _compute_forecast_errors
+
+        fc_values = np.asarray(auto_fc.mean, dtype=float).ravel()
+        y_holdout_arr = np.asarray(y_holdout, dtype=float).ravel()
+        n = min(len(fc_values), len(y_holdout_arr))
+        period = max(self._lags_model.get("lags", [1])) if self._lags_model else 1
+        self.accuracy = _compute_forecast_errors(
+            y_holdout_arr[:n],
+            fc_values[:n],
+            np.asarray(y_in_sample, dtype=float),
+            period,
+        )
+
     def _validate_prediction_inputs(self):
         """
         Validate that the model is properly fitted before prediction.
@@ -3219,3 +3934,79 @@ class ADAM:
             return "Model has not been fitted yet. Call fit() first."
 
         return model_summary(self, digits=digits)
+
+    def plot(  # noqa: B006
+        self,
+        which=[1, 2, 4, 6],
+        level: float = 0.95,
+        legend: bool = False,
+        lowess: bool = True,
+        **kwargs,
+    ):
+        """
+        Diagnostic plots for the fitted ADAM model (R: ``plot.adam``).
+
+        Parameters
+        ----------
+        which : int or list of int, optional
+            Plot type(s) to produce. Default ``[1, 2, 4, 6]``.
+
+            1  — Actuals vs Fitted
+
+            2  — Standardised Residuals vs Fitted
+
+            3  — Studentised Residuals vs Fitted
+
+            4  — |Residuals| vs Fitted
+
+            5  — Residuals² vs Fitted
+
+            6  — Q-Q plot (distribution-specific)
+
+            7  — Actuals and Fitted over time
+
+            8  — Standardised Residuals vs Time
+
+            9  — Studentised Residuals vs Time
+
+            10 — ACF of Residuals
+
+            11 — PACF of Residuals
+
+            12 — Model states over time
+
+            13 — |Standardised Residuals| vs Fitted
+
+            14 — Standardised Residuals² vs Fitted
+
+            15 — ACF of Squared Residuals
+
+            16 — PACF of Squared Residuals
+
+        level : float, optional
+            Confidence level for bounds and bands. Default 0.95.
+        legend : bool, optional
+            Show legend on applicable plots (2, 3, 7, 8, 9). Default False.
+        lowess : bool, optional
+            Add LOWESS smoothing line to scatter plots. Default True.
+        **kwargs
+            Passed to matplotlib (e.g. ``figsize``).
+
+        Returns
+        -------
+        matplotlib.figure.Figure or list[matplotlib.figure.Figure]
+            Single figure when ``which`` has one element, list otherwise.
+
+        Examples
+        --------
+        >>> model = ADAM(model="AAA", lags=[1, 12])
+        >>> model.fit(y)
+        >>> figs = model.plot()                   # default: which=[1,2,4,6]
+        >>> fig  = model.plot(which=7)            # single time-series plot
+        >>> figs = model.plot(which=[10, 11])     # ACF and PACF
+        """
+        from smooth.adam_general.core.plotting import plot_adam
+
+        return plot_adam(
+            self, which=which, level=level, legend=legend, lowess=lowess, **kwargs
+        )

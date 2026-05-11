@@ -32,8 +32,11 @@ def _check_distribution_loss(distribution, loss, silent=False):
         "dlogis",
         "dt",
         "dgnorm",
+        "dlnorm",
+        "dinvgauss",
         "dgamma",
         "dpois",
+        "plogis",
     ]
 
     # Valid loss functions
@@ -371,6 +374,7 @@ def _check_initial(
         "initial_arima": None,
         "initial_arima_estimate": True,
         "initial_arima_number": 0,
+        "initial_xreg": None,
         "initial_xreg_estimate": True,
         "initial_xreg_provided": False,
     }
@@ -493,6 +497,13 @@ def _check_initial(
                 result["initial_arima_number"] = len(initial["arima"])
             else:
                 result["initial_arima_number"] = 1
+
+        # Process xreg initial
+        if "xreg" in initial:
+            result["initial_xreg"] = np.asarray(initial["xreg"], dtype=float).reshape(
+                -1, 1
+            )
+            result["initial_xreg_provided"] = True
 
         # Mark overall initial as not estimated
         result["initial_estimate"] = False

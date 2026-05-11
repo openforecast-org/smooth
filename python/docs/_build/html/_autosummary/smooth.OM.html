@@ -1,0 +1,394 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.OM &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.OM.fit" href="smooth.OM.fit.html" />
+    <link rel="prev" title="smooth.AutoMSARIMA.transition" href="smooth.AutoMSARIMA.transition.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">smooth.OM</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#smooth.OM"><code class="docutils literal notranslate"><span class="pre">OM</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.outlierdummy.html">smooth.OM.outlierdummy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.plot.html">smooth.OM.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.predict_intervals.html">smooth.OM.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.rmultistep.html">smooth.OM.rmultistep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.rstandard.html">smooth.OM.rstandard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.rstudent.html">smooth.OM.rstudent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.select_best_model.html">smooth.OM.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.summary.html">smooth.OM.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.actuals.html">smooth.OM.actuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.aic.html">smooth.OM.aic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.aicc.html">smooth.OM.aicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.b_value.html">smooth.OM.b_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.bic.html">smooth.OM.bic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.bicc.html">smooth.OM.bicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.coef.html">smooth.OM.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.constant_value.html">smooth.OM.constant_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.data.html">smooth.OM.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.distribution_.html">smooth.OM.distribution_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.error_type.html">smooth.OM.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.fitted.html">smooth.OM.fitted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.holdout_data.html">smooth.OM.holdout_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.ic_weights.html">smooth.OM.ic_weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.initial_type.html">smooth.OM.initial_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.initial_value.html">smooth.OM.initial_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.is_combined.html">smooth.OM.is_combined</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.lags_used.html">smooth.OM.lags_used</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.loglik.html">smooth.OM.loglik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.loss_.html">smooth.OM.loss_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.loss_value.html">smooth.OM.loss_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.measurement.html">smooth.OM.measurement</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.model_name.html">smooth.OM.model_name</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.model_type.html">smooth.OM.model_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.models.html">smooth.OM.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.n_param.html">smooth.OM.n_param</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.nobs.html">smooth.OM.nobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.nparam.html">smooth.OM.nparam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.occurrence.html">smooth.OM.occurrence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.occurrence_char.html">smooth.OM.occurrence_char</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.om_model.html">smooth.OM.om_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.orders.html">smooth.OM.orders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.persistence_vector.html">smooth.OM.persistence_vector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.phi_.html">smooth.OM.phi_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.profile.html">smooth.OM.profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.residuals.html">smooth.OM.residuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.scale.html">smooth.OM.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.sigma.html">smooth.OM.sigma</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.states.html">smooth.OM.states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.time_elapsed.html">smooth.OM.time_elapsed</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.transition.html">smooth.OM.transition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">smooth.OM</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.OM.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-om">
+<h1>smooth.OM<a class="headerlink" href="#smooth-om" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="smooth.OM">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">OM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ZXZ'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ar_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ma_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">occurrence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'odds-ratio'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlopt_kargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ets</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'conventional'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.OM" title="Link to this definition"></a></dt>
+<dd><p>Occurrence model — Python port of R’s <code class="docutils literal notranslate"><span class="pre">om()</span></code>.</p>
+<p>Inherits the ADAM API surface and overrides the bits that differ:
+cost function (Bernoulli likelihood with link transform), distribution
+(always <code class="docutils literal notranslate"><span class="pre">&quot;plogis&quot;</span></code>), scale (<code class="docutils literal notranslate"><span class="pre">nan</span></code>), and model-name format
+(<code class="docutils literal notranslate"><span class="pre">&quot;oETS(...)[F|O|I|D]&quot;</span></code>).</p>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.fit.html#smooth.OM.fit" title="smooth.OM.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>(y[, X])</p></td>
+<td><p>Fit the ADAM model to time series data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.outlierdummy.html#smooth.OM.outlierdummy" title="smooth.OM.outlierdummy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">outlierdummy</span></code></a>([level, type])</p></td>
+<td><p>Detect outliers and return a matrix of indicator dummy variables.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.plot.html#smooth.OM.plot" title="smooth.OM.plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot</span></code></a>([which, level, legend, lowess])</p></td>
+<td><p>Diagnostic plots for the fitted ADAM model (R: <code class="docutils literal notranslate"><span class="pre">plot.adam</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.predict.html#smooth.OM.predict" title="smooth.OM.predict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict</span></code></a>(h[, X, interval, level, side, ...])</p></td>
+<td><p>Probability forecast for the occurrence model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.predict_intervals.html#smooth.OM.predict_intervals" title="smooth.OM.predict_intervals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict_intervals</span></code></a>(h[, X, levels, side, nsim])</p></td>
+<td><p>Generate prediction intervals using the fitted ADAM model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.rmultistep.html#smooth.OM.rmultistep" title="smooth.OM.rmultistep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rmultistep</span></code></a>([h])</p></td>
+<td><p>Return the (T-h) × h matrix of rolling in-sample multistep forecast errors.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.rstandard.html#smooth.OM.rstandard" title="smooth.OM.rstandard"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rstandard</span></code></a>()</p></td>
+<td><p>Return standardised residuals.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.rstudent.html#smooth.OM.rstudent" title="smooth.OM.rstudent"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rstudent</span></code></a>()</p></td>
+<td><p>Return studentised (leave-one-out) residuals.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.select_best_model.html#smooth.OM.select_best_model" title="smooth.OM.select_best_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">select_best_model</span></code></a>()</p></td>
+<td><p>Select the best model based on information criteria and update model parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.summary.html#smooth.OM.summary" title="smooth.OM.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([digits])</p></td>
+<td><p>Generate a formatted summary of the fitted model.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.actuals.html#smooth.OM.actuals" title="smooth.OM.actuals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">actuals</span></code></a></p></td>
+<td><p>Binary 0/1 occurrence indicator (matches R's <code class="docutils literal notranslate"><span class="pre">actuals.om</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.aic.html#smooth.OM.aic" title="smooth.OM.aic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">aic</span></code></a></p></td>
+<td><p>Return Akaike Information Criterion.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.aicc.html#smooth.OM.aicc" title="smooth.OM.aicc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">aicc</span></code></a></p></td>
+<td><p>Return corrected Akaike Information Criterion.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.b_value.html#smooth.OM.b_value" title="smooth.OM.b_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">b_value</span></code></a></p></td>
+<td><p>$B).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.bic.html#smooth.OM.bic" title="smooth.OM.bic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bic</span></code></a></p></td>
+<td><p>Return Bayesian Information Criterion.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.bicc.html#smooth.OM.bicc" title="smooth.OM.bicc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bicc</span></code></a></p></td>
+<td><p>Return corrected Bayesian Information Criterion.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.coef.html#smooth.OM.coef" title="smooth.OM.coef"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coef</span></code></a></p></td>
+<td><p>Return estimated coefficients (parameter vector B).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.constant_value.html#smooth.OM.constant_value" title="smooth.OM.constant_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_value</span></code></a></p></td>
+<td><p>$constant).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.data.html#smooth.OM.data" title="smooth.OM.data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span></code></a></p></td>
+<td><p>$data).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.distribution_.html#smooth.OM.distribution_" title="smooth.OM.distribution_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">distribution_</span></code></a></p></td>
+<td><p>Always <code class="docutils literal notranslate"><span class="pre">&quot;plogis&quot;</span></code> for occurrence models.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.error_type.html#smooth.OM.error_type" title="smooth.OM.error_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_type</span></code></a></p></td>
+<td><p>'A' (additive) or 'M' (multiplicative).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.fitted.html#smooth.OM.fitted" title="smooth.OM.fitted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted</span></code></a></p></td>
+<td><p>In-sample fitted <em>probabilities</em> in [0, 1].</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.holdout_data.html#smooth.OM.holdout_data" title="smooth.OM.holdout_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">holdout_data</span></code></a></p></td>
+<td><p>$holdout).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.ic_weights.html#smooth.OM.ic_weights" title="smooth.OM.ic_weights"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ic_weights</span></code></a></p></td>
+<td><p>$ICw).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.initial_type.html#smooth.OM.initial_type" title="smooth.OM.initial_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_type</span></code></a></p></td>
+<td><p>$initialType).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.initial_value.html#smooth.OM.initial_value" title="smooth.OM.initial_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_value</span></code></a></p></td>
+<td><p>$initial).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.is_combined.html#smooth.OM.is_combined" title="smooth.OM.is_combined"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_combined</span></code></a></p></td>
+<td><p>Return True if model is a combination of multiple models.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.lags_used.html#smooth.OM.lags_used" title="smooth.OM.lags_used"><code class="xref py py-obj docutils literal notranslate"><span class="pre">lags_used</span></code></a></p></td>
+<td><p>Return the vector of lags used in the model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.loglik.html#smooth.OM.loglik" title="smooth.OM.loglik"><code class="xref py py-obj docutils literal notranslate"><span class="pre">loglik</span></code></a></p></td>
+<td><p>Return log-likelihood of the fitted model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.loss_.html#smooth.OM.loss_" title="smooth.OM.loss_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">loss_</span></code></a></p></td>
+<td><p>$loss).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.loss_value.html#smooth.OM.loss_value" title="smooth.OM.loss_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">loss_value</span></code></a></p></td>
+<td><p>$lossValue).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.measurement.html#smooth.OM.measurement" title="smooth.OM.measurement"><code class="xref py py-obj docutils literal notranslate"><span class="pre">measurement</span></code></a></p></td>
+<td><p>$measurement).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.model_name.html#smooth.OM.model_name" title="smooth.OM.model_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_name</span></code></a></p></td>
+<td><p>Model name in <code class="docutils literal notranslate"><span class="pre">oETS(...)[X]</span></code> form (uppercase X = F/O/I/D).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.model_type.html#smooth.OM.model_type" title="smooth.OM.model_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_type</span></code></a></p></td>
+<td><p>Return ETS model type code (e.g., 'AAN', 'AAA', 'MAdM').</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.models.html#smooth.OM.models" title="smooth.OM.models"><code class="xref py py-obj docutils literal notranslate"><span class="pre">models</span></code></a></p></td>
+<td><p>$models).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.n_param.html#smooth.OM.n_param" title="smooth.OM.n_param"><code class="xref py py-obj docutils literal notranslate"><span class="pre">n_param</span></code></a></p></td>
+<td><p>$nParam).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.nobs.html#smooth.OM.nobs" title="smooth.OM.nobs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nobs</span></code></a></p></td>
+<td><p>Return number of observations used for fitting.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.nparam.html#smooth.OM.nparam" title="smooth.OM.nparam"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nparam</span></code></a></p></td>
+<td><p>Return number of estimated parameters.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.occurrence.html#smooth.OM.occurrence" title="smooth.OM.occurrence"><code class="xref py py-obj docutils literal notranslate"><span class="pre">occurrence</span></code></a></p></td>
+<td><p>Occurrence type used for fitting (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;odds-ratio&quot;</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.occurrence_char.html#smooth.OM.occurrence_char" title="smooth.OM.occurrence_char"><code class="xref py py-obj docutils literal notranslate"><span class="pre">occurrence_char</span></code></a></p></td>
+<td><p>Single-letter occurrence flag handed to the C++ fitter.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.om_model.html#smooth.OM.om_model" title="smooth.OM.om_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">om_model</span></code></a></p></td>
+<td><p>Fitted occurrence model (OM / OMG / AutoOM), or None.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.orders.html#smooth.OM.orders" title="smooth.OM.orders"><code class="xref py py-obj docutils literal notranslate"><span class="pre">orders</span></code></a></p></td>
+<td><p>Return ARIMA orders as dict with 'ar', 'i', 'ma' keys.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.persistence_vector.html#smooth.OM.persistence_vector" title="smooth.OM.persistence_vector"><code class="xref py py-obj docutils literal notranslate"><span class="pre">persistence_vector</span></code></a></p></td>
+<td><p>$persistence).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.phi_.html#smooth.OM.phi_" title="smooth.OM.phi_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">phi_</span></code></a></p></td>
+<td><p>$phi).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.profile.html#smooth.OM.profile" title="smooth.OM.profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">profile</span></code></a></p></td>
+<td><p>$profile).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.residuals.html#smooth.OM.residuals" title="smooth.OM.residuals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">residuals</span></code></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ot</span> <span class="pre">-</span> <span class="pre">p_fitted</span></code> (binary indicator minus fitted probability).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.scale.html#smooth.OM.scale" title="smooth.OM.scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale</span></code></a></p></td>
+<td><p>Always NaN for occurrence models (no continuous error scale).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.sigma.html#smooth.OM.sigma" title="smooth.OM.sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma</span></code></a></p></td>
+<td><p>Same as <code class="xref py py-attr docutils literal notranslate"><span class="pre">scale</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.states.html#smooth.OM.states" title="smooth.OM.states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">states</span></code></a></p></td>
+<td><p>$states).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.time_elapsed.html#smooth.OM.time_elapsed" title="smooth.OM.time_elapsed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_elapsed</span></code></a></p></td>
+<td><p>Time taken to fit the model in seconds.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.transition.html#smooth.OM.transition" title="smooth.OM.transition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">transition</span></code></a></p></td>
+<td><p>$transition).</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.AutoMSARIMA.transition.html" class="btn btn-neutral float-left" title="smooth.AutoMSARIMA.transition" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.OM.fit.html" class="btn btn-neutral float-right" title="smooth.OM.fit" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

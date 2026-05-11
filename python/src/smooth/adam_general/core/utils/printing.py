@@ -244,70 +244,106 @@ def _format_persistence_vector(model: Any, digits: int = 4) -> str:
     return f"{header}\n{vals}"
 
 
+def _format_param_matrix(row_labels, col_labels, matrix, digits):
+    """Format a parameter matrix (rows=orders, cols=lags) as aligned text like R."""
+    col_w = max(digits + 7, max(len(c) for c in col_labels))
+    row_w = max(len(r) for r in row_labels)
+    # Header
+    header = " " * row_w + "  " + "  ".join(c.rjust(col_w) for c in col_labels)
+    lines = [header]
+    for r_label, row in zip(row_labels, matrix):
+        cells = []
+        for val in row:
+            if val is None:
+                cells.append("NA".rjust(col_w))
+            else:
+                cells.append(f"{val:.{digits}f}".rjust(col_w))
+        lines.append(r_label.ljust(row_w) + "  " + "  ".join(cells))
+    return "\n".join(lines)
+
+
 def _format_arma_parameters(model: Any, digits: int = 4) -> str:
-    """
-    Format ARMA parameters for display.
-
-    Parameters
-    ----------
-    model : ADAM
-        Fitted ADAM model
-    digits : int
-        Number of decimal places
-
-    Returns
-    -------
-    str
-        Formatted ARMA parameters string
-    """
+    """Format ARMA parameters as R-style matrix (rows=orders, cols=lags)."""
     if not hasattr(model, "_arima") or not model._arima:
+        return ""
+    if not model._arima.get("arima_model", False):
         return ""
 
     arima = model._arima
-    if not arima.get("arima_model", False):
-        return ""
+    ar_orders = arima.get("ar_orders") or []
+    ma_orders = arima.get("ma_orders") or []
 
-    lines = []
+    # Get lags from lags_original (the input lags, aligned with ar/ma orders)
+    lags = []
+    if hasattr(model, "_lags_model") and model._lags_model:
+        lags = (
+            model._lags_model.get("lags_original")
+            or model._lags_model.get("lags")
+            or []
+        )
+    if not lags and hasattr(model, "_config"):
+        lags = model._config.get("lags") or [1]
 
-    # AR parameters
-    ar_params = arima.get("ar_parameters", [])
-    if ar_params and len(ar_params) > 0:
-        ar_orders = arima.get("ar_orders", [])
-        lags = model._lags_model.get("lags", [1])
+    # Get polynomial values from _prepared
+    # arma["ar"] = arPolynomial[1:], arma["ma"] = maPolynomial[1:]
+    ar_poly = []
+    ma_poly = []
+    if hasattr(model, "_prepared") and model._prepared:
+        arma = model._prepared.get("arma") or {}
+        ar_poly = list(arma.get("ar") or [])
+        ma_poly = list(arma.get("ma") or [])
 
-        lines.append("AR parameters:")
-        param_idx = 0
-        for i, order in enumerate(ar_orders):
-            if order > 0:
-                lag = lags[i] if i < len(lags) else 1
-                for j in range(order):
-                    if param_idx < len(ar_params):
-                        lines.append(
-                            f"  AR({j + 1}) Lag {lag}: "
-                            f"{ar_params[param_idx]:.{digits}f}"
-                        )
-                        param_idx += 1
+    def _get_ar_val(order_j, lag):
+        """AR(j) at lag: display = -arPolynomial[j*lag] = raw B value."""
+        pos = order_j * lag - 1
+        if pos < len(ar_poly):
+            return -float(ar_poly[pos])
+        return None
 
-    # MA parameters
-    ma_params = arima.get("ma_parameters", [])
-    if ma_params and len(ma_params) > 0:
-        ma_orders = arima.get("ma_orders", [])
-        lags = model._lags_model.get("lags", [1])
+    def _get_ma_val(order_j, lag):
+        """MA(j) at lag: display = maPolynomial[j*lag] = raw B value."""
+        pos = order_j * lag - 1
+        if pos < len(ma_poly):
+            return float(ma_poly[pos])
+        return None
 
-        lines.append("MA parameters:")
-        param_idx = 0
-        for i, order in enumerate(ma_orders):
-            if order > 0:
-                lag = lags[i] if i < len(lags) else 1
-                for j in range(order):
-                    if param_idx < len(ma_params):
-                        lines.append(
-                            f"  MA({j + 1}) Lag {lag}: "
-                            f"{ma_params[param_idx]:.{digits}f}"
-                        )
-                        param_idx += 1
+    blocks = []
 
-    return "\n".join(lines)
+    # AR block
+    if ar_poly and any(o > 0 for o in ar_orders):
+        n = min(len(ar_orders), len(lags))
+        active = [(k, lags[k]) for k in range(n) if ar_orders[k] > 0]
+        if active:
+            max_ar = max(ar_orders[k] for k, _ in active)
+            col_labels = [f"Lag {lag}" for _, lag in active]
+            row_labels = [f"AR({j + 1})" for j in range(max_ar)]
+            matrix = [
+                [
+                    _get_ar_val(j + 1, lag) if j < ar_orders[k] else None
+                    for k, lag in active
+                ]
+                for j in range(max_ar)
+            ]
+            blocks.append(_format_param_matrix(row_labels, col_labels, matrix, digits))
+
+    # MA block
+    if ma_poly and any(o > 0 for o in ma_orders):
+        n = min(len(ma_orders), len(lags))
+        active = [(k, lags[k]) for k in range(n) if ma_orders[k] > 0]
+        if active:
+            max_ma = max(ma_orders[k] for k, _ in active)
+            col_labels = [f"Lag {lag}" for _, lag in active]
+            row_labels = [f"MA({j + 1})" for j in range(max_ma)]
+            matrix = [
+                [
+                    _get_ma_val(j + 1, lag) if j < ma_orders[k] else None
+                    for k, lag in active
+                ]
+                for j in range(max_ma)
+            ]
+            blocks.append(_format_param_matrix(row_labels, col_labels, matrix, digits))
+
+    return "\n".join(blocks)
 
 
 def _format_information_criteria(
@@ -357,7 +393,7 @@ def _compute_forecast_errors(
     period: int = 1,
 ) -> Dict[str, float]:
     """
-    Compute forecast error metrics.
+    Compute forecast error metrics using greybox.measures().
 
     Parameters
     ----------
@@ -368,70 +404,18 @@ def _compute_forecast_errors(
     y_in_sample : np.ndarray
         In-sample actual values (for scaling)
     period : int
-        Seasonal period for MASE calculation
+        Unused; kept for API compatibility.
 
     Returns
     -------
     Dict[str, float]
         Dictionary of error metrics
     """
-    errors = y_holdout - y_fitted_holdout
+    from greybox.point_measures import measures
 
-    # Basic errors
-    me = np.mean(errors)
-    mae = np.mean(np.abs(errors))
-    mse = np.mean(errors**2)
-    rmse = np.sqrt(mse)
-
-    # Scaled errors
-    y_mean = np.mean(y_in_sample)
-    sce = np.sum(errors) / np.sum(y_in_sample) if np.sum(y_in_sample) != 0 else np.nan
-    smae = mae / y_mean if y_mean != 0 else np.nan
-    smse = mse / (y_mean**2) if y_mean != 0 else np.nan
-
-    # Asymmetry
-    pos_errors = np.sum(errors[errors > 0])
-    neg_errors = np.abs(np.sum(errors[errors < 0]))
-    asymmetry = (
-        (pos_errors - neg_errors) / (pos_errors + neg_errors)
-        if (pos_errors + neg_errors) != 0
-        else 0
-    )
-
-    # MASE and RMSSE (using naive seasonal forecast as benchmark)
-    if len(y_in_sample) > period:
-        naive_errors = y_in_sample[period:] - y_in_sample[:-period]
-        scale = np.mean(np.abs(naive_errors))
-        mase = mae / scale if scale != 0 else np.nan
-        rmsse = (
-            rmse / np.sqrt(np.mean(naive_errors**2))
-            if np.mean(naive_errors**2) != 0
-            else np.nan
-        )
-    else:
-        mase = np.nan
-        rmsse = np.nan
-
-    # Relative errors (vs naive)
-    naive_forecast = y_in_sample[-1] if len(y_in_sample) > 0 else 0
-    naive_mae = np.mean(np.abs(y_holdout - naive_forecast))
-    naive_rmse = np.sqrt(np.mean((y_holdout - naive_forecast) ** 2))
-    rmae = mae / naive_mae if naive_mae != 0 else np.nan
-    rrmse = rmse / naive_rmse if naive_rmse != 0 else np.nan
-
-    return {
-        "ME": me,
-        "MAE": mae,
-        "RMSE": rmse,
-        "sCE": sce,
-        "asymmetry": asymmetry,
-        "sMAE": smae,
-        "sMSE": smse,
-        "MASE": mase,
-        "RMSSE": rmsse,
-        "rMAE": rmae,
-        "rRMSE": rrmse,
-    }
+    m = measures(y_holdout, y_fitted_holdout, y_in_sample)
+    m["RMSE"] = np.sqrt(m["MSE"])
+    return m
 
 
 def _format_forecast_errors(errors: Dict[str, float], digits: int = 3) -> str:
@@ -604,7 +588,17 @@ def model_summary(model: Any, digits: int = 4) -> str:
     if _is_ets_model(model):
         persistence_str = _format_persistence_vector(model, digits)
         if persistence_str:
-            lines.append("Persistence vector g:")
+            has_xreg = (
+                hasattr(model, "_explanatory")
+                and bool(model._explanatory)
+                and model._explanatory.get("xreg_model", False)
+            )
+            g_label = (
+                "Persistence vector g (excluding xreg):"
+                if has_xreg
+                else "Persistence vector g:"
+            )
+            lines.append(g_label)
             lines.append(persistence_str)
 
         # Damping parameter
@@ -639,14 +633,99 @@ def model_summary(model: Any, digits: int = 4) -> str:
     # Forecast errors (if holdout)
     errors_str = _format_holdout_errors(model, digits)
     if errors_str:
+        lines.append("")
         lines.append("Forecast errors:")
         lines.append(errors_str)
 
     return "\n".join(lines)
 
 
+def _build_model_name(model: Any) -> str:
+    """Build the full R-style model name (e.g. 'SARIMA(1,1,2)[1](1,1,2)[12]')."""
+    model_str = getattr(model, "model", "") or ""
+    ets_model = False
+    arima_model = False
+    ar_orders = i_orders = ma_orders = []
+    lags = [1]
+    xreg_model = False
+    n_ets_seasonal = 0
+    constant_estimate = False
+    regressors = "use"
+
+    if hasattr(model, "_model_type") and model._model_type:
+        ets_model = model._model_type.get("ets_model", False)
+    if hasattr(model, "_arima") and model._arima:
+        arima_model = model._arima.get("arima_model", False)
+        ar_orders = model._arima.get("ar_orders") or []
+        i_orders = model._arima.get("i_orders") or []
+        ma_orders = model._arima.get("ma_orders") or []
+    if hasattr(model, "_lags_model") and model._lags_model:
+        lags = model._lags_model.get("lags", [1]) or [1]
+    if hasattr(model, "_explanatory") and model._explanatory:
+        xreg_model = model._explanatory.get("xreg_model", False)
+    if hasattr(model, "_components") and model._components:
+        n_ets_seasonal = model._components.get("components_number_ets_seasonal", 0)
+    if hasattr(model, "_constant") and model._constant:
+        constant_estimate = model._constant.get("constant_estimate", False)
+    if hasattr(model, "_config"):
+        regressors = model._config.get("regressors", "use")
+
+    name = ""
+
+    # ETS part
+    if ets_model and model_str != "NNN":
+        xstr = "X" if xreg_model else ""
+        name = f"ETS{xstr}({model_str})"
+        if n_ets_seasonal > 1:
+            seasonal_lags = [str(lag) for lag in lags if lag != 1]
+            name += f"[{', '.join(seasonal_lags)}]"
+
+    # ARIMA part
+    if arima_model:
+        if ets_model:
+            name += "+"
+        # Non-seasonal: all lags == 1, or all seasonal-lag orders are zero
+        seasonal_lags_idx = [k for k, lag in enumerate(lags) if lag > 1]
+        is_nonseasonal = all(lag == 1 for lag in lags) or all(
+            (k >= len(ar_orders) or ar_orders[k] == 0)
+            and (k >= len(i_orders) or i_orders[k] == 0)
+            and (k >= len(ma_orders) or ma_orders[k] == 0)
+            for k in seasonal_lags_idx
+        )
+        xstr = "X" if (xreg_model and not ets_model) else ""
+        if is_nonseasonal:
+            p = ar_orders[0] if ar_orders else 0
+            d = i_orders[0] if i_orders else 0
+            q = ma_orders[0] if ma_orders else 0
+            name += f"ARIMA{xstr}({p},{d},{q})"
+        else:
+            name += f"SARIMA{xstr}"
+            for k, lag in enumerate(lags):
+                p = ar_orders[k] if k < len(ar_orders) else 0
+                d = i_orders[k] if k < len(i_orders) else 0
+                q = ma_orders[k] if k < len(ma_orders) else 0
+                if p == 0 and d == 0 and q == 0:
+                    continue
+                name += f"({p},{d},{q})[{lag}]"
+
+    if not ets_model and not arima_model:
+        if model_str == "NNN":
+            if xreg_model:
+                name = "Regression" if regressors != "adapt" else "Dynamic regression"
+            else:
+                name = "Constant level"
+        elif xreg_model:
+            name = "Regression" if regressors != "adapt" else "Dynamic regression"
+
+    if (ets_model or arima_model) and constant_estimate:
+        constant_name = "drift" if model_str != "NNN" else "constant"
+        name += f" with {constant_name}"
+
+    return name or model_str or "Unknown"
+
+
 def _get_model_name(model: Any) -> str:
-    """Get the model name string (e.g., 'ETS(AAN)')."""
+    """Get the model name string."""
     if hasattr(model, "model") and model.model:
         return model.model
     return "Unknown"
@@ -711,8 +790,8 @@ def _format_loss(model: Any, digits: int) -> str:
 def _format_constant(model: Any, digits: int) -> str:
     """Format constant/drift value if present."""
     if hasattr(model, "_constant") and model._constant:
-        if model._constant.get("constant_estimate", False):
-            constant_val = model._constant.get("constant_value")
+        if model._constant.get("constant_required", False):
+            constant_val = model.constant_value
             if constant_val is not None:
                 return f"Intercept/Drift value: {constant_val:.{digits}f}"
     return ""
@@ -855,17 +934,24 @@ def _format_holdout_errors(model: Any, digits: int) -> str:
     if y_holdout is None or len(y_holdout) == 0:
         return ""
 
-    # Get forecasts for holdout period
+    # Fast path: accuracy already computed by _auto_predict()
+    if hasattr(model, "accuracy") and model.accuracy:
+        return _format_forecast_errors(model.accuracy, digits)
+
+    # Fallback: compute from forecast results (manual predict or auto-forecast)
+    fc = None
     if hasattr(model, "_forecast_results") and model._forecast_results is not None:
-        y_forecast = model._forecast_results.mean.values
-        if len(y_forecast) >= len(y_holdout):
-            y_forecast = y_forecast[: len(y_holdout)]
-        else:
-            return ""
-    else:
+        fc = model._forecast_results
+    elif hasattr(model, "_auto_forecast") and model._auto_forecast is not None:
+        fc = model._auto_forecast
+    if fc is None:
         return ""
 
-    # Get period for MASE calculation
+    y_forecast = np.asarray(fc.mean, dtype=float).ravel()
+    if len(y_forecast) < len(y_holdout):
+        return ""
+    y_forecast = y_forecast[: len(y_holdout)]
+
     period = 1
     if hasattr(model, "_lags_model") and model._lags_model:
         lags = model._lags_model.get("lags", [1])

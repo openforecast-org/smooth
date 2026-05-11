@@ -3,9 +3,7 @@ import numpy as np
 from ._utils import _warn
 
 
-def _check_occurrence(
-    data, occurrence, frequency=None, silent=False, holdout=False, h=0
-):
+def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
     """
     Check and handle 'occurrence' parameter for intermittent demand data.
 
@@ -15,8 +13,6 @@ def _check_occurrence(
         Input time series data
     occurrence : str
         Occurrence type ('none', 'auto', 'fixed', etc.)
-    frequency : str, optional
-        Time series frequency
     silent : bool, optional
         Whether to suppress warnings
     holdout : bool, optional
@@ -142,7 +138,6 @@ def _calculate_ot_logical(
     occurrence,
     occurrence_model,
     obs_in_sample,
-    frequency=None,
     h=0,
     holdout=False,
 ):
@@ -159,8 +154,6 @@ def _calculate_ot_logical(
         Whether occurrence model is used
     obs_in_sample : int
         Number of in-sample observations
-    frequency : str, optional
-        Time series frequency
     h : int, optional
         Forecast horizon
     holdout : bool, optional
@@ -197,12 +190,8 @@ def _calculate_ot_logical(
     if not occurrence_model and occurrence != "provided":
         ot_logical = np.ones_like(ot_logical, dtype=bool)
 
-    # Determine frequency
-    if frequency is not None:
-        freq = frequency
-    else:
-        freq = "1"  # Default
-
+    # Determine frequency from pandas index if available
+    freq = "1"
     if (
         hasattr(data, "index")
         and hasattr(data.index, "freq")

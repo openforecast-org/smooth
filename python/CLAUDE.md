@@ -2,6 +2,50 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Never clip, clamp, or patch around bad numerics
+
+This rule applies across the whole project — `adam`, `OM`, `OMG`, `ES`,
+`MSARIMA`, `AutoADAM`, the cost functions, the link functions, the C++
+`adamCore` path, and anywhere else a numerical signal flows from the model
+into a loss or back into the optimiser.
+
+- **Do not clip or clamp the model output.** Fitted values, states,
+  residuals, forecasts, intermediate vectors out of the C++ — leave them
+  exactly as the model produced them. If a value lands outside an
+  expected range (a probability outside `[0, 1]`, a state diverging,
+  a forecast going negative for a multiplicative model), that is a true
+  signal of a model–data mismatch, a bad initialisation, or an upstream
+  bug. Clipping turns those signals into silently-wrong results.
+- **Do not patch the loss function with `pmax` / `np.maximum` floors
+  inside `log()` (or analogous "epsilon" safeguards) either.** It looks
+  like numerical hygiene but it does the same thing: a `-Inf` log-
+  likelihood is the optimiser telling you "the parameters at this point
+  are inconsistent with the data". Hiding it loses the diagnostic.
+- **There is one correct exception: an infeasibility guard at the top of
+  the cost function.** A check like
+  `if(any(is.nan(yFitted)) || any(yFitted<0) || any(yFitted>1)) return(1e+300)`
+  in `om()`'s cost is *not* a clip — it tells the optimiser "the
+  parameters at this point are inconsistent with the model" and returns a
+  uniformly large penalty so it steers away. That is fine. The bad
+  patterns are silent in-place fixes (`pmax`/`np.maximum` inside `log()`,
+  `np.clip` on the fitted vector, "if cost is `Inf` return `1e10`", etc.)
+  that change the value flowing forward without flagging anything.
+- **When the infeasibility guard fires repeatedly and the optimiser is
+  stuck on the penalty plateau, that is also a bug report.** Usually the
+  initialiser handed it a broken `x0`, or the model–data combination is
+  invalid and should have been rejected at parameter-check time.
+- **The right responses, in order of preference:**
+  1. Fix the initialiser so the optimiser's starting point produces a
+     finite, finite-gradient cost in the feasible region.
+  2. Reject incompatible model / data / option combinations at parameter
+     check time with an informative error.
+  3. Surface (don't hide) the signal when the user is exploring a
+     known-fragile combination — warn, don't suppress.
+
+When you are about to write `pmax(x, 1e-15)`, `np.clip(...)`, `if x < 0
+return 1e+300`, `if cf is Inf return 1e10`, or anything in that family:
+**stop and find the actual root cause first.**
+
 ## Important Testing Note
 
 **RNG Differences**: R and Python use different random number generation algorithms. Even with the same seed (e.g., `set.seed(33)` in R and `np.random.seed(33)` in Python), they will produce completely different random data.
@@ -66,16 +110,17 @@ make test
 
 ### Linting and Code Quality
 
+**Always run ruff check and ruff format after every code change:**
+
 ```bash
-# Run ruff linter
-ruff check smooth/
+# Run ruff linter (must pass with zero errors)
+.venv/bin/ruff check src/
 
 # Run ruff formatter
-ruff format smooth/
-
-# Or use Makefile
-make lint  # Note: This uses flake8/pydocstyle (may be outdated)
+.venv/bin/ruff format src/
 ```
+
+These two commands must be run together after any Python source edit. Fix all errors reported by `ruff check` before considering a task complete.
 
 **Linting Config**: Defined in `pyproject.toml` under `[tool.ruff]`
 - Line length: 88 (Black-compatible)
@@ -258,3 +303,13 @@ fc.to_dataframe()    # flat pd.DataFrame with prefixed column names
 
 **Current Branch**: `Python` (active development)
 **Main Branch**: `master`
+
+## R / Python API Parity
+
+The Python implementation must match R's public API as closely as possible. **Parameters, defaults, return types, attributes, and output structure should be equivalent** unless a language difference makes strict parity impossible (e.g. R uses `...` / `formula`, Python uses `X=` / keyword args).
+
+When adding or removing parameters from any class (`ADAM`, `OM`, `OMG`, `AutoOM`, `AutoADAM`, etc.), **check the corresponding R function signature first**. If Python has parameters or return-type behaviour that R does not (or vice-versa), flag the discrepancy explicitly before implementing. In particular:
+
+- Functions that return a fitted object in R should have `.fit()` return the same type in Python (not a separate wrapper class). For example, `auto.om()` returns the best `om` object; `AutoOM.fit()` must return the best `OM` or `OMG`.
+- Parameter names may differ between R and Python (camelCase → snake_case is acceptable). Extra parameters with no R equivalent are not allowed without approval.
+- Fitted attributes should mirror R's `$` access: if R has `m$timeElapsed`, Python should have `m.time_elapsed_`.

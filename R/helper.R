@@ -186,7 +186,7 @@ dfDiscounterFit <- function(persistence, transition,
                                   indexLookupTableBack, profilesRecentTableBack,
                                   yInSampleBack, otBack,
                                   FALSE, 1,
-                                  FALSE);
+                                  FALSE, "n");
 
     # Get the final profile. It now contains the discounted df for the start of the data
     return(list(profileRecent=adamFittedBack$profile));

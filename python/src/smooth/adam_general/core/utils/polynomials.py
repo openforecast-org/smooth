@@ -84,9 +84,10 @@ def adam_polynomialiser(
     )
 
     # Convert C++ PolyResult struct to Python dict with numpy arrays
+    # Flatten to 1D: C++ arma::vec may come back as (n,1) via pybind11
     return {
-        "ar_polynomial": np.array(result.arPolynomial),
-        "i_polynomial": np.array(result.iPolynomial),
-        "ari_polynomial": np.array(result.ariPolynomial),
-        "ma_polynomial": np.array(result.maPolynomial),
+        "ar_polynomial": np.asarray(result.arPolynomial).flatten(),
+        "i_polynomial": np.asarray(result.iPolynomial).flatten(),
+        "ari_polynomial": np.asarray(result.ariPolynomial).flatten(),
+        "ma_polynomial": np.asarray(result.maPolynomial).flatten(),
     }

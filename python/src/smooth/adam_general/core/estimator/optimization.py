@@ -24,25 +24,19 @@ def _setup_arima_polynomials(model_type_dict, arima_dict, lags_dict):
         AR and MA polynomial matrices
     """
     if model_type_dict["arima_model"]:
-        # AR polynomials
-        ar_polynomial_matrix = np.zeros(
-            (
-                np.sum(arima_dict["ar_orders"]) * lags_dict["lags"],
-                np.sum(arima_dict["ar_orders"]) * lags_dict["lags"],
-            )
-        )
+        # R uses original user-provided lags (not lagsModel) for companion matrices
+        lags = lags_dict.get("lags_original", lags_dict["lags"])
+        # AR polynomials - use dot product (R's %*%) since lags is an array
+        ar_dim = int(np.dot(arima_dict["ar_orders"], lags))
+        ar_polynomial_matrix = np.zeros((ar_dim, ar_dim))
         if ar_polynomial_matrix.shape[0] > 1:
-            ar_polynomial_matrix[1:, :-1] = np.eye(ar_polynomial_matrix.shape[0] - 1)
+            ar_polynomial_matrix[:-1, 1:] = np.eye(ar_polynomial_matrix.shape[0] - 1)
 
-        # MA polynomials
-        ma_polynomial_matrix = np.zeros(
-            (
-                np.sum(arima_dict["ma_orders"]) * lags_dict["lags"],
-                np.sum(arima_dict["ma_orders"]) * lags_dict["lags"],
-            )
-        )
+        # MA polynomials - use dot product (R's %*%) since lags is an array
+        ma_dim = int(np.dot(arima_dict["ma_orders"], lags))
+        ma_polynomial_matrix = np.zeros((ma_dim, ma_dim))
         if ma_polynomial_matrix.shape[0] > 1:
-            ma_polynomial_matrix[1:, :-1] = np.eye(ma_polynomial_matrix.shape[0] - 1)
+            ma_polynomial_matrix[:-1, 1:] = np.eye(ma_polynomial_matrix.shape[0] - 1)
 
         return ar_polynomial_matrix, ma_polynomial_matrix
     else:
@@ -132,6 +126,13 @@ def _setup_optimization_parameters(
         if explanatory_dict["xreg_model"]:
             maxeval_used = len(B) * 100
             maxeval_used = max(1000, maxeval_used)
+        # NOTE: R does NOT use 80 for pure ARIMA - the commented code is not active
+        # Keeping the logic here for potential future use, but matching R exactly
+        # elif (
+        #     components_dict.get("components_number_arima", 0) > 0
+        #     and components_dict.get("components_number_ets", 0) == 0
+        # ):
+        #     maxeval_used = len(B) * 80
 
     # Handle LASSO/RIDGE denominator calculation
     if general_dict["loss"] in ["LASSO", "RIDGE"]:
@@ -225,11 +226,11 @@ def _configure_optimizer(
     # which matches R's defaults: len(B)*40 standard, max(1000, len(B)*100) for xreg
     opt.set_maxeval(maxeval_used)
 
-    # Set timeout if specified, otherwise use long default
+    # Set timeout if specified; R default is -1 (no limit)
     if maxtime is not None:
         opt.set_maxtime(maxtime)
     else:
-        opt.set_maxtime(1800)  # 30 minutes default timeout
+        opt.set_maxtime(-1)
     return opt
 
 
@@ -249,6 +250,10 @@ def _create_objective_function(
     general_dict,
     adam_cpp,
     print_level,
+    ar_polynomial_matrix=None,
+    ma_polynomial_matrix=None,
+    other=None,
+    other_parameter_estimate=False,
 ):
     """
     Create objective function for optimization.
@@ -313,6 +318,10 @@ def _create_objective_function(
                 general=general_dict,
                 adam_cpp=adam_cpp,
                 bounds=general_dict["bounds"],
+                other=other,
+                otherParameterEstimate=other_parameter_estimate,
+                arPolynomialMatrix=ar_polynomial_matrix,
+                maPolynomialMatrix=ma_polynomial_matrix,
             )
         except Exception:
             cf_value = 1e100
@@ -330,9 +339,8 @@ def _create_objective_function(
             param_str = ", ".join([f"{val:.4f}" for val in x])
             print(f"Iter {iteration_count[0]:3d}: B=[{param_str}] -> CF={cf_value:.6f}")
 
-        # Limit extreme values to prevent numerical instability
-        if not np.isfinite(cf_value) or cf_value > 1e10:
-            return 1e10
+        if not np.isfinite(cf_value):
+            return 1e300
         return cf_value
 
     return objective_wrapper
@@ -383,6 +391,7 @@ def _calculate_loglik(
     adam_cpp,
     multisteps,
     n_param_estimated,
+    other_parameter_estimate=False,
 ):
     """
     Calculate log-likelihood for the estimated model.
@@ -447,6 +456,7 @@ def _calculate_loglik(
         profile_dict,
         adam_cpp,
         multisteps=multisteps,
+        otherParameterEstimate=other_parameter_estimate,
     )
 
     # In case of likelihood, we typically have one more parameter to estimate - scale.

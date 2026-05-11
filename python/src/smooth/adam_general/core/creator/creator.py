@@ -2,8 +2,6 @@ import warnings
 
 import numpy as np
 
-from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
-
 from .initialization import _initialize_states
 
 # Suppress divide by zero warnings
@@ -30,7 +28,7 @@ def creator(
     # Components info
     components_dict,
     explanatory_checked=None,
-    smoother="lowess",
+    smoother="global",
 ):
     """
     Create state-space matrices for ADAM model representation.
@@ -405,6 +403,7 @@ def _extract_model_parameters(
     lags_model_arima = lags_dict["lags_model_arima"]
     lags_model_all = lags_dict["lags_model_all"]
     lags_model_max = lags_dict["lags_model_max"]
+    lags_original = lags_dict.get("lags_original", lags) or [1]
 
     # Extract profiles info
     profiles_recent_table = profiles_dict["profiles_recent_table"]
@@ -432,6 +431,7 @@ def _extract_model_parameters(
         "lags_model_arima": lags_model_arima,
         "lags_model_all": lags_model_all,
         "lags_model_max": lags_model_max,
+        "lags_original": lags_original,
         "profiles_recent_table": profiles_recent_table,
         "profiles_recent_provided": profiles_recent_provided,
     }
@@ -533,12 +533,10 @@ def _setup_measurement_vector(matrices, model_params, explanatory_checked):
 
     # If xreg are provided, then fill in the respective values in Wt vector
     if explanatory_checked["xreg_model"]:
-        mat_wt[
-            :,
-            components_number_ets + components_number_arima : components_number_ets
-            + components_number_arima
-            + explanatory_checked["xreg_number"],
-        ] = explanatory_checked["xreg_data"]
+        n_xreg_rows = len(explanatory_checked["xreg_data"])
+        col_start = components_number_ets + components_number_arima
+        col_end = col_start + explanatory_checked["xreg_number"]
+        mat_wt[:n_xreg_rows, col_start:col_end] = explanatory_checked["xreg_data"]
 
     # Damping parameter value
     if ets_model and model_is_trendy:
@@ -608,6 +606,7 @@ def _setup_persistence_vector(
                     for i in provided_indices
                 ]
                 vec_g[j + provided_indices, 0] = provided_values
+            j += model_params["components_number_ets_seasonal"]
 
     # ARIMA model, persistence
     if arima_checked["arima_model"]:
@@ -651,53 +650,8 @@ def _handle_polynomial_setup(matrices, model_params, arima_checked):
     mat_f = matrices["mat_f"]
     vec_g = matrices["vec_g"]
 
-    # Get parameters
-    lags = model_params["lags"]
-    components_number_ets = model_params["components_number_ets"]
-
-    # If the arma parameters were provided, fill in the persistence
-    arima_polynomials = None
-    if arima_checked["arima_model"] and (
-        not arima_checked["ar_estimate"] and not arima_checked["ma_estimate"]
-    ):
-        # Call polynomial
-        arima_polynomials = {
-            key: np.array(value)
-            for key, value in adam_polynomialiser(
-                0,
-                arima_checked["ar_orders"],
-                arima_checked["i_orders"],
-                arima_checked["ma_orders"],
-                arima_checked["ar_estimate"],
-                arima_checked["ma_estimate"],
-                arima_checked["arma_parameters"],
-                lags,
-            ).items()
-        }
-
-        # Fill in the transition matrix
-        if len(arima_checked["non_zero_ari"]) > 0:
-            non_zero_ari = np.array(arima_checked["non_zero_ari"])
-            mat_f[
-                components_number_ets + non_zero_ari[:, 1],
-                components_number_ets + non_zero_ari[:, 1],
-            ] = -arima_polynomials["ari_polynomial"][non_zero_ari[:, 0]]
-
-        # Fill in the persistence vector
-        if len(arima_checked["non_zero_ari"]) > 0:
-            non_zero_ari = np.array(arima_checked["non_zero_ari"])
-            vec_g[components_number_ets + non_zero_ari[:, 1], 0] = -arima_polynomials[
-                "ari_polynomial"
-            ][non_zero_ari[:, 0]]
-
-        if len(arima_checked["non_zero_ma"]) > 0:
-            non_zero_ma = np.array(arima_checked["non_zero_ma"])
-            vec_g[components_number_ets + non_zero_ma[:, 1], 0] += arima_polynomials[
-                "ma_polynomial"
-            ][non_zero_ma[:, 0]]
-
     matrices["mat_f"] = mat_f
     matrices["vec_g"] = vec_g
-    matrices["arima_polynomials"] = arima_polynomials
+    matrices["arima_polynomials"] = None
 
     return matrices

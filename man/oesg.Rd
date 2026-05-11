@@ -2,149 +2,82 @@
 % Please edit documentation in R/oesg.R
 \name{oesg}
 \alias{oesg}
-\title{Occurrence ETS, general model}
+\title{Occurrence ETS general model}
 \usage{
-oesg(y, modelA = "MNN", modelB = "MNN", persistenceA = NULL,
-  persistenceB = NULL, phiA = NULL, phiB = NULL, initialA = "optimal",
-  initialB = "optimal", initialSeasonA = NULL, initialSeasonB = NULL,
-  ic = c("AICc", "AIC", "BIC", "BICc"), h = 10, holdout = FALSE,
-  bounds = c("usual", "admissible", "none"), silent = c("all", "graph",
-  "legend", "output", "none"), xregA = NULL, xregB = NULL,
-  initialXA = NULL, initialXB = NULL, regressorsA = c("use", "select"),
-  regressorsB = c("use", "select"), ...)
+oesg(y, modelA = "MNN", modelB = modelA, lags = c(frequency(y)),
+  persistenceA = NULL, persistenceB = persistenceA, phiA = NULL,
+  phiB = phiA, initial = c("backcasting", "optimal", "two-stage",
+  "complete"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
+  holdout = FALSE, bounds = c("usual", "admissible", "none"),
+  etsA = c("conventional", "adam"), etsB = etsA, xregA = NULL,
+  xregB = NULL, regressorsA = c("use", "select"),
+  regressorsB = regressorsA, silent = TRUE, ...)
 }
 \arguments{
-\item{y}{Either numeric vector or time series vector.}
+\item{y}{Univariate numeric vector or time series. Non-binary input is
+binarised internally by \link[smooth]{omg}.}
 
-\item{modelA}{The type of the ETS for the model A.}
+\item{modelA}{Three-letter ETS specification for sub-model A.}
 
-\item{modelB}{The type of the ETS for the model B.}
+\item{modelB}{Three-letter ETS specification for sub-model B.
+Defaults to \code{modelA}.}
 
-\item{persistenceA}{The persistence vector \eqn{g}, containing smoothing
-parameters used in the model A. If \code{NULL}, then estimated.}
+\item{lags}{Vector of seasonal lags. Defaults to \code{frequency(y)}.}
 
-\item{persistenceB}{The persistence vector \eqn{g}, containing smoothing
-parameters used in the model B. If \code{NULL}, then estimated.}
+\item{persistenceA}{Optional persistence vector for sub-model A.}
 
-\item{phiA}{The value of the dampening parameter in the model A. Used only
-for damped-trend models.}
+\item{persistenceB}{Optional persistence vector for sub-model B.
+Defaults to \code{persistenceA}.}
 
-\item{phiB}{The value of the dampening parameter in the model B. Used only
-for damped-trend models.}
+\item{phiA}{Optional damping parameter for sub-model A.}
 
-\item{initialA}{Either \code{"o"} - optimal or the vector of initials for the
-level and / or trend for the model A.}
+\item{phiB}{Optional damping parameter for sub-model B. Defaults to \code{phiA}.}
 
-\item{initialB}{Either \code{"o"} - optimal or the vector of initials for the
-level and / or trend for the model B.}
+\item{initial}{Initialisation method passed to both sub-models.}
 
-\item{initialSeasonA}{The vector of the initial seasonal components for the
-model A. If \code{NULL}, then it is estimated.}
-
-\item{initialSeasonB}{The vector of the initial seasonal components for the
-model B. If \code{NULL}, then it is estimated.}
-
-\item{ic}{Information criteria to use in case of model selection.}
+\item{ic}{Information criterion for model selection.}
 
 \item{h}{Forecast horizon.}
 
-\item{holdout}{If \code{TRUE}, holdout sample of size \code{h} is taken from
-the end of the data.}
+\item{holdout}{If \code{TRUE}, a holdout of size \code{h} is withheld.}
 
-\item{bounds}{What type of bounds to use in the model estimation. The first
-letter can be used instead of the whole word.}
+\item{bounds}{Parameter bounds type.}
 
-\item{silent}{If \code{silent="none"}, then nothing is silent, everything is
-printed out and drawn. \code{silent="all"} means that nothing is produced or
-drawn (except for warnings). In case of \code{silent="graph"}, no graph is
-produced. If \code{silent="legend"}, then legend of the graph is skipped.
-And finally \code{silent="output"} means that nothing is printed out in the
-console, but the graph is produced. \code{silent} also accepts \code{TRUE}
-and \code{FALSE}. In this case \code{silent=TRUE} is equivalent to
-\code{silent="all"}, while \code{silent=FALSE} is equivalent to
-\code{silent="none"}. The parameter also accepts first letter of words ("n",
-"a", "g", "l", "o").}
+\item{etsA}{ETS type for sub-model A: \code{"conventional"} or \code{"adam"}.}
 
-\item{xregA}{The vector or the matrix of exogenous variables, explaining some parts
-of occurrence variable of the model A.}
+\item{etsB}{ETS type for sub-model B. Defaults to \code{etsA}.}
 
-\item{xregB}{The vector or the matrix of exogenous variables, explaining some parts
-of occurrence variable of the model B.}
+\item{xregA}{Optional numeric vector or matrix of exogenous regressors for
+sub-model A, aligned with \code{y}.}
 
-\item{initialXA}{The vector of initial parameters for exogenous variables in the model
-A. Ignored if \code{xregA} is NULL.}
+\item{xregB}{Optional numeric vector or matrix of exogenous regressors for
+sub-model B, aligned with \code{y}.}
 
-\item{initialXB}{The vector of initial parameters for exogenous variables in the model
-B. Ignored if \code{xregB} is NULL.}
+\item{regressorsA}{How to handle \code{xregA}: \code{"use"} or \code{"select"}.}
 
-\item{regressorsA}{Variable defines what to do with the provided \code{xregA}:
-\code{"use"} means that all of the data should be used, while
-\code{"select"} means that a selection using \code{ic} should be done.}
+\item{regressorsB}{How to handle \code{xregB}. Defaults to \code{regressorsA}.}
 
-\item{regressorsB}{Similar to the \code{regressorsA}, but for the part B of the model.}
+\item{silent}{If \code{TRUE}, suppresses output and plot.}
 
-\item{...}{The parameters passed to the optimiser, such as \code{maxeval},
-\code{xtol_rel}, \code{algorithm} and \code{print_level}. The description of
-these is printed out by \code{nloptr.print.options()} function from the \code{nloptr}
-package. The default values in the oes function are \code{maxeval=500},
-\code{xtol_rel=1E-8}, \code{algorithm="NLOPT_LN_NELDERMEAD"} and \code{print_level=0}.}
+\item{...}{Additional arguments forwarded to \link[smooth]{omg}.}
 }
 \value{
-The object of class "occurrence" is returned. It contains following list of
-values:
-
-\itemize{
-\item \code{modelA} - the model A of the class oes, that contains the output similar
-to the one from the \code{oes()} function;
-\item \code{modelB} - the model B of the class oes, that contains the output similar
-to the one from the \code{oes()} function.
-\item \code{B} - the vector of all the estimated parameters.
-}
+An object of class \code{c("omg","om","smooth","occurrence")}.
 }
 \description{
-Function returns the general occurrence model of the of iETS model.
-}
-\details{
-The function estimates probability of demand occurrence, based on the iETS_G
-state-space model. It involves the estimation and modelling of the two
-simultaneous state space equations. Thus two parts for the model type,
-persistence, initials etc.
-
-For the details about the model and its implementation, see the respective
-vignette: \code{vignette("oes","smooth")}
-
-The model is based on:
-
-\deqn{o_t \sim Bernoulli(p_t)}
-\deqn{p_t = \frac{a_t}{a_t+b_t}},
-
-where a_t and b_t are the parameters of the Beta distribution and are modelled
-using separate ETS models.
+Wrapper of \link[smooth]{omg} that fits a general occurrence (probability)
+model — two parallel ETS sub-models A and B combined via a Beta-distribution
+link — to a univariate intermittent time series. ARIMA components and
+regression formulas are disabled; use \link[smooth]{omg} directly if those
+are needed.
 }
 \examples{
-
-y <- rpois(100,0.1)
-oesg(y, modelA="MNN", modelB="ANN")
+set.seed(42)
+y <- rbinom(120, 1, 0.3)
+m <- oesg(y, modelA="MNN", modelB="MNN")
+forecast(m, h=12)
 
 }
 \seealso{
-\code{\link[smooth]{es}, \link[smooth]{oes}}
+\link[smooth]{omg}, \link[smooth]{oes}
 }
-\author{
-Ivan Svetunkov, \email{ivan@svetunkov.com}
-}
-\keyword{demand}
-\keyword{exponential}
-\keyword{forecasting}
-\keyword{intermittent}
-\keyword{iss}
-\keyword{model}
-\keyword{models}
-\keyword{nonlinear}
-\keyword{regression}
-\keyword{smooth}
-\keyword{smoothing}
-\keyword{space}
-\keyword{state}
-\keyword{ts}
-\keyword{univar}

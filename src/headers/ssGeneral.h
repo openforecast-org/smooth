@@ -1,6 +1,7 @@
 #pragma once
 
 #include <limits>
+#include "ssOccurrence.h"
 
 // Define R_PosInf for Python builds
 #ifndef R_PosInf
@@ -19,26 +20,27 @@ inline arma::mat matrixPower(arma::mat const &A, int const &power){
     return B;
 }
 
-/* # Function returns multiplicative or additive error for scalar */
-inline double errorf(double const &yact, double &yfit, char const &E){
-    if(E=='A'){
-        return yact - yfit;
-    }
-    else{
-        if((yact==0) & (yfit==0)){
-            return 0;
-        }
-        else if((yact!=0) & (yfit==0)){
+/* # Function returns multiplicative or additive error for scalar.
+ * Optional ot and O parameters extend it to occurrence models:
+ * - O='n' (default): demand model; ot==0 returns 0 immediately.
+ * - O='d'/'o'/'i': dispatches to occurrenceError() (yact IS the occurrence indicator). */
+inline double errorf(double const &yact, double &yfit, char const &E,
+                     double const &ot = 1.0, char const &O = 'n') {
+    if(O == 'n') {
+        if(ot == 0) { return 0; }
+        if(E=='A') { return yact - yfit; }
+        if((yact==0) & (yfit==0)) { return 0; }
+        if((yact!=0) & (yfit==0)) {
 #ifdef PYTHON_BUILD
             return std::numeric_limits<double>::infinity();
 #else
             return R_PosInf;
 #endif
         }
-        else{
-            return (yact - yfit) / yfit;
-        }
+        return (yact - yfit) / yfit;
     }
+    // Occurrence types d/o/i: yact IS the occurrence indicator (ot)
+    return occurrenceError(yact, yfit, 1.0, E, 'M', O)[0];
 }
 
 /* # Function is needed to estimate the correct error for ETS when multisteps model selection with r(matvt) is sorted out. */

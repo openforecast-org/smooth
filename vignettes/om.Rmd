@@ -1,0 +1,137 @@
+---
+title: "om() - ADAM-based occurrence model"
+author: "Ivan Svetunkov"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{om() - ADAM-based occurrence model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+bibliography: library.bib
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path='Figs/', fig.show='hold',
+                      warning=FALSE, message=FALSE)
+library(smooth)
+```
+
+The `om()` function is the ADAM-based occurrence model for intermittent demand data. It estimates the probability of demand occurrence $p_t$ using the full ADAM state-space framework, which means the underlying model for the occurrence dynamics can be an ETS model, an ARIMA model, a regression model, or a combination of all three.
+
+The five link functions (occurrence types) supported by `om()` are identical to those in `oes()`: **fixed**, **odds-ratio**, **inverse-odds-ratio**, **direct**, and **general**. For the mathematical derivations behind each link function see the [oes vignette](oes.html). This vignette focuses on the added flexibility that `om()` inherits from ADAM.
+
+
+## The data
+
+We use the same artificial data as in the oes vignette:
+
+```{r data}
+set.seed(41)
+y <- ts(c(rpois(20, 0.25), rpois(20, 0.5), rpois(20, 1),
+          rpois(20, 2),    rpois(20, 3),    rpois(20, 5)))
+```
+
+The series starts sparse (low Poisson rate) and becomes increasingly dense. Any non-zero value in the input is automatically binarised to 1 by `om()`, so passing a count series is fine.
+
+
+## om(): ETS occurrence model
+
+The simplest call resembles `oes()`. We fix an ETS(M,N,N) model and use the odds-ratio link:
+
+```{r etsManual}
+omETS <- om(y, model="MNN", occurrence="odds-ratio", h=10, holdout=TRUE)
+omETS
+plot(omETS, 7)
+```
+
+Model selection across ETS components is supported through the same `"Z"` / `"X"` / `"Y"` wildcards used in `adam()` and `es()`. The default `model="ZXZ"` searches across all sensible error types and seasonal patterns:
+
+```{r etsAuto}
+omETSAuto <- om(y, occurrence="odds-ratio", h=10, holdout=TRUE)
+omETSAuto
+```
+
+The fitted occurrence model can be passed directly to `adam()` for a full iETS model that jointly describes demand occurrence and demand sizes:
+
+```{r iETS}
+adam(y, "MNN", occurrence=omETS, h=10, holdout=TRUE, silent=FALSE)
+```
+
+
+## om(): ARIMA occurrence model
+
+Any ADAM-supported ARIMA structure can drive the occurrence dynamics. Set `model="NNN"` to suppress ETS components and specify the ARIMA orders directly. Note that automatic ARIMA order selection requires using `auto.om()` (see below) or passing `orders=list(ar=..., i=..., ma=..., select=TRUE)`:
+
+```{r arima}
+omARIMA <- om(y, model="NNN",
+              orders=list(ar=1, i=0, ma=1),
+              occurrence="odds-ratio", h=10, holdout=TRUE)
+omARIMA
+plot(omARIMA, 7)
+```
+
+
+## om(): Regression occurrence model
+
+External regressors are incorporated via `cbind()`, exactly as in `adam()`. The first column of the matrix is treated as the response; subsequent columns become regressors. Here we use the `Seatbelts` dataset from the `datasets` package: the response is a binary indicator for above-median driver casualties, and the predictor is the seatbelt law indicator:
+
+```{r regression}
+data(Seatbelts)
+highDeaths <- as.integer(Seatbelts[, "DriversKilled"] > median(Seatbelts[, "DriversKilled"]))
+ySeat <- ts(cbind(highDeaths, law=Seatbelts[, "law"]), start=c(1969, 1), frequency=12)
+omReg <- om(ySeat, model="NNN",
+            occurrence="odds-ratio", regressors="use",
+            h=12, holdout=TRUE)
+omReg
+plot(omReg, 7)
+```
+
+Setting `regressors="select"` would apply automatic variable selection, dropping regressors that do not improve the information criterion.
+
+
+## omg(): the general two-component occurrence model
+
+`omg()` fits the iETS$_G$ model directly, estimating separate ETS (or ARIMA, or regression) structures for both the $a_t$ (numerator) and $b_t$ (denominator) components of the probability link. Unlike `om(..., occurrence="general")`, which applies the same model to both sides, `omg()` lets you specify different model types for each:
+
+```{r omg}
+omgModel <- omg(y, modelA="MNN", modelB="ANN", h=10, holdout=TRUE)
+omgModel
+plot(omgModel, 7)
+```
+
+Calling `om(..., occurrence="general")` is a shortcut that delegates to `omg()` with the same model specification on both sides.
+
+
+## auto.om(): automatic occurrence type selection
+
+`auto.om()` fits `om()` (or `omg()`) for each candidate occurrence type and returns the model with the lowest information criterion. By default all five types are tested:
+
+```{r autoOmAll}
+autoOmModel <- auto.om(y, model="MNN", h=10, holdout=TRUE)
+autoOmModel
+```
+
+Passing `orders=list(ar=2, i=1, ma=2, select=TRUE)` activates automatic ARIMA order selection for each candidate occurrence type, returning the best overall combination of occurrence link and ARIMA structure:
+
+```{r autoOmARIMA}
+autoOmARIMA <- auto.om(y, model="MNN",
+                       orders=list(ar=2, i=1, ma=2, select=TRUE),
+                       h=10, holdout=TRUE)
+autoOmARIMA
+```
+
+A subset of occurrence types can be tested by supplying an explicit vector:
+
+```{r autoOmSubset}
+autoOmSubset <- auto.om(y, model="MNN",
+                        occurrence=c("fixed", "odds-ratio", "inverse-odds-ratio"),
+                        h=10, holdout=TRUE)
+autoOmSubset
+```
+
+
+## See also
+
+The oETS model family and its mathematical foundations are documented in detail in the [oes vignette](oes.html). The `oes()` function provides these same oETS models with a simpler, ETS-only interface. For the full intermittent demand model that combines occurrence and demand sizes, use `adam()` with the estimated occurrence model passed to the `occurrence` argument.
+
+## References

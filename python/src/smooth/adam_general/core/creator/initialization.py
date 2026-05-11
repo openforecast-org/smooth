@@ -239,17 +239,20 @@ def _initialize_ets_seasonal_states_with_decomp(
             mat_vt[j, 0:lags_model_max] = np.mean(y_in_sample[ot_logical])
 
         if explanatory_checked["xreg_model"]:
+            xreg_init = (
+                explanatory_checked["xreg_model_initials"][0]
+                if e_type == "A"
+                or explanatory_checked["xreg_model_initials"][1] is None
+                else explanatory_checked["xreg_model_initials"][1]
+            )
+            xreg_coefs = xreg_init["initial_xreg"].ravel()
             if e_type == "A":
                 mat_vt[j, 0:lags_model_max] -= np.dot(
-                    explanatory_checked["xreg_model_initials"][0]["initial_xreg"],
-                    explanatory_checked["xreg_data"][0],
+                    xreg_coefs, explanatory_checked["xreg_data"][0]
                 )
             else:
                 mat_vt[j, 0:lags_model_max] /= np.exp(
-                    np.dot(
-                        explanatory_checked["xreg_model_initials"][1]["initial_xreg"],
-                        explanatory_checked["xreg_data"][0],
-                    )
+                    np.dot(xreg_coefs, explanatory_checked["xreg_data"][0])
                 )
     else:
         mat_vt[j, 0:lags_model_max] = initials_checked["initial_level"]
@@ -374,17 +377,20 @@ def _initialize_ets_seasonal_states_small_sample(
     if initials_checked["initial_level_estimate"]:
         mat_vt[j, 0:lags_model_max] = np.mean(y_in_sample[0:lags_model_max])
         if explanatory_checked["xreg_model"]:
+            xreg_init = (
+                explanatory_checked["xreg_model_initials"][0]
+                if e_type == "A"
+                or explanatory_checked["xreg_model_initials"][1] is None
+                else explanatory_checked["xreg_model_initials"][1]
+            )
+            xreg_coefs = xreg_init["initial_xreg"].ravel()
             if e_type == "A":
                 mat_vt[j, 0:lags_model_max] -= np.dot(
-                    explanatory_checked["xreg_model_initials"][0]["initial_xreg"],
-                    explanatory_checked["xreg_data"][0],
+                    xreg_coefs, explanatory_checked["xreg_data"][0]
                 )
             else:
                 mat_vt[j, 0:lags_model_max] /= np.exp(
-                    np.dot(
-                        explanatory_checked["xreg_model_initials"][1]["initial_xreg"],
-                        explanatory_checked["xreg_data"][0],
-                    )
+                    np.dot(xreg_coefs, explanatory_checked["xreg_data"][0])
                 )
     else:
         mat_vt[j, 0:lags_model_max] = initials_checked["initial_level"]
@@ -546,7 +552,6 @@ def _initialize_arima_states(
     components_number_ets = model_params["components_number_ets"]
     components_number_arima = model_params["components_number_arima"]
     e_type = model_params["e_type"]
-    lags = model_params["lags"]
     y_in_sample = model_params["y_in_sample"]
     ot_logical = model_params["ot_logical"]
 
@@ -556,13 +561,26 @@ def _initialize_arima_states(
             0 : initials_checked["initial_arima_number"],
         ] = 0 if e_type == "A" else 1
 
-        if any(lag > 1 for lag in lags):
+        # Use original user-specified lags (not ETS-only lags which may be empty
+        # for pure ARIMA models) — mirrors R's use of lags in adam.R:1091-1108
+        lags_original = model_params.get("lags_original", [1]) or [1]
+        obs_in_sample = model_params["obs_in_sample"]
+
+        has_seasonal = any(lag > 1 for lag in lags_original)
+        if has_seasonal and obs_in_sample > max(lags_original) * 2:
+            # R uses the full time-varying seasonal series (T values) from msdecompose
+            # (adam.R lines 1092-1097: tail(msdecompose(...)$seasonal, 1)[[1]]).
+            # Using ["initial"]["seasonal"][-1] (12 values, static) instead of
+            # ["seasonal"][-1] (T values, time-varying) gives wrong seed row values
+            # for columns 12..initial_arima_number-1.
             y_decomposition = msdecompose(
                 y_in_sample,
-                [lag for lag in lags if lag != 1],
+                [lag for lag in lags_original if lag != 1],
                 type="additive" if e_type == "A" else "multiplicative",
                 smoother=model_params["smoother"],
-            )["seasonal"][-1][0]
+            )["seasonal"][-1]
+        elif has_seasonal:
+            y_decomposition = y_in_sample[ot_logical][:obs_in_sample]
         else:
             y_decomposition = (
                 np.mean(np.diff(y_in_sample[ot_logical]))
@@ -570,12 +588,14 @@ def _initialize_arima_states(
                 else np.exp(np.mean(np.diff(np.log(y_in_sample[ot_logical]))))
             )
 
+        # Tile using max of original lags (R: ceiling(initialArimaNumber/max(lags)))
+        max_arima_lag = max(lags_original) if has_seasonal else 1
         mat_vt[
             components_number_ets + components_number_arima - 1,
             0 : initials_checked["initial_arima_number"],
         ] = np.tile(
             y_decomposition,
-            int(np.ceil(initials_checked["initial_arima_number"] / max(lags))),
+            int(np.ceil(initials_checked["initial_arima_number"] / max_arima_lag)),
         )[: initials_checked["initial_arima_number"]]
     else:
         mat_vt[
@@ -672,7 +692,7 @@ def _initialize_constant(
 
     if constants_checked["constant_estimate"]:
         # Add the mean of data
-        if sum(arima_checked["i_orders"]) == 0 and not ets_model:
+        if sum(arima_checked["i_orders"] or []) == 0 and not ets_model:
             mat_vt[
                 components_number_ets
                 + components_number_arima

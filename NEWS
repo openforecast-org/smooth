@@ -1,3 +1,13 @@
+smooth v4.5.0 (Release data: 2026-05-10)
+=======
+
+Change:
+* om() function that implements the occurrence model. This substitutes oes() completely, having as much functionality as the adam() function does in comparison with es().
+* adam() now calls for om() by default, not oes().
+* auto.om() function to select occurrence and/or ARIMA orders.
+* om() supports all types of occurrence and does automatic selection via auto.om().
+
+
 smooth v4.4.1 (Release data: 2026-02-26)
 =======
 
@@ -6,6 +16,7 @@ Changes:
 
 Bugfixes:
 * Fixed the calculation of the number of estimated parameters in case of combined ETS.
+* A failsafe for models with lb>B or ub<B.
 
 
 smooth v4.4.0 (Release data: 2026-02-05)

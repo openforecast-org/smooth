@@ -294,6 +294,161 @@ class TestADAMBounds:
         )
 
 
+class TestADAMConstant:
+    """Tests for the constant/drift parameter."""
+
+    @pytest.fixture
+    def linear_series(self):
+        np.random.seed(42)
+        return np.arange(1, 61, dtype=float) + np.random.randn(60) * 0.1
+
+    def test_ets_constant_fits(self, linear_series):
+        """ETS(ANN) with constant=True fits without error."""
+        model = ADAM("ANN", constant=True)
+        model.fit(linear_series)
+        assert np.isfinite(model.constant_value)
+
+    def test_ets_constant_improves_fit(self, linear_series):
+        """constant=True gives lower AICc than no constant on a linear-trend series."""
+        m0 = ADAM("ANN").fit(linear_series)
+        m1 = ADAM("ANN", constant=True).fit(linear_series)
+        assert m1.loss_value <= m0.loss_value
+
+    def test_arima_constant_fits(self, linear_series):
+        """ARIMA(1,1,1) with constant=True fits without error."""
+        model = ADAM("NNN", ar_order=1, i_order=1, ma_order=1, constant=True)
+        model.fit(linear_series)
+        assert np.isfinite(model.constant_value)
+
+    def test_fixed_constant(self, linear_series):
+        """constant=0.5 (fixed value) is stored and accessible after fit."""
+        model = ADAM("ANN", constant=0.5)
+        model.fit(linear_series)
+        assert model.constant_value == pytest.approx(0.5)
+
+    def test_fixed_constant_numeric_ets(self, linear_series):
+        """constant=1.6 (numeric) is preserved exactly throughout optimisation."""
+        model = ADAM("ANN", constant=1.6)
+        model.fit(linear_series)
+        assert model.constant_value == pytest.approx(1.6)
+
+    def test_fixed_constant_numeric_arima(self, linear_series):
+        """Numeric constant is preserved for ARIMA models too."""
+        model = ADAM("NNN", ar_order=1, i_order=1, ma_order=1, constant=0.3)
+        model.fit(linear_series)
+        assert model.constant_value == pytest.approx(0.3)
+
+    def test_constant_shown_in_summary(self, linear_series):
+        """Model summary includes the constant value when constant=True."""
+        model = ADAM("ANN", constant=True)
+        model.fit(linear_series)
+        summary = str(model)
+        assert "Intercept" in summary or "constant" in summary.lower()
+
+
+class TestADAMARIMAOrders:
+    """Tests for ARIMA orders and lags interaction."""
+
+    @pytest.fixture
+    def series60(self):
+        np.random.seed(1)
+        return np.random.randn(60)
+
+    def test_short_lags_equals_explicit_padded(self, series60):
+        """lags=[12] + ar=[1] equals lags=[1,12] + ar=[1,0] (lag=1 auto-prepended)."""
+        m1 = ADAM("NNN", lags=[12], ar_order=[1], i_order=[1], ma_order=[1]).fit(series60)
+        m2 = ADAM("NNN", lags=[1, 12], ar_order=[1, 0], i_order=[1, 0], ma_order=[1, 0]).fit(series60)
+
+        assert m1._arima["lags_model_arima"] == m2._arima["lags_model_arima"]
+        assert abs(m1.loss_value - m2.loss_value) < 1e-6
+
+    def test_nonseasonal_arima_at_lag1_only(self, series60):
+        """ar_order=[1] with lags=[12] gives non-seasonal ARIMA (at lag 1 only)."""
+        m = ADAM("NNN", lags=[12], ar_order=[1], i_order=[1], ma_order=[1]).fit(series60)
+
+        arima = m._arima
+        # After prepending lag=1, orders should be [1,0] (non-zero only at lag=1)
+        assert arima["ar_orders"] == [1, 0]
+        assert arima["ma_orders"] == [1, 0]
+
+    def test_seasonal_only_arima(self, series60):
+        """ar_order=[0,1] with lags=[1,12] gives seasonal-only ARIMA at lag=12."""
+        m = ADAM("NNN", lags=[1, 12], ar_order=[0, 1], i_order=[0, 1], ma_order=[0, 1]).fit(series60)
+
+        arima = m._arima
+        assert arima["ar_orders"] == [0, 1]
+        assert arima["ma_orders"] == [0, 1]
+
+
+class TestADAMArmaFixed:
+    """Tests for fixed ARMA parameters via the arma argument."""
+
+    @pytest.fixture
+    def arima_series(self):
+        np.random.seed(42)
+        return np.cumsum(np.random.randn(60)) + 100.0
+
+    @pytest.fixture
+    def long_series(self):
+        np.random.seed(7)
+        trend = np.arange(120) * 0.5
+        seasonal = np.tile(np.sin(np.linspace(0, 2 * np.pi, 12)), 10)
+        return trend + seasonal + np.random.randn(120) * 0.3
+
+    def test_arma_ar_fixed_non_seasonal(self, arima_series):
+        """Fixed AR coef is stored in arma_parameters, not in B."""
+        m = ADAM("NNN", ar_order=1, i_order=0, ma_order=0, arma={"ar": [0.5]})
+        m.fit(arima_series)
+        assert m._arima["arma_parameters"] == pytest.approx([0.5])
+        assert len(m.coef) == 0  # nothing estimated
+
+    def test_arma_ma_fixed_non_seasonal(self, arima_series):
+        """Fixed MA coef is stored in arma_parameters."""
+        m = ADAM("NNN", ar_order=0, i_order=1, ma_order=1, arma={"ma": [0.3]})
+        m.fit(arima_series)
+        assert m._arima["arma_parameters"] == pytest.approx([0.3])
+        assert len(m.coef) == 0
+
+    def test_arma_both_fixed(self, arima_series):
+        """Both AR and MA fixed: arma_parameters contains both in order."""
+        m = ADAM("NNN", ar_order=1, i_order=1, ma_order=1,
+                 arma={"ar": [0.5], "ma": [0.2]})
+        m.fit(arima_series)
+        assert m._arima["arma_parameters"] == pytest.approx([0.5, 0.2])
+        assert len(m.coef) == 0
+
+    def test_arma_fixed_produces_different_fitted(self, arima_series):
+        """Different fixed MA values produce different fitted values."""
+        m03 = ADAM("NNN", ar_order=0, i_order=1, ma_order=1, arma={"ma": [0.3]}).fit(arima_series)
+        m08 = ADAM("NNN", ar_order=0, i_order=1, ma_order=1, arma={"ma": [0.8]}).fit(arima_series)
+        assert not np.allclose(m03.fitted, m08.fitted)
+
+    def test_arma_with_constant(self, arima_series):
+        """Fixed arma with constant=True fits without error."""
+        m = ADAM("NNN", ar_order=1, i_order=1, ma_order=1,
+                 arma={"ar": [0.5], "ma": [0.2]}, constant=True)
+        m.fit(arima_series)
+        assert np.isfinite(m.constant_value)
+
+    def test_arma_sarima(self, long_series):
+        """Fixed arma on SARIMA fits without error."""
+        m = ADAM("NNN", lags=[1, 12],
+                 ar_order=[1, 0], i_order=[1, 1], ma_order=[1, 1],
+                 arma={"ma": [0.3, 0.2]})
+        m.fit(long_series)
+        assert m._arima["arma_parameters"] is not None
+        assert np.all(np.isfinite(m.fitted))
+
+    def test_msarima_arma_fixed(self, arima_series):
+        """MSARIMA with fixed arma stores fixed values in arma_parameters."""
+        from smooth import MSARIMA
+        m = MSARIMA(ar_order=1, i_order=1, ma_order=1,
+                    arma={"ar": [0.5], "ma": [0.2]})
+        m.fit(arima_series)
+        assert m._arima["arma_parameters"] == pytest.approx([0.5, 0.2])
+        assert len(m.coef) == 0
+
+
 class TestADAMReproducibility:
     """Tests for reproducibility."""
 

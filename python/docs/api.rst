@@ -11,7 +11,13 @@ Classes
    :template: class.rst
 
    ADAM
+   AutoADAM
    ES
+   MSARIMA
+   AutoMSARIMA
+   OM
+   OMG
+   AutoOM
 
 Functions
 ---------
@@ -20,3 +26,4 @@ Functions
    :toctree: _autosummary
 
    msdecompose
+   lowess

@@ -1,0 +1,387 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.OM.fit &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.OM.outlierdummy" href="smooth.OM.outlierdummy.html" />
+    <link rel="prev" title="smooth.OM" href="smooth.OM.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">smooth.OM.fit</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#smooth.OM.fit"><code class="docutils literal notranslate"><span class="pre">OM.fit()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="smooth.OM.html">smooth.OM</a></li>
+      <li class="breadcrumb-item active">smooth.OM.fit</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.OM.fit.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-om-fit">
+<h1>smooth.OM.fit<a class="headerlink" href="#smooth-om-fit" title="Link to this heading"></a></h1>
+<dl class="py method">
+<dt class="sig sig-object py" id="smooth.OM.fit">
+<span class="sig-prename descclassname"><span class="pre">OM.</span></span><span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.OM.fit" title="Link to this definition"></a></dt>
+<dd><p>Fit the ADAM model to time series data.</p>
+<p>This method estimates the model parameters, selects the best model
+(if automatic selection is enabled), and prepares the model for
+forecasting. It implements the complete ADAM estimation pipeline:
+parameter checking, model architecture creation, state-space matrix
+construction, parameter optimization, and model preparation.</p>
+<p><strong>Estimation Process</strong>:</p>
+<ol class="arabic simple">
+<li><p><strong>Parameter Validation</strong>: Check all inputs via <code class="docutils literal notranslate"><span class="pre">parameters_checker()</span></code></p></li>
+<li><p><strong>Model Selection</strong> (if <code class="docutils literal notranslate"><span class="pre">model_do=&quot;select&quot;</span></code>): Use Branch &amp; Bound algorithm</p></li>
+<li><p><strong>Model Architecture</strong>: Define components and lags via <code class="docutils literal notranslate"><span class="pre">architector()</span></code></p></li>
+<li><p><strong>Matrix Creation</strong>: Build state-space matrices via <code class="docutils literal notranslate"><span class="pre">creator()</span></code></p></li>
+<li><p><strong>Parameter Estimation</strong>: Optimize using NLopt via <code class="docutils literal notranslate"><span class="pre">estimator()</span></code></p></li>
+<li><p><strong>Model Preparation</strong>: Compute fitted values and final states
+via <code class="docutils literal notranslate"><span class="pre">preparator()</span></code></p></li>
+</ol>
+<p>After fitting, the model stores all results as attributes:</p>
+<ul class="simple">
+<li><p>Estimated parameters (<code class="docutils literal notranslate"><span class="pre">persistence_level_</span></code>, <code class="docutils literal notranslate"><span class="pre">phi_</span></code>, etc.)</p></li>
+<li><p>State-space matrices (<code class="docutils literal notranslate"><span class="pre">states</span></code>, <code class="docutils literal notranslate"><span class="pre">transition</span></code>, <code class="docutils literal notranslate"><span class="pre">measurement</span></code>)</p></li>
+<li><p>Fitted values and residuals (<code class="docutils literal notranslate"><span class="pre">fitted</span></code>, <code class="docutils literal notranslate"><span class="pre">residuals</span></code>)</p></li>
+<li><p>Information criteria (<code class="docutils literal notranslate"><span class="pre">aic</span></code>, <code class="docutils literal notranslate"><span class="pre">aicc</span></code>, <code class="docutils literal notranslate"><span class="pre">bic</span></code>, <code class="docutils literal notranslate"><span class="pre">bicc</span></code>)</p></li>
+<li><p>Model specification (<code class="docutils literal notranslate"><span class="pre">model_name</span></code>, <code class="docutils literal notranslate"><span class="pre">model_type</span></code>)</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>array-like</em><em>, </em><em>shape</em><em> (</em><em>T</em><em>,</em><em>)</em>) – <p>Time series data to fit. Can be:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code>: Shape (T,) for univariate time series</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pandas.Series</span></code>: Will use index for time information if DatetimeIndex</p></li>
+</ul>
+<p>Data requirements:</p>
+<ul>
+<li><p><strong>Minimum length</strong>: Depends on model complexity. Rule of thumb:
+T ≥ 3 × (number of parameters)</p></li>
+<li><p><strong>Multiplicative models</strong>: Require strictly positive data (y &gt; 0)</p></li>
+<li><p><strong>Missing values</strong>: Currently not supported in Python version</p></li>
+<li><p><strong>Frequency</strong>: Auto-detected from pandas Series with DatetimeIndex</p></li>
+</ul>
+</p></li>
+<li><p><strong>X</strong> (<em>array-like</em><em>, </em><em>shape</em><em> (</em><em>T</em><em>, </em><em>n_features</em><em>)</em><em>, </em><em>optional</em>) – <p>External regressors (explanatory variables). If provided:</p>
+<ul>
+<li><p>Must have same length as <code class="docutils literal notranslate"><span class="pre">y</span></code> (T observations)</p></li>
+<li><p>Each column is a separate regressor</p></li>
+<li><p>Used only if <code class="docutils literal notranslate"><span class="pre">regressors</span></code> parameter was set in <code class="docutils literal notranslate"><span class="pre">__init__</span></code></p></li>
+<li><p>Can be adaptive (with persistence) or fixed coefficients</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">trend</span><span class="p">,</span> <span class="n">holidays</span><span class="p">,</span> <span class="n">temperature</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">)</span>
+</pre></div>
+</div>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><strong>self</strong> – The fitted model instance with populated attributes:</p>
+<p><strong>Fitted Parameters</strong> (scikit-learn style with trailing underscores):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">persistence_level_</span></code>: α (level smoothing), range [0, 1]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">persistence_trend_</span></code>: β (trend smoothing), range [0, α]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">persistence_seasonal_</span></code>: γ (seasonal smoothing), list if multiple</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">phi_</span></code>: Damping parameter, range [0, 1]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">arma_parameters_</span></code>: AR/MA coefficients (if ARIMA)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">initial_states_</span></code>: Initial state values</p></li>
+</ul>
+<p><strong>Model Components</strong> (via properties):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">model_name</span></code>: Full model specification string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">coef</span></code> / <code class="docutils literal notranslate"><span class="pre">B</span></code>: Estimated parameter vector</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">states</span></code>: State matrix over time</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">transition</span></code>: Transition matrix</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">measurement</span></code>: Measurement matrix</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">aic</span></code>, <code class="docutils literal notranslate"><span class="pre">aicc</span></code>, <code class="docutils literal notranslate"><span class="pre">bic</span></code>, <code class="docutils literal notranslate"><span class="pre">bicc</span></code>: Information criteria</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM">ADAM</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If data validation fails:
+    
+    - y contains NaN values
+    - y has insufficient length for model complexity
+    - Multiplicative model specified for non-positive data
+    - X and y have mismatched lengths</p></li>
+<li><p><strong>RuntimeError</strong> – If optimization fails to converge. Check:
+    
+    - Model specification is appropriate for data
+    - Initial values are reasonable (try different <code class="docutils literal notranslate"><span class="pre">initial</span></code> method)
+    - Bounds are not too restrictive</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p><strong>Optimization Algorithm</strong>:</p>
+<p>Uses NLopt’s Nelder-Mead simplex algorithm by default (derivative-free, robust).
+For large models or difficult optimization, consider:</p>
+<ul class="simple">
+<li><p>Changing <code class="docutils literal notranslate"><span class="pre">initial</span></code> method</p></li>
+<li><p>Adjusting bounds (<code class="docutils literal notranslate"><span class="pre">bounds=&quot;usual&quot;</span></code> vs <code class="docutils literal notranslate"><span class="pre">bounds=&quot;admissible&quot;</span></code>)</p></li>
+<li><p>Providing custom starting values via <code class="docutils literal notranslate"><span class="pre">nlopt_initial</span></code> parameter</p></li>
+</ul>
+<p><strong>Computational Complexity</strong>:</p>
+<p>Fitting time depends on:</p>
+<ul class="simple">
+<li><p>Sample size T: O(T) per function evaluation</p></li>
+<li><p>Number of parameters k: ~40k function evaluations</p></li>
+<li><p>Model selection: Estimates ~10-15 models for “ZZZ”</p></li>
+</ul>
+<p>Typical fitting times:</p>
+<ul class="simple">
+<li><p>T=100, simple ETS: ~0.1 seconds</p></li>
+<li><p>T=1000, ETS with 2 seasonalities: ~1-2 seconds</p></li>
+<li><p>T=1000, automatic selection: ~10-20 seconds</p></li>
+</ul>
+<p><strong>Model Selection Details</strong>:</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">model_do=&quot;select&quot;</span></code>:</p>
+<ol class="arabic simple">
+<li><p>Branch &amp; Bound explores model space efficiently</p></li>
+<li><p>Each candidate model is fully estimated</p></li>
+<li><p>Best model selected based on <code class="docutils literal notranslate"><span class="pre">ic</span></code> criterion</p></li>
+<li><p>Selected model is re-estimated with full optimization</p></li>
+</ol>
+<p>To see which models were tested:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">ic_selection</span><span class="p">)</span>  <span class="c1"># Dict of model names -&gt; IC values</span>
+</pre></div>
+</div>
+<p><strong>Holdout Validation</strong>:</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">holdout=True</span></code> in <code class="docutils literal notranslate"><span class="pre">__init__</span></code>:</p>
+<ul class="simple">
+<li><p>Last <code class="docutils literal notranslate"><span class="pre">h</span></code> observations are withheld for validation</p></li>
+<li><p>Model estimated on first T-h observations</p></li>
+<li><p>Can use holdout for out-of-sample accuracy assessment</p></li>
+</ul>
+<p><strong>Two-Stage Initialization</strong>:</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">initial=&quot;two-stage&quot;</span></code>:</p>
+<ol class="arabic simple">
+<li><p><strong>Stage 1</strong>: Quick backcasting estimation for initial states</p></li>
+<li><p><strong>Stage 2</strong>: Refined optimization starting from stage 1 results</p></li>
+</ol>
+<p>Often provides better results than pure <code class="docutils literal notranslate"><span class="pre">initial=&quot;optimal&quot;</span></code> for
+complex models.</p>
+<p><strong>Memory Usage</strong>:</p>
+<ul class="simple">
+<li><p>State matrix: O(n_components × (T + max_lag)) floats</p></li>
+<li><p>Modest for typical models (~1-10 MB)</p></li>
+<li><p>Multiple seasonality can increase memory usage</p></li>
+</ul>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="smooth.OM.predict.html#smooth.OM.predict" title="smooth.OM.predict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict</span></code></a></dt><dd><p>Generate forecasts from fitted model</p>
+</dd>
+<dt><a class="reference internal" href="smooth.OM.predict_intervals.html#smooth.OM.predict_intervals" title="smooth.OM.predict_intervals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict_intervals</span></code></a></dt><dd><p>Generate prediction intervals</p>
+</dd>
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">estimator</span></code></dt><dd><p>Underlying estimation function</p>
+</dd>
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">parameters_checker</span></code></dt><dd><p>Input validation function</p>
+</dd>
+</dl>
+</div>
+<p class="rubric">Examples</p>
+<p>Basic fitting:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">ADAM</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+<span class="gp">... </span>    <span class="mi">112</span><span class="p">,</span> <span class="mi">118</span><span class="p">,</span> <span class="mi">132</span><span class="p">,</span> <span class="mi">129</span><span class="p">,</span> <span class="mi">121</span><span class="p">,</span> <span class="mi">135</span><span class="p">,</span> <span class="mi">148</span><span class="p">,</span> <span class="mi">148</span><span class="p">,</span> <span class="mi">136</span><span class="p">,</span> <span class="mi">119</span><span class="p">,</span> <span class="mi">104</span><span class="p">,</span> <span class="mi">118</span>
+<span class="gp">... </span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;ANN&quot;</span><span class="p">,</span> <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alpha: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">persistence_level_</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>With external regressors:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;AAN&quot;</span><span class="p">,</span> <span class="n">regressors</span><span class="o">=</span><span class="s2">&quot;use&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Coefficients: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">coef</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Automatic model selection:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;ZZZ&quot;</span><span class="p">,</span> <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">12</span><span class="p">],</span> <span class="n">ic</span><span class="o">=</span><span class="s2">&quot;AICc&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Selected: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AICc: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">aicc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Access fitted values and residuals:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fitted</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fitted</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">residuals</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">residuals</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;RMSE: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">residuals</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Using pandas Series with datetime index:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dates</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">date_range</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s1">&#39;2020-01-01&#39;</span><span class="p">,</span> <span class="n">periods</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="n">freq</span><span class="o">=</span><span class="s1">&#39;M&#39;</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y_series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">dates</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y_series</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Frequency auto-detected from index</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<hr class="docutils" />
+<p><strong>Parent Class:</strong> <a class="reference internal" href="../om.html#smooth.OM" title="smooth.OM"><code class="xref py py-class docutils literal notranslate"><span class="pre">OM</span></code></a></p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.OM.html" class="btn btn-neutral float-left" title="smooth.OM" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.OM.outlierdummy.html" class="btn btn-neutral float-right" title="smooth.OM.outlierdummy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

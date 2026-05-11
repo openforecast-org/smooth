@@ -22,6 +22,10 @@ When coding, use the best practice, focusing on the following principles:
 - Avoid Deep Nesting. Too many nesting levels make code harder to read and follow.
 - Avoid long lines. It is easier for humans to read blocks of lines that are horizontally short and vertically long.
 
+When writing R code specifically:
+- Always use explicit `return(object)` at the end of every function.
+- Always wrap `if`, `for`, and `while` bodies in `{}`, even for single-line bodies: `if (...) { ... }`.
+
 
 ## R Package Development
 

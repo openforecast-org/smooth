@@ -1,0 +1,165 @@
+{
+  "nnn_nonseasonal": {
+    "data_file": "ref_nnn_nonseasonal.csv",
+    "python_params": {
+      "model": "NNN",
+      "lags": [
+        1
+      ],
+      "ar_order": 2,
+      "i_order": 2,
+      "ma_order": 2,
+      "arima_select": true,
+      "distribution": [
+        "dnorm",
+        "dlaplace",
+        "ds"
+      ],
+      "ic": "AICc"
+    },
+    "model_name": "NNN",
+    "distribution": "dnorm",
+    "ar_orders": 0,
+    "i_orders": 1,
+    "ma_orders": 0,
+    "aicc": 291.2624
+  },
+  "nnn_seasonal": {
+    "data_file": "ref_nnn_seasonal.csv",
+    "python_params": {
+      "model": "NNN",
+      "lags": [
+        1,
+        12
+      ],
+      "ar_order": [
+        2,
+        2
+      ],
+      "i_order": [
+        2,
+        1
+      ],
+      "ma_order": [
+        2,
+        2
+      ],
+      "arima_select": true,
+      "distribution": [
+        "dnorm",
+        "dlaplace"
+      ],
+      "ic": "AICc"
+    },
+    "model_name": "NNN",
+    "distribution": "dnorm",
+    "ar_orders": [0, 0],
+    "i_orders": [1, 1],
+    "ma_orders": [0, 1],
+    "aicc": 668.7304
+  },
+  "ets_only": {
+    "data_file": "ref_ets_only.csv",
+    "python_params": {
+      "model": "ZXZ",
+      "lags": [
+        12
+      ],
+      "ar_order": 0,
+      "i_order": 0,
+      "ma_order": 0,
+      "arima_select": false,
+      "distribution": [
+        "dnorm",
+        "dlaplace",
+        "dgamma"
+      ],
+      "ic": "AICc"
+    },
+    "model_name": "MAM",
+    "distribution": "dgamma",
+    "ar_orders": 0,
+    "i_orders": 0,
+    "ma_orders": 0,
+    "aicc": 744.4691
+  },
+  "ets_arima": {
+    "data_file": "ref_ets_arima.csv",
+    "python_params": {
+      "model": "AAN",
+      "lags": [
+        1
+      ],
+      "ar_order": 2,
+      "i_order": 2,
+      "ma_order": 2,
+      "arima_select": true,
+      "distribution": [
+        "dnorm",
+        "dlaplace"
+      ],
+      "ic": "AICc"
+    },
+    "model_name": "AAN",
+    "distribution": "dnorm",
+    "ar_orders": 2,
+    "i_orders": 0,
+    "ma_orders": 0,
+    "aicc": 596.321
+  },
+  "etsx": {
+    "data_file": "etsx_data.csv",
+    "python_params": {
+      "model": "AAN",
+      "ar_order": 0,
+      "i_order": 0,
+      "ma_order": 0,
+      "arima_select": false,
+      "distribution": [
+        "dnorm",
+        "dlaplace"
+      ],
+      "regressors": "use",
+      "ic": "AICc"
+    },
+    "model_name": "AAN",
+    "distribution": "dnorm",
+    "ar_orders": 0,
+    "i_orders": 0,
+    "ma_orders": 0,
+    "aicc": 339.7398
+  },
+  "ets_arima_seasonal": {
+    "data_file": "ref_ets_arima_seasonal.csv",
+    "python_params": {
+      "model": "ZXZ",
+      "lags": [
+        12
+      ],
+      "ar_order": [
+        2,
+        2
+      ],
+      "i_order": [
+        2,
+        1
+      ],
+      "ma_order": [
+        2,
+        2
+      ],
+      "arima_select": true,
+      "distribution": [
+        "dnorm",
+        "dlaplace"
+      ],
+      "ic": "AICc"
+    },
+    "model_name": "AAA",
+    "distribution": "dnorm",
+    "ar_orders": [1, 0],
+    "i_orders": [0, 0],
+    "ma_orders": [0, 0],
+    "aicc": 598.171
+  }
+}

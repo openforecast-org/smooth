@@ -609,6 +609,22 @@ pointLik.oes <- function(object, log=TRUE, ...){
     return(likValues);
 }
 
+#' @export
+pointLik.om <- function(object, log=TRUE, ...){
+    ot <- as.numeric(actuals(object));
+    pFitted <- as.numeric(fitted(object));
+    otLogical <- ot == 1;
+    likValues <- numeric(length(ot));
+    likValues[otLogical]  <- log(pFitted[otLogical]);
+    likValues[!otLogical] <- log(1 - pFitted[!otLogical]);
+    fittedTS <- fitted(object);
+    likValues <- ts(likValues, start=start(fittedTS), frequency=frequency(fittedTS));
+    if(!log){
+        likValues[] <- exp(likValues);
+    }
+    return(likValues);
+}
+
 #### Extraction of parameters of models ####
 #' @export
 coef.smooth <- function(object, ...)
@@ -698,7 +714,7 @@ forecast.oes <- function(object, h=10,
                          h=h,silent="all",...);
     }
     else{
-        newModel <- oes(actuals(object),model=object,h=h,silent="all",...);
+        newModel <- oes_old(actuals(object),model=object,h=h,silent="all",...);
     }
 
     # Remove the redundant values, if they were produced

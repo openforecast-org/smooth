@@ -70,6 +70,7 @@ def _fill_matrices_if_needed(
             explanatory_checked=explanatory_checked,
             phi_dict=phi_dict,
             constants_checked=constants_checked,
+            adam_cpp=adam_cpp,
         )
 
     return matrices_dict
@@ -462,7 +463,8 @@ def _process_initial_values(
 
     # Write down the ARIMA initials
     if arima_checked["arima_model"]:
-        j += 1
+        if model_type_dict["ets_model"]:
+            j += 1
         initial_estimated[j] = initials_checked["initial_arima_estimate"]
         if initials_checked["initial_arima_estimate"]:
             initial_value[j] = matrices_dict["mat_vt"][
@@ -502,35 +504,21 @@ def _process_arma_parameters(arima_checked, adam_estimated):
     """
     # TODO: B here was not defined in the function namespace. Validate if it's indeed
     # in that dictionary
-    B = adam_estimated["B"]
     if arima_checked["arima_model"]:
         arma_parameters_list = {}
-        j = 0
-        if arima_checked["ar_required"] and arima_checked["ar_estimate"]:
-            # Avoid damping parameter phi by checking name length > 3
-            arma_parameters_list["ar"] = [
-                b for name, b in B.items() if len(name) > 3 and name.startswith("phi")
-            ]
-            j += 1
-        elif arima_checked["ar_required"] and not arima_checked["ar_estimate"]:
-            # Avoid damping parameter phi
-            arma_parameters_list["ar"] = [
-                p
-                for name, p in arima_checked["arma_parameters"].items()
-                if name.startswith("phi")
-            ]
-            j += 1
-
-        if arima_checked["ma_required"] and arima_checked["ma_estimate"]:
-            arma_parameters_list["ma"] = [
-                b for name, b in B.items() if name.startswith("theta")
-            ]
-        elif arima_checked["ma_required"] and not arima_checked["ma_estimate"]:
-            arma_parameters_list["ma"] = [
-                p
-                for name, p in arima_checked["arma_parameters"].items()
-                if name.startswith("theta")
-            ]
+        arima_polys = adam_estimated.get("arima_polynomials", {})
+        if arima_checked["ar_required"]:
+            ar_poly = arima_polys.get("ar_polynomial", arima_polys.get("arPolynomial"))
+            if ar_poly is not None:
+                arma_parameters_list["ar"] = list(ar_poly[1:])
+            else:
+                arma_parameters_list["ar"] = []
+        if arima_checked["ma_required"]:
+            ma_poly = arima_polys.get("ma_polynomial", arima_polys.get("maPolynomial"))
+            if ma_poly is not None:
+                arma_parameters_list["ma"] = list(ma_poly[1:])
+            else:
+                arma_parameters_list["ma"] = []
     else:
         arma_parameters_list = None
 
@@ -627,9 +615,10 @@ def _process_other_parameters(
             "nonZeroMA": arima_checked["non_zero_ma"],
         }
 
-        # Create AR polynomial matrix
+        # Create AR polynomial matrix (R: arOrders %*% lags)
         if lags_dict is not None:
-            ar_matrix_size = sum(arima_checked["ar_orders"]) * lags_dict["lags"]
+            lags_original = lags_dict.get("lags_original", lags_dict["lags"])
+            ar_matrix_size = int(np.dot(arima_checked["ar_orders"], lags_original))
             other_returned["ar_polynomial_matrix"] = np.zeros(
                 (ar_matrix_size, ar_matrix_size)
             )
@@ -998,6 +987,7 @@ def preparator(
         explanatory_checked,
         phi_dict,
         constants_checked,
+        adam_cpp=adam_cpp,
     )
 
     # 2. Prepare profiles recent table
@@ -1057,6 +1047,7 @@ def preparator(
         backcast=backcast_value_prep,
         nIterations=initials_checked["n_iterations"],
         refineHead=refine_head,
+        O="n",
     )
     # 5. Correct negative or NaN values in multiplicative components
     matrices_dict, profiles_dict = _correct_multiplicative_components(

@@ -1,0 +1,238 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.AutoMSARIMA.predict &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.AutoMSARIMA.predict_intervals" href="smooth.AutoMSARIMA.predict_intervals.html" />
+    <link rel="prev" title="smooth.AutoMSARIMA.plot" href="smooth.AutoMSARIMA.plot.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">smooth.AutoMSARIMA.predict</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#smooth.AutoMSARIMA.predict"><code class="docutils literal notranslate"><span class="pre">AutoMSARIMA.predict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+      <li class="breadcrumb-item active">smooth.AutoMSARIMA.predict</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.AutoMSARIMA.predict.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-automsarima-predict">
+<h1>smooth.AutoMSARIMA.predict<a class="headerlink" href="#smooth-automsarima-predict" title="Link to this heading"></a></h1>
+<dl class="py method">
+<dt class="sig sig-object py" id="smooth.AutoMSARIMA.predict">
+<span class="sig-prename descclassname"><span class="pre">AutoMSARIMA.</span></span><span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">h</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'none'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">side</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'both'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cumulative</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nsim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">occurrence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scenarios</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.AutoMSARIMA.predict" title="Link to this definition"></a></dt>
+<dd><p>Generate forecasts using the fitted ADAM model.</p>
+<p>Matches R’s <code class="docutils literal notranslate"><span class="pre">forecast.adam()</span></code> interface for interval types and
+additional parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>h</strong> (<em>int</em>) – Forecast horizon (number of steps to forecast).</p></li>
+<li><p><strong>X</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – Exogenous variables for the forecast period.
+Ensure that X covers the entire forecast horizon <code class="docutils literal notranslate"><span class="pre">h</span></code>.</p></li>
+<li><p><strong>interval</strong> (<em>str</em><em>, </em><em>default=&quot;none&quot;</em>) – <p>Type of prediction interval to construct:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code>: No intervals, point forecasts only.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;prediction&quot;</span></code>: Automatically selects <code class="docutils literal notranslate"><span class="pre">&quot;simulated&quot;</span></code> or
+<code class="docutils literal notranslate"><span class="pre">&quot;approximate&quot;</span></code> depending on the model type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;simulated&quot;</span></code>: Simulation-based intervals (Monte Carlo).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;approximate&quot;</span></code>: Analytical (parametric) intervals.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;semiparametric&quot;</span></code>: Not yet implemented.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;nonparametric&quot;</span></code>: Not yet implemented.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;empirical&quot;</span></code>: Not yet implemented.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;confidence&quot;</span></code>: Not yet implemented.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;complete&quot;</span></code>: Not yet implemented.</p></li>
+</ul>
+</p></li>
+<li><p><strong>level</strong> (<em>float</em><em> or </em><em>list</em><em> of </em><em>float</em><em>, </em><em>default=0.95</em>) – <p>Confidence level(s) for prediction intervals. Accepts a single
+value (e.g. <code class="docutils literal notranslate"><span class="pre">0.95</span></code>) or a list for multiple simultaneous levels
+(e.g. <code class="docutils literal notranslate"><span class="pre">[0.9,</span> <span class="pre">0.95,</span> <span class="pre">0.99]</span></code>). Values above 1 are treated as
+percentages and divided by 100.</p>
+<p>Each level produces a pair of <code class="docutils literal notranslate"><span class="pre">lower_X</span></code> / <code class="docutils literal notranslate"><span class="pre">upper_X</span></code> columns
+in the output, where X is the corresponding quantile. For example,
+<code class="docutils literal notranslate"><span class="pre">level=0.95</span></code> with <code class="docutils literal notranslate"><span class="pre">side=&quot;both&quot;</span></code> yields columns
+<code class="docutils literal notranslate"><span class="pre">&quot;lower_0.025&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;upper_0.975&quot;</span></code>.</p>
+</p></li>
+<li><p><strong>side</strong> (<em>str</em><em>, </em><em>default=&quot;both&quot;</em>) – <p>Which side(s) of the intervals to compute:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;both&quot;</span></code>: Both lower and upper bounds (default).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;upper&quot;</span></code>: Upper bound only. Column named <code class="docutils literal notranslate"><span class="pre">&quot;upper_&lt;level&gt;&quot;</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;lower&quot;</span></code>: Lower bound only. Column named <code class="docutils literal notranslate"><span class="pre">&quot;lower_&lt;1-level&gt;&quot;</span></code>.</p></li>
+</ul>
+</p></li>
+<li><p><strong>cumulative</strong> (<em>bool</em><em>, </em><em>default=False</em>) – If True, return cumulative (summed) forecasts over the horizon.</p></li>
+<li><p><strong>nsim</strong> (<em>int</em><em>, </em><em>default=10000</em>) – Number of simulations for simulation-based intervals.</p></li>
+<li><p><strong>occurrence</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – External occurrence probabilities for the forecast period.
+Overrides the fitted model’s occurrence for forecasting.</p></li>
+<li><p><strong>scenarios</strong> (<em>bool</em><em>, </em><em>default=False</em>) – If True and <code class="docutils literal notranslate"><span class="pre">interval=&quot;simulated&quot;</span></code>, store the raw simulation
+matrix in <code class="docutils literal notranslate"><span class="pre">self._general[&quot;_scenarios_matrix&quot;]</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Structured result with <code class="docutils literal notranslate"><span class="pre">.mean</span></code> (pd.Series), <code class="docutils literal notranslate"><span class="pre">.lower</span></code> and
+<code class="docutils literal notranslate"><span class="pre">.upper</span></code> (pd.DataFrame or None), <code class="docutils literal notranslate"><span class="pre">.level</span></code>, <code class="docutils literal notranslate"><span class="pre">.side</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">.interval</span></code> attributes.  Use <code class="docutils literal notranslate"><span class="pre">.to_dataframe()</span></code> for a flat
+pd.DataFrame.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ForecastResult</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the model has not been fitted yet or <code class="docutils literal notranslate"><span class="pre">h</span></code> is not set.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<hr class="docutils" />
+<p><strong>Parent Class:</strong> <a class="reference internal" href="../msarima.html#smooth.AutoMSARIMA" title="smooth.AutoMSARIMA"><code class="xref py py-class docutils literal notranslate"><span class="pre">AutoMSARIMA</span></code></a></p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.AutoMSARIMA.plot.html" class="btn btn-neutral float-left" title="smooth.AutoMSARIMA.plot" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.AutoMSARIMA.predict_intervals.html" class="btn btn-neutral float-right" title="smooth.AutoMSARIMA.predict_intervals" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -243,8 +243,12 @@ def count_internal_params(
     elif phi_dict.get("phi_required", False):
         n_provided += 1
 
-    # Initial states
-    if initials_checked.get("initial_estimate", True):
+    # Initial states — only counted when optimised (optimal/two-stage),
+    # not for backcasting/complete
+    initial_type = initials_checked.get("initial_type", "optimal")
+    initial_optimised = initial_type in ["optimal", "two-stage"]
+
+    if initial_optimised and initials_checked.get("initial_estimate", True):
         # Level initial
         if initials_checked.get("initial_level_estimate", True):
             n_estimated += 1
@@ -264,8 +268,8 @@ def count_internal_params(
                 n_estimated += n_seasonal_init
             else:
                 n_provided += n_seasonal_init
-    else:
-        # All initials provided
+    elif not initials_checked.get("initial_estimate", True):
+        # All initials explicitly provided (fixed)
         if model_type_dict.get("ets_model", False):
             n_provided += 1  # level
             if model_type_dict.get("trend_type", "N") != "N":
@@ -384,8 +388,12 @@ def build_n_param_table(
     n_param.estimated["internal"] = n_internal_est
     n_param.provided["internal"] = n_internal_prov
 
-    # Count xreg parameters
+    # Count xreg parameters — for "complete" initial type, xreg is estimated via
+    # backcasting (not in B), so R does not count it as a free parameter
     n_xreg_est, n_xreg_prov = count_xreg_params(explanatory_checked)
+    if initials_checked.get("initial_type") == "complete":
+        n_xreg_prov += n_xreg_est
+        n_xreg_est = 0
     n_param.estimated["xreg"] = n_xreg_est
     n_param.provided["xreg"] = n_xreg_prov
 

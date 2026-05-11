@@ -168,11 +168,8 @@ def _organize_occurrence_info(occurrence, occurrence_model, obs_in_sample, h=0):
     occurrence_dict = {
         "occurrence": occurrence,
         "occurrence_model": occurrence_model,
-        "oes_model": "none",  # Default OES model type
-        "probability": None,  # Will be filled during estimation
-        "occurrence_probability": None,  # Will be filled during estimation
-        "occurrence_parameters": None,  # Will be filled during estimation
-        "occurrence_y": None,  # Will be filled during estimation
+        "oes_model": "none",
+        "p_fitted": None,  # Filled by ADAM.fit() from a fitted OM/OMG/AutoOM
     }
 
     return occurrence_dict
@@ -237,7 +234,7 @@ def _calculate_parameters_number(
     # Add ARIMA parameters if present
     if arima_info["arima_model"]:
         # Add number of ARMA parameters
-        parameters_number[1][0] += len(arima_info.get("arma_parameters", []))
+        parameters_number[1][0] += len(arima_info.get("arma_parameters") or [])
 
     # Add constant if required
     if constant_required:

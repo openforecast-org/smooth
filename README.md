@@ -12,8 +12,8 @@ Python:
 
 [![PyPI version](https://img.shields.io/pypi/v/smooth.svg)](https://pypi.org/project/smooth/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/smooth.svg)](https://pypi.org/project/smooth/)
-[![Python CI](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml)
 [![Python versions](https://img.shields.io/pypi/pyversions/smooth.svg)](https://pypi.org/project/smooth/)
+[![Python CI](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml)
 
 
 The **smooth** package implements Single Source of Error (SSOE) state-space models for forecasting and time series analysis, available for both R and Python.
@@ -37,20 +37,8 @@ remotes::install_github("config-i1/smooth")
 
 **Python (PyPI):**
 ```bash
-# Not yet available
+pip install smooth
 ```
-
-**Python (github, release):**
-Choose the wheel file for your platform from the [latest release](https://github.com/config-i1/smooth/releases/tag/v4.4.0) then run:
-```bash
-pip install <wheel-file-for-your-platform>
-```
-For example, for Windows with Python 3.13:
-
-```bash
-pip install https://github.com/config-i1/smooth/releases/download/v4.4.0/smooth-1.0.0-cp313-cp313-win_amd64.whl
-```
-
 
 **Python (github, dev):**
 ```bash

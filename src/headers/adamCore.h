@@ -1,5 +1,6 @@
 #include "ssGeneral.h"
 #include "adamGeneral.h"
+#include "ssOccurrence.h"
 
 // ============================================================================
 // STRUCTURE DEFINITIONS
@@ -19,6 +20,18 @@ struct FitResult {
     arma::vec fitted;
     arma::vec errors;
     arma::mat profile;
+};
+
+// Result structure for the general occurrence model fitter (two parallel models)
+struct OmFitGeneralResult {
+    arma::mat statesA;
+    arma::vec fittedA;
+    arma::vec errorsA;
+    arma::mat profileA;
+    arma::mat statesB;
+    arma::vec fittedB;
+    arma::vec errorsB;
+    arma::mat profileB;
 };
 
 // Result structure for forecaster
@@ -69,6 +82,47 @@ private:
     unsigned int nComponents;
     bool constant;
     bool adamETS;
+
+    // Private helper: shared loop control for fit(), omfit(), omfitGeneral()
+    template<typename ForwardFn, typename BackwardFn,
+             typename HeadFillFwdFn, typename HeadFillBwdFn,
+             typename TrendReversalFn>
+    void fitLoopImpl(int obs, int lagsModelMax,
+                     bool backcast, unsigned int nIterations, bool refineHead,
+                     ForwardFn forwardStep,
+                     BackwardFn backwardStep,
+                     HeadFillFwdFn headFillFwd,
+                     HeadFillBwdFn headFillBwd,
+                     TrendReversalFn trendReversal) {
+        // Loop for the backcast
+        for (unsigned int j=1; j<=nIterations; j=j+1) {
+            // Refine the head (in order for it to make sense)
+            // This is only needed for ETS(*,Z,Z) models, with trend.
+            // This is not needed for lagsMax=1, because there is nothing to fill in
+            if(lagsModelMax > 1 && refineHead) {
+                headFillFwd();
+            }
+            ////// Run forward
+            // Loop for the model construction
+            for (int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
+                forwardStep(i);
+            }
+            ////// Backwards run
+            if(backcast && j<nIterations) {
+                // Change the specific element in the state vector to negative/inverse
+                trendReversal();
+                for (int i=obs+lagsModelMax-1; i>=lagsModelMax; i=i-1) {
+                    backwardStep(i);
+                }
+                // Fill in the head of the series.
+                if(refineHead) {
+                    headFillBwd();
+                }
+                // Restore the specific element in the state vector
+                trendReversal();
+            }
+        }
+    }
 
 public:
     // Constructor
@@ -193,13 +247,17 @@ public:
         return result;
     }
 
-    // Method 2: Fitter - fits SSOE model to the data
+    // Method 2: Fitter - fits SSOE model to the data.
+    // For demand models (O='n', default): vectorYt is the demand series; vectorOt is the
+    // occurrence multiplier (1, fractional, or 0 for intermittent).
+    // For occurrence models (O='d'/'o'/'i'): pass vectorOt as both vectorYt and vectorOt;
+    // the raw state-space output is transformed to a probability post-loop.
     FitResult fit(arma::mat matrixVt, arma::mat const &matrixWt,
                   arma::mat &matrixF, arma::vec const &vectorG,
                   arma::umat const &indexLookupTable, arma::mat profilesRecent,
                   arma::vec const &vectorYt, arma::vec const &vectorOt,
                   bool const &backcast, unsigned int const &nIterations,
-                  bool const &refineHead) {
+                  bool const &refineHead, char const &O = 'n') {
         /* # matrixVt should have a length of obs + lagsModelMax.
          * # matrixWt is a matrix with nrows = obs
          * # vecG should be a vector
@@ -213,126 +271,237 @@ public:
         arma::vec vecYfit(obs, arma::fill::zeros);
         arma::vec vecErrors(obs, arma::fill::zeros);
 
-        // These are objects used in backcasting.
-        // Needed for some experiments.
-        arma::mat &matrixFInv = matrixF;
-        arma::vec const &vectorGInv = vectorG;
+        // What to do in the forward pass
+        auto forwardStep = [&](int i) {
+            int idx = i - lagsModelMax;
+            /* # Measurement equation and the error term */
+            vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
+                    matrixWt.row(idx), E, T, S,
+                    nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+            // We need this multiplication for cases, when occurrence is fractional
+            if(vectorOt(idx) != 0) {
+                vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
+            }
+            // errorf() returns 0 when ot==0; dispatches to occurrenceError() when O!='n'
+            vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
+            /* # Transition equation */
+            profilesRecent(indexLookupTable.col(i)) =
+                adamFvalue(profilesRecent(indexLookupTable.col(i)),
+                           matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
+                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                           vectorG, vecErrors(idx), vecYfit(idx), adamETS);
+            matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
+        };
 
-        // Loop for the backcast
-        for (unsigned int j=1; j<=nIterations; j=j+1) {
-            // Refine the head (in order for it to make sense)
-            // This is only needed for ETS(*,Z,Z) models, with trend.
-            // This is not needed for lagsMax=1, because there is nothing to fill in
-            if(lagsModelMax>1){
-                if(refineHead && (T!='N')){
-                    // Record the initial profile to the first column
-                    matrixVt.col(0) = profilesRecent(indexLookupTable.col(0));
-                    // Update the head, but only for the trend component
-                    for (int i=1; i<lagsModelMax; i=i+1) {
-                        profilesRecent(indexLookupTable.col(i).rows(0,1)) = adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                                       matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant).rows(0,1);
-                        matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
-                    }
+        // What to do in the backward pass
+        auto backwardStep = [&](int i) {
+            int idx = i - lagsModelMax;
+            /* # Measurement equation and the error term */
+            vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
+                    matrixWt.row(idx), E, T, S,
+                    nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+            if(vectorOt(idx) != 0) {
+                vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
+            }
+            vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
+            /* # Transition equation */
+            profilesRecent(indexLookupTable.col(i)) =
+                adamFvalue(profilesRecent(indexLookupTable.col(i)),
+                           matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
+                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                           vectorG, vecErrors(idx), vecYfit(idx), adamETS);
+        };
+
+        // How to fill in the head before the forward pass
+        auto headFillFwd = [&]() {
+            if(T != 'N') {
+                // Record the initial profile to the first column
+                matrixVt.col(0) = profilesRecent(indexLookupTable.col(0));
+                // Update the head, but only for the trend component
+                for (int i=1; i<lagsModelMax; i=i+1) {
+                    profilesRecent(indexLookupTable.col(i).rows(0,1)) =
+                        adamFvalue(profilesRecent(indexLookupTable.col(i)),
+                                   matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                                   nComponents, constant).rows(0,1);
+                    matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
                 }
-                else if(refineHead){
-                    // Record the profile to the head of time series to fill in the state matrix
-                    for (int i=0; i<lagsModelMax; i=i+1) {
-                        matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
-                    }
+            } else {
+                // Record the profile to the head of time series to fill in the state matrix
+                for (int i=0; i<lagsModelMax; i=i+1) {
+                    matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
                 }
             }
-            ////// Run forward
-            // Loop for the model construction
-            for (int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
-                /* # Measurement equation and the error term */
-                vecYfit(i-lagsModelMax) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
-                        matrixWt.row(i-lagsModelMax), E, T, S,
-                        nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+        };
 
-                // If this is zero (intermittent), then set error to zero
-                if(vectorOt(i-lagsModelMax)==0){
-                    vecErrors(i-lagsModelMax) = 0;
-                }
-                else{
-                    // We need this multiplication for cases, when occurrence is fractional
-                    vecYfit(i-lagsModelMax) = vectorOt(i-lagsModelMax)*vecYfit(i-lagsModelMax);
-                    vecErrors(i-lagsModelMax) = errorf(vectorYt(i-lagsModelMax), vecYfit(i-lagsModelMax), E);
-                }
-
-                /* # Transition equation */
-                profilesRecent(indexLookupTable.col(i)) = adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                               matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
-                                   adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(i-lagsModelMax), E, T, S,
-                                              nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
-                                              vectorG, vecErrors(i-lagsModelMax), vecYfit(i-lagsModelMax), adamETS);
-
-                matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
-
-                // If ot is fractional, amend the fitted value
-                if(vectorOt(i-lagsModelMax)!=0 && vectorOt(i-lagsModelMax)!=1){
-                    // We need this multiplication for cases, when occurrence is fractional
-                    vecYfit(i-lagsModelMax) = vectorOt(i-lagsModelMax)*vecYfit(i-lagsModelMax);
-                }
+        // How to fix the head after the bakwards pass
+        auto headFillBwd = [&]() {
+            for (int i=lagsModelMax-1; i>=0; i=i-1) {
+                profilesRecent(indexLookupTable.col(i)) =
+                    adamFvalue(profilesRecent(indexLookupTable.col(i)),
+                               matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
             }
+        };
 
-            ////// Backwards run
-            if(backcast && j<(nIterations)){
-                // Change the specific element in the state vector to negative
-                if(T=='A'){
-                    profilesRecent(1) = -profilesRecent(1);
-                }
-                else if(T=='M'){
-                    profilesRecent(1) = 1/profilesRecent(1);
-                }
+        // How to revert the trend component for backcasting
+        auto trendReversal = [&]() {
+            if(T == 'A')      { profilesRecent(1) = -profilesRecent(1); }
+            else if(T == 'M') { profilesRecent(1) = 1/profilesRecent(1); }
+        };
 
-                for (int i=obs+lagsModelMax-1; i>=lagsModelMax; i=i-1) {
-                    /* # Measurement equation and the error term */
-                    vecYfit(i-lagsModelMax) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
-                            matrixWt.row(i-lagsModelMax), E, T, S,
-                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-
-                    // If this is zero (intermittent), then set error to zero
-                    if(vectorOt(i-lagsModelMax)==0){
-                        vecErrors(i-lagsModelMax) = 0;
-                    }
-                    else{
-                        // We need this multiplication for cases, when occurrence is fractional
-                        vecYfit(i-lagsModelMax) = vectorOt(i-lagsModelMax)*vecYfit(i-lagsModelMax);
-                        vecErrors(i-lagsModelMax) = errorf(vectorYt(i-lagsModelMax), vecYfit(i-lagsModelMax), E);
-                    }
-
-                    /* # Transition equation */
-                    profilesRecent(indexLookupTable.col(i)) = adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                                   matrixFInv, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
-                                       adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixFInv,
-                                                  matrixWt.row(i-lagsModelMax), E, T, S,
-                                                  nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
-                                                  vectorGInv, vecErrors(i-lagsModelMax), vecYfit(i-lagsModelMax), adamETS);
-                }
-
-                // Fill in the head of the series.
-                if(refineHead){
-                    for (int i=lagsModelMax-1; i>=0; i=i-1) {
-                        profilesRecent(indexLookupTable.col(i)) = adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                                       matrixFInv, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                    }
-                }
-
-                // Change back the specific element in the state vector
-                if(T=='A'){
-                    profilesRecent(1) = -profilesRecent(1);
-                }
-                else if(T=='M'){
-                    profilesRecent(1) = 1/profilesRecent(1);
-                }
-            }
-        }
+        // Do the fit!
+        fitLoopImpl(obs, lagsModelMax, backcast, nIterations, refineHead,
+                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal);
 
         FitResult result;
         result.states = matrixVt;
         result.fitted = vecYfit;
         result.errors = vecErrors;
         result.profile = profilesRecent;
+        return result;
+    }
+
+    // Method 2b: General occurrence model fitter (type 'g')
+    // Fits two parallel ETS models (A and B) simultaneously.
+    // this = model A; model B structural params are explicit.
+    OmFitGeneralResult omfitGeneral(
+            arma::mat matrixVtA, arma::mat const &matrixWtA,
+            arma::mat &matrixFA, arma::vec const &vectorGA,
+            arma::umat const &indexLookupTableA, arma::mat profilesRecentA,
+            char const &EB, char const &TB, char const &SB,
+            unsigned int const &nNonSeasonalB, unsigned int const &nSeasonalB,
+            unsigned int const &nETSB, unsigned int const &nArimaB,
+            unsigned int const &nXregB, unsigned int const &nComponentsB,
+            bool const &constantB, bool const &adamETSB,
+            arma::mat matrixVtB, arma::mat const &matrixWtB,
+            arma::mat &matrixFB, arma::vec const &vectorGB,
+            arma::umat const &indexLookupTableB, arma::mat profilesRecentB,
+            arma::vec const &vectorOt,
+            bool const &backcast, unsigned int const &nIterations,
+            bool const &refineHead) {
+        int obs = vectorOt.n_rows;
+        int lagsModelMaxA = max(lags);
+        // Model B may have different lags so we use indexLookupTableB.n_cols
+        // lagsModelMax for the loop is taken from model A (same obs)
+        arma::vec vecAfit(obs, arma::fill::zeros);
+        arma::vec vecBfit(obs, arma::fill::zeros);
+        arma::vec vecErrorsA(obs, arma::fill::zeros);
+        arma::vec vecErrorsB(obs, arma::fill::zeros);
+
+        auto forwardStep = [&](int i) {
+            int idx = i - lagsModelMaxA;
+            /* # Measurement equations for models A and B */
+            vecAfit(idx) = adamWvalue(profilesRecentA(indexLookupTableA.col(i)),
+                    matrixWtA.row(idx), E, T, S,
+                    nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+            vecBfit(idx) = adamWvalue(profilesRecentB(indexLookupTableB.col(i)),
+                    matrixWtB.row(idx), EB, TB, SB,
+                    nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB);
+            // Compute errors for both models jointly via occurrenceError(O='g')
+            auto errs = occurrenceError(vectorOt(idx), vecAfit(idx), vecBfit(idx), E, EB, 'g');
+            vecErrorsA(idx) = errs[0];
+            vecErrorsB(idx) = errs[1];
+            /* # Transition equations for models A and B */
+            profilesRecentA(indexLookupTableA.col(i)) =
+                adamFvalue(profilesRecentA(indexLookupTableA.col(i)),
+                           matrixFA, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                adamGvalue(profilesRecentA(indexLookupTableA.col(i)), matrixFA, matrixWtA.row(idx), E, T, S,
+                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                           vectorGA, vecErrorsA(idx), vecAfit(idx), adamETS);
+            profilesRecentB(indexLookupTableB.col(i)) =
+                adamFvalue(profilesRecentB(indexLookupTableB.col(i)),
+                           matrixFB, EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nComponentsB, constantB) +
+                adamGvalue(profilesRecentB(indexLookupTableB.col(i)), matrixFB, matrixWtB.row(idx), EB, TB, SB,
+                           nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB,
+                           vectorGB, vecErrorsB(idx), vecBfit(idx), adamETSB);
+            matrixVtA.col(i) = profilesRecentA(indexLookupTableA.col(i));
+            matrixVtB.col(i) = profilesRecentB(indexLookupTableB.col(i));
+        };
+
+        auto backwardStep = [&](int i) {
+            int idx = i - lagsModelMaxA;
+            /* # Measurement equations for models A and B */
+            vecAfit(idx) = adamWvalue(profilesRecentA(indexLookupTableA.col(i)),
+                    matrixWtA.row(idx), E, T, S,
+                    nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+            vecBfit(idx) = adamWvalue(profilesRecentB(indexLookupTableB.col(i)),
+                    matrixWtB.row(idx), EB, TB, SB,
+                    nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB);
+            auto errs = occurrenceError(vectorOt(idx), vecAfit(idx), vecBfit(idx), E, EB, 'g');
+            vecErrorsA(idx) = errs[0];
+            vecErrorsB(idx) = errs[1];
+            /* # Transition equations for models A and B */
+            profilesRecentA(indexLookupTableA.col(i)) =
+                adamFvalue(profilesRecentA(indexLookupTableA.col(i)),
+                           matrixFA, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                adamGvalue(profilesRecentA(indexLookupTableA.col(i)), matrixFA, matrixWtA.row(idx), E, T, S,
+                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                           vectorGA, vecErrorsA(idx), vecAfit(idx), adamETS);
+            profilesRecentB(indexLookupTableB.col(i)) =
+                adamFvalue(profilesRecentB(indexLookupTableB.col(i)),
+                           matrixFB, EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nComponentsB, constantB) +
+                adamGvalue(profilesRecentB(indexLookupTableB.col(i)), matrixFB, matrixWtB.row(idx), EB, TB, SB,
+                           nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB,
+                           vectorGB, vecErrorsB(idx), vecBfit(idx), adamETSB);
+        };
+
+        auto headFillFwd = [&]() {
+            if(T != 'N') {
+                // Record the initial profile to the first column (model A)
+                matrixVtA.col(0) = profilesRecentA(indexLookupTableA.col(0));
+                // Update the head, but only for the trend component
+                for (int i=1; i<lagsModelMaxA; i=i+1) {
+                    profilesRecentA(indexLookupTableA.col(i).rows(0,1)) =
+                        adamFvalue(profilesRecentA(indexLookupTableA.col(i)),
+                                   matrixFA, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                                   nComponents, constant).rows(0,1);
+                    matrixVtA.col(i) = profilesRecentA(indexLookupTableA.col(i));
+                }
+            } else {
+                // Record the profile to the head of time series to fill in the state matrix
+                for (int i=0; i<lagsModelMaxA; i=i+1) {
+                    matrixVtA.col(i) = profilesRecentA(indexLookupTableA.col(i));
+                }
+            }
+            // Model B head fill (always non-trend style for simplicity; B typically has no trend)
+            for (int i=0; i<lagsModelMaxA; i=i+1) {
+                matrixVtB.col(i) = profilesRecentB(indexLookupTableB.col(i));
+            }
+        };
+
+        auto headFillBwd = [&]() {
+            // Fill in the head of the series for both models
+            for (int i=lagsModelMaxA-1; i>=0; i=i-1) {
+                profilesRecentA(indexLookupTableA.col(i)) =
+                    adamFvalue(profilesRecentA(indexLookupTableA.col(i)),
+                               matrixFA, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
+                profilesRecentB(indexLookupTableB.col(i)) =
+                    adamFvalue(profilesRecentB(indexLookupTableB.col(i)),
+                               matrixFB, EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nComponentsB, constantB);
+            }
+        };
+
+        // Reverse/restore both models' trends symmetrically
+        auto trendReversal = [&]() {
+            if(T == 'A')       { profilesRecentA(1) = -profilesRecentA(1); }
+            else if(T == 'M')  { profilesRecentA(1) = 1/profilesRecentA(1); }
+            if(TB == 'A')      { profilesRecentB(1) = -profilesRecentB(1); }
+            else if(TB == 'M') { profilesRecentB(1) = 1/profilesRecentB(1); }
+        };
+
+        fitLoopImpl(obs, lagsModelMaxA, backcast, nIterations, refineHead,
+                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal);
+
+        OmFitGeneralResult result;
+        result.statesA   = matrixVtA;
+        result.fittedA   = vecAfit;
+        result.errorsA   = vecErrorsA;
+        result.profileA  = profilesRecentA;
+        result.statesB   = matrixVtB;
+        result.fittedB   = vecBfit;
+        result.errorsB   = vecErrorsB;
+        result.profileB  = profilesRecentB;
         return result;
     }
 
@@ -518,15 +687,13 @@ public:
                         matYfit(i-lagsModelMax,k) = 1;
                     }
 
-                    // If this is zero (intermittent), then set error to zero
-                    if(matrixOt(i-lagsModelMax)==0){
-                        vecErrors(i-lagsModelMax) = 0;
-                    }
-                    else{
-                        // We need this multiplication for cases, when occurrence is fractional
+                    // We need this multiplication for cases, when occurrence is fractional
+                    if(matrixOt(i-lagsModelMax)!=0){
                         matYfit(i-lagsModelMax,k) = matrixOt(i-lagsModelMax) * matYfit(i-lagsModelMax,k);
-                        vecErrors(i-lagsModelMax) = errorf(matrixYt(i-lagsModelMax), matYfit(i-lagsModelMax,k), E);
                     }
+                    // errorf() returns 0 immediately when ot==0
+                    vecErrors(i-lagsModelMax) = errorf(matrixYt(i-lagsModelMax), matYfit(i-lagsModelMax,k), E,
+                                                       matrixOt(i-lagsModelMax));
 
                     /* # Transition equation */
                     arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
@@ -561,15 +728,11 @@ public:
                             matYfit(i-lagsModelMax,k) = 1;
                         }
 
-                        // If this is zero (intermittent), then set error to zero
-                        if(matrixOt(i-lagsModelMax)==0){
-                            vecErrors(i-lagsModelMax) = 0;
-                        }
-                        else{
-                            // We need this multiplication for cases, when occurrence is fractional
+                        if(matrixOt(i-lagsModelMax)!=0){
                             matYfit(i-lagsModelMax,k) = matrixOt(i-lagsModelMax) * matYfit(i-lagsModelMax,k);
-                            vecErrors(i-lagsModelMax) = errorf(matrixYt(i-lagsModelMax), matYfit(i-lagsModelMax,k), E);
                         }
+                        vecErrors(i-lagsModelMax) = errorf(matrixYt(i-lagsModelMax), matYfit(i-lagsModelMax,k), E,
+                                                           matrixOt(i-lagsModelMax));
 
                         /* # Transition equation */
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =

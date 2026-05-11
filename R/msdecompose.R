@@ -94,9 +94,22 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
             return(supsmu(1:length(y), y, span=span, ...)$y)
         }
         else if(smoother=="global"){
-            X <- cbind("Intercept"=1, trend=1:length(y));
-            trendDetermAdd <- .lm.fit(X,y);
-            return(y - trendDetermAdd$residuals);
+            n <- length(y);
+            if(is.null(order) || order <= 1){
+                X <- cbind(1L, seq_len(n));
+            }
+            else{
+                nGroups <- ceiling(lagsMax / order);
+                if(nGroups <= 1L){
+                    X <- cbind(1L, seq_len(n));
+                }
+                else{
+                    blockIdx <- rep(seq_len(nGroups) - 1L, each=order, length.out=n);
+                    dummies  <- outer(blockIdx, seq_len(nGroups - 1L) - 1L, `==`) + 0L;
+                    X <- cbind(1L, dummies, seq_len(n));
+                }
+            }
+            return(y - .lm.fit(X, y)$residuals);
         }
     }
 

@@ -14,6 +14,9 @@ except ImportError:
 
 # Note: Custom lowess_r function is kept as reference/fallback implementation
 
+# Default smoother for ADAM/ES model initialisation (msdecompose keeps "lowess")
+SMOOTHER_DEFAULT = "global"
+
 
 def lowess_r(x, y, f=2 / 3, nsteps=3, delta=None):
     """
@@ -529,12 +532,23 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
         return result
 
     def smoothing_function_global(y, order=None):
-        """Global linear regression smoother"""
+        """Global linear regression smoother with block dummies"""
         y = y.astype(float)
         n = len(y)
-        X = np.column_stack([np.ones(n), np.arange(1, n + 1)])
+        if order is None or order <= 1:
+            X = np.column_stack([np.ones(n), np.arange(1, n + 1)])
+        else:
+            n_groups = int(np.ceil(int(lags[-1]) / order))
+            if n_groups <= 1:
+                X = np.column_stack([np.ones(n), np.arange(1, n + 1)])
+            else:
+                block_idx = np.resize(np.repeat(np.arange(n_groups), order), n)
+                dummies = (
+                    block_idx[:, None] == np.arange(n_groups - 1)[None, :]
+                ).astype(float)
+                X = np.column_stack([np.ones(n), dummies, np.arange(1, n + 1)])
         coef = np.linalg.lstsq(X, y, rcond=None)[0]
-        return y - (y - X @ coef)  # Returns fitted values: X @ coef
+        return X @ coef
 
     # Initial data processing
     # obs_in_sample is already defined above
@@ -755,7 +769,7 @@ def calculate_pacf(data, nlags=40):
     if isinstance(data, pd.Series):
         data = data.values
 
-    return pacf(data, nlags=nlags, method="ols")
+    return pacf(data, nlags=nlags, method="ywmle")
 
 
 def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
@@ -780,15 +794,19 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
                 y, df=2, loc=y_fitted, scale=scale * np.sqrt(y_fitted)
             )
     elif distribution == "dgnorm":
-        # Implement generalized normal distribution
-        pass
+        beta = other if other is not None else 2.0
+        if Etype == "A":
+            return stats.gennorm.logpdf(y, beta, loc=y_fitted, scale=scale)
+        else:  # "M"
+            return stats.gennorm.logpdf(y, beta, loc=y_fitted, scale=scale * y_fitted)
     elif distribution == "dalaplace":
         # Implement asymmetric Laplace distribution
         pass
     elif distribution == "dlnorm":
-        return stats.lognorm.logpdf(
-            y, s=scale, scale=np.exp(np.log(y_fitted) - scale**2 / 2)
-        )
+        # Use complex log to handle negative y_fitted during optimization,
+        # mirroring R's Re(log(as.complex(y_fitted))) failsafe.
+        meanlog = np.real(np.log(y_fitted.astype(complex))) - scale**2 / 2
+        return stats.lognorm.logpdf(y, s=scale, scale=np.exp(meanlog))
     elif distribution == "dllaplace":
         return stats.laplace.logpdf(
             np.log(y), loc=np.log(y_fitted), scale=scale
@@ -838,11 +856,13 @@ def calculate_entropy(distribution, scale, other, obsZero, y_fitted):
 
 def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
     if loss == "MSEh":
-        return np.sum(adam_errors[:, h - 1] ** 2) / (obs_in_sample - h)
+        return np.linalg.norm(adam_errors[:, h - 1]) ** 2 / (obs_in_sample - h)
     elif loss == "TMSE":
-        return np.sum(np.sum(adam_errors**2, axis=0) / (obs_in_sample - h))
+        return np.sum(np.linalg.norm(adam_errors, axis=0) ** 2 / (obs_in_sample - h))
     elif loss == "GTMSE":
-        return np.sum(np.log(np.sum(adam_errors**2, axis=0) / (obs_in_sample - h)))
+        return np.sum(
+            np.log(np.linalg.norm(adam_errors, axis=0) ** 2 / (obs_in_sample - h))
+        )
     elif loss == "MSCE":
         return np.sum(np.sum(adam_errors, axis=1) ** 2) / (obs_in_sample - h)
     elif loss == "MAEh":
@@ -894,7 +914,7 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         return np.log(np.abs(x) + 1j * (x.imag - x.real))
 
     if distribution == "dnorm":
-        return np.sqrt(np.sum(errors**2) / obs_in_sample)
+        return np.linalg.norm(errors) / np.sqrt(obs_in_sample)
 
     elif distribution == "dlaplace":
         return np.sum(np.abs(errors)) / obs_in_sample
@@ -903,7 +923,8 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         return np.sum(np.sqrt(np.abs(errors))) / (obs_in_sample * 2)
 
     elif distribution == "dgnorm":
-        return (other * np.sum(np.abs(errors) ** other) / obs_in_sample) ** (1 / other)
+        beta = other if other is not None else 2.0
+        return (beta * np.sum(np.abs(errors) ** beta) / obs_in_sample) ** (1 / beta)
 
     elif distribution == "dalaplace":
         return np.sum(errors * (other - (errors <= 0) * 1)) / obs_in_sample
@@ -913,12 +934,13 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
             temp = 1 - np.sqrt(
                 np.abs(
                     1
-                    - np.sum(np.log(np.abs(1 + errors / y_fitted)) ** 2) / obs_in_sample
+                    - np.linalg.norm(np.log(np.abs(1 + errors / y_fitted))) ** 2
+                    / obs_in_sample
                 )
             )
         else:  # "M"
             temp = 1 - np.sqrt(
-                np.abs(1 - np.sum(np.log(1 + errors) ** 2) / obs_in_sample)
+                np.abs(1 - np.linalg.norm(np.log(1 + errors)) ** 2 / obs_in_sample)
             )
         return np.sqrt(2 * np.abs(temp))
 
@@ -964,9 +986,9 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
 
     elif distribution == "dgamma":
         if Etype == "A":
-            return np.sum((errors / y_fitted) ** 2) / obs_in_sample
+            return np.linalg.norm(errors / y_fitted) ** 2 / obs_in_sample
         else:  # "M"
-            return np.sum(errors**2) / obs_in_sample
+            return np.linalg.norm(errors) ** 2 / obs_in_sample
 
     else:
         raise ValueError(f"Unknown distribution: {distribution}")

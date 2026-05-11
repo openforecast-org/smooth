@@ -1,0 +1,401 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSARIMA and AutoMSARIMA &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="OM, OMG and AutoOM" href="om.html" />
+    <link rel="prev" title="AutoADAM" href="autoadam.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">MSARIMA and AutoMSARIMA</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#msarima">MSARIMA</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.MSARIMA"><code class="docutils literal notranslate"><span class="pre">MSARIMA</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#automsarima">AutoMSARIMA</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.AutoMSARIMA"><code class="docutils literal notranslate"><span class="pre">AutoMSARIMA</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">MSARIMA and AutoMSARIMA</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/msarima.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="msarima-and-automsarima">
+<h1>MSARIMA and AutoMSARIMA<a class="headerlink" href="#msarima-and-automsarima" title="Link to this heading"></a></h1>
+<p>Multiple Seasonal ARIMA with fixed or automatically-selected orders.</p>
+<section id="msarima">
+<h2>MSARIMA<a class="headerlink" href="#msarima" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="smooth.MSARIMA">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">MSARIMA</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ar_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ma_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arima_select</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.MSARIMA" title="Link to this definition"></a></dt>
+<dd><p>Multiple Seasonal ARIMA in Single Source of Error state space form.</p>
+<p>This class wraps ADAM with <code class="docutils literal notranslate"><span class="pre">model=&quot;NNN&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">distribution=&quot;dnorm&quot;</span></code>
+hardcoded, providing a clean interface for pure ARIMA (and SARIMA) models
+without ETS components. It mirrors R’s <code class="docutils literal notranslate"><span class="pre">msarima()</span></code> function.</p>
+<p>The default specification is ARIMA(0,1,1), matching R’s default
+<code class="docutils literal notranslate"><span class="pre">orders=list(ar=c(0),</span> <span class="pre">i=c(1),</span> <span class="pre">ma=c(1))</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>orders</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – <p>R-style alternative to <code class="docutils literal notranslate"><span class="pre">ar_order</span></code>/<code class="docutils literal notranslate"><span class="pre">i_order</span></code>/<code class="docutils literal notranslate"><span class="pre">ma_order</span></code>.
+A dict with keys <code class="docutils literal notranslate"><span class="pre">&quot;ar&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;i&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code> (each an int or list
+of ints) and optionally <code class="docutils literal notranslate"><span class="pre">&quot;select&quot;</span></code> (bool). Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">orders</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ar&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;i&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;ma&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]}</span>
+</pre></div>
+</div>
+<p>If <code class="docutils literal notranslate"><span class="pre">ar_order</span></code>, <code class="docutils literal notranslate"><span class="pre">i_order</span></code>, or <code class="docutils literal notranslate"><span class="pre">ma_order</span></code> are non-zero they
+take priority over <code class="docutils literal notranslate"><span class="pre">orders</span></code>.</p>
+</p></li>
+<li><p><strong>lags</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – Seasonal period(s). E.g. <code class="docutils literal notranslate"><span class="pre">lags=[1,</span> <span class="pre">12]</span></code> for monthly data.
+If None, defaults to <code class="docutils literal notranslate"><span class="pre">[1]</span></code> (non-seasonal).</p></li>
+<li><p><strong>ar_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=0</em>) – Autoregressive order(s). Matches R default <code class="docutils literal notranslate"><span class="pre">ar=c(0)</span></code>.</p></li>
+<li><p><strong>i_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=1</em>) – Integration order(s). Matches R default <code class="docutils literal notranslate"><span class="pre">i=c(1)</span></code>.</p></li>
+<li><p><strong>ma_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=1</em>) – Moving average order(s). Matches R default <code class="docutils literal notranslate"><span class="pre">ma=c(1)</span></code>.</p></li>
+<li><p><strong>arima_select</strong> (<em>bool</em><em>, </em><em>default=False</em>) – Whether to perform automatic ARIMA order selection. Equivalent to
+including <code class="docutils literal notranslate"><span class="pre">&quot;select&quot;:</span> <span class="pre">True</span></code> in the <code class="docutils literal notranslate"><span class="pre">orders</span></code> dict.</p></li>
+<li><p><strong>constant</strong> (<em>Union</em><em>[</em><em>bool</em><em>, </em><em>float</em><em>]</em><em>, </em><em>default=False</em>) – Whether to include a constant (drift) term. <code class="docutils literal notranslate"><span class="pre">True</span></code> estimates it;
+a numeric value fixes it. The model name will show “with drift”
+when <code class="docutils literal notranslate"><span class="pre">i_order</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>, or “with constant” otherwise.
+The fitted value is accessible via <code class="docutils literal notranslate"><span class="pre">model.constant_value</span></code>.</p></li>
+<li><p><strong>arma</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – Fixed ARMA parameter values (not estimated). If None, all ARMA
+parameters are estimated.</p></li>
+<li><p><strong>initial</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em><em>, </em><em>default=&quot;backcasting&quot;</em>) – Initialisation method or dict of fixed initial values.
+String options: <code class="docutils literal notranslate"><span class="pre">&quot;backcasting&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;optimal&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;complete&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;two-stage&quot;</span></code>.</p></li>
+<li><p><strong>initial_X</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – Initial values for regressor coefficients.</p></li>
+<li><p><strong>ic</strong> (<em>Literal</em><em>[</em><em>&quot;AIC&quot;</em><em>, </em><em>&quot;AICc&quot;</em><em>, </em><em>&quot;BIC&quot;</em><em>, </em><em>&quot;BICc&quot;</em><em>]</em><em>, </em><em>default=&quot;AICc&quot;</em>) – Information criterion for model selection.</p></li>
+<li><p><strong>loss</strong> (<em>LOSS_OPTIONS</em><em>, </em><em>default=&quot;likelihood&quot;</em>) – Loss function for parameter estimation.</p></li>
+<li><p><strong>h</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em><em>, </em><em>default=None</em>) – Forecast horizon. Can also be set in <code class="docutils literal notranslate"><span class="pre">predict()</span></code>.</p></li>
+<li><p><strong>holdout</strong> (<em>bool</em><em>, </em><em>default=False</em>) – Whether to use a holdout sample for validation.</p></li>
+<li><p><strong>bounds</strong> (<em>Literal</em><em>[</em><em>&quot;usual&quot;</em><em>, </em><em>&quot;admissible&quot;</em><em>, </em><em>&quot;none&quot;</em><em>]</em><em>, </em><em>default=&quot;usual&quot;</em>) – Parameter bounds type.</p></li>
+<li><p><strong>verbose</strong> (<em>int</em><em>, </em><em>default=0</em>) – Verbosity level. 0 = silent.</p></li>
+<li><p><strong>regressors</strong> (<em>Literal</em><em>[</em><em>&quot;use&quot;</em><em>, </em><em>&quot;select&quot;</em><em>, </em><em>&quot;adapt&quot;</em><em>]</em><em>, </em><em>default=&quot;use&quot;</em>) – How to handle external regressors.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to ADAM.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM</span></code></a></dt><dd><p>Parent class with full attribute documentation.</p>
+</dd>
+<dt><a class="reference internal" href="_autosummary/smooth.ES.html#smooth.ES" title="smooth.ES"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ES</span></code></a></dt><dd><p>ETS-only wrapper (counterpart for pure ETS models).</p>
+</dd>
+</dl>
+</div>
+<p class="rubric">Examples</p>
+<p>Default ARIMA(0,1,1):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">MSARIMA</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">60</span><span class="p">))</span> <span class="o">+</span> <span class="mf">100.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">MSARIMA</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>ARIMA(1,1,1) with drift:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">MSARIMA</span><span class="p">(</span><span class="n">ar_order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">i_order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ma_order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">constant</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Drift: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">constant_value</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>SARIMA(1,1,1)(1,1,1)[12] via R-style dict:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">MSARIMA</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">orders</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ar&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;i&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;ma&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]},</span>
+<span class="gp">... </span>    <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+</pre></div>
+</div>
+<p class="rubric">References</p>
+<ul class="simple">
+<li><p>Svetunkov, I. (2023). Forecasting and Analytics with the
+Augmented Dynamic Adaptive Model. <a class="reference external" href="https://openforecast.org/adam/">https://openforecast.org/adam/</a></p></li>
+</ul>
+</dd></dl>
+
+<p><code class="docutils literal notranslate"><span class="pre">MSARIMA</span></code> fits a pure ARIMA model (no ETS components) with explicitly
+specified orders.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">MSARIMA</span>
+
+<span class="c1"># ARIMA(0,1,1) — default</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MSARIMA</span><span class="p">()</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="c1"># SARIMA(1,1,1)(1,1,1)[12]</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MSARIMA</span><span class="p">(</span>
+    <span class="n">orders</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ar&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;i&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;ma&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]},</span>
+    <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="s2">&quot;prediction&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+
+<span class="c1"># With drift term</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MSARIMA</span><span class="p">(</span><span class="n">ar_order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">i_order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ma_order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">constant</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="automsarima">
+<h2>AutoMSARIMA<a class="headerlink" href="#automsarima" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="smooth.AutoMSARIMA">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">AutoMSARIMA</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ar_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[3,</span> <span class="pre">3]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[2,</span> <span class="pre">1]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ma_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[3,</span> <span class="pre">3]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outliers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ignore'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.99</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.AutoMSARIMA" title="Link to this definition"></a></dt>
+<dd><p>Automatic Multiple Seasonal ARIMA with order selection.</p>
+<p>Wraps <a class="reference internal" href="autoadam.html#smooth.AutoADAM" title="smooth.AutoADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">AutoADAM</span></code></a> with <code class="docutils literal notranslate"><span class="pre">model=&quot;NNN&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">distribution=&quot;dnorm&quot;</span></code>
+fixed, providing automatic ARIMA order selection for pure ARIMA (and
+SARIMA) models without ETS components. Mirrors R’s <code class="docutils literal notranslate"><span class="pre">auto.msarima()</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>lags</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – Seasonal period(s). E.g. <code class="docutils literal notranslate"><span class="pre">lags=[1,</span> <span class="pre">12]</span></code> for monthly data.
+If None, defaults to <code class="docutils literal notranslate"><span class="pre">[1]</span></code> (non-seasonal).</p></li>
+<li><p><strong>ar_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=</em><em>[</em><em>3</em><em>, </em><em>3</em><em>]</em>) – Maximum AR order(s) per lag level for selection.
+Matches R’s <code class="docutils literal notranslate"><span class="pre">orders=list(ar=c(3,3))</span></code>.</p></li>
+<li><p><strong>i_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=</em><em>[</em><em>2</em><em>, </em><em>1</em><em>]</em>) – Maximum integration order(s) per lag level.
+Matches R’s <code class="docutils literal notranslate"><span class="pre">orders=list(i=c(2,1))</span></code>.</p></li>
+<li><p><strong>ma_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=</em><em>[</em><em>3</em><em>, </em><em>3</em><em>]</em>) – Maximum MA order(s) per lag level for selection.
+Matches R’s <code class="docutils literal notranslate"><span class="pre">orders=list(ma=c(3,3))</span></code>.</p></li>
+<li><p><strong>orders</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – R-style alternative to scalar max orders. A dict with keys
+<code class="docutils literal notranslate"><span class="pre">&quot;ar&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;i&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code> (each an int or list). When provided,
+<code class="docutils literal notranslate"><span class="pre">ar_order</span></code>/<code class="docutils literal notranslate"><span class="pre">i_order</span></code>/<code class="docutils literal notranslate"><span class="pre">ma_order</span></code> are ignored.</p></li>
+<li><p><strong>constant</strong> (<em>Union</em><em>[</em><em>bool</em><em>, </em><em>float</em><em>]</em><em>, </em><em>default=False</em>) – Whether to include a constant (drift) term.</p></li>
+<li><p><strong>initial</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em><em>, </em><em>default=&quot;backcasting&quot;</em>) – Initialisation method or dict of fixed initial values.
+String options: <code class="docutils literal notranslate"><span class="pre">&quot;backcasting&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;optimal&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;complete&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;two-stage&quot;</span></code>.</p></li>
+<li><p><strong>initial_X</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – Initial values for regressor coefficients (equivalent to R’s
+<code class="docutils literal notranslate"><span class="pre">initialX</span></code>).</p></li>
+<li><p><strong>ic</strong> (<em>Literal</em><em>[</em><em>&quot;AIC&quot;</em><em>, </em><em>&quot;AICc&quot;</em><em>, </em><em>&quot;BIC&quot;</em><em>, </em><em>&quot;BICc&quot;</em><em>]</em><em>, </em><em>default=&quot;AICc&quot;</em>) – Information criterion for model comparison during selection.</p></li>
+<li><p><strong>loss</strong> (<em>LOSS_OPTIONS</em><em>, </em><em>default=&quot;likelihood&quot;</em>) – Loss function for parameter estimation.</p></li>
+<li><p><strong>h</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em><em>, </em><em>default=None</em>) – Forecast horizon. Can also be set in <code class="docutils literal notranslate"><span class="pre">predict()</span></code>.</p></li>
+<li><p><strong>holdout</strong> (<em>bool</em><em>, </em><em>default=False</em>) – Whether to use a holdout sample.</p></li>
+<li><p><strong>bounds</strong> (<em>Literal</em><em>[</em><em>&quot;usual&quot;</em><em>, </em><em>&quot;admissible&quot;</em><em>, </em><em>&quot;none&quot;</em><em>]</em><em>, </em><em>default=&quot;usual&quot;</em>) – Parameter bounds type.</p></li>
+<li><p><strong>regressors</strong> (<em>Literal</em><em>[</em><em>&quot;use&quot;</em><em>, </em><em>&quot;select&quot;</em><em>, </em><em>&quot;adapt&quot;</em><em>]</em><em>, </em><em>default=&quot;use&quot;</em>) – How to handle external regressors.</p></li>
+<li><p><strong>outliers</strong> (<em>Literal</em><em>[</em><em>&quot;ignore&quot;</em><em>, </em><em>&quot;use&quot;</em><em>, </em><em>&quot;select&quot;</em><em>]</em><em>, </em><em>default=&quot;ignore&quot;</em>) – Outlier handling mode (see <a class="reference internal" href="autoadam.html#smooth.AutoADAM" title="smooth.AutoADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">AutoADAM</span></code></a>).</p></li>
+<li><p><strong>level</strong> (<em>float</em><em>, </em><em>default=0.99</em>) – Confidence level for outlier detection.</p></li>
+<li><p><strong>verbose</strong> (<em>int</em><em>, </em><em>default=0</em>) – Verbosity level. 0 = silent.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments forwarded to <a class="reference internal" href="autoadam.html#smooth.AutoADAM" title="smooth.AutoADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">AutoADAM</span></code></a>.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="autoadam.html#smooth.AutoADAM" title="smooth.AutoADAM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AutoADAM</span></code></a></dt><dd><p>Full automatic model selection.</p>
+</dd>
+<dt><a class="reference internal" href="#smooth.MSARIMA" title="smooth.MSARIMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MSARIMA</span></code></a></dt><dd><p>Fixed-order MSARIMA wrapper.</p>
+</dd>
+</dl>
+</div>
+<p class="rubric">Examples</p>
+<p>Automatic non-seasonal ARIMA:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoMSARIMA</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span> <span class="o">+</span> <span class="mf">100.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">AutoMSARIMA</span><span class="p">(</span><span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Automatic seasonal ARIMA for monthly data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">AutoMSARIMA</span><span class="p">(</span><span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fc</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
+</pre></div>
+</div>
+<p class="rubric">References</p>
+<ul class="simple">
+<li><p>Svetunkov, I. (2023). Forecasting and Analytics with the
+Augmented Dynamic Adaptive Model. <a class="reference external" href="https://openforecast.org/adam/">https://openforecast.org/adam/</a></p></li>
+</ul>
+</dd></dl>
+
+<p><code class="docutils literal notranslate"><span class="pre">AutoMSARIMA</span></code> wraps <a class="reference internal" href="autoadam.html#smooth.AutoADAM" title="smooth.AutoADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">AutoADAM</span></code></a> with <code class="docutils literal notranslate"><span class="pre">model=&quot;NNN&quot;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">distribution=&quot;dnorm&quot;</span></code> fixed, mirroring R’s <code class="docutils literal notranslate"><span class="pre">auto.msarima()</span></code>.
+The parameters <code class="docutils literal notranslate"><span class="pre">model</span></code>, <code class="docutils literal notranslate"><span class="pre">distribution</span></code>, and <code class="docutils literal notranslate"><span class="pre">arima_select</span></code> are fixed
+and cannot be overridden — passing them raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoMSARIMA</span>
+
+<span class="c1"># Automatic seasonal ARIMA</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">AutoMSARIMA</span><span class="p">(</span><span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">])</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>   <span class="c1"># AutoMSARIMA: ARIMA([p,P],[d,D],[q,Q])</span>
+
+<span class="c1"># Reduce search space for speed</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">AutoMSARIMA</span><span class="p">(</span>
+    <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
+    <span class="n">ar_order</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">i_order</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">ma_order</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
+
+<span class="c1"># With external regressors</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">AutoMSARIMA</span><span class="p">(</span><span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span> <span class="n">regressors</span><span class="o">=</span><span class="s2">&quot;select&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="autoadam.html#smooth.AutoADAM" title="smooth.AutoADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">AutoADAM</span></code></a> — Full automatic ETS + ARIMA + distribution selection</p></li>
+<li><p><a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a> — Base unified framework</p></li>
+<li><p><a class="reference internal" href="msdecompose.html"><span class="doc">msdecompose</span></a> — Multiple seasonal decomposition</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="autoadam.html" class="btn btn-neutral float-left" title="AutoADAM" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="om.html" class="btn btn-neutral float-right" title="OM, OMG and AutoOM" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -5,6 +5,8 @@ import pandas as pd
 
 # Note: adam_cpp instance is passed to functions that need C++ integration
 # The adamCore object is created in architector() and passed through the pipeline
+from smooth.adam_general.core.utils.n_param import NParam
+
 from ._helpers import (
     _prepare_lookup_table,
     _prepare_matrices_for_forecast,
@@ -12,6 +14,7 @@ from ._helpers import (
 )
 from .intervals import (
     ensure_level_format,
+    generate_multistep_interval,
     generate_prediction_interval,
     generate_simulation_interval,
 )
@@ -230,9 +233,28 @@ def _generate_point_forecasts(
         model_prepared, observations_dict, lags_dict, general_dict
     )
 
+    # Inject new_xreg values into the forecast measurement matrix.
+    # The xreg columns of mat_wt must contain X values for the *forecast* period,
+    # not the last h rows of the in-sample X (which _prepare_matrices_for_forecast
+    # would have copied).  If the caller passed new_xreg, overwrite those columns.
+    new_xreg = explanatory_checked.get("new_xreg") if explanatory_checked else None
+    if (
+        explanatory_checked
+        and explanatory_checked.get("xreg_model")
+        and new_xreg is not None
+    ):
+        xreg_start = (
+            components_dict["components_number_ets"]
+            + components_dict["components_number_arima"]
+        )
+        xreg_end = xreg_start + explanatory_checked["xreg_number"]
+        mat_wt[:, xreg_start:xreg_end] = new_xreg
+
     # Prepare data for adam_forecaster
+    # Must copy: adam_cpp.forecast() modifies profilesRecent in-place via carma memory
+    # sharing, advancing the profile from T to T+h. Copy prevents corruption.
     profiles_recent_table = np.asfortranarray(
-        model_prepared["profiles_recent_table"], dtype=np.float64
+        model_prepared["profiles_recent_table"].copy(), dtype=np.float64
     )
     index_lookup_table = np.asfortranarray(lookup, dtype=np.uint64)
 
@@ -335,11 +357,12 @@ def _process_occurrence_forecast(occurrence_dict, general_dict):
         # If this is a mixture model, produce forecasts for the occurrence
         if occurrence_dict.get("occurrence_model"):
             occurrence_model = True
-            if occurrence_dict["occurrence"] == "provided":
-                p_forecast = np.ones(general_dict["h"])
+            # Use pre-computed p_forecast if available (set by ADAM.predict before
+            # calling forecaster so intervals can use the actual OM probabilities).
+            if occurrence_dict.get("p_forecast") is not None:
+                p_forecast = np.asarray(occurrence_dict["p_forecast"], dtype=float)
             else:
-                # TODO: Implement forecast for occurrence model
-                pass
+                p_forecast = np.ones(general_dict["h"])
         else:
             occurrence_model = False
             # If this was provided occurrence, then use provided values
@@ -702,9 +725,8 @@ def forecaster(
     y_forecast_values = y_forecast_values * p_forecast
     if general_dict.get("cumulative"):
         y_forecast_values = np.sum(y_forecast_values)
-    # In case of occurrence model use simulations - the cumulative
-    # probability is complex
-    if occurrence_model:
+    # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated.
+    if occurrence_model and general_dict.get("cumulative", False):
         general_dict["interval"] = "simulated"
         resolved_interval = "simulated"
 
@@ -752,6 +774,7 @@ def forecaster(
                     level_low,
                     level_up,
                     nsim=nsim,
+                    p_forecast=p_forecast if occurrence_model else None,
                 )
             if general_dict.get("scenarios", False):
                 general_dict["_scenarios_matrix"] = y_simulated
@@ -766,12 +789,31 @@ def forecaster(
                 params_info,
                 level_low,
                 level_up,
+                p_forecast=p_forecast if occurrence_model else None,
+            )
+            if general_dict.get("scenarios", False):
+                warnings.warn('scenarios=True requires interval="simulated". Ignored.')
+        elif resolved_interval in ("semiparametric", "empirical", "nonparametric"):
+            y_lower, y_upper = generate_multistep_interval(
+                y_forecast_values,
+                model_prepared,
+                general_dict,
+                observations_dict,
+                model_type_dict,
+                lags_dict,
+                params_info,
+                adam_cpp,
+                level_low,
+                level_up,
+                resolved_interval,
             )
             if general_dict.get("scenarios", False):
                 warnings.warn('scenarios=True requires interval="simulated". Ignored.')
         else:
             raise NotImplementedError(
-                f'interval="{resolved_interval}" is not yet implemented'
+                f'interval="{resolved_interval}" is not yet implemented. '
+                '"confidence" and "complete" require reforecast() '
+                "which is not yet ported."
             )
 
         n_levels = len(level_low)
@@ -909,6 +951,27 @@ def forecaster_combined(
 
         general_dict_copy = copy.deepcopy(general_dict)
 
+        # Use the sub-model's own distribution (stored by preparator at fit time).
+        # Without this, A-error sub-models would inherit the best (M-error) model's
+        # "dgamma" distribution, causing wrong error generation and wider intervals.
+        sub_dist = prepared.get("distribution")
+        if sub_dist:
+            general_dict_copy["distribution"] = sub_dist
+
+        # Build per-sub-model NParam so simulation uses df = T - k_i, not weighted_k.
+        n_est_i = model_info.get("n_param_estimated", 0)
+        n_param_sub = NParam()
+        n_param_sub.estimated["internal"] = n_est_i
+        if general_dict_copy.get("loss") == "likelihood":
+            n_param_sub.estimated["scale"] = 1
+        n_param_sub.update_totals()
+        general_dict_copy["n_param"] = n_param_sub
+
+        # Build per-sub-model params_info for sigma() in approximate intervals.
+        # Combined model stores [[0],[0]] which would cause IndexError in sigma().
+        n_scale = 1 if general_dict_copy.get("loss") == "likelihood" else 0
+        sub_params_info = [[n_est_i, n_scale, n_est_i + n_scale], [0]]
+
         model_forecast = forecaster(
             model_prepared=prepared,
             observations_dict=observations_dict,
@@ -925,7 +988,7 @@ def forecaster_combined(
                 "constants_dict",
                 {"constant_required": False},
             ),
-            params_info=params_info,
+            params_info=sub_params_info,
             adam_cpp=adam_cpp,
             interval=interval,
             level=level,

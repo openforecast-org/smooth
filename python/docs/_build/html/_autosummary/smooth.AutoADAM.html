@@ -1,0 +1,461 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.AutoADAM &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.AutoADAM.fit" href="smooth.AutoADAM.fit.html" />
+    <link rel="prev" title="smooth.ADAM.transition" href="smooth.ADAM.transition.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">smooth.AutoADAM</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#smooth.AutoADAM"><code class="docutils literal notranslate"><span class="pre">AutoADAM</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.outlierdummy.html">smooth.AutoADAM.outlierdummy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.plot.html">smooth.AutoADAM.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.predict_intervals.html">smooth.AutoADAM.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.rmultistep.html">smooth.AutoADAM.rmultistep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.rstandard.html">smooth.AutoADAM.rstandard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.rstudent.html">smooth.AutoADAM.rstudent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.select_best_model.html">smooth.AutoADAM.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.summary.html">smooth.AutoADAM.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.actuals.html">smooth.AutoADAM.actuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.aic.html">smooth.AutoADAM.aic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.aicc.html">smooth.AutoADAM.aicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.b_value.html">smooth.AutoADAM.b_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.bic.html">smooth.AutoADAM.bic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.bicc.html">smooth.AutoADAM.bicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.coef.html">smooth.AutoADAM.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.constant_value.html">smooth.AutoADAM.constant_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.data.html">smooth.AutoADAM.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.distribution_.html">smooth.AutoADAM.distribution_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.error_type.html">smooth.AutoADAM.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.fitted.html">smooth.AutoADAM.fitted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.holdout_data.html">smooth.AutoADAM.holdout_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.ic_weights.html">smooth.AutoADAM.ic_weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.initial_type.html">smooth.AutoADAM.initial_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.initial_value.html">smooth.AutoADAM.initial_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.is_combined.html">smooth.AutoADAM.is_combined</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.lags_used.html">smooth.AutoADAM.lags_used</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.loglik.html">smooth.AutoADAM.loglik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.loss_.html">smooth.AutoADAM.loss_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.loss_value.html">smooth.AutoADAM.loss_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.measurement.html">smooth.AutoADAM.measurement</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.model_name.html">smooth.AutoADAM.model_name</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.model_type.html">smooth.AutoADAM.model_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.models.html">smooth.AutoADAM.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.n_param.html">smooth.AutoADAM.n_param</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.nobs.html">smooth.AutoADAM.nobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.nparam.html">smooth.AutoADAM.nparam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.om_model.html">smooth.AutoADAM.om_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.orders.html">smooth.AutoADAM.orders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.persistence_vector.html">smooth.AutoADAM.persistence_vector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.phi_.html">smooth.AutoADAM.phi_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.profile.html">smooth.AutoADAM.profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.residuals.html">smooth.AutoADAM.residuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.scale.html">smooth.AutoADAM.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.sigma.html">smooth.AutoADAM.sigma</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.states.html">smooth.AutoADAM.states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.time_elapsed.html">smooth.AutoADAM.time_elapsed</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.transition.html">smooth.AutoADAM.transition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">smooth.AutoADAM</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.AutoADAM.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-autoadam">
+<h1>smooth.AutoADAM<a class="headerlink" href="#smooth-autoadam" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="smooth.AutoADAM">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">AutoADAM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ZXZ'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ar_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ma_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arima_select</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distribution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outliers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ignore'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.99</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ets</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'conventional'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.AutoADAM" title="Link to this definition"></a></dt>
+<dd><p>Automatic ADAM model selection.</p>
+<p>Wraps <a class="reference internal" href="smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a> with automatic selection of ARIMA orders and error
+distribution, mirroring R’s <code class="docutils literal notranslate"><span class="pre">auto.adam()</span></code> function.</p>
+<p>ETS model selection (ZZZ, ZXZ, FFF, CCC …) is handled by the underlying
+ADAM machinery and is not duplicated here.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>List</em><em>[</em><em>str</em><em>]</em><em>]</em><em>, </em><em>default=&quot;ZXZ&quot;</em>) – ETS model specification passed to each internal ADAM fit.
+Supports all codes accepted by <a class="reference internal" href="smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a>.</p></li>
+<li><p><strong>lags</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – Seasonal period(s). Lag 1 is prepended automatically when absent.</p></li>
+<li><p><strong>ar_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=</em><em>[</em><em>3</em><em>, </em><em>3</em><em>]</em>) – Maximum AR order(s) per lag level for ARIMA selection.
+Defaults to <code class="docutils literal notranslate"><span class="pre">[3,</span> <span class="pre">3]</span></code> matching R’s <code class="docutils literal notranslate"><span class="pre">auto.adam()</span></code>.</p></li>
+<li><p><strong>i_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=</em><em>[</em><em>2</em><em>, </em><em>1</em><em>]</em>) – Maximum integration order(s) per lag level for ARIMA selection.
+Defaults to <code class="docutils literal notranslate"><span class="pre">[2,</span> <span class="pre">1]</span></code> matching R’s <code class="docutils literal notranslate"><span class="pre">auto.adam()</span></code>.</p></li>
+<li><p><strong>ma_order</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>, </em><em>default=</em><em>[</em><em>3</em><em>, </em><em>3</em><em>]</em>) – Maximum MA order(s) per lag level for ARIMA selection.
+Defaults to <code class="docutils literal notranslate"><span class="pre">[3,</span> <span class="pre">3]</span></code> matching R’s <code class="docutils literal notranslate"><span class="pre">auto.adam()</span></code>.</p></li>
+<li><p><strong>orders</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – R-style alternative to scalar max orders. A dict with keys
+<code class="docutils literal notranslate"><span class="pre">&quot;ar&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;i&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code> (each an int or list) and optionally
+<code class="docutils literal notranslate"><span class="pre">&quot;select&quot;</span></code> (bool). When provided, <code class="docutils literal notranslate"><span class="pre">ar_order</span></code>/<code class="docutils literal notranslate"><span class="pre">i_order</span></code>/
+<code class="docutils literal notranslate"><span class="pre">ma_order</span></code> are ignored.</p></li>
+<li><p><strong>arima_select</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Whether to perform ARIMA order selection. Unlike <a class="reference internal" href="smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a>,
+this defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><p><strong>distribution</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>List</em><em>[</em><em>str</em><em>]</em><em>]</em><em>, </em><em>default=</em><em>(</em><em>all 7 distributions</em><em>)</em>) – Distribution(s) to try. When a list is supplied every entry is
+fitted and the one with lowest IC is kept.  A single string uses
+only that distribution (no selection loop).</p></li>
+<li><p><strong>outliers</strong> (<em>Literal</em><em>[</em><em>&quot;ignore&quot;</em><em>, </em><em>&quot;use&quot;</em><em>, </em><em>&quot;select&quot;</em><em>]</em><em>, </em><em>default=&quot;ignore&quot;</em>) – Outlier handling mode.  <code class="docutils literal notranslate"><span class="pre">&quot;use&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;select&quot;</span></code> are accepted but
+not yet implemented; a <code class="xref py py-class docutils literal notranslate"><span class="pre">UserWarning</span></code> is issued.</p></li>
+<li><p><strong>level</strong> (<em>float</em><em>, </em><em>default=0.99</em>) – Confidence level for outlier detection (placeholder for future use).</p></li>
+<li><p><strong>ic</strong> (<em>Literal</em><em>[</em><em>&quot;AIC&quot;</em><em>, </em><em>&quot;AICc&quot;</em><em>, </em><em>&quot;BIC&quot;</em><em>, </em><em>&quot;BICc&quot;</em><em>]</em><em>, </em><em>default=&quot;AICc&quot;</em>) – Information criterion used for all model comparisons.</p></li>
+<li><p><strong>loss</strong> (<em>LOSS_OPTIONS</em><em>, </em><em>default=&quot;likelihood&quot;</em>) – Loss function for parameter estimation.</p></li>
+<li><p><strong>constant</strong> (<em>Union</em><em>[</em><em>bool</em><em>, </em><em>float</em><em>]</em><em>, </em><em>default=False</em>) – Constant/drift term. Overridden by ARIMA selection when
+<code class="docutils literal notranslate"><span class="pre">arima_select=True</span></code> (the selection algorithm tests constant on/off).</p></li>
+<li><p><strong>holdout</strong> (<em>bool</em><em>, </em><em>default=False</em>) – Whether to use a holdout sample.</p></li>
+<li><p><strong>h</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em><em>, </em><em>default=None</em>) – Forecast horizon.</p></li>
+<li><p><strong>bounds</strong> (<em>Literal</em><em>[</em><em>&quot;usual&quot;</em><em>, </em><em>&quot;admissible&quot;</em><em>, </em><em>&quot;none&quot;</em><em>]</em><em>, </em><em>default=&quot;usual&quot;</em>) – Parameter bounds type.</p></li>
+<li><p><strong>initial</strong> (<em>str</em><em> or </em><em>dict</em><em>, </em><em>default=&quot;backcasting&quot;</em>) – Initialisation method or fixed initial values.</p></li>
+<li><p><strong>regressors</strong> (<em>Literal</em><em>[</em><em>&quot;use&quot;</em><em>, </em><em>&quot;select&quot;</em><em>, </em><em>&quot;adapt&quot;</em><em>]</em><em>, </em><em>default=&quot;use&quot;</em>) – How to handle external regressors.</p></li>
+<li><p><strong>verbose</strong> (<em>int</em><em>, </em><em>default=0</em>) – Verbosity level for the <em>final</em> model fit. All intermediate
+selection fits are always silent.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments forwarded to every internal <a class="reference internal" href="smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a> fit.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM</span></code></a></dt><dd><p>Full ADAM model.</p>
+</dd>
+<dt><a class="reference internal" href="smooth.ES.html#smooth.ES" title="smooth.ES"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ES</span></code></a></dt><dd><p>ETS-only wrapper.</p>
+</dd>
+<dt><a class="reference internal" href="../msarima.html#smooth.MSARIMA" title="smooth.MSARIMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MSARIMA</span></code></a></dt><dd><p>Pure ARIMA wrapper.</p>
+</dd>
+</dl>
+</div>
+<p class="rubric">Examples</p>
+<p>Full automatic selection (ETS + ARIMA + distribution):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoADAM</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">120</span><span class="p">))</span> <span class="o">+</span> <span class="mi">100</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">AutoADAM</span><span class="p">(</span><span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">12</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">distribution_</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>ARIMA-only automatic selection (no ETS):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">AutoADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;NNN&quot;</span><span class="p">,</span> <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Fix the distribution, only select ARIMA orders:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">AutoADAM</span><span class="p">(</span><span class="n">distribution</span><span class="o">=</span><span class="s2">&quot;dnorm&quot;</span><span class="p">,</span> <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+</pre></div>
+</div>
+<p class="rubric">References</p>
+<ul class="simple">
+<li><p>Svetunkov, I. (2023). Forecasting and Analytics with the Augmented
+Dynamic Adaptive Model. <a class="reference external" href="https://openforecast.org/adam/">https://openforecast.org/adam/</a></p></li>
+</ul>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.fit.html#smooth.AutoADAM.fit" title="smooth.AutoADAM.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>(y[, X])</p></td>
+<td><p>Fit the AutoADAM model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.outlierdummy.html#smooth.AutoADAM.outlierdummy" title="smooth.AutoADAM.outlierdummy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">outlierdummy</span></code></a>([level, type])</p></td>
+<td><p>Detect outliers and return a matrix of indicator dummy variables.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.plot.html#smooth.AutoADAM.plot" title="smooth.AutoADAM.plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot</span></code></a>([which, level, legend, lowess])</p></td>
+<td><p>Diagnostic plots for the fitted ADAM model (R: <code class="docutils literal notranslate"><span class="pre">plot.adam</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.predict.html#smooth.AutoADAM.predict" title="smooth.AutoADAM.predict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict</span></code></a>(h[, X, interval, level, side, ...])</p></td>
+<td><p>Generate forecasts using the fitted ADAM model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.predict_intervals.html#smooth.AutoADAM.predict_intervals" title="smooth.AutoADAM.predict_intervals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict_intervals</span></code></a>(h[, X, levels, side, nsim])</p></td>
+<td><p>Generate prediction intervals using the fitted ADAM model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.rmultistep.html#smooth.AutoADAM.rmultistep" title="smooth.AutoADAM.rmultistep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rmultistep</span></code></a>([h])</p></td>
+<td><p>Return the (T-h) × h matrix of rolling in-sample multistep forecast errors.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.rstandard.html#smooth.AutoADAM.rstandard" title="smooth.AutoADAM.rstandard"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rstandard</span></code></a>()</p></td>
+<td><p>Return standardised residuals.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.rstudent.html#smooth.AutoADAM.rstudent" title="smooth.AutoADAM.rstudent"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rstudent</span></code></a>()</p></td>
+<td><p>Return studentised (leave-one-out) residuals.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.select_best_model.html#smooth.AutoADAM.select_best_model" title="smooth.AutoADAM.select_best_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">select_best_model</span></code></a>()</p></td>
+<td><p>Select the best model based on information criteria and update model parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.summary.html#smooth.AutoADAM.summary" title="smooth.AutoADAM.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([digits])</p></td>
+<td><p>Generate a formatted summary of the fitted model.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.actuals.html#smooth.AutoADAM.actuals" title="smooth.AutoADAM.actuals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">actuals</span></code></a></p></td>
+<td><p>Return original in-sample data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.aic.html#smooth.AutoADAM.aic" title="smooth.AutoADAM.aic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">aic</span></code></a></p></td>
+<td><p>Return Akaike Information Criterion.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.aicc.html#smooth.AutoADAM.aicc" title="smooth.AutoADAM.aicc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">aicc</span></code></a></p></td>
+<td><p>Return corrected Akaike Information Criterion.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.b_value.html#smooth.AutoADAM.b_value" title="smooth.AutoADAM.b_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">b_value</span></code></a></p></td>
+<td><p>$B).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.bic.html#smooth.AutoADAM.bic" title="smooth.AutoADAM.bic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bic</span></code></a></p></td>
+<td><p>Return Bayesian Information Criterion.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.bicc.html#smooth.AutoADAM.bicc" title="smooth.AutoADAM.bicc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bicc</span></code></a></p></td>
+<td><p>Return corrected Bayesian Information Criterion.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.coef.html#smooth.AutoADAM.coef" title="smooth.AutoADAM.coef"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coef</span></code></a></p></td>
+<td><p>Return estimated coefficients (parameter vector B).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.constant_value.html#smooth.AutoADAM.constant_value" title="smooth.AutoADAM.constant_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_value</span></code></a></p></td>
+<td><p>$constant).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.data.html#smooth.AutoADAM.data" title="smooth.AutoADAM.data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span></code></a></p></td>
+<td><p>$data).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.distribution_.html#smooth.AutoADAM.distribution_" title="smooth.AutoADAM.distribution_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">distribution_</span></code></a></p></td>
+<td><p>$distribution).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.error_type.html#smooth.AutoADAM.error_type" title="smooth.AutoADAM.error_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_type</span></code></a></p></td>
+<td><p>'A' (additive) or 'M' (multiplicative).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.fitted.html#smooth.AutoADAM.fitted" title="smooth.AutoADAM.fitted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted</span></code></a></p></td>
+<td><p>Return in-sample fitted values.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.holdout_data.html#smooth.AutoADAM.holdout_data" title="smooth.AutoADAM.holdout_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">holdout_data</span></code></a></p></td>
+<td><p>$holdout).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.ic_weights.html#smooth.AutoADAM.ic_weights" title="smooth.AutoADAM.ic_weights"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ic_weights</span></code></a></p></td>
+<td><p>$ICw).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.initial_type.html#smooth.AutoADAM.initial_type" title="smooth.AutoADAM.initial_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_type</span></code></a></p></td>
+<td><p>$initialType).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.initial_value.html#smooth.AutoADAM.initial_value" title="smooth.AutoADAM.initial_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_value</span></code></a></p></td>
+<td><p>$initial).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.is_combined.html#smooth.AutoADAM.is_combined" title="smooth.AutoADAM.is_combined"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_combined</span></code></a></p></td>
+<td><p>Return True if model is a combination of multiple models.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.lags_used.html#smooth.AutoADAM.lags_used" title="smooth.AutoADAM.lags_used"><code class="xref py py-obj docutils literal notranslate"><span class="pre">lags_used</span></code></a></p></td>
+<td><p>Return the vector of lags used in the model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.loglik.html#smooth.AutoADAM.loglik" title="smooth.AutoADAM.loglik"><code class="xref py py-obj docutils literal notranslate"><span class="pre">loglik</span></code></a></p></td>
+<td><p>Return log-likelihood of the fitted model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.loss_.html#smooth.AutoADAM.loss_" title="smooth.AutoADAM.loss_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">loss_</span></code></a></p></td>
+<td><p>$loss).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.loss_value.html#smooth.AutoADAM.loss_value" title="smooth.AutoADAM.loss_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">loss_value</span></code></a></p></td>
+<td><p>$lossValue).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.measurement.html#smooth.AutoADAM.measurement" title="smooth.AutoADAM.measurement"><code class="xref py py-obj docutils literal notranslate"><span class="pre">measurement</span></code></a></p></td>
+<td><p>$measurement).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.model_name.html#smooth.AutoADAM.model_name" title="smooth.AutoADAM.model_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_name</span></code></a></p></td>
+<td><p>modelName()).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.model_type.html#smooth.AutoADAM.model_type" title="smooth.AutoADAM.model_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_type</span></code></a></p></td>
+<td><p>Return ETS model type code (e.g., 'AAN', 'AAA', 'MAdM').</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.models.html#smooth.AutoADAM.models" title="smooth.AutoADAM.models"><code class="xref py py-obj docutils literal notranslate"><span class="pre">models</span></code></a></p></td>
+<td><p>$models).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.n_param.html#smooth.AutoADAM.n_param" title="smooth.AutoADAM.n_param"><code class="xref py py-obj docutils literal notranslate"><span class="pre">n_param</span></code></a></p></td>
+<td><p>$nParam).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.nobs.html#smooth.AutoADAM.nobs" title="smooth.AutoADAM.nobs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nobs</span></code></a></p></td>
+<td><p>Return number of observations used for fitting.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.nparam.html#smooth.AutoADAM.nparam" title="smooth.AutoADAM.nparam"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nparam</span></code></a></p></td>
+<td><p>Return number of estimated parameters.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.om_model.html#smooth.AutoADAM.om_model" title="smooth.AutoADAM.om_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">om_model</span></code></a></p></td>
+<td><p>Fitted occurrence model (OM / OMG / AutoOM), or None.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.orders.html#smooth.AutoADAM.orders" title="smooth.AutoADAM.orders"><code class="xref py py-obj docutils literal notranslate"><span class="pre">orders</span></code></a></p></td>
+<td><p>Return ARIMA orders as dict with 'ar', 'i', 'ma' keys.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.persistence_vector.html#smooth.AutoADAM.persistence_vector" title="smooth.AutoADAM.persistence_vector"><code class="xref py py-obj docutils literal notranslate"><span class="pre">persistence_vector</span></code></a></p></td>
+<td><p>$persistence).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.phi_.html#smooth.AutoADAM.phi_" title="smooth.AutoADAM.phi_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">phi_</span></code></a></p></td>
+<td><p>$phi).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.profile.html#smooth.AutoADAM.profile" title="smooth.AutoADAM.profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">profile</span></code></a></p></td>
+<td><p>$profile).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.residuals.html#smooth.AutoADAM.residuals" title="smooth.AutoADAM.residuals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">residuals</span></code></a></p></td>
+<td><p>Return model residuals (errors from fitting).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.scale.html#smooth.AutoADAM.scale" title="smooth.AutoADAM.scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale</span></code></a></p></td>
+<td><p>$scale).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.sigma.html#smooth.AutoADAM.sigma" title="smooth.AutoADAM.sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma</span></code></a></p></td>
+<td><p>Return scale/standard error estimate.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.states.html#smooth.AutoADAM.states" title="smooth.AutoADAM.states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">states</span></code></a></p></td>
+<td><p>$states).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.AutoADAM.time_elapsed.html#smooth.AutoADAM.time_elapsed" title="smooth.AutoADAM.time_elapsed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_elapsed</span></code></a></p></td>
+<td><p>Time taken to fit the model in seconds.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.AutoADAM.transition.html#smooth.AutoADAM.transition" title="smooth.AutoADAM.transition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">transition</span></code></a></p></td>
+<td><p>$transition).</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.ADAM.transition.html" class="btn btn-neutral float-left" title="smooth.ADAM.transition" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.AutoADAM.fit.html" class="btn btn-neutral float-right" title="smooth.AutoADAM.fit" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

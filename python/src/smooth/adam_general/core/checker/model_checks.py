@@ -638,6 +638,18 @@ def _check_ets_model(model, distribution, data, silent=False, max_lag=1):
             "allow_multiplicative": allow_multiplicative,
         }
 
+    # Check if NNN (pure ARIMA, no ETS)
+    if isinstance(model, str) and model.upper() == "NNN":
+        return {
+            "ets_model": False,
+            "model": "NNN",
+            "error_type": "A",
+            "trend_type": "N",
+            "season_type": "N",
+            "damped": False,
+            "allow_multiplicative": allow_multiplicative,
+        }
+
     # Check if this is an ETS model
     if isinstance(model, str) and len(model) in [3, 4]:
         # Parse model configuration

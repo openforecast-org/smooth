@@ -64,6 +64,18 @@ is.oesg <- function(x){
 
 #' @rdname isFunctions
 #' @export
+is.om <- function(x){
+    return(inherits(x,"om"))
+}
+
+#' @rdname isFunctions
+#' @export
+is.omg <- function(x){
+    return(inherits(x,"omg"))
+}
+
+#' @rdname isFunctions
+#' @export
 is.smooth.sim <- function(x){
     return(inherits(x,"smooth.sim"))
 }

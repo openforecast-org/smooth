@@ -91,7 +91,7 @@ jobs:
           
           # Install system dependencies for BLAS/LAPACK
           # Linux: Install OpenBLAS and LAPACK
-          CIBW_BEFORE_BUILD_LINUX: yum install -y openblas-devel lapack-devel
+          CIBW_BEFORE_BUILD_LINUX: yum install -y openblas-devel lapack-devel || dnf install -y openblas-devel lapack-devel
           
           # macOS: Install OpenBLAS via brew
           CIBW_BEFORE_BUILD_MACOS: brew install openblas || true
@@ -173,8 +173,7 @@ jobs:
           generate_release_notes: true
           body: |
             ## Installation
-            
-            Install from PyPI (once available):
+
             ```bash
             pip install smooth
             ```
@@ -191,23 +190,28 @@ jobs:
 
   # Optional: Upload to PyPI
   # Uncomment this job when you're ready to publish to PyPI
-  # upload_pypi:
-  #   name: Upload to PyPI
-  #   needs: [build_wheels, build_sdist]
-  #   runs-on: ubuntu-latest
-  #   # Only upload to PyPI on tag pushes
-  #   if: startsWith(github.ref, 'refs/tags/')
-  #   environment:
-  #     name: pypi
-  #     url: https://pypi.org/p/smooth
-  #   permissions:
-  #     id-token: write  # Required for trusted publishing
-  #   steps:
-  #     - name: Download all artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         path: dist
-  #         merge-multiple: true
-  #
-  #     - name: Publish to PyPI
-  #       uses: pypa/gh-action-pypi-publish@release/v1
+  upload_pypi:
+    name: Upload to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    # Only upload to PyPI on tag pushes
+    if: startsWith(github.ref, 'refs/tags/')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/smooth
+    permissions:
+      id-token: write  # Required for trusted publishing
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Display downloaded files
+        run: ls -R dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist

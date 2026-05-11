@@ -1052,7 +1052,8 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         else{
             occurrenceModel <- FALSE;
             # If this was provided occurrence, then use provided values
-            if(!is.null(object$occurrence) && !is.null(object$occurrence$occurrence) &&
+            if(!is.null(object$occurrence) && is.list(object$occurrence) &&
+               !is.null(object$occurrence$occurrence) &&
                (object$occurrence$occurrence=="provided")){
                 pForecast <- object$occurrence$forecast;
             }

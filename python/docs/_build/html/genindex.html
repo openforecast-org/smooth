@@ -41,7 +41,13 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.html">smooth.AutoOM</a></li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
@@ -49,6 +55,16 @@
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.fit.html">smooth.ES.fit</a></li>
@@ -57,9 +73,31 @@
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="lowess.html">lowess</a></li>
 </ul>
@@ -115,25 +153,61 @@
       <li><a href="_autosummary/smooth.ADAM.actuals.html#smooth.ADAM.actuals">actuals (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.actuals.html#smooth.AutoADAM.actuals">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.actuals.html#smooth.AutoMSARIMA.actuals">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.actuals.html#smooth.ES.actuals">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.actuals.html#smooth.MSARIMA.actuals">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.actuals.html#smooth.OM.actuals">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.actuals.html#smooth.OMG.actuals">(smooth.OMG property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.html#smooth.ADAM">ADAM (class in smooth)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/smooth.ADAM.aic.html#smooth.ADAM.aic">aic (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.aic.html#smooth.AutoADAM.aic">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.aic.html#smooth.AutoMSARIMA.aic">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.aic.html#smooth.ES.aic">(smooth.ES property)</a>
 </li>
+        <li><a href="_autosummary/smooth.MSARIMA.aic.html#smooth.MSARIMA.aic">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.aic.html#smooth.OM.aic">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.aic.html#smooth.OMG.aic">(smooth.OMG property)</a>
+</li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/smooth.ADAM.aicc.html#smooth.ADAM.aicc">aicc (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.aicc.html#smooth.AutoADAM.aicc">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.aicc.html#smooth.AutoMSARIMA.aicc">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.aicc.html#smooth.ES.aicc">(smooth.ES property)</a>
 </li>
+        <li><a href="_autosummary/smooth.MSARIMA.aicc.html#smooth.MSARIMA.aicc">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.aicc.html#smooth.OM.aicc">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.aicc.html#smooth.OMG.aicc">(smooth.OMG property)</a>
+</li>
       </ul></li>
+      <li><a href="_autosummary/smooth.AutoADAM.html#smooth.AutoADAM">AutoADAM (class in smooth)</a>, <a href="autoadam.html#smooth.AutoADAM">[1]</a>
+</li>
+      <li><a href="_autosummary/smooth.AutoMSARIMA.html#smooth.AutoMSARIMA">AutoMSARIMA (class in smooth)</a>, <a href="msarima.html#smooth.AutoMSARIMA">[1]</a>
+</li>
+      <li><a href="_autosummary/smooth.AutoOM.html#smooth.AutoOM">AutoOM (class in smooth)</a>, <a href="om.html#smooth.AutoOM">[1]</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -143,13 +217,33 @@
       <li><a href="_autosummary/smooth.ADAM.b_value.html#smooth.ADAM.b_value">b_value (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.b_value.html#smooth.AutoADAM.b_value">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.b_value.html#smooth.AutoMSARIMA.b_value">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.b_value.html#smooth.ES.b_value">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.b_value.html#smooth.MSARIMA.b_value">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.b_value.html#smooth.OM.b_value">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.b_value.html#smooth.OMG.b_value">(smooth.OMG property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.bic.html#smooth.ADAM.bic">bic (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.bic.html#smooth.AutoADAM.bic">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.bic.html#smooth.AutoMSARIMA.bic">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.bic.html#smooth.ES.bic">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.bic.html#smooth.MSARIMA.bic">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.bic.html#smooth.OM.bic">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.bic.html#smooth.OMG.bic">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -157,7 +251,17 @@
       <li><a href="_autosummary/smooth.ADAM.bicc.html#smooth.ADAM.bicc">bicc (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.bicc.html#smooth.AutoADAM.bicc">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.bicc.html#smooth.AutoMSARIMA.bicc">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.bicc.html#smooth.ES.bicc">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.bicc.html#smooth.MSARIMA.bicc">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.bicc.html#smooth.OM.bicc">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.bicc.html#smooth.OMG.bicc">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -169,7 +273,17 @@
       <li><a href="_autosummary/smooth.ADAM.coef.html#smooth.ADAM.coef">coef (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.coef.html#smooth.AutoADAM.coef">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.coef.html#smooth.AutoMSARIMA.coef">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.coef.html#smooth.ES.coef">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.coef.html#smooth.MSARIMA.coef">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.coef.html#smooth.OM.coef">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.coef.html#smooth.OMG.coef">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -177,7 +291,15 @@
       <li><a href="_autosummary/smooth.ADAM.constant_value.html#smooth.ADAM.constant_value">constant_value (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.constant_value.html#smooth.AutoADAM.constant_value">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.constant_value.html#smooth.AutoMSARIMA.constant_value">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.constant_value.html#smooth.ES.constant_value">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.constant_value.html#smooth.MSARIMA.constant_value">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.constant_value.html#smooth.OM.constant_value">(smooth.OM property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -189,7 +311,15 @@
       <li><a href="_autosummary/smooth.ADAM.data.html#smooth.ADAM.data">data (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.data.html#smooth.AutoADAM.data">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.data.html#smooth.AutoMSARIMA.data">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.data.html#smooth.ES.data">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.data.html#smooth.MSARIMA.data">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.data.html#smooth.OM.data">(smooth.OM property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -197,7 +327,17 @@
       <li><a href="_autosummary/smooth.ADAM.distribution_.html#smooth.ADAM.distribution_">distribution_ (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.distribution_.html#smooth.AutoADAM.distribution_">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.distribution_.html#smooth.AutoMSARIMA.distribution_">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.distribution_.html#smooth.ES.distribution_">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.distribution_.html#smooth.MSARIMA.distribution_">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.distribution_.html#smooth.OM.distribution_">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.distribution_.html#smooth.OMG.distribution_">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -209,7 +349,15 @@
       <li><a href="_autosummary/smooth.ADAM.error_type.html#smooth.ADAM.error_type">error_type (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.error_type.html#smooth.AutoADAM.error_type">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.error_type.html#smooth.AutoMSARIMA.error_type">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.error_type.html#smooth.ES.error_type">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.error_type.html#smooth.MSARIMA.error_type">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.error_type.html#smooth.OM.error_type">(smooth.OM property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -225,7 +373,19 @@
       <li><a href="_autosummary/smooth.ADAM.fit.html#smooth.ADAM.fit">fit() (smooth.ADAM method)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.fit.html#smooth.AutoADAM.fit">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.fit.html#smooth.AutoMSARIMA.fit">(smooth.AutoMSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoOM.fit.html#smooth.AutoOM.fit">(smooth.AutoOM method)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.fit.html#smooth.ES.fit">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.fit.html#smooth.MSARIMA.fit">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.fit.html#smooth.OM.fit">(smooth.OM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.fit.html#smooth.OMG.fit">(smooth.OMG method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -233,7 +393,17 @@
       <li><a href="_autosummary/smooth.ADAM.fitted.html#smooth.ADAM.fitted">fitted (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.fitted.html#smooth.AutoADAM.fitted">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.fitted.html#smooth.AutoMSARIMA.fitted">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.fitted.html#smooth.ES.fitted">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.fitted.html#smooth.MSARIMA.fitted">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.fitted.html#smooth.OM.fitted">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.fitted.html#smooth.OMG.fitted">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -245,7 +415,17 @@
       <li><a href="_autosummary/smooth.ADAM.holdout_data.html#smooth.ADAM.holdout_data">holdout_data (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.holdout_data.html#smooth.AutoADAM.holdout_data">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.holdout_data.html#smooth.AutoMSARIMA.holdout_data">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.holdout_data.html#smooth.ES.holdout_data">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.holdout_data.html#smooth.MSARIMA.holdout_data">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.holdout_data.html#smooth.OM.holdout_data">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.holdout_data.html#smooth.OMG.holdout_data">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -257,13 +437,29 @@
       <li><a href="_autosummary/smooth.ADAM.ic_weights.html#smooth.ADAM.ic_weights">ic_weights (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.ic_weights.html#smooth.AutoADAM.ic_weights">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.ic_weights.html#smooth.AutoMSARIMA.ic_weights">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.ic_weights.html#smooth.ES.ic_weights">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.ic_weights.html#smooth.MSARIMA.ic_weights">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.ic_weights.html#smooth.OM.ic_weights">(smooth.OM property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.initial_type.html#smooth.ADAM.initial_type">initial_type (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.initial_type.html#smooth.AutoADAM.initial_type">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.initial_type.html#smooth.AutoMSARIMA.initial_type">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.initial_type.html#smooth.ES.initial_type">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.initial_type.html#smooth.MSARIMA.initial_type">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.initial_type.html#smooth.OM.initial_type">(smooth.OM property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -271,13 +467,29 @@
       <li><a href="_autosummary/smooth.ADAM.initial_value.html#smooth.ADAM.initial_value">initial_value (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.initial_value.html#smooth.AutoADAM.initial_value">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.initial_value.html#smooth.AutoMSARIMA.initial_value">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.initial_value.html#smooth.ES.initial_value">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.initial_value.html#smooth.MSARIMA.initial_value">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.initial_value.html#smooth.OM.initial_value">(smooth.OM property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.is_combined.html#smooth.ADAM.is_combined">is_combined (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.is_combined.html#smooth.AutoADAM.is_combined">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.is_combined.html#smooth.AutoMSARIMA.is_combined">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.is_combined.html#smooth.ES.is_combined">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.is_combined.html#smooth.MSARIMA.is_combined">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.is_combined.html#smooth.OM.is_combined">(smooth.OM property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -289,13 +501,33 @@
       <li><a href="_autosummary/smooth.ADAM.lags_used.html#smooth.ADAM.lags_used">lags_used (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.lags_used.html#smooth.AutoADAM.lags_used">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.lags_used.html#smooth.AutoMSARIMA.lags_used">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.lags_used.html#smooth.ES.lags_used">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.lags_used.html#smooth.MSARIMA.lags_used">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.lags_used.html#smooth.OM.lags_used">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.lags_used.html#smooth.OMG.lags_used">(smooth.OMG property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.loglik.html#smooth.ADAM.loglik">loglik (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.loglik.html#smooth.AutoADAM.loglik">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.loglik.html#smooth.AutoMSARIMA.loglik">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.loglik.html#smooth.ES.loglik">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.loglik.html#smooth.MSARIMA.loglik">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.loglik.html#smooth.OM.loglik">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.loglik.html#smooth.OMG.loglik">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -303,16 +535,36 @@
       <li><a href="_autosummary/smooth.ADAM.loss_.html#smooth.ADAM.loss_">loss_ (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.loss_.html#smooth.AutoADAM.loss_">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.loss_.html#smooth.AutoMSARIMA.loss_">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.loss_.html#smooth.ES.loss_">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.loss_.html#smooth.MSARIMA.loss_">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.loss_.html#smooth.OM.loss_">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.loss_.html#smooth.OMG.loss_">(smooth.OMG property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.loss_value.html#smooth.ADAM.loss_value">loss_value (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.loss_value.html#smooth.AutoADAM.loss_value">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.loss_value.html#smooth.AutoMSARIMA.loss_value">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.loss_value.html#smooth.ES.loss_value">(smooth.ES property)</a>
 </li>
+        <li><a href="_autosummary/smooth.MSARIMA.loss_value.html#smooth.MSARIMA.loss_value">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.loss_value.html#smooth.OM.loss_value">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.loss_value.html#smooth.OMG.loss_value">(smooth.OMG property)</a>
+</li>
       </ul></li>
-      <li><a href="lowess.html#smooth.lowess">lowess() (in module smooth)</a>
+      <li><a href="_autosummary/smooth.lowess.html#smooth.lowess">lowess() (in module smooth)</a>, <a href="lowess.html#smooth.lowess">[1]</a>
 </li>
   </ul></td>
 </tr></table>
@@ -323,13 +575,33 @@
       <li><a href="_autosummary/smooth.ADAM.measurement.html#smooth.ADAM.measurement">measurement (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.measurement.html#smooth.AutoADAM.measurement">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.measurement.html#smooth.AutoMSARIMA.measurement">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.measurement.html#smooth.ES.measurement">(smooth.ES property)</a>
 </li>
+        <li><a href="_autosummary/smooth.MSARIMA.measurement.html#smooth.MSARIMA.measurement">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.measurement.html#smooth.OM.measurement">(smooth.OM property)</a>
+</li>
       </ul></li>
+      <li><a href="_autosummary/smooth.OMG.model.html#smooth.OMG.model">model (smooth.OMG property)</a>
+</li>
       <li><a href="_autosummary/smooth.ADAM.model_name.html#smooth.ADAM.model_name">model_name (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.model_name.html#smooth.AutoADAM.model_name">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.model_name.html#smooth.AutoMSARIMA.model_name">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.model_name.html#smooth.ES.model_name">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.model_name.html#smooth.MSARIMA.model_name">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.model_name.html#smooth.OM.model_name">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.model_name.html#smooth.OMG.model_name">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -337,15 +609,33 @@
       <li><a href="_autosummary/smooth.ADAM.model_type.html#smooth.ADAM.model_type">model_type (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.model_type.html#smooth.AutoADAM.model_type">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.model_type.html#smooth.AutoMSARIMA.model_type">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.model_type.html#smooth.ES.model_type">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.model_type.html#smooth.MSARIMA.model_type">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.model_type.html#smooth.OM.model_type">(smooth.OM property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.models.html#smooth.ADAM.models">models (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.models.html#smooth.AutoADAM.models">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.models.html#smooth.AutoMSARIMA.models">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.models.html#smooth.ES.models">(smooth.ES property)</a>
 </li>
+        <li><a href="_autosummary/smooth.MSARIMA.models.html#smooth.MSARIMA.models">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.models.html#smooth.OM.models">(smooth.OM property)</a>
+</li>
       </ul></li>
+      <li><a href="_autosummary/smooth.MSARIMA.html#smooth.MSARIMA">MSARIMA (class in smooth)</a>, <a href="msarima.html#smooth.MSARIMA">[1]</a>
+</li>
       <li><a href="_autosummary/smooth.msdecompose.html#smooth.msdecompose">msdecompose() (in module smooth)</a>
 </li>
   </ul></td>
@@ -357,13 +647,31 @@
       <li><a href="_autosummary/smooth.ADAM.n_param.html#smooth.ADAM.n_param">n_param (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.n_param.html#smooth.AutoADAM.n_param">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.n_param.html#smooth.AutoMSARIMA.n_param">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.n_param.html#smooth.ES.n_param">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.n_param.html#smooth.MSARIMA.n_param">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.n_param.html#smooth.OM.n_param">(smooth.OM property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.nobs.html#smooth.ADAM.nobs">nobs (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.nobs.html#smooth.AutoADAM.nobs">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.nobs.html#smooth.AutoMSARIMA.nobs">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.nobs.html#smooth.ES.nobs">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.nobs.html#smooth.MSARIMA.nobs">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.nobs.html#smooth.OM.nobs">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.nobs.html#smooth.OMG.nobs">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -371,7 +679,17 @@
       <li><a href="_autosummary/smooth.ADAM.nparam.html#smooth.ADAM.nparam">nparam (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.nparam.html#smooth.AutoADAM.nparam">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.nparam.html#smooth.AutoMSARIMA.nparam">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.nparam.html#smooth.ES.nparam">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.nparam.html#smooth.MSARIMA.nparam">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.nparam.html#smooth.OM.nparam">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.nparam.html#smooth.OMG.nparam">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -380,10 +698,60 @@
 <h2 id="O">O</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/smooth.OM.occurrence.html#smooth.OM.occurrence">occurrence (smooth.OM property)</a>
+
+      <ul>
+        <li><a href="_autosummary/smooth.OMG.occurrence.html#smooth.OMG.occurrence">(smooth.OMG property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/smooth.OM.occurrence_char.html#smooth.OM.occurrence_char">occurrence_char (smooth.OM property)</a>
+</li>
+      <li><a href="_autosummary/smooth.OM.html#smooth.OM">OM (class in smooth)</a>, <a href="om.html#smooth.OM">[1]</a>
+</li>
+      <li><a href="_autosummary/smooth.ADAM.om_model.html#smooth.ADAM.om_model">om_model (smooth.ADAM property)</a>
+
+      <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.om_model.html#smooth.AutoADAM.om_model">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.om_model.html#smooth.AutoMSARIMA.om_model">(smooth.AutoMSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.ES.om_model.html#smooth.ES.om_model">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.om_model.html#smooth.MSARIMA.om_model">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.om_model.html#smooth.OM.om_model">(smooth.OM property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/smooth.OMG.html#smooth.OMG">OMG (class in smooth)</a>, <a href="om.html#smooth.OMG">[1]</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/smooth.ADAM.orders.html#smooth.ADAM.orders">orders (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.orders.html#smooth.AutoADAM.orders">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.orders.html#smooth.AutoMSARIMA.orders">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.orders.html#smooth.ES.orders">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.orders.html#smooth.MSARIMA.orders">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.orders.html#smooth.OM.orders">(smooth.OM property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/smooth.ADAM.outlierdummy.html#smooth.ADAM.outlierdummy">outlierdummy() (smooth.ADAM method)</a>
+
+      <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.outlierdummy.html#smooth.AutoADAM.outlierdummy">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.outlierdummy.html#smooth.AutoMSARIMA.outlierdummy">(smooth.AutoMSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.ES.outlierdummy.html#smooth.ES.outlierdummy">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.outlierdummy.html#smooth.MSARIMA.outlierdummy">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.outlierdummy.html#smooth.OM.outlierdummy">(smooth.OM method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -395,33 +763,89 @@
       <li><a href="_autosummary/smooth.ADAM.persistence_vector.html#smooth.ADAM.persistence_vector">persistence_vector (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.persistence_vector.html#smooth.AutoADAM.persistence_vector">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.persistence_vector.html#smooth.AutoMSARIMA.persistence_vector">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.persistence_vector.html#smooth.ES.persistence_vector">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.persistence_vector.html#smooth.MSARIMA.persistence_vector">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.persistence_vector.html#smooth.OM.persistence_vector">(smooth.OM property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.phi_.html#smooth.ADAM.phi_">phi_ (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.phi_.html#smooth.AutoADAM.phi_">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.phi_.html#smooth.AutoMSARIMA.phi_">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.phi_.html#smooth.ES.phi_">(smooth.ES property)</a>
 </li>
+        <li><a href="_autosummary/smooth.MSARIMA.phi_.html#smooth.MSARIMA.phi_">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.phi_.html#smooth.OM.phi_">(smooth.OM property)</a>
+</li>
       </ul></li>
-      <li><a href="_autosummary/smooth.ADAM.predict.html#smooth.ADAM.predict">predict() (smooth.ADAM method)</a>
+      <li><a href="_autosummary/smooth.ADAM.plot.html#smooth.ADAM.plot">plot() (smooth.ADAM method)</a>
 
       <ul>
-        <li><a href="_autosummary/smooth.ES.predict.html#smooth.ES.predict">(smooth.ES method)</a>
+        <li><a href="_autosummary/smooth.AutoADAM.plot.html#smooth.AutoADAM.plot">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.plot.html#smooth.AutoMSARIMA.plot">(smooth.AutoMSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.ES.plot.html#smooth.ES.plot">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.plot.html#smooth.MSARIMA.plot">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.plot.html#smooth.OM.plot">(smooth.OM method)</a>
 </li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/smooth.ADAM.predict.html#smooth.ADAM.predict">predict() (smooth.ADAM method)</a>
+
+      <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.predict.html#smooth.AutoADAM.predict">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.predict.html#smooth.AutoMSARIMA.predict">(smooth.AutoMSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.ES.predict.html#smooth.ES.predict">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.predict.html#smooth.MSARIMA.predict">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.predict.html#smooth.OM.predict">(smooth.OM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.predict.html#smooth.OMG.predict">(smooth.OMG method)</a>
+</li>
+      </ul></li>
       <li><a href="_autosummary/smooth.ADAM.predict_intervals.html#smooth.ADAM.predict_intervals">predict_intervals() (smooth.ADAM method)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.predict_intervals.html#smooth.AutoADAM.predict_intervals">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.predict_intervals.html#smooth.AutoMSARIMA.predict_intervals">(smooth.AutoMSARIMA method)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.predict_intervals.html#smooth.ES.predict_intervals">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.predict_intervals.html#smooth.MSARIMA.predict_intervals">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.predict_intervals.html#smooth.OM.predict_intervals">(smooth.OM method)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.profile.html#smooth.ADAM.profile">profile (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.profile.html#smooth.AutoADAM.profile">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.profile.html#smooth.AutoMSARIMA.profile">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.profile.html#smooth.ES.profile">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.profile.html#smooth.MSARIMA.profile">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.profile.html#smooth.OM.profile">(smooth.OM property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -433,7 +857,61 @@
       <li><a href="_autosummary/smooth.ADAM.residuals.html#smooth.ADAM.residuals">residuals (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.residuals.html#smooth.AutoADAM.residuals">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.residuals.html#smooth.AutoMSARIMA.residuals">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.residuals.html#smooth.ES.residuals">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.residuals.html#smooth.MSARIMA.residuals">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.residuals.html#smooth.OM.residuals">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.residuals.html#smooth.OMG.residuals">(smooth.OMG property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/smooth.ADAM.rmultistep.html#smooth.ADAM.rmultistep">rmultistep() (smooth.ADAM method)</a>
+
+      <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.rmultistep.html#smooth.AutoADAM.rmultistep">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.rmultistep.html#smooth.AutoMSARIMA.rmultistep">(smooth.AutoMSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.ES.rmultistep.html#smooth.ES.rmultistep">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.rmultistep.html#smooth.MSARIMA.rmultistep">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.rmultistep.html#smooth.OM.rmultistep">(smooth.OM method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/smooth.ADAM.rstandard.html#smooth.ADAM.rstandard">rstandard() (smooth.ADAM method)</a>
+
+      <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.rstandard.html#smooth.AutoADAM.rstandard">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.rstandard.html#smooth.AutoMSARIMA.rstandard">(smooth.AutoMSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.ES.rstandard.html#smooth.ES.rstandard">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.rstandard.html#smooth.MSARIMA.rstandard">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.rstandard.html#smooth.OM.rstandard">(smooth.OM method)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/smooth.ADAM.rstudent.html#smooth.ADAM.rstudent">rstudent() (smooth.ADAM method)</a>
+
+      <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.rstudent.html#smooth.AutoADAM.rstudent">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.rstudent.html#smooth.AutoMSARIMA.rstudent">(smooth.AutoMSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.ES.rstudent.html#smooth.ES.rstudent">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.rstudent.html#smooth.MSARIMA.rstudent">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.rstudent.html#smooth.OM.rstudent">(smooth.OM method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -445,19 +923,47 @@
       <li><a href="_autosummary/smooth.ADAM.scale.html#smooth.ADAM.scale">scale (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.scale.html#smooth.AutoADAM.scale">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.scale.html#smooth.AutoMSARIMA.scale">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.scale.html#smooth.ES.scale">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.scale.html#smooth.MSARIMA.scale">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.scale.html#smooth.OM.scale">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.scale.html#smooth.OMG.scale">(smooth.OMG property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.select_best_model.html#smooth.ADAM.select_best_model">select_best_model() (smooth.ADAM method)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.select_best_model.html#smooth.AutoADAM.select_best_model">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.select_best_model.html#smooth.AutoMSARIMA.select_best_model">(smooth.AutoMSARIMA method)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.select_best_model.html#smooth.ES.select_best_model">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.select_best_model.html#smooth.MSARIMA.select_best_model">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.select_best_model.html#smooth.OM.select_best_model">(smooth.OM method)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.sigma.html#smooth.ADAM.sigma">sigma (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.sigma.html#smooth.AutoADAM.sigma">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.sigma.html#smooth.AutoMSARIMA.sigma">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.sigma.html#smooth.ES.sigma">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.sigma.html#smooth.MSARIMA.sigma">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.sigma.html#smooth.OM.sigma">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.sigma.html#smooth.OMG.sigma">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -465,13 +971,29 @@
       <li><a href="_autosummary/smooth.ADAM.states.html#smooth.ADAM.states">states (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.states.html#smooth.AutoADAM.states">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.states.html#smooth.AutoMSARIMA.states">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.states.html#smooth.ES.states">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.states.html#smooth.MSARIMA.states">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.states.html#smooth.OM.states">(smooth.OM property)</a>
 </li>
       </ul></li>
       <li><a href="_autosummary/smooth.ADAM.summary.html#smooth.ADAM.summary">summary() (smooth.ADAM method)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.summary.html#smooth.AutoADAM.summary">(smooth.AutoADAM method)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.summary.html#smooth.AutoMSARIMA.summary">(smooth.AutoMSARIMA method)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.summary.html#smooth.ES.summary">(smooth.ES method)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.summary.html#smooth.MSARIMA.summary">(smooth.MSARIMA method)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.summary.html#smooth.OM.summary">(smooth.OM method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -483,7 +1005,17 @@
       <li><a href="_autosummary/smooth.ADAM.time_elapsed.html#smooth.ADAM.time_elapsed">time_elapsed (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.time_elapsed.html#smooth.AutoADAM.time_elapsed">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.time_elapsed.html#smooth.AutoMSARIMA.time_elapsed">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.time_elapsed.html#smooth.ES.time_elapsed">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.time_elapsed.html#smooth.MSARIMA.time_elapsed">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.time_elapsed.html#smooth.OM.time_elapsed">(smooth.OM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OMG.time_elapsed.html#smooth.OMG.time_elapsed">(smooth.OMG property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -491,7 +1023,15 @@
       <li><a href="_autosummary/smooth.ADAM.transition.html#smooth.ADAM.transition">transition (smooth.ADAM property)</a>
 
       <ul>
+        <li><a href="_autosummary/smooth.AutoADAM.transition.html#smooth.AutoADAM.transition">(smooth.AutoADAM property)</a>
+</li>
+        <li><a href="_autosummary/smooth.AutoMSARIMA.transition.html#smooth.AutoMSARIMA.transition">(smooth.AutoMSARIMA property)</a>
+</li>
         <li><a href="_autosummary/smooth.ES.transition.html#smooth.ES.transition">(smooth.ES property)</a>
+</li>
+        <li><a href="_autosummary/smooth.MSARIMA.transition.html#smooth.MSARIMA.transition">(smooth.MSARIMA property)</a>
+</li>
+        <li><a href="_autosummary/smooth.OM.transition.html#smooth.OM.transition">(smooth.OM property)</a>
 </li>
       </ul></li>
   </ul></td>

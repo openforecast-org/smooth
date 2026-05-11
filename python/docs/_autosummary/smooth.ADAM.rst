@@ -15,8 +15,13 @@
    :template: method.rst
 
    ~ADAM.fit
+   ~ADAM.outlierdummy
+   ~ADAM.plot
    ~ADAM.predict
    ~ADAM.predict_intervals
+   ~ADAM.rmultistep
+   ~ADAM.rstandard
+   ~ADAM.rstudent
    ~ADAM.select_best_model
    ~ADAM.summary
 
@@ -57,6 +62,7 @@
    ~ADAM.n_param
    ~ADAM.nobs
    ~ADAM.nparam
+   ~ADAM.om_model
    ~ADAM.orders
    ~ADAM.persistence_vector
    ~ADAM.phi_

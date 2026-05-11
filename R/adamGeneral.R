@@ -1,215 +1,16 @@
-parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
-                              outliers=c("ignore","use","select"), level=0.99,
-                              persistence, phi, initial,
-                              distribution=c("default","dnorm","dlaplace","dalaplace","ds","dgnorm",
-                                             "dlnorm","dinvgauss","dgamma"),
-                              loss, h, holdout, occurrence,
-                              ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
-                              regressors, yName,
-                              silent, modelDo, ParentEnvironment,
-                              ellipsis, fast=FALSE){
+commonParametersChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
+                                    persistence, phi, initial,
+                                    distribution=c("default","dnorm","dlaplace","dalaplace","ds","dgnorm",
+                                                   "dlnorm","dinvgauss","dgamma","plogis"),
+                                    loss, h, holdout, occurrence,
+                                    ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
+                                    regressors, yName,
+                                    silent, modelDo,
+                                    ellipsis, fast=FALSE){
 
-    # The function checks the provided parameters of adam and/or oes
-    ##### data #####
-    # yName is the name of the object. It might differ from response if matrix is provided
-    responseName <- yName;
-
-    # If this is simulated, extract the actuals
-    if(is.adam.sim(data) || is.smooth.sim(data)){
-        data <- data$data;
-        lags <- frequency(data);
-    }
-    # If this is Mdata, use all the available stuff
-    else if(inherits(data,"Mdata")){
-        h <- data$h;
-        holdout <- TRUE;
-        if(modelDo!="use"){
-            lags <- frequency(data$x);
-        }
-        data <- ts(c(data$x,data$xx),start=start(data$x),frequency=frequency(data$x));
-    }
-
-    # Extract index from the object in order to use it later
-    ### tsibble has its own index function, so shit happens because of it...
-    if(inherits(data,"tbl_ts")){
-        yIndex <- data[[1]];
-        if(any(duplicated(yIndex))){
-            warning(paste0("You have duplicated time stamps in the variable ",yName,
-                           ". I will refactor this."),call.=FALSE);
-            yIndex <- yIndex[1] + c(1:length(data[[1]])) * diff(tail(yIndex,2));
-        }
-    }
-    else{
-        yIndex <- try(time(data),silent=TRUE);
-        # If we cannot extract time, do something
-        if(inherits(yIndex,"try-error")){
-            if(!is.data.frame(data) && !is.null(dim(data))){
-                yIndex <- as.POSIXct(rownames(data));
-            }
-            else if(is.data.frame(data)){
-                yIndex <- c(1:nrow(data));
-            }
-            else{
-                yIndex <- c(1:length(data));
-            }
-        }
-    }
-    yClasses <- class(data);
-
-    # If this is something like a matrix
-    if(!is.null(ncol(data)) && ncol(data)>1){
-        xregData <- data;
-        # Get rid of the bloody tibble class. Gives me headaches!
-        if(inherits(data,"tbl_df") || inherits(data,"tbl")){
-            data <- as.data.frame(data);
-        }
-
-        if(!is.null(formulaToUse)){
-            responseName <- all.vars(formulaToUse)[1];
-            y <- data[,responseName];
-        }
-        else{
-            responseName <- colnames(xregData)[1];
-            # If we deal with data.table / tibble / data.frame, the syntax is different.
-            # We don't want to import specific classes, so just use inherits()
-            if(inherits(data,"tbl_ts")){
-                # With tsibble we cannot extract explanatory variables easily...
-                y <- data$value;
-            }
-            else if(inherits(data,"data.table") || inherits(data,"data.frame")){
-                y <- data[[1]];
-            }
-            else if(inherits(data,"zoo")){
-                if(ncol(data)>1){
-                    xregData <- as.data.frame(data);
-                }
-                y <- zoo(data[,1],order.by=time(data));
-            }
-            else{
-                y <- data[,1];
-            }
-        }
-        # Give the indeces another try
-        yIndex <- try(time(y),silent=TRUE);
-        # If we cannot extract time, do something
-        if(inherits(yIndex,"try-error")){
-            if(!is.null(dim(data))){
-                yIndex <- try(as.POSIXct(rownames(data)),silent=TRUE);
-                if(inherits(yIndex,"try-error")){
-                    yIndex <- c(1:nrow(data));
-                }
-            }
-            else{
-                yIndex <- c(1:length(y));
-            }
-        }
-        else{
-            yClasses <- class(y);
-        }
-    }
-    else{
-        xregData <- NULL;
-        if(!is.null(ncol(data)) && !is.null(colnames(data)[1])){
-            responseName <- colnames(data)[1];
-            y <- data[,1];
-        }
-        else{
-            y <- data;
-        }
-    }
-
-    # Make the response a secure name
-    responseName <- make.names(responseName);
-
-    # Define obs, the number of observations of in-sample
-    obsAll <- length(y) + (1 - holdout)*h;
-    obsInSample <- length(y) - holdout*h;
-
-
-    if(obsInSample<=0){
-        stop("The number of in-sample observations is not positive. Cannot do anything.",
-             call.=FALSE);
-    }
-
-    # Interpolate NAs using fourier + polynomials
-    yNAValues <- is.na(y);
-    if(any(yNAValues)){
-        warning("Data contains NAs. The values will be ignored during the model construction.",call.=FALSE);
-        X <- cbind(1,poly(c(1:obsAll),degree=min(max(trunc(obsAll/10),1),5)),
-                   sinpi(matrix(c(1:obsAll)*rep(c(1:max(max(lags),10)),each=obsAll)/max(max(lags),10), ncol=max(max(lags),10))));
-        # If we deal with purely positive data, take logarithms to deal with multiplicative seasonality
-        if(any(y[!yNAValues]<=0)){
-            lmFit <- .lm.fit(X[!yNAValues,,drop=FALSE], matrix(y[!yNAValues],ncol=1));
-            y[yNAValues] <- (X %*% coef(lmFit))[yNAValues];
-        }
-        else{
-            lmFit <- .lm.fit(X[!yNAValues,,drop=FALSE], matrix(log(y[!yNAValues]),ncol=1));
-            y[yNAValues] <- exp(X %*% coef(lmFit))[yNAValues];
-        }
-        if(!is.null(xregData)){
-            xregData[yNAValues,responseName] <- y[yNAValues];
-        }
-        rm(X);
-        # Clean memory if have a big object
-        if(obsInSample>10000){
-            gc(verbose=FALSE);
-        }
-    }
-
-    # If this is just a numeric variable, use ts class
-    if(all(yClasses=="integer") || all(yClasses=="numeric") ||
-       all(yClasses=="data.frame") || all(yClasses=="matrix")){
-        if(any(class(yIndex) %in% c("POSIXct","Date"))){
-            yClasses <- "zoo";
-        }
-        else{
-            yClasses <- "ts";
-        }
-    }
-    yFrequency <- frequency(y);
-    yStart <- yIndex[1];
-    yInSample <- matrix(y[1:obsInSample],ncol=1);
-    if(holdout){
-        yForecastStart <- yIndex[obsInSample+1];
-        yHoldout <- matrix(y[-c(1:obsInSample)],ncol=1);
-        yForecastIndex <- yIndex[-c(1:obsInSample)];
-        yInSampleIndex <- yIndex[c(1:obsInSample)];
-        yIndexAll <- yIndex;
-    }
-    else{
-        yInSampleIndex <- yIndex;
-        if(any(yClasses=="ts")){
-            yIndexDiff <- deltat(yIndex);
-            yForecastIndex <- yIndex[obsInSample]+yIndexDiff*c(1:max(h,1));
-        }
-        else{
-            yIndexDiff <- diff(tail(yIndex,2));
-            yForecastIndex <- yIndex[obsInSample]+yIndexDiff*c(1:max(h,1));
-        }
-        yForecastStart <- yIndex[obsInSample]+yIndexDiff;
-        yHoldout <- NULL;
-        yIndexAll <- c(yIndex,yForecastIndex);
-    }
-
-    if(!is.numeric(yInSample)){
-        stop("The provided data is not numeric! Can't construct any model!", call.=FALSE);
-    }
-
-    # If the user asked for trend, but it's not in the data, add it
-    if(!is.null(formulaToUse) &&
-       any(all.vars(formulaToUse)=="trend") && all(colnames(xregData)!="trend")){
-        if(!is.null(xregData)){
-            xregData <- cbind(xregData,trend=c(1:obsAll));
-        }
-        else{
-            xregData <- cbind(y=y,trend=c(1:obsAll));
-        }
-    }
-
-    # Number of parameters to estimate / provided
-    parametersNumber <- matrix(0,2,5,
-                               dimnames=list(c("Estimated","Provided"),
-                                             c("nParamInternal","nParamXreg","nParamOccurrence","nParamScale","nParamAll")));
+    #### Data ####
+    list2env(adam_checkData(data, lags, h, holdout, yName, modelDo, formulaToUse),
+             envir=environment());
 
     #### Check what is used for the model ####
     if(!is.character(model)){
@@ -759,22 +560,14 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
         componentsNumberETSSeasonal <- 0;
     }
 
-    outliers <- match.arg(outliers);
-    if(outliers!="ignore"){
-        select <- TRUE;
-    }
-
     if(!fast){
         #### Distribution selected ####
         distribution <- match.arg(distribution[1], c("default","dnorm","dlaplace","dalaplace","ds","dgnorm",
-                                                  "dlnorm","dinvgauss","dgamma"));
+                                                      "dlnorm","dinvgauss","dgamma","plogis"));
     }
 
     if(select){
-        assign("distribution",distribution,ParentEnvironment);
-        assign("outliers",outliers,ParentEnvironment);
-        # This stuff is needed for switch to auto.adam.
-        return(list(select=select));
+        return(list(select=TRUE, distribution=distribution));
     }
 
     #### Loss function type ####
@@ -1046,19 +839,19 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
 
     #### Occurrence variable ####
     if(is.occurrence(occurrence)){
-        oesModel <- occurrence;
-        occurrence <- oesModel$occurrence;
+        omModel <- occurrence;
+        occurrence <- omModel$occurrence;
         if(occurrence=="provided"){
             occurrenceModelProvided <- FALSE;
         }
         else{
             occurrenceModelProvided <- TRUE;
         }
-        pFitted <- matrix(fitted(oesModel), obsInSample, 1);
+        pFitted <- matrix(fitted(omModel), obsInSample, 1);
     }
     else{
         occurrenceModelProvided <- FALSE;
-        oesModel <- NULL;
+        omModel <- NULL;
         pFitted <- matrix(1, obsInSample, 1);
     }
     pForecast <- rep(NA,h);
@@ -1100,8 +893,12 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
                 pForecast <- NA;
             }
             occurrence <- "provided";
-            oesModel <- list(fitted=pFitted,forecast=pForecast,occurrence="provided");
+            omModel <- list(fitted=pFitted,forecast=pForecast,occurrence="provided");
         }
+    }
+    else if(is.occurrence(occurrence)){
+        omModel <- occurrence;
+        occurrence <- omModel$occurrence;
     }
 
     occurrence <- match.arg(occurrence[1],c("none","auto","fixed","general","odds-ratio",
@@ -1123,7 +920,7 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
         pFitted[] <- otLogical*1;
         pForecast[] <- 1;
         occurrenceModel <- FALSE;
-        oesModel <- structure(list(y=matrix((otLogical)*1,ncol=1),fitted=pFitted,forecast=pForecast,
+        omModel <- structure(list(y=matrix((otLogical)*1,ncol=1),fitted=pFitted,forecast=pForecast,
                                    occurrence="provided"),class="occurrence");
     }
     else{
@@ -1133,7 +930,7 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
         }
         else if(occurrence=="provided"){
             occurrenceModel <- TRUE;
-            oesModel$y <- matrix(otLogical*1,ncol=1);
+            omModel$y <- matrix(otLogical*1,ncol=1);
         }
         else{
             occurrenceModel <- TRUE;
@@ -1721,8 +1518,10 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
                 # Form subset in order to use in-sample only
                 subset <- rep(FALSE, obsAll);
                 subset[1:obsInSample] <- TRUE;
-                # Exclude zeroes if this is an occurrence model
+                # Exclude zeroes if this is an occurrence model (demand-size models need
+                # only non-zero demand; for the occurrence-probability ALM we keep all obs)
                 if(occurrenceModel){
+                    subsetOccurrence <- subset;
                     subset[1:obsInSample][!otLogical] <- FALSE;
                 }
 
@@ -1761,10 +1560,11 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
                     else{
                         FI <- ellipsis$FI;
                     }
+                    almSubset <- if(occurrenceModel) which(subsetOccurrence) else which(subset);
                     almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
                                                     distribution=distribution, loss=loss,
-                                                    subset=which(subset),
-                                                    occurrence=oesModel,FI=FI));
+                                                    subset=almSubset,
+                                                    occurrence=omModel,FI=FI));
                     almModel$call$data <- as.name(yName);
                     return(almModel);
                 }
@@ -2379,7 +2179,7 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
                 }
 
                 almModel <- do.call("stepwise", list(data=xregData, formula=formulaToUse, subset=subset,
-                                                     distribution=distribution, occurrence=oesModel));
+                                                     distribution=distribution, occurrence=omModel));
                 almModel$call$data <- as.name(yName);
                 return(almModel);
             }
@@ -2467,6 +2267,7 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
         # Fix the names of variables
         colnames(xregData) <- make.names(colnames(xregData), unique=TRUE);
         xregNames[] <- make.names(xregNames, unique=TRUE);
+        xregData <- as.matrix(xregData);
 
         # If there are no variables after all of that, then xreg doesn't exist
         if(xregNumber==0){
@@ -2557,8 +2358,8 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
 
     # Update the number of parameters
     if(occurrenceModelProvided){
-        parametersNumber[2,3] <- nparam(oesModel);
-        pForecast <- c(forecast(oesModel, h=h, interval="none")$mean);
+        parametersNumber[2,3] <- nparam(omModel);
+        pForecast <- c(forecast(omModel, h=h)$mean);
     }
 
     #### Information Criteria ####
@@ -2944,171 +2745,8 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
     lagsModelMax[] <- max(lagsModelAll);
 
     #### Process ellipsis ####
-    # Parameters for the optimiser
-    if(is.null(ellipsis$maxeval)){
-        maxeval <- NULL;
-        # Make a warning if this is a big computational task
-        if(any(lags>24) && arimaModel && any(initialType==c("optimal","two-stage"))){
-            warning(paste0("The estimation of ARIMA model with initial='optimal' on high frequency data might ",
-                           "take more time to converge to the optimum. Consider either setting maxeval parameter ",
-                           "to a higher value (e.g. maxeval=10000, which will take ~25 times more than this) ",
-                           "or using initial='backcasting'."),
-                    call.=FALSE, immediate.=TRUE);
-        }
-    }
-    else{
-        maxeval <- ellipsis$maxeval;
-    }
-    if(is.null(ellipsis$maxtime)){
-        maxtime <- -1;
-    }
-    else{
-        maxtime <- ellipsis$maxtime;
-    }
-    if(is.null(ellipsis$xtol_rel)){
-        xtol_rel <- 1E-6;
-    }
-    else{
-        xtol_rel <- ellipsis$xtol_rel;
-    }
-    if(is.null(ellipsis$xtol_abs)){
-        xtol_abs <- 1E-8;
-    }
-    else{
-        xtol_abs <- ellipsis$xtol_abs;
-    }
-    if(is.null(ellipsis$ftol_rel)){
-        ftol_rel <- 1E-8;
-    }
-    else{
-        ftol_rel <- ellipsis$ftol_rel;
-    }
-    if(is.null(ellipsis$ftol_abs)){
-        ftol_abs <- 0;
-    }
-    else{
-        ftol_abs <- ellipsis$ftol_abs;
-    }
-    if(is.null(ellipsis$algorithm)){
-        algorithm <- "NLOPT_LN_NELDERMEAD";
-    }
-    else{
-        algorithm <- ellipsis$algorithm;
-    }
-    if(is.null(ellipsis$print_level)){
-        print_level <- 0;
-    }
-    else{
-        print_level <- ellipsis$print_level;
-    }
-    # The following three arguments are used for the function itself, not the options
-    if(is.null(ellipsis$lb)){
-        lb <- NULL;
-    }
-    else{
-        lb <- ellipsis$lb;
-    }
-    if(is.null(ellipsis$ub)){
-        ub <- NULL;
-    }
-    else{
-        ub <- ellipsis$ub;
-    }
-    if(is.null(ellipsis$B)){
-        B <- NULL;
-    }
-    else{
-        B <- ellipsis$B;
-    }
-    # Initialise parameters
-    lambda <- other <- NULL;
-    otherParameterEstimate <- FALSE
-    # lambda for LASSO
-    if(any(loss==c("LASSO","RIDGE"))){
-        if(is.null(ellipsis$lambda)){
-            warning(paste0("You have not provided lambda parameter. I will set it to zero."), call.=FALSE);
-            lambda <- 0;
-        }
-        else{
-            lambda <- ellipsis$lambda;
-        }
-    }
-    # Parameters for distributions
-    if(distribution=="dalaplace"){
-        if(is.null(ellipsis$alpha)){
-            other <- 0.5
-            otherParameterEstimate <- TRUE;
-        }
-        else{
-            other <- ellipsis$alpha;
-            otherParameterEstimate <- FALSE;
-        }
-        names(other) <- "alpha";
-    }
-    else if(any(distribution==c("dgnorm","dlgnorm"))){
-        if(is.null(ellipsis$shape)){
-            other <- 2
-            otherParameterEstimate <- TRUE;
-        }
-        else{
-            other <- ellipsis$shape;
-            otherParameterEstimate <- FALSE;
-        }
-        names(other) <- "shape";
-    }
-    else if(distribution=="dt"){
-        if(is.null(ellipsis$nu)){
-            other <- 2
-            otherParameterEstimate <- TRUE;
-        }
-        else{
-            other <- ellipsis$nu;
-            otherParameterEstimate <- FALSE;
-        }
-        names(other) <- "nu";
-    }
-    # Number of iterations for backcasting
-    if(is.null(ellipsis$nIterations)){
-        # 1 iteration in case of optimal/provided initials
-        nIterations <- 1;
-        # 2 iterations otherwise
-        if(any(initialType==c("complete","backcasting"))){
-            nIterations[] <- 2;
-        }
-    }
-    else{
-        nIterations <- ellipsis$nIterations;
-    }
-    # Smoother used in msdecompose
-    if(is.null(ellipsis$smoother)){
-        smoother <- "lowess";
-    }
-    else{
-        smoother <- ellipsis$smoother;
-    }
-    # Fisher Information
-    if(is.null(ellipsis$FI)){
-        FI <- FALSE;
-    }
-    else{
-        FI <- ellipsis$FI;
-    }
-    # Step size for the hessian
-    if(is.null(ellipsis$stepSize)){
-        stepSize <- .Machine$double.eps^(1/4);
-    }
-    else{
-        stepSize <- ellipsis$stepSize;
-    }
-
-    #### Temporary hidden parameter to switch the df calculation in case of backcasting ####
-    if(is.null(ellipsis$dfForBack)){
-        dfForBack <- FALSE;
-    }
-    else{
-        dfForBack <- ellipsis$dfForBack;
-    }
-
+    list2env(adam_checkOptimizer(ellipsis, loss, distribution, initialType, lags, arimaModel),
+             envir=environment());
 
     # Add constant in the model
     if(is.numeric(constant)){
@@ -3158,8 +2796,9 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
             modelDo <- "estimate";
         }
         Etype <- switch(distribution,
-                        "default"=,"dnorm"=,"dlaplace"=,"ds"=,"dgnorm"=,"dlogis"=,"dt"=,"dalaplace"="A",
-                        "dlnorm"=,"dllaplace"=,"dls"=,"dlgnorm"=,"dinvgauss"=,"dgamma"="M");
+                        "default"=,"dnorm"=,"dlaplace"=,"ds"=,"dgnorm"=,"dlogis"=,"plogis"=,"dt"=,"dalaplace"="A",
+                        "dlnorm"=,"dllaplace"=,"dls"=,"dlgnorm"=,"dinvgauss"=,"dgamma"="M",
+                        "A");
         Ttype <- "N";
         Stype <- "N";
         phiEstimate <- FALSE;
@@ -3202,193 +2841,203 @@ parametersChecker <- function(data, model, lags, formulaToUse, orders, constant=
         colnames(yHoldout) <- responseName;
     }
 
-    #### Return the values to the previous environment ####
-    ### Actuals
-    assign("y",y,ParentEnvironment);
-    assign("yHoldout",yHoldout,ParentEnvironment);
-    assign("yInSample",yInSample,ParentEnvironment);
-    assign("yNAValues",yNAValues,ParentEnvironment);
-
-    ### Index and all related structure variables
-    assign("yClasses",yClasses,ParentEnvironment);
-    assign("yIndex",yIndex,ParentEnvironment);
-    assign("yInSampleIndex",yInSampleIndex,ParentEnvironment);
-    assign("yForecastIndex",yForecastIndex,ParentEnvironment);
-    assign("yIndexAll",yIndexAll,ParentEnvironment);
-    assign("yFrequency",yFrequency,ParentEnvironment);
-    assign("yStart",yStart,ParentEnvironment);
-    assign("yForecastStart",yForecastStart,ParentEnvironment);
-
-    # The rename of the variable is needed for the hessian to work
-    assign("horizon",h,ParentEnvironment);
-    assign("h",h,ParentEnvironment);
-    assign("holdout",holdout,ParentEnvironment);
-
-    ### Number of observations and parameters
-    assign("obsInSample",obsInSample,ParentEnvironment);
-    assign("obsAll",obsAll,ParentEnvironment);
-    assign("obsStates",obsStates,ParentEnvironment);
-    assign("obsNonzero",obsNonzero,ParentEnvironment);
-    assign("obsZero",obsZero,ParentEnvironment);
-    assign("parametersNumber",parametersNumber,ParentEnvironment);
-
-    ### Model type
-    assign("etsModel",etsModel,ParentEnvironment);
-    assign("model",model,ParentEnvironment);
-    assign("Etype",Etype,ParentEnvironment);
-    assign("Ttype",Ttype,ParentEnvironment);
-    assign("Stype",Stype,ParentEnvironment);
-    assign("modelIsTrendy",modelIsTrendy,ParentEnvironment);
-    assign("modelIsSeasonal",modelIsSeasonal,ParentEnvironment);
-    assign("modelsPool",modelsPool,ParentEnvironment);
-    assign("damped",damped,ParentEnvironment);
-    assign("modelDo",modelDo,ParentEnvironment);
-    assign("allowMultiplicative",allowMultiplicative,ParentEnvironment);
-
-    ### Numbers and names of components
-    assign("componentsNumberETS",componentsNumberETS,ParentEnvironment);
-    assign("componentsNamesETS",componentsNamesETS,ParentEnvironment);
-    assign("componentsNumberETSNonSeasonal",componentsNumberETS-componentsNumberETSSeasonal,ParentEnvironment);
-    assign("componentsNumberETSSeasonal",componentsNumberETSSeasonal,ParentEnvironment);
-    # The number and names of ARIMA components
-    assign("componentsNumberARIMA",componentsNumberARIMA,ParentEnvironment);
-    assign("componentsNamesARIMA",componentsNamesARIMA,ParentEnvironment);
-
-    ### Lags
-    # This is the original vector of lags, modified for the level components.
-    # This can be used in ARIMA
-    assign("lags",lags,ParentEnvironment);
-    # This is the vector of lags of ETS components
-    assign("lagsModel",lagsModel,ParentEnvironment);
-    # This is the vector of seasonal lags
-    assign("lagsModelSeasonal",lagsModelSeasonal,ParentEnvironment);
-    # This is the vector of lags for ARIMA components (not lags of ARIMA)
-    assign("lagsModelARIMA",lagsModelARIMA,ParentEnvironment);
-    # This is the vector of all the lags of model (ETS + ARIMA + X)
-    assign("lagsModelAll",lagsModelAll,ParentEnvironment);
-    # This is the maximum lag
-    assign("lagsModelMax",lagsModelMax,ParentEnvironment);
-
-    ### Persistence
-    assign("persistence",persistence,ParentEnvironment);
-    assign("persistenceEstimate",persistenceEstimate,ParentEnvironment);
-    assign("persistenceLevel",persistenceLevel,ParentEnvironment);
-    assign("persistenceLevelEstimate",persistenceLevelEstimate,ParentEnvironment);
-    assign("persistenceTrend",persistenceTrend,ParentEnvironment);
-    assign("persistenceTrendEstimate",persistenceTrendEstimate,ParentEnvironment);
-    assign("persistenceSeasonal",persistenceSeasonal,ParentEnvironment);
-    assign("persistenceSeasonalEstimate",persistenceSeasonalEstimate,ParentEnvironment);
-    assign("persistenceXreg",persistenceXreg,ParentEnvironment);
-    assign("persistenceXregEstimate",persistenceXregEstimate,ParentEnvironment);
-    assign("persistenceXregProvided",persistenceXregProvided,ParentEnvironment);
-
-    ### phi
-    assign("phi",phi,ParentEnvironment);
-    assign("phiEstimate",phiEstimate,ParentEnvironment);
-
-    ### Initials
-    assign("initial",initial,ParentEnvironment);
-    assign("initialType",initialType,ParentEnvironment);
-    assign("initialEstimate",initialEstimate,ParentEnvironment);
-    assign("initialLevel",initialLevel,ParentEnvironment);
-    assign("initialLevelEstimate",initialLevelEstimate,ParentEnvironment);
-    assign("initialTrend",initialTrend,ParentEnvironment);
-    assign("initialTrendEstimate",initialTrendEstimate,ParentEnvironment);
-    assign("initialSeasonal",initialSeasonal,ParentEnvironment);
-    assign("initialSeasonalEstimate",initialSeasonalEstimate,ParentEnvironment);
-    assign("initialArima",initialArima,ParentEnvironment);
-    assign("initialArimaEstimate",initialArimaEstimate,ParentEnvironment);
-    # Number of initials that the ARIMA has (either provided or to estimate)
-    assign("initialArimaNumber",initialArimaNumber,ParentEnvironment);
-    assign("initialXregEstimate",initialXregEstimate,ParentEnvironment);
-    assign("initialXregProvided",initialXregProvided,ParentEnvironment);
-
-    ### Occurrence model
-    assign("oesModel",oesModel,ParentEnvironment);
-    assign("occurrenceModel",occurrenceModel,ParentEnvironment);
-    assign("occurrenceModelProvided",occurrenceModelProvided,ParentEnvironment);
-    assign("occurrence",occurrence,ParentEnvironment);
-    assign("pFitted",pFitted,ParentEnvironment);
-    assign("pForecast",pForecast,ParentEnvironment);
-    assign("ot",ot,ParentEnvironment);
-    assign("otLogical",otLogical,ParentEnvironment);
-
-    ### Outliers detection
-    assign("outliers",outliers,ParentEnvironment);
-
-    ### Distribution, loss, bounds and IC
-    assign("distribution",distribution,ParentEnvironment);
-    assign("loss",loss,ParentEnvironment);
-    assign("lossFunction",lossFunction,ParentEnvironment);
-    assign("multisteps",multisteps,ParentEnvironment);
-    assign("ic",ic,ParentEnvironment);
-    assign("icFunction",icFunction,ParentEnvironment);
-    assign("bounds",bounds,ParentEnvironment);
-
-    ### ARIMA components
-    assign("arimaModel",arimaModel,ParentEnvironment);
-    assign("arOrders",arOrders,ParentEnvironment);
-    assign("iOrders",iOrders,ParentEnvironment);
-    assign("maOrders",maOrders,ParentEnvironment);
-    assign("arRequired",arRequired,ParentEnvironment);
-    assign("iRequired",iRequired,ParentEnvironment);
-    assign("maRequired",maRequired,ParentEnvironment);
-    assign("arEstimate",arEstimate,ParentEnvironment);
-    assign("maEstimate",maEstimate,ParentEnvironment);
-    assign("armaParameters",armaParameters,ParentEnvironment);
-    assign("nonZeroARI",nonZeroARI,ParentEnvironment);
-    assign("nonZeroMA",nonZeroMA,ParentEnvironment);
-    assign("select",select,ParentEnvironment);
-
-    ### Explanatory variables
-    assign("xregModel",xregModel,ParentEnvironment);
-    assign("regressors",regressors,ParentEnvironment);
-    assign("xregModelInitials",xregModelInitials,ParentEnvironment);
-    assign("xregData",xregData,ParentEnvironment);
-    assign("xregNumber",xregNumber,ParentEnvironment);
-    assign("xregNames",xregNames,ParentEnvironment);
-    assign("responseName",responseName,ParentEnvironment);
-    assign("formula",formulaToUse,ParentEnvironment);
-    assign("xregParametersMissing",xregParametersMissing,ParentEnvironment);
-    assign("xregParametersIncluded",xregParametersIncluded,ParentEnvironment);
-    assign("xregParametersEstimated",xregParametersEstimated,ParentEnvironment);
-    assign("xregParametersPersistence",xregParametersPersistence,ParentEnvironment);
-
-    ### Constant
-    assign("constantRequired",constantRequired,ParentEnvironment);
-    assign("constantEstimate",constantEstimate,ParentEnvironment);
-    assign("constantValue",constantValue,ParentEnvironment);
-    assign("constantName",constantName,ParentEnvironment);
-
-    ### Ellipsis thingies
-    # Optimisation related
-    assign("maxeval",maxeval,ParentEnvironment);
-    assign("maxtime",maxtime,ParentEnvironment);
-    assign("xtol_rel",xtol_rel,ParentEnvironment);
-    assign("xtol_abs",xtol_abs,ParentEnvironment);
-    assign("ftol_rel",ftol_rel,ParentEnvironment);
-    assign("ftol_abs",ftol_abs,ParentEnvironment);
-    assign("algorithm",algorithm,ParentEnvironment);
-    assign("print_level",print_level,ParentEnvironment);
-    assign("B",B,ParentEnvironment);
-    assign("lb",lb,ParentEnvironment);
-    assign("ub",ub,ParentEnvironment);
-    # Parameters for distributions
-    assign("other",other,ParentEnvironment);
-    assign("otherParameterEstimate",otherParameterEstimate,ParentEnvironment);
-    # LASSO / RIDGE
-    assign("lambda",lambda,ParentEnvironment);
-    # Number of iterations in backcasting
-    assign("nIterations",nIterations,ParentEnvironment);
-    # Smoother used in the msdecompose
-    assign("smoother",smoother,ParentEnvironment);
-    # Fisher Information
-    assign("FI",FI,ParentEnvironment);
-    # Step size for the hessian
-    assign("stepSize",stepSize,ParentEnvironment);
-
-    # Temporary parameter to switch on/off the backcasting df
-    assign("dfForBack",dfForBack,ParentEnvironment);
-
-    return(list(select=FALSE));
+    #### Return the validated parameters as a named list ####
+    return(list(
+        # Actuals
+        y = y,
+        yHoldout = yHoldout,
+        yInSample = yInSample,
+        yNAValues = yNAValues,
+        # Index and structure
+        yClasses = yClasses,
+        yIndex = yIndex,
+        yInSampleIndex = yInSampleIndex,
+        yForecastIndex = yForecastIndex,
+        yIndexAll = yIndexAll,
+        yFrequency = yFrequency,
+        yStart = yStart,
+        yForecastStart = yForecastStart,
+        horizon = h,
+        h = h,
+        holdout = holdout,
+        # Observation counts
+        obsInSample = obsInSample,
+        obsAll = obsAll,
+        obsStates = obsStates,
+        obsNonzero = obsNonzero,
+        obsZero = obsZero,
+        parametersNumber = parametersNumber,
+        # Model type
+        etsModel = etsModel,
+        model = model,
+        Etype = Etype,
+        Ttype = Ttype,
+        Stype = Stype,
+        modelIsTrendy = modelIsTrendy,
+        modelIsSeasonal = modelIsSeasonal,
+        modelsPool = modelsPool,
+        damped = damped,
+        modelDo = modelDo,
+        allowMultiplicative = allowMultiplicative,
+        # Component counts and names
+        componentsNumberETS = componentsNumberETS,
+        componentsNamesETS = componentsNamesETS,
+        componentsNumberETSNonSeasonal = componentsNumberETS - componentsNumberETSSeasonal,
+        componentsNumberETSSeasonal = componentsNumberETSSeasonal,
+        componentsNumberARIMA = componentsNumberARIMA,
+        componentsNamesARIMA = componentsNamesARIMA,
+        # Lags
+        lags = lags,
+        lagsModel = lagsModel,
+        lagsModelSeasonal = lagsModelSeasonal,
+        lagsModelARIMA = lagsModelARIMA,
+        lagsModelAll = lagsModelAll,
+        lagsModelMax = lagsModelMax,
+        # Persistence
+        persistence = persistence,
+        persistenceEstimate = persistenceEstimate,
+        persistenceLevel = persistenceLevel,
+        persistenceLevelEstimate = persistenceLevelEstimate,
+        persistenceTrend = persistenceTrend,
+        persistenceTrendEstimate = persistenceTrendEstimate,
+        persistenceSeasonal = persistenceSeasonal,
+        persistenceSeasonalEstimate = persistenceSeasonalEstimate,
+        persistenceXreg = persistenceXreg,
+        persistenceXregEstimate = persistenceXregEstimate,
+        persistenceXregProvided = persistenceXregProvided,
+        # phi
+        phi = phi,
+        phiEstimate = phiEstimate,
+        # Initials
+        initial = initial,
+        initialType = initialType,
+        initialEstimate = initialEstimate,
+        initialLevel = initialLevel,
+        initialLevelEstimate = initialLevelEstimate,
+        initialTrend = initialTrend,
+        initialTrendEstimate = initialTrendEstimate,
+        initialSeasonal = initialSeasonal,
+        initialSeasonalEstimate = initialSeasonalEstimate,
+        initialArima = initialArima,
+        initialArimaEstimate = initialArimaEstimate,
+        initialArimaNumber = initialArimaNumber,
+        initialXregEstimate = initialXregEstimate,
+        initialXregProvided = initialXregProvided,
+        # Occurrence model
+        omModel = omModel,
+        occurrenceModel = occurrenceModel,
+        occurrenceModelProvided = occurrenceModelProvided,
+        occurrence = occurrence,
+        pFitted = pFitted,
+        pForecast = pForecast,
+        ot = ot,
+        otLogical = otLogical,
+        # Distribution, loss, bounds and IC
+        distribution = distribution,
+        loss = loss,
+        lossFunction = lossFunction,
+        multisteps = multisteps,
+        ic = ic,
+        icFunction = icFunction,
+        bounds = bounds,
+        # ARIMA components
+        arimaModel = arimaModel,
+        arOrders = arOrders,
+        iOrders = iOrders,
+        maOrders = maOrders,
+        arRequired = arRequired,
+        iRequired = iRequired,
+        maRequired = maRequired,
+        arEstimate = arEstimate,
+        maEstimate = maEstimate,
+        armaParameters = armaParameters,
+        nonZeroARI = nonZeroARI,
+        nonZeroMA = nonZeroMA,
+        select = select,
+        # Explanatory variables
+        xregModel = xregModel,
+        regressors = regressors,
+        xregModelInitials = xregModelInitials,
+        xregData = xregData,
+        xregNumber = xregNumber,
+        xregNames = xregNames,
+        responseName = responseName,
+        formula = formulaToUse,
+        xregParametersMissing = xregParametersMissing,
+        xregParametersIncluded = xregParametersIncluded,
+        xregParametersEstimated = xregParametersEstimated,
+        xregParametersPersistence = xregParametersPersistence,
+        # Constant
+        constantRequired = constantRequired,
+        constantEstimate = constantEstimate,
+        constantValue = constantValue,
+        constantName = constantName,
+        # Optimisation
+        maxeval = maxeval,
+        maxtime = maxtime,
+        xtol_rel = xtol_rel,
+        xtol_abs = xtol_abs,
+        ftol_rel = ftol_rel,
+        ftol_abs = ftol_abs,
+        algorithm = algorithm,
+        print_level = print_level,
+        B = B,
+        lb = lb,
+        ub = ub,
+        # Distribution shape and regularisation
+        other = other,
+        otherParameterEstimate = otherParameterEstimate,
+        lambda = lambda,
+        # Misc
+        nIterations = nIterations,
+        smoother = smoother,
+        FI = FI,
+        stepSize = stepSize,
+        dfForBack = dfForBack
+    ));
 }
+
+#### adamSpecificChecker: thin wrapper adding outliers/distribution early-exit ####
+#' @keywords internal
+adamSpecificChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
+                                outliers=c("ignore","use","select"), level=0.99,
+                                persistence, phi, initial,
+                                distribution=c("default","dnorm","dlaplace","dalaplace",
+                                               "ds","dgnorm","dlnorm","dinvgauss","dgamma","plogis"),
+                                loss, h, holdout, occurrence,
+                                ic=c("AICc","AIC","BIC","BICc"),
+                                bounds=c("usual","admissible","none"),
+                                regressors, yName,
+                                silent, modelDo,
+                                ellipsis, fast=FALSE){
+    outliers <- match.arg(outliers)
+    if(!fast){
+        distribution <- match.arg(distribution[1],
+                                   c("default","dnorm","dlaplace","dalaplace",
+                                     "ds","dgnorm","dlnorm","dinvgauss","dgamma","plogis"))
+    }
+
+    if(outliers != "ignore"){
+        return(list(select=TRUE, distribution=distribution, outliers=outliers))
+    }
+
+    result <- commonParametersChecker(data=data, model=model, lags=lags,
+                                      formulaToUse=formulaToUse,
+                                      orders=orders, constant=constant, arma=arma,
+                                      persistence=persistence, phi=phi, initial=initial,
+                                      distribution=distribution, loss=loss,
+                                      h=h, holdout=holdout,
+                                      occurrence=occurrence, ic=ic, bounds=bounds,
+                                      regressors=regressors, yName=yName,
+                                      silent=silent, modelDo=modelDo,
+                                      ellipsis=ellipsis, fast=fast)
+
+    if(is.alm(result)){
+        return(result)
+    }
+
+    return(c(result, list(outliers=outliers)))
+}
+
+#### Backward-compatible alias ####
+parametersChecker <- adamSpecificChecker;

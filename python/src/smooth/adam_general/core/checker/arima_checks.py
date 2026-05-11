@@ -49,7 +49,117 @@ def _expand_orders(orders):
     return ar_orders, i_orders, ma_orders
 
 
-def _check_arima(orders, validated_lags, silent=False):
+def _get_polynomial_indices_from_cpp(ar_orders, i_orders, ma_orders, lags):
+    """
+    Use C++ polynomialise to get correct polynomial indices matching R's algorithm.
+
+    This function calls the C++ polynomialise with dummy parameters to extract
+    the correct polynomial structure (which indices are non-zero) matching exactly
+    what R's implementation produces.
+    """
+    try:
+        from smooth.adam_general._adamCore import adamCore
+    except ImportError:
+        return None
+
+    try:
+        ar_orders_arr = np.array(ar_orders, dtype=np.uint64)
+        i_orders_arr = np.array(i_orders, dtype=np.uint64)
+        ma_orders_arr = np.array(ma_orders, dtype=np.uint64)
+        lags_arr = np.array(lags, dtype=np.uint64)
+
+        n_ar = int(np.sum(ar_orders_arr))
+        n_ma = int(np.sum(ma_orders_arr))
+        n_arma = n_ar + n_ma
+
+        if n_arma == 0:
+            return None
+
+        # Use distinct values to prevent polynomial term cancellation
+        # (e.g. ARIMA(2,1,0) with equal phi1=phi2 makes the B² term vanish)
+        dummy_B = np.arange(1, n_arma + 1, dtype=np.float64) * 0.1
+
+        # Create minimal adamCore instance for polynomialise
+        # max_lag = max(lags_arr) if len(lags_arr) > 0 else 1
+        dummy_lags = np.array([1], dtype=np.uint64)
+        adam_cpp = adamCore(
+            dummy_lags,  # lags
+            "N",  # E
+            "N",  # T
+            "N",  # S
+            0,  # nNonSeasonal
+            0,  # nSeasonal
+            0,  # nETS
+            n_arma,  # nArima
+            0,  # nXreg
+            n_arma,  # nComponents
+            False,  # constant
+            False,  # adamETS
+        )
+
+        result = adam_cpp.polynomialise(
+            dummy_B,
+            ar_orders_arr,
+            i_orders_arr,
+            ma_orders_arr,
+            n_ar > 0,
+            n_ma > 0,
+            np.array([], dtype=np.float64),
+            lags_arr,
+        )
+
+        ari_poly = np.asarray(result.ariPolynomial).flatten()
+        ma_poly = np.asarray(result.maPolynomial).flatten()
+
+        # Use actual polynomial values (with non-zero params) to find structural indices
+        # This correctly captures cross-terms from polynomial multiplication
+        ari_indices = list(np.where(np.abs(ari_poly[1:]) > 1e-10)[0] + 1)
+        ma_indices = list(np.where(np.abs(ma_poly[1:]) > 1e-10)[0] + 1)
+
+        if len(ari_indices) == 0 and len(ma_indices) == 0:
+            return None
+
+        # Keep polynomial positions as direct numpy indices:
+        # coefficient for B^k is stored at index k.
+        all_lag_values = sorted(set(list(ari_indices) + list(ma_indices)))
+        lags_model_arima = all_lag_values
+
+        components_number_arima = len(lags_model_arima)
+        initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
+
+        # Map lag/polynomial position -> ARIMA state index.
+        ari_state_map = {idx: i for i, idx in enumerate(lags_model_arima)}
+        ma_state_map = {idx: i for i, idx in enumerate(lags_model_arima)}
+
+        # Handle empty indices case - must create 2D array with shape (0, 2)
+        if len(ari_indices) > 0:
+            non_zero_ari = np.array(
+                [[idx, ari_state_map[idx]] for idx in ari_indices], dtype=int
+            )
+        else:
+            non_zero_ari = np.zeros((0, 2), dtype=int)
+
+        if len(ma_indices) > 0:
+            non_zero_ma = np.array(
+                [[idx, ma_state_map[idx]] for idx in ma_indices], dtype=int
+            )
+        else:
+            non_zero_ma = np.zeros((0, 2), dtype=int)
+
+        return (
+            non_zero_ari,
+            non_zero_ma,
+            lags_model_arima,
+            components_number_arima,
+            initial_arima_number,
+        )
+
+    except Exception:
+        # Return None on any error to fall back to Python algorithm
+        return None
+
+
+def _check_arima(orders, validated_lags, silent=False, arma=None):
     """
     Check and validate ARIMA model specification.
 
@@ -151,98 +261,117 @@ def _check_arima(orders, validated_lags, silent=False):
     arima_result["i_orders"] = i_orders
     arima_result["ma_orders"] = ma_orders
 
-    # Define the non-zero values via polynomial computation - R lines 580-616
-    # This computes all possible lag positions in the ARI and MA polynomials
-    ari_values = []
-    ma_values = []
+    cpp_result = _get_polynomial_indices_from_cpp(ar_orders, i_orders, ma_orders, lags)
 
-    for i in range(len(lags)):
-        # ARI values for this lag - R lines 583-588
-        ari_for_lag = [0]
-        if ar_orders[i] > 0:
-            ari_for_lag.extend(range(1, ar_orders[i] + 1))
-        if i_orders[i] > 0:
-            ari_for_lag.extend(range(ar_orders[i] + 1, ar_orders[i] + i_orders[i] + 1))
-        # Multiply by lag and take unique - R line 588
-        ari_for_lag = list(set([v * lags[i] for v in ari_for_lag]))
-        ari_values.append(ari_for_lag)
-
-        # MA values for this lag - R line 589
-        ma_for_lag = [0]
-        if ma_orders[i] > 0:
-            ma_for_lag.extend(range(1, ma_orders[i] + 1))
-        ma_for_lag = list(set([v * lags[i] for v in ma_for_lag]))
-        ma_values.append(ma_for_lag)
-
-    # Produce ARI polynomial lag positions - R lines 592-603
-    # This creates all combinations of lag positions across seasonal factors
-    def expand_polynomial(values_list):
-        """Expand polynomial by multiplying across seasonal factors."""
-        if len(values_list) == 0:
-            return [0]
-        result = values_list[0]
-        for i in range(1, len(values_list)):
-            new_result = []
-            for r in result:
-                for v in values_list[i]:
-                    new_result.append(r + v)
-            result = new_result
-        return result
-
-    ari_polynomial = expand_polynomial(ari_values)
-    ma_polynomial = expand_polynomial(ma_values)
-
-    # What are the non-zero ARI and MA polynomials? - R lines 618-625
-    # Remove the first element (which corresponds to L^0 = 1 coefficient) and get unique
-    non_zero_ari_lags = sorted(set([x for x in ari_polynomial if x > 0]))
-    non_zero_ma_lags = sorted(set([x for x in ma_polynomial if x > 0]))
-
-    # Lags for the ARIMA components - R line 623
-    lags_model_arima = sorted(set(non_zero_ari_lags + non_zero_ma_lags))
-
-    if len(lags_model_arima) == 0:
-        # No ARIMA states needed
-        arima_result["arima_model"] = False
-        return arima_result
-
-    # Create nonZeroARI matrix - R line 624
-    # Column 0: polynomial index (position in ariPolynomial, 0-indexed for Python)
-    # Column 1: state index (position in lagsModelARIMA, 0-indexed for Python)
-    non_zero_ari = []
-    for lag in non_zero_ari_lags:
-        poly_idx = lag  # The lag value itself serves as index into polynomial
-        state_idx = lags_model_arima.index(lag)
-        non_zero_ari.append([poly_idx, state_idx])
-
-    non_zero_ma = []
-    for lag in non_zero_ma_lags:
-        poly_idx = lag
-        state_idx = lags_model_arima.index(lag)
-        non_zero_ma.append([poly_idx, state_idx])
-
-    # Convert to numpy arrays
-    non_zero_ari = (
-        np.array(non_zero_ari, dtype=int)
-        if non_zero_ari
-        else np.zeros((0, 2), dtype=int)
-    )
-    non_zero_ma = (
-        np.array(non_zero_ma, dtype=int) if non_zero_ma else np.zeros((0, 2), dtype=int)
-    )
-
-    # Number of components - R line 628
-    components_number_arima = len(lags_model_arima)
-
-    # Component names - R lines 629-630
-    if components_number_arima > 1:
-        components_names_arima = [
-            f"ARIMAState{i + 1}" for i in range(components_number_arima)
-        ]
+    if cpp_result is not None:
+        (
+            non_zero_ari,
+            non_zero_ma,
+            lags_model_arima,
+            components_number_arima,
+            initial_arima_number,
+        ) = cpp_result
+        # Component names - R lines 629-630
+        if components_number_arima > 1:
+            components_names_arima = [
+                f"ARIMAState{i + 1}" for i in range(components_number_arima)
+            ]
+        else:
+            components_names_arima = (
+                ["ARIMAState1"] if components_number_arima > 0 else []
+            )
     else:
-        components_names_arima = ["ARIMAState1"] if components_number_arima > 0 else []
+        # Fall back to Python algorithm for simple cases or when C++ fails
+        # Define the non-zero values via polynomial computation - R lines 580-616
+        ari_values = []
+        ma_values = []
 
-    # Number of initials needed - R line 649
-    initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
+        def _unique_preserve_order(values):
+            seen = set()
+            out = []
+            for value in values:
+                if value not in seen:
+                    seen.add(value)
+                    out.append(value)
+            return out
+
+        for i in range(len(lags)):
+            ari_for_lag = [0]
+            if ar_orders[i] > 0:
+                ari_for_lag.extend(range(1, ar_orders[i] + 1))
+            if i_orders[i] > 0:
+                ari_for_lag.extend(
+                    range(ar_orders[i] + 1, ar_orders[i] + i_orders[i] + 1)
+                )
+            ari_for_lag = _unique_preserve_order([v * lags[i] for v in ari_for_lag])
+            ari_values.append(ari_for_lag)
+
+            ma_for_lag = [0]
+            if ma_orders[i] > 0:
+                ma_for_lag.extend(range(1, ma_orders[i] + 1))
+            ma_for_lag = _unique_preserve_order([v * lags[i] for v in ma_for_lag])
+            ma_values.append(ma_for_lag)
+
+        def expand_polynomial(values_list):
+            if len(values_list) == 0:
+                return [0]
+            dims = [len(values) for values in values_list]
+            result = np.zeros(dims, dtype=int)
+            for axis, values in enumerate(values_list):
+                shape = [1] * len(values_list)
+                shape[axis] = len(values)
+                result = result + np.asarray(values, dtype=int).reshape(shape)
+            return result.flatten(order="F").tolist()
+
+        ari_polynomial = expand_polynomial(ari_values)
+        ma_polynomial = expand_polynomial(ma_values)
+
+        def _unique_positive_in_order(values):
+            seen = set()
+            out = []
+            for value in values:
+                if value > 0 and value not in seen:
+                    seen.add(value)
+                    out.append(value)
+            return out
+
+        non_zero_ari_lags = _unique_positive_in_order(ari_polynomial)
+        non_zero_ma_lags = _unique_positive_in_order(ma_polynomial)
+
+        lags_model_arima = sorted(set(non_zero_ari_lags + non_zero_ma_lags))
+
+        if len(lags_model_arima) == 0:
+            arima_result["arima_model"] = False
+            return arima_result
+
+        ari_state_map = {lag: idx for idx, lag in enumerate(lags_model_arima)}
+        ma_state_map = ari_state_map
+
+        non_zero_ari = [[lag, ari_state_map[lag]] for lag in non_zero_ari_lags]
+        non_zero_ma = [[lag, ma_state_map[lag]] for lag in non_zero_ma_lags]
+
+        non_zero_ari = (
+            np.array(non_zero_ari, dtype=int)
+            if non_zero_ari
+            else np.zeros((0, 2), dtype=int)
+        )
+        non_zero_ma = (
+            np.array(non_zero_ma, dtype=int)
+            if non_zero_ma
+            else np.zeros((0, 2), dtype=int)
+        )
+
+        components_number_arima = len(lags_model_arima)
+        initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
+        # Component names
+        if components_number_arima > 1:
+            components_names_arima = [
+                f"ARIMAState{i + 1}" for i in range(components_number_arima)
+            ]
+        else:
+            components_names_arima = (
+                ["ARIMAState1"] if components_number_arima > 0 else []
+            )
 
     # Update result
     arima_result["non_zero_ari"] = non_zero_ari
@@ -268,5 +397,28 @@ def _check_arima(orders, validated_lags, silent=False):
                 arima_parameters.append(0.0)
 
     arima_result["arma_parameters"] = arima_parameters if arima_parameters else None
+
+    # Apply fixed ARMA values from `arma` dict
+    if arma is not None and isinstance(arma, dict):
+        ar_fixed = arma.get("ar", None)
+        ma_fixed = arma.get("ma", None)
+        n_ar = sum(ar_orders)
+        n_ma = sum(ma_orders)
+
+        if ar_fixed is not None and ar_required:
+            ar_fixed = (
+                [ar_fixed] if isinstance(ar_fixed, (int, float)) else list(ar_fixed)
+            )
+            arima_result["ar_estimate"] = False
+            arima_parameters[:n_ar] = ar_fixed[:n_ar]
+
+        if ma_fixed is not None and ma_required:
+            ma_fixed = (
+                [ma_fixed] if isinstance(ma_fixed, (int, float)) else list(ma_fixed)
+            )
+            arima_result["ma_estimate"] = False
+            arima_parameters[n_ar : n_ar + n_ma] = ma_fixed[:n_ma]
+
+        arima_result["arma_parameters"] = arima_parameters if arima_parameters else None
 
     return arima_result

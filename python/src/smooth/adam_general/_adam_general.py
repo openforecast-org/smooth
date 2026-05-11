@@ -82,6 +82,7 @@ def adam_fitter(
         backcast=bool(backcast),
         nIterations=int(nIterations),
         refineHead=bool(refineHead),
+        O="n",
     )
 
     # Convert C++ FitResult to dict for backward compatibility

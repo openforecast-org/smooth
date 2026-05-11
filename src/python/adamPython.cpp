@@ -30,6 +30,17 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("errors", &FitResult::errors)
         .def_readonly("profile", &FitResult::profile);
 
+    // Bind OmFitGeneralResult struct
+    py::class_<OmFitGeneralResult>(m, "OmFitGeneralResult")
+        .def_readonly("statesA",  &OmFitGeneralResult::statesA)
+        .def_readonly("fittedA",  &OmFitGeneralResult::fittedA)
+        .def_readonly("errorsA",  &OmFitGeneralResult::errorsA)
+        .def_readonly("profileA", &OmFitGeneralResult::profileA)
+        .def_readonly("statesB",  &OmFitGeneralResult::statesB)
+        .def_readonly("fittedB",  &OmFitGeneralResult::fittedB)
+        .def_readonly("errorsB",  &OmFitGeneralResult::errorsB)
+        .def_readonly("profileB", &OmFitGeneralResult::profileB);
+
     // Bind ForecastResult struct
     py::class_<ForecastResult>(m, "ForecastResult")
         .def_readonly("forecast", &ForecastResult::forecast);
@@ -86,6 +97,35 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("indexLookupTable"),
             py::arg("profilesRecent"),
             py::arg("vectorYt"),
+            py::arg("vectorOt"),
+            py::arg("backcast"),
+            py::arg("nIterations"),
+            py::arg("refineHead"),
+            py::arg("O") = 'n')
+        .def("omfitGeneral", &adamCore::omfitGeneral,
+            py::arg("matrixVtA"),
+            py::arg("matrixWtA"),
+            py::arg("matrixFA"),
+            py::arg("vectorGA"),
+            py::arg("indexLookupTableA"),
+            py::arg("profilesRecentA"),
+            py::arg("EB"),
+            py::arg("TB"),
+            py::arg("SB"),
+            py::arg("nNonSeasonalB"),
+            py::arg("nSeasonalB"),
+            py::arg("nETSB"),
+            py::arg("nArimaB"),
+            py::arg("nXregB"),
+            py::arg("nComponentsB"),
+            py::arg("constantB"),
+            py::arg("adamETSB"),
+            py::arg("matrixVtB"),
+            py::arg("matrixWtB"),
+            py::arg("matrixFB"),
+            py::arg("vectorGB"),
+            py::arg("indexLookupTableB"),
+            py::arg("profilesRecentB"),
             py::arg("vectorOt"),
             py::arg("backcast"),
             py::arg("nIterations"),

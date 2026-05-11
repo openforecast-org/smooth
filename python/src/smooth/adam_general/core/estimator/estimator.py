@@ -38,13 +38,16 @@ def estimator(
     maxeval=None,
     B_initial=None,
     return_matrices=False,
+    other=None,
+    other_parameter_estimate=False,
     # NLopt parameters
     xtol_rel=1e-6,
     xtol_abs=1e-8,
     ftol_rel=1e-8,
     ftol_abs=0,
     algorithm="NLOPT_LN_NELDERMEAD",
-    smoother="lowess",
+    smoother="global",
+    adam_ets: bool = False,
 ):
     """
     Estimate parameters for ADAM model using non-linear optimization.
@@ -285,7 +288,7 @@ def estimator(
         - 'profile_dict': Updated profile dictionary
         - 'components_dict': Components information
 
-    smoother : str, default="lowess"
+    smoother : str, default="global"
         Smoother type for time series decomposition used in initial state estimation.
 
         - "lowess": Uses LOWESS for both trend and seasonal extraction
@@ -451,10 +454,11 @@ def estimator(
         lags_dict,
         observations_dict,
         arima_dict,
-        constant_dict,
         explanatory_dict,
+        constant_dict,
         profiles_recent_table,
         profiles_recent_provided,
+        adam_ets,
     )
 
     # Step 2: Create model matrices
@@ -488,38 +492,14 @@ def estimator(
         bounds=general_dict["bounds"],
         phi_dict=phi_dict,
         profile_dict=profile_dict,
+        adam_cpp=adam_cpp,
+        other_parameter_estimate=other_parameter_estimate,
+        other_value=other if other is not None else 2.0,
     )
-    # Get initial parameter vector and bounds
-    if B_initial is not None:
-        B = B_initial
-    else:
-        B = b_values["B"]
-    if lb is None:
-        lb = b_values["Bl"]
-    if ub is None:
-        ub = b_values["Bu"]
-
-    # Ensure bounds are compatible with B
-    if B_initial is not None:
-        # Extend bounds if necessary
-        if len(lb) != len(B):
-            # This shouldn't happen if B_initial has correct length, but safety first
-            if len(lb) < len(B):
-                lb = np.pad(
-                    lb, (0, len(B) - len(lb)), "constant", constant_values=-np.inf
-                )
-                ub = np.pad(
-                    ub, (0, len(B) - len(ub)), "constant", constant_values=np.inf
-                )
-
-        # Check compatibility
-        if np.any(B < lb) or np.any(B > ub):
-            # Adjust bounds to accommodate B
-            lb = np.minimum(lb, B)
-            ub = np.maximum(ub, B)
-            # Maybe relax bounds slightly
-            lb[B < lb] -= 1e-5
-            ub[B > ub] += 1e-5
+    # Get initial parameter vector and bounds; user-provided values are used as-is
+    B = np.asarray(B_initial, dtype=float) if B_initial is not None else b_values["B"]
+    lb = np.asarray(lb, dtype=float) if lb is not None else b_values["Bl"]
+    ub = np.asarray(ub, dtype=float) if ub is not None else b_values["Bu"]
 
     # Step 4: Set up ARIMA polynomials if needed
     ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
@@ -576,6 +556,10 @@ def estimator(
         general_dict,
         adam_cpp,
         print_level,
+        ar_polynomial_matrix=ar_polynomial_matrix,
+        ma_polynomial_matrix=ma_polynomial_matrix,
+        other=other,
+        other_parameter_estimate=other_parameter_estimate,
     )
 
     # Set objective function
@@ -583,16 +567,15 @@ def estimator(
 
     # Step 9: Run optimization
     B[:] = _run_optimization(opt, B)
-
-    # Step 10: Extract the solution and the loss value
     CF_value = opt.last_optimum_value()
+
+    # Step 9a: R uses only Nelder-Mead; no BOBYQA refinement. Disabling BOBYQA
+    # pass to match R exactly and achieve 100% identical ARIMA results.
 
     # Step 10a: Retry optimization with zero smoothing parameters if initial
     # optimization failed
-    # This matches R's behavior (lines 2717-2768 in adam.R)
-    # R checks for is.infinite(res$objective) || res$objective==1e+300
-    # Python's objective wrapper caps at 1e10, so we check >= 1e10
-    if not np.isfinite(CF_value) or CF_value >= 1e10:
+    # Matches R: is.infinite(res$objective) || res$objective==1e+300
+    if not np.isfinite(CF_value) or CF_value >= 1e300:
         # Calculate number of ETS persistence parameters (alpha, beta, gamma)
         components_number_ets = 0
         if model_type_dict["ets_model"]:
@@ -654,26 +637,6 @@ def estimator(
         B[:] = _run_optimization(opt2, B)
         CF_value = opt2.last_optimum_value()
 
-    # Step 10: Calculate CF_value using optimized B
-    # CF_value = CF(
-    #     B=B,
-    #     model_type_dict=model_type_dict,
-    #     components_dict=components_dict,
-    #     lags_dict=lags_dict,
-    #     matrices_dict=adam_created,
-    #     persistence_checked=persistence_dict,
-    #     initials_checked=initials_dict,
-    #     arima_checked=arima_dict,
-    #     explanatory_checked=explanatory_dict,
-    #     phi_dict=phi_dict,
-    #     constants_checked=constant_dict,
-    #     observations_dict=observations_dict,
-    #     profile_dict=profile_dict,
-    #     general=general_dict,
-    #     adam_cpp=adam_cpp,
-    #     bounds="usual",
-    # )
-
     # A fix for the special case of LASSO/RIDGE with lambda==1
     if (
         any(general_dict["loss"] == loss_type for loss_type in ["LASSO", "RIDGE"])
@@ -703,11 +666,13 @@ def estimator(
         adam_cpp,
         multisteps,
         n_param_estimated,
+        other_parameter_estimate=other_parameter_estimate,
     )
 
     # Step 12: Prepare and return results
     result = {
         "B": B,
+        "other_parameter_estimate": other_parameter_estimate,
         "CF_value": CF_value,
         "n_param_estimated": n_param_estimated,
         "log_lik_adam_value": log_lik_adam_value,
@@ -732,6 +697,7 @@ def estimator(
             explanatory_dict,
             phi_dict,
             constant_dict,
+            adam_cpp=adam_cpp,
         )
 
         # Run adam_cpp.fit() with backcasting to update states
@@ -763,6 +729,7 @@ def estimator(
                 backcast=True,
                 nIterations=initials_dict.get("n_iterations", 2) or 2,
                 refineHead=True,  # Always True (fixed backcasting issue)
+                O="n",
             )
 
             # Update original matrices

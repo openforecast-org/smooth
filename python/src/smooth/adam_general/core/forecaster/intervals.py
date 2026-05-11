@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import stats
+from scipy.optimize import minimize
 from scipy.special import gamma
 
 from smooth.adam_general.core.utils.distributions import (
@@ -12,7 +13,11 @@ from smooth.adam_general.core.utils.var_covar import (
     var_anal,
 )
 
-from ._helpers import _prepare_lookup_table, _prepare_matrices_for_forecast
+from ._helpers import (
+    _compute_multistep_errors,
+    _prepare_lookup_table,
+    _prepare_matrices_for_forecast,
+)
 
 
 def ensure_level_format(level, side):
@@ -56,6 +61,8 @@ def generate_prediction_interval(
     params_info,
     level_low,
     level_up,
+    p_forecast=None,
+    scale_2d_override=None,
 ):
     mat_vt, mat_wt, vec_g, mat_f = _prepare_matrices_for_forecast(
         prepared_model, observations_dict, lags_dict, general
@@ -69,8 +76,9 @@ def generate_prediction_interval(
     # Skipping for now.
     # Will ask Ivan what this is
 
-    # Check if model is ETS and has certain distributions with multiplicative errors
-    if (
+    if scale_2d_override is not None:
+        v_voc_multi = np.asarray(scale_2d_override, dtype=float).ravel()
+    elif (
         model_type_dict["ets_model"]
         and general["distribution"]
         in ["dinvgauss", "dgamma", "dlnorm", "dllaplace", "dls", "dlgnorm"]
@@ -124,10 +132,35 @@ def generate_prediction_interval(
         "other", {}
     )  # Handle cases where 'other' might be missing
 
-    # Reshape for broadcasting: scale (h,1), levels (1,n_levels)
+    # Reshape for broadcasting: scale (h,1), levels (1,n_levels) or (h,n_levels)
     scale_2d = v_voc_multi.reshape(-1, 1) if v_voc_multi.ndim == 1 else v_voc_multi
-    ll = level_low.reshape(1, -1)
-    lu = level_up.reshape(1, -1)
+    ll = level_low.reshape(1, -1)  # (1, n_levels)
+    lu = level_up.reshape(1, -1)  # (1, n_levels)
+
+    # Occurrence-aware level adjustment (R/adam.R ~6220-6225).
+    # R adjusts the confidence LEVEL (e.g. 0.95), not the quantiles:
+    #   level_adj = max(0, (level - (1-p)) / p)
+    # then derives symmetric quantile pairs from the adjusted level.
+    # level = level_up - level_low in all sides (both/upper/lower).
+    if p_forecast is not None:
+        p_col = np.asarray(p_forecast, dtype=float).reshape(-1, 1)  # (h, 1)
+        conf_levels = (level_up - level_low).reshape(1, -1)  # (1, n_levels)
+        conf_levels_adj = np.maximum(  # (h, n_levels)
+            0.0, (conf_levels - (1.0 - p_col)) / p_col
+        )
+        # Reconstruct quantile pairs using the same side logic as ensure_level_format
+        is_upper_side = level_low == 0  # (n_levels,)
+        is_lower_side = level_up == 1  # (n_levels,)
+        ll = np.where(
+            is_upper_side,
+            0.0,
+            np.where(is_lower_side, 1.0 - conf_levels_adj, (1.0 - conf_levels_adj) / 2),
+        )
+        lu = np.where(
+            is_upper_side,
+            conf_levels_adj,
+            np.where(is_lower_side, 1.0, (1.0 + conf_levels_adj) / 2),
+        )
 
     if distribution == "dnorm":
         scale = np.sqrt(scale_2d)
@@ -405,6 +438,7 @@ def generate_simulation_interval(
     level_up,
     nsim=10000,
     external_errors=None,
+    p_forecast=None,
 ):
     """
     Generate prediction intervals using simulation.
@@ -561,8 +595,15 @@ def generate_simulation_interval(
     for i in range(nsim):
         mat_g[:, i] = vec_g.flatten()
 
-    # Occurrence matrix (all ones for now - no occurrence model)
-    mat_ot = np.ones((h, nsim), order="F")
+    # Occurrence matrix: Bernoulli draws when occurrence model is active
+    if p_forecast is not None:
+        rng = np.random.default_rng()
+        mat_ot = rng.binomial(
+            1, np.asarray(p_forecast, dtype=float).reshape(-1, 1), (h, nsim)
+        ).astype(float)
+        mat_ot = np.asfortranarray(mat_ot)
+    else:
+        mat_ot = np.ones((h, nsim), order="F")
 
     # Profiles recent table - expand to 3D cube (nComponents, lagsModelMax, nsim)
     profiles_recent_2d = prepared_model["profiles_recent_table"]
@@ -604,8 +645,8 @@ def generate_simulation_interval(
     if general_dict.get("cumulative", False):
         y_forecast_sim = np.mean(np.sum(y_simulated, axis=0))
         cum_sums = np.sum(y_simulated, axis=0)
-        y_lower = np.quantile(cum_sums, level_low).reshape(1, n_levels)
-        y_upper = np.quantile(cum_sums, level_up).reshape(1, n_levels)
+        y_lower = np.nanquantile(cum_sums, level_low).reshape(1, n_levels)
+        y_upper = np.nanquantile(cum_sums, level_up).reshape(1, n_levels)
     else:
         # 10. Calculate quantiles for each horizon
         y_lower = np.zeros((h, n_levels))
@@ -617,8 +658,8 @@ def generate_simulation_interval(
             # (matches R commit 7d4d3736)
             y_forecast_sim[i] = np.mean(y_simulated[i, :])
 
-            y_lower[i, :] = np.quantile(y_simulated[i, :], level_low)
-            y_upper[i, :] = np.quantile(y_simulated[i, :], level_up)
+            y_lower[i, :] = np.nanquantile(y_simulated[i, :], level_low)
+            y_upper[i, :] = np.nanquantile(y_simulated[i, :], level_up)
 
     # 11. Convert to relative form (like parametric intervals)
     # Use (h, 1) broadcasting for 2D y_lower/y_upper
@@ -627,23 +668,174 @@ def generate_simulation_interval(
         y_lower = y_lower - pred_col
         y_upper = y_upper - pred_col
     else:
-        sim_col = y_forecast_sim.reshape(-1, 1)
-        y_lower = np.where(sim_col != 0, y_lower / sim_col, 0)
-        y_upper = np.where(sim_col != 0, y_upper / sim_col, 0)
+        pred_col = predictions.reshape(-1, 1)
+        y_lower = np.where(pred_col != 0, y_lower / pred_col, 0)
+        y_upper = np.where(pred_col != 0, y_upper / pred_col, 0)
 
     # 12. Final combination with forecasts (same as parametric)
-    replace_val = 0.0 if e_type == "A" else 1.0
+    replace_val = 0.0  # both A and M: R sets NaN to 0 (yLower[is.nan(yLower)] <- 0)
     y_lower_final = np.where(np.isnan(y_lower), replace_val, y_lower)
     y_upper_final = np.where(np.isnan(y_upper), replace_val, y_upper)
 
+    pred_col = predictions.reshape(-1, 1)
     if e_type == "A":
-        pred_col = predictions.reshape(-1, 1)
         y_lower_final = pred_col + y_lower_final
         y_upper_final = pred_col + y_upper_final
     else:
-        sim_col = y_forecast_sim.reshape(-1, 1)
-        y_lower_final = sim_col * y_lower_final
-        y_upper_final = sim_col * y_upper_final
+        y_lower_final = pred_col * y_lower_final
+        y_upper_final = pred_col * y_upper_final
 
     scenarios_out = y_simulated if general_dict.get("scenarios", False) else None
     return y_lower_final, y_upper_final, scenarios_out, y_forecast_sim
+
+
+# Distributions where errors are normalised by fitted values for semiparametric/
+# empirical/nonparametric intervals when Etype=="A" (R/adam.R ~6414-6448).
+_LOG_DISTS = frozenset({"dinvgauss", "dgamma", "dlnorm", "dls", "dllaplace", "dlgnorm"})
+
+
+def _fit_power_quantile(errors, horizons, level):
+    """Fit quantile q_k = A0 * k^A1 by minimising the pinball loss.
+
+    Translates R's nonparametric interval fitting (R/adam.R ~6618-6677).
+
+    Parameters
+    ----------
+    errors : np.ndarray, shape (T-h, h)
+    horizons : np.ndarray, shape (h,)
+    level : float
+        Quantile level in [0, 1].
+
+    Returns
+    -------
+    np.ndarray, shape (h,)
+    """
+
+    def pinball_total(params):
+        a0, a1 = params
+        total = 0.0
+        for i, k in enumerate(horizons):
+            q_k = a0 * (k**a1)
+            diff = errors[:, i] - q_k
+            total += np.sum(np.where(diff >= 0, level * diff, (level - 1) * diff))
+        return total
+
+    result = minimize(
+        pinball_total,
+        x0=[1.0, 1.0],
+        method="Nelder-Mead",
+        options={"xatol": 1e-6, "fatol": 1e-6, "maxiter": 5000},
+    )
+    a0, a1 = result.x
+    return np.array([a0 * (k**a1) for k in horizons])
+
+
+def generate_multistep_interval(
+    predictions,
+    prepared_model,
+    general_dict,
+    observations_dict,
+    model_type_dict,
+    lags_dict,
+    params_info,
+    adam_cpp,
+    level_low,
+    level_up,
+    interval_type,
+):
+    """Generate semiparametric, empirical, or nonparametric prediction intervals.
+
+    Translates R's forecast.adam() R/adam.R lines ~6414-6677.
+    All three types use the (T-h) x h multistep in-sample error matrix from ferrors.
+
+    Returns
+    -------
+    tuple
+        (y_lower, y_upper) each of shape (h, n_levels).
+    """
+    h = general_dict["h"]
+    obs = observations_dict["obs_in_sample"]
+    e_type = model_type_dict["error_type"]
+    distribution = general_dict["distribution"]
+    cumulative = general_dict.get("cumulative", False)
+
+    mat_wt = np.asfortranarray(prepared_model["measurement"], dtype=np.float64)
+    mat_f = np.asfortranarray(prepared_model["transition"], dtype=np.float64)
+
+    if h > 1:
+        adam_errors = _compute_multistep_errors(
+            adam_cpp,
+            prepared_model,
+            observations_dict,
+            lags_dict,
+            general_dict,
+            mat_wt,
+            mat_f,
+        )
+        n = obs - h
+    else:
+        adam_errors = np.asarray(prepared_model["residuals"], dtype=float).reshape(
+            -1, 1
+        )
+        n = obs
+
+    if h > 1 and distribution in _LOG_DISTS and e_type == "A":
+        y_fitted = np.asarray(prepared_model["y_fitted"], dtype=float)
+        fitted_matrix = np.column_stack(
+            [y_fitted[i : obs - h + i] for i in range(1, h + 1)]
+        )
+        adam_errors = adam_errors / fitted_matrix
+
+    if interval_type == "semiparametric":
+        if cumulative:
+            vcov = float(np.sum(adam_errors.T @ adam_errors / n))
+        else:
+            vcov = np.diag(adam_errors.T @ adam_errors / n)
+        return generate_prediction_interval(
+            predictions,
+            prepared_model,
+            general_dict,
+            observations_dict,
+            model_type_dict,
+            lags_dict,
+            params_info,
+            level_low,
+            level_up,
+            scale_2d_override=np.atleast_1d(vcov).reshape(-1, 1),
+        )
+
+    n_levels = len(level_low)
+    yf = np.atleast_1d(np.asarray(predictions, dtype=float))
+
+    if cumulative:
+        cum_errors = np.sum(adam_errors, axis=1)
+        y_lower = np.array([[np.quantile(cum_errors, q) for q in level_low]])
+        y_upper = np.array([[np.quantile(cum_errors, q) for q in level_up]])
+    elif interval_type == "empirical" or h == 1:
+        y_lower = np.zeros((h, n_levels))
+        y_upper = np.zeros((h, n_levels))
+        for i in range(h):
+            col = adam_errors[:, i]
+            y_lower[i] = [np.quantile(col, q) for q in level_low]
+            y_upper[i] = [np.quantile(col, q) for q in level_up]
+    else:  # nonparametric, h > 1
+        horizons = np.arange(1, h + 1, dtype=float)
+        y_lower = np.column_stack(
+            [_fit_power_quantile(adam_errors, horizons, q) for q in level_low]
+        )
+        y_upper = np.column_stack(
+            [_fit_power_quantile(adam_errors, horizons, q) for q in level_up]
+        )
+
+    pred_col = yf.reshape(-1, 1)
+    if e_type == "M":
+        y_lower = pred_col * (1.0 + y_lower)
+        y_upper = pred_col * (1.0 + y_upper)
+    elif distribution in _LOG_DISTS:
+        y_lower = pred_col * y_lower
+        y_upper = pred_col * y_upper
+    else:
+        y_lower = pred_col + y_lower
+        y_upper = pred_col + y_upper
+
+    return y_lower, y_upper

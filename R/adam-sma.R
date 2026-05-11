@@ -229,7 +229,7 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
                                   TRUE, 2,
-                                  TRUE);
+                                  TRUE, "n");
 
         # Get scale, cf, logLik and IC
         scale <- sqrt(sum(adamFitted$errors^2)/obsInSample);

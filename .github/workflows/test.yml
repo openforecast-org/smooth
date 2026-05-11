@@ -2,9 +2,19 @@ name: R-CMD-check
 
 on:
   pull_request:
+    paths:
+      - 'R/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'man/**'
+      - 'man-roxygen/**'
+      - 'vignettes/**'
+      - 'DESCRIPTION'
+      - 'NAMESPACE'
+      - '.github/workflows/test.yml'
   workflow_dispatch:
   schedule:
-   - cron:  '0 0 * * 1'
+    - cron: '0 0 * * 1'
 
 jobs:
   R-CMD-check:

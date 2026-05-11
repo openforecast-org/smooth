@@ -145,14 +145,8 @@ def _estimate_model(
     initials_results,
     occurrence_dict,
     components_dict,
-    # NLopt parameters
-    print_level=0,
-    xtol_rel=1e-6,
-    xtol_abs=1e-8,
-    ftol_rel=1e-8,
-    ftol_abs=0,
-    algorithm="NLOPT_LN_NELDERMEAD",
-    smoother="lowess",
+    nlopt_kargs=None,
+    smoother="global",
 ):
     """
     Estimate a single model and calculate its information criterion.
@@ -209,12 +203,7 @@ def _estimate_model(
         occurrence_dict=occurrence_dict,
         phi_dict=phi_dict_temp,
         components_dict=components_dict,
-        print_level=print_level,
-        xtol_rel=xtol_rel,
-        xtol_abs=xtol_abs,
-        ftol_rel=ftol_rel,
-        ftol_abs=ftol_abs,
-        algorithm=algorithm,
+        **(nlopt_kargs or {}),
         smoother=smoother,
     )
 
@@ -251,14 +240,8 @@ def _run_branch_and_bound(
     pool_trends,
     check_seasonal,
     check_trend,
-    # NLopt parameters
-    print_level=0,
-    xtol_rel=1e-6,
-    xtol_abs=1e-8,
-    ftol_rel=1e-8,
-    ftol_abs=0,
-    algorithm="NLOPT_LN_NELDERMEAD",
-    smoother="lowess",
+    nlopt_kargs=None,
+    smoother="global",
     silent=False,
 ):
     """
@@ -382,12 +365,7 @@ def _run_branch_and_bound(
             initials_results,
             occurrence_dict,
             components_dict,
-            print_level=print_level,
-            xtol_rel=xtol_rel,
-            xtol_abs=xtol_abs,
-            ftol_rel=ftol_rel,
-            ftol_abs=ftol_abs,
-            algorithm=algorithm,
+            nlopt_kargs=nlopt_kargs,
             smoother=smoother,
         )
 
@@ -570,17 +548,11 @@ def _estimate_all_models(
     occurrence_dict,
     components_dict,
     silent=False,
-    # NLopt parameters
-    print_level=0,
-    xtol_rel=1e-6,
-    xtol_abs=1e-8,
-    ftol_rel=1e-8,
-    ftol_abs=0,
-    algorithm="NLOPT_LN_NELDERMEAD",
+    nlopt_kargs=None,
     # Pre-computed results from branch-and-bound
     precomputed_results=None,
     precomputed_models=None,
-    smoother="lowess",
+    smoother="global",
 ):
     """
     Estimate all models in the provided pool.
@@ -696,12 +668,7 @@ def _estimate_all_models(
             occurrence_dict=occurrence_dict,
             phi_dict=phi_dict_temp,
             components_dict=components_dict,
-            print_level=print_level,
-            xtol_rel=xtol_rel,
-            xtol_abs=xtol_abs,
-            ftol_rel=ftol_rel,
-            ftol_abs=ftol_abs,
-            algorithm=algorithm,
+            **(nlopt_kargs or {}),
             smoother=smoother,
         )
         results[j]["IC"] = ic_function(
@@ -734,14 +701,8 @@ def selector(
     initials_results,
     criterion="AICc",
     silent=False,
-    # NLopt parameters
-    print_level=0,
-    xtol_rel=1e-6,
-    xtol_abs=1e-8,
-    ftol_rel=1e-8,
-    ftol_abs=0,
-    algorithm="NLOPT_LN_NELDERMEAD",
-    smoother="lowess",
+    nlopt_kargs=None,
+    smoother="global",
 ):
     """
     Automatic model selection for ADAM using information criteria and Branch & Bound.
@@ -1049,12 +1010,7 @@ def selector(
                     pool_trends,
                     check_seasonal,
                     check_trend,
-                    print_level=print_level,
-                    xtol_rel=xtol_rel,
-                    xtol_abs=xtol_abs,
-                    ftol_rel=ftol_rel,
-                    ftol_abs=ftol_abs,
-                    algorithm=algorithm,
+                    nlopt_kargs=nlopt_kargs,
                     smoother=smoother,
                     silent=silent,
                 )
@@ -1102,12 +1058,7 @@ def selector(
         occurrence_dict,
         components_dict,
         silent,
-        print_level=print_level,
-        xtol_rel=xtol_rel,
-        xtol_abs=xtol_abs,
-        ftol_rel=ftol_rel,
-        ftol_abs=ftol_abs,
-        algorithm=algorithm,
+        nlopt_kargs=nlopt_kargs,
         precomputed_results=bb_results,
         precomputed_models=bb_models_tested,
         smoother=smoother,

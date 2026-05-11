@@ -62,7 +62,7 @@ class TestADAMAirPassengersBasic:
         model.fit(AIRPASSENGERS)
 
         # Reference loss value
-        expected_loss = 755.937489
+        expected_loss = 755.065923
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAN loss {actual_loss} differs from expected {expected_loss}"
@@ -150,8 +150,8 @@ class TestADAMAirPassengersPartialPersistence:
         assert model.persistence_level_ == 0.4
 
         # Loss should be higher than optimal since alpha is fixed
-        # Reference: optimal loss is ~586, with alpha=0.4 it's ~713
-        expected_loss = 713.407063
+        # Reference: optimal loss is ~586, with alpha=0.4 it's ~649
+        expected_loss = 649.145309
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"Loss with alpha=0.4: {actual_loss} differs from expected {expected_loss}"
@@ -261,7 +261,7 @@ class TestADAMAirPassengersInitialTypes:
         model = ADAM(model="ANA", lags=[12], initial="optimal")
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 593.375675
+        expected_loss = 588.474062
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"ANA optimal loss {actual_loss} differs from expected {expected_loss}"
@@ -281,7 +281,7 @@ class TestADAMAirPassengersInitialTypes:
         model = ADAM(model="AAA", lags=[12], initial="backcasting")
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 565.381907
+        expected_loss = 565.313766
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAA backcasting loss {actual_loss} differs from expected {expected_loss}"
@@ -291,7 +291,7 @@ class TestADAMAirPassengersInitialTypes:
         model = ADAM(model="AAA", lags=[12], initial="optimal")
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 565.815441
+        expected_loss = 569.312991
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAA optimal loss {actual_loss} differs from expected {expected_loss}"
@@ -301,7 +301,7 @@ class TestADAMAirPassengersInitialTypes:
         model = ADAM(model="AAA", lags=[12], initial="two-stage")
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 565.188104
+        expected_loss = 565.123455
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAA two-stage loss {actual_loss} differs from expected {expected_loss}"
@@ -343,7 +343,7 @@ class TestADAMAirPassengersAAAPersistence:
         model = ADAM(model="AAA", lags=[12])
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 565.381907
+        expected_loss = 565.313766
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAA loss {actual_loss} differs from expected {expected_loss}"
@@ -361,7 +361,7 @@ class TestADAMAirPassengersAAAPersistence:
         assert model.persistence_level_ == 0.5
 
         # Reference loss with alpha=0.5
-        expected_loss = 703.748569
+        expected_loss = 636.965563
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"AAA alpha=0.5 loss {actual_loss} differs from expected {expected_loss}"
@@ -376,7 +376,7 @@ class TestADAMAirPassengersAAAPersistence:
         assert model.persistence_trend_ == 0.1
 
         # Reference loss
-        expected_loss = 722.992495
+        expected_loss = 654.328174
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"AAA alpha=0.5, beta=0.1 loss {actual_loss} differs from expected {expected_loss}"
@@ -401,9 +401,9 @@ class TestADAMAirPassengersAAAPersistence:
 
         B = model.coef
         # Reference values
-        expected_alpha = 0.23373680
-        expected_beta = 0.00056139
-        expected_gamma = 0.76623396
+        expected_alpha = 0.24444748
+        expected_beta = 0.00108759
+        expected_gamma = 0.75490673
 
         assert np.isclose(B[0], expected_alpha, rtol=1e-3), \
             f"Alpha {B[0]} differs from expected {expected_alpha}"

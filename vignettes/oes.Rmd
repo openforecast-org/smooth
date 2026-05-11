@@ -121,7 +121,7 @@ The occurrence part of the model oETS$_F$ is constructed using `oes()` function:
 ```{r iETSFExample1}
 oETSFModel1 <- oes(y, occurrence="fixed", h=10, holdout=TRUE)
 oETSFModel1
-plot(oETSFModel1)
+plot(oETSFModel1, 7)
 ```
 
 The occurrence part of the model is supported by `adam()` function. For example, here's how the iETS(M,M,N)$_F$ can be constructed:
@@ -163,7 +163,7 @@ The occurrence part of the model iETS$_O$ is constructed using the very same `oe
 ```{r iETSOExample1}
 oETSOModel <- oes(y, model="MMN", occurrence="o", h=10, holdout=TRUE)
 oETSOModel
-plot(oETSOModel)
+plot(oETSOModel, 7)
 ```
 
 And here's the full iETS(M,M,N)$_O$ model:
@@ -211,7 +211,7 @@ Once again `oes()` function is used in the construction of the model:
 ```{r iETSIExample1}
 oETSIModel <- oes(y, model="MMN", occurrence="i", h=10, holdout=TRUE)
 oETSIModel
-plot(oETSIModel)
+plot(oETSIModel, 7)
 ```
 
 And here's the full iETS(M,M,N)$_O$ model:
@@ -275,7 +275,7 @@ Here's an example of the application of the model to the same artificial data:
 ```{r iETSDExample1}
 oETSDModel <- oes(y, model="MMN", occurrence="d", h=10, holdout=TRUE)
 oETSDModel
-plot(oETSDModel)
+plot(oETSDModel, 7)
 ```
 
 The usage of the model in case of univariate forecasting functions is the same as in the cases of other occurrence models, discussed above:
@@ -306,14 +306,14 @@ There is a separate function for this model, called `oesg()`. It has twice more 
 ```{r iETSGExample1}
 oETSGModel1 <- oesg(y, modelA="MNN", modelB="AAN", h=10, holdout=TRUE)
 oETSGModel1
-plot(oETSGModel1)
+plot(oETSGModel1, 7)
 ```
 
 The `oes()` function accepts `occurrence="g"` and in this case calls for `oesg()` with the same types of ETS models for both parts:
 ```{r iETSGExample2}
 oETSGModel2 <- oes(y, model="MNN", occurrence="g", h=10, holdout=TRUE)
 oETSGModel2
-plot(oETSGModel2)
+plot(oETSGModel2, 7)
 ```
 
 Finally, the more flexible way to construct iETS model would be to do it in two steps: either using `oesg()` or `oes()` and then using the `adam()` with the provided model in `occurrence` variable. But a simpler option is available as well:
@@ -327,7 +327,7 @@ Finally, there is an occurrence type selection mechanism. It tries out all the i
 ```{r iETSAExample1}
 oETSAModel <- oes(y, model="MNN", occurrence="a", h=10, holdout=TRUE)
 oETSAModel
-plot(oETSAModel)
+plot(oETSAModel, 7)
 ```
 
 The main restriction of the iETS models at the moment (`smooth` v.2.5.0) is that there is no model selection between the ETS models for the occurrence part. This needs to be done manually. Hopefully, this feature will appear in the next release of the package.

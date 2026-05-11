@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "smooth"
-version = "1.0.0"
+version = "1.0.3"
 description = "Python version of the smooth forecasting library"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,9 @@ dependencies = [
     "pandas>=2.0",
     "nlopt",
     "scipy>=1.11.0,<1.16.0",
-    "statsmodels"
+    "statsmodels",
+    "greybox",
+    "matplotlib",
 ]
 
 [tool.setuptools.packages.find]
@@ -29,7 +31,6 @@ dev = [
     "pre-commit",
     "ipykernel",
     "tqdm",
-    "matplotlib",  
     "ipython>=8.0.0"
 ]
 r = ["rpy2>=3.5.0"]
@@ -54,6 +55,7 @@ addopts = [
     "-v",
     "--tb=short",
     "-ra",
+    "-m", "not r_comparison and not r_parity",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
@@ -61,6 +63,8 @@ filterwarnings = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "r_comparison: tests that compare Python output against R reference data (skipped by default; run with -m r_comparison)",
+    "r_parity: cross-language numerical-equivalence tests requiring R+smooth+devtools (run with -m r_parity)",
 ]
 
 [tool.coverage.run]

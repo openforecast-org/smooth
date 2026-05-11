@@ -171,7 +171,7 @@ def sigma(observations_dict, params_info, general, prepared_model):
     params_number = params_info[0][-1]
 
     # In case of likelihood, scale is not calculated towards parameters for variance
-    if general["loss"] == "likelihood":
+    if general["loss"] == "likelihood" and len(params_info[0]) > 1:
         params_number = params_number - params_info[0][1]
 
     vals = observations_dict["obs_in_sample"] - params_number
@@ -183,6 +183,7 @@ def sigma(observations_dict, params_info, general, prepared_model):
     non_nan_mask = ~residuals.isna()
 
     # Calculate sigma based on distribution type
+    r = residuals[non_nan_mask]
     if general["distribution"] in [
         "dnorm",
         "dlaplace",
@@ -191,22 +192,15 @@ def sigma(observations_dict, params_info, general, prepared_model):
         "dt",
         "dlogis",
         "dalaplace",
+        "dinvgauss",
+        "dgamma",
     ]:
-        sigma = (residuals[non_nan_mask] ** 2).sum()
+        return np.linalg.norm(r) / np.sqrt(vals)
     elif general["distribution"] in ["dlnorm", "dllaplace", "dls"]:
-        sigma = (np.log(residuals[non_nan_mask]) ** 2).sum()
-    # elif general['distribution'] == 'dlgnorm':
-    # we need the extract_scale() function here
-    #    sigma = (np.log(residuals[non_nan_mask] - extract_scale()**2/2)**2).sum()
-    elif general["distribution"] in ["dinvgauss", "dgamma"]:
-        # sigma = ((residuals[non_nan_mask] - 1)**2).sum()
-
-        # Important note: I have droped to -1 here to match the R.
-        # In case we have other distribution we might need to sum + 1 to make the match
-        # I cant find the source of the discrepancy.
-        sigma = ((residuals[non_nan_mask]) ** 2).sum()
-
-    return np.sqrt(sigma / vals)
+        # elif general['distribution'] == 'dlgnorm':
+        # we need the extract_scale() function here
+        #    sigma = (np.log(r - extract_scale()**2/2)**2).sum()
+        return np.linalg.norm(np.log(r)) / np.sqrt(vals)
 
 
 def covar_anal(lags_model, h, measurement, transition, persistence, s2):

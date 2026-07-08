@@ -1,263 +1,49 @@
+import math
+from typing import Literal
+
 import numpy as np
 import pandas as pd
+from greybox import lowess as _greybox_lowess
 from scipy import stats
 from scipy.special import beta, digamma, gamma
 from statsmodels.tsa.stattools import acf, pacf
 
-# Import C++ lowess for performance (with Python fallback)
-try:
-    from smooth.adam_general import lowess_cpp as _lowess_cpp
+from smooth.adam_general import _ols  # type: ignore[attr-defined]
 
-    _USE_CPP_LOWESS = True
-except ImportError:
-    _USE_CPP_LOWESS = False
 
-# Note: Custom lowess_r function is kept as reference/fallback implementation
+def _fsum_mean(x):
+    # Shewchuk exact summation, matches R's LDOUBLE mean() to ULP.
+    n = len(x)
+    return math.fsum(x) / n if n else float("nan")
+
+
+def _fsum_nanmean(x):
+    arr = np.asarray(x, dtype=np.float64).ravel()
+    mask = ~np.isnan(arr)
+    n = int(mask.sum())
+    return math.fsum(arr[mask]) / n if n else float("nan")
+
+
+def _r_filter_mean(x):
+    # Mirror R's stats::filter(weights=1/N) summation order byte-for-byte:
+    # walk the array from the last element down to the first, accumulating
+    # `value * (1/N)` in IEEE-double. Without this exact order the seasonal
+    # init seeds drift by ≤1 ULP, which the undamped multiplicative ETS(M,M,M)
+    # recursion amplifies into a different NLopt basin on chaotic configs
+    # like taylor at lag=48.
+    n = len(x)
+    if not n:
+        return float("nan")
+    inv_n = 1.0 / n
+    arr = np.asarray(x, dtype=np.float64).ravel()
+    s = 0.0
+    for i in range(n - 1, -1, -1):
+        s += float(arr[i]) * inv_n
+    return s
+
 
 # Default smoother for ADAM/ES model initialisation (msdecompose keeps "lowess")
-SMOOTHER_DEFAULT = "global"
-
-
-def lowess_r(x, y, f=2 / 3, nsteps=3, delta=None):
-    """
-    LOWESS smoother that exactly matches R's stats::lowess function.
-
-    This is a pure Python/NumPy implementation of Cleveland's LOWESS algorithm
-    as implemented in R's stats package (clowess C function).
-
-    Parameters
-    ----------
-    x : array-like
-        X values (will be converted to float)
-    y : array-like
-        Y values (will be converted to float)
-    f : float
-        Smoother span (fraction of points), default 2/3
-    nsteps : int
-        Number of robustifying iterations, default 3
-    delta : float or None
-        Distance threshold for interpolation. If None, uses 0.01 * range(x)
-
-    Returns
-    -------
-    ndarray
-        Smoothed y values
-
-    References
-    ----------
-    Cleveland, W.S. (1979) "Robust Locally Weighted Regression and
-    Smoothing Scatterplots". JASA 74(368): 829-836.
-    R source: https://github.com/SurajGupta/r-source/blob/master/src/library/stats/src/lowess.c
-    """
-    x = np.asarray(x, dtype=np.float64)
-    y = np.asarray(y, dtype=np.float64)
-    n = len(x)
-
-    if n < 2:
-        return y.copy()
-
-    if delta is None:
-        delta = 0.01 * (x.max() - x.min())
-
-    # Number of points in local window - at least 2, at most n
-    ns = max(2, min(n, int(f * n + 1e-7)))
-
-    # Sort by x if not already sorted
-    order = np.argsort(x)
-    x_sorted = x[order]
-    y_sorted = y[order]
-
-    ys = np.zeros(n)  # smoothed values
-    rw = np.ones(n)  # robustness weights
-    res = np.zeros(n)  # residuals
-
-    # Compute range for stability checks
-    x_range = x_sorted[n - 1] - x_sorted[0]
-
-    def lowest(xs, nleft, nright, rw_iter):
-        """
-        Compute weighted local regression at point xs.
-        This matches R's lowest() function exactly.
-        """
-        # Compute bandwidth h
-        h = max(xs - x_sorted[nleft], x_sorted[nright] - xs)
-
-        # Thresholds for weight calculation (R's h9 and h1)
-        h9 = 0.999 * h
-        h1 = 0.001 * h
-
-        # Sum of weights
-        a = 0.0
-        # Store weights - allocate enough space for potential ties beyond nright
-        w = np.zeros(n)
-
-        # Loop through points - continue past nright to pick up ties
-        j = nleft
-        nrt = nright  # will track rightmost point with non-zero weight
-
-        while j < n:
-            # Compute absolute distance
-            r = abs(x_sorted[j] - xs)
-
-            # Check if within bandwidth (using h9 threshold)
-            if r <= h9:
-                if r <= h1:
-                    # Very close - weight = 1
-                    w[j] = 1.0
-                else:
-                    # Tricube weight: (1 - (r/h)^3)^3
-                    w[j] = (1.0 - (r / h) ** 3) ** 3
-
-                # Apply robustness weight from previous iteration
-                w[j] *= rw_iter[j]
-                a += w[j]
-                nrt = j
-            elif x_sorted[j] > xs:
-                # Past the point, no more ties possible
-                break
-
-            j += 1
-
-        # Check if we have any non-zero weights
-        if a <= 0.0:
-            return 0.0, False
-
-        # Normalize weights to sum to 1
-        for j in range(nleft, nrt + 1):
-            w[j] /= a
-
-        # Check if we can fit a line (h > 0)
-        if h > 0.0:
-            # Compute weighted center of x values
-            a = 0.0
-            for j in range(nleft, nrt + 1):
-                a += w[j] * x_sorted[j]
-
-            # Compute slope if points are spread out enough
-            b = xs - a
-            c = 0.0
-            for j in range(nleft, nrt + 1):
-                c += w[j] * (x_sorted[j] - a) ** 2
-
-            # Stability check - only use slope if points are spread out
-            # (R checks: sqrt(c) > 0.001 * range)
-            if np.sqrt(c) > 0.001 * x_range:
-                b /= c
-                # Adjust weights for linear fit
-                for j in range(nleft, nrt + 1):
-                    w[j] *= b * (x_sorted[j] - a) + 1.0
-
-        # Compute fitted value as weighted sum
-        ys_out = 0.0
-        for j in range(nleft, nrt + 1):
-            ys_out += w[j] * y_sorted[j]
-
-        return ys_out, True
-
-    # Main robustness iterations
-    iteration = 0
-    while iteration <= nsteps:
-        nleft = 0
-        nright = ns - 1
-        last = -1  # index of previous estimated point
-        i = 0  # index of current point
-
-        while True:
-            # Move window right if it decreases radius
-            if nright < n - 1:
-                d1 = x_sorted[i] - x_sorted[nleft]
-                d2 = x_sorted[nright + 1] - x_sorted[i]
-
-                if d1 > d2:
-                    # Radius decreases by moving right
-                    nleft += 1
-                    nright += 1
-                    continue
-
-            # Compute fitted value at x[i]
-            ys[i], ok = lowest(x_sorted[i], nleft, nright, rw)
-
-            if not ok:
-                # All weights zero - copy over value
-                ys[i] = y_sorted[i]
-
-            # Interpolate skipped points
-            if last < i - 1:
-                denom = x_sorted[i] - x_sorted[last]
-                # Should be non-zero by construction
-                if denom > 0:
-                    for j in range(last + 1, i):
-                        alpha = (x_sorted[j] - x_sorted[last]) / denom
-                        ys[j] = alpha * ys[i] + (1.0 - alpha) * ys[last]
-
-            # Update last estimated point
-            last = i
-
-            # Skip ahead using delta - find next point beyond delta
-            cut = x_sorted[last] + delta
-            i += 1
-            while i < n:
-                if x_sorted[i] > cut:
-                    break
-                # Special case: exact ties get same value
-                if x_sorted[i] == x_sorted[last]:
-                    ys[i] = ys[last]
-                    last = i
-                i += 1
-
-            # Adjust i (R's: i = max(last+1, i-1))
-            i = max(last + 1, i - 1)
-
-            if last >= n - 1:
-                break
-
-        # Compute residuals
-        for i in range(n):
-            res[i] = y_sorted[i] - ys[i]
-
-        # Overall scale estimate (mean absolute residual)
-        sc = np.sum(np.abs(res)) / n
-
-        # Compute robustness weights (except on last iteration)
-        if iteration >= nsteps:
-            break
-
-        # Compute median absolute deviation (cmad = 6 * median)
-        abs_res = np.abs(res)
-        m1 = n // 2
-
-        # Partial sort to find median
-        abs_res_sorted = np.partition(abs_res, m1)
-        if n % 2 == 0:
-            m2 = n - m1 - 1
-            abs_res_sorted = np.partition(abs_res_sorted, m2)
-            cmad = 3.0 * (abs_res_sorted[m1] + abs_res_sorted[m2])
-        else:
-            cmad = 6.0 * abs_res_sorted[m1]
-
-        # Check if effectively zero (R's threshold: 1e-7 * sc)
-        if cmad < 1e-7 * sc:
-            break
-
-        # Compute biweight robustness weights
-        c9 = 0.999 * cmad
-        c1 = 0.001 * cmad
-        for i in range(n):
-            r = abs(res[i])
-            if r <= c1:
-                rw[i] = 1.0
-            elif r <= c9:
-                rw[i] = (1.0 - (r / cmad) ** 2) ** 2
-            else:
-                rw[i] = 0.0
-
-        iteration += 1
-
-    # Restore original order
-    result = np.zeros(n)
-    result[order] = ys
-
-    return result
+SMOOTHER_DEFAULT: Literal["lowess", "ma", "global"] = "global"
 
 
 def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
@@ -457,8 +243,7 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
     if smoother not in ["ma", "lowess", "supsmu", "global"]:
         raise ValueError("smoother must be 'ma', 'lowess', 'supsmu', or 'global'")
 
-    # Note: lowess/supsmu now use custom lowess_r implementation that matches R exactly
-    # No external dependencies required
+    # Note: lowess/supsmu use greybox's lowess implementation.
 
     # Variable name handling
     y_name = "y"
@@ -467,10 +252,10 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
     y = np.asarray(y)
     obs_in_sample = len(y)
 
-    # Handle empty lags case - treat as lags=[1] to match R behavior
-    # In R, msdecompose is never called with empty lags, but the Python code
-    # filters lags to remove lag=1, which can result in empty lags.
-    # We treat empty lags as lags=[1] to ensure consistent smoothing behavior.
+    # Handle empty lags case — treat as lags=[1]. The decomposition entry
+    # point filters out lag=1 before reaching this branch, which can leave
+    # an empty list when the only requested lag was 1. Falling back to
+    # lags=[1] keeps the smoothing path consistent.
     if len(lags) == 0:
         lags = [1]
 
@@ -519,11 +304,10 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
         x_range = x_valid.max() - x_valid.min()
         delta = 0.01 * x_range if x_range > 0 else 0.0
 
-        # Use C++ lowess for performance, fall back to Python if unavailable
-        if _USE_CPP_LOWESS:
-            smoothed_y = _lowess_cpp(x_valid, y_valid, f=span, nsteps=3, delta=delta)
-        else:
-            smoothed_y = lowess_r(x_valid, y_valid, f=span, nsteps=3, delta=delta)
+        # greybox's lowess (x_valid is ascending, so its internal sort is a no-op)
+        smoothed_y = np.asarray(
+            _greybox_lowess(x_valid, y_valid, f=span, iter=3, delta=delta)["y"]
+        )
 
         # Map back to original indices
         result = np.full_like(y, np.nan)
@@ -547,7 +331,9 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
                     block_idx[:, None] == np.arange(n_groups - 1)[None, :]
                 ).astype(float)
                 X = np.column_stack([np.ones(n), dummies, np.arange(1, n + 1)])
-        coef = np.linalg.lstsq(X, y, rcond=None)[0]
+        X = np.ascontiguousarray(X, dtype=np.float64)
+        y = np.ascontiguousarray(y, dtype=np.float64)
+        coef = _ols.ols(X, y)
         return X @ coef
 
     # Initial data processing
@@ -591,8 +377,9 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
         X_sin = np.column_stack(
             [np.sin(np.pi * t * k / max_lag) for k in range(1, max_lag + 1)]
         )
-        X = np.column_stack((X_poly, X_sin))
-        coef = np.linalg.lstsq(X[~y_na_values], y_insample[~y_na_values], rcond=None)[0]
+        X = np.ascontiguousarray(np.column_stack((X_poly, X_sin)), dtype=np.float64)
+        y_fit = np.ascontiguousarray(y_insample[~y_na_values], dtype=np.float64)
+        coef = _ols.ols(X[~y_na_values], y_fit)
         y_insample[y_na_values] = X[y_na_values] @ coef
 
     # Smoothing and trend extraction
@@ -626,7 +413,7 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
 
                 if len(y_seasonal_non_na) > 0:
                     if smoother_second == "ma":
-                        y_seasonal_smooth = np.mean(y_seasonal_non_na)
+                        y_seasonal_smooth = _r_filter_mean(y_seasonal_non_na)
                         pattern_i[indices] = y_seasonal_smooth
                     else:
                         y_seasonal_smooth = smoothing_function(
@@ -640,7 +427,7 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
             # Use only complete seasonal cycles for mean calculation
             obs_in_sample_lags = int(np.floor(obs_in_sample / lags[i]) * lags[i])
             if obs_in_sample_lags > 0:
-                pattern_i -= np.nanmean(pattern_i[:obs_in_sample_lags])
+                pattern_i -= _fsum_nanmean(pattern_i[:obs_in_sample_lags])
             patterns.append(pattern_i)
     else:
         patterns = None
@@ -649,11 +436,9 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
     # Create initial as a dict with nonseasonal and seasonal components
     initial = {"nonseasonal": {}, "seasonal": []}
 
-    # Calculate nonseasonal initial values (level and trend)
-    #  R: initial$nonseasonal <-
-    # c(ySmooth[[ySmoothLength]][!is.na(ySmooth[[ySmoothLength]])][1],
-    #                             mean(diff(ySmooth[[ySmoothLength]]),na.rm=T));
-    data_for_initial = y_smooth[lags_length]  # Matches R's ySmooth[[ySmoothLength]]
+    # Calculate nonseasonal initial values (level and trend) from the
+    # smoothed series at the largest seasonal lag.
+    data_for_initial = y_smooth[lags_length]
     valid_data_for_initial = data_for_initial[~np.isnan(data_for_initial)]
     if len(valid_data_for_initial) == 0:
         init_level = 0.0
@@ -661,18 +446,17 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
     else:
         # Level: first non-NA value
         init_level = valid_data_for_initial[0]
-        # Trend: mean of diffs of full series (with NAs), then remove NAs from mean
-        # This matches R's mean(diff(x), na.rm=T) behavior
-        diffs = np.diff(data_for_initial)  # Diff full series, NAs propagate
-        init_trend = np.nanmean(diffs) if len(diffs) > 0 else 0.0
+        # Trend: NaN-skipping mean of first differences of the full series.
+        diffs = np.diff(data_for_initial)
+        init_trend = _fsum_nanmean(diffs) if len(diffs) > 0 else 0.0
 
     lags_max = max(lags)
 
-    # Fix the initial for MA smoother (lines 200-202 in R)
+    # Centre-correct the initial level when using the moving-average smoother
     if smoother == "ma":
         init_level -= init_trend * np.floor(lags_max / 2)
 
-    # Lag things back to get values useful for ADAM (lines 204-206 in R)
+    # Lag things back to get values useful for ADAM
     init_level -= init_trend * lags_max
 
     # Store in nonseasonal dict
@@ -803,8 +587,9 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
         # Implement asymmetric Laplace distribution
         pass
     elif distribution == "dlnorm":
-        # Use complex log to handle negative y_fitted during optimization,
-        # mirroring R's Re(log(as.complex(y_fitted))) failsafe.
+        # Use the real part of the complex logarithm so that negative
+        # y_fitted values during optimisation produce a finite log instead
+        # of NaN (the imaginary part is discarded).
         meanlog = np.real(np.log(y_fitted.astype(complex))) - scale**2 / 2
         return stats.lognorm.logpdf(y, s=scale, scale=np.exp(meanlog))
     elif distribution == "dllaplace":
@@ -909,9 +694,12 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
     float: The calculated scale parameter
     """
 
-    # Helper function to safely compute complex logarithm
-    def safe_log(x):
-        return np.log(np.abs(x) + 1j * (x.imag - x.real))
+    # Helper: take ``log`` of a possibly-negative input via complex extension.
+    # ``log(as.complex(z))`` for z < 0 yields ``log|z| + iπ``; downstream the
+    # modulus ``abs(...)`` is taken so the result is finite and continuous.
+    # Mirrors R's ``log(as.complex(...))`` pattern used in ``adam_scaler``.
+    def complex_log(x):
+        return np.log(np.asarray(x, dtype=np.complex128))
 
     if distribution == "dnorm":
         return np.linalg.norm(errors) / np.sqrt(obs_in_sample)
@@ -930,49 +718,41 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         return np.sum(errors * (other - (errors <= 0) * 1)) / obs_in_sample
 
     elif distribution == "dlnorm":
+        # Cast 1+errors (or 1+errors/yFitted) to complex so log() of negative
+        # arguments stays finite; the outer modulus turns the complex log
+        # into a real number. Mirrors R's ``log(as.complex(...))`` pattern.
         if Etype == "A":
-            temp = 1 - np.sqrt(
-                np.abs(
-                    1
-                    - np.linalg.norm(np.log(np.abs(1 + errors / y_fitted))) ** 2
-                    / obs_in_sample
-                )
-            )
+            log_term = np.abs(complex_log(1 + errors / y_fitted))
         else:  # "M"
-            temp = 1 - np.sqrt(
-                np.abs(1 - np.linalg.norm(np.log(1 + errors)) ** 2 / obs_in_sample)
-            )
+            log_term = np.abs(complex_log(1 + errors))
+        temp = 1 - np.sqrt(np.abs(1 - np.linalg.norm(log_term) ** 2 / obs_in_sample))
         return np.sqrt(2 * np.abs(temp))
 
     elif distribution == "dllaplace":
         if Etype == "A":
-            return np.real(
-                np.sum(np.abs(safe_log(1 + errors / y_fitted))) / obs_in_sample
-            )
+            return np.sum(np.abs(complex_log(1 + errors / y_fitted))) / obs_in_sample
         else:  # "M"
-            return np.sum(np.abs(np.log(1 + errors))) / obs_in_sample
+            return np.sum(np.abs(complex_log(1 + errors))) / obs_in_sample
 
     elif distribution == "dls":
         if Etype == "A":
-            return np.real(
-                np.sum(np.sqrt(np.abs(safe_log(1 + errors / y_fitted)))) / obs_in_sample
+            return (
+                np.sum(np.sqrt(np.abs(complex_log(1 + errors / y_fitted))))
+                / obs_in_sample
             )
         else:  # "M"
-            return np.sum(np.sqrt(np.abs(np.log(1 + errors)))) / obs_in_sample
+            return np.sum(np.sqrt(np.abs(complex_log(1 + errors)))) / obs_in_sample
 
     elif distribution == "dlgnorm":
         if Etype == "A":
-            return np.real(
-                (
-                    other
-                    * np.sum(np.abs(safe_log(1 + errors / y_fitted)) ** other)
-                    / obs_in_sample
-                )
-                ** (1 / other)
-            )
+            return (
+                other
+                * np.sum(np.abs(complex_log(1 + errors / y_fitted)) ** other)
+                / obs_in_sample
+            ) ** (1 / other)
         else:  # "M"
             return (
-                other * np.sum(np.abs(safe_log(1 + errors)) ** other) / obs_in_sample
+                other * np.sum(np.abs(complex_log(1 + errors)) ** other) / obs_in_sample
             ) ** (1 / other)
 
     elif distribution == "dinvgauss":

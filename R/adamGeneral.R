@@ -581,7 +581,13 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                                     "MSEh","TMSE","GTMSE","MSCE",
                                     "MAEh","TMAE","GTMAE","MACE",
                                     "HAMh","THAM","GTHAM","CHAM","GPL",
-                                    "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL"));
+                                    "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL",
+                                    # "custom" is set upstream by om() / omg()
+                                    # when the user passes a callable — accept
+                                    # it as a valid string so the rest of the
+                                    # checker pipeline doesn't reject the OM
+                                    # custom-loss flow.
+                                    "custom"));
 
         if(any(loss==c("MSEh","TMSE","GTMSE","MSCE","MAEh","TMAE","GTMAE","MACE",
                        "HAMh","THAM","GTHAM","CHAM","GPL",

@@ -1093,10 +1093,11 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         boundsOriginal <- bounds;
         bounds <- "none";
 
-        # Calculate hessian
-        FI <- -hessian(logLikFunction, B, h=stepSize, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt,
-                       arRequired=arRequired, maRequired=maRequired,
-                       arEstimate=arEstimate, maEstimate=maEstimate);
+        # Calculate hessian via the shared C++ implementation (src/hessianCpp.cpp).
+        logLikFunction_FI <- function(B) logLikFunction(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt,
+                                                        arRequired=arRequired, maRequired=maRequired,
+                                                        arEstimate=arEstimate, maEstimate=maEstimate);
+        FI <- -hessianCpp(logLikFunction_FI, B, h=stepSize);
         colnames(FI) <- rownames(FI) <- names(B);
 
         if(any(substr(names(B),1,3)=="phi")){

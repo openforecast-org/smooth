@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 from numpy.linalg import eigvals
 
@@ -9,6 +11,110 @@ from smooth.adam_general.core.utils.utils import (
     calculate_multistep_loss,
     scaler,
 )
+
+
+def trim_b_for_penalty(
+    B,  # noqa: N803
+    components_dict,
+    persistence_checked,
+    explanatory_checked,
+    phi_dict,
+    arima_checked,
+    initials_checked,
+    model_type_dict,
+    lags_dict,
+    general,
+):
+    """Build the trimmed/transformed parameter vector for LASSO/RIDGE penalty.
+
+    Mirrors the block in the additive/ARIMA ADAM CF (R/adam.R:894-937,
+    `cost_functions.py:544-677` pre-refactor): drops initial-state entries
+    from ``B``, shrinks ``phi`` and the AR coefficients to ``1 - x``
+    (so the penalty pushes them toward 1, not 0), keeps MA as-is, and
+    normalises xreg coefficients by the additive ``y_denominator``.
+
+    Shared by ADAM's ``CF``, ``om_cf`` (for ``OM``) and ``omg_cf``
+    (for ``OMG``) so the regularisation acts on the exact same parameter
+    subset across all three.
+    """
+    components_ets = int(components_dict.get("components_number_ets", 0) or 0)
+    persistence_xreg_est = int(
+        persistence_checked.get("persistence_xreg_estimate", False) or 0
+    )
+    xreg_num = int(explanatory_checked.get("xreg_number", 0) or 0)
+    phi_est = int(phi_dict.get("phi_estimate", False) or 0)
+    ar_orders = arima_checked.get("ar_orders") if arima_checked else None
+    ma_orders = arima_checked.get("ma_orders") if arima_checked else None
+    arima_model = arima_checked.get("arima_model", False) if arima_checked else False
+
+    if ar_orders is None or (hasattr(ar_orders, "__len__") and len(ar_orders) == 0):
+        ar_orders = [0]
+    if ma_orders is None or (hasattr(ma_orders, "__len__") and len(ma_orders) == 0):
+        ma_orders = [0]
+
+    persistence_to_skip = (
+        components_ets
+        + persistence_xreg_est * xreg_num
+        + phi_est
+        + sum(ar_orders)
+        + sum(ma_orders)
+    )
+
+    B_penalty = np.asarray(B, dtype=float).copy()  # noqa: N806
+
+    if phi_est:
+        phi_idx = components_ets + persistence_xreg_est * xreg_num
+        if phi_idx < len(B_penalty):
+            B_penalty[phi_idx] = 1 - B_penalty[phi_idx]
+
+    j = components_ets + persistence_xreg_est * xreg_num + phi_est
+
+    if arima_model and (sum(ma_orders) > 0 or sum(ar_orders) > 0):
+        lags = lags_dict.get("lags", [1]) if lags_dict else [1]
+        if not hasattr(lags, "__len__"):
+            lags = [lags]
+        for i in range(len(lags)):
+            ar_order_i = ar_orders[i] if i < len(ar_orders) else 0
+            ma_order_i = ma_orders[i] if i < len(ma_orders) else 0
+            if ar_order_i > 0 and j + ar_order_i <= len(B_penalty):
+                B_penalty[j : j + ar_order_i] = 1 - B_penalty[j : j + ar_order_i]
+            j += ar_order_i + ma_order_i
+
+    initial_type = (
+        initials_checked.get("initial_type", "optimal")
+        if initials_checked
+        else "optimal"
+    )
+    if isinstance(initial_type, list):
+        initial_type_matches = any(
+            t in ("optimal", "backcasting", "two-stage") for t in initial_type
+        )
+    else:
+        initial_type_matches = initial_type in (
+            "optimal",
+            "backcasting",
+            "two-stage",
+        )
+
+    if initial_type_matches:
+        if xreg_num > 0:
+            denominator = general.get("denominator")
+            error_type = model_type_dict.get("error_type", "A")
+            if error_type == "A" and denominator is not None:
+                B_penalty = np.concatenate(
+                    [
+                        B_penalty[:persistence_to_skip],
+                        B_penalty[-xreg_num:] / denominator,
+                    ]
+                )
+            else:
+                B_penalty = np.concatenate(
+                    [B_penalty[:persistence_to_skip], B_penalty[-xreg_num:]]
+                )
+        else:
+            B_penalty = B_penalty[:persistence_to_skip]
+
+    return B_penalty
 
 
 def CF(  # noqa: N802
@@ -312,7 +418,9 @@ def CF(  # noqa: N802
     ]
     mat_vt = np.asfortranarray(adam_elements["mat_vt"], dtype=np.float64)
 
-    # Restore seed row for next CF call (mirrors R copy-on-modify for matVt parameter).
+    # Restore the seed row of mat_vt before the next CF call so each
+    # optimiser step starts from the same initial state (the C++ fitter may
+    # mutate the row in place).
     if arima_seed_backup is not None:
         idx, n, row = arima_seed_backup
         matrices_dict["mat_vt"][idx, :n] = row
@@ -389,34 +497,33 @@ def CF(  # noqa: N802
             ):
                 return 1e300
 
-        # Not supporting regression model now
-        # if explanatory_checked['xreg_model'] and regressors == "adapt":
-        #     if any(adam_elements['vec_g'][components_dict['components_number_ets'] +
-        #                               components_dict['components_number_arima']:
-        #                               components_dict['components_number_ets'] +
-        #                               components_dict['components_number_arima'] +
-        #                               explanatory_checked['xreg_number']] > 1) or \
-        #        any(adam_elements['vec_g'][components_dict['components_number_ets'] +
-        #                               components_dict['components_number_arima']:
-        #                               components_dict['components_number_ets'] +
-        #                               components_dict['components_number_arima'] +
-        #                               explanatory_checked['xreg_number']] < 0):
-        #         return 1e100 * np.max(np.abs(adam_elements['vec_g']
-        #             [components_dict['components_number_ets'] +
-        #             components_dict['components_number_arima']:
-        #             components_dict['components_number_ets'] +
-        #             components_dict['components_number_arima'] +
-        #             explanatory_checked['xreg_number']] - 0.5))
+        if explanatory_checked["xreg_model"] and regressors == "adapt":
+            xreg_start = (
+                components_dict["components_number_ets"]
+                + components_dict["components_number_arima"]
+            )
+            deltas = adam_elements["vec_g"][
+                xreg_start : xreg_start + explanatory_checked["xreg_number"]
+            ]
+            if np.any(deltas > 1) or np.any(deltas < 0):
+                return 1e100 * np.max(np.abs(deltas - 0.5))
 
     elif bounds == "admissible":
         if arima_checked["arima_model"]:
-            if arima_checked["ar_estimate"] and (
-                sum(-adam_elements["arima_polynomials"]["arPolynomial"][1:]) >= 1
-                or sum(-adam_elements["arima_polynomials"]["arPolynomial"][1:]) < 0
+            # Mirror R's admissible AR-check (utils-adam.R:1484-1486):
+            # AND of (all -arPoly[1:] > 0) AND (sum -arPoly[1:] >= 1).  The
+            # legacy `or sum(...) < 0` clause was a stale rule that fired the
+            # AR-eigvals penalty on B-points where R passes through to the
+            # state-space smoothEigens check; on ARIMA-only fits with negative
+            # AR seeds (e.g. NLopt simplex probes with ar1[1] ~= -2) it pushed
+            # Py into a different basin from R.
+            ar_neg_coefs = -adam_elements["arima_polynomials"]["arPolynomial"][1:]
+            if (
+                arima_checked["ar_estimate"]
+                and np.all(np.asarray(ar_neg_coefs) > 0)
+                and sum(ar_neg_coefs) >= 1
             ):
-                arPolynomialMatrix[:, 0] = -adam_elements["arima_polynomials"][
-                    "arPolynomial"
-                ][1:]
+                arPolynomialMatrix[:, 0] = ar_neg_coefs
                 eigenValues = np.abs(eigvals(arPolynomialMatrix))
                 if any(eigenValues > 1):
                     return 1e100 * np.max(eigenValues)
@@ -501,18 +608,21 @@ def CF(  # noqa: N802
                 observations_dict["obs_in_sample"],
                 other,
             )
-            # print(adam_fitted.errors)
-            # Calculate the likelihood
-            CFValue = -np.sum(
-                calculate_likelihood(
-                    general["distribution_new"],
-                    model_type_dict["error_type"],
-                    observations_dict["y_in_sample"][observations_dict["ot_logical"]],
-                    adam_fitted.fitted[observations_dict["ot_logical"]],
-                    scale,
-                    other,
-                )
+            # Calculate the likelihood.  Use math.fsum (Shewchuk exact) to
+            # mirror R's LDOUBLE-accumulator sum() — NumPy's default pairwise
+            # sum drifts by 1 ULP per call against R, which through NLopt's
+            # deterministic simplex moves becomes a different convergence
+            # point on flat ARIMA cost surfaces.  Same class of fix as the
+            # msdecompose summation-order work.
+            ll = calculate_likelihood(
+                general["distribution_new"],
+                model_type_dict["error_type"],
+                observations_dict["y_in_sample"][observations_dict["ot_logical"]],
+                adam_fitted.fitted[observations_dict["ot_logical"]],
+                scale,
+                other,
             )
+            CFValue = -math.fsum(np.asarray(ll, dtype=np.float64).ravel().tolist())
             # Differential entropy for the logLik of occurrence model
             if observations_dict.get("occurrence_model", False) or any(
                 ~observations_dict["ot_logical"]
@@ -540,101 +650,21 @@ def CF(  # noqa: N802
                 / observations_dict["obs_in_sample"]
             )
         elif general["loss"] in ["LASSO", "RIDGE"]:
-            # Extract values with safe defaults (use consistent pattern throughout)
-            components_ets = int(components_dict.get("components_number_ets", 0) or 0)
-            persistence_xreg_est = int(
-                persistence_checked.get("persistence_xreg_estimate", False) or 0
+            # Trim B for penalty term (shared helper — also called by om_cf
+            # and omg_cf so OM/OMG penalise the exact same parameter subset
+            # ADAM does).
+            B_penalty = trim_b_for_penalty(  # noqa: N806
+                B,
+                components_dict,
+                persistence_checked,
+                explanatory_checked,
+                phi_dict,
+                arima_checked,
+                initials_checked,
+                model_type_dict,
+                lags_dict,
+                general,
             )
-            xreg_num = int(explanatory_checked.get("xreg_number", 0) or 0)
-            phi_est = int(phi_dict.get("phi_estimate", False) or 0)
-            ar_orders = arima_checked.get("ar_orders") if arima_checked else None
-            ma_orders = arima_checked.get("ma_orders") if arima_checked else None
-            arima_model = (
-                arima_checked.get("arima_model", False) if arima_checked else False
-            )
-
-            # Ensure ar_orders and ma_orders are lists
-            if ar_orders is None or (
-                hasattr(ar_orders, "__len__") and len(ar_orders) == 0
-            ):
-                ar_orders = [0]
-            if ma_orders is None or (
-                hasattr(ma_orders, "__len__") and len(ma_orders) == 0
-            ):
-                ma_orders = [0]
-
-            # Calculate persistenceToSkip (number of persistence parameters to keep)
-            persistenceToSkip = (
-                components_ets
-                + persistence_xreg_est * xreg_num
-                + phi_est
-                + sum(ar_orders)
-                + sum(ma_orders)
-            )
-
-            # Make a copy of B to avoid modifying optimizer's state
-            B_penalty = B.copy()
-
-            # Shrink phi to 1 if estimated
-            if phi_est:
-                phi_idx = components_ets + persistence_xreg_est * xreg_num
-                if phi_idx < len(B_penalty):
-                    B_penalty[phi_idx] = 1 - B_penalty[phi_idx]
-
-            j = components_ets + persistence_xreg_est * xreg_num + phi_est
-
-            # Handle ARIMA parameters: shrink AR to 1, keep MA as-is
-            if arima_model and (sum(ma_orders) > 0 or sum(ar_orders) > 0):
-                lags = lags_dict.get("lags", [1]) if lags_dict else [1]
-                if not hasattr(lags, "__len__"):
-                    lags = [lags]
-                for i in range(len(lags)):
-                    ar_order_i = ar_orders[i] if i < len(ar_orders) else 0
-                    ma_order_i = ma_orders[i] if i < len(ma_orders) else 0
-                    if ar_order_i > 0 and j + ar_order_i <= len(B_penalty):
-                        B_penalty[j : j + ar_order_i] = (
-                            1 - B_penalty[j : j + ar_order_i]
-                        )
-                    j += ar_order_i + ma_order_i
-
-            # Handle initial_type to determine if we should trim B_penalty
-            initial_type = (
-                initials_checked.get("initial_type", "optimal")
-                if initials_checked
-                else "optimal"
-            )
-            if isinstance(initial_type, list):
-                initial_type_matches = any(
-                    [t in ["optimal", "backcasting", "two-stage"] for t in initial_type]
-                )
-            else:
-                initial_type_matches = initial_type in [
-                    "optimal",
-                    "backcasting",
-                    "two-stage",
-                ]
-
-            # Trim B_penalty based on initial_type and xreg
-            if initial_type_matches:
-                if xreg_num > 0:
-                    denominator = general.get("denominator")
-                    error_type = model_type_dict.get("error_type", "A")
-                    if error_type == "A" and denominator is not None:
-                        # Normalize xreg parameters for additive errors
-                        B_penalty = np.concatenate(
-                            [
-                                B_penalty[:persistenceToSkip],
-                                B_penalty[-xreg_num:] / denominator,
-                            ]
-                        )
-                    else:
-                        # Keep xreg parameters as-is for multiplicative errors
-                        B_penalty = np.concatenate(
-                            [B_penalty[:persistenceToSkip], B_penalty[-xreg_num:]]
-                        )
-                else:
-                    # No xreg: just take persistence parameters
-                    B_penalty = B_penalty[:persistenceToSkip]
 
             # Flatten errors to avoid potential broadcasting issues
             errors_flat = np.asarray(adam_fitted.errors).ravel()

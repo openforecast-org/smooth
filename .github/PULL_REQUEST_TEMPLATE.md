@@ -6,7 +6,7 @@ Closes #<!-- issue number -->
 
 - [ ] R
 - [ ] Python
-- [ ] Both
+- [ ] Other?
 
 ## Package version
 

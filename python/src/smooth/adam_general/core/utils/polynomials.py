@@ -22,10 +22,10 @@ def adam_polynomialiser(
     """
     Compute ARIMA polynomials using the C++ adamCore.polynomialise method.
 
-    This function wraps the C++ polynomialise method exposed via pybind11.
-    It mirrors R's call: adamCpp$polynomialise(B, arOrders, iOrders, maOrders,
-                                               arEstimate, maEstimate, armaParameters,
-                                               lags)
+    This function wraps the C++ ``polynomialise`` method exposed via
+    pybind11. Given the optimisation parameter vector ``B`` and the
+    AR/I/MA order specification, it builds the ARMA polynomials used by
+    the state-space fitter.
 
     Parameters
     ----------

@@ -10,6 +10,7 @@ man-roxygen
 cran-comments.md
 ^CRAN-SUBMISSION$
 ^python
+^python/.*\.so$
 ^src/python_examples
 ^src/libs
 dev_load.R
@@ -18,3 +19,4 @@ CLAUDE.md
 .claude
 LICENSE
 conda
+^\.claude$

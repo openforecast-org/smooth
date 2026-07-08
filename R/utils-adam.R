@@ -1370,23 +1370,27 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                   "ds"=sum(sqrt(abs(errors))) / (obsInSample*2),
                   "dgnorm"=(other*sum(abs(errors)^other)/obsInSample)^{1/other},
                   "dalaplace"=sum(errors*(other-(errors<=0)*1))/obsInSample,
+                  # Log-domain distributions: route 1+errors (or 1+errors/yFitted)
+                  # through as.complex() and take abs() of the resulting log so
+                  # the scale stays finite when the argument is non-positive.
+                  # Equivalent Python: abs(log((1+errors).astype(complex))). The
+                  # outer abs() is the modulus of the complex log, replacing the
+                  # earlier Re()/abs() of a real arg pattern.
                   "dlnorm"=sqrt(2*abs(switch(Etype,
-                                             "A"=1-sqrt(abs(1-sum(log(abs(1+errors/yFitted))^2)/
+                                             "A"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors/yFitted)))^2)/
                                                                 obsInSample)),
-                                             "M"=1-sqrt(abs(1-sum(log(1+errors)^2)/obsInSample))))),
+                                             "M"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors)))^2)/obsInSample))))),
                   "dllaplace"=switch(Etype,
-                                     "A"=Re(sum(abs(log(as.complex(
-                                         1+errors/yFitted))))/obsInSample),
-                                     "M"=sum(abs(log(1+errors))/obsInSample)),
+                                     "A"=sum(abs(log(as.complex(1+errors/yFitted))))/obsInSample,
+                                     "M"=sum(abs(log(as.complex(1+errors))))/obsInSample),
                   "dls"=switch(Etype,
-                               "A"=Re(sum(sqrt(abs(log(as.complex(
-                                   1+errors/yFitted))))/obsInSample)),
-                               "M"=sum(sqrt(abs(log(1+errors)))/obsInSample)),
+                               "A"=sum(sqrt(abs(log(as.complex(1+errors/yFitted)))))/obsInSample,
+                               "M"=sum(sqrt(abs(log(as.complex(1+errors)))))/obsInSample),
                   "dlgnorm"=switch(Etype,
-                                   "A"=Re((other*sum(abs(log(as.complex(1+errors/yFitted)))^other)/
-                                               obsInSample)^{1/other}),
-                                   "M"=(other*sum(abs(log(as.complex(1+errors)))^other)/
-                                            obsInSample)^{1/other}),
+                                   "A"=abs((other*sum(abs(log(as.complex(1+errors/yFitted)))^other)/
+                                                obsInSample)^{1/other}),
+                                   "M"=abs((other*sum(abs(log(as.complex(1+errors)))^other)/
+                                                obsInSample)^{1/other})),
                   "dinvgauss"=switch(Etype,
                                      "A"=sum((errors/yFitted)^2/(1+errors/yFitted))/obsInSample,
                                      "M"=sum((errors)^2/(1+errors))/obsInSample),

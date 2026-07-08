@@ -1,9 +1,9 @@
 """
 AutoMSARIMA — automatic ARIMA order selection wrapper for ADAM.
 
-Mirrors R's ``auto.msarima()`` function: fixes ``model="NNN"`` and
-``distribution="dnorm"``, always enables ARIMA order selection, and
-forwards all other parameters to :class:`AutoADAM`.
+Fixes ``model="NNN"`` and ``distribution="dnorm"``, always enables ARIMA
+order selection, and forwards all other parameters to :class:`AutoADAM`.
+Use this when you want a pure (S)ARIMA without ETS components.
 """
 
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -21,7 +21,7 @@ class AutoMSARIMA(AutoADAM):
 
     Wraps :class:`AutoADAM` with ``model="NNN"`` and ``distribution="dnorm"``
     fixed, providing automatic ARIMA order selection for pure ARIMA (and
-    SARIMA) models without ETS components. Mirrors R's ``auto.msarima()``.
+    SARIMA) models without ETS components.
 
     Parameters
     ----------
@@ -30,21 +30,19 @@ class AutoMSARIMA(AutoADAM):
         If None, defaults to ``[1]`` (non-seasonal).
 
     ar_order : Union[int, List[int]], default=[3, 3]
-        Maximum AR order(s) per lag level for selection.
-        Matches R's ``orders=list(ar=c(3,3))``.
+        Maximum AR order(s) per lag level for selection (one entry per
+        seasonal frequency in ``lags``).
 
     i_order : Union[int, List[int]], default=[2, 1]
         Maximum integration order(s) per lag level.
-        Matches R's ``orders=list(i=c(2,1))``.
 
     ma_order : Union[int, List[int]], default=[3, 3]
         Maximum MA order(s) per lag level for selection.
-        Matches R's ``orders=list(ma=c(3,3))``.
 
     orders : Optional[Dict[str, Any]], default=None
-        R-style alternative to scalar max orders. A dict with keys
-        ``"ar"``, ``"i"``, ``"ma"`` (each an int or list). When provided,
-        ``ar_order``/``i_order``/``ma_order`` are ignored.
+        Dict-style alternative to the scalar max-order arguments above. A
+        dict with keys ``"ar"``, ``"i"``, ``"ma"`` (each an int or list).
+        When provided, ``ar_order`` / ``i_order`` / ``ma_order`` are ignored.
 
     constant : Union[bool, float], default=False
         Whether to include a constant (drift) term.
@@ -119,9 +117,9 @@ class AutoMSARIMA(AutoADAM):
     def __init__(
         self,
         lags: Optional[List[int]] = None,
-        ar_order: Union[int, List[int]] = [3, 3],  # noqa: B006
-        i_order: Union[int, List[int]] = [2, 1],  # noqa: B006
-        ma_order: Union[int, List[int]] = [3, 3],  # noqa: B006
+        ar_order: Union[int, List[int], None] = [3, 3],  # noqa: B006
+        i_order: Union[int, List[int], None] = [2, 1],  # noqa: B006
+        ma_order: Union[int, List[int], None] = [3, 3],  # noqa: B006
         orders: Optional[Dict[str, Any]] = None,
         constant: Union[bool, float] = False,
         initial: Union[str, Dict[str, Any], None] = "backcasting",
@@ -147,6 +145,20 @@ class AutoMSARIMA(AutoADAM):
             )
 
         initial_value = MSARIMA._build_initial(initial, initial_X)
+
+        # AutoMSARIMA's whole purpose is automatic ARIMA-order selection — so
+        # translate the scalar ``ar_order`` / ``i_order`` / ``ma_order`` (when
+        # used as upper search bounds, the AutoMSARIMA convention) into the
+        # equivalent ``orders`` dict with ``select=True``. AutoADAM's new
+        # precedence rule otherwise treats the scalar triplet as FIXED orders.
+        if orders is None and any(x is not None for x in (ar_order, i_order, ma_order)):
+            orders = {
+                "ar": ar_order if ar_order is not None else 0,
+                "i": i_order if i_order is not None else 0,
+                "ma": ma_order if ma_order is not None else 0,
+                "select": True,
+            }
+            ar_order = i_order = ma_order = None  # avoid the both-supplied warning
 
         super().__init__(
             model="NNN",

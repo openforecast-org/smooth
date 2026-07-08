@@ -5,27 +5,19 @@ smoothEigensR <- function(persistence, transition, measurement, lagsModelAll, xr
     .Call('_smooth_smoothEigensR', PACKAGE = 'smooth', persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber, constantRequired)
 }
 
+hessianCpp <- function(f, x0, h = 1.220703125e-4) {
+    .Call('_smooth_hessianCpp', PACKAGE = 'smooth', f, x0, h)
+}
+
 matrixPowerWrap <- function(matA, power) {
     .Call('_smooth_matrixPowerWrap', PACKAGE = 'smooth', matA, power)
 }
 
+olsCpp <- function(X, y, tol = 1e-7) {
+    .Call('_smooth_olsCpp', PACKAGE = 'smooth', X, y, tol)
+}
+
 forecasterwrap <- function(matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX) {
     .Call('_smooth_forecasterwrap', PACKAGE = 'smooth', matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX)
-}
-
-occurenceFitterWrap <- function(matvt, matF, matw, vecg, ot, modellags, Etype, Ttype, Stype, Otype, matxt, matat, matFX, vecgX) {
-    .Call('_smooth_occurenceFitterWrap', PACKAGE = 'smooth', matvt, matF, matw, vecg, ot, modellags, Etype, Ttype, Stype, Otype, matxt, matat, matFX, vecgX)
-}
-
-occurrenceOptimizerWrap <- function(matvt, matF, matw, vecg, ot, modellags, Etype, Ttype, Stype, Otype, matxt, matat, matFX, vecgX, bounds) {
-    .Call('_smooth_occurrenceOptimizerWrap', PACKAGE = 'smooth', matvt, matF, matw, vecg, ot, modellags, Etype, Ttype, Stype, Otype, matxt, matat, matFX, vecgX, bounds)
-}
-
-occurenceGeneralFitterWrap <- function(ot, modellagsA, EtypeA, TtypeA, StypeA, matvtA, matFA, matwA, vecgA, matxtA, matatA, matFXA, vecgXA, modellagsB, EtypeB, TtypeB, StypeB, matvtB, matFB, matwB, vecgB, matxtB, matatB, matFXB, vecgXB) {
-    .Call('_smooth_occurenceGeneralFitterWrap', PACKAGE = 'smooth', ot, modellagsA, EtypeA, TtypeA, StypeA, matvtA, matFA, matwA, vecgA, matxtA, matatA, matFXA, vecgXA, modellagsB, EtypeB, TtypeB, StypeB, matvtB, matFB, matwB, vecgB, matxtB, matatB, matFXB, vecgXB)
-}
-
-occurrenceGeneralOptimizerWrap <- function(ot, bounds, modellagsA, EtypeA, TtypeA, StypeA, matvtA, matFA, matwA, vecgA, matxtA, matatA, matFXA, vecgXA, modellagsB, EtypeB, TtypeB, StypeB, matvtB, matFB, matwB, vecgB, matxtB, matatB, matFXB, vecgXB) {
-    .Call('_smooth_occurrenceGeneralOptimizerWrap', PACKAGE = 'smooth', ot, bounds, modellagsA, EtypeA, TtypeA, StypeA, matvtA, matFA, matwA, vecgA, matxtA, matatA, matFXA, vecgXA, modellagsB, EtypeB, TtypeB, StypeB, matvtB, matFB, matwB, vecgB, matxtB, matatB, matFXB, vecgXB)
 }
 

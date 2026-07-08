@@ -1,28 +1,25 @@
 """
-Unit tests for the lowess function.
+Unit tests for the lowess function (provided by greybox >= 1.0.2).
 
-Tests cover:
+``smooth`` no longer ships its own LOWESS; it relies on ``greybox.lowess``.
+These tests guard that dependency and cover:
 - Basic functionality and output format
 - Parameter variations (f, iter, delta)
 - Edge cases (small datasets, unsorted data)
 - R compatibility
-- C++ vs Python implementation consistency
 """
 
 import numpy as np
 import pytest
-
-from smooth import lowess
-from smooth.adam_general import lowess_cpp
-from smooth.adam_general.core.utils.utils import lowess_r
+from greybox import lowess
 
 
 class TestLowessBasic:
     """Basic functionality tests for lowess."""
 
     def test_import(self):
-        """Test that lowess can be imported from smooth."""
-        from smooth import lowess
+        """Test that lowess can be imported from greybox."""
+        from greybox import lowess
         assert callable(lowess)
 
     def test_basic_output_format(self):
@@ -197,29 +194,6 @@ class TestLowessEdgeCases:
 
         with pytest.raises(ValueError):
             lowess(x)
-
-
-class TestLowessCppConsistency:
-    """Tests for consistency between C++ and Python implementations."""
-
-    def test_cpp_vs_python(self):
-        """Test that C++ and Python implementations match."""
-        np.random.seed(42)
-        x = np.linspace(0, 10, 50)
-        y = np.sin(x) + np.random.randn(50) * 0.2
-
-        # Call C++ directly
-        result_cpp = lowess_cpp(x, y, f=0.5, nsteps=3, delta=0.1)
-
-        # Call Python implementation
-        result_py = lowess_r(x, y, f=0.5, nsteps=3, delta=0.1)
-
-        np.testing.assert_array_almost_equal(result_cpp, result_py, decimal=10)
-
-    def test_wrapper_uses_cpp(self):
-        """Test that the wrapper function uses C++ implementation."""
-        from smooth.adam_general.core.utils.utils import _USE_CPP_LOWESS
-        assert _USE_CPP_LOWESS is True
 
 
 class TestLowessNumericalStability:

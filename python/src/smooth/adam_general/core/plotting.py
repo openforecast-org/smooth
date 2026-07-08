@@ -1,4 +1,4 @@
-"""Diagnostic plots for fitted ADAM models — Python equivalent of R's plot.adam()."""
+"""Diagnostic plots for fitted ADAM models (residuals, ACF/PACF, Q-Q, fit)."""
 
 import math
 
@@ -91,7 +91,7 @@ def _log_transform(y, dist):
 
 def _lowess_line(ax, x, y):
     """Draw a red LOWESS smoothing line on ax."""
-    from smooth.lowess import lowess
+    from greybox import lowess
 
     mask = ~(np.isnan(x) | np.isnan(y))
     if mask.sum() < 4:  # noqa: PLR2004
@@ -336,7 +336,7 @@ def _plot5(model, ax, legend, **kw):
         full_t, full_y = t_in, actuals
     ax.plot(full_t, full_y, color="#000000", lw=1.5, label="Actuals")
 
-    # Fitted values — dashed purple on top (#A020F0 matches R's "purple")
+    # Fitted values — dashed purple on top
     ax.plot(t_in, fitted, color="#A020F0", lw=1.5, linestyle="--", label="Fitted")
 
     # Horizontal line at the last in-sample observation
@@ -603,7 +603,7 @@ def _plot9(model, ax, type_, lowess, **kw):
 # Dispatch table and main entry point
 # ---------------------------------------------------------------------------
 
-_WHICH_MAP = {
+_WHICH_MAP: dict = {
     1: (_plot1, {}),
     2: (_plot2, {"resid_type": "rstandard"}),
     3: (_plot2, {"resid_type": "rstudent"}),

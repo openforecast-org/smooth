@@ -24,7 +24,7 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: r-lib/actions/setup-pandoc@v2
 
@@ -36,8 +36,11 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          # Don't check suggests to avoid Windows issues with doMC
-          cache: false
+          # Don't check suggests to avoid Windows issues with doMC.
+          # Cache the installed R-package tree keyed on DESCRIPTION +
+          # the OS / R-version pair; rebuilds only when DESCRIPTION
+          # changes. Saves ~3-5 min per leg.
+          cache: true
           extra-packages: |
             any::rcmdcheck
             any::testthat

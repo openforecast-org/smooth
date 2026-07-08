@@ -1,7 +1,8 @@
 """
 ARIMA order selection for ADAM.
 
-Mirrors R's three-phase arimaSelector() algorithm from autoadam.R.
+Three-phase selection algorithm:
+
 Phase 1: Select differencing (I) orders exhaustively.
 Phase 2: Greedy MA order selection using ACF of residuals (while loop).
 Phase 3: Greedy AR order selection using PACF of residuals (while loop).
@@ -135,7 +136,7 @@ def _select_i_orders(
     """Phase 1: exhaustive search over all I-order combinations × constant.
 
     When an ETS baseline is provided via ``initial_ic`` / ``initial_model``,
-    they serve as the starting best (mirrors R's ICOriginal).
+    those values seed the search as the initial best IC and best model.
     """
     n = len(lags)
     zeros = [0] * n
@@ -194,8 +195,8 @@ def _select_ma_orders(
 ) -> Tuple[List[int], Any, float]:
     """Phase 2: greedy MA selection using ACF of residuals (while loop).
 
-    Mirrors R's while loop: after accepting an MA order, updates residuals
-    and tries again until no further IC improvement.
+    After accepting an MA order, residuals are recomputed and the search
+    continues until no further IC improvement is found.
     """
     from statsmodels.tsa.stattools import acf
 
@@ -272,8 +273,8 @@ def _select_ar_orders(
 ) -> Tuple[List[int], Any, float]:
     """Phase 3: greedy AR selection using PACF of residuals (while loop).
 
-    Mirrors R's while loop: after accepting an AR order, updates residuals
-    and tries again until no further IC improvement.
+    After accepting an AR order, residuals are recomputed and the search
+    continues until no further IC improvement is found.
     """
     from statsmodels.tsa.stattools import pacf
 
@@ -397,7 +398,9 @@ def arima_selector(
     """
     Three-phase ARIMA order selection.
 
-    Mirrors R's ``arimaSelector()`` from autoadam.R lines 455-791.
+    Selects ARIMA(p, d, q) orders by combining an exhaustive search over
+    differencing orders with greedy ACF/PACF-driven searches over MA and AR
+    orders, then a special-case check for IMA(d, q) models.
 
     Parameters
     ----------
@@ -422,9 +425,9 @@ def arima_selector(
         External regressor matrix passed to each internal fit.
     ets_baseline : fitted ADAM, optional
         Pre-fitted ETS-only model for this distribution. When provided, its
-        IC serves as the Phase-1 baseline (mirrors R's ICOriginal), and the
-        final result is compared against it — pure ETS is returned if
-        ETS+ARIMA is not an improvement.
+        IC seeds Phase 1 as the initial best, and the final result is
+        compared against it — pure ETS is returned if ETS+ARIMA is not an
+        improvement.
     **adam_kwargs
         Additional keyword arguments forwarded to every internal ADAM fit.
 
@@ -553,6 +556,8 @@ def arima_selector(
         **adam_kwargs,
     )
     if ima_model is not None:
+        # ima_i / ima_ma are produced together with ima_model
+        assert ima_i is not None and ima_ma is not None
         best_i, best_ma, best_model, best_ic = ima_i, ima_ma, ima_model, ima_ic
 
     # Final check: if ETS baseline is better or equal, return it

@@ -12,8 +12,8 @@ These objects are imported from other packages. Follow the links
 below to see their documentation.
 
 \describe{
-  \item{generics}{\code{\link[generics]{accuracy}}}
+  \item{generics}{\code{\link[generics:accuracy]{accuracy()}}}
 
-  \item{xtable}{\code{\link[xtable]{xtable}}}
+  \item{xtable}{\code{\link[xtable:xtable]{xtable()}}}
 }}
 

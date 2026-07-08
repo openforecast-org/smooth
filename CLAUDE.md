@@ -11,6 +11,23 @@ A Python implementation is under development in the `python/` subdirectory (see 
 ## Claude instructions
 Do not create summaries of what you do. Do not create additional files/documents if not explicitly asked to.
 
+**Never dismiss a failing test.** Do not write off a failure as "pre-existing", "stale reference", "tolerance too tight", "flat-surface optimiser-floor effect", or "unrelated to my changes". A failing test is a real signal that something is wrong, even when the diff is tiny or the immediate task did not touch the failing code path. Report every failure clearly with the actual numbers, and if the current task cannot accommodate fixing them, log them as a follow-up and revisit them once the current task is done. Comparing failure sets across commits ("the same tests failed before") does not make the failures acceptable — it only narrows where to look. The goal is zero failing tests, not unchanged failing-test counts.
+
+Never create files or folders in the repository root. The root holds R package files only (DESCRIPTION, NAMESPACE, R/, src/, man/, tests/, vignettes/, ...) and must stay clean for CRAN. Put Python work under `python/`, and never let Python build artifacts (`.so`, `.venv`, `build/`, or symlinks into a venv) leak above the `python/` boundary — `R CMD build` follows symlinks during the source copy and dangling links abort the build.
+
+For Python, the local environment must always be `python/.venv`. Do not create venvs at the repo root, in `python/venv`, or anywhere else.
+
+**Always run linting (ruff check, ruff format) and mypy after every Python code change.** Whenever anything under `python/src/` is edited, run all three checks from the `python/` directory before considering the task complete:
+
+```bash
+cd python/
+.venv/bin/ruff check src/
+.venv/bin/ruff format src/
+.venv/bin/mypy src/smooth
+```
+
+All three must pass with zero errors. This applies to every Python edit — small or large, signature change or one-line tweak. See `python/CLAUDE.md` for the full rationale.
+
 When coding, use the best practice, focusing on the following principles:
 
 - Write as few lines as possible.

@@ -711,8 +711,9 @@ def forecaster(
         y_forecast_values, model_type_dict, model_prepared, general_dict
     )
 
-    # Point forecasts now always come from adam_cpp.forecast(), not simulations.
-    # (matches R commit 7d4d3736: forecast.adam returns $forecast, not sim mean)
+    # Point forecasts always come from adam_cpp.forecast(), not from the
+    # simulation mean — the deterministic forecast is more accurate and
+    # avoids Monte-Carlo noise.
     resolved_interval = general_dict["interval"]
     _cached_sim = None
 
@@ -920,7 +921,8 @@ def forecaster_combined(
 
     h = general_dict["h"]
 
-    # Filter weights >= 0.01 and renormalize (matches R's forecast.adamCombined)
+    # Drop models with negligible IC weight (< 0.01) and renormalise the
+    # remaining weights so they sum to 1.
     model_weights = {m["name"]: m["weight"] for m in prepared_models}
     filtered_weights = {k: v for k, v in model_weights.items() if v >= 0.01}
     total_weight = sum(filtered_weights.values())

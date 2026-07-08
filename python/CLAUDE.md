@@ -2,6 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Always update `python/NEWS.md` after changing Python code
+
+When you make a user-visible change to the Python package — new feature, bugfix,
+dependency change, API change, supported-version change — add an entry under the
+current unreleased version in `python/NEWS.md`. If no unreleased section exists
+yet, create one above the latest released version. Keep entries terse and grouped
+under `Changes:` / `Bugfixes:`, matching the existing style.
+
+Skip the changelog only for: pure refactors with no behaviour change, comment/doc
+typo fixes, and edits to test files that don't change tested behaviour. When in
+doubt, add the entry.
+
+## Never add a `frequency` parameter
+
+Do not add a `frequency` (or `period`, `seasonality`, or any equivalent) parameter
+to any class or function. Seasonal period is always inferred automatically from the
+data — from a pandas `DatetimeIndex`, from `lags`, or from the model specification.
+Exposing it as a parameter creates redundancy and diverges from the R API.
+
+**Exception:** the standalone `sim_*` simulators (`sim_es`, `sim_gum`, `sim_ces`,
+`sim_ssarima`, `sim_sma`, `sim_oes`) accept `frequency=<int>` to match the R API
+one-for-one. They are data-generators with no fitted state or input series to
+infer seasonality from, so the parameter is load-bearing. This exception does
+**not** extend to `ADAM.simulate()` / `ES.simulate()` / etc., which read `lags`
+straight off the fitted model.
+
 ## Never clip, clamp, or patch around bad numerics
 
 This rule applies across the whole project — `adam`, `OM`, `OMG`, `ES`,
@@ -110,7 +136,7 @@ make test
 
 ### Linting and Code Quality
 
-**Always run ruff check and ruff format after every code change:**
+**Always run ruff check, ruff format, and mypy after every code change:**
 
 ```bash
 # Run ruff linter (must pass with zero errors)
@@ -118,9 +144,14 @@ make test
 
 # Run ruff formatter
 .venv/bin/ruff format src/
+
+# Run mypy type checker (must pass with zero errors)
+.venv/bin/mypy src/smooth
 ```
 
-These two commands must be run together after any Python source edit. Fix all errors reported by `ruff check` before considering a task complete.
+These three commands must be run together after any Python source edit. Fix all errors reported by `ruff check` and `mypy` before considering a task complete.
+
+**Whenever you make an important change** — changing a function's signature (inputs/outputs), adding or removing parameters, changing return types, adding or removing classes or large blocks of code, touching any base class whose subclasses override the same method — **you MUST run all three checks**. Signature changes on a base class break LSP-compatibility on subclass overrides, and mypy is the only thing that will catch that before CI does. Don't skip mypy because "it's just a small change" — the LSP-break in `OM.predict` from a single added kwarg on `ADAM.predict` is exactly the class of bug it catches.
 
 **Linting Config**: Defined in `pyproject.toml` under `[tool.ruff]`
 - Line length: 88 (Black-compatible)

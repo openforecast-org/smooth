@@ -1,7 +1,9 @@
-"""Occurrence Model (OM): port of R's ``om()`` to Python.
+"""Occurrence Model (OM).
 
 This module implements the :class:`OM` class — a state-space model for the
-*probability of occurrence* of demand, mirroring R's ``smooth::om()``.
+*probability of occurrence* of demand. Useful for intermittent-demand data
+where many observations are zero and the size of the non-zero demands is
+modelled separately.
 
 Supported ``occurrence`` values:
 
@@ -22,10 +24,11 @@ from __future__ import annotations
 
 import time
 import warnings
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Union, cast
 
 import nlopt
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 
 from smooth.adam_general.core.adam import ADAM
@@ -93,11 +96,10 @@ def om_initial_transform(
     constant_required: bool,
     constant_estimate: bool,
 ) -> np.ndarray:
-    """Translation of ``om_initial_transform`` (R/om.R:1140).
+    """Transform initial state values from probability space onto the
+    model-native scale before optimisation begins.
 
-    Transforms initial state values from probability space onto the
-    model-native scale before optimisation begins.  Mutates ``mat_vt`` in
-    place and also returns it.
+    Mutates ``mat_vt`` in place and also returns it.
     """
 
     def _transform(value):
@@ -351,12 +353,12 @@ def om_preparator(
 
 
 class OM(ADAM):
-    """Occurrence model — Python port of R's ``om()``.
+    """Occurrence model — state-space model for the probability of demand occurrence.
 
-    Inherits the ADAM API surface and overrides the bits that differ:
-    cost function (Bernoulli likelihood with link transform), distribution
-    (always ``"plogis"``), scale (``nan``), and model-name format
-    (``"oETS(...)[F|O|I|D]"``).
+    Inherits the ADAM API surface and overrides the bits that differ for an
+    occurrence model: cost function (Bernoulli likelihood applied to the
+    link-transformed fitted values), distribution (always ``"plogis"``),
+    scale (``nan``), and model-name format (``"oETS(...)[F|O|I|D]"``).
     """
 
     _OM_DEFAULT_LOSS = "likelihood"
@@ -402,7 +404,7 @@ class OM(ADAM):
     def __init__(
         self,
         model: Union[str, List[str]] = "ZXZ",
-        lags: Optional[NDArray] = None,
+        lags: Optional[Union[List[int], NDArray]] = None,
         ar_order: Union[int, List[int]] = 0,
         i_order: Union[int, List[int]] = 0,
         ma_order: Union[int, List[int]] = 0,
@@ -410,15 +412,20 @@ class OM(ADAM):
         constant: bool = False,
         formula: Optional[str] = None,
         regressors: Literal["use", "select", "adapt"] = "use",
-        occurrence: OM_OCCURRENCE_OPTIONS = "odds-ratio",
-        loss: Literal["likelihood", "MSE"] = "likelihood",
+        # ``str`` (not just the OM_OCCURRENCE_OPTIONS literals) because ``__new__``
+        # also routes "general"/"auto", and wrappers pass runtime-validated strings.
+        occurrence: str = "odds-ratio",
+        loss: Union[
+            Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE", "custom"],
+            Callable,
+        ] = "likelihood",
+        reg_lambda: Optional[float] = None,
         h: int = 0,
         holdout: bool = False,
-        persistence: Optional[Dict[str, float]] = None,
+        # ``float`` permitted so the "fixed" occurrence path can set persistence=0.
+        persistence: Optional[Union[Dict[str, float], float]] = None,
         phi: Optional[float] = None,
-        initial: Union[
-            Dict[str, Any], Literal["backcasting", "optimal", "two-stage", "complete"]
-        ] = "backcasting",
+        initial: Union[Dict[str, Any], str] = "backcasting",
         n_iterations: Optional[int] = None,
         arma: Optional[Dict[str, Any]] = None,
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
@@ -438,11 +445,28 @@ class OM(ADAM):
                 f"Invalid occurrence={occurrence!r}; expected one of "
                 f"{list(_OCC_TO_CHAR)}."
             )
-        if loss not in ("likelihood", "MSE"):
-            raise ValueError(f"Invalid loss={loss!r}; expected 'likelihood' or 'MSE'.")
+        # Accept callable for a user-defined custom loss (signature
+        # ``(actual, fitted, B) -> scalar`` — same as ADAM, mirrors R's
+        # ``adamGeneral.R:574-602``). The callable flows through to
+        # ADAM's ``parameter_checks._check_distribution_and_loss`` which
+        # detects ``callable(loss)`` and sets the internal flag to
+        # ``"custom"`` while populating ``_general["loss_function"]``.
+        if not callable(loss) and loss not in (
+            "likelihood",
+            "MSE",
+            "MAE",
+            "HAM",
+            "LASSO",
+            "RIDGE",
+        ):
+            raise ValueError(
+                f"Invalid loss={loss!r}; expected one of "
+                "'likelihood', 'MSE', 'MAE', 'HAM', 'LASSO', 'RIDGE', "
+                "or a callable returning a scalar."
+            )
 
         # For "fixed" occurrence the model is forced to ANN with persistence
-        # disabled and an analytic initial level — match R/om.R:130-136.
+        # disabled and an analytic initial level.
         if occurrence == "fixed":
             model = "ANN"
             persistence = 0
@@ -458,7 +482,10 @@ class OM(ADAM):
             constant=constant,
             regressors=regressors,
             distribution="dnorm",
-            loss=loss,
+            # ADAM.__init__ types `loss` as a string Literal; the callable
+            # path is handled by ADAM's parameter_checks (which natively
+            # accepts callables and flips the internal flag to "custom").
+            loss=loss,  # type: ignore[arg-type]
             ic=ic,
             bounds=bounds,
             occurrence=occurrence,
@@ -472,10 +499,21 @@ class OM(ADAM):
             holdout=holdout,
             nlopt_kargs=nlopt_kargs,
             ets=ets,
+            reg_lambda=reg_lambda,
+            # ``reg_lambda`` is the user-facing name on OM (mirrors ADAM's
+            # public surface), but the cost function reads
+            # ``_general["lambda"]`` which is populated from
+            # ``lambda_param`` in ``parameters_checker``. Forward both so
+            # LASSO / RIDGE actually see the chosen weight.
+            lambda_param=reg_lambda,
             **kwargs,
         )
 
         self._is_om = True
+        # Set to True by OMG._om_from_side when this OM instance is a
+        # sub-model of an OMG; flips ``actuals`` from binary-indicator to
+        # the latent reconstruction. See OM.actuals.
+        self._is_omg_submodel: bool = False
         self._om_occurrence = occurrence
         self._occurrence_char = _OCC_TO_CHAR[occurrence]
         self._formula = formula
@@ -564,7 +602,7 @@ class OM(ADAM):
             i_ = getattr(self, "i_order", 0) or 2
             ma = getattr(self, "ma_order", 0) or 3
             return AutoOM(
-                model=self.model,
+                model=cast(str, self.model),  # OM always carries a string spec
                 lags=getattr(self, "lags", None),
                 occurrence=[self._om_occurrence],
                 arima_select=True,
@@ -599,7 +637,8 @@ class OM(ADAM):
         )
         self._check_parameters(y, X)
 
-        # Pure-regression early exit — mirrors R/om.R:154-281.
+        # Pure-regression early exit: when the user supplied an explicit
+        # ALM regression model, refit it under the plogis link and return.
         if getattr(self, "_alm_model", None) is not None:
             from greybox import ALM as _ALM
 
@@ -616,12 +655,12 @@ class OM(ADAM):
 
         self._restore_user_model_spec(requested_model_spec)
 
-        # Replace y_in_sample with binary ot (mirrors R: oInSample <- as.numeric(ot))
-        # so the inherited forecaster/preparator paths see the binary indicator.
+        # Replace y_in_sample with the binary occurrence indicator so the
+        # inherited forecaster/preparator paths see the 0/1 series.
         ot = np.asarray(self._observations["ot"], dtype=np.float64)
         self._observations["y_in_sample"] = ot
         self._observations["obs_zero"] = int(np.sum(~self._observations["ot_logical"]))
-        # Binarize holdout too (mirrors R: yHoldout <- as.numeric(yHoldout != 0))
+        # Binarise the holdout as well.
         y_hld_raw = self._observations.get("y_holdout")
         if self._general.get("holdout") and y_hld_raw is not None:
             self._observations["y_holdout"] = (np.asarray(y_hld_raw) != 0).astype(
@@ -652,7 +691,15 @@ class OM(ADAM):
             "orders": self._init_orders,
             "constant": self.constant,
             "regressors": self.regressors,
-            "loss": self.loss,
+            # Carry the callable through ``_config`` so ``coefbootstrap``
+            # refits replay the same custom loss; otherwise the resolved
+            # string flag.
+            "loss": (
+                self._general.get("loss_function")
+                if self._general.get("loss") == "custom"
+                else self.loss
+            ),
+            "reg_lambda": self.reg_lambda,
             "ic": self.ic,
             "bounds": self.bounds,
             "occurrence": self._om_occurrence,
@@ -810,11 +857,11 @@ class OM(ADAM):
     def _build_final_fit_adam_created(self, profile_dict):
         """Rebuild matrices using the ORIGINAL error/trend/season types.
 
-        Mirrors R's ``omgFinalFitA`` / ``omgFinalFitB``: those functions call
-        ``adam_creator`` with the checker's actual Etype/Ttype/Stype (not the
-        forced-additive version used during optimization). The difference matters
-        for the seasonal initial-state values in ``mat_vt``, which seed the
-        backcasting that runs inside the final standalone ``adamCpp$fit``.
+        During optimisation the model is forced to use additive error/trend/
+        season types for numerical stability. For the final standalone fit
+        we rebuild the matrices using the user-requested Etype/Ttype/Stype,
+        because the difference matters for the seasonal initial-state values
+        in ``mat_vt`` that seed the backcasting inside ``adamCpp$fit``.
         """
         model_type_dict = self._model_type
         original_ot_logical = self._observations["ot_logical"]
@@ -900,16 +947,46 @@ class OM(ADAM):
             other_value=2.0,
         )
 
-        B = np.asarray(b_values["B"], dtype=float)
-        lb = np.asarray(b_values["Bl"], dtype=float)
-        ub = np.asarray(b_values["Bu"], dtype=float)
+        # Optimisation knobs (subset of nlopt_kargs we care about for OM)
+        kargs = self.nlopt_kargs or {}
+
+        # Respect user-supplied B / lb / ub from nlopt_kargs (mirrors R's
+        # adam_checkOptimizer + adam.R:1229-1361 pattern). Named B is supplied
+        # as a dict (parameter-name -> value); array-like B is assigned
+        # positionally. lb / ub fall back to b_values only when not provided.
+        user_B = kargs.get("B")  # noqa: N806
+        user_lb = kargs.get("lb")
+        user_ub = kargs.get("ub")
+
+        B = np.asarray(b_values["B"], dtype=float)  # noqa: N806
+        names = b_values.get("names")
+        if user_B is not None:
+            if isinstance(user_B, dict):
+                if names is None:
+                    raise ValueError(
+                        "Initialiser did not return parameter names; "
+                        "cannot apply dict-keyed user B."
+                    )
+                for k, v in user_B.items():
+                    if k in names:
+                        B[names.index(k)] = float(v)
+            else:
+                B[:] = np.asarray(user_B, dtype=float)
+
+        lb = (
+            np.asarray(user_lb, dtype=float)
+            if user_lb is not None
+            else np.asarray(b_values["Bl"], dtype=float)
+        )
+        ub = (
+            np.asarray(user_ub, dtype=float)
+            if user_ub is not None
+            else np.asarray(b_values["Bu"], dtype=float)
+        )
 
         ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
             self._model_type, self._arima, self._lags_model
         )
-
-        # Optimisation knobs (subset of nlopt_kargs we care about for OM)
-        kargs = self.nlopt_kargs or {}
         algorithm = kargs.get("algorithm", "NLOPT_LN_NELDERMEAD")
         xtol_rel = kargs.get("xtol_rel", 1e-6)
         xtol_abs = kargs.get("xtol_abs", 1e-8)
@@ -925,9 +1002,25 @@ class OM(ADAM):
 
         regressors = self._explanatory.get("regressors")
         # Mirror R: omCF receives `loss` separately; we store it in a dict for
-        # om_cf to read.
+        # om_cf to read. ``loss_function`` is already in ``_general`` from
+        # ADAM's checker when the user passes a callable.
         general_for_cf = dict(self._general)
         general_for_cf["loss"] = self._general.get("loss", "likelihood")
+
+        # Snapshot the *pristine* mat_vt and profiles_recent_table BEFORE
+        # NLopt mutates them.  The C++ kernel's head-fill / backcasting
+        # passes overwrite ``adam_created["mat_vt"]`` and
+        # ``profile_dict["profiles_recent_table"]`` in place every CF
+        # evaluation; without this snapshot the post-fit Hessian (used by
+        # vcov / FI) would be computed off a CF that disagrees with R's
+        # by ~0.002 — R re-creates fresh matrices for FI via
+        # adam_creator + om_initial_transform on every Hessian probe
+        # (R/om.R:830-870).  We do the equivalent here by stashing the
+        # initial bytes and restoring them in _fisher_information_matrix.
+        self._fi_pristine = {
+            "mat_vt": adam_created["mat_vt"].copy(),
+            "profiles_recent_table": profile_dict["profiles_recent_table"].copy(),
+        }
 
         def _objective(x, _grad):
             try:
@@ -977,11 +1070,14 @@ class OM(ADAM):
             pass
         cf_value = opt.last_optimum_value()
 
-        # Retry with zero persistence if first run blew up (mirrors R)
-        if not np.isfinite(cf_value) or cf_value >= 1e300:
-            n_ets = self._components.get("components_number_ets", 0)
-            if n_ets > 0:
-                B[:n_ets] = 0
+        # Retry from a small-persistence safe point if the first run hit the
+        # infeasibility plateau, but ONLY when the user did NOT supply their
+        # own B — otherwise their B is the authoritative starting point.
+        # Failsafe mirrors R/om.R: all params 0.001 with alpha bumped to 0.01.
+        if user_B is None and (not np.isfinite(cf_value) or cf_value >= 1e300):
+            B[:] = 0.001
+            if len(B) > 0:
+                B[0] = 0.01
             opt2 = nlopt.opt(nlopt_algorithm, len(B))
             opt2 = _configure_optimizer(
                 opt2,
@@ -1006,6 +1102,7 @@ class OM(ADAM):
 
         self._adam_estimated = {
             "B": B,
+            "B_names": list(names) if names is not None else None,
             "CF_value": float(cf_value),
             "n_param_estimated": n_param_estimated,
             "log_lik_adam_value": {
@@ -1235,25 +1332,27 @@ class OM(ADAM):
         self,
         h: int,
         X: Optional[NDArray] = None,
-        interval: Literal["none"] = "none",
+        # Wider than ADAM's interval literals (LSP-safe); only "none" is supported
+        # and other values warn and fall back to point forecasts.
+        interval: str = "none",
         level: Optional[Union[float, List[float]]] = 0.95,
         side: Literal["both", "upper", "lower"] = "both",
         cumulative: bool = False,
         nsim: int = 10000,
         occurrence: Optional[NDArray] = None,
         scenarios: bool = False,
+        seed: Optional[int] = None,
     ):
         """Probability forecast for the occurrence model.
 
-        Mirrors R's ``forecast.om`` (R/om.R:1286). Currently only
-        ``interval="none"`` is supported; intervals on the probability scale
-        are not implemented yet (matches R behaviour).
+        Currently only ``interval="none"`` is supported; intervals on the
+        probability scale are not implemented yet.
         """
         self._check_is_fitted()
         if interval != "none":
             warnings.warn(
                 "Intervals on the probability scale are not implemented for OM "
-                "models; returning point forecasts only (matches R's forecast.om)."
+                "models; returning point forecasts only."
             )
         return self._om_forecast(h, X_future=X)
 
@@ -1279,13 +1378,32 @@ class OM(ADAM):
 
     @property
     def scale(self) -> float:
-        """Always NaN for occurrence models (no continuous error scale)."""
-        return float("nan")
+        """Link-scale residual std-dev — alias for :attr:`sigma`.
+
+        Mirrors :attr:`ADAM.scale`, which is an alias for ``sigma`` (the
+        Python convention is that ``scale`` and ``sigma`` both report the
+        std-dev, not the variance — even though R calls the variance
+        ``s2`` and ``sigma`` the std-dev). See :attr:`sigma` for the
+        underlying formula and R reference.
+        """
+        return self.sigma
 
     @property
     def sigma(self) -> float:
-        """Same as :attr:`scale`."""
-        return float("nan")
+        """Link-scale residual std-dev: ``sqrt(mean(residuals²))``.
+
+        Matches R's ``sigma.om`` (R/om.R): the OM residuals live on the
+        link-transformed scale (logit / log-odds), so their second moment
+        is a meaningful scale parameter for the underlying ETS, even
+        though there's no equivalent on the probability axis.
+
+        Returns NaN only if the model has no residuals yet (e.g.
+        constructed but not fitted).
+        """
+        residuals = getattr(self, "_prepared", {}).get("residuals")
+        if residuals is None:
+            return float("nan")
+        return float(np.sqrt(np.mean(np.asarray(residuals, dtype=float) ** 2)))
 
     @property
     def distribution_(self) -> str:
@@ -1300,12 +1418,27 @@ class OM(ADAM):
     def model_name(self) -> str:
         """Model name in ``oETS(...)[X]`` form (uppercase X = F/O/I/D)."""
         self._check_is_fitted()
-        return self.model
+        return self.model if isinstance(self.model, str) else str(self.model)
 
     @property
     def actuals(self) -> NDArray:
-        """Binary 0/1 occurrence indicator (matches R's ``actuals.om``)."""
+        """In-sample actuals.
+
+        For a standalone :class:`OM`, returns the binary 0/1 occurrence
+        indicator. For an OM that has been built as a sub-model of an
+        :class:`~smooth.adam_general.core.omg.OMG` (flag
+        ``_is_omg_submodel`` set by ``OMG._om_from_side``), returns the
+        latent unobservable value the sub-model was implicitly fitting:
+        ``fitted + residuals`` — mirrors R's ``actuals.omg_submodel``
+        (R/omg.R:1748-1756). OM stores residuals additively
+        (``ot - fitted``) regardless of error type, so the same formula
+        recovers the latent value for both ``Etype="A"`` and ``Etype="M"``.
+        """
         self._check_is_fitted()
+        if getattr(self, "_is_omg_submodel", False):
+            fitted = np.asarray(self.fitted, dtype=float)
+            residuals = np.asarray(self.residuals, dtype=float)
+            return fitted + residuals
         return np.asarray(self._observations["ot"], dtype=float)
 
     @property
@@ -1325,7 +1458,6 @@ class OM(ADAM):
 
         Formula: ``(ot - p) / sqrt(p*(1-p)) * sqrt(n/df)``
         where ``df = n - k`` (n observations, k estimated parameters).
-        Mirrors R's ``rstandard.om()``.
         """
         self._check_is_fitted()
         obs = self.nobs
@@ -1339,7 +1471,6 @@ class OM(ADAM):
 
         Formula: ``(ot - p) / sqrt(p*(1-p)) * sqrt(n/df)``
         where ``df = n - k - 1``.
-        Mirrors R's ``rstudent.om()``.
         """
         self._check_is_fitted()
         obs = self.nobs
@@ -1352,3 +1483,230 @@ class OM(ADAM):
     def loglik(self) -> float:
         self._check_is_fitted()
         return float(self._adam_estimated["log_lik_adam_value"]["value"])
+
+    # ------------------------------------------------------------------
+    # Inference (overrides ADAM's FI path because om_cf — not the ADAM
+    # likelihood — is the cost the OM optimiser minimised)
+    # ------------------------------------------------------------------
+
+    def _fisher_information_matrix(self, step_size=None):
+        """Observed FI for OM (Hessian of ``om_cf`` at the estimated B).
+
+        ``om_cf`` already returns the negative log-likelihood, so its Hessian
+        is the observed Fisher Information directly — no sign flip.
+
+        Bounds are disabled (``bounds="none"``) during the Hessian call to
+        match R's ``vcov.adam`` (R/adam.R:2797 — ``boundsFI <- "none"``). With
+        the user's usual/admissible bounds left on, FD perturbations ``B ± h``
+        that cross the feasibility boundary would return the 1e300 penalty
+        instead of the actual log-likelihood — the resulting second
+        derivative blows up and the inverse FI collapses to ~0. ``bounds=
+        "none"`` lets the underlying ``adam_cpp.fit`` evaluate cleanly even
+        when smoothing parameters are nominally out of range.
+        """
+        from smooth.adam_general.core.utils.var_covar import numerical_hessian
+
+        self._check_is_fitted()
+
+        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
+            self._model_type, self._arima, self._lags_model
+        )
+        general_for_cf = dict(self._general)
+        general_for_cf["loss"] = self._general.get("loss", "likelihood")
+
+        # R rebuilds adam_created fresh every Hessian probe via
+        # adam_creator + om_initial_transform (R/om.R:830-870).  We do the
+        # equivalent by restoring the pristine pre-NLopt snapshots of
+        # mat_vt and profiles_recent_table before each _cost call — the
+        # kernel will mutate them again inside om_cf via the
+        # backcasting / head-fill passes, so each call gets the same
+        # starting state R sees.
+        pristine = getattr(self, "_fi_pristine", None)
+
+        def _cost(b):
+            if pristine is not None:
+                self._adam_created["mat_vt"][...] = pristine["mat_vt"]
+                self._profile["profiles_recent_table"][...] = pristine[
+                    "profiles_recent_table"
+                ]
+            return om_cf(
+                B=b,
+                model_type_dict=self._model_type,
+                components_dict=self._components,
+                lags_dict=self._lags_model,
+                matrices_dict=self._adam_created,
+                persistence_checked=self._persistence,
+                initials_checked=self._initials,
+                arima_checked=self._arima,
+                explanatory_checked=self._explanatory,
+                phi_dict=self._phi_internal,
+                constants_checked=self._constant,
+                observations_dict=self._observations,
+                profile_dict=self._profile,
+                general=general_for_cf,
+                adam_cpp=self._adam_cpp,
+                occurrence=self._om_occurrence,
+                occurrence_char=self._occurrence_char,
+                bounds="none",
+                arPolynomialMatrix=ar_polynomial_matrix,
+                maPolynomialMatrix=ma_polynomial_matrix,
+                regressors=self._explanatory.get("regressors"),
+            )
+
+        return numerical_hessian(_cost, self.coef, step_size=step_size)
+
+    def summary(self, level: float = 0.95, digits: int = 4):
+        """Coefficient-table summary, mirroring R's ``summary.om``.
+
+        Identical content to :meth:`ADAM.summary`, but the printed report is
+        prefixed by an ``"Occurrence model"`` header (R's ``summary.om``
+        prepends the same line before delegating to ``summary.adam``).
+        """
+        from smooth.adam_general.core.utils.printing import OMSummary
+
+        self._check_is_fitted()
+        return OMSummary(self, level=level, digits=digits)
+
+    def simulate(
+        self,
+        nsim: int = 1,
+        seed: Optional[int] = None,
+        obs: Optional[int] = None,
+        randomizer: Optional[Any] = None,
+        **randomizer_kwargs,
+    ):
+        """Re-simulate probabilities + 0/1 occurrence indicators.
+
+        Python port of R's ``simulate.om`` (R/om.R:2272-2342). Calls
+        :meth:`ADAM.simulate` to obtain the latent ETS series via
+        ``super().simulate(...)``, maps it to a probability via
+        :func:`om_link_function`, and draws 0/1 occurrence indicators
+        via ``rng.binomial(1, prob)``.
+
+        Parameters
+        ----------
+        nsim : int, default 1
+            Number of simulated series.
+        seed : int, optional
+            RNG seed. Pins both the latent-error draw and the
+            binomial occurrence draw.
+        obs : int, optional
+            Observations per simulated series. Defaults to the
+            in-sample length.
+        randomizer : str | callable, optional
+            Forwarded to :meth:`ADAM.simulate`. When ``None`` (the
+            default), substitute a Gaussian-noise sampler with the
+            empirical residual std as the scale — needed because OM
+            stores ``distribution="plogis"`` for which
+            ``generate_errors()`` has no closed-form branch and
+            ``self.scale`` is ``NaN``.
+        **randomizer_kwargs
+            Forwarded to the randomizer.
+
+        Returns
+        -------
+        SimulateResult
+            ``data`` and ``probability`` carry the probability
+            series; ``occurrence`` carries the 0/1 indicators;
+            ``latent`` carries the pre-link state-space output (used
+            by :meth:`OMG.simulate` to combine sub-models).
+        """
+        from smooth.adam_general.core.simulate.result import SimulateResult
+
+        self._check_is_fitted()
+
+        # 1. Latent simulation via ADAM.simulate. Override the
+        # default ``randomizer`` with a Gaussian sampler on the
+        # empirical residual scale — OM uses ``distribution="plogis"``
+        # which has no branch in ``generate_errors()``.
+        effective_randomizer = randomizer
+        if effective_randomizer is None:
+            effective_randomizer = _om_default_randomizer(self, seed=seed)
+
+        latent_sim = super().simulate(
+            nsim=nsim,
+            seed=seed,
+            obs=obs,
+            randomizer=effective_randomizer,
+            **randomizer_kwargs,
+        )
+
+        # 2. Extract the latent matrix shape from latent_sim.data.
+        latent_arr = (
+            latent_sim.data.to_numpy()
+            if isinstance(latent_sim.data, pd.Series)
+            else latent_sim.data.to_numpy()
+        )
+        if latent_arr.ndim == 1:
+            latent_arr = latent_arr.reshape(-1, 1)
+        n_obs_out = latent_arr.shape[0]
+        nsim_out = latent_arr.shape[1]
+
+        # 3. latent → probability via the link function.
+        e_type = self._model_type.get("error_type", "A")
+        occurrence = self._om_occurrence
+        probability = om_link_function(latent_arr.ravel(), e_type, occurrence)
+        probability = np.asarray(probability, dtype=np.float64).reshape(
+            n_obs_out, nsim_out
+        )
+        # ``om_link_function``'s odds-ratio paths can overshoot under
+        # extreme latent noise; clip uniformly as a numerical guard.
+        # NaN can appear on multiplicative-ETS paths where the latent
+        # state collapses to zero — replace with the neutral 0.5 so
+        # the downstream binomial draw is well-defined.
+        probability = np.nan_to_num(probability, nan=0.5, posinf=1.0, neginf=0.0)
+        probability = np.clip(probability, 0.0, 1.0)
+
+        # 4. 0/1 indicator draw, seeded from the master seed.
+        rng = np.random.default_rng(seed)
+        occurrence_data = rng.binomial(1, probability)
+
+        # 5. Output assembly.
+        if nsim_out == 1:
+            data_out = pd.Series(probability[:, 0])
+        else:
+            data_out = pd.DataFrame(probability)
+
+        base_model = self._model_type.get("model", "oETS")
+        model_label = f"{base_model} (occurrence simulated)"
+
+        return SimulateResult(
+            model=model_label,
+            data=data_out,
+            states=latent_sim.states,
+            residuals=latent_sim.residuals,
+            latent=latent_arr,
+            probability=probability if nsim_out > 1 else probability[:, 0],
+            occurrence=occurrence_data,
+            occurrence_type=occurrence,
+            other={"binary_data": occurrence_data},
+        )
+
+
+def _om_default_randomizer(om_object, seed=None):
+    """Gaussian-noise randomizer keyed on the empirical residual std.
+
+    OM stores ``distribution="plogis"`` (the logit link) for which
+    :func:`generate_errors` has no closed-form branch, and
+    ``OM.scale`` returns ``NaN``. Substituting ``rnorm(0, sigma)``
+    with ``sigma = sqrt(mean(residuals**2))`` is the equivalent of
+    the R helper's fallback in ``simulateADAMCore`` for distributions
+    without a closed-form scale (R/adam.R, the post-refactor
+    ``simulateADAMCore`` body).
+
+    The ``seed`` argument is threaded through so the returned
+    callable is reproducible — same seed in, same draws out.
+    """
+    res = np.asarray(om_object.residuals, dtype=np.float64).ravel()
+    if res.size:
+        sigma = float(np.sqrt(np.nanmean(res**2)))
+    else:
+        sigma = 1.0
+    if not np.isfinite(sigma) or sigma == 0.0:
+        sigma = 1.0
+    rng = np.random.default_rng(seed)
+
+    def _draw(n):
+        return rng.normal(0.0, sigma, n)
+
+    return _draw

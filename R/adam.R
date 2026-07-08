@@ -317,7 +317,6 @@
 #' @importFrom stats acf pacf
 #' @importFrom statmod dinvgauss
 #' @importFrom nloptr nloptr
-#' @importFrom pracma hessian
 #' @importFrom zoo zoo
 #' @importFrom utils head
 #' @importFrom methods new
@@ -2724,6 +2723,14 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             #                         "complete"=,
             #                         "backcasting"="provided",
             #                         initialType);
+            # Two-stage is identical to optimal in B shape (initials are in B);
+            # the staged start is just a better seed for the optimiser, not a
+            # different parameterisation. Treat them identically inside the FI
+            # refit so the Hessian has the same dimensions and the same
+            # initial-state SE rows as the optimal path.
+            if(initialTypeFI == "two-stage"){
+                initialTypeFI <- "optimal";
+            }
             initialEstimateFI <- FALSE;
             # Define parameters just for FI calculation
             if(initialTypeFI=="provided"){
@@ -2796,7 +2803,11 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             # This is needed in order to avoid the 1e+300 in the CF
             boundsFI <- "none";
 
-            FI <- -hessian(logLikADAM, B, etsModel=etsModel, Etype=Etype, Ttype=Ttype, Stype=Stype, modelIsTrendy=modelIsTrendy,
+            # Use the shared C++ Hessian (src/hessianCpp.cpp), backed by the same
+            # algorithm header (src/headers/hessianCore.h) that Python uses.
+            # Replaces pracma::hessian — identical formula, no dependency.
+            logLikADAM_FI <- function(B){
+                logLikADAM(B, etsModel=etsModel, Etype=Etype, Ttype=Ttype, Stype=Stype, modelIsTrendy=modelIsTrendy,
                            modelIsSeasonal=modelIsSeasonal, yInSample=yInSample,
                            ot=ot, otLogical=otLogical, occurrenceModel=occurrenceModel, pFitted=pFitted, obsInSample=obsInSample,
                            componentsNumberETS=componentsNumberETS, componentsNumberETSSeasonal=componentsNumberETSSeasonal,
@@ -2828,8 +2839,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                            denominator=denominator, yDenominator=yDenominator,
                            other=other, otherParameterEstimate=otherParameterEstimateFI, lambda=lambda,
                            arPolynomialMatrix=arPolynomialMatrix, maPolynomialMatrix=maPolynomialMatrix,
-                           adamCpp=adamCpp,
-                           h=stepSize);
+                           adamCpp=adamCpp)
+            }
+            FI <- -hessianCpp(logLikADAM_FI, B, h=stepSize);
 
             colnames(FI) <- names(B);
             rownames(FI) <- names(B);
@@ -5998,7 +6010,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                                "Using the last available values as future ones."),
                         call.=FALSE);
                 newnRows <- h-nrow(newdata);
-                xreg <- newdata[c(1:nrow(newdata),rep(nrow(newdata)),each=newnRows),];
+                xreg <- newdata[c(1:nrow(newdata),rep(nrow(newdata),each=newnRows)),];
                 # xreg <- rbind(newdata,
                 #               data.frame(matrix(rep(tail(newdata,1),each=newnRows),
                 #                                 newnRows,ncol(newdata),
@@ -7338,40 +7350,20 @@ pointLik.adam <- function(object, log=TRUE, ...){
 }
 
 #### Simulate function ####
-
-#' @param obs Number of observations to produce in the simulated data.
-#' @param nsim Number of series to generate from the model.
-#' @param seed Random seed used in simulation of data.
-#' @examples
-#' # Fit ADAM to the data
-#' ourModel <- adam(rnorm(100,100,10), model="AAdN")
-#' # Simulate the data
-#' x <- simulate(ourModel)
-#'
-#' @rdname adam
-#' @export
-simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
-    # Start measuring the time of calculations
-    startTime <- Sys.time();
-
+# Does the matrix prep, distribution-aware error sampling, occurrence-mask
+# draw, and ``adamCpp$simulate(...)`` call shared by ``simulate.adam``,
+# ``simulate.om`` and ``simulate.omg``. Returns a raw list with the
+# data / states / matrices — no ts/zoo wrapping, no S3 class. The caller
+# is responsible for the public-facing wrapping (time index, class
+# assignment, extra fields).
+# ----------------------------------------------------------------------
+simulateADAMCore <- function(object, nsim=1, obs=nobs(object), ...){
     ellipsis <- list(...);
 
-    # Check whether we deal with adam ETS or the conventional
-    adamETS <- adamETSChecker(object);
-
-    if(!is.null(seed)){
-        set.seed(seed);
-    }
-
     # All the variables needed in the function
-    yInSample <- actuals(object);
-    yClasses <- class(yInSample);
     obsInSample <- obs;
     Etype <- errorType(object);
-    Ttype <- substr(modelType(object),2,2);
-    Stype <- substr(modelType(object),nchar(modelType(object)),nchar(modelType(object)));
     lags <- object$lags;
-    lagsSeasonal <- lags[lags!=1];
     lagsModelAll <- object$lagsAll;
     lagsModelMax <- max(lagsModelAll);
     persistence <- as.matrix(object$persistence);
@@ -7384,120 +7376,44 @@ simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
     # Get componentsNumberETS, seasonal and componentsNumberARIMA
     componentsDefined <- componentsDefiner(object);
     componentsNumberETS <- componentsDefined$componentsNumberETS;
-    componentsNumberETSSeasonal <- componentsDefined$componentsNumberETSSeasonal;
-    componentsNumberETSNonSeasonal <- componentsDefined$componentsNumberETSNonSeasonal;
     componentsNumberARIMA <- componentsDefined$componentsNumberARIMA;
     constantRequired <- componentsDefined$constantRequired;
 
     # Prepare variables for xreg
     if(!is.null(object$initial$xreg)){
-        xregModel <- TRUE;
-
-        #### Create xreg vectors ####
-        xreg <- object$data;
-        formula <- formula(object)
-        responseName <- all.vars(formula)[1];
-        # Robustify the names of variables
-        colnames(xreg) <- make.names(colnames(xreg),unique=TRUE);
-        # The names of the original variables
-        xregNamesOriginal <- all.vars(formula)[-1];
-        # Levels for the factors
-        xregFactorsLevels <- lapply(xreg,levels);
-        xregFactorsLevels[[responseName]] <- NULL;
-        # Expand the variables. We cannot use alm, because it is based on obsInSample
-        xregData <- model.frame(formula,data=as.data.frame(xreg));
-        # Binary, flagging factors in the data
-        xregFactors <- (attr(terms(xregData),"dataClasses")=="factor")[-1];
-        # Get the names from the standard model.matrix
-        xregNames <- colnames(model.matrix(xregData,data=xregData));
-        interceptIsPresent <- FALSE;
-        if(any(xregNames=="(Intercept)")){
-            interceptIsPresent[] <- TRUE;
-            xregNames <- xregNames[xregNames!="(Intercept)"];
-        }
-        # Expanded stuff with all levels for factors
-        if(any(xregFactors)){
-            xregModelMatrix <- model.matrix(xregData,xregData,
-                                            contrasts.arg=lapply(xregData[attr(terms(xregData),"dataClasses")=="factor"],
-                                                                 contrasts, contrasts=FALSE));
-            xregNamesModified <- colnames(xregModelMatrix)[-1];
-        }
-        else{
-            xregModelMatrix <- model.matrix(xregData,data=xregData);
-            xregNamesModified <- xregNames;
-        }
-        xregData <- as.matrix(xregModelMatrix);
-        # Remove intercept
-        if(interceptIsPresent){
-            xregData <- xregData[,-1,drop=FALSE];
-        }
-        xregNumber <- ncol(xregData);
-
-        # The indices of the original parameters
-        xregParametersMissing <- setNames(vector("numeric",xregNumber),xregNamesModified);
-        # # The indices of the original parameters
-        xregParametersIncluded <- setNames(vector("numeric",xregNumber),xregNamesModified);
-        # The vector, marking the same values of smoothing parameters
-        if(interceptIsPresent){
-            xregParametersPersistence <- setNames(attr(xregModelMatrix,"assign")[-1],xregNamesModified);
-        }
-        else{
-            xregParametersPersistence <- setNames(attr(xregModelMatrix,"assign"),xregNamesModified);
-        }
-
-        # If there are factors not in the alm data, create additional initials
-        if(any(!(xregNamesModified %in% xregNames))){
-            xregAbsent <- !(xregNamesModified %in% xregNames);
-            # Go through new names and find, where they came from. Then get the missing parameters
-            for(i in which(xregAbsent)){
-                # Find the name of the original variable
-                # Use only the last value... hoping that the names like x and x1 are not used.
-                xregNameFound <- tail(names(sapply(xregNamesOriginal,grepl,xregNamesModified[i])),1);
-                # Get the indices of all k-1 levels
-                xregParametersIncluded[xregNames[xregNames %in% paste0(xregNameFound,
-                                                                       xregFactorsLevels[[xregNameFound]])]] <- i;
-                # Get the index of the absent one
-                xregParametersMissing[i] <- i;
-            }
-            # Write down the new parameters
-            xregNames <- xregNamesModified;
-        }
-        # The vector of parameters that should be estimated (numeric + original levels of factors)
-        xregParametersEstimated <- xregParametersIncluded
-        xregParametersEstimated[xregParametersEstimated!=0] <- 1;
-        xregParametersEstimated[xregParametersMissing==0 & xregParametersIncluded==0] <- 1;
+        xregNumber <- ncol(object$data) - 1;
     }
     else{
-        xregModel <- FALSE;
         xregNumber <- 0;
-        xregParametersMissing <- 0;
-        xregParametersIncluded <- 0;
-        xregParametersEstimated <- 0;
-        xregParametersPersistence <- 0;
     }
     profiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample);
     indexLookupTable <- profiles$lookup;
 
     # Create C++ adam class
     adamCpp <- object$adamCpp;
-    # adamCpp <- new(adamCore,
-    #                lagsModelAll, Etype, Ttype, Stype,
-    #                componentsNumberETSNonSeasonal,
-    #                componentsNumberETSSeasonal,
-    #                componentsNumberETS, componentsNumberARIMA,
-    #                xregNumber, length(lagsModelAll),
-    #                constantRequired, adamETS);
 
     #### Prepare the necessary matrices ####
-    # States are defined similar to how it is done in adam.
-    arrVt <- array(t(object$states),c(ncol(object$states),nrow(object$states)+obsInSample-nobs(object),nsim),
+    # For ``adam`` objects, ``object$states`` already includes the
+    # ``lagsModelMax`` lag-head rows at the front; for ``om`` / ``omg``
+    # it doesn't, so prepend the lag head from ``object$profileInitial``
+    # before building the state cube.
+    expectedRows <- obsInSample + lagsModelMax;
+    if(nrow(object$states) >= expectedRows){
+        statesFull <- object$states;
+    }
+    else if(nrow(object$states) == obsInSample){
+        lagHead <- t(object$profileInitial[, 1:lagsModelMax, drop=FALSE]);
+        colnames(lagHead) <- colnames(object$states);
+        statesFull <- rbind(lagHead, object$states);
+    }
+    else{
+        statesFull <- object$states;
+    }
+    arrVt <- array(t(statesFull),c(ncol(statesFull),nrow(statesFull)+obsInSample-nobs(object),nsim),
                    dimnames=list(colnames(object$states),NULL,paste0("nsim",c(1:nsim))));
 
-    # Set profile, which is used in the data generation
-    # profilesRecentTable <- t(object$states[1:lagsModelMax,]);
     profilesRecentTable <- object$profileInitial;
 
-    # Transition and measurement
     arrF <- array(object$transition,c(dim(object$transition),nsim));
     matWt <- object$measurement;
     if(nrow(matWt)<obsInSample){
@@ -7506,11 +7422,15 @@ simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
                               obsInSample-nrow(matWt), ncol(matWt)));
     }
 
-    # Persistence matrix
     matG <- array(persistence, c(length(persistence), nsim),
                   dimnames=list(names(persistence), paste0("nsim",c(1:nsim))));
 
-    if(is.null(object$occurrence)){
+    if(is.null(object$occurrence) || is.character(object$occurrence)){
+        # ADAM without intermittency OR om/omg (where ``$occurrence`` is
+        # a scheme string like "odds-ratio", not a fitted model).
+        # For om/omg the 0/1 occurrence draw happens in simulate.om /
+        # simulate.omg using the latent-derived probability — here we
+        # just feed the C++ simulator a no-op all-ones mask.
         pt <- rep(1, obsInSample);
     }
     else{
@@ -7519,19 +7439,13 @@ simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
 
     # Number of degrees of freedom to de-bias scales
     df <- obsInSample-nparam(object);
-    # If the sample is too small, then use biased estimator
     if(df<=0){
         df[] <- obsInSample;
     }
 
     # If scale model is included, produce forecasts
     if(is.scale(object$scale)){
-        # as.vector is needed to declass the mean.
         scaleValue <- as.vector(fitted(object$scale));
-        # De-bias the scales and transform to the appropriate scale
-        # dnorm, dlnorm fit model on square residuals
-        # dgnorm needs to be done with ^beta to get to 1/T part
-        # The rest do not require transformations, only de-bias
         scaleValue[] <- switch(object$distribution,
                                "dlnorm"=,
                                "dnorm"=(scaleValue*obsInSample/df)^0.5,
@@ -7541,21 +7455,45 @@ simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
     else{
         scaleValue <- object$scale*obsInSample/df;
     }
-    matErrors <- matrix(switch(object$distribution,
-                               "dnorm"=rnorm(obsInSample*nsim, 0, scaleValue),
-                               "dlaplace"=rlaplace(obsInSample*nsim, 0, scaleValue),
-                               "ds"=rs(obsInSample*nsim, 0, scaleValue),
-                               "dgnorm"=rgnorm(obsInSample*nsim, 0, scaleValue, object$other$shape),
-                               "dlogis"=rlogis(obsInSample*nsim, 0, scaleValue),
-                               "dt"=rt(obsInSample*nsim, obsInSample-nparam(object)),
-                               "dalaplace"=ralaplace(obsInSample*nsim, 0, scaleValue, object$other$alpha),
-                               "dlnorm"=rlnorm(obsInSample*nsim, -scaleValue^2/2, scaleValue)-1,
-                               "dinvgauss"=rinvgauss(obsInSample*nsim, 1, dispersion=scaleValue)-1,
-                               "dgamma"=rgamma(obsInSample*nsim, shape=scaleValue^{-1}, scale=scaleValue)-1,
-                               "dllaplace"=exp(rlaplace(obsInSample*nsim, 0, scaleValue))-1,
-                               "dls"=exp(rs(obsInSample*nsim, 0, scaleValue))-1,
-                               "dlgnorm"=exp(rgnorm(obsInSample*nsim, 0, scaleValue, object$other$shape))-1
-    ), obsInSample, nsim);
+    # Fallback when ``object$scale`` is NA — happens for ``om`` /
+    # ``omg`` objects which use ``distribution="plogis"`` and don't
+    # store a closed-form scale. Use the empirical residual std-dev
+    # instead, or 1 if that's also unavailable.
+    if(any(is.na(scaleValue)) || any(!is.finite(scaleValue))){
+        fallback <- suppressWarnings(sqrt(mean(object$residuals^2, na.rm=TRUE)));
+        if(!is.finite(fallback) || fallback==0){
+            fallback <- 1;
+        }
+        scaleValue <- fallback;
+    }
+    # Allow an external ``randomizer`` callable to override the
+    # distribution-based sampler — same pattern as ``sim.es`` /
+    # ``sim.oes``. Enables the R↔Python "plug-in numbers" parity tests
+    # for ``simulate.adam`` / ``simulate.om`` / ``simulate.omg``: both
+    # languages feed the C++ kernel the exact same error vector.
+    if(!is.null(ellipsis$randomizer)){
+        matErrors <- matrix(do.call(ellipsis$randomizer,
+                                    list(n=obsInSample*nsim)),
+                            obsInSample, nsim);
+    }
+    else{
+        matErrors <- matrix(switch(object$distribution,
+                                   "dnorm"=rnorm(obsInSample*nsim, 0, scaleValue),
+                                   "dlaplace"=rlaplace(obsInSample*nsim, 0, scaleValue),
+                                   "ds"=rs(obsInSample*nsim, 0, scaleValue),
+                                   "dgnorm"=rgnorm(obsInSample*nsim, 0, scaleValue, object$other$shape),
+                                   "dlogis"=rlogis(obsInSample*nsim, 0, scaleValue),
+                                   "dt"=rt(obsInSample*nsim, obsInSample-nparam(object)),
+                                   "dalaplace"=ralaplace(obsInSample*nsim, 0, scaleValue, object$other$alpha),
+                                   "dlnorm"=rlnorm(obsInSample*nsim, -scaleValue^2/2, scaleValue)-1,
+                                   "dinvgauss"=rinvgauss(obsInSample*nsim, 1, dispersion=scaleValue)-1,
+                                   "dgamma"=rgamma(obsInSample*nsim, shape=scaleValue^{-1}, scale=scaleValue)-1,
+                                   "dllaplace"=exp(rlaplace(obsInSample*nsim, 0, scaleValue))-1,
+                                   "dls"=exp(rs(obsInSample*nsim, 0, scaleValue))-1,
+                                   "dlgnorm"=exp(rgnorm(obsInSample*nsim, 0, scaleValue, object$other$shape))-1,
+                                   "plogis"=rnorm(obsInSample*nsim, 0, scaleValue)
+        ), obsInSample, nsim);
+    }
 
     # This stuff is needed in order to produce adequate values for weird models
     EtypeModified <- Etype;
@@ -7563,8 +7501,9 @@ simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
         EtypeModified[] <- "M";
     }
 
-    # Refit the model with the new parameter
-    ySimulated <- adamCpp$simulate(matErrors, matrix(rbinom(obsInSample*nsim, 1, pt), obsInSample, nsim),
+    matOt <- matrix(rbinom(obsInSample*nsim, 1, pt), obsInSample, nsim);
+
+    ySimulated <- adamCpp$simulate(matErrors, matOt,
                                    arrVt, matWt,
                                    arrF, matG,
                                    indexLookupTable,
@@ -7574,27 +7513,62 @@ simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
                                            nsim)),
                                    EtypeModified);
 
+    return(list(data        = ySimulated$data,
+                states      = ySimulated$states,
+                matErrors   = matErrors,
+                matOt       = matOt,
+                pt          = pt,
+                matWt       = matWt,
+                arrF        = arrF,
+                matG        = matG,
+                obsInSample = obsInSample,
+                ellipsis    = ellipsis));
+}
+
+#' @param obs Number of observations to produce in the simulated data.
+#' @param nsim Number of series to generate from the model.
+#' @param seed Random seed used in simulation of data.
+#' @examples
+#' # Fit ADAM to the data
+#' ourModel <- adam(rnorm(100,100,10), model="AAdN")
+#' # Simulate the data
+#' x <- simulate(ourModel)
+#' @rdname adam
+#' @export
+simulate.adam <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
+    # Start measuring the time of calculations
+    startTime <- Sys.time();
+
+    if(!is.null(seed)){
+        set.seed(seed);
+    }
+
+    inner <- simulateADAMCore(object, nsim=nsim, obs=obs, ...);
+
+    yInSample <- actuals(object);
+    yClasses <- class(yInSample);
+    obsInSample <- inner$obsInSample;
+
     # Set the proper time stamps for the fitted
     if(any(yClasses=="zoo")){
-        # Get indices for the cases, when obsInSample was provided by user
         yIndex <- time(yInSample)
         yIndexDiff <- diff(head(yIndex,2));
         yTime <- yIndex[1]+yIndexDiff*c(1:(obsInSample-1));
-        matrixYt <- zoo(array(ySimulated$data,c(obsInSample,nsim),
+        matrixYt <- zoo(array(inner$data,c(obsInSample,nsim),
                               dimnames=list(NULL,paste0("nsim",c(1:nsim)))),
                         order.by=yTime);
     }
     else{
-        matrixYt <- ts(array(ySimulated$data,c(obsInSample,nsim),
+        matrixYt <- ts(array(inner$data,c(obsInSample,nsim),
                              dimnames=list(NULL,paste0("nsim",c(1:nsim)))),
                        start=start(yInSample), frequency=frequency(yInSample));
     }
 
     return(structure(list(timeElapsed=Sys.time()-startTime, model=object$model, distribution=object$distribution,
-                          data=matrixYt, states=ySimulated$states, persistence=object$persistence,
-                          measurement=matWt, transition=object$transition, initial=object$initial,
-                          probability=pt, occurrence=object$occurrence,
-                          residuals=matErrors, other=ellipsis),
+                          data=matrixYt, states=inner$states, persistence=object$persistence,
+                          measurement=inner$matWt, transition=object$transition, initial=object$initial,
+                          probability=inner$pt, occurrence=object$occurrence,
+                          residuals=inner$matErrors, other=inner$ellipsis),
                      class=c("adam.sim","smooth.sim")));
 }
 

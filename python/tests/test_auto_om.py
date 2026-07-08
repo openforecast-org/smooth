@@ -10,8 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from smooth import OM, AutoOM, OMG
-
+from smooth import OM, OMG, AutoOM
 
 # --------------------------------------------------------------------------
 # Fixtures
@@ -152,9 +151,13 @@ class TestProperties:
     def test_lags_used_nonempty(self, fitted_auto):
         assert len(fitted_auto.lags_used) > 0
 
-    def test_scale_is_nan(self, fitted_auto):
-        assert np.isnan(fitted_auto.scale)
-        assert np.isnan(fitted_auto.sigma)
+    def test_scale_matches_link_residual_std(self, fitted_auto):
+        """AutoOM inherits OM's scale = sqrt(mean(residuals²))."""
+        expected = float(np.sqrt(np.mean(np.asarray(fitted_auto.residuals) ** 2)))
+        assert np.isfinite(fitted_auto.scale)
+        assert np.isfinite(fitted_auto.sigma)
+        np.testing.assert_allclose(fitted_auto.scale, expected)
+        np.testing.assert_allclose(fitted_auto.sigma, expected)
 
     def test_distribution_is_plogis(self, fitted_auto):
         assert fitted_auto.distribution_ == "plogis"

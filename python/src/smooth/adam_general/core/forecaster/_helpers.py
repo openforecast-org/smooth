@@ -29,9 +29,13 @@ def _compute_multistep_errors(
         obs_all=obs,
         lags=lags_dict["lags"],
     )
-    idx_table = np.asfortranarray(
-        profile_result["index_lookup_table"][:, lags_model_max:], dtype=np.uint64
-    )
+    # Pass the *full* lookup table (no `[:, lags_model_max:]` slice). The
+    # C++ ``adamCore::ferrors`` adds ``+lagsModelMax`` to its column index
+    # internally — pre-slicing on the Python side double-offsets and walks
+    # off the end whenever ``lags_model_max >= 2`` (i.e. any model with
+    # ``i_order >= 1`` or seasonal lag > 1). R/rmultistep.R:101-111 passes
+    # the full ``adamProfiles$lookup`` for the same reason.
+    idx_table = np.asfortranarray(profile_result["index_lookup_table"], dtype=np.uint64)
 
     profiles_initial = np.asfortranarray(
         prepared_model["mat_vt"][:, :lags_model_max], dtype=np.float64

@@ -561,18 +561,18 @@ def _initialize_arima_states(
             0 : initials_checked["initial_arima_number"],
         ] = 0 if e_type == "A" else 1
 
-        # Use original user-specified lags (not ETS-only lags which may be empty
-        # for pure ARIMA models) — mirrors R's use of lags in adam.R:1091-1108
+        # Use the user-specified lags rather than the ETS-only lags here:
+        # the ETS-only list can be empty for pure ARIMA models, but the
+        # ARIMA initialiser still needs the original seasonal periods.
         lags_original = model_params.get("lags_original", [1]) or [1]
         obs_in_sample = model_params["obs_in_sample"]
 
         has_seasonal = any(lag > 1 for lag in lags_original)
         if has_seasonal and obs_in_sample > max(lags_original) * 2:
-            # R uses the full time-varying seasonal series (T values) from msdecompose
-            # (adam.R lines 1092-1097: tail(msdecompose(...)$seasonal, 1)[[1]]).
-            # Using ["initial"]["seasonal"][-1] (12 values, static) instead of
-            # ["seasonal"][-1] (T values, time-varying) gives wrong seed row values
-            # for columns 12..initial_arima_number-1.
+            # We need the full time-varying seasonal series (length T) from
+            # msdecompose, not the static one-period pattern. Using the
+            # static ``["initial"]["seasonal"][-1]`` produces wrong seed-row
+            # values for columns 12..initial_arima_number-1.
             y_decomposition = msdecompose(
                 y_in_sample,
                 [lag for lag in lags_original if lag != 1],

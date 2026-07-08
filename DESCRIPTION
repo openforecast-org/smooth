@@ -1,8 +1,8 @@
 Package: smooth
 Type: Package
 Title: Forecasting Using State Space Models
-Version: 4.5.0.41003
-Date: 2026-05-10
+Version: 4.5.0
+Date: 2026-06-19
 Authors@R: person("Ivan", "Svetunkov", email = "ivan@svetunkov.com", role = c("aut", "cre"),
                   comment="Senior Lecturer at Centre for Marketing Analytics and Forecasting, Lancaster University, UK")
 URL: https://github.com/config-i1/smooth
@@ -27,7 +27,6 @@ Imports:
     graphics,
     grDevices,
     methods,
-    pracma,
     statmod,
     MASS,
     nloptr,
@@ -49,4 +48,4 @@ Encoding: UTF-8
 Roxygen: list(old_usage = TRUE)
 ByteCompile: true
 Config/roxygen2/version: 8.0.0
-RoxygenNote: 7.3.3
+RoxygenNote: 8.0.0

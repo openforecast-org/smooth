@@ -826,7 +826,7 @@ ssInput <- function(smoothType=c("es","gum","ces","ssarima","smoothC"),...){
     }
 
     ##### Occurrence part of the model #####
-    if(is.oes(occurrence)){
+    if(inherits(occurrence,"oes")){
         occurrenceModel <- occurrence;
         occurrence <- occurrenceModel$occurrence;
         occurrenceModelProvided <- TRUE;

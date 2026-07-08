@@ -4,20 +4,59 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "smooth"
-version = "1.0.3"
-description = "Python version of the smooth forecasting library"
+version = "1.0.6"
+description = "Forecasting and time series analysis with single-source-of-error state-space models (ADAM, ETS, ARIMA, occurrence, SMA)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
+authors = [{ name = "Ivan Svetunkov", email = "ivan@svetunkov.com" }]
+license = { file = "LICENSE" }
+keywords = [
+    "forecasting",
+    "time-series",
+    "state-space",
+    "exponential-smoothing",
+    "ETS",
+    "ARIMA",
+    "ADAM",
+    "occurrence-model",
+    "intermittent-demand",
+    "moving-average",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
     "pybind11[global]>=2.6.0",
     "numpy>=1.14",
     "pandas>=2.0",
     "nlopt",
-    "scipy>=1.11.0,<1.16.0",
+    "scipy>=1.11.0,<1.19.0",
     "statsmodels",
-    "greybox",
+    "greybox>=1.0.2",
     "matplotlib",
 ]
+
+[project.urls]
+Homepage      = "https://github.com/config-i1/smooth"
+Documentation = "https://openforecast.org/smooth-py/"
+Repository    = "https://github.com/config-i1/smooth"
+Issues        = "https://github.com/config-i1/smooth/issues"
+Changelog     = "https://github.com/config-i1/smooth/blob/Python/python/NEWS.md"
+"R package"   = "https://cran.r-project.org/package=smooth"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -28,12 +67,19 @@ exclude = ["tests*", "tests.*", "*.tests", "*.tests.*"]
 dev = [
     "pytest",
     "ruff",
+    "mypy",
     "pre-commit",
     "ipykernel",
     "tqdm",
     "ipython>=8.0.0"
 ]
 r = ["rpy2>=3.5.0"]
+parallel = ["joblib>=1.3"]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
+    "sphinx-autodoc-typehints>=2.0",
+]
 
 [tool.scikit-build]
 # wheel.expand-macos-universal-tags = true
@@ -159,3 +205,9 @@ line-ending = "auto"
 dev = [
     "pytest-cov>=7.0.0",
 ]
+
+[tool.mypy]
+# Type-check the package source. Third-party deps (nlopt, greybox, statsmodels,
+# scipy, …) ship without stubs, so missing imports are ignored.
+files = ["src/smooth"]
+ignore_missing_imports = true

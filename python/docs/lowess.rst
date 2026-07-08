@@ -17,8 +17,8 @@ with local weighting. It is particularly useful for:
 - **Robust estimation** that is resistant to outliers
 - **Exploratory data analysis** to reveal underlying trends
 
-The implementation exactly matches R's ``stats::lowess`` function, ensuring
-reproducibility across R and Python workflows.
+Output is deterministic: the returned ``x`` values are sorted in ascending
+order and ``y`` contains the smoothed values aligned to that sorted ``x``.
 
 Example Usage
 -------------
@@ -65,7 +65,7 @@ Handling outliers:
    # More iterations for heavily contaminated data
    result_robust = lowess(x, y_outliers, iter=5)
 
-Using 2D input (R-style):
+Using 2D input (single array containing both x and y):
 
 .. code-block:: python
 
@@ -135,4 +135,3 @@ See Also
 --------
 
 - :doc:`msdecompose` - Uses LOWESS internally for trend extraction
-- R's ``stats::lowess`` - Equivalent R function

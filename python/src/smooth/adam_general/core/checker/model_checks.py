@@ -325,7 +325,8 @@ def _check_model_composition(
         if season_type == "C":
             season_type = "Z"
 
-    # Handle sensible pool case ("S") - matches R adamGeneral.R lines 393-430
+    # Handle the sensible-pool case ("S"): a curated 19-model pool of
+    # ETS specifications with finite forecast variance.
     if "S" in [error_type, trend_type, season_type]:
         model_do = "select"
         # Build sensible pool (19 models with finite variance)

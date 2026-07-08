@@ -2,7 +2,7 @@
 Multiple Seasonal ARIMA (MSARIMA) wrapper for ADAM.
 
 This module provides an MSARIMA class that wraps the ADAM model for pure
-ARIMA forecasting without ETS components, mirroring R's msarima() function.
+(S)ARIMA forecasting without ETS components.
 """
 
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -18,15 +18,14 @@ class MSARIMA(ADAM):
 
     This class wraps ADAM with ``model="NNN"`` and ``distribution="dnorm"``
     hardcoded, providing a clean interface for pure ARIMA (and SARIMA) models
-    without ETS components. It mirrors R's ``msarima()`` function.
+    without ETS components.
 
-    The default specification is ARIMA(0,1,1), matching R's default
-    ``orders=list(ar=c(0), i=c(1), ma=c(1))``.
+    The default specification is ARIMA(0,1,1).
 
     Parameters
     ----------
     orders : Optional[Dict[str, Any]], default=None
-        R-style alternative to ``ar_order``/``i_order``/``ma_order``.
+        Dict-style alternative to ``ar_order``/``i_order``/``ma_order``.
         A dict with keys ``"ar"``, ``"i"``, ``"ma"`` (each an int or list
         of ints) and optionally ``"select"`` (bool). Example::
 
@@ -40,13 +39,13 @@ class MSARIMA(ADAM):
         If None, defaults to ``[1]`` (non-seasonal).
 
     ar_order : Union[int, List[int]], default=0
-        Autoregressive order(s). Matches R default ``ar=c(0)``.
+        Autoregressive order(s) per seasonal frequency in ``lags``.
 
     i_order : Union[int, List[int]], default=1
-        Integration order(s). Matches R default ``i=c(1)``.
+        Integration order(s) per seasonal frequency in ``lags``.
 
     ma_order : Union[int, List[int]], default=1
-        Moving average order(s). Matches R default ``ma=c(1)``.
+        Moving average order(s) per seasonal frequency in ``lags``.
 
     arima_select : bool, default=False
         Whether to perform automatic ARIMA order selection. Equivalent to
@@ -115,7 +114,7 @@ class MSARIMA(ADAM):
         >>> model.fit(y)
         >>> print(f"Drift: {model.constant_value:.4f}")
 
-    SARIMA(1,1,1)(1,1,1)[12] via R-style dict::
+    SARIMA(1,1,1)(1,1,1)[12] via the ``orders`` dict::
 
         >>> model = MSARIMA(
         ...     orders={"ar": [1, 1], "i": [1, 1], "ma": [1, 1]},

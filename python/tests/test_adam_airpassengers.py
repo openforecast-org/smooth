@@ -8,10 +8,8 @@ The reference loss values were recorded from the implementation to ensure consis
 """
 
 import numpy as np
-import pytest
 
 from smooth import ADAM
-
 
 # Full AirPassengers dataset (1949-1960, 144 monthly observations)
 AIRPASSENGERS = np.array([

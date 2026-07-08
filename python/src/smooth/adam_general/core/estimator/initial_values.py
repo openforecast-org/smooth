@@ -92,7 +92,8 @@ def _process_initial_values(
                     i, start_idx : lags_dict["lags_model_max"]
                 ].copy()
 
-                # Renormalise seasonal initials to match R implementation
+                # Renormalise seasonal initials so additive components sum to 0
+                # and multiplicative components have geometric mean 1.
                 if np.any(~np.isnan(seasonal_full)):
                     if model_type_dict["season_type"] == "A":
                         seasonal_full = seasonal_full - np.nanmean(seasonal_full)

@@ -42,9 +42,10 @@ AutoMSARIMA
    :members: fit, predict
 
 ``AutoMSARIMA`` wraps :class:`AutoADAM` with ``model="NNN"`` and
-``distribution="dnorm"`` fixed, mirroring R's ``auto.msarima()``.
-The parameters ``model``, ``distribution``, and ``arima_select`` are fixed
-and cannot be overridden — passing them raises ``ValueError``.
+``distribution="dnorm"`` fixed, giving automatic ARIMA / SARIMA order
+selection without any ETS components. The parameters ``model``,
+``distribution``, and ``arima_select`` are fixed and cannot be overridden —
+passing them raises ``ValueError``.
 
 .. code-block:: python
 

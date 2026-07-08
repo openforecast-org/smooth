@@ -14,7 +14,6 @@ import pytest
 from smooth import ADAM, AutoADAM
 from smooth.adam_general.core.adam import OutlierDummy
 
-
 # Full AirPassengers dataset (1949-1960, 144 monthly observations)
 AIRPASSENGERS = np.array([
     112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118,

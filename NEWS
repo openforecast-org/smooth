@@ -1,11 +1,35 @@
-smooth v4.5.0 (Release data: 2026-05-10)
+smooth v4.5.0 (Release data: 2026-06-19)
+=======
+
+Changes:
+* Retired the legacy occurrence ETS implementation: `oes_old()`, `oesg_old()`, `is.oes()` and `is.oesg()` are no longer exported. Use the `oes()` / `oesg()` wrappers (backed by `om()` / `omg()`) for any new code — they cover every occurrence type (`"fixed"`, `"odds-ratio"`, `"inverse-odds-ratio"`, `"direct"`, `"general"`, `"auto"`) the legacy path supported. The `ets=` argument on the new wrappers selects the ETS update mechanism (`"conventional"` vs `"adam"`) and is unrelated to the legacy code path.
+* Removed the four legacy C++ entry points (`occurenceFitterWrap`, `occurrenceOptimizerWrap`, `occurenceGeneralFitterWrap`, `occurrenceGeneralOptimizerWrap`) in `src/ssOccurrence.cpp`; the inline header helper `occurrenceError()` in `src/headers/ssOccurrence.h` is preserved (still used by the `om()` / `adam()` paths).
+* Dropped the unreachable S3 methods `forecast.oes`, `plot.oes`, `print.oes`, `pointLik.oes`, `modelType.oesg` since no live producer of class `"oes"` / `"oesg"` remains. `sim.oes()` and the `"oes.sim"` class (used by `om()` / `omg()` simulator output) are unchanged.
+
+NOTE: any user code calling `oes_old()` / `oesg_old()` / `is.oes()` / `is.oesg()` directly, or relying on deserialising stored `"oes"`-classed objects, will need updating. The recommended replacement is `oes()` / `oesg()` for fresh fits.
+
+Bugfixes:
+* `om(y, occurrence="general", silent=FALSE)` (and `omg(y, silent=FALSE)`) with the default `h=0` no longer error out in the diagnostic plot. Previously `omg()` left `$forecast=NULL` on the result, and `plot.smooth` would then strip the slot from its `do.call(graphmaker, ...)` call, causing `argument "forecast" is missing, with no default`. Now mirrors `om()`'s convention: when `h=0`, `$forecast` is a one-element `ts(NA)` / `zoo(NA)` placeholder.
+
+
+smooth v4.4.5 (Release data: 2026-05-27)
 =======
 
 Change:
+* msdecompose() now routes its two OLS calls (global smoother and missing-value imputation) through a shared C++ helper (olsCpp), implemented via pivoted QR with a scale-invariant rank cutoff in src/headers/olsCore.h. The same header is now used by the Python build, so the OLS step gives the same result on both sides. The QR backend changes from LINPACK (.lm.fit / dqrls.f) to LAPACK (Armadillo / geqp3), which can shift the seeded initial level / trend by a few ULPs versus prior versions on multi-parameter ETS models fitted with initial="optimal" / "two-stage".
 * om() function that implements the occurrence model. This substitutes oes() completely, having as much functionality as the adam() function does in comparison with es().
 * adam() now calls for om() by default, not oes().
 * auto.om() function to select occurrence and/or ARIMA orders.
 * om() supports all types of occurrence and does automatic selection via auto.om().
+* vcov, confint and summary methods for the om class.
+* coefbootstrap for the om class.
+* We now use our own hessian function and no longer rely on pracma.
+* Changed how scale is calculated for the Log Normal distribution in case of the exotic additive error - we use complex numbers :D.
+* MSE/MAE/HAM/RIDGE/LASSO and custom losses in om() and omg().
+* Hessian calculation is now done internally using a C++ function with relative steps (not absolute as in pracma). This should get slightly better estimates of covariance matrix.
+
+Bugfixes:
+* forecast.adam() would not do the correct row repetition for explanatory variables when the new values are not provided.
 
 
 smooth v4.4.1 (Release data: 2026-02-26)

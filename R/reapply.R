@@ -742,7 +742,7 @@ reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ..
         profilesRecentArray[j+1,1,] <- randomParameters[,k+1];
     }
 
-    if(is.null(object$occurrence)){
+    if(is.null(object$occurrence) || !is.occurrence(object$occurrence)){
         ot <- matrix(rep(1, obsInSample));
         pt <- rep(1, obsInSample);
     }

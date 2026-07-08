@@ -4,18 +4,30 @@
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/smooth.svg)](https://pypi.org/project/smooth/)
 [![Python versions](https://img.shields.io/pypi/pyversions/smooth.svg)](https://pypi.org/project/smooth/)
 [![Python CI](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml)
+[![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![License: LGPL-2.1](https://img.shields.io/badge/License-LGPL--2.1-blue.svg)](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
 
 ![hex-sticker of the smooth package for Python](https://github.com/config-i1/smooth/blob/master/python/img/smooth-python-web.png?raw=true)
 
 Python implementation of the **smooth** package for forecasting and time series analysis using Single Source of Error (SSOE) state-space models.
 
+Every wheel published to PyPI is signed via [Sigstore](https://www.sigstore.dev/) on the exact GitHub Actions runner that built it and ships with [PEP 740 attestations](https://peps.python.org/pep-0740/) (SLSA Build Level 3 provenance). Verify a downloaded wheel client-side with [`pypi-attestations`](https://pypi.org/project/pypi-attestations/):
+
+```bash
+pip install pypi-attestations
+pypi-attestations verify pypi --repository https://github.com/config-i1/smooth smooth-*.whl
+```
+
 The package includes the following models:
 
 - [ADAM](https://openforecast.org/adam/) - Augmented Dynamic Adaptive Model, uniting exponential smoothing, ARIMA and regression, implemented in the `ADAM` class.
 - [ETS](https://github.com/config-i1/smooth/wiki/ES) - Exponential Smoothing in the SSOE state space form, implemented in the `ES` class.
+- [CES](https://github.com/config-i1/smooth/wiki/CES) - Complex Exponential Smoothing with complex-valued smoothing parameters, implemented in the `CES` class (fixed seasonality type) and `AutoCES` class (automatic seasonality selection).
 - [MSARIMA](https://github.com/config-i1/smooth/wiki/MSARIMA) - Multiple seasonal ARIMA in state space form, implemented in the `MSARIMA` class (fixed orders) and `AutoMSARIMA` class (automatic order selection).
 - [OM](https://github.com/config-i1/smooth/wiki/OM) - Occurrence Model for intermittent demand, implemented in the `OM` class (plus `OMG` for the general two-component model and `AutoOM` for automatic type selection).
+- [SMA](https://github.com/config-i1/smooth/wiki/SMA) - Simple Moving Average in state-space form (an AR(m) model with fixed coefficients), implemented in the `SMA` class with automatic order selection.
+
+The package also provides standalone data generators that mirror R's `sim.*` family — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, and `sim_oes` — plus a `.simulate()` method on fitted `ADAM`, `OM`, and `OMG` objects. See [Simulation Functions](https://github.com/config-i1/smooth/wiki/Simulation-Functions).
 
 All of these are implemented with the support of the following features:
 
@@ -25,6 +37,8 @@ All of these are implemented with the support of the following features:
 - Advanced loss functions
 - Fine tuning of any elements of ADAM/ETS/ARIMA/Regression
 - A variety of prediction interval construction methods
+
+Like the R version, the Python **smooth** depends on the [**greybox**](https://github.com/config-i1/greybox) package for distributions, information criteria, regressor selection, and the LOWESS smoother. It is installed automatically as a dependency.
 
 
 ## Installation
@@ -140,11 +154,55 @@ model.fit(y)
 fc = model.predict(h=24)
 ```
 
+## CES — Complex Exponential Smoothing
+
+`CES` and `AutoCES` mirror R's `ces()` / `auto.ces()`. CES uses complex-valued
+smoothing parameters to capture both the level and the "potential" of a series,
+covering four seasonality modes: `"none"`, `"simple"`, `"partial"`, `"full"`.
+
+```python
+import numpy as np
+from smooth import CES, AutoCES
+
+y = np.array([
+    112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118,
+    115, 126, 141, 135, 125, 149, 170, 170, 158, 133, 114, 140,
+], dtype=float)
+
+# CES with a fixed seasonality type
+model = CES(seasonality="partial", lags=[1, 12], h=6, holdout=True)
+model.fit(y)
+print(model.model_name)         # e.g. "CES(partial)"
+print(model.a_, model.b_)       # complex smoothing parameters
+fc = model.predict(h=6)
+print(fc.mean)
+
+# AutoCES — select the best seasonality type by information criterion
+auto = AutoCES(lags=[1, 12], h=6, holdout=True, ic="AICc")
+auto.fit(y)
+print(auto.best_model_.model_name)
+```
+
+> **Note**: strict R-parity in the two-stage NLopt path requires
+> `nlopt>=2.10.0`; older versions still fit, but the BOBYQA stage-1 trajectory
+> may differ slightly from R.
+
 ## Documentation
 
 - [GitHub Wiki](https://github.com/config-i1/smooth/wiki) - Full documentation
 - [ADAM](https://github.com/config-i1/smooth/wiki/ADAM) - Main unified ETS/ARIMA framework
 - [Installation Guide](https://github.com/config-i1/smooth/wiki/Installation) - Dependencies and troubleshooting
+
+The pages below document the models and their Python classes:
+
+- [ADAM](https://github.com/config-i1/smooth/wiki/ADAM) — Augmented Dynamic Adaptive Model — unified ETS/ARIMA/regression framework
+- [AutoADAM](https://github.com/config-i1/smooth/wiki/AutoADAM) — Automatic ADAM with distribution and ARIMA order selection
+- [ES](https://github.com/config-i1/smooth/wiki/ES) — Exponential Smoothing (ETS) wrapper for ADAM
+- [CES](https://github.com/config-i1/smooth/wiki/CES) — Complex Exponential Smoothing (`CES`, `AutoCES`)
+- [MSARIMA](https://github.com/config-i1/smooth/wiki/MSARIMA) — Multiple Seasonal ARIMA (fixed orders) and automatic selection (`AutoMSARIMA`)
+- [OM](https://github.com/config-i1/smooth/wiki/OM) — Occurrence Model for intermittent demand (`OM`, `OMG`, `AutoOM`)
+- [SMA](https://github.com/config-i1/smooth/wiki/SMA) — Simple Moving Average in state-space form with automatic order selection
+- [Simulation Functions](https://github.com/config-i1/smooth/wiki/Simulation-Functions) — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, `sim_oes`, and the `.simulate()` method on fitted models
 
 **Book:** Svetunkov, I. (2023). *Forecasting and Analytics with the Augmented Dynamic Adaptive Model (ADAM)*. Chapman and Hall/CRC. Online: https://openforecast.org/adam/
 

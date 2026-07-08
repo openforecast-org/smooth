@@ -18,6 +18,7 @@ Classes
    ADAM
    AutoADAM
    ES
+   SMA
    MSARIMA
    AutoMSARIMA
    OM
@@ -71,6 +72,18 @@ ES Methods
    ES.predict_intervals
    ES.select_best_model
    ES.summary
+
+SMA Methods
+-----------
+
+.. autosummary::
+   :toctree: _autosummary
+   :template: method.rst
+
+   SMA.fit
+   SMA.predict
+   SMA.predict_intervals
+   SMA.summary
 
 MSARIMA Methods
 ---------------
@@ -179,6 +192,7 @@ customize the optimization behavior via the ``nlopt_kargs`` parameter:
 
    api
    autoadam
+   sma
    msarima
    om
    msdecompose

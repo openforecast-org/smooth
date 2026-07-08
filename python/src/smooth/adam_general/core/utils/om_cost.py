@@ -1,12 +1,14 @@
 """Cost function for occurrence (OM) models.
 
-Mirrors ``omCF_local`` in ``R/om.R``: fills the state-space matrices from B,
-runs the C++ fitter with the occurrence flag, applies the link function to map
-raw fitted values into [0, 1] probabilities, and returns the negative
+Fills the state-space matrices from the optimisation vector ``B``, runs the
+C++ fitter with the occurrence flag, applies the link function to map the
+raw fitted values into ``[0, 1]`` probabilities, and returns the negative
 Bernoulli log-likelihood (or MSE on the binary indicators).
 """
 
 from __future__ import annotations
+
+import math
 
 import numpy as np
 from numpy.linalg import eigvals
@@ -15,9 +17,11 @@ from smooth.adam_general.core.creator import filler
 
 
 def om_link_function(x, error_type, occurrence):
-    """Translation of ``omLinkFunction`` (R/om.R:1258).
+    """Map raw state-space fitted values onto a probability scale.
 
-    Maps raw state-space fitted values onto a probability scale.
+    The exact transformation depends on the ``occurrence`` type
+    (odds-ratio, inverse-odds-ratio, direct or fixed) and on the
+    underlying error type (additive or multiplicative).
     """
     x = np.asarray(x, dtype=np.float64)
     if occurrence == "odds-ratio":
@@ -189,24 +193,79 @@ def om_cf(  # noqa: N802
     # Infeasibility guard (NOT a clipping hack): if the link function
     # produced NaN or values outside [0, 1], the parameters at this point
     # are infeasible for the model — return a uniformly large penalty so
-    # the optimiser steers away. Mirrors R/om.R:omCF_local.
+    # the optimiser steers away.
     if np.any(np.isnan(p_fitted)) or np.any(p_fitted < 0) or np.any(p_fitted > 1):
         return 1e300
 
-    # 5. Compute loss
+    # 5. Compute loss — mirrors ADAM's CF dispatch
+    # (`cost_functions.py:544-685`). The same single-step loss menu plus
+    # LASSO/RIDGE and custom-callable, but errors are
+    # ``residual = ot - p_fitted`` on the probability scale instead of the
+    # ADAM additive/multiplicative errors.
     ot_logical = observations_dict["ot_logical"]
     loss = general.get("loss", "likelihood")
-    if loss == "likelihood":
+    loss_function = general.get("loss_function")
+    residual = ot - p_fitted
+
+    if loss == "custom":
+        if loss_function is None:
+            raise ValueError(
+                "loss='custom' requires `loss_function` in `general` dict; "
+                "om.OM.__init__ should have spliced it in."
+            )
+        cf_value = float(loss_function(actual=ot, fitted=p_fitted, B=np.asarray(B)))
+    elif loss == "likelihood":
         # Bernoulli log-likelihood: -(sum log p[ot=1] + sum log(1-p)[ot=0]).
         # No epsilon floor inside log() — see CLAUDE.md "never clip" rule.
         # If p hits 0 or 1 exactly, the resulting -Inf is a true signal that
         # the initialiser handed the optimiser a parameter region the model
         # cannot represent, and that should surface, not be hidden.
+        #
+        # Aggregate via math.fsum (Shewchuk exact summation) instead of
+        # np.sum (pairwise IEEE-double) to match R's LDOUBLE-accumulator
+        # sum() byte-for-byte at feasible points.  Same ULP-level
+        # difference can otherwise push NLopt's deterministic simplex
+        # into a different basin on flat-loss seasonal OM surfaces.
+        p_on = p_fitted[ot_logical]
+        p_off = p_fitted[~ot_logical]
         cf_value = -(
-            np.sum(np.log(p_fitted[ot_logical]))
-            + np.sum(np.log(1.0 - p_fitted[~ot_logical]))
+            math.fsum(np.log(p_on).tolist()) + math.fsum(np.log(1.0 - p_off).tolist())
         )
+    elif loss == "MSE":
+        cf_value = float(np.mean(residual**2))
+    elif loss == "MAE":
+        cf_value = float(np.mean(np.abs(residual)))
+    elif loss == "HAM":
+        cf_value = float(np.mean(np.sqrt(np.abs(residual))))
+    elif loss in ("LASSO", "RIDGE"):
+        from smooth.adam_general.core.utils.cost_functions import trim_b_for_penalty
+
+        lam = float(general.get("lambda", 0) or 0.0)
+        B_penalty = trim_b_for_penalty(  # noqa: N806
+            B,
+            components_dict,
+            persistence_checked,
+            explanatory_checked,
+            phi_dict,
+            arima_checked,
+            initials_checked,
+            model_type_dict,
+            lags_dict,
+            general,
+        )
+        obs_in_sample = observations_dict.get("obs_in_sample", len(residual))
+        # Error term identical in shape to ADAM's additive branch but
+        # measured on the probability-scale residual (the OM "error").
+        error_term = (
+            (1.0 - lam)
+            * float(np.linalg.norm(residual))
+            / float(np.sqrt(obs_in_sample))
+        )
+        if loss == "LASSO":
+            cf_value = error_term + lam * float(np.sum(np.abs(B_penalty)))
+        else:  # RIDGE
+            cf_value = error_term + lam * float(np.linalg.norm(B_penalty))
     else:
-        cf_value = float(np.mean((ot - p_fitted) ** 2))
+        raise ValueError(f"Unsupported OM loss={loss!r}.")
 
     return cf_value

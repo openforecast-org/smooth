@@ -1,4 +1,94 @@
+import warnings
+
 import numpy as np
+
+
+def _is_meaningful_order(value):
+    """Return True if the ARIMA order argument carries an explicit non-zero spec.
+
+    Used by :func:`resolve_arima_orders` to decide whether the scalar
+    ``ar_order`` / ``i_order`` / ``ma_order`` arguments are "supplied". ``None``
+    and any all-zero list/scalar are treated as unset.
+    """
+    if value is None:
+        return False
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        return int(value) != 0
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return any(int(v) != 0 for v in value)
+    return False
+
+
+def resolve_arima_orders(
+    orders, ar_order, i_order, ma_order, arima_select=False, silent=False
+):
+    """Resolve the ARIMA-order specification from ``orders`` dict + scalar triplet.
+
+    Precedence rule (shared by ``ADAM`` and ``AutoADAM``):
+
+    1. If ``orders`` (a dict) is supplied, use it and **ignore** the three
+       scalar arguments. ``select`` is taken from ``orders.get("select", ...)``;
+       falls back to the ``arima_select`` parameter if absent.
+    2. Else if any of ``ar_order`` / ``i_order`` / ``ma_order`` carries a
+       non-zero value, use them as **fixed** orders (no selection).
+    3. Else return ``(None, False)`` — no ARIMA component at all.
+
+    A warning is emitted (unless ``silent=True``) when both ``orders`` and at
+    least one of the triplet are supplied, so the silent-shadowing previously
+    in place doesn't go unnoticed.
+
+    Parameters
+    ----------
+    orders : dict or None
+        ARIMA order dict (may include ``"ar"``, ``"i"``, ``"ma"``, ``"select"``).
+    ar_order, i_order, ma_order : int / list[int] / None
+        Scalar alternatives to ``orders``.
+    arima_select : bool, default False
+        Default for the ``"select"`` key when ``orders`` doesn't specify it.
+    silent : bool, default False
+        Suppress the both-supplied warning.
+
+    Returns
+    -------
+    (orders_resolved, select_flag) : tuple
+        ``orders_resolved`` is either a dict ready for ``parameters_checker``
+        (with a ``"select"`` key) or ``None``. ``select_flag`` mirrors the
+        ``"select"`` field for callers that want it as a plain bool.
+    """
+    triplet_supplied = any(
+        _is_meaningful_order(x) for x in (ar_order, i_order, ma_order)
+    )
+
+    if orders is not None:
+        if triplet_supplied and not silent:
+            warnings.warn(
+                "Both `orders` and one or more of `ar_order` / `i_order` / "
+                "`ma_order` were supplied; `orders` takes precedence and the "
+                "scalar arguments are ignored.",
+                stacklevel=2,
+            )
+        resolved = dict(orders)
+        resolved["select"] = bool(resolved.get("select", arima_select))
+        return resolved, resolved["select"]
+
+    if triplet_supplied:
+        # When ``orders=None`` and the triplet has values, use them as the
+        # ARIMA spec. ``arima_select`` (the explicit parameter) decides whether
+        # the values are treated as upper bounds for a search (True) or as
+        # fixed orders (False). Default is False — to opt into selection a
+        # caller passes ``arima_select=True`` or uses the ``orders`` dict with
+        # ``"select": True``.
+        return (
+            {
+                "ar": ar_order if ar_order is not None else 0,
+                "i": i_order if i_order is not None else 0,
+                "ma": ma_order if ma_order is not None else 0,
+                "select": bool(arima_select),
+            },
+            bool(arima_select),
+        )
+
+    return None, False
 
 
 def _expand_orders(orders):
@@ -163,8 +253,9 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
     """
     Check and validate ARIMA model specification.
 
-    This function mirrors R's parametersChecker ARIMA handling in adamGeneral.R lines
-    519-666.
+    Normalises the user-supplied ``orders`` argument (which may be a list,
+    tuple, scalar, dict or ``None``), validates compatibility with the
+    seasonal lags, and returns the canonical AR/I/MA order lists.
 
     Parameters
     ----------

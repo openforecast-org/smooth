@@ -1,100 +1,66 @@
 name: Publish to TestPyPI
 
+# Manual flow for shipping a candidate release to TestPyPI. Step-by-step:
+#
+#   1. Trigger ``build-release-wheels.yml`` via its own
+#      ``workflow_dispatch`` (or push a commit to a branch that runs it).
+#   2. Wait for it to pass.
+#   3. Open the successful run in the Actions tab; copy the numeric run
+#      ID from the URL (``.../actions/runs/<RUN_ID>``).
+#   4. Run this workflow via "Actions → Publish to TestPyPI → Run
+#      workflow", pasting the run ID into the ``build-run-id`` input.
+#
+# The workflow downloads the artifacts produced by that specific build
+# run and publishes them to TestPyPI via trusted publishing. No wheels
+# are rebuilt.
 on:
   workflow_dispatch:
+    inputs:
+      build-run-id:
+        description: 'build-release-wheels.yml run ID to publish (find it in the URL of the build run)'
+        required: true
+        type: string
+
+# Opt every JavaScript action into the Node.js 24 runtime — GitHub
+# deprecates Node 20 on 2026-06-02 and removes it on 2026-09-16.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel
-
-      - name: Build wheels
-        run: python -m cibuildwheel python --output-dir wheelhouse
-        env:
-          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
-          CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux*"
-          CIBW_BEFORE_BUILD_LINUX: yum install -y openblas-devel lapack-devel
-          CIBW_BEFORE_BUILD_MACOS: brew install openblas || true
-          CIBW_BEFORE_BUILD_WINDOWS: pip install numpy
-          CIBW_TEST_REQUIRES: pytest numpy
-          CIBW_TEST_COMMAND: "pytest {project}/python/tests"
-          CIBW_ARCHS_MACOS: "x86_64 arm64"
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
-
-      - name: Upload wheels as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-${{ matrix.os }}
-          path: ./wheelhouse/*.whl
-          retention-days: 5
-
-  build_sdist:
-    name: Build source distribution
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install build
-        run: python -m pip install build
-
-      - name: Build sdist
-        run: python -m build --sdist python
-
-      - name: Upload sdist as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdist
-          path: ./python/dist/*.tar.gz
-          retention-days: 5
-
   publish:
     name: Publish to TestPyPI
-    needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
     environment:
       name: testpypi
       url: https://test.pypi.org/p/smooth
     permissions:
-      id-token: write
+      id-token: write       # trusted publishing
+      attestations: write   # PEP 740 / Sigstore attestations
+      actions: read         # download-artifact across workflows
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - name: Download wheel artifacts from build run ${{ inputs.build-run-id }}
+        uses: actions/download-artifact@v6
         with:
           path: dist
           merge-multiple: true
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
+          pattern: 'wheels-*'
 
-      - name: Display downloaded files
+      - name: Download sdist artifact from build run ${{ inputs.build-run-id }}
+        uses: actions/download-artifact@v6
+        with:
+          name: sdist
+          path: dist
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: List downloaded files
         run: ls -R dist/
 
-      - name: Publish to TestPyPI
+      - name: Publish to TestPyPI (with PEP 740 attestations)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          attestations: true

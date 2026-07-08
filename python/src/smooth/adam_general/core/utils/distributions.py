@@ -278,7 +278,8 @@ def normalize_errors(errors, error_type):
     Normalize errors to have zero mean (additive) or unit mean multiplier
     (multiplicative).
 
-    This matches R's normalization for nsim <= 500.
+    Applied for small simulation sample sizes (``nsim <= 500``) to remove
+    Monte-Carlo bias in the simulated residual draws.
 
     Parameters
     ----------

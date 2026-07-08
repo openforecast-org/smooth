@@ -6,6 +6,8 @@ R:
 
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/smooth)](https://cran.r-project.org/package=smooth)
 [![Downloads](https://cranlogs.r-pkg.org/badges/smooth)](https://cran.r-project.org/package=smooth)
+[![Conda version](https://img.shields.io/conda/v/r/r-smooth)](https://anaconda.org/r/r-smooth)
+[![Conda downloads](https://img.shields.io/conda/dn/r/r-smooth)](https://anaconda.org/r/r-smooth)
 [![R-CMD-check](https://github.com/config-i1/smooth/actions/workflows/test.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/test.yml)
 
 Python:
@@ -14,11 +16,15 @@ Python:
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/smooth.svg)](https://pypi.org/project/smooth/)
 [![Python versions](https://img.shields.io/pypi/pyversions/smooth.svg)](https://pypi.org/project/smooth/)
 [![Python CI](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml)
+[![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
+Python wheels on PyPI ship with [PEP 740 attestations](https://peps.python.org/pep-0740/) — SLSA Build Level 3 provenance, signed via [Sigstore](https://www.sigstore.dev/) on the GitHub Actions runner that built them. Verifiable client-side with [`pypi-attestations`](https://pypi.org/project/pypi-attestations/).
 
 The **smooth** package implements Single Source of Error (SSOE) state-space models for forecasting and time series analysis, available for both R and Python.
 
 ![hex-sticker of the smooth package for R](https://github.com/config-i1/smooth/blob/master/man/figures/smooth-web.png?raw=true) ![hex-sticker of the smooth package for Python](https://github.com/config-i1/smooth/blob/master/python/img/smooth-python-web.png?raw=true)
+
+Both the R and Python versions of **smooth** depend on the [**greybox**](https://github.com/config-i1/greybox) package for distributions, information criteria, and supporting utilities (in Python this also provides the LOWESS smoother). It is installed automatically with **smooth**.
 
 
 ## Installation

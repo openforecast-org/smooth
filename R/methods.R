@@ -595,21 +595,6 @@ pointLik.smooth <- function(object, log=TRUE, ...){
 }
 
 #' @export
-pointLik.oes <- function(object, log=TRUE, ...){
-    ot <- actuals(object);
-    pFitted <- fitted(object);
-    likValues <- vector("numeric",nobs(object));
-    likValues[ot==1] <- log(pFitted[ot==1]);
-    likValues[ot==0] <- log(1-pFitted[ot==0]);
-    likValues <- ts(likValues, start=start(ot), frequency=frequency(ot));
-
-    if(!log){
-        likValues[] <- exp(likValues);
-    }
-    return(likValues);
-}
-
-#' @export
 pointLik.om <- function(object, log=TRUE, ...){
     ot <- as.numeric(actuals(object));
     pFitted <- as.numeric(fitted(object));
@@ -692,48 +677,6 @@ fitted.smooth <- function(object, ...){
 #' @export
 fitted.smooth.forecast <- function(object, ...){
     return(fitted(object$model));
-}
-
-#' @rdname forecast.smooth
-#' @export
-forecast.oes <- function(object, h=10,
-                         # interval=c("parametric","semiparametric","nonparametric","none"),
-                         # level=0.95, side=c("both","upper","lower"),
-                         ...){
-    # side <- match.arg(side);
-    # This correction is needed in order to reduce the level and then just use one bound
-    # if(any(side==c("upper","lower"))){
-    #     levelNew <- level*2-1;
-    # }
-    # else{
-    #     levelNew <- level;
-    # }
-
-    if(is.oesg(object)){
-        newModel <- oesg(actuals(object),modelA=object$modelA,modelB=object$modelB,
-                         h=h,silent="all",...);
-    }
-    else{
-        newModel <- oes_old(actuals(object),model=object,h=h,silent="all",...);
-    }
-
-    # Remove the redundant values, if they were produced
-    # if(side=="upper"){
-    #     newModel$lower[] <- NA;
-    #     newModel$level <- level;
-    # }
-    # else if(side=="lower"){
-    #     newModel$upper[] <- NA;
-    #     newModel$level <- level;
-    # }
-
-    output <- list(model=object, method=object$model, mean=newModel$forecast,
-                   forecast=newModel$forecast, interval="none"
-                   # lower=newModel$lower,upper=newModel$upper,level=levelNew,
-                   # interval=interval,side=side
-                   );
-
-    return(structure(output,class=c("smooth.forecast","forecast")));
 }
 
 #' @importFrom stats window
@@ -1008,11 +951,6 @@ modelType.smooth <- function(object, ...){
 
 #' @export
 modelType.smooth.sim <- modelType.smooth;
-
-#' @export
-modelType.oesg <- function(object, ...){
-    return(modelType(object$modelA));
-}
 
 #' @export
 modelType.ets <- function(object, ...){
@@ -1908,12 +1846,6 @@ plot.smooth.forecast <- function(x, ...){
 }
 
 #' @export
-plot.oes <- function(x, which=7, ...){
-    # This is needed, because diagnostics doesn't make sense in case of oes
-    plot.smooth(x, which=which, ...);
-}
-
-#' @export
 plot.oes.sim <- function(x, ...){
     ellipsis <- list(...);
     if(is.null(ellipsis$main)){
@@ -2090,59 +2022,6 @@ print.smooth.forecast <- function(x, ...){
         output <- x$mean;
     }
     print(output);
-}
-
-#' @export
-print.oes <- function(x, ...){
-    ellipsis <- list(...);
-    if(!any(names(ellipsis)=="digits")){
-        digits <- 4;
-    }
-    else{
-        digits <- ellipsis$digits;
-    }
-
-    occurrence <- x$occurrence
-    if(occurrence=="general"){
-        occurrence <- "General";
-    }
-    else if(occurrence=="direct"){
-        occurrence <- "Direct probability";
-    }
-    else if(occurrence=="fixed"){
-        occurrence <- "Fixed probability";
-    }
-    else if(occurrence=="inverse-odds-ratio"){
-        occurrence <- "Inverse odds ratio";
-    }
-    else if(occurrence=="odds-ratio"){
-        occurrence <- "Odds ratio";
-    }
-    else{
-        occurrence <- "None";
-    }
-    ICs <- round(c(AIC(x),AICc(x),BIC(x),BICc(x)),digits);
-    names(ICs) <- c("AIC","AICc","BIC","BICc");
-    cat(paste0("Occurrence state space model estimated: ",occurrence,"\n"));
-    if(!is.null(x$model)){
-        cat(paste0("Underlying ETS model: ",x$model,"\n"));
-    }
-    if(!is.null(x$persistence) && (x$occurrence!="fixed")){
-        cat("Smoothing parameters:\n");
-        print(round(x$persistence[,1],digits));
-    }
-    if(!is.null(x$initial)){
-        cat("Vector of initials:\n");
-        print(round(x$initial,digits));
-    }
-    if(!is.null(sigma(x))){
-        cat("\nError standard deviation: "); cat(round(sigma(x),digits));
-    }
-    cat("\nSample size: "); cat(nobs(x));
-    cat("\nNumber of estimated parameters: "); cat(nparam(x));
-    cat("\nNumber of degrees of freedom: "); cat(nobs(x)-nparam(x));
-    cat("\nInformation criteria: \n");
-    print(ICs);
 }
 
 #' @export

@@ -63,7 +63,7 @@ class TestInit:
         assert isinstance(m, AutoOM)
 
     def test_auto_fit_returns_om_or_omg(self, intermittent_y):
-        from smooth import AutoOM, OMG
+        from smooth import OMG, AutoOM
         m = OM(model="MNN", occurrence="auto", lags=[1]).fit(intermittent_y)
         assert isinstance(m, (OM, OMG))
         assert not isinstance(m, AutoOM)
@@ -79,7 +79,41 @@ class TestInit:
 
     def test_init_rejects_invalid_loss(self):
         with pytest.raises(ValueError, match="Invalid loss"):
-            OM(loss="HAM")
+            OM(loss="not-a-real-loss")
+
+
+# --------------------------------------------------------------------------
+# Loss menu (mirrors R `om()`'s full single-step menu + LASSO/RIDGE + custom)
+# --------------------------------------------------------------------------
+
+
+class TestLossMenu:
+    @pytest.mark.parametrize("loss", ["likelihood", "MSE", "MAE", "HAM"])
+    def test_string_losses_fit(self, intermittent_y, loss):
+        m = OM(model="MNN", occurrence="odds-ratio", loss=loss).fit(intermittent_y)
+        assert m.loss_ == loss
+        assert np.isfinite(m.loss_value)
+
+    @pytest.mark.parametrize("loss", ["LASSO", "RIDGE"])
+    def test_regularised_losses_fit(self, intermittent_y, loss):
+        m = OM(
+            model="MNN", occurrence="odds-ratio", loss=loss, reg_lambda=0.3
+        ).fit(intermittent_y)
+        assert m.loss_ == loss
+        assert np.isfinite(m.loss_value)
+        assert m.reg_lambda == 0.3
+
+    def test_custom_callable_loss(self, intermittent_y):
+        def cube_abs(actual, fitted, B):  # noqa: N803
+            import numpy as _np
+
+            return float(_np.sum(_np.abs(actual - fitted) ** 3))
+
+        m = OM(
+            model="MNN", occurrence="odds-ratio", loss=cube_abs
+        ).fit(intermittent_y)
+        assert m.loss_ == "custom"
+        assert np.isfinite(m.loss_value)
 
 
 # --------------------------------------------------------------------------
@@ -141,9 +175,15 @@ class TestProperties:
     def test_distribution_is_plogis(self, fitted_model):
         assert fitted_model.distribution_ == "plogis"
 
-    def test_scale_is_nan(self, fitted_model):
-        assert np.isnan(fitted_model.scale)
-        assert np.isnan(fitted_model.sigma)
+    def test_scale_matches_link_residual_std(self, fitted_model):
+        """OM.scale / sigma == sqrt(mean(residuals²)) — mirrors R's
+        ``sigma.om`` (R/om.R) so multi-step covariances on the link
+        scale are well-defined."""
+        expected = float(np.sqrt(np.mean(np.asarray(fitted_model.residuals) ** 2)))
+        assert np.isfinite(fitted_model.scale)
+        assert np.isfinite(fitted_model.sigma)
+        np.testing.assert_allclose(fitted_model.scale, expected)
+        np.testing.assert_allclose(fitted_model.sigma, expected)
 
     def test_loss_is_likelihood(self, fitted_model):
         assert fitted_model.loss_ == "likelihood"
@@ -344,6 +384,44 @@ class TestInputs:
 # --------------------------------------------------------------------------
 # Regressions
 # --------------------------------------------------------------------------
+
+
+class TestInferenceMethods:
+    """vcov / confint / summary for OM."""
+
+    @pytest.fixture
+    def fitted_om(self, intermittent_y):
+        return OM(model="MNN", occurrence="odds-ratio", lags=[1]).fit(intermittent_y)
+
+    def test_vcov_shape(self, fitted_om):
+        V = fitted_om.vcov()
+        assert V.shape == (fitted_om.nparam - 1, fitted_om.nparam - 1) or V.shape == (
+            len(fitted_om.coef),
+            len(fitted_om.coef),
+        )
+        # Diagonal must be non-negative (covariance variances)
+        diag = np.diag(V.to_numpy())
+        assert np.all(diag >= 0)
+
+    def test_confint_columns(self, fitted_om):
+        ci = fitted_om.confint(level=0.95)
+        assert ci.columns.tolist() == ["S.E.", "2.5%", "97.5%"]
+        # SEs must be non-negative; lo <= hi
+        assert (ci["S.E."] >= 0).all()
+        assert (ci["2.5%"] <= ci["97.5%"]).all()
+
+    def test_summary_contains_occurrence_header(self, fitted_om):
+        text = str(fitted_om.summary())
+        assert "Occurrence model" in text
+        assert "Sample size" in text
+
+    def test_confint_level_changes_bounds(self, fitted_om):
+        ci90 = fitted_om.confint(level=0.90)
+        ci99 = fitted_om.confint(level=0.99)
+        # Higher confidence => wider intervals
+        width90 = ci90.iloc[:, 2] - ci90.iloc[:, 1]
+        width99 = ci99.iloc[:, 2] - ci99.iloc[:, 1]
+        assert (width99 >= width90).all()
 
 
 class TestRegressions:

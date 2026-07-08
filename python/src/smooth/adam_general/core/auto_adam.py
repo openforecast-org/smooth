@@ -1,7 +1,7 @@
 """
 AutoADAM — automatic model selection wrapper for ADAM.
 
-Mirrors R's ``auto.adam()`` function, providing automatic selection of:
+Provides automatic selection of:
 - ARIMA orders (three-phase D→MA→AR search)
 - Error distribution (tries each candidate; picks lowest IC)
 - ETS model (delegated to ADAM's existing selection machinery)
@@ -37,7 +37,7 @@ class AutoADAM(ADAM):
     Automatic ADAM model selection.
 
     Wraps :class:`ADAM` with automatic selection of ARIMA orders and error
-    distribution, mirroring R's ``auto.adam()`` function.
+    distribution.
 
     ETS model selection (ZZZ, ZXZ, FFF, CCC …) is handled by the underlying
     ADAM machinery and is not duplicated here.
@@ -61,13 +61,12 @@ class AutoADAM(ADAM):
 
     ma_order : Union[int, List[int]], default=[3, 3]
         Maximum MA order(s) per lag level for ARIMA selection.
-        Defaults to ``[3, 3]`` matching R's ``auto.adam()``.
 
     orders : Optional[Dict[str, Any]], default=None
-        R-style alternative to scalar max orders. A dict with keys
-        ``"ar"``, ``"i"``, ``"ma"`` (each an int or list) and optionally
-        ``"select"`` (bool). When provided, ``ar_order``/``i_order``/
-        ``ma_order`` are ignored.
+        Dict-style alternative to the scalar max-order arguments above. A
+        dict with keys ``"ar"``, ``"i"``, ``"ma"`` (each an int or list)
+        and optionally ``"select"`` (bool). When provided,
+        ``ar_order`` / ``i_order`` / ``ma_order`` are ignored.
 
     arima_select : bool, default=True
         Whether to perform ARIMA order selection. Unlike :class:`ADAM`,
@@ -153,12 +152,12 @@ class AutoADAM(ADAM):
     def __init__(
         self,
         model: Union[str, List[str]] = "ZXZ",
-        lags: Optional[List[int]] = None,
+        lags: Optional[Union[int, List[int]]] = None,
         ar_order: Union[int, List[int], None] = None,
         i_order: Union[int, List[int], None] = None,
         ma_order: Union[int, List[int], None] = None,
         orders: Optional[Dict[str, Any]] = None,
-        arima_select: bool = True,
+        arima_select: bool = False,
         distribution: Union[str, List[str], None] = None,
         outliers: Literal["ignore", "use", "select"] = "ignore",
         level: float = 0.99,
@@ -174,7 +173,29 @@ class AutoADAM(ADAM):
         ets: Literal["conventional", "adam"] = "conventional",
         **kwargs,
     ) -> None:
-        """Initialise AutoADAM."""
+        """Initialise AutoADAM.
+
+        Notes on ``lags`` and ARIMA-order parameters
+        --------------------------------------------
+        ``lags`` accepts either a scalar (``lags=12``) or a list
+        (``lags=[12]``); both are equivalent.
+
+        The ARIMA-order specification follows a precedence rule shared with
+        :class:`ADAM`:
+
+        - If ``orders`` (dict) is supplied, it is used and the three scalar
+          arguments ``ar_order`` / ``i_order`` / ``ma_order`` are **ignored**
+          (a warning is emitted). Order selection is on iff
+          ``orders.get("select", arima_select)`` is true.
+        - Else if any of the three scalar order arguments has a non-zero value,
+          they are used as **fixed** orders (no selection).
+        - Else (the default), no ARIMA component is fitted and no order
+          selection is performed.
+        """
+        # Normalise scalar lags to a list so downstream code is uniform.
+        if isinstance(lags, (int, np.integer)):
+            lags = [int(lags)]
+
         # Store AutoADAM-specific params before delegating to ADAM
         self._auto_distribution_spec: List[str] = (
             list(distribution)
@@ -185,30 +206,43 @@ class AutoADAM(ADAM):
                 else list(_ALL_DISTRIBUTIONS)
             )
         )
-        self._auto_arima_select: bool = arima_select
         self._auto_outliers: str = outliers
         self._auto_level: float = level
+        self._auto_verbose: int = verbose
 
-        # Default orders match R's auto.adam(): ar=[3,3], i=[2,1], ma=[3,3]
-        _ar = ar_order if ar_order is not None else [3, 3]
-        _i = i_order if i_order is not None else [2, 1]
-        _ma = ma_order if ma_order is not None else [3, 3]
+        # Resolve the ARIMA order specification using the shared helper so
+        # ADAM and AutoADAM share the same precedence rule.
+        from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
 
-        # Parse max ARIMA orders (scalar → list normalised in arima_selector)
-        self._auto_max_ar: List[int] = list(_ar) if isinstance(_ar, list) else [_ar]
-        self._auto_max_i: List[int] = list(_i) if isinstance(_i, list) else [_i]
-        self._auto_max_ma: List[int] = list(_ma) if isinstance(_ma, list) else [_ma]
+        resolved, select_flag = resolve_arima_orders(
+            orders, ar_order, i_order, ma_order, arima_select=arima_select
+        )
 
-        # Parse orders dict if provided (overrides scalar args)
-        if orders is not None:
-            ar_val = orders.get("ar", _ar)
-            i_val = orders.get("i", _i)
-            ma_val = orders.get("ma", _ma)
-            self._auto_max_ar = list(ar_val) if isinstance(ar_val, list) else [ar_val]
-            self._auto_max_i = list(i_val) if isinstance(i_val, list) else [i_val]
-            self._auto_max_ma = list(ma_val) if isinstance(ma_val, list) else [ma_val]
-            if orders.get("select", arima_select):
-                self._auto_arima_select = True
+        # Decide search ranges for the selection loop. When the resolved dict
+        # carries scalar values they get broadcast in ``arima_selector``.
+        # When orders=None and triplet=empty, the resolver returned None →
+        # AutoADAM is effectively pure ETS.
+        self._auto_arima_select: bool = bool(select_flag)
+        if resolved is not None:
+            ar_val = resolved.get("ar", 0)
+            i_val = resolved.get("i", 0)
+            ma_val = resolved.get("ma", 0)
+            self._auto_max_ar: List[int] = (
+                list(ar_val) if isinstance(ar_val, (list, tuple)) else [int(ar_val)]
+            )
+            self._auto_max_i: List[int] = (
+                list(i_val) if isinstance(i_val, (list, tuple)) else [int(i_val)]
+            )
+            self._auto_max_ma: List[int] = (
+                list(ma_val) if isinstance(ma_val, (list, tuple)) else [int(ma_val)]
+            )
+        else:
+            # No ARIMA at all — set placeholder zeros so existing code paths
+            # that read these attributes don't break, but ``arima_select=False``
+            # ensures the selection loop is skipped.
+            self._auto_max_ar = [0]
+            self._auto_max_i = [0]
+            self._auto_max_ma = [0]
 
         # Pass placeholder values to ADAM.__init__ — fit() will override them
         super().__init__(
@@ -303,7 +337,18 @@ class AutoADAM(ADAM):
         ets_model = self.model if isinstance(self.model, str) else self.model[0]
         has_ets = ets_model != "NNN"
 
+        verbose = bool(self._auto_verbose)
+        if verbose:
+            # Mirror R's autoadam.R style: one line, comma-separated as we go.
+            print(
+                "Evaluating models with different distributions... ",
+                end="",
+                flush=True,
+            )
+
         for dist in candidates:
+            if verbose:
+                print(f"{dist}, ", end="", flush=True)
             if self._auto_arima_select:
                 # ETS-first strategy (mirrors autoadam.R lines 392-423, 560-595):
                 # When the model has ETS components, fit ETS-only first, then
@@ -370,10 +415,15 @@ class AutoADAM(ADAM):
                     continue
 
         if not results:
+            if verbose:
+                print("(no distribution succeeded)")
             raise RuntimeError(
                 "AutoADAM: all candidate distributions failed. "
                 "Check your data and model specification."
             )
+
+        if verbose:
+            print("Done!")
 
         # ------------------------------------------------------------------
         # Select best distribution
@@ -381,6 +431,14 @@ class AutoADAM(ADAM):
         best_dist = min(results, key=lambda d: results[d]["ic"])
         best_entry = results[best_dist]
         best_model = best_entry["model"]
+
+        if verbose:
+            print(f"Selected distribution: {best_dist}")
+            if self._auto_arima_select and "ar_orders" in best_entry:
+                print(
+                    f"Selected ARIMA orders: AR={best_entry['ar_orders']}, "
+                    f"I={best_entry['i_orders']}, MA={best_entry['ma_orders']}"
+                )
 
         # ------------------------------------------------------------------
         # Outlier handling: detect on best model, refit with dummies appended

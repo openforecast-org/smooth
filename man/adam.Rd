@@ -433,7 +433,6 @@ plot(ourModel, c(1:11))}
 ourModel <- adam(rnorm(100,100,10), model="AAdN")
 # Simulate the data
 x <- simulate(ourModel)
-
 # Automatic selection of appropriate distribution and orders of ADAM ETS+ARIMA
 \donttest{ourModel <- auto.adam(rnorm(100,100,10), model="ZZN", lags=c(1,4),
                       orders=list(ar=c(2,2),ma=c(2,2),select=TRUE))}

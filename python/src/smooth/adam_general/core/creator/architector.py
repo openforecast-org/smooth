@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -13,14 +13,14 @@ def architector(
     # Observation info
     observations_dict: Dict[str, Any],
     # Optional model components
-    arima_checked: Dict[str, Any] = None,
-    explanatory_checked: Dict[str, Any] = None,
-    constants_checked: Dict[str, Any] = None,
+    arima_checked: Optional[Dict[str, Any]] = None,
+    explanatory_checked: Optional[Dict[str, Any]] = None,
+    constants_checked: Optional[Dict[str, Any]] = None,
     # Profiles
     profiles_recent_table: Union[np.ndarray, None] = None,
     profiles_recent_provided: bool = False,
     adam_ets: bool = False,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], Any, Dict[str, Any], Dict[str, Any], Any, Any]:
     """
     Determine and set up ADAM model architecture before matrix creation.
 
@@ -263,7 +263,6 @@ def architector(
     )
 
     # Create C++ adam class, which will then use fit, forecast etc methods
-    # This matches R implementation (adam.R line 752-758)
     adam_cpp = adamCore(
         lags=np.array(lags_dict["lags_model_all"], dtype=np.uint64),
         E=model_type_dict["error_type"],
@@ -450,7 +449,7 @@ def _create_profiles(
 
 
 def adam_profile_creator(
-    lags_model_all: List[List[int]],
+    lags_model_all: List[int],
     lags_model_max: int,
     obs_all: int,
     lags: Union[List[int], None] = None,

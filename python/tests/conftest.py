@@ -2,8 +2,27 @@
 Pytest configuration and shared fixtures for smooth package tests.
 """
 
+import os
+
 import numpy as np
 import pytest
+
+
+def pytest_collection_modifyitems(config, items):
+    """Never run R-comparison tests on GitHub Actions.
+
+    These tests compare against committed R reference data and are meant for
+    local cross-language validation only. They are deselected by default via
+    ``addopts`` (``-m "not r_comparison and not r_parity"``); this hook is a
+    belt-and-suspenders guarantee that they are skipped on CI even if collected
+    explicitly (e.g. via ``-m r_comparison``).
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+    skip_ci = pytest.mark.skip(reason="R-comparison tests do not run on GitHub Actions")
+    for item in items:
+        if "r_comparison" in item.keywords or "r_parity" in item.keywords:
+            item.add_marker(skip_ci)
 
 
 @pytest.fixture

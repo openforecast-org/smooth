@@ -105,6 +105,7 @@ test_that("ADAM ETS(AAN) with custom loss on BJsales", {
 
 #### ETS + occurrence model ####
 # Generate intermittent data
+set.seed(41)
 x <- sim.oes("MNN", 120, frequency=12, occurrence="general", persistence=0.01, initial=2, initialB=1)
 x <- sim.es("MNN", 120, frequency=12, probability=x$probability, persistence=0.1)
 

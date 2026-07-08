@@ -84,40 +84,32 @@ def generate_prediction_interval(
         in ["dinvgauss", "dgamma", "dlnorm", "dllaplace", "dls", "dlgnorm"]
         and model_type_dict["error_type"] == "M"
     ):
-        # again scale object
-        # lines 8425 8428
-
+        # Multiplicative-error variance under one of the log/positive
+        # distributions: compute the per-horizon analytic variance.
         v_voc_multi = var_anal(
             lags_dict["lags_model_all"], general["h"], mat_wt[0], mat_f, vec_g, s2
         )
 
-        # Lines 8429-8433 in R/adam.R
-        # If distribution is one of the log-based ones, transform the variance
+        # For log-based distributions, transform the variance through log(1+v)
         if general["distribution"] in ["dlnorm", "dls", "dllaplace", "dlgnorm"]:
             v_voc_multi = np.log(1 + v_voc_multi)
 
-        # Lines 8435-8437 in R/adam.R
-        # We don't do correct cumulatives in this case...
+        # Cumulative forecasts in this branch are not strictly correct —
+        # we fall back to summing the per-horizon variances.
         if general.get("cumulative", False):
             v_voc_multi = np.sum(v_voc_multi)
     else:
-        # Lines 8439-8441 in R/adam.R
         v_voc_multi = covar_anal(
             lags_dict["lags_model_all"], general["h"], mat_wt, mat_f, vec_g, s2
         )
 
-        # Skipping the is.scale check (lines 8442-8445)
-
-        # Lines 8447-8453 in R/adam.R
-        # Do either the variance of sum, or a diagonal
+        # Variance of the cumulative sum vs. per-horizon diagonal variances.
         if general.get("cumulative", False):
             v_voc_multi = np.sum(v_voc_multi)
         else:
             v_voc_multi = np.diag(v_voc_multi)
 
-    # Extract extra values which we will include in the function call
-    # Now implement prediction intervals based on distribution
-    # Translating from R/adam.R lines 8515-8640
+    # Build prediction intervals per distribution.
     y_forecast = np.atleast_1d(predictions)
     v_voc_multi = np.atleast_1d(v_voc_multi)
     n_levels = len(level_low)
@@ -137,11 +129,11 @@ def generate_prediction_interval(
     ll = level_low.reshape(1, -1)  # (1, n_levels)
     lu = level_up.reshape(1, -1)  # (1, n_levels)
 
-    # Occurrence-aware level adjustment (R/adam.R ~6220-6225).
-    # R adjusts the confidence LEVEL (e.g. 0.95), not the quantiles:
-    #   level_adj = max(0, (level - (1-p)) / p)
-    # then derives symmetric quantile pairs from the adjusted level.
-    # level = level_up - level_low in all sides (both/upper/lower).
+    # Occurrence-aware level adjustment. Adjust the confidence LEVEL (e.g.
+    # 0.95), not the quantiles, then derive symmetric quantile pairs from
+    # the adjusted level:
+    #     level_adj = max(0, (level - (1 - p)) / p)
+    # ``level = level_up - level_low`` regardless of side (both / upper / lower).
     if p_forecast is not None:
         p_col = np.asarray(p_forecast, dtype=float).reshape(-1, 1)  # (h, 1)
         conf_levels = (level_up - level_low).reshape(1, -1)  # (1, n_levels)
@@ -443,8 +435,8 @@ def generate_simulation_interval(
     """
     Generate prediction intervals using simulation.
 
-    This implements the simulation-based intervals from R's forecast.adam()
-    (lines 8317-8412 in R/adam.R).
+    Simulates ``nsim`` forecast trajectories from the fitted state-space
+    model and takes empirical quantiles at the requested levels.
 
     Parameters
     ----------
@@ -654,8 +646,8 @@ def generate_simulation_interval(
         y_forecast_sim = np.zeros(h)
 
         for i in range(h):
-            # Point forecasts now always from adam_cpp.forecast(), not sim mean.
-            # (matches R commit 7d4d3736)
+            # Point forecasts come from adam_cpp.forecast(); the sim mean is
+            # kept here only for diagnostics / cross-checks.
             y_forecast_sim[i] = np.mean(y_simulated[i, :])
 
             y_lower[i, :] = np.nanquantile(y_simulated[i, :], level_low)
@@ -690,14 +682,16 @@ def generate_simulation_interval(
 
 
 # Distributions where errors are normalised by fitted values for semiparametric/
-# empirical/nonparametric intervals when Etype=="A" (R/adam.R ~6414-6448).
+# empirical/nonparametric intervals when Etype=="A".
 _LOG_DISTS = frozenset({"dinvgauss", "dgamma", "dlnorm", "dls", "dllaplace", "dlgnorm"})
 
 
 def _fit_power_quantile(errors, horizons, level):
-    """Fit quantile q_k = A0 * k^A1 by minimising the pinball loss.
+    """Fit a power-law quantile ``q_k = A0 * k^A1`` by minimising the pinball loss.
 
-    Translates R's nonparametric interval fitting (R/adam.R ~6618-6677).
+    Used for nonparametric prediction intervals: ``A0`` and ``A1`` are
+    chosen so the quantile across horizons matches the empirical multistep
+    residual distribution at the requested level.
 
     Parameters
     ----------
@@ -745,8 +739,8 @@ def generate_multistep_interval(
 ):
     """Generate semiparametric, empirical, or nonparametric prediction intervals.
 
-    Translates R's forecast.adam() R/adam.R lines ~6414-6677.
-    All three types use the (T-h) x h multistep in-sample error matrix from ferrors.
+    All three interval types use the ``(T - h) × h`` multistep in-sample
+    error matrix produced by ``ferrors``.
 
     Returns
     -------

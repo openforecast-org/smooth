@@ -177,13 +177,13 @@ class TestAutoADAMARIMASelection:
         assert m.model.startswith("ARIMA")
 
     def test_arima_select_finds_nonzero_orders(self, trend_data):
+        # New precedence: scalar triplet alone means FIXED orders. Use the
+        # orders-dict form with ``select=True`` to enable order selection.
         m = AutoADAM(
             model="NNN",
             distribution="dnorm",
             lags=[1],
-            ar_order=2,
-            i_order=2,
-            ma_order=2,
+            orders={"ar": 2, "i": 2, "ma": 2, "select": True},
         ).fit(trend_data)
         orders = m._selected_arima_orders
         total = (
@@ -334,8 +334,18 @@ class TestAutoADAMOutliers:
 
 
 class TestAutoADAMDefaults:
-    def test_default_arima_select_is_true(self):
+    def test_default_arima_select_is_false(self):
+        # Per the precedence rule: with orders=None and no scalar orders
+        # provided, AutoADAM defaults to pure ETS — no ARIMA selection.
         m = AutoADAM()
+        assert m._auto_arima_select is False
+
+    def test_arima_select_on_via_orders_dict(self):
+        m = AutoADAM(orders={"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True})
+        assert m._auto_arima_select is True
+
+    def test_arima_select_on_via_explicit_flag(self):
+        m = AutoADAM(orders={"ar": [3, 3], "i": [2, 1], "ma": [3, 3]}, arima_select=True)
         assert m._auto_arima_select is True
 
     def test_default_ic_is_aicc(self):

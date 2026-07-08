@@ -14,7 +14,7 @@ omg(data, modelA = "MNN", modelB = modelA, ordersA = list(ar = c(0), i =
   holdout = FALSE, initial = c("backcasting", "optimal", "two-stage",
   "complete"), loss = c("likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE"),
   ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual", "admissible",
-  "none"), silent = TRUE, ...)
+  "none"), model = NULL, silent = TRUE, ...)
 }
 \arguments{
 \item{data}{Binary time series (0/1), vector or data frame.}
@@ -69,6 +69,13 @@ omg(data, modelA = "MNN", modelB = modelA, ordersA = list(ar = c(0), i =
 
 \item{bounds}{Parameter bounds type (shared).}
 
+\item{model}{An already-fitted \code{omg} object. When supplied, the
+per-side parameters are lifted from \code{model$modelA} and
+\code{model$modelB} and no estimation is performed; passing
+\code{FI=TRUE} alongside computes the observed Fisher information
+over the joint parameter vector (the path used by
+\code{vcov.omg}).}
+
 \item{silent}{If \code{TRUE}, suppress output.}
 
 \item{...}{Additional arguments passed to the optimiser.}
@@ -86,7 +93,6 @@ set.seed(41)
 y <- rpois(100, 0.5)
 m <- omg(y)
 forecast(m, h=10)
-
 }
 \seealso{
 \link{om}, \link{forecast.omg}

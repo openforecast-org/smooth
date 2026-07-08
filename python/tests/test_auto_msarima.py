@@ -14,7 +14,6 @@ import pytest
 
 from smooth import AutoMSARIMA
 
-
 # Full AirPassengers dataset (1949-1960, 144 monthly observations)
 AIRPASSENGERS = np.array([
     112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118,
@@ -228,10 +227,17 @@ class TestRComparisonWithR:
 
     def test_aicc_reference_value(self, fitted_seasonal):
         """
-        AICc matches the value recorded from the Python run.
+        AICc matches the AICc of the *best* model found over the orders pool.
 
-        R reference: auto.msarima(AirPassengers, orders=list(ar=c(2,1),i=c(2,1),
-        ma=c(2,1)), lags=c(1,12))$ICs["AICc"] ≈ 1101.64.
+        For AirPassengers, the lowest-AICc model in the
+        `(ar=c(2,1), i=c(2,1), ma=c(2,1)), lags=c(1,12)` search space is
+        ARIMA([0,1], [1,0], [1,0])[1,12] at AICc = 1101.6409 (R: `adam(y,
+        "NNN", orders=list(ar=c(0,1), i=c(1,0), ma=c(1,0)), lags=c(1,12),
+        distribution="dnorm")` evaluated against `AICc(m)`).  R's
+        `auto.msarima` on the full pool currently picks the bigger
+        ARIMA([0,1], [1,1], [1,1]) at AICc=1108.38 instead, but the
+        smaller model has the strictly lower AICc and is what Python's
+        `AutoMSARIMA` selects.
         """
         expected_aicc = 1101.64
         assert np.isclose(fitted_seasonal.aicc, expected_aicc, rtol=1e-3), (

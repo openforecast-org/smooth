@@ -243,7 +243,7 @@ def _calculate_parameters_number(
     # Handle pure constant model case (no ETS, no ARIMA, no xreg)
     if not ets_info["ets_model"] and not arima_info["arima_model"] and not xreg_info:
         parameters_number[0][0] = 0
-        parameters_number[1][0] = 2  # Matches R code line 3047
+        parameters_number[1][0] = 2  # constant + scale
 
     return parameters_number
     # return {

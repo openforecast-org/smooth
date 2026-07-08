@@ -1,18 +1,18 @@
 ---
 title: "Cran Comments"
 author: "Ivan Svetunkov"
-date: "5 February 2026"
+date: "20 June 2026"
 output: html_document
 ---
-## Update
-Fixed the link to the wiki, and changed the year from 2025 to 2026 in the DESCRIPTION file.
 
 ## Version
-This is ``smooth`` package, v4.4.0
+This is ``smooth`` package, v4.5.0
+
+This release retires the legacy occurrence-ETS code path.
 
 
 ## Test environments
-* local Ubuntu 25.04, R 4.5.1
+* local Ubuntu 26.04, R 4.6.0
 * github actions
 * win-builder (devel and release)
 * rhub v2
@@ -32,7 +32,7 @@ Successful checks for:
 
 - Windows latest release with latest R
 - MacOS 15.7.3 with latest R
-- Ubuntu 24.04.3 LTS with latest R
+- Ubuntu 24.04.4 LTS with latest R
 
 ## win-builder check results
 >* checking package dependencies ... NOTE
@@ -41,7 +41,12 @@ Successful checks for:
 This is expected, because doMC is not available for Windows.
 
 ## R-hub
-All is fine
+Successful checks for:
+
+- Windows Server 2022 x64 (build 26100), R 4.5.0
+- MacOS macOS Sequoia 15.7.7, R 4.5.0
+- MacOS 15.7.3, R 4.5.0
+- Ubuntu 24.04.4 LTS, R 4.5.0
 
 ## Downstream dependencies
 I have also run R CMD check on reverse dependencies of smooth.

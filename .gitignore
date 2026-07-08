@@ -172,4 +172,8 @@ dmypy.json
 # cursor files
 .cursor/
 .claude/
+# but track shared Claude Code skills
+!.claude/
+.claude/*
+!.claude/skills/
 python/tests/speed_tests/benchmark_data/

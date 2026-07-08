@@ -186,6 +186,9 @@ def adam_simulator(
         nETS=int(nNonSeasonal + nSeasonal),
         nArima=int(nArima),
         nXreg=int(nXreg),
+        nComponents=int(
+            nNonSeasonal + nSeasonal + nArima + nXreg + int(bool(constant))
+        ),
         constant=bool(constant),
         adamETS=False,
     )
@@ -218,3 +221,143 @@ def adam_simulator(
         "arrayVt": np.array(result.states),
         "matrixYt": np.array(result.data),
     }
+
+
+def adam_reapply(
+    matrixYt,
+    matrixOt,
+    arrayVt,
+    arrayWt,
+    arrayF,
+    matrixG,
+    lags,
+    indexLookupTable,
+    arrayProfilesRecent,
+    E,
+    T,
+    S,
+    nNonSeasonal,
+    nSeasonal,
+    nArima,
+    nXreg,
+    constant,
+    adamETS,
+    backcast,
+    refineHead,
+):
+    """Wrapper for ``adamCore.reapply()`` — re-runs the in-sample ADAM kernel
+    for ``nsim`` parameter draws and returns the per-draw states, fitted and
+    final profile.
+
+    See ``ADAM.reapply`` for the high-level API.
+    """
+    lags = np.asarray(lags, dtype=np.uint64).ravel()
+
+    adam_core = _adamCore.adamCore(
+        lags=lags,
+        E=E,
+        T=T,
+        S=S,
+        nNonSeasonal=int(nNonSeasonal),
+        nSeasonal=int(nSeasonal),
+        nETS=int(nNonSeasonal + nSeasonal),
+        nArima=int(nArima),
+        nXreg=int(nXreg),
+        nComponents=int(
+            nNonSeasonal + nSeasonal + nArima + nXreg + int(bool(constant))
+        ),
+        constant=bool(constant),
+        adamETS=bool(adamETS),
+    )
+
+    matrixYt = np.asfortranarray(matrixYt, dtype=np.float64)
+    matrixOt = np.asfortranarray(matrixOt, dtype=np.float64)
+    arrayVt = np.asfortranarray(arrayVt, dtype=np.float64)
+    arrayWt = np.asfortranarray(arrayWt, dtype=np.float64)
+    arrayF = np.asfortranarray(arrayF, dtype=np.float64)
+    matrixG = np.asfortranarray(matrixG, dtype=np.float64)
+    indexLookupTable = np.asfortranarray(indexLookupTable, dtype=np.uint64)
+    arrayProfilesRecent = np.asfortranarray(arrayProfilesRecent, dtype=np.float64)
+
+    result = adam_core.reapply(
+        matrixYt=matrixYt,
+        matrixOt=matrixOt,
+        arrayVt=arrayVt,
+        arrayWt=arrayWt,
+        arrayF=arrayF,
+        matrixG=matrixG,
+        indexLookupTable=indexLookupTable,
+        arrayProfilesRecent=arrayProfilesRecent,
+        backcast=bool(backcast),
+        refineHead=bool(refineHead),
+    )
+
+    return {
+        "states": np.array(result.states),
+        "fitted": np.array(result.fitted),
+        "profile": np.array(result.profile),
+    }
+
+
+def adam_reforecast(
+    arrayErrors,
+    arrayOt,
+    arrayWt,
+    arrayF,
+    matrixG,
+    lags,
+    indexLookupTable,
+    arrayProfileRecent,
+    E,
+    T,
+    S,
+    nNonSeasonal,
+    nSeasonal,
+    nArima,
+    nXreg,
+    constant,
+    adamETS=False,
+):
+    """Wrapper for ``adamCore.reforecast()`` — generates ``(h, nsim, nsim)``
+    forecast paths from per-replicate state matrices and per-replicate error
+    samples. See ``ADAM.reforecast`` for the high-level API.
+    """
+    lags = np.asarray(lags, dtype=np.uint64).ravel()
+
+    adam_core = _adamCore.adamCore(
+        lags=lags,
+        E=E,
+        T=T,
+        S=S,
+        nNonSeasonal=int(nNonSeasonal),
+        nSeasonal=int(nSeasonal),
+        nETS=int(nNonSeasonal + nSeasonal),
+        nArima=int(nArima),
+        nXreg=int(nXreg),
+        nComponents=int(
+            nNonSeasonal + nSeasonal + nArima + nXreg + int(bool(constant))
+        ),
+        constant=bool(constant),
+        adamETS=bool(adamETS),
+    )
+
+    arrayErrors = np.asfortranarray(arrayErrors, dtype=np.float64)
+    arrayOt = np.asfortranarray(arrayOt, dtype=np.float64)
+    arrayWt = np.asfortranarray(arrayWt, dtype=np.float64)
+    arrayF = np.asfortranarray(arrayF, dtype=np.float64)
+    matrixG = np.asfortranarray(matrixG, dtype=np.float64)
+    indexLookupTable = np.asfortranarray(indexLookupTable, dtype=np.uint64)
+    arrayProfileRecent = np.asfortranarray(arrayProfileRecent, dtype=np.float64)
+
+    result = adam_core.reforecast(
+        arrayErrors=arrayErrors,
+        arrayOt=arrayOt,
+        arrayWt=arrayWt,
+        arrayF=arrayF,
+        matrixG=matrixG,
+        indexLookupTable=indexLookupTable,
+        arrayProfileRecent=arrayProfileRecent,
+        E=E,
+    )
+
+    return {"data": np.array(result.data)}

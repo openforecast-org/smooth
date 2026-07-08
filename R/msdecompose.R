@@ -109,7 +109,7 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
                     X <- cbind(1L, dummies, seq_len(n));
                 }
             }
-            return(y - .lm.fit(X, y)$residuals);
+            return(as.vector(X %*% olsCpp(X, y)));
         }
     }
 
@@ -146,8 +146,8 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
     if(any(yNAValues)){
         X <- cbind(1,poly(c(1:obsInSample),degree=min(max(trunc(obsInSample/10),1),5)),
                    sinpi(matrix(c(1:obsInSample)*rep(c(1:lagsMax),each=obsInSample)/lagsMax, ncol=lagsMax)));
-        lmFit <- .lm.fit(X[!yNAValues,,drop=FALSE], matrix(yInsample[!yNAValues],ncol=1));
-        yInsample[yNAValues] <- (X %*% coef(lmFit))[yNAValues];
+        b <- olsCpp(X[!yNAValues,,drop=FALSE], yInsample[!yNAValues]);
+        yInsample[yNAValues] <- (X %*% b)[yNAValues];
         rm(X)
     }
 

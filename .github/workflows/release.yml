@@ -1,217 +1,63 @@
-name: Build and Release
+name: Publish release to PyPI
 
+# Triggered when a GitHub release is published (i.e. you go to the
+# repo's Releases page and click "Publish release" on a draft).
+#
+# The flow:
+#   1. ``build-release-wheels.yml`` (manual) builds the wheels +
+#      sdist and attaches them to a *draft* release with the tag the
+#      user supplied. Re-running replaces the assets in place.
+#   2. User reviews the draft in the GitHub UI, edits release notes
+#      as desired, then clicks "Publish release".
+#   3. That click creates the git tag at ``target_commitish`` AND
+#      fires the ``release: published`` event that runs this
+#      workflow.
+#   4. This workflow downloads the assets that were just attached to
+#      the now-published release and uploads them to PyPI with
+#      PEP 740 attestations.
 on:
-  push:
-    tags:
-      - 'v*.*.*'  # Trigger on version tags like v1.0.0, v0.1.2, etc.
-  workflow_dispatch:  # Allow manual triggering
-    inputs:
-      platforms:
-        description: 'Platforms to build for'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
-          - ubuntu-windows
-          - ubuntu-macos
-          - windows-macos
+  release:
+    types: [published]
+
+# Opt every JavaScript action into the Node.js 24 runtime — GitHub
+# deprecates Node 20 on 2026-06-02 and removes it on 2026-09-16.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  setup:
-    name: Determine build matrix
+  publish:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            case "${{ github.event.inputs.platforms }}" in
-              "ubuntu-latest")
-                echo 'matrix=["ubuntu-latest"]' >> $GITHUB_OUTPUT
-                ;;
-              "windows-latest")
-                echo 'matrix=["windows-latest"]' >> $GITHUB_OUTPUT
-                ;;
-              "macos-latest")
-                echo 'matrix=["macos-latest"]' >> $GITHUB_OUTPUT
-                ;;
-              "ubuntu-windows")
-                echo 'matrix=["ubuntu-latest","windows-latest"]' >> $GITHUB_OUTPUT
-                ;;
-              "ubuntu-macos")
-                echo 'matrix=["ubuntu-latest","macos-latest"]' >> $GITHUB_OUTPUT
-                ;;
-              "windows-macos")
-                echo 'matrix=["windows-latest","macos-latest"]' >> $GITHUB_OUTPUT
-                ;;
-              *)
-                echo 'matrix=["ubuntu-latest","windows-latest","macos-latest"]' >> $GITHUB_OUTPUT
-                ;;
-            esac
-          else
-            # Default for automatic triggers (tags, branches)
-            echo 'matrix=["ubuntu-latest","windows-latest","macos-latest"]' >> $GITHUB_OUTPUT
-          fi
-
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    needs: setup
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJson(needs.setup.outputs.matrix) }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive  # Initialize and checkout all submodules including carma
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel
-
-      - name: Build wheels
-        run: python -m cibuildwheel python --output-dir wheelhouse
-        env:
-          # Configure which Python versions to build for
-          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
-          # Skip 32-bit builds and musllinux
-          CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux*"
-          
-          # Install system dependencies for BLAS/LAPACK
-          # Linux: Install OpenBLAS and LAPACK
-          CIBW_BEFORE_BUILD_LINUX: yum install -y openblas-devel lapack-devel || dnf install -y openblas-devel lapack-devel
-          
-          # macOS: Install OpenBLAS via brew
-          CIBW_BEFORE_BUILD_MACOS: brew install openblas || true
-          
-          # Windows: Install NumPy (which provides OpenBLAS via our CMake fix)
-          CIBW_BEFORE_BUILD_WINDOWS: pip install numpy
-          
-          # Run tests after building
-          CIBW_TEST_REQUIRES: pytest numpy
-          CIBW_TEST_COMMAND: "pytest {project}/python/tests"
-          
-          # macOS: Build for both x86_64 and arm64
-          CIBW_ARCHS_MACOS: "x86_64 arm64"
-          
-          # Linux: Use manylinux2014 for broad compatibility
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
-
-      - name: Upload wheels as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-${{ matrix.os }}
-          path: ./wheelhouse/*.whl
-          retention-days: 5
-
-  build_sdist:
-    name: Build source distribution
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive  # Initialize and checkout all submodules
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install build
-        run: python -m pip install build
-
-      - name: Build sdist
-        run: python -m build --sdist python
-
-      - name: Upload sdist as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdist
-          path: ./python/dist/*.tar.gz
-          retention-days: 5
-
-  create_release:
-    name: Create GitHub Release
-    needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Required to create releases
-    # Only create release on tag pushes, not on Python branch pushes or manual runs
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-
-      - name: Display structure of downloaded files
-        run: ls -R dist/
-
-      - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          body: |
-            ## Installation
-
-            ```bash
-            pip install smooth
-            ```
-            
-            Or install from this release:
-            ```bash
-            pip install <wheel-file-for-your-platform>
-            ```
-            
-            ## What's Changed
-            See the release notes below.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Optional: Upload to PyPI
-  # Uncomment this job when you're ready to publish to PyPI
-  upload_pypi:
-    name: Upload to PyPI
-    needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
-    # Only upload to PyPI on tag pushes
-    if: startsWith(github.ref, 'refs/tags/')
     environment:
       name: pypi
       url: https://pypi.org/p/smooth
     permissions:
-      id-token: write  # Required for trusted publishing
+      id-token: write       # trusted publishing
+      attestations: write   # PEP 740 / Sigstore attestations
+      contents: read        # gh release download
+
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir -p dist
+          # ``gh release download`` pulls every asset attached to
+          # the release into ``dist/``. The wheels + sdist that
+          # build-release-wheels.yml staged on the draft are the
+          # exact files we publish to PyPI.
+          gh release download "$TAG" --repo "${{ github.repository }}" --dir dist
+          ls -R dist/
 
-      - name: Display downloaded files
-        run: ls -R dist/
-
-      - name: Publish to PyPI
+      - name: Publish to PyPI (with PEP 740 attestations)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist
+          # SLSA Build Level 3 in-toto attestation per file,
+          # signed via Sigstore using the runner's OIDC identity,
+          # uploaded to PyPI alongside the wheel.
+          attestations: true
+          # Retry-safe: if the publish step gets re-run for any
+          # reason, already-uploaded files are skipped instead of
+          # blowing up the whole upload.
+          skip-existing: true

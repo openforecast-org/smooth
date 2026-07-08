@@ -1,13 +1,16 @@
-.PHONY: all lint test install environment
+.PHONY: all lint mypy test install environment
 
 SRC_DIR = smooth
 
-lint: 
-	flake8 $(SRC_DIR)
-	pydocstyle $(SRC_DIR)
+lint:
+	ruff check src/$(SRC_DIR)
+	ruff format --check src/$(SRC_DIR)
+
+mypy:
+	mypy src/$(SRC_DIR)
 
 test:
-	pytest $(SRC_DIR)
+	pytest tests/
 
 install:
 	pip install -e ".[dev]"

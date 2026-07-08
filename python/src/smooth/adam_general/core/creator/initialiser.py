@@ -698,7 +698,7 @@ def initialiser(
                         else:
                             Bl[j : j + lag - 1] = 0
                             Bu[j : j + lag - 1] = np.inf
-                        names.extend([f"seasonal_{m}" for m in range(2, lag)])
+                        names.extend([f"seasonal{k + 1}_{m}" for m in range(1, lag)])
                         j += lag - 1
             else:
                 # Get the correct seasonal component index and lag
@@ -713,7 +713,7 @@ def initialiser(
                 else:
                     Bl[j : j + temp_lag - 1] = 0
                     Bu[j : j + temp_lag - 1] = np.inf
-                # names.extend([f"seasonal_{m}" for m in range(2, temp_lag)])
+                names.extend([f"seasonal_{m}" for m in range(1, temp_lag)])
                 j += temp_lag - 1
     if (
         initials_checked["initial_type"] not in ["backcasting", "complete"]
@@ -727,7 +727,7 @@ def initialiser(
             - 1,
             : initials_checked["initial_arima_number"],
         ]
-        # Normalize by ARI polynomial tail (matches R lines 1684-1686)
+        # Normalise the ARIMA initial state by the tail of the ARI polynomial.
         if adam_cpp is not None:
             n_ar = (
                 sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
@@ -874,7 +874,17 @@ def initialiser(
         j += 1
         B[j - 1] = other_value
         names.append("other")
-        Bl[j - 1] = 0.25  # penalty kicks in below 0.25 (cost_functions.py:323)
+        # Match R's `adam_checkOptimizer` (R/utils-adam.R:241ff) which uses a
+        # near-zero lower bound on the distribution shape parameter. A
+        # tighter bound (we previously used 0.25) changes NLopt's bounded
+        # initial simplex even when the boundary is never active at the
+        # optimum, which made Python's Nelder-Mead land in a different
+        # local minimum than R's nloptr on the same cost surface (e.g.
+        # AirPassengers with model="MAM", distribution="dgnorm"). The
+        # soft penalty for shape < 0.25 in ``cost_functions.py`` still
+        # protects against the genuinely-pathological region where the
+        # density becomes too peaked.
+        Bl[j - 1] = 1e-10
         Bu[j - 1] = np.inf
     return {"B": B, "Bl": Bl, "Bu": Bu, "names": names}
 
@@ -1145,10 +1155,10 @@ def _calculate_initial_parameters_and_bounds(
 
     # --- Populate B, Bl, Bu, names based on old initialiser logic ---
 
-    # Determine model-specific initial values for persistence parameters
-    #  R has special initialization for "mixed" models (models with both A and M
-    # components)
-    # See R/adam.R lines 1450-1485
+    # Determine model-specific initial values for persistence parameters.
+    # "Mixed" ETS specifications (models that combine additive and
+    # multiplicative components) need their own seeds because the additive
+    # defaults would put the optimiser on a flat/penalty plateau.
     initial_type = initials_checked.get("initial_type")
     is_mixed = (
         ets_model

@@ -1,7 +1,7 @@
-"""Automatic Occurrence Model Selection (AutoOM): port of R's ``auto.om()``.
+"""Automatic Occurrence Model Selection (AutoOM).
 
-Tries each occurrence type from ``occurrence`` and returns the model with the
-lowest information criterion.
+Fits an :class:`OM` (or :class:`OMG`) for each candidate occurrence type and
+returns the model with the lowest information criterion.
 """
 
 from __future__ import annotations
@@ -31,13 +31,12 @@ def _get_ic(model: Union[OM, OMG], ic_name: str) -> float:
 
 
 class AutoOM:
-    """Automatic occurrence model selection — port of R's ``auto.om()``.
+    """Automatic occurrence-model selection.
 
     Fits an :class:`OM` (or :class:`OMG`) for each entry in ``occurrence``
     and returns the best-fitting model (lowest IC) directly.  The returned
     object is a plain :class:`OM` or :class:`OMG` with one extra attribute
-    ``time_elapsed_`` (total selection time in seconds), matching R's
-    ``$timeElapsed`` on the returned ``om`` object.
+    ``time_elapsed_`` (total selection time in seconds).
 
     Parameters
     ----------

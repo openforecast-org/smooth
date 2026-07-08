@@ -908,13 +908,8 @@ def selector(
 
     **Model Combination (CCC)**:
 
-    The "CCC" option for combining model forecasts using IC weights is mentioned in
-    R documentation but not fully implemented in Python version yet. Use "ZZZ" for
-    selection instead.
-
-    **Equivalent to R's auto.adam()**:
-
-    This function implements Python equivalent of R's `auto.adam()` from smooth package.
+    The "CCC" option for combining model forecasts using IC weights is not
+    yet implemented. Use "ZZZ" for selection instead.
 
     See Also
     --------

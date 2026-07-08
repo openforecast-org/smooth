@@ -1,0 +1,263 @@
+name: Build release wheels
+
+# Builds release-quality Python wheels and stages them on a **draft**
+# GitHub release. Run manually; the workflow does not publish to PyPI
+# and does not create a git tag. The draft release is the "staging
+# area" — re-running this workflow with the same ``tag`` input
+# replaces the draft's assets in place, so build failures are
+# fully recoverable.
+#
+# Once the draft looks right, going to the repo's Releases page and
+# clicking "Publish release" creates the git tag and fires
+# release.yml, which uploads the just-attached wheels to PyPI.
+#
+# PR-time / push-to-master continues to go through python_ci.yml,
+# which is intentionally lighter.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for the draft release (e.g. v1.0.6). Re-runs with the same tag replace the existing draft.'
+        required: true
+        type: string
+
+# Opt every JavaScript action (including those bundled inside
+# ``pypa/cibuildwheel@v3.1``, e.g. ``actions/setup-python@v5``) into
+# the Node.js 24 runtime. GitHub deprecates Node.js 20 on 2026-06-02
+# and removes it on 2026-09-16; this env var is the documented opt-in
+# mechanism for the transition period.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build_wheels:
+    name: Build ${{ matrix.cibw-build }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The ``tag`` field is an artifact- and cache-key-safe version
+        # of ``cibw-build`` — GitHub Actions expression syntax has no
+        # ``replace()`` function, so the ``*`` glob would otherwise
+        # leak into artifact names and break the upload step.
+        include:
+          # Linux: cp311–cp314 manylinux
+          - { os: ubuntu-latest,  cibw-build: 'cp311-manylinux*', tag: 'cp311-linux' }
+          - { os: ubuntu-latest,  cibw-build: 'cp312-manylinux*', tag: 'cp312-linux' }
+          - { os: ubuntu-latest,  cibw-build: 'cp313-manylinux*', tag: 'cp313-linux' }
+          - { os: ubuntu-latest,  cibw-build: 'cp314-manylinux*', tag: 'cp314-linux' }
+          # macOS: cp311–cp313 (cp314 not yet on macOS x86_64 — same
+          # skip rule release.yml uses today). Glob matches both
+          # x86_64 and arm64 — the row produces both wheels.
+          - { os: macos-latest,   cibw-build: 'cp311-macosx*',    tag: 'cp311-macos' }
+          - { os: macos-latest,   cibw-build: 'cp312-macosx*',    tag: 'cp312-macos' }
+          - { os: macos-latest,   cibw-build: 'cp313-macosx*',    tag: 'cp313-macos' }
+          # Windows: cp311–cp313. Pinned to ``windows-2025``, mirroring
+          # python_ci.yml; ``windows-latest`` rolls forward to a VS18 /
+          # MSVC 14.51 preview toolchain whose cmd.exe parser behaviour
+          # we haven't validated against the ``CIBW_BEFORE_ALL_WINDOWS``
+          # ``if exist ... else ...`` short-circuit below.
+          - { os: windows-2025,   cibw-build: 'cp311-win_amd64',  tag: 'cp311-win' }
+          - { os: windows-2025,   cibw-build: 'cp312-win_amd64',  tag: 'cp312-win' }
+          - { os: windows-2025,   cibw-build: 'cp313-win_amd64',  tag: 'cp313-win' }
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      # Cache the OpenMathLib OpenBLAS install tree on Windows. The
+      # download + extract in CIBW_BEFORE_ALL_WINDOWS takes ~30-60s
+      # per run; with a cache hit it's a no-op. Keyed on the OpenBLAS
+      # release version so a bump invalidates the cache automatically.
+      # See header note in python_ci.yml for why we dropped the
+      # earlier vcpkg ``openblas + lapack-reference`` chain (vcpkg's
+      # ``vcpkg-gfortran`` silently switched to LLVMFlang, which
+      # fails to build ``lapack-reference 3.12.1``).
+      - name: Cache OpenBLAS (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: C:\openblas
+          key: openblas-windows-0.3.33
+
+      # Cache Homebrew's bottle download tree on macOS. ``brew install
+      # openblas`` still runs (so symlinks / dependency-resolution stay
+      # correct) but skips the ~100 MB bottle download on cache hit.
+      - name: Cache Homebrew downloads (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: brew-openblas-${{ runner.os }}-${{ runner.arch }}
+
+      # Cache cibuildwheel's per-OS interpreter / pip download cache.
+      # Saves ~1-2 minutes per matrix row by reusing CPython binaries
+      # and the pip wheel cache that cibuildwheel populates inside
+      # the build environment. Scoped per (OS × Python build tag) so
+      # cache entries don't shadow each other.
+      - name: Cache cibuildwheel
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/cibuildwheel
+            ~/AppData/Local/Temp/cibuildwheel/Cache
+          key: cibuildwheel-${{ matrix.tag }}-v1
+
+      - name: Build & test wheels
+        uses: pypa/cibuildwheel@v3.1
+        with:
+          package-dir: python
+          output-dir: wheelhouse
+        env:
+          CIBW_BUILD: ${{ matrix.cibw-build }}
+          # Skip 32-bit + musllinux; the cp314-macosx_x86_64 wheel
+          # is excluded by not having a matrix row for it.
+          CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux*"
+
+          CIBW_ARCHS_LINUX: x86_64
+          CIBW_ARCHS_MACOS: x86_64 arm64
+          CIBW_ARCHS_WINDOWS: AMD64
+
+          # Linux: install OpenBLAS + LAPACK so CMakeLists' module-mode
+          # ``find_package`` succeeds inside the manylinux container.
+          CIBW_BEFORE_ALL_LINUX: |
+            yum install -y openblas-devel lapack-devel pkgconfig || \
+            (apt-get update && apt-get install -y libopenblas-dev liblapack-dev pkg-config)
+          CIBW_ENVIRONMENT_LINUX: PKG_CONFIG_PATH="/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
+
+          # macOS: brew's openblas ships LAPACK; ``brew install openblas``
+          # is enough for the module-mode find_package path.
+          CIBW_BEFORE_ALL_MACOS: brew install openblas
+
+          # Windows: download the OpenMathLib pre-built OpenBLAS zip
+          # (LAPACK is bundled in ``libopenblas.dll``, no Fortran
+          # compiler needed at build time). ``actions/cache@v4`` above
+          # restores ``C:\openblas`` if a prior run wrote it, so the
+          # ``BEFORE_ALL`` is idempotent: ``if exist ... else (download)``
+          # — re-running ``mkdir C:\openblas`` on a restored cache
+          # would error. cmd.exe's ``if exist ... (Y) else (Z)``
+          # resolves on a single line, so the YAML folded scalar ``>``
+          # joins everything with spaces. CMakeLists.txt picks the
+          # install tree up via ``OPENBLAS_HOME``; ``delvewheel`` then
+          # bundles ``libopenblas.dll`` and its MinGW runtime DLLs
+          # (``libgfortran-5.dll``, ``libgcc_s_seh-1.dll``,
+          # ``libwinpthread-1.dll``) into the wheel.
+          CIBW_BEFORE_ALL_WINDOWS: >
+            if exist C:\openblas\lib\libopenblas.dll.a
+            (echo OpenBLAS cache hit) else
+            (curl -L -o C:/openblas.zip
+            https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.33/OpenBLAS-0.3.33-x64.zip
+            && mkdir C:\openblas
+            && tar -xf C:/openblas.zip -C C:/openblas)
+          CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
+          CIBW_ENVIRONMENT_WINDOWS: >
+            CMAKE_ARGS="-DOPENBLAS_HOME=C:/openblas"
+            OPENBLAS_HOME=C:/openblas
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair -w {dest_dir} {wheel} --add-path C:/openblas/bin
+
+          # Use manylinux_2_28 so scipy/numpy binary wheels resolve in
+          # the test env.
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+
+          CIBW_TEST_REQUIRES: pytest numpy
+          CIBW_TEST_COMMAND: pytest {project}/python/tests -v --tb=short
+
+      - name: Upload wheels as artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          # Use the artifact-safe ``tag`` matrix field instead of
+          # ``cibw-build`` directly — ``actions/upload-artifact``
+          # rejects ``*`` in artifact names (NTFS limitation).
+          name: wheels-${{ matrix.tag }}
+          path: ./wheelhouse/*.whl
+          retention-days: 14
+          if-no-files-found: error
+
+  build_sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'   # caches pip downloads keyed on requirements
+
+      - name: Install build
+        run: python -m pip install build
+
+      - name: Build sdist
+        run: python -m build --sdist python
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: sdist
+          path: ./python/dist/*.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+
+  prepare_draft_release:
+    name: Stage wheels on draft GitHub release
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # creating / updating the draft release
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: 'wheels-*'
+
+      - name: Download sdist artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: sdist
+          path: dist
+
+      - name: List staged files
+        run: ls -R dist/
+
+      - name: Create or update draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          # ``draft: true`` means no git tag is created yet —
+          # GitHub creates it at ``target_commitish`` when the
+          # user clicks "Publish release" in the UI.
+          # Re-running this workflow with the same ``tag_name``
+          # updates the existing draft (assets are replaced).
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ github.sha }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          files: dist/*
+          fail_on_unmatched_files: true
+          body: |
+            ## Installation
+
+            ```bash
+            pip install smooth
+            ```
+
+            ## Verification
+
+            Wheels are signed with [Sigstore](https://www.sigstore.dev/) and ship with [PEP 740 attestations](https://peps.python.org/pep-0740/) — SLSA Build Level 3 provenance. Verify a downloaded wheel:
+
+            ```bash
+            pip install pypi-attestations
+            pypi-attestations verify pypi --repository https://github.com/config-i1/smooth smooth-*.whl
+            ```
+
+            ## What's Changed
+            See the auto-generated release notes below.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

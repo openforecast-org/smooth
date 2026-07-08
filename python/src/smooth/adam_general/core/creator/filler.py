@@ -335,15 +335,24 @@ def filler(
                     )
                     lag = lags_dict["lags"][seasonal_index]
 
-                    matrices_dict["mat_vt"][seasonal_index, : lag - 1] = B[j : j + lag]
+                    # Read lag-1 free seasonal values from B and store them.
+                    # The lag-th seasonal slot is determined by the constraint
+                    # (sum = 0 for additive, product = 1 for multiplicative)
+                    # so it doesn't take a separate B entry. j advances by
+                    # lag-1 below — these three slices must agree.
+                    # Mirrors R's adam_filler (R/utils-adam.R near line 970+):
+                    # ``B[j+2:(lagsModel[...])-1]`` is lag-1 elements.
+                    matrices_dict["mat_vt"][seasonal_index, : lag - 1] = B[
+                        j : j + lag - 1
+                    ]
 
                     if model_type_dict["season_type"] == "A":
                         matrices_dict["mat_vt"][seasonal_index, lag - 1] = -np.sum(
-                            B[j : j + lag]
+                            B[j : j + lag - 1]
                         )
                     else:  # "M"
                         matrices_dict["mat_vt"][seasonal_index, lag - 1] = 1 / np.prod(
-                            B[j : j + lag]
+                            B[j : j + lag - 1]
                         )
 
                     j += lag - 1

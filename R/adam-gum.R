@@ -808,7 +808,8 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
             initialXregEstimate <- TRUE;
         }
 
-        FI <- -hessian(logLikFunction, B, h=stepSize, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt);
+        logLikFunction_FI <- function(B) logLikFunction(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt);
+        FI <- -hessianCpp(logLikFunction_FI, B, h=stepSize);
         colnames(FI) <- rownames(FI) <- names(B);
 
         if(any(substr(names(B),1,1)=="g")){

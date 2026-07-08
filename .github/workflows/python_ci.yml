@@ -7,26 +7,45 @@ on:
       - '.github/workflows/python_ci.yml'
   workflow_dispatch:
 
+# Opt every JavaScript action (including those bundled inside
+# ``pypa/cibuildwheel@v3.1``, e.g. ``actions/setup-python@v5``) into
+# the Node.js 24 runtime. GitHub deprecates Node.js 20 on 2026-06-02
+# and removes it on 2026-09-16; this env var is the documented opt-in
+# mechanism for the transition period.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+          # Cache pip's download tree so ``pip install ruff mypy`` hits
+          # the cache on subsequent runs. ``cache: 'pip'`` keys on every
+          # discoverable lockfile / requirements file in the checkout;
+          # there isn't one for ruff+mypy specifically, so the key
+          # degrades to the python-version + OS pair, which is fine —
+          # ruff/mypy are pinned in the Install step below anyway.
+          cache: 'pip'
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Install ruff and mypy
+        run: pip install ruff mypy
 
       - name: Run ruff linter
         run: ruff check python/src/smooth/
 
       - name: Run ruff formatter check
         run: ruff format --check python/src/smooth/
+
+      - name: Run mypy
+        working-directory: python
+        run: mypy src/smooth
 
   build-and-test:
     name: Build & Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
@@ -46,22 +65,52 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.13"
             cibw-build: "cp313-manylinux*"
+          - os: ubuntu-latest
+            python-version: "3.14"
+            cibw-build: "cp314-manylinux*"
           # macOS
           - os: macos-latest
             python-version: "3.11"
             cibw-build: "cp311-macosx*"
-          # Windows
-          - os: windows-latest
+          # Windows — pin to windows-2025 (newer Server 2025 host, but
+          # still a stable VS17 toolchain on GitHub's image) rather than
+          # ``windows-latest``. ``windows-latest`` now rolls to a VS18 /
+          # MSVC 14.51.36231 preview toolchain that openblas 0.3.33 (the
+          # vcpkg port we pull in CIBW_BEFORE_ALL_WINDOWS) doesn't
+          # compile under, killing the ``vcpkg install
+          # openblas:x64-windows-release`` step.
+          - os: windows-2025
             python-version: "3.11"
             cibw-build: "cp311-win_amd64"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
+      # Cache the OpenMathLib OpenBLAS install tree on Windows. The
+      # download + extract in CIBW_BEFORE_ALL_WINDOWS takes ~30-60s
+      # per run; with a cache hit it's a no-op. Keyed on the OpenBLAS
+      # release version so a bump invalidates the cache automatically.
+      - name: Cache OpenBLAS (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: C:\openblas
+          key: openblas-windows-0.3.33
+
+      # Cache Homebrew's bottle download tree on macOS. ``brew install
+      # openblas`` still runs (so symlinks / dependency-resolution stay
+      # correct) but skips the ~100 MB bottle download on cache hit.
+      - name: Cache Homebrew downloads (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: brew-openblas-${{ runner.os }}-${{ runner.arch }}
+
       - name: Build and test with cibuildwheel
-        uses: pypa/cibuildwheel@v2.21
+        uses: pypa/cibuildwheel@v3.1
         with:
           package-dir: python
           output-dir: wheelhouse
@@ -75,9 +124,40 @@ jobs:
             (apt-get update && apt-get install -y libopenblas-dev liblapack-dev pkg-config)
           CIBW_ENVIRONMENT_LINUX: PKG_CONFIG_PATH="/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
           CIBW_BEFORE_ALL_MACOS: brew install openblas
-          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas:x64-windows-release lapack:x64-windows-release
+          # Stop using vcpkg for BLAS/LAPACK on Windows. The vcpkg
+          # ``openblas`` port does not bundle LAPACK kernels, so we
+          # used to pair it with ``lapack-reference``, which in turn
+          # needs a Fortran compiler. vcpkg's bundled Fortran
+          # (``vcpkg-gfortran``) silently switched to LLVMFlang
+          # somewhere in early 2025, and LLVMFlang 22.x doesn't build
+          # ``lapack-reference 3.12.1`` — every recent CI run dies
+          # there.
+          #
+          # OpenBLAS publishes pre-built Windows binaries on GitHub
+          # that already include LAPACK in ``libopenblas.dll`` (no
+          # Fortran compiler needed at build time). Download the
+          # release zip, extract it, and let CMakeLists.txt pick it
+          # up via ``OPENBLAS_HOME``. ``delvewheel`` then bundles the
+          # OpenBLAS DLL and its MinGW runtime DLLs
+          # (``libgfortran-5.dll``, ``libgcc_s_seh-1.dll``,
+          # ``libwinpthread-1.dll``) into the wheel.
+          # ``actions/cache@v4`` (Windows step above) restores
+          # ``C:\openblas`` if a prior run wrote it. Skip the download
+          # in that case — re-running ``mkdir C:\openblas`` would fail
+          # and re-extracting would be wasted work. cmd.exe's
+          # ``if exist ... (Y) else (Z)`` resolves on a single line, so
+          # the YAML folded scalar ``>`` joins everything with spaces.
+          CIBW_BEFORE_ALL_WINDOWS: >
+            if exist C:\openblas\lib\libopenblas.dll.a
+            (echo OpenBLAS cache hit) else
+            (curl -L -o C:/openblas.zip
+            https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.33/OpenBLAS-0.3.33-x64.zip
+            && mkdir C:\openblas
+            && tar -xf C:/openblas.zip -C C:/openblas)
           CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
-          CIBW_ENVIRONMENT_WINDOWS: CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-release"
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair -w {dest_dir} {wheel} --add-path C:/vcpkg/installed/x64-windows-release/bin
+          CIBW_ENVIRONMENT_WINDOWS: >
+            CMAKE_ARGS="-DOPENBLAS_HOME=C:/openblas"
+            OPENBLAS_HOME=C:/openblas
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair -w {dest_dir} {wheel} --add-path C:/openblas/bin
           CIBW_TEST_REQUIRES: pytest numpy
           CIBW_TEST_COMMAND: pytest {project}/python/tests -v --tb=short

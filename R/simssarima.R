@@ -653,7 +653,7 @@ sim.ssarima <- function(orders=list(ar=0,i=1,ma=1), lags=1,
                                       arrF,
                                       matG,
                                       indexLookupTable, profilesRecentArray,
-                                      Etype);
+                                      Etype, TRUE);
 
     if(all(probability == 1)){
         matYt <- simulateddata$data;

@@ -224,7 +224,6 @@ omg <- function(data,
 
     occurrenceModel <- FALSE
     yFitted         <- matrix(rep(mean(oInSample), obsInSample), ncol=1)
-    refineHead      <- TRUE
 
     #### Optimiser settings ####
     optimSettings <- adam_checkOptimizer(ellipsis=ellipsis, loss=loss,
@@ -651,7 +650,7 @@ omg <- function(data,
             # Shared
             bounds=bounds, regressors=regressorsA,
             ot=ot, otLogical=otLogical, obsInSample=obsInSample,
-            nIterations=nIterations, refineHead=refineHead,
+            nIterations=nIterations,
             nParamsA=nParamsA,
             loss=loss, lossFunction=omgUserLossFunction, lambda=lambda)
 
@@ -911,7 +910,7 @@ omg <- function(data,
             adamArchitect$indexLookupTable, prof,
             as.numeric(ot), as.numeric(ot),
             any(checker$initialType == c("complete","backcasting")),
-            nIterations, refineHead, occurrenceChar)
+            nIterations, occurrenceChar)
 
         yFitted <- adamFitted$fitted
 
@@ -1264,7 +1263,7 @@ omgCF_local <- function(B,
                         # Shared
                         bounds, regressors,
                         ot, otLogical, obsInSample,
-                        nIterations, refineHead, nParamsA,
+                        nIterations, nParamsA,
                         loss = "likelihood",
                         lossFunction = NULL,
                         lambda = 0) {
@@ -1354,7 +1353,7 @@ omgCF_local <- function(B,
         indexLookupTableB, profilesRecentTableB,
         as.numeric(ot),
         any(initialTypeA == c("complete","backcasting")),
-        nIterations, refineHead)
+        nIterations)
 
     pCombined <- omgLinkFunction(res$fittedA, res$fittedB, EtypeA, EtypeB)
 

@@ -618,6 +618,11 @@ def generate_simulation_interval(
     # 8. Call adam_cpp.simulate() with the prepared inputs
     # Note: E, T, S, nNonSeasonal, nSeasonal, nArima, nXreg, constant are set
     # during adamCore construction
+    # refineHead=False: this is the forecast-interval path; ``arr_vt``'s first
+    # ``lagsModelMax`` columns hold the fitted tail of the state matrix (not
+    # a raw initialiser output), so no head walk is required — and the sliced
+    # ``lookup`` has only ``h`` columns, so calling refineHeadFwd on it would
+    # read out of bounds when ``lagsModelMax > h``.
     sim_result = adam_cpp.simulate(
         matrixErrors=mat_errors_f,
         matrixOt=mat_ot_f,
@@ -628,6 +633,7 @@ def generate_simulation_interval(
         indexLookupTable=lookup_f,
         profilesRecent=profiles_recent,
         E=e_type_modified,
+        refineHead=False,
     )
 
     y_simulated = sim_result.data  # Shape: (h, nsim)

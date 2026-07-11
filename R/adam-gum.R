@@ -289,10 +289,6 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         modelIsMultiplicative <- FALSE;
     }
 
-    # This is the variable needed for the C++ code to determine whether the head of data needs to be
-    # refined.
-    refineHead <- TRUE;
-
     ##### Elements of GUM #####
     filler <- function(B, vt, matF, vecG, matWt){
 
@@ -358,8 +354,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                   elements$matF, elements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations,
-                                  refineHead, "n");
+                                  any(initialType==c("complete","backcasting")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -429,10 +424,6 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     if(!is.null(initialValue)){
         initialType <- "provided";
     }
-
-    # if(initialType=="provided"){
-    #     refineHead[] <- FALSE;
-    # }
 
     orders <- ordersOriginal;
     lags <- lagsOriginal;
@@ -838,8 +829,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                               matF, vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations,
-                              refineHead, "n");
+                              any(initialType==c("complete","backcasting")), nIterations, "n");
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;

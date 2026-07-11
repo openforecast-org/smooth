@@ -140,8 +140,6 @@ reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ..
     gumModel <- gumChecker(object);
     ssarimaModel <- ssarimaChecker(object);
 
-    refineHead <- TRUE;
-
     # Get componentsNumberETS, seasonal and componentsNumberARIMA
     componentsDefined <- componentsDefiner(object);
     componentsNumberETS <- componentsDefined$componentsNumberETS;
@@ -246,6 +244,10 @@ reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ..
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, adamETS);
+    # Drift flips sign in the backcasting backward pass when the total order
+    # of differencing is odd — the ARIMA analog of the ETS trend reversal
+    adamCpp$flipConstant <- constantRequired && !is.null(object$orders) &&
+        (sum(object$orders$i) %% 2 == 1);
 
     # Generate the data from the multivariate normal
     randomParameters <- mvrnorm(nsim, coef(object), vcovAdam);
@@ -758,7 +760,7 @@ reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ..
                                     arrVt, arrWt,
                                     arrF, matG,
                                     indexLookupTable, profilesRecentArray,
-                                    any(object$initialType==c("backcasting","complete")), refineHead)
+                                    any(object$initialType==c("backcasting","complete")))
 
     arrVt[] <- adamRefitted$states;
     fittedMatrix[] <- adamRefitted$fitted * as.vector(pt);

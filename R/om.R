@@ -433,7 +433,6 @@ om <- function(data,
     occurrenceModel <- FALSE;
     oesModel <- NULL;
     yFitted <- matrix(rep(mean(yInSample), obsInSample), ncol=1);
-    refineHead <- TRUE;
     adamETS <- (ets == "adam");
 
     #### Optimiser settings ####
@@ -676,7 +675,7 @@ om <- function(data,
             constantEstimate=constantEstimate,
             bounds=bounds, regressors=regressors, loss=loss,
             ot=ot, otLogical=otLogical, obsInSample=obsInSample,
-            nIterations=nIterations, refineHead=refineHead,
+            nIterations=nIterations,
             occurrence=occurrence, occurrenceChar=occurrenceChar,
             adamCpp=adamCpp,
             lambda=lambda, lossFunction=lossFunction);
@@ -871,7 +870,7 @@ om <- function(data,
                                                 adamArchitect$indexLookupTable, prof,
                                                 as.numeric(ot), as.numeric(ot),
                                                 any(initialType == c("complete","backcasting")),
-                                                nIterations, refineHead, occurrenceChar);
+                                                nIterations, occurrenceChar);
         yFitted <- omLinkFunction(adamFitted$fitted, nla$Etype, occurrence);
 
         # For "fixed" occurrence the optimizer never ran, so logLikADAMValue is absent.
@@ -1359,7 +1358,7 @@ om <- function(data,
             constantEstimate=constantEstimate,
             bounds=bounds, regressors=regressors, loss=loss,
             ot=ot, otLogical=otLogical, obsInSample=obsInSample,
-            nIterations=nIterations, refineHead=refineHead,
+            nIterations=nIterations,
             occurrence=occurrence, occurrenceChar=occurrenceChar,
             adamCpp=adamArchitectUse$adamCpp);
 
@@ -1716,7 +1715,7 @@ omCF_local <- function(B,
                        constantRequired, constantEstimate,
                        bounds, regressors, loss,
                        ot, otLogical, obsInSample,
-                       nIterations, refineHead,
+                       nIterations,
                        occurrence, occurrenceChar,
                        adamCpp,
                        lambda = 0, lossFunction = NULL){
@@ -1763,7 +1762,7 @@ omCF_local <- function(B,
                               indexLookupTable, profilesRecentTable,
                               as.numeric(ot), as.numeric(ot),
                               any(initialType == c("complete","backcasting")),
-                              nIterations, refineHead, occurrenceChar);
+                              nIterations, occurrenceChar);
     yFitted <- omLinkFunction(adamFitted$fitted, Etype, occurrence);
     if(any(is.nan(yFitted)) || any(yFitted<0) || any(yFitted>1)){
         return(1e+300);

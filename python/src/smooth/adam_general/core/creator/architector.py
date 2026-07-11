@@ -279,6 +279,16 @@ def architector(
         else False,
         adamETS=adam_ets,
     )
+    # Drift flips sign in the backcasting backward pass when the total order
+    # of ARIMA differencing is odd (time reversal changes the drift by
+    # (-1)^(d+D)) — the ARIMA analog of the ETS trend reversal.
+    adam_cpp.flipConstant = bool(
+        constants_checked
+        and constants_checked.get("constant_required", False)
+        and arima_checked
+        and arima_checked.get("arima_model", False)
+        and sum(arima_checked.get("i_orders") or []) % 2 == 1
+    )
 
     return (
         model_type_dict,
@@ -477,7 +487,10 @@ def adam_profile_creator(
     # it's a list of lists
 
     profiles_recent_table = np.zeros((len(lags_model_all), lags_model_max))
-    index_lookup_table = np.ones((len(lags_model_all), obs_all + lags_model_max))
+    # The extra lags_model_max columns at the end form the "tail" — the cyclic
+    # continuation past the last observation used by the backcasting tail
+    # mirror in the C++ code.
+    index_lookup_table = np.ones((len(lags_model_all), obs_all + 2 * lags_model_max))
     profile_indices = (
         np.arange(1, lags_model_max * len(lags_model_all) + 1)
         .reshape(-1, len(lags_model_all))
@@ -485,28 +498,27 @@ def adam_profile_creator(
     )
 
     # Update matrices based on lagsModelAll
-    # Update matrices based on lagsModelAll
+    obs_all_tail = obs_all + lags_model_max
     for i, lag in enumerate(lags_model_all):
         # Create the matrix with profiles based on the provided lags.
         # For every row, fill the first 'lag' elements from 1 to lag
         profiles_recent_table[i, :lag] = np.arange(1, lag + 1)
 
         # For the i-th row in indexLookupTable, fill with a repeated sequence starting
-        # from lagsModelMax to the end of the row.
+        # from lagsModelMax to the end of the row (including the tail columns).
         # The repeated sequence is the i-th row of profileIndices, repeated enough times
-        # to cover 'obsAll' observations.
+        # to cover 'obsAll' observations plus the tail.
         # '- 1' at the end adjusts these values to Python's zero-based indexing.
-        # Fix the array size mismatch - ensure we're using the correct range
-        index_lookup_table[i, lags_model_max : (lags_model_max + obs_all)] = (
+        index_lookup_table[i, lags_model_max : (lags_model_max + obs_all_tail)] = (
             np.tile(
                 profile_indices[i, : lags_model_all[i]],
-                int(np.ceil(obs_all / lags_model_all[i])),
-            )[:obs_all]
+                int(np.ceil(obs_all_tail / lags_model_all[i])),
+            )[:obs_all_tail]
             - 1
         )
 
         # Fix the head: use order-preserving unique (like R's unique()),
-        # and use the full obs_all slice (not obs_all - 1)
+        # based on the in-sample columns only (tail excluded)
         vals = index_lookup_table[i, lags_model_max : (lags_model_max + obs_all)]
         unique_indices = np.array(list(dict.fromkeys(vals.tolist())))
 

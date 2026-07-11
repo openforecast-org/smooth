@@ -583,9 +583,12 @@ def _initialize_arima_states(
             y_decomposition = y_in_sample[ot_logical][:obs_in_sample]
         else:
             y_decomposition = (
-                np.mean(np.diff(y_in_sample[ot_logical]))
+                np.mean(y_in_sample[ot_logical])
                 if e_type == "A"
-                else np.exp(np.mean(np.diff(np.log(y_in_sample[ot_logical]))))
+                else np.exp(np.mean(np.log(y_in_sample[ot_logical])))
+                # np.mean(np.diff(y_in_sample[ot_logical]))
+                # if e_type == "A"
+                # else np.exp(np.mean(np.diff(np.log(y_in_sample[ot_logical]))))
             )
 
         # Tile using max of original lags (R: ceiling(initialArimaNumber/max(lags)))

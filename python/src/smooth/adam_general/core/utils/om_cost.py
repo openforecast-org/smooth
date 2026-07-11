@@ -180,7 +180,6 @@ def om_cf(  # noqa: N802
         vectorOt=ot,
         backcast=backcast_value,
         nIterations=initials_checked["n_iterations"],
-        refineHead=True,
         O=occurrence_char,
     )
 

@@ -88,7 +88,7 @@ private:
              typename HeadFillFwdFn, typename HeadFillBwdFn,
              typename TrendReversalFn>
     void fitLoopImpl(int obs, int lagsModelMax,
-                     bool backcast, unsigned int nIterations, bool refineHead,
+                     bool backcast, unsigned int nIterations,
                      ForwardFn forwardStep,
                      BackwardFn backwardStep,
                      HeadFillFwdFn headFillFwd,
@@ -96,10 +96,9 @@ private:
                      TrendReversalFn trendReversal) {
         // Loop for the backcast
         for (unsigned int j=1; j<=nIterations; j=j+1) {
-            // Refine the head (in order for it to make sense)
-            // This is only needed for ETS(*,Z,Z) models, with trend.
-            // This is not needed for lagsMax=1, because there is nothing to fill in
-            if(lagsModelMax > 1 && refineHead) {
+            // Refine the head so the initial level/trend land at position -lagsModelMax+1
+            // and walk forward across the head cycle. Skip when lagsModelMax=1 (nothing to fill).
+            if(lagsModelMax > 1) {
                 headFillFwd();
             }
             ////// Run forward
@@ -115,11 +114,36 @@ private:
                     backwardStep(i);
                 }
                 // Fill in the head of the series.
-                if(refineHead) {
-                    headFillBwd();
-                }
+                headFillBwd();
                 // Restore the specific element in the state vector
                 trendReversal();
+            }
+        }
+    }
+
+    // Private helper: refine the head of a state matrix so that the initial
+    // level/trend are placed at column 0 (observation -lagsModelMax+1) and the
+    // trend rows are walked forward one step per column across the head cycle.
+    // Uses this instance's T/E/S/nETS/... members. For the T=='N' case it just
+    // copies the profile into the head columns (no trend to walk).
+    void refineHeadFwd(arma::mat &matVt, arma::mat &profile,
+                       arma::mat const &matF,
+                       arma::umat const &lookup, int lagsModelMax) {
+        if(T != 'N') {
+            // Record the initial profile to the first column
+            matVt.col(0) = profile(lookup.col(0));
+            // Update the head, but only for the trend component
+            for (int i=1; i<lagsModelMax; i=i+1) {
+                profile(lookup.col(i).rows(0,1)) =
+                    adamFvalue(profile(lookup.col(i)),
+                               matF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                               nComponents, constant).rows(0,1);
+                matVt.col(i) = profile(lookup.col(i));
+            }
+        } else {
+            // No trend to walk; just seed the head columns from the profile
+            for (int i=0; i<lagsModelMax; i=i+1) {
+                matVt.col(i) = profile(lookup.col(i));
             }
         }
     }
@@ -257,7 +281,7 @@ public:
                   arma::umat const &indexLookupTable, arma::mat profilesRecent,
                   arma::vec const &vectorYt, arma::vec const &vectorOt,
                   bool const &backcast, unsigned int const &nIterations,
-                  bool const &refineHead, char const &O = 'n') {
+                  char const &O = 'n') {
         /* # matrixVt should have a length of obs + lagsModelMax.
          * # matrixWt is a matrix with nrows = obs
          * # vecG should be a vector
@@ -316,23 +340,8 @@ public:
 
         // How to fill in the head before the forward pass
         auto headFillFwd = [&]() {
-            if(T != 'N') {
-                // Record the initial profile to the first column
-                matrixVt.col(0) = profilesRecent(indexLookupTable.col(0));
-                // Update the head, but only for the trend component
-                for (int i=1; i<lagsModelMax; i=i+1) {
-                    profilesRecent(indexLookupTable.col(i).rows(0,1)) =
-                        adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                                   matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
-                                   nComponents, constant).rows(0,1);
-                    matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
-                }
-            } else {
-                // Record the profile to the head of time series to fill in the state matrix
-                for (int i=0; i<lagsModelMax; i=i+1) {
-                    matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
-                }
-            }
+            refineHeadFwd(matrixVt, profilesRecent, matrixF,
+                          indexLookupTable, lagsModelMax);
         };
 
         // How to fix the head after the bakwards pass
@@ -351,7 +360,7 @@ public:
         };
 
         // Do the fit!
-        fitLoopImpl(obs, lagsModelMax, backcast, nIterations, refineHead,
+        fitLoopImpl(obs, lagsModelMax, backcast, nIterations,
                     forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal);
 
         FitResult result;
@@ -378,8 +387,7 @@ public:
             arma::mat &matrixFB, arma::vec const &vectorGB,
             arma::umat const &indexLookupTableB, arma::mat profilesRecentB,
             arma::vec const &vectorOt,
-            bool const &backcast, unsigned int const &nIterations,
-            bool const &refineHead) {
+            bool const &backcast, unsigned int const &nIterations) {
         int obs = vectorOt.n_rows;
         int lagsModelMaxA = max(lags);
         // Model B may have different lags so we use indexLookupTableB.n_cols
@@ -447,24 +455,10 @@ public:
         };
 
         auto headFillFwd = [&]() {
-            if(T != 'N') {
-                // Record the initial profile to the first column (model A)
-                matrixVtA.col(0) = profilesRecentA(indexLookupTableA.col(0));
-                // Update the head, but only for the trend component
-                for (int i=1; i<lagsModelMaxA; i=i+1) {
-                    profilesRecentA(indexLookupTableA.col(i).rows(0,1)) =
-                        adamFvalue(profilesRecentA(indexLookupTableA.col(i)),
-                                   matrixFA, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
-                                   nComponents, constant).rows(0,1);
-                    matrixVtA.col(i) = profilesRecentA(indexLookupTableA.col(i));
-                }
-            } else {
-                // Record the profile to the head of time series to fill in the state matrix
-                for (int i=0; i<lagsModelMaxA; i=i+1) {
-                    matrixVtA.col(i) = profilesRecentA(indexLookupTableA.col(i));
-                }
-            }
-            // Model B head fill (always non-trend style for simplicity; B typically has no trend)
+            // Model A: full trend-aware refinement via the shared helper
+            refineHeadFwd(matrixVtA, profilesRecentA, matrixFA,
+                          indexLookupTableA, lagsModelMaxA);
+            // Model B: plain copy (B typically has no trend; keep original behaviour)
             for (int i=0; i<lagsModelMaxA; i=i+1) {
                 matrixVtB.col(i) = profilesRecentB(indexLookupTableB.col(i));
             }
@@ -490,7 +484,7 @@ public:
             else if(TB == 'M') { profilesRecentB(1) = 1/profilesRecentB(1); }
         };
 
-        fitLoopImpl(obs, lagsModelMaxA, backcast, nIterations, refineHead,
+        fitLoopImpl(obs, lagsModelMaxA, backcast, nIterations,
                     forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal);
 
         OmFitGeneralResult result;
@@ -569,11 +563,18 @@ public:
         return result;
     }
 
-    // Method 5: Simulator - creates the simulated data based on the SSOE matrices
+    // Method 5: Simulator - creates the simulated data based on the SSOE matrices.
+    // ``refineHead=true`` walks the initial level/trend forward across the seasonal
+    // head so the simulator's first observation reads the same state the fitter
+    // would (used by ``sim.es`` / ``simulate.adam``). ``refineHead=false`` treats
+    // the caller-supplied head columns as already positioned — that path is used
+    // by the forecast-interval simulator, which feeds the fitted tail of the
+    // state matrix rather than a raw initialiser output.
     SimulateResult simulate(arma::mat const &matrixErrors, arma::mat const &matrixOt,
                             arma::cube &arrayVt, arma::mat const &matrixWt,
                             arma::cube const &arrayF, arma::mat const &matrixG,
-                            arma::umat const &indexLookupTable, arma::cube arrayProfile, char const &E){
+                            arma::umat const &indexLookupTable, arma::cube arrayProfile,
+                            char const &E, bool const &refineHead){
 
         unsigned int obs = matrixErrors.n_rows;
         unsigned int nSeries = matrixErrors.n_cols;
@@ -593,6 +594,12 @@ public:
             matrixVt = arrayVt.slice(i);
             matrixF = arrayF.slice(i);
             profilesRecent = arrayProfile.slice(i);
+            // Walk the initial level/trend forward across the head cycle so the
+            // simulator's first observation reads the same state the fitter would.
+            if(lagsModelMax > 1 && refineHead) {
+                refineHeadFwd(matrixVt, profilesRecent, matrixF,
+                              indexLookupTable, lagsModelMax);
+            }
             for(int j=lagsModelMax; j<obsAll; j=j+1) {
                 /* # Measurement equation and the error term */
                 yFitted = adamWvalue(profilesRecent(indexLookupTable.col(j-lagsModelMax)),
@@ -635,7 +642,7 @@ public:
                           arma::cube &arrayVt, arma::cube const &arrayWt,
                           arma::cube const &arrayF, arma::mat const &matrixG,
                           arma::umat const &indexLookupTable, arma::cube arrayProfilesRecent,
-                          bool const &backcast, bool const &refineHead){
+                          bool const &backcast){
 
         int obs = matrixYt.n_rows;
         unsigned int nSeries = matrixG.n_cols;
@@ -655,25 +662,21 @@ public:
         for(unsigned int k=0; k<nSeries; k=k+1){
             // Loop for the backcasting
             for (unsigned int j=1; j<=nIterations; j=j+1) {
-                // Refine the head (in order for it to make sense)
-                if(lagsModelMax>1){
-                    if(refineHead && (T!='N')){
-                        // Record the initial profile to the first column
-                        arrayVt.slice(k).col(0) = arrayProfilesRecent.slice(k).elem(indexLookupTable.col(0));
-
-                        for(int i=1; i<lagsModelMax; i=i+1) {
-                            arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                                adamFvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                           arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                            arrayVt.slice(k).col(i) = arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i));
-                        }
-                    }
-                    else if(refineHead){
-                        // Record the profile to the head of time series to fill in the state matrix
-                        for (int i=0; i<lagsModelMax; i=i+1) {
-                            arrayVt.slice(k).col(i) = arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i));
-                        }
-                    }
+                // Refine the head via the shared helper so it is walked one step
+                // per column across the head cycle (or copied verbatim when T=='N').
+                if(lagsModelMax > 1) {
+                    // Bind slice views so refineHeadFwd can mutate them via references.
+                    arma::mat sliceVt = arrayVt.slice(k);
+                    arma::mat sliceProfile = arrayProfilesRecent.slice(k);
+                    arma::mat sliceF = arrayF.slice(k);
+                    // Note: reapply's original branch used the full profile column,
+                    // not just the trend rows, so we call refineHeadFwd once here to
+                    // match — the helper writes the trend-walked value into the
+                    // level+trend rows and preserves the seasonal via the profile.
+                    refineHeadFwd(sliceVt, sliceProfile, sliceF,
+                                  indexLookupTable, lagsModelMax);
+                    arrayVt.slice(k) = sliceVt;
+                    arrayProfilesRecent.slice(k) = sliceProfile;
                 }
                 // Loop for the model construction
                 for(int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
@@ -744,13 +747,11 @@ public:
                                                   matrixG.col(k), vecErrors(i-lagsModelMax), matYfit(i-lagsModelMax,k), adamETS);
                     }
 
-                    if(refineHead){
-                        // Fill in the head of the series.
-                        for(int i=lagsModelMax-1; i>=0; i=i-1) {
-                            arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                                adamFvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                           arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                        }
+                    // Fill in the head of the series (backward pass).
+                    for(int i=lagsModelMax-1; i>=0; i=i-1) {
+                        arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
+                            adamFvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                                       arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
                     }
 
                     // Change the specific element in the state vector to negative

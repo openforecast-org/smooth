@@ -205,7 +205,6 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     lagsModelMax <- max(lagsModelAll);
     initialArimaNumber <- componentsNumberARIMA <- length(lagsModelAll);
     componentsNamesARIMA <- componentsNamesARIMA[lagsModelAll];
-    refineHead <- TRUE;
 
     # Fix the non-zero ARI/MA to have the sparse ones
     nonZeroARI <- nonZeroARI[nonZeroARI[,2] %in% p,, drop=FALSE];
@@ -403,8 +402,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                   matricesFilled$matF, matricesFilled$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations,
-                                  refineHead, "n");
+                                  any(initialType==c("complete","backcasting")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -573,8 +571,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                               matricesFinal$matF, matricesFinal$vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations,
-                              refineHead, "n");
+                              any(initialType==c("complete","backcasting")), nIterations, "n");
 
     # Prepare fitted and error with ts / zoo
     if(any(yClasses=="ts")){

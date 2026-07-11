@@ -245,10 +245,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     # A fix to make sure that usual bounds are possible
     bounds <- boundsOriginal;
 
-    # This is the variable needed for the C++ code to determine whether the head of data needs to be
-    # refined. In case of SSARIMA this only creates a mess
-    refineHead <- TRUE;
-
     ##### Elements of SSARIMA #####
     filler <- function(B, matVt, matF, vecG, matWt, arRequired=TRUE, maRequired=TRUE, arEstimate=TRUE, maEstimate=TRUE){
 
@@ -440,8 +436,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                                   elements$matF, elements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations,
-                                  refineHead, "n");
+                                  any(initialType==c("complete","backcasting")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -1132,8 +1127,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                               matF, vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations,
-                              refineHead, "n");
+                              any(initialType==c("complete","backcasting")), nIterations, "n");
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;

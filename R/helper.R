@@ -164,7 +164,7 @@ dfDiscounterFit <- function(persistence, transition,
                             etsModel, adamCpp){
 
     # This is the sample to model to reflect the backcasted period (back and forth)
-    # lagsModelMax appears because we have "refineHead"
+    # lagsModelMax appears because the fitter refines the head across the seasonal cycle
     obsInSampleBackcasting <- obsInSample*2+lagsModelMax-1;
     nStates <- ncol(transition);
     # State matrix that has columns similar to obsStates
@@ -185,8 +185,7 @@ dfDiscounterFit <- function(persistence, transition,
                                   transition, persistence,
                                   indexLookupTableBack, profilesRecentTableBack,
                                   yInSampleBack, otBack,
-                                  FALSE, 1,
-                                  FALSE, "n");
+                                  FALSE, 1, "n");
 
     # Get the final profile. It now contains the discounted df for the start of the data
     return(list(profileRecent=adamFittedBack$profile));

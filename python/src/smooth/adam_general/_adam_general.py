@@ -32,7 +32,6 @@ def adam_fitter(
     vectorOt,
     backcast,
     nIterations,
-    refineHead,
     adamETS,
 ):
     """
@@ -81,7 +80,6 @@ def adam_fitter(
         vectorOt=vectorOt,
         backcast=bool(backcast),
         nIterations=int(nIterations),
-        refineHead=bool(refineHead),
         O="n",
     )
 
@@ -168,6 +166,7 @@ def adam_simulator(
     nArima,
     nXreg,
     constant,
+    refineHead=True,
 ):
     """
     Wrapper for adamCore.simulate() method.
@@ -214,6 +213,7 @@ def adam_simulator(
         indexLookupTable=indexLookupTable,
         profilesRecent=profilesRecent,
         E=E,
+        refineHead=bool(refineHead),
     )
 
     # Convert to dict
@@ -243,7 +243,6 @@ def adam_reapply(
     constant,
     adamETS,
     backcast,
-    refineHead,
 ):
     """Wrapper for ``adamCore.reapply()`` — re-runs the in-sample ADAM kernel
     for ``nsim`` parameter draws and returns the per-draw states, fitted and
@@ -289,7 +288,6 @@ def adam_reapply(
         indexLookupTable=indexLookupTable,
         arrayProfilesRecent=arrayProfilesRecent,
         backcast=bool(backcast),
-        refineHead=bool(refineHead),
     )
 
     return {

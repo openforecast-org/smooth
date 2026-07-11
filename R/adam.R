@@ -641,19 +641,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         ic=ic, bounds=bounds, silent=silent, ...)));
     }
 
-    # This is the variable needed for the C++ code to determine whether the head of data needs to be
-    # refined. Only needed for the ETS(*,Z,*) models
-    refineHead <- TRUE;
-    # if(arimaModel){
-    #     refineHead[] <- FALSE;
-    # }
-    # if(initialType!="backcasting" | componentsNumberARIMA==0){
-    #     refineHead[] <- TRUE;
-    # }
-    # if(initialType=="provided"){
-    #     refineHead[] <- FALSE;
-    # }
-
     #### Thin wrappers: top-level adam_* functions + adam() closure variables ####
     architector <- function(...){
         return(adam_architector(...,
@@ -772,8 +759,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                   adamElements$matF, adamElements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations,
-                                  refineHead, "n");
+                                  any(initialType==c("complete","backcasting")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -1146,8 +1132,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                           adamElements$matF, adamElements$vecG,
                                           indexLookupTable, profilesRecentTable,
                                           yInSample, ot,
-                                          any(initialType==c("complete","backcasting")), nIterations,
-                                          refineHead, "n");
+                                          any(initialType==c("complete","backcasting")), nIterations, "n");
                 logLikReturn[] <- logLikReturn - sum(log(abs(adamFitted$fitted)));
             }
 
@@ -1647,8 +1632,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                       adamCreated$matF, adamCreated$vecG,
                                       indexLookupTable, profilesRecentTable,
                                       yInSample, ot,
-                                      any(initialType==c("complete","backcasting")), nIterations,
-                                      refineHead, "n");
+                                      any(initialType==c("complete","backcasting")), nIterations, "n");
 
             # Extract the errors correctly
             errors <- switch(distributionNew,
@@ -1927,8 +1911,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                   matF, vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations,
-                                  refineHead, "n");
+                                  any(initialType==c("complete","backcasting")), nIterations, "n");
 
         matVt[] <- adamFitted$states;
 
@@ -6328,7 +6311,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                                              c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired,
                                                lagsModelMax,
                                                nsim)),
-                                       EtypeModified)$data;
+                                       EtypeModified, FALSE)$data;
 
         #### Note that the cumulative doesn't work with oes at the moment!
         if(cumulative){
@@ -7218,7 +7201,7 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
                                              c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired,
                                                lagsModelMax,
                                                nsim)),
-                                       EtypeModified)$data;
+                                       EtypeModified, FALSE)$data;
 
         yForecast <- vector("numeric", h);
         for(i in 1:h){
@@ -7393,22 +7376,21 @@ simulateADAMCore <- function(object, nsim=1, obs=nobs(object), ...){
     adamCpp <- object$adamCpp;
 
     #### Prepare the necessary matrices ####
-    # For ``adam`` objects, ``object$states`` already includes the
-    # ``lagsModelMax`` lag-head rows at the front; for ``om`` / ``omg``
-    # it doesn't, so prepend the lag head from ``object$profileInitial``
-    # before building the state cube.
+    # ``adamCpp$simulate`` now applies the same seasonal-head trend refinement
+    # as the fitter. Always feed it the *unrefined* head from
+    # ``object$profileInitial`` — for ``adam`` objects whose ``$states``
+    # already carries a walked head we strip those rows first so the simulator
+    # is not walking a head that was walked once already.
     expectedRows <- obsInSample + lagsModelMax;
+    lagHead <- t(object$profileInitial[, 1:lagsModelMax, drop=FALSE]);
+    colnames(lagHead) <- colnames(object$states);
     if(nrow(object$states) >= expectedRows){
-        statesFull <- object$states;
-    }
-    else if(nrow(object$states) == obsInSample){
-        lagHead <- t(object$profileInitial[, 1:lagsModelMax, drop=FALSE]);
-        colnames(lagHead) <- colnames(object$states);
-        statesFull <- rbind(lagHead, object$states);
+        obsRows <- object$states[-(1:lagsModelMax), , drop=FALSE];
     }
     else{
-        statesFull <- object$states;
+        obsRows <- object$states;
     }
+    statesFull <- rbind(lagHead, obsRows);
     arrVt <- array(t(statesFull),c(ncol(statesFull),nrow(statesFull)+obsInSample-nobs(object),nsim),
                    dimnames=list(colnames(object$states),NULL,paste0("nsim",c(1:nsim))));
 
@@ -7511,7 +7493,7 @@ simulateADAMCore <- function(object, nsim=1, obs=nobs(object), ...){
                                          c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired,
                                            lagsModelMax,
                                            nsim)),
-                                   EtypeModified);
+                                   EtypeModified, TRUE);
 
     return(list(data        = ySimulated$data,
                 states      = ySimulated$states,

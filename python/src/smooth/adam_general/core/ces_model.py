@@ -531,7 +531,6 @@ class CES:
             vectorOt=np.asfortranarray(ot, dtype=np.float64).ravel(),
             backcast=initial_type in ("complete", "backcasting"),
             nIterations=int(n_iterations),
-            refineHead=True,
         )
 
         errors = np.array(adam_fitted.errors).ravel()

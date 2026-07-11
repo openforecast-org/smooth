@@ -140,8 +140,6 @@ reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ..
     gumModel <- gumChecker(object);
     ssarimaModel <- ssarimaChecker(object);
 
-    refineHead <- TRUE;
-
     # Get componentsNumberETS, seasonal and componentsNumberARIMA
     componentsDefined <- componentsDefiner(object);
     componentsNumberETS <- componentsDefined$componentsNumberETS;
@@ -758,7 +756,7 @@ reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ..
                                     arrVt, arrWt,
                                     arrF, matG,
                                     indexLookupTable, profilesRecentArray,
-                                    any(object$initialType==c("backcasting","complete")), refineHead)
+                                    any(object$initialType==c("backcasting","complete")))
 
     arrVt[] <- adamRefitted$states;
     fittedMatrix[] <- adamRefitted$fitted * as.vector(pt);

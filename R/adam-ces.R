@@ -240,14 +240,6 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                        silent, modelDo, ellipsis, fast=FALSE);
     list2env(checkerReturn, envir=environment());
 
-    # This is the variable needed for the C++ code to determine whether the head of data needs to be
-    # refined. GUM doesn't need that.
-    refineHead <- TRUE;
-
-    # if(initialType=="provided"){
-    #     refineHead[] <- FALSE;
-    # }
-
     # Fix lagsModel and Ttype for CES. This is needed because the function drops duplicate seasonal lags
     # if(seasonality=="simple"){
     #     # Build our own lags, no non-seasonal ones
@@ -513,8 +505,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                   elements$matF, elements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations,
-                                  refineHead, "n");
+                                  any(initialType==c("complete","backcasting")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -999,8 +990,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                               matF, vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations,
-                              refineHead, "n");
+                              any(initialType==c("complete","backcasting")), nIterations, "n");
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;

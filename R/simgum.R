@@ -371,7 +371,7 @@ sim.gum <- function(orders=c(1), lags=c(1),
                                       arrF,
                                       matG,
                                       indexLookupTable, profilesRecentArray,
-                                      Etype);
+                                      Etype, TRUE);
 
     if(all(probability == 1)){
         matYt <- simulateddata$data;

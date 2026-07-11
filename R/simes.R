@@ -551,7 +551,7 @@ sim.es <- function(model="ANN", obs=10, nsim=1,
                                       arrF,
                                       matG,
                                       indexLookupTable, profilesRecentArray,
-                                      Etype);
+                                      Etype, TRUE);
 
     matYt <- simulateddata$data;
     arrVt[] <- simulateddata$states;

@@ -94,6 +94,7 @@ namespace Rcpp {
 RCPP_MODULE(adamCore_module) {
     class_<adamCore>("adamCore")
     .constructor<arma::uvec, char, char, char, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, bool, bool>()
+    .field("flipConstant", &adamCore::flipConstant)
     .method("polynomialise", &adamCore::polynomialise)
     .method("fit", &adamCore::fit)
     .method("omfitGeneral", &adamCore::omfitGeneral)

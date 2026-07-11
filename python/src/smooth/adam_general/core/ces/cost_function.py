@@ -154,7 +154,6 @@ def ces_cf(
         vectorOt=ot_f,
         backcast=backcast,
         nIterations=int(n_iterations),
-        refineHead=True,
     )
 
     errors = np.array(adam_fitted.errors).ravel()

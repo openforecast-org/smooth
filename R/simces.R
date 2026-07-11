@@ -409,7 +409,7 @@ sim.ces <- function(seasonality=c("none","simple","partial","full"),
                                       arrF,
                                       matG,
                                       indexLookupTable, profilesRecentArray,
-                                      Etype);
+                                      Etype, TRUE);
 
     if(all(probability == 1)){
         matYt <- simulateddata$data;

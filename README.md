@@ -6,8 +6,8 @@ R:
 
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/smooth)](https://cran.r-project.org/package=smooth)
 [![Downloads](https://cranlogs.r-pkg.org/badges/smooth)](https://cran.r-project.org/package=smooth)
-[![Conda version](https://img.shields.io/conda/v/r/r-smooth)](https://anaconda.org/r/r-smooth)
-[![Conda downloads](https://img.shields.io/conda/dn/r/r-smooth)](https://anaconda.org/r/r-smooth)
+[![Conda version](https://img.shields.io/conda/v/conda-forge/r-smooth)](https://anaconda.org/conda-forge/r-smooth)
+[![Conda downloads](https://img.shields.io/conda/dn/conda-forge/r-smooth)](https://anaconda.org/conda-forge/r-smooth)
 [![R-CMD-check](https://github.com/config-i1/smooth/actions/workflows/test.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/test.yml)
 
 Python:

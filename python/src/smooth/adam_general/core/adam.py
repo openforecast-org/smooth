@@ -5425,7 +5425,6 @@ class ADAM:
 
         initial_type = self.initial_type
         backcast = initial_type in ("backcasting", "complete")
-        refine_head = True
 
         result = self._adam_cpp.reapply(
             matrixYt=np.asfortranarray(y_in_sample),
@@ -5437,7 +5436,6 @@ class ADAM:
             indexLookupTable=index_lookup_table,
             arrayProfilesRecent=profiles_recent_array_f,
             backcast=backcast,
-            refineHead=refine_head,
         )
 
         # 9. Unpack + scale fitted by occurrence probabilities (R/reapply.R:763-770).

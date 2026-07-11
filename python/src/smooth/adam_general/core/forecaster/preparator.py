@@ -1014,10 +1014,7 @@ def preparator(
         profiles_recent_table,
     )
 
-    # 4. Run adam_fitter to get fitted values and states
-    # refineHead should always be True (fixed backcasting issue)
-    refine_head = True
-
+    # 4. Run adam_fitter to get fitted values and states.
     # Check if initial_type is a list or string and compute backcast correctly
     if isinstance(initials_checked["initial_type"], list):
         backcast_value_prep = any(
@@ -1046,7 +1043,6 @@ def preparator(
         vectorOt=ot,
         backcast=backcast_value_prep,
         nIterations=initials_checked["n_iterations"],
-        refineHead=refine_head,
         O="n",
     )
     # 5. Correct negative or NaN values in multiplicative components

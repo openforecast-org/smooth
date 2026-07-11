@@ -138,3 +138,22 @@ test_that("simulate.adam still works after the simulateADAMCore split", {
     expect_s3_class(sim, "adam.sim")
     expect_equal(dim(sim$data), c(60, 2))
 })
+
+#### Head-refinement alignment between sim.es and es/adam fitters ####
+# Before the head-refinement fix the simulator started from the raw initial
+# level while the fitter walked (m-1) trend steps forward across the seasonal
+# head. On ETS(A,A,A) with lags=12 this produced a systematic offset of
+# (m-1) * trend on the first simulated observation. Guard against regression.
+test_that("sim.es reproduces the fitted first observation for trended-seasonal ETS", {
+    fit <- es(AirPassengers, model="AAA", h=0, silent=TRUE)
+    initVec <- c(fit$initial$level, fit$initial$trend)
+    initSeasVec <- fit$initial$seasonal
+    simObj <- sim.es(model="AAA", obs=length(AirPassengers), nsim=1,
+                     persistence=fit$persistence, phi=fit$phi,
+                     initial=initVec, initialSeason=initSeasVec,
+                     frequency=12,
+                     randomizer="rnorm", mean=0, sd=1e-12)
+    expect_equal(as.numeric(simObj$data)[1],
+                 as.numeric(fitted(fit))[1],
+                 tolerance=1e-6)
+})

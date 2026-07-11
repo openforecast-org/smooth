@@ -239,7 +239,6 @@ def omg_cf(  # noqa: N802
         vectorOt=ot,
         backcast=backcast,
         nIterations=int(initials_a["n_iterations"]),
-        refineHead=True,
     )
 
     e_a = side_a["model_type_dict"]["error_type"]

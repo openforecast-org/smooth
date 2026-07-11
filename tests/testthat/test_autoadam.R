@@ -23,12 +23,15 @@ test_that("auto.adam() ARIMA selection (NNN) on BJsales", {
                    orders=list(ar=c(2,0), i=c(2,0), ma=c(2,0), select=TRUE),
                    distribution="dnorm", silent=TRUE)
     expect_equal(modelType(m), "NNN")
-    expect_equal(AICc(m), 521.6353, tolerance=0.01)
+    # Reference values re-pinned after the backcasting drift-sign fix
+    # (ARIMA(2,1,2) with drift is selected; d=1 is odd, so the constant
+    # flips in the backward pass). AICc improved from 521.6353.
+    expect_equal(AICc(m), 520.9463, tolerance=0.01)
     expect_equal(m$distribution, "dnorm")
     expect_equal(as.numeric(m$arma[[1]]),
-                 c(0.26485, 0.49232), tolerance=1e-3)
+                 c(0.21925, 0.51365), tolerance=1e-3)
     expect_equal(as.numeric(m$arma[[2]]),
-                 c(-0.05723, -0.32949), tolerance=1e-3)
+                 c(-0.01044, -0.33828), tolerance=1e-3)
 })
 
 # 3. ETS + ARIMA selection on AirPassengers

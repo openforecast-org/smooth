@@ -336,7 +336,8 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
                              arimaModel, lagsModelARIMA, xregModel, constantRequired,
                              componentsNumberARIMA,
                              obsAll, yIndexAll, yClasses, adamETS,
-                             profilesRecentTable=NULL, profilesRecentProvided=FALSE){
+                             profilesRecentTable=NULL, profilesRecentProvided=FALSE,
+                             flipConstant=FALSE){
     if(etsModel){
         modelIsTrendy <- Ttype != "N"
         if(modelIsTrendy){
@@ -405,6 +406,10 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, adamETS)
+    # Flip the drift sign in the backward pass of backcasting when the total
+    # order of ARIMA differencing is odd (time reversal changes the drift by
+    # (-1)^(d+D)) — the ARIMA analog of the ETS trend reversal
+    adamCpp$flipConstant <- flipConstant
 
     return(list(
         lagsModel = lagsModel,
@@ -735,8 +740,10 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
                 }
                 else{
                     yDecomposition <- switch(Etype,
-                                             "A"=mean(diff(yInSample[otLogical])),
-                                             "M"=exp(mean(diff(log(yInSample[otLogical])))))
+                                             "A"=mean(yInSample[otLogical]),
+                                             "M"=exp(mean(log(yInSample[otLogical]))));
+                                             # "A"=mean(diff(yInSample[otLogical])),
+                                             # "M"=exp(mean(diff(log(yInSample[otLogical])))))
                 }
                 matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
                     rep(yDecomposition, ceiling(initialArimaNumber/max(lags)))[1:initialArimaNumber]

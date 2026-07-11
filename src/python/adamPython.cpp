@@ -80,6 +80,7 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("nComponents"),
             py::arg("constant"),
             py::arg("adamETS"))
+        .def_readwrite("flipConstant", &adamCore::flipConstant)
         .def("polynomialise", &adamCore::polynomialise,
             py::arg("B"),
             py::arg("arOrders"),
@@ -100,7 +101,6 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("vectorOt"),
             py::arg("backcast"),
             py::arg("nIterations"),
-            py::arg("refineHead"),
             py::arg("O") = 'n')
         .def("omfitGeneral", &adamCore::omfitGeneral,
             py::arg("matrixVtA"),
@@ -128,8 +128,7 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("profilesRecentB"),
             py::arg("vectorOt"),
             py::arg("backcast"),
-            py::arg("nIterations"),
-            py::arg("refineHead"))
+            py::arg("nIterations"))
         .def("forecast", &adamCore::forecast,
             py::arg("matrixWt"),
             py::arg("matrixF"),
@@ -153,7 +152,8 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("matrixG"),
             py::arg("indexLookupTable"),
             py::arg("profilesRecent"),
-            py::arg("E"))
+            py::arg("E"),
+            py::arg("refineHead"))
         .def("reapply", &adamCore::reapply,
             py::arg("matrixYt"),
             py::arg("matrixOt"),
@@ -163,8 +163,7 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("matrixG"),
             py::arg("indexLookupTable"),
             py::arg("arrayProfilesRecent"),
-            py::arg("backcast"),
-            py::arg("refineHead"))
+            py::arg("backcast"))
         .def("reforecast", &adamCore::reforecast,
             py::arg("arrayErrors"),
             py::arg("arrayOt"),

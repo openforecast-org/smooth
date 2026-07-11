@@ -562,9 +562,6 @@ def CF(  # noqa: N802
         profile_dict["profiles_recent_table"], dtype=np.float64
     )
 
-    # refineHead should always be True (fixed backcasting issue)
-    refine_head = True
-
     # Check if initial_type is a list or string and compute backcast correctly
     if isinstance(initials_checked["initial_type"], list):
         backcast_value = any(
@@ -590,7 +587,6 @@ def CF(  # noqa: N802
         vectorOt=ot,
         backcast=backcast_value,
         nIterations=initials_checked["n_iterations"],
-        refineHead=refine_head,
         O="n",
     )
 
@@ -1157,10 +1153,7 @@ def log_Lik_ADAM(  # noqa: N802
                 :, : lags_dict["lags_model_max"]
             ]
 
-            # Fit the model again to extract the fitted values
-            # refineHead should always be True (fixed backcasting issue)
-            refine_head = True
-
+            # Fit the model again to extract the fitted values.
             # Check if initial_type is a list or string and compute backcast correctly
             if isinstance(initials_dict["initial_type"], list):
                 backcast_value_log = any(
@@ -1204,7 +1197,6 @@ def log_Lik_ADAM(  # noqa: N802
                 vectorOt=ot,
                 backcast=backcast_value_log,
                 nIterations=initials_dict["n_iterations"],
-                refineHead=refine_head,
                 O="n",
             )
 

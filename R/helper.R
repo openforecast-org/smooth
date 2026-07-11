@@ -171,7 +171,10 @@ dfDiscounterFit <- function(persistence, transition,
     matVtBack <- matrix(1, nStates, obsInSampleBackcasting + lagsModelMax);
     # Measurement matrix with the new sample
     matWtBack <- matrix(1, obsInSampleBackcasting, nStates);
-    # indexLookupTable for the new data. This is similar to doing forth and back pass
+    # indexLookupTable for the new data. This is similar to doing forth and back pass.
+    # Trim the tail-mirror columns first: the doubling below relies on the table
+    # ending exactly at the last in-sample column (obsInSample+lagsModelMax).
+    indexLookupTable <- indexLookupTable[, 1:(obsInSample+lagsModelMax), drop=FALSE];
     indexLookupTableBack <- cbind(indexLookupTable,indexLookupTable[,(ncol(indexLookupTable)-1):1, drop=FALSE]);
 
     # The new data. This is just zeroes to see how the df effect evaporates

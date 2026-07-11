@@ -577,6 +577,9 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, FALSE);
+    # Drift flips sign in the backcasting backward pass when the total order
+    # of differencing is odd — the ARIMA analog of the ETS trend reversal
+    adamCpp$flipConstant <- constantRequired && (sum(iOrders) %% 2 == 1);
 
     if(!is.null(initialValueProvided)){
         initialType <- "provided";

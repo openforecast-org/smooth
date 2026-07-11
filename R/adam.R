@@ -646,7 +646,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         return(adam_architector(...,
                                 componentsNumberARIMA=componentsNumberARIMA,
                                 obsAll=obsAll, yIndexAll=yIndexAll, yClasses=yClasses,
-                                adamETS=adamETS));
+                                adamETS=adamETS,
+                                flipConstant=arimaModel && constantRequired &&
+                                    (sum(iOrders) %% 2 == 1)));
     }
     creator <- function(...){
         return(adam_creator(...,
@@ -3108,17 +3110,20 @@ adamProfileCreator <- function(lagsModelAll, lagsModelMax, obsAll,
     # Create the matrix with profiles, based on provided lags
     profilesRecentTable <- matrix(0,length(lagsModelAll),lagsModelMax,
                                   dimnames=list(lagsModelAll,NULL));
-    # Create the lookup table
-    indexLookupTable <- matrix(1,length(lagsModelAll),obsAll+lagsModelMax,
+    # Create the lookup table. The extra lagsModelMax columns at the end form
+    # the "tail" — the cyclic continuation past the last observation used by
+    # the backcasting tail mirror in the C++ code.
+    indexLookupTable <- matrix(1,length(lagsModelAll),obsAll+2*lagsModelMax,
                                dimnames=list(lagsModelAll,NULL));
     # Modify the lookup table in order to get proper indices in C++
     profileIndices <- matrix(c(1:(lagsModelMax*length(lagsModelAll))),length(lagsModelAll));
 
+    obsAllTail <- obsAll+lagsModelMax;
     for(i in 1:length(lagsModelAll)){
         profilesRecentTable[i,1:lagsModelAll[i]] <- 1:lagsModelAll[i];
         # -1 is needed to align this with C++ code
-        indexLookupTable[i,lagsModelMax+c(1:obsAll)] <- rep(profileIndices[i,1:lagsModelAll[i]],
-                                                            ceiling(obsAll/lagsModelAll[i]))[1:obsAll] -1;
+        indexLookupTable[i,lagsModelMax+c(1:obsAllTail)] <- rep(profileIndices[i,1:lagsModelAll[i]],
+                                                                ceiling(obsAllTail/lagsModelAll[i]))[1:obsAllTail] -1;
         # Fix the head of the data, before the sample starts
         indexLookupTable[i,1:lagsModelMax] <- tail(rep(unique(indexLookupTable[i,lagsModelMax+c(1:obsAll)]),lagsModelMax),
                                                    lagsModelMax);

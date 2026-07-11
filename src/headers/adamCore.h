@@ -68,6 +68,14 @@ struct ReforecastResult {
 // ============================================================================
 
 class adamCore {
+public:
+    // Whether to flip the sign of the constant (drift) during the backward
+    // pass of backcasting. Time reversal changes the drift of an integrated
+    // series by (-1)^(d+D), so the flip is needed when the total number of
+    // differences (non-seasonal + seasonal) is odd. Set from R/Python after
+    // construction; defaults to false (no ARIMA differencing).
+    bool flipConstant = false;
+
 private:
     arma::uvec lags;
     char E;
@@ -353,10 +361,15 @@ public:
             }
         };
 
-        // How to revert the trend component for backcasting
+        // How to revert the trend component for backcasting.
+        // The constant (drift) flips sign when the total order of differencing
+        // is odd — the direct ARIMA analog of the ETS trend reversal.
         auto trendReversal = [&]() {
             if(T == 'A')      { profilesRecent(1) = -profilesRecent(1); }
             else if(T == 'M') { profilesRecent(1) = 1/profilesRecent(1); }
+            if(constant && flipConstant) {
+                profilesRecent(nComponents-1) = -profilesRecent(nComponents-1);
+            }
         };
 
         // Do the fit!
@@ -719,6 +732,12 @@ public:
                     else if(T=='M'){
                         arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
                     }
+                    // The constant (drift) flips sign when the total order of
+                    // differencing is odd — ARIMA analog of the trend reversal
+                    if(constant && flipConstant){
+                        arrayProfilesRecent.slice(k)(nComponents-1) =
+                            -arrayProfilesRecent.slice(k)(nComponents-1);
+                    }
 
                     for(int i=obs+lagsModelMax-1; i>=lagsModelMax; i=i-1) {
                         /* # Measurement equation and the error term */
@@ -760,6 +779,11 @@ public:
                     }
                     else if(T=='M'){
                         arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
+                    }
+                    // Restore the constant sign after the backward pass
+                    if(constant && flipConstant){
+                        arrayProfilesRecent.slice(k)(nComponents-1) =
+                            -arrayProfilesRecent.slice(k)(nComponents-1);
                     }
                 }
             }

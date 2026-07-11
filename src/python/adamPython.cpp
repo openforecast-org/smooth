@@ -80,6 +80,7 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("nComponents"),
             py::arg("constant"),
             py::arg("adamETS"))
+        .def_readwrite("flipConstant", &adamCore::flipConstant)
         .def("polynomialise", &adamCore::polynomialise,
             py::arg("B"),
             py::arg("arOrders"),

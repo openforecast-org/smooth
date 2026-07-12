@@ -382,7 +382,8 @@ def CF(  # noqa: N802
     if (
         arima_checked["arima_model"]
         and any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]])
-        and initials_checked["initial_type"] in ["complete", "backcasting"]
+        and initials_checked["initial_type"]
+        in ["complete", "backcasting", "gradient"]
     ):
         seed_row_idx = (
             components_dict["components_number_ets"]

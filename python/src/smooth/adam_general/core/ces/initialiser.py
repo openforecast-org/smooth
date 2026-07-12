@@ -97,7 +97,7 @@ def ces_initialiser(
                 names.extend(["beta_0", "beta_1"])
 
     # --- Initial states --- R lines 724-740
-    if initial_type not in ("backcasting", "complete"):
+    if initial_type not in ("backcasting", "complete", "gradient"):
         if seasonality != "simple":
             # R: B <- c(B, matVt[1:2, 1])
             B.extend(mat_vt[0:2, 0].tolist())

@@ -626,7 +626,7 @@ def parameters_checker(
     n_iterations_provided = n_iterations is not None
 
     if n_iterations is None:
-        if init_info["initial_type"] in ["backcasting", "complete"]:
+        if init_info["initial_type"] in ["backcasting", "complete", "gradient"]:
             n_iterations = 2
         else:
             n_iterations = 1

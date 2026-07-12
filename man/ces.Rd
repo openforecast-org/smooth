@@ -199,7 +199,7 @@ Springer-Verlag. \doi{10.1007/978-3-540-71918-2}.
 \itemize{
 \item  Svetunkov, I., Kourentzes, N., & Ord, J. K. (2022).
 Complex exponential smoothing. Naval Research Logistics, 69(8),
-1108<e2><80><93>1123. https://doi.org/10.1002/nav.22074
+1108–1123. https://doi.org/10.1002/nav.22074
 }
 }
 \seealso{

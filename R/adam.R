@@ -1530,34 +1530,18 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         }
 
         nStatesBackcasting <- 0;
-        # Calculate the number of degrees of freedom coming from states in case of backcasting
-        if(any(initialType==c("backcasting","complete","gradient"))){
-            # Fill in the matrices. This is now needed for the correct calculation of the df
-            adamFilled <- filler(B,
-                                 etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
-                                 componentsNumberETS, componentsNumberETSNonSeasonal,
-                                 componentsNumberETSSeasonal, componentsNumberARIMA,
-                                 lags, lagsModel, lagsModelMax,
-                                 adamCreated$matVt, adamCreated$matWt, adamCreated$matF, adamCreated$vecG,
-                                 persistenceEstimate, persistenceLevelEstimate, persistenceTrendEstimate,
-                                 persistenceSeasonalEstimate, persistenceXregEstimate,
-                                 phiEstimate,
-                                 initialType, initialEstimate,
-                                 initialLevelEstimate, initialTrendEstimate, initialSeasonalEstimate,
-                                 initialArimaEstimate, initialXregEstimate,
-                                 arimaModel, arEstimate, maEstimate, arOrders, iOrders, maOrders,
-                                 arRequired, maRequired, armaParameters,
-                                 nonZeroARI, nonZeroMA, adamCreated$arimaPolynomials,
-                                 xregModel, xregNumber,
-                                 xregParametersMissing, xregParametersIncluded,
-                                 xregParametersEstimated, xregParametersPersistence, constantEstimate,
-                                 adamCpp);
-
-            nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll,
-                                                           etsModel, Stype, componentsNumberETSNonSeasonal,
-                                                           componentsNumberETSSeasonal, adamFilled$vecG, adamFilled$matF,
-                                                           obsInSample, lagsModelMax, indexLookupTable,
-                                                           adamCpp, dfForBack);
+        # With initial="gradient" the ETS initials are solved by least squares
+        # rather than placed in the optimiser's B vector, but they are genuinely
+        # estimated and still consume degrees of freedom. Count them exactly as
+        # initial="optimal" does, so the information criteria are comparable.
+        # This applies only in the gradient solve's scope (pure ETS); with ARIMA
+        # or xreg present gradient falls back to backcasting, so it keeps the
+        # historical zero-initial-df accounting there, as do backcasting/complete.
+        if(any(initialType=="gradient") && etsModel && !arimaModel && !xregModel){
+            nStatesBackcasting[] <- initialLevelEstimate +
+                                    modelIsTrendy*initialTrendEstimate +
+                                    modelIsSeasonal*
+                                        sum(initialSeasonalEstimate*(lagsModelSeasonal-1));
         }
 
         nParamEstimated <- length(B) + nStatesBackcasting;

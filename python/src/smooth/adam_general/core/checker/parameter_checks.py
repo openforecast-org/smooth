@@ -389,7 +389,13 @@ def _check_initial(
 
     # Handle "optimal" or "backcasting" strings
     if isinstance(initial, str):
-        if initial.lower() in ["optimal", "backcasting", "complete", "two-stage"]:
+        if initial.lower() in [
+            "optimal",
+            "backcasting",
+            "complete",
+            "two-stage",
+            "gradient",
+        ]:
             result["initial_type"] = initial.lower()
             return result
         else:

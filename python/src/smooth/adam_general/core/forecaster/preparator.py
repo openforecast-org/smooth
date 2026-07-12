@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import scaler
 
 from ._helpers import _safe_create_index
@@ -1029,22 +1030,34 @@ def preparator(
             "backcasting",
         ]
 
-    # Call adam_cpp.fit() with the prepared inputs
+    # Call the fit (or gradient initial-state solve) with the prepared inputs.
+    # For initial="gradient" the dispatcher re-solves the initials from the seed
+    # profile and fits with backcast=False; otherwise it is the ordinary fit.
     # Note: E, T, S, nNonSeasonal, nSeasonal, nArima, nXreg, constant are set
-    # during adamCore construction
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt,
-        matrixWt=mat_wt,
-        matrixF=mat_f,
-        vectorG=vec_g,
-        indexLookupTable=index_lookup_table,
-        profilesRecent=profiles_recent_table_fortran,
-        vectorYt=y_in_sample,
-        vectorOt=ot,
-        backcast=backcast_value_prep,
-        nIterations=initials_checked["n_iterations"],
-        O="n",
+    # during adamCore construction.
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt,
+        mat_wt=mat_wt,
+        mat_f=mat_f,
+        vec_g=vec_g,
+        index_lookup_table=index_lookup_table,
+        profiles_recent_table=profiles_recent_table_fortran,
+        y_in_sample=y_in_sample,
+        ot=ot,
+        initial_type=initials_checked["initial_type"],
+        n_iterations=initials_checked["n_iterations"],
+        backcast_value=backcast_value_prep,
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
     )
+    # The gradient solve overwrites the head of mat_vt in place; mirror the
+    # solved initials back into matrices_dict so downstream initial-value
+    # extraction reports them (not the discarded seed).
+    matrices_dict["mat_vt"][:, : lags_dict["lags_model_max"]] = mat_vt[
+        :, : lags_dict["lags_model_max"]
+    ]
     # 5. Correct negative or NaN values in multiplicative components
     matrices_dict, profiles_dict = _correct_multiplicative_components(
         matrices_dict, profiles_dict, model_type_dict, components_dict

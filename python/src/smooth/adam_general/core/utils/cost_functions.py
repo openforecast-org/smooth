@@ -5,6 +5,7 @@ from numpy.linalg import eigvals
 
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import (
     calculate_entropy,
     calculate_likelihood,
@@ -573,21 +574,25 @@ def CF(  # noqa: N802
     else:
         backcast_value = initials_checked["initial_type"] in ["complete", "backcasting"]
 
-    # Call adam_cpp.fit() using the new class-based interface
-    #  Parameters that were passed to adam_fitter are now stored in adam_cpp (E, T, S,
-    # etc.)
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt,
-        matrixWt=mat_wt,
-        matrixF=mat_f,
-        vectorG=vec_g,
-        indexLookupTable=index_lookup_table,
-        profilesRecent=profiles_recent_table,
-        vectorYt=y_in_sample,
-        vectorOt=ot,
-        backcast=backcast_value,
-        nIterations=initials_checked["n_iterations"],
-        O="n",
+    # Call adam_cpp.fit() (or the gradient initial-state solve) via the shared
+    # dispatcher — parity with R's adam_fitOrGradient. Parameters that were passed
+    # to adam_fitter are now stored in adam_cpp (E, T, S, etc.).
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt,
+        mat_wt=mat_wt,
+        mat_f=mat_f,
+        vec_g=vec_g,
+        index_lookup_table=index_lookup_table,
+        profiles_recent_table=profiles_recent_table,
+        y_in_sample=y_in_sample,
+        ot=ot,
+        initial_type=initials_checked["initial_type"],
+        n_iterations=initials_checked["n_iterations"],
+        backcast_value=backcast_value,
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
     )
 
     # adam_fitted.errors = np.repeat()
@@ -1186,18 +1191,22 @@ def log_Lik_ADAM(  # noqa: N802
                 profile_dict["profiles_recent_table"], dtype=np.float64
             )
 
-            adam_fitted = adam_cpp.fit(
-                matrixVt=mat_vt,
-                matrixWt=mat_wt,
-                matrixF=mat_f,
-                vectorG=vec_g,
-                indexLookupTable=index_lookup_table,
-                profilesRecent=profiles_recent_table,
-                vectorYt=y_in_sample,
-                vectorOt=ot,
-                backcast=backcast_value_log,
-                nIterations=initials_dict["n_iterations"],
-                O="n",
+            adam_fitted = adam_fit_or_gradient(
+                adam_cpp=adam_cpp,
+                mat_vt=mat_vt,
+                mat_wt=mat_wt,
+                mat_f=mat_f,
+                vec_g=vec_g,
+                index_lookup_table=index_lookup_table,
+                profiles_recent_table=profiles_recent_table,
+                y_in_sample=y_in_sample,
+                ot=ot,
+                initial_type=initials_dict["initial_type"],
+                n_iterations=initials_dict["n_iterations"],
+                backcast_value=backcast_value_log,
+                model_type_dict=model_type_dict,
+                components_dict=components_dict,
+                lags_dict=lags_dict,
             )
 
             logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))

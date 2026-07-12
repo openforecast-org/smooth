@@ -295,7 +295,8 @@ def filler(
     # Initials of ETS
     if (
         model_type_dict["ets_model"]
-        and initials_checked["initial_type"] not in ["complete", "backcasting"]
+        and initials_checked["initial_type"]
+        not in ["complete", "backcasting", "gradient"]
         and initials_checked["initial_estimate"]
     ):
         i = 0
@@ -364,7 +365,8 @@ def filler(
     # Initials of ARIMA
     if arima_checked["arima_model"]:
         if (
-            initials_checked["initial_type"] not in ["complete", "backcasting"]
+            initials_checked["initial_type"]
+            not in ["complete", "backcasting", "gradient"]
             and initials_checked["initial_arima_estimate"]
         ):
             # print(f"DEBUG - Processing ARIMA initial values starting at index {j}")

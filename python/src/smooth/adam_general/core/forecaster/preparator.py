@@ -1051,6 +1051,7 @@ def preparator(
         model_type_dict=model_type_dict,
         components_dict=components_dict,
         lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
     )
     # The gradient solve overwrites the head of mat_vt in place; mirror the
     # solved initials back into matrices_dict so downstream initial-value

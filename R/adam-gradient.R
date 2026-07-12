@@ -13,10 +13,8 @@
 # uses, in a single C++ call. Returns the solved recent profile (same shape as
 # `profile`), or NULL on failure.
 adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
-                               profile, yInSample, ot, layout, lagsModelMax){
-    y <- as.numeric(yInSample)
-    obs <- length(y)
-    nComp <- nrow(profile)
+                               profile, yInSample, ot, layout, lagsModelMax,
+                               obsInSample){
     Etype <- layout$Etype
     additive <- layout$additive
 
@@ -26,23 +24,32 @@ adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
     nFree <- length(probes)
     if(nFree == 0){ return(NULL) }
 
+    # yInSample and ot are already (obsInSample x 1) matrices and vecG an
+    # (nComponents x 1) persistence matrix, so they are handed to reapply()
+    # untouched. The residual arithmetic below needs the actuals as a plain vector
+    # (subtracting matrices of different column counts is non-conformable in R),
+    # so derive that once. nComponents is the row count of the state profile.
+    nComponents <- nrow(profile)
+    yVector <- as.numeric(yInSample)
+
     # Residuals of one forward pass for a set of candidate profiles (slices).
-    # Returns an obs x nSlices matrix of residuals, or NULL on failure.
-    residualsFor <- function(profList){
-        nSlices <- length(profList)
-        arrProf <- array(0, c(nComp, lagsModelMax, nSlices))
-        for(s in 1:nSlices){ arrProf[, , s] <- profList[[s]] }
-        arrVt <- array(0, c(nComp, obs + lagsModelMax, nSlices))
-        arrWt <- array(matWt, c(dim(matWt), nSlices))
-        arrF <- array(matF, c(dim(matF), nSlices))
-        matG <- matrix(as.numeric(vecG), nComp, nSlices)
-        res <- try(adamCpp$reapply(matrix(y, obs, 1), matrix(as.numeric(ot), obs, 1),
-                                   arrVt, arrWt, arrF, matG, indexLookupTable,
-                                   arrProf, FALSE), silent = TRUE)
+    # Returns an obsInSample x nSlices matrix of residuals, or NULL on failure.
+    residualsFor <- function(profileList){
+        nSlices <- length(profileList)
+        arrayProfile <- array(0, c(nComponents, lagsModelMax, nSlices))
+        for(i in seq_len(nSlices)){ arrayProfile[, , i] <- profileList[[i]] }
+        # Slice-count varies per call, so these cubes are genuinely per-call.
+        arrayVt <- array(0, c(nComponents, obsInSample + lagsModelMax, nSlices))
+        arrayWt <- array(matWt, c(dim(matWt), nSlices))
+        arrayF <- array(matF, c(dim(matF), nSlices))
+        matrixG <- matrix(vecG, nComponents, nSlices)
+        res <- try(adamCpp$reapply(yInSample, ot, arrayVt, arrayWt, arrayF,
+                                   matrixG, indexLookupTable, arrayProfile, FALSE),
+                   silent = TRUE)
         if(inherits(res, "try-error")){ return(NULL) }
-        fitted <- res$fitted
-        if(any(!is.finite(fitted))){ return(NULL) }
-        E <- switch(Etype, "M" = y / fitted - 1, y - fitted)
+        yFitted <- res$fitted
+        if(any(!is.finite(yFitted))){ return(NULL) }
+        E <- switch(Etype, "M" = yVector / yFitted - 1, yVector - yFitted)
         if(any(!is.finite(E))){ return(NULL) }
         return(E)
     }
@@ -68,7 +75,7 @@ adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
         E <- residualsFor(slices)
         if(is.null(E)){ return(NULL) }
         e0 <- E[, 1]
-        designA <- matrix(0, obs, nFree)
+        designA <- matrix(0, obsInSample, nFree)
         for(j in 1:nFree){ designA[, j] <- e0 - E[, j + 1] }
         # Solve min ||e0 - A d|| in C++ (pivoted QR, rank-deficiency aware) so the
         # result is identical in the Python port that shares the same core.
@@ -93,7 +100,7 @@ adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
             }
             E <- residualsFor(slices)
             if(is.null(E)){ break }
-            Jm <- matrix(0, obs, nFree)
+            Jm <- matrix(0, obsInSample, nFree)
             for(j in 1:nFree){ Jm[, j] <- (E[, j] - e0) / hs[j] }
             # Gauss-Newton step via the C++ solve (parity with Python).
             step <- tryCatch(-as.numeric(olsCpp(Jm, e0, 1e-7)),
@@ -154,14 +161,16 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                                yInSample, ot, initialType, nIterations, adamCpp,
                                etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                componentsNumberETS, componentsNumberETSSeasonal,
-                               componentsNumberETSNonSeasonal, lagsModel, lagsModelMax){
+                               componentsNumberETSNonSeasonal, lagsModel, lagsModelMax,
+                               obsInSample){
     if(any(initialType == "gradient")){
         layout <- adam_gradientLayout(etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                       componentsNumberETS, componentsNumberETSSeasonal,
                                       componentsNumberETSNonSeasonal, lagsModel, lagsModelMax)
         if(!is.null(layout)){
             solved <- adam_gradientSolve(adamCpp, matWt, matF, vecG, indexLookupTable,
-                                         profile, yInSample, ot, layout, lagsModelMax)
+                                         profile, yInSample, ot, layout, lagsModelMax,
+                                         obsInSample)
             if(!is.null(solved)){
                 matVt[, 1:lagsModelMax] <- solved
                 # A single forward pass from the solved initials (backcast=FALSE).

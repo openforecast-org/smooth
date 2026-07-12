@@ -69,48 +69,58 @@ def adam_gradient_solve(
     ot,
     layout,
     lags_model_max,
+    obs_in_sample,
 ):
     """Solve for the initial recent profile that minimises in-sample SSE.
 
     Returns the solved recent profile (same shape as ``profile``), or ``None`` on
     failure. Mirrors ``adam_gradientSolve``.
     """
-    y = np.asarray(y_in_sample, dtype=np.float64).ravel()
-    obs = y.shape[0]
-    profile = np.array(profile, dtype=np.float64)
-    n_comp = profile.shape[0]
     e_type = layout["e_type"]
     additive = layout["additive"]
-
     probes = layout["probes"]
     n_free = len(probes)
     if n_free == 0:
         return None
 
+    # y_in_sample and ot arrive as length-obs_in_sample vectors; reapply() needs
+    # them as (obs_in_sample, 1) matrices, so reshape once. The same y matrix
+    # broadcasts against the (obs, n_slices) fitted values in the residuals, so it
+    # doubles as the residual operand. vec_g is an (n_components, 1) persistence
+    # column, used as-is. All of these are loop-invariant.
+    profile = np.array(profile, dtype=np.float64)
+    n_components = profile.shape[0]
+    y_matrix = np.asfortranarray(
+        np.asarray(y_in_sample, dtype=np.float64).reshape(obs_in_sample, 1)
+    )
+    ot_matrix = np.asfortranarray(
+        np.asarray(ot, dtype=np.float64).reshape(obs_in_sample, 1)
+    )
     mat_wt = np.asarray(mat_wt, dtype=np.float64)
     mat_f = np.asarray(mat_f, dtype=np.float64)
-    vec_g = np.asarray(vec_g, dtype=np.float64).ravel()
+    vec_g = np.asarray(vec_g, dtype=np.float64).reshape(n_components, 1)
     index_lookup_table = np.asfortranarray(index_lookup_table, dtype=np.uint64)
-    y_col = np.asfortranarray(y.reshape(obs, 1))
-    ot_col = np.asfortranarray(np.asarray(ot, dtype=np.float64).reshape(obs, 1))
 
     def residuals_for(prof_list):
         """Residuals of one forward pass for candidate profiles (slices).
 
-        Returns an ``(obs, n_slices)`` array of residuals, or ``None`` on failure.
+        Returns an ``(obs_in_sample, n_slices)`` array of residuals, or ``None``.
         """
         n_slices = len(prof_list)
-        arr_prof = np.zeros((n_comp, lags_model_max, n_slices), order="F")
-        for s in range(n_slices):
-            arr_prof[:, :, s] = prof_list[s]
-        arr_vt = np.zeros((n_comp, obs + lags_model_max, n_slices), order="F")
+        arr_prof = np.zeros((n_components, lags_model_max, n_slices), order="F")
+        for i in range(n_slices):
+            arr_prof[:, :, i] = prof_list[i]
+        # Slice-count varies per call, so these cubes are genuinely per-call.
+        arr_vt = np.zeros(
+            (n_components, obs_in_sample + lags_model_max, n_slices), order="F"
+        )
         arr_wt = np.repeat(mat_wt[:, :, None], n_slices, axis=2)
         arr_f = np.repeat(mat_f[:, :, None], n_slices, axis=2)
-        mat_g = np.repeat(vec_g[:, None], n_slices, axis=1)
+        mat_g = np.repeat(vec_g, n_slices, axis=1)
         try:
             res = adam_cpp.reapply(
-                matrixYt=y_col,
-                matrixOt=ot_col,
+                matrixYt=y_matrix,
+                matrixOt=ot_matrix,
                 arrayVt=np.asfortranarray(arr_vt),
                 arrayWt=np.asfortranarray(arr_wt),
                 arrayF=np.asfortranarray(arr_f),
@@ -121,13 +131,15 @@ def adam_gradient_solve(
             )
         except Exception:
             return None
-        fitted = np.array(res.fitted, dtype=np.float64).reshape(obs, n_slices)
-        if not np.all(np.isfinite(fitted)):
+        y_fitted = np.array(res.fitted, dtype=np.float64).reshape(
+            obs_in_sample, n_slices
+        )
+        if not np.all(np.isfinite(y_fitted)):
             return None
         if e_type == "M":
-            e = y[:, None] / fitted - 1.0
+            e = y_matrix / y_fitted - 1.0
         else:
-            e = y[:, None] - fitted
+            e = y_matrix - y_fitted
         if not np.all(np.isfinite(e)):
             return None
         return e
@@ -151,7 +163,7 @@ def adam_gradient_solve(
         if e is None:
             return None
         e0 = e[:, 0]
-        design_a = np.zeros((obs, n_free), dtype=np.float64)
+        design_a = np.zeros((obs_in_sample, n_free), dtype=np.float64)
         for j in range(n_free):
             design_a[:, j] = e0 - e[:, j + 1]
         # Solve min ||e0 - A d|| in C++ (pivoted QR, rank-deficiency aware) so the
@@ -180,7 +192,7 @@ def adam_gradient_solve(
         e = residuals_for(slices)
         if e is None:
             break
-        jm = np.zeros((obs, n_free), dtype=np.float64)
+        jm = np.zeros((obs_in_sample, n_free), dtype=np.float64)
         for j in range(n_free):
             jm[:, j] = (e[:, j] - e0) / hs[j]
         try:
@@ -220,6 +232,7 @@ def adam_fit_or_gradient(
     model_type_dict,
     components_dict,
     lags_dict,
+    obs_in_sample,
     o_type="n",
 ):
     """Fit dispatcher mirroring ``adam_fitOrGradient``.
@@ -262,6 +275,7 @@ def adam_fit_or_gradient(
                 ot,
                 layout,
                 lags_model_max,
+                obs_in_sample,
             )
             if solved is not None:
                 mat_vt[:, :lags_model_max] = solved

@@ -594,6 +594,7 @@ def CF(  # noqa: N802
         model_type_dict=model_type_dict,
         components_dict=components_dict,
         lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
     )
 
     # adam_fitted.errors = np.repeat()
@@ -1208,6 +1209,7 @@ def log_Lik_ADAM(  # noqa: N802
                 model_type_dict=model_type_dict,
                 components_dict=components_dict,
                 lags_dict=lags_dict,
+                obs_in_sample=observations_dict["obs_in_sample"],
             )
 
             logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))

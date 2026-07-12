@@ -806,6 +806,7 @@ def estimator(
                 model_type_dict=model_type_dict,
                 components_dict=components_dict,
                 lags_dict=lags_dict,
+                obs_in_sample=observations_dict["obs_in_sample"],
             )
 
             # Update original matrices

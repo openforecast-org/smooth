@@ -19,7 +19,7 @@
 #' @rdname ces
 #' @export
 auto.ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequency(y)),
-                     initial=c("backcasting","optimal","two-stage","complete"),
+                     initial=c("backcasting","optimal","two-stage","complete","gradient"),
                      ic=c("AICc","AIC","BIC","BICc"),
                      loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                      h=0, holdout=FALSE,

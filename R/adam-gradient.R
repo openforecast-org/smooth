@@ -1,123 +1,185 @@
 #' @keywords internal
-#' Gradient initialisation for adam().
+#' Least-squares initial-state solve for ETS ("gradient" initialisation).
 #'
-#' Solves for the initial state by least squares instead of the backcasting
-#' filter heuristic. In a Single Source of Error model the in-sample residuals
-#' are, at fixed persistence, an affine function of the initial state (for
-#' additive models), so the SSE-optimal initials are a single linear solve —
-#' no backward pass, no time reversal, no fixed-point iteration to diverge.
+#' Given fixed persistence (the current \code{matF} / \code{vecG}) and a seeded
+#' recent profile, this solves for the initial state that minimises the in-sample
+#' SSE. In a Single Source of Error model the residuals are, at fixed persistence,
+#' an affine function of the initial state for additive models (exact one-shot
+#' least squares) and a smooth nonlinear function otherwise (Gauss-Newton). It
+#' does not run the backcasting backward pass at all.
 #'
-#' Implemented as a wrapper around the existing provided-initial path so the
-#' core estimation code is left untouched:
-#'   1. fit with initial="backcasting" to obtain the persistence / selected model;
-#'   2. probe the forward pass at unit perturbations of each free initial to
-#'      build the design, then solve;
-#'   3. refit with the solved initials (initial=<list>).
+#' The forward-pass oracle is \code{adamCore$reapply(backcast=FALSE)}: each slice
+#' of the profile cube is one probe, run through the same forward machinery the
+#' final fit uses, in a single C++ call.
 #'
-#' Phase 1 supports additive ETS models (no ARIMA, no xreg, single seasonality).
-#' Anything else falls back to backcasting with a message, so behaviour never
-#' silently changes for unsupported specifications.
-#'
-#' @param cl The original adam() call (with initial="gradient").
-#' @param envir The environment in which to evaluate cl (the caller's frame).
-adam_gradient <- function(cl, envir){
-    # Step 1: backcasting fit -> persistence and (if selected) the model
-    cl0 <- cl
-    cl0$initial <- "backcasting"
-    m0 <- eval(cl0, envir)
+#' @param adamCpp The adamCore object.
+#' @param matWt,matF,vecG,indexLookupTable Model matrices for the current params.
+#' @param profile The seeded recent profile (nComponents x lagsModelMax).
+#' @param yInSample,ot The data and occurrence vectors.
+#' @param layout A list describing the free ETS initials (see adam_gradientLayout).
+#' @param lagsModelMax Maximum lag.
+#' @return The solved recent profile (same shape as \code{profile}), or NULL on failure.
+adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
+                               profile, yInSample, ot, layout, lagsModelMax){
+    y <- as.numeric(yInSample)
+    obs <- length(y)
+    nComp <- nrow(profile)
+    Etype <- layout$Etype
+    additive <- layout$additive
 
-    # Determine free-initial structure from the fitted object
-    trendy <- !is.null(m0$initial$trend)
-    seasonal <- !is.null(m0$initial$seasonal)
-    seasVec <- NULL
-    if(seasonal){
-        seasVec <- if(is.list(m0$initial$seasonal)) m0$initial$seasonal[[1]] else m0$initial$seasonal
-    }
-    mSeason <- length(seasVec)
+    # Free-initial probe map: each entry is a set of (row, cols) in the profile
+    # that move together as one free parameter.
+    probes <- layout$probes
+    nFree <- length(probes)
+    if(nFree == 0){ return(NULL) }
 
-    # Phase 1 support gate: additive ETS, no ARIMA, no xreg, at most one seasonality
-    modelStr <- modelType(m0)
-    Etype <- substr(modelStr, 1, 1)
-    hasARIMA <- !is.null(m0$arma) && length(unlist(m0$arma)) > 0 &&
-        any(unlist(m0$arma) != 0)
-    hasXreg <- !is.null(m0$initial$xreg)
-    multiSeasonal <- is.list(m0$initial$seasonal) && length(m0$initial$seasonal) > 1
-    supported <- (Etype == "A") && !grepl("M", modelStr) &&
-        !hasARIMA && !hasXreg && !multiSeasonal
-
-    if(!supported){
-        warning(paste0("initial=\"gradient\" currently supports additive ETS models ",
-                       "(no ARIMA/xreg, single seasonality). Using backcasting for this model."),
-                call.=FALSE)
-        return(m0)
-    }
-
-    # Map between the free-initial vector and the initial=list() form
-    v0ToList <- function(v0){
-        lst <- list(level = v0[1])
-        idx <- 2
-        if(trendy){ lst$trend <- v0[idx]; idx <- idx + 1 }
-        if(seasonal){ lst$seasonal <- v0[idx:(idx + mSeason - 1)] }
-        return(lst)
-    }
-    listToV0 <- function(init){
-        return(c(init$level,
-                 if(trendy){ init$trend } else { NULL },
-                 if(seasonal){ if(is.list(init$seasonal)) init$seasonal[[1]] else init$seasonal } else { NULL }))
-    }
-
-    persUsed <- m0$persistence
-    phiUsed <- m0$phi
-
-    # Oracle: in-sample residuals of one forward pass at the given initials,
-    # with persistence / model / phi held fixed. Reuses the provided-initial path.
-    oracle <- function(v0){
-        clo <- cl
-        clo$initial <- v0ToList(v0)
-        clo$model <- modelStr
-        clo$persistence <- persUsed
-        clo$phi <- phiUsed
-        res <- try(as.numeric(residuals(eval(clo, envir))), silent = TRUE)
+    # Residuals of one forward pass for a set of candidate profiles (slices).
+    # Returns an obs x nSlices matrix of residuals, or NULL on failure.
+    residualsFor <- function(profList){
+        nSlices <- length(profList)
+        arrProf <- array(0, c(nComp, lagsModelMax, nSlices))
+        for(s in 1:nSlices){ arrProf[, , s] <- profList[[s]] }
+        arrVt <- array(0, c(nComp, obs + lagsModelMax, nSlices))
+        arrWt <- array(matWt, c(dim(matWt), nSlices))
+        arrF <- array(matF, c(dim(matF), nSlices))
+        matG <- matrix(as.numeric(vecG), nComp, nSlices)
+        res <- try(adamCpp$reapply(matrix(y, obs, 1), matrix(as.numeric(ot), obs, 1),
+                                   arrVt, arrWt, arrF, matG, indexLookupTable,
+                                   arrProf, FALSE), silent = TRUE)
         if(inherits(res, "try-error")){ return(NULL) }
-        return(res)
+        fitted <- res$fitted
+        if(any(!is.finite(fitted))){ return(NULL) }
+        E <- switch(Etype, "M" = y / fitted - 1, y - fitted)
+        if(any(!is.finite(E))){ return(NULL) }
+        return(E)
     }
 
-    # Step 2: build the design by unit probes, then solve (additive => exact)
-    b0 <- listToV0(m0$initial)
-    e0 <- oracle(b0)
-    if(is.null(e0)){
-        warning("initial=\"gradient\" solve failed; using backcasting.", call.=FALSE)
-        return(m0)
-    }
-    k <- length(b0)
-    designA <- matrix(0, length(e0), k)
-    for(j in 1:k){
-        bj <- b0
-        bj[j] <- bj[j] + 1
-        ej <- oracle(bj)
-        if(is.null(ej)){
-            warning("initial=\"gradient\" solve failed; using backcasting.", call.=FALSE)
-            return(m0)
+    # Apply a step in free-parameter coordinates to a profile.
+    applyStep <- function(prof, step){
+        for(j in 1:nFree){
+            p <- probes[[j]]
+            prof[p$row, p$cols] <- prof[p$row, p$cols] + step[j]
         }
-        designA[, j] <- e0 - ej
+        return(prof)
     }
-    # min || e0 - A d ||, pivoted QR handles the seasonal sum-zero rank deficiency
-    qrA <- qr(designA)
-    d <- qr.coef(qrA, e0)
-    d[is.na(d)] <- 0
-    v0Hat <- b0 + d
 
-    # Step 3: final fit with the solved initials
-    clf <- cl
-    clf$initial <- v0ToList(v0Hat)
-    clf$model <- modelStr
-    clf$persistence <- persUsed
-    clf$phi <- phiUsed
-    mFinal <- try(eval(clf, envir), silent = TRUE)
-    if(inherits(mFinal, "try-error")){
-        warning("initial=\"gradient\" final fit failed; using backcasting.", call.=FALSE)
-        return(m0)
+    if(additive){
+        # Affine: build the design with unit probes, solve once.
+        slices <- vector("list", nFree + 1)
+        slices[[1]] <- profile
+        for(j in 1:nFree){
+            pj <- profile; pp <- probes[[j]]
+            pj[pp$row, pp$cols] <- pj[pp$row, pp$cols] + 1
+            slices[[j + 1]] <- pj
+        }
+        E <- residualsFor(slices)
+        if(is.null(E)){ return(NULL) }
+        e0 <- E[, 1]
+        designA <- matrix(0, obs, nFree)
+        for(j in 1:nFree){ designA[, j] <- e0 - E[, j + 1] }
+        # Solve min ||e0 - A d|| in C++ (pivoted QR, rank-deficiency aware) so the
+        # result is identical in the Python port that shares the same core.
+        d <- as.numeric(olsCpp(designA, e0, 1e-7))
+        d[!is.finite(d)] <- 0
+        return(applyStep(profile, d))
     }
-    mFinal$initialType <- "gradient"
-    return(mFinal)
+    else{
+        # Nonlinear: Gauss-Newton with finite-difference Jacobian and line search.
+        prof <- profile
+        E0 <- residualsFor(list(prof))
+        if(is.null(E0)){ return(NULL) }
+        e0 <- E0[, 1]; fCur <- sum(e0^2)
+        for(iter in 1:15){
+            slices <- vector("list", nFree)
+            hs <- numeric(nFree)
+            for(j in 1:nFree){
+                pp <- probes[[j]]
+                h <- 1e-4 * max(1, abs(prof[pp$row, pp$cols[1]]))
+                pj <- prof; pj[pp$row, pp$cols] <- pj[pp$row, pp$cols] + h
+                slices[[j]] <- pj; hs[j] <- h
+            }
+            E <- residualsFor(slices)
+            if(is.null(E)){ break }
+            Jm <- matrix(0, obs, nFree)
+            for(j in 1:nFree){ Jm[, j] <- (E[, j] - e0) / hs[j] }
+            # Gauss-Newton step via the C++ solve (parity with Python).
+            step <- tryCatch(-as.numeric(olsCpp(Jm, e0, 1e-7)),
+                             error = function(e) rep(NA_real_, nFree))
+            step[!is.finite(step)] <- 0
+            if(sqrt(sum(step^2)) < 1e-8){ break }
+            improved <- FALSE
+            for(tt in c(1, 0.5, 0.25, 0.125, 0.0625, 0.03125)){
+                Et <- residualsFor(list(applyStep(prof, tt * step)))
+                if(!is.null(Et) && sum(Et[, 1]^2) < fCur){
+                    prof <- applyStep(prof, tt * step); e0 <- Et[, 1]; fCur <- sum(e0^2)
+                    improved <- TRUE; break
+                }
+            }
+            if(!improved){ break }
+        }
+        return(prof)
+    }
+}
+
+#' @keywords internal
+#' Build the free-initial probe map for gradient initialisation of an ETS model.
+#' Returns NULL when the model is out of scope (ARIMA / xreg / non-ETS), so the
+#' caller falls back to backcasting.
+adam_gradientLayout <- function(etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                                componentsNumberETS, componentsNumberETSSeasonal,
+                                componentsNumberETSNonSeasonal, lagsModel, lagsModelMax){
+    if(!etsModel || arimaModel || xregModel){ return(NULL) }
+    probes <- list()
+    # level: row 1, all head columns move together
+    probes[[length(probes) + 1]] <- list(row = 1, cols = 1:lagsModelMax)
+    # trend: row 2
+    if(Ttype != "N"){
+        probes[[length(probes) + 1]] <- list(row = 2, cols = 1:lagsModelMax)
+    }
+    # seasonal: each cell of each seasonal row is a free parameter
+    if(Stype != "N" && componentsNumberETSSeasonal > 0){
+        for(i in 1:componentsNumberETSSeasonal){
+            r <- componentsNumberETSNonSeasonal + i
+            for(c in 1:lagsModel[r]){
+                probes[[length(probes) + 1]] <- list(row = r, cols = c)
+            }
+        }
+    }
+    additive <- (Etype == "A") && (Ttype %in% c("N", "A")) && (Stype %in% c("N", "A"))
+    return(list(probes = probes, Etype = Etype, additive = additive))
+}
+
+#' @keywords internal
+#' Fit dispatcher: runs the gradient initial-state solve when
+#' initialType=="gradient" and the model is in scope (ETS, no ARIMA/xreg),
+#' otherwise the ordinary adamCore$fit (with the backcast flag). Gradient always
+#' fits with backcast=FALSE from the solved initials; it never runs the backward
+#' pass. Out-of-scope gradient models fall back to backcasting.
+adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profile,
+                               yInSample, ot, initialType, nIterations, adamCpp,
+                               etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                               componentsNumberETS, componentsNumberETSSeasonal,
+                               componentsNumberETSNonSeasonal, lagsModel, lagsModelMax){
+    if(any(initialType == "gradient")){
+        layout <- adam_gradientLayout(etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                                      componentsNumberETS, componentsNumberETSSeasonal,
+                                      componentsNumberETSNonSeasonal, lagsModel, lagsModelMax)
+        if(!is.null(layout)){
+            solved <- adam_gradientSolve(adamCpp, matWt, matF, vecG, indexLookupTable,
+                                         profile, yInSample, ot, layout, lagsModelMax)
+            if(!is.null(solved)){
+                matVt[, 1:lagsModelMax] <- solved
+                # A single forward pass from the solved initials (backcast=FALSE).
+                # nIterations must be 1 here: with no backward pass, a second
+                # iteration would re-run headFillFwd on the profile already
+                # mutated by the first forward pass and diverge.
+                return(adamCpp$fit(matVt, matWt, matF, vecG, indexLookupTable, solved,
+                                   yInSample, ot, FALSE, 1, "n"))
+            }
+        }
+    }
+    return(adamCpp$fit(matVt, matWt, matF, vecG, indexLookupTable, profile,
+                       yInSample, ot,
+                       any(initialType == c("complete", "backcasting", "gradient")),
+                       nIterations, "n"))
 }

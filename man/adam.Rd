@@ -17,8 +17,8 @@ adam(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar =
   "TMSE", "GTMSE", "MSCE", "GPL"), outliers = c("ignore", "use", "select"),
   level = 0.99, h = 0, holdout = FALSE, persistence = NULL,
   phi = NULL, initial = c("backcasting", "optimal", "two-stage",
-  "complete"), arma = NULL, ic = c("AICc", "AIC", "BIC", "BICc"),
-  bounds = c("usual", "admissible", "none"), silent = TRUE,
+  "complete", "gradient"), arma = NULL, ic = c("AICc", "AIC", "BIC",
+  "BICc"), bounds = c("usual", "admissible", "none"), silent = TRUE,
   ets = c("conventional", "adam"), ...)
 
 \method{simulate}{adam}(object, nsim = 1, seed = NULL,
@@ -32,8 +32,8 @@ auto.adam(data, model = "ZXZ", lags = c(frequency(data)),
   "ds", "dgnorm", "dlnorm", "dinvgauss", "dgamma"), outliers = c("ignore",
   "use", "select"), level = 0.99, h = 0, holdout = FALSE,
   persistence = NULL, phi = NULL, initial = c("backcasting", "optimal",
-  "two-stage", "complete"), arma = NULL, ic = c("AICc", "AIC", "BIC",
-  "BICc"), bounds = c("usual", "admissible", "none"), silent = TRUE,
+  "two-stage", "complete", "gradient"), arma = NULL, ic = c("AICc", "AIC",
+  "BIC", "BICc"), bounds = c("usual", "admissible", "none"), silent = TRUE,
   parallel = FALSE, ets = c("conventional", "adam"), ...)
 
 \method{sm}{adam}(object, model = "YYY", lags = NULL, orders = list(ar =
@@ -218,11 +218,12 @@ explanatory variables are optimised. This is recommended for ETSX and ARIMAX
 models. Alternatively, you can set \code{initial="complete"} backcasting,
 which means that all states (including explanatory variables) are initialised
 via backcasting. Finally, \code{initial="gradient"} solves for the initial
-states by least squares (a single linear solve at fixed persistence), which is
-exact for additive ETS and avoids the divergence that backcasting can exhibit
-for seasonal models with a trend and a large seasonal smoothing parameter. This
-option currently supports additive ETS models (no ARIMA/xreg, single
-seasonality); other specifications fall back to backcasting.
+states by least squares: a single linear solve for additive ETS (exact,
+because the residuals are then affine in the initial state) or a Gauss-Newton
+iteration for multiplicative / mixed ETS. It avoids the divergence that
+backcasting can exhibit for additive seasonal models with a trend and a large
+seasonal smoothing parameter. This option currently supports ETS models (no
+ARIMA/xreg, single seasonality); other specifications fall back to backcasting.
 
 If a use provides a list of values, it is recommended to use the named one and
 to provide the initial components that are available. For example:

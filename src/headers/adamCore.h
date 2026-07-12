@@ -1,6 +1,7 @@
 #include "ssGeneral.h"
 #include "adamGeneral.h"
 #include "ssOccurrence.h"
+#include "olsCore.h"
 
 // ============================================================================
 // STRUCTURE DEFINITIONS
@@ -90,6 +91,53 @@ private:
     unsigned int nComponents;
     bool constant;
     bool adamETS;
+
+    // Private helper for gradientSolve(): one in-sample forward pass from the
+    // given recent profile (mirrors the in-sample slice loop of reapply() with
+    // backcast=false, including the head refinement). Writes the residuals into
+    // vecErrors and returns false when they go non-finite.
+    bool gradientPass(arma::mat profilesRecent,
+                      arma::mat const &matrixYt, arma::mat const &matrixOt,
+                      arma::mat const &matrixWt, arma::mat const &matrixF,
+                      arma::vec const &vectorG, arma::umat const &indexLookupTable,
+                      arma::vec &vecErrors) {
+        int obs = matrixYt.n_rows;
+        int lagsModelMax = max(lags);
+        if(lagsModelMax > 1) {
+            arma::mat scratchVt(profilesRecent.n_rows, lagsModelMax);
+            refineHeadFwd(scratchVt, profilesRecent, matrixF,
+                          indexLookupTable, lagsModelMax);
+        }
+        double yFit;
+        for(int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
+            int idx = i - lagsModelMax;
+            yFit = adamWvalue(profilesRecent(indexLookupTable.col(i)),
+                              matrixWt.row(idx), E, T, S,
+                              nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
+                              nComponents, constant);
+            // Fix potential issue with negatives in mixed models
+            if((E=='M' || T=='M' || S=='M') && (yFit<=0)){
+                yFit = 1;
+            }
+            // Multiplication needed for cases when occurrence is fractional
+            if(matrixOt(idx)!=0){
+                yFit = matrixOt(idx) * yFit;
+            }
+            // errorf() returns 0 immediately when ot==0
+            vecErrors(idx) = errorf(matrixYt(idx), yFit, E, matrixOt(idx));
+
+            profilesRecent(indexLookupTable.col(i)) =
+                adamFvalue(profilesRecent(indexLookupTable.col(i)),
+                           matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal,
+                           nArima, nComponents, constant) +
+                adamGvalue(profilesRecent(indexLookupTable.col(i)),
+                           matrixF, matrixWt.row(idx), E, T, S,
+                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
+                           nComponents, constant, vectorG, vecErrors(idx),
+                           yFit, adamETS);
+        }
+        return vecErrors.is_finite();
+    }
 
     // Private helper: shared loop control for fit(), omfit(), omfitGeneral()
     template<typename ForwardFn, typename BackwardFn,
@@ -794,6 +842,222 @@ public:
         result.fitted = matYfit;
         result.profile = arrayProfilesRecent;
         return result;
+    }
+
+    // Method 6b: gradientSolve - least-squares solve for the initial recent
+    // profile (initial="gradient"). Given fixed persistence, finds the initial
+    // state minimising the in-sample SSE. probeBasis maps nFree free parameters
+    // to profile cells (column j holds 1s on the cells that move together as one
+    // parameter; profile candidates are profile + reshape(probeBasis*theta)).
+    //
+    // For additive ETS the residuals are affine in theta, so the design matrix
+    // (the residual sensitivities) is propagated analytically alongside a single
+    // forward pass and the problem is solved by one pivoted-QR least squares.
+    // Otherwise finite-difference Gauss-Newton with a backtracking line search
+    // and a Levenberg-Marquardt fallback is used. The solve is stateless: the
+    // result is a deterministic function of the inputs, which the optimiser
+    // requires and which keeps the R and Python builds bit-identical.
+    //
+    // Returns the solved recent profile, or an empty matrix on failure (the
+    // caller then falls back to the backcasting fit).
+    arma::mat gradientSolve(arma::mat const &matrixYt, arma::mat const &matrixOt,
+                            arma::mat const &matrixWt, arma::mat const &matrixF,
+                            arma::vec const &vectorG, arma::umat const &indexLookupTable,
+                            arma::mat const &profile, arma::mat const &probeBasis,
+                            unsigned int const &nIterations){
+
+        int obs = matrixYt.n_rows;
+        int lagsModelMax = max(lags);
+        unsigned int nFree = probeBasis.n_cols;
+        arma::mat const failure(0, 0);
+        if(nFree == 0){
+            return failure;
+        }
+
+        // The solve is defined over the in-sample SSE of the same forward pass the
+        // final fit runs, so both branches share gradientPass().
+        bool additive = (E=='A') && (T!='M') && (S!='M');
+
+        if(additive){
+            // Affine case: one forward pass propagating the residual sensitivities.
+            // S holds d(profile cell)/d(theta) for every profile cell (rows follow
+            // the profile's column-major linear indices, which is exactly what
+            // indexLookupTable contains), so S.rows(lookup) are the sensitivities
+            // of the states involved at a given observation. All the involved maps
+            // are linear here: measurement w'v, transition F*v, update g*e.
+            arma::mat prof = profile;
+            arma::mat sens = probeBasis;
+            arma::vec residuals(obs);
+            arma::mat design(obs, nFree);
+
+            // Head refinement: refineHeadFwd walks the level/trend rows across the
+            // head columns via adamFvalue (= F*v here); sensitivities follow.
+            if(lagsModelMax > 1 && T != 'N'){
+                for(int i=1; i<lagsModelMax; i=i+1){
+                    arma::uvec cells = indexLookupTable.col(i);
+                    arma::vec profNew = adamFvalue(prof(cells), matrixF, E, T, S,
+                                                   nETS, nNonSeasonal, nSeasonal,
+                                                   nArima, nComponents, constant);
+                    arma::mat sensNew = matrixF * sens.rows(cells);
+                    prof(cells.rows(0,1)) = profNew.rows(0,1);
+                    sens.rows(cells.rows(0,1)) = sensNew.rows(0,1);
+                }
+            }
+
+            for(int i=lagsModelMax; i<obs+lagsModelMax; i=i+1){
+                int idx = i - lagsModelMax;
+                arma::uvec cells = indexLookupTable.col(i);
+                double yFit = adamWvalue(prof(cells), matrixWt.row(idx), E, T, S,
+                                         nETS, nNonSeasonal, nSeasonal, nArima,
+                                         nXreg, nComponents, constant);
+                arma::rowvec dyFit = matrixWt.row(idx) * sens.rows(cells);
+                if(matrixOt(idx)!=0){
+                    yFit = matrixOt(idx) * yFit;
+                    dyFit = matrixOt(idx) * dyFit;
+                }
+                residuals(idx) = errorf(matrixYt(idx), yFit, E, matrixOt(idx));
+                // d(residual)/d(theta) = -dyFit when the point is observed;
+                // errorf returns a constant 0 when ot==0.
+                arma::rowvec dError = (matrixOt(idx)!=0) ? arma::rowvec(-dyFit)
+                                                         : arma::rowvec(nFree, arma::fill::zeros);
+                // The design column j is e0 - e_j (residual drop per unit probe),
+                // i.e. minus the residual sensitivity.
+                design.row(idx) = -dError;
+
+                prof(cells) = adamFvalue(prof(cells), matrixF, E, T, S,
+                                         nETS, nNonSeasonal, nSeasonal, nArima,
+                                         nComponents, constant) +
+                              adamGvalue(prof(cells), matrixF, matrixWt.row(idx),
+                                         E, T, S, nETS, nNonSeasonal, nSeasonal,
+                                         nArima, nXreg, nComponents, constant,
+                                         vectorG, residuals(idx), yFit, adamETS);
+                sens.rows(cells) = matrixF * sens.rows(cells) + vectorG * dError;
+            }
+
+            if(!residuals.is_finite() || !design.is_finite()){
+                return failure;
+            }
+            arma::vec theta = olsCore(design, residuals, 1e-7);
+            theta.elem(arma::find_nonfinite(theta)).zeros();
+            return profile + arma::reshape(probeBasis * theta,
+                                           profile.n_rows, profile.n_cols);
+        }
+
+        // Nonlinear case: Gauss-Newton with a finite-difference Jacobian, a
+        // backtracking line search and a Levenberg-Marquardt fallback. The solve
+        // is deliberately stateless (always starts from the seed profile): the
+        // objective must be a deterministic function of the inputs, both for the
+        // optimiser and for exact parity between the R and Python builds.
+        arma::mat prof = profile;
+        arma::vec residuals(obs);
+        if(!gradientPass(prof, matrixYt, matrixOt, matrixWt, matrixF, vectorG,
+                         indexLookupTable, residuals)){
+            return failure;
+        }
+        double sseCurrent = arma::dot(residuals, residuals);
+
+        // First profile cell of each probe: the finite-difference step is scaled
+        // by the current value there, matching the original R implementation.
+        arma::uvec firstCell(nFree);
+        for(unsigned int j=0; j<nFree; j=j+1){
+            arma::uvec nonZero = arma::find(probeBasis.col(j));
+            firstCell(j) = nonZero(0);
+        }
+
+        arma::mat jacobian(obs, nFree);
+        arma::vec residualsProbe(obs);
+        double sseBeforeIteration;
+        for(unsigned int iter=0; iter<nIterations; iter=iter+1){
+            sseBeforeIteration = sseCurrent;
+            bool jacobianOk = true;
+            for(unsigned int j=0; j<nFree; j=j+1){
+                double h = 1e-4 * std::max(1.0, std::abs(prof(firstCell(j))));
+                arma::mat profProbe = prof + arma::reshape(h * probeBasis.col(j),
+                                                           profile.n_rows, profile.n_cols);
+                if(!gradientPass(profProbe, matrixYt, matrixOt, matrixWt, matrixF,
+                                 vectorG, indexLookupTable, residualsProbe)){
+                    jacobianOk = false;
+                    break;
+                }
+                jacobian.col(j) = (residualsProbe - residuals) / h;
+            }
+            if(!jacobianOk){
+                break;
+            }
+
+            arma::vec step = -olsCore(jacobian, residuals, 1e-7);
+            step.elem(arma::find_nonfinite(step)).zeros();
+            if(std::sqrt(arma::dot(step, step)) < 1e-8){
+                break;
+            }
+
+            // Try the plain Gauss-Newton step with a backtracking line search.
+            bool improved = false;
+            double stepSize = 1;
+            for(int half=0; half<6; half=half+1){
+                arma::mat profCandidate = prof + arma::reshape(probeBasis * (stepSize * step),
+                                                               profile.n_rows, profile.n_cols);
+                if(gradientPass(profCandidate, matrixYt, matrixOt, matrixWt, matrixF,
+                                vectorG, indexLookupTable, residualsProbe) &&
+                   arma::dot(residualsProbe, residualsProbe) < sseCurrent){
+                    prof = profCandidate;
+
+                    residuals = residualsProbe;
+                    sseCurrent = arma::dot(residuals, residuals);
+                    improved = true;
+                    break;
+                }
+                stepSize = stepSize / 2;
+            }
+
+            // Levenberg-Marquardt fallback: when the raw Gauss-Newton step fails
+            // (typically because the Jacobian is ill-conditioned and the step is
+            // wildly oversized), solve the damped normal equations
+            // [J; sqrt(lambda) I] step = [e; 0] with increasing damping until a
+            // step improves the SSE. This keeps the descent property without
+            // clipping anything: pure gradient-descent behaviour as lambda grows.
+            if(!improved){
+                double lambdaScale = arma::accu(arma::square(jacobian)) / nFree;
+                arma::mat jacobianDamped(obs + nFree, nFree, arma::fill::zeros);
+                jacobianDamped.rows(0, obs-1) = jacobian;
+                arma::vec residualsDamped(obs + nFree, arma::fill::zeros);
+                residualsDamped.rows(0, obs-1) = residuals;
+                for(int power=-2; power<=4 && !improved; power=power+2){
+                    double lambda = lambdaScale * std::pow(10.0, power);
+                    jacobianDamped.rows(obs, obs+nFree-1) =
+                        std::sqrt(lambda) * arma::eye(nFree, nFree);
+                    step = -olsCore(jacobianDamped, residualsDamped, 1e-7);
+                    step.elem(arma::find_nonfinite(step)).zeros();
+                    if(std::sqrt(arma::dot(step, step)) < 1e-8){
+                        break;
+                    }
+                    arma::mat profCandidate = prof + arma::reshape(probeBasis * step,
+                                                                   profile.n_rows, profile.n_cols);
+                    if(gradientPass(profCandidate, matrixYt, matrixOt, matrixWt, matrixF,
+                                    vectorG, indexLookupTable, residualsProbe) &&
+                       arma::dot(residualsProbe, residualsProbe) < sseCurrent){
+                        prof = profCandidate;
+
+                        residuals = residualsProbe;
+                        sseCurrent = arma::dot(residuals, residuals);
+                        improved = true;
+                    }
+                }
+            }
+            if(!improved){
+                break;
+            }
+            // Diminishing returns: once an iteration improves the SSE by less
+            // than a relative 1e-4, further iterations are not worth their
+            // Jacobian cost — the warm start carries the remaining convergence
+            // across the optimiser's evaluations.
+            if(sseCurrent > sseBeforeIteration * (1 - 1e-4)){
+                break;
+            }
+        }
+
+
+        return prof;
     }
 
     // Method 7: Reforecast - produce many forecasts given the matrices

@@ -7,7 +7,7 @@
 \usage{
 msarima(y, orders = list(ar = c(0), i = c(1), ma = c(1)), lags = c(1),
   constant = FALSE, arma = NULL, model = NULL,
-  initial = c("backcasting", "optimal", "two-stage", "complete"),
+  initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
   ic = c("AICc", "AIC", "BIC", "BICc"), loss = c("likelihood", "MSE",
   "MAE", "HAM", "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"), h = 0,
   holdout = FALSE, bounds = c("usual", "admissible", "none"),
@@ -16,7 +16,7 @@ msarima(y, orders = list(ar = c(0), i = c(1), ma = c(1)), lags = c(1),
 
 auto.msarima(y, orders = list(ar = c(3, 3), i = c(2, 1), ma = c(3, 3)),
   lags = c(1, frequency(y)), initial = c("backcasting", "optimal",
-  "two-stage", "complete"), ic = c("AICc", "AIC", "BIC", "BICc"),
+  "two-stage", "complete", "gradient"), ic = c("AICc", "AIC", "BIC", "BICc"),
   loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
   "MSCE", "GPL"), h = 0, holdout = FALSE, bounds = c("usual",
   "admissible", "none"), silent = TRUE, xreg = NULL,
@@ -280,7 +280,7 @@ Springer-Verlag. \doi{10.1007/978-3-540-71918-2}.
 
 \itemize{
 \item Svetunkov, I., & Boylan, J. E. (2019). State-space ARIMA for supply-chain forecasting.
-International Journal of Production Research, 0(0), 1–10.
+International Journal of Production Research, 0(0), 1<e2><80><93>10.
 \doi{10.1080/00207543.2019.1600764}
 }
 }

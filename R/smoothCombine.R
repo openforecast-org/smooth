@@ -90,7 +90,7 @@
 #' @importFrom stats fitted
 #' @export smoothCombine
 smoothCombine <- function(y, models=NULL,
-                          initial=c("backcasting", "optimal", "two-stage", "complete"),
+                          initial=c("backcasting", "optimal", "two-stage", "complete", "gradient"),
                           ic=c("AICc","AIC","BIC","BICc"),
                           loss=c("MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE"),
                           h=10, holdout=FALSE, cumulative=FALSE,

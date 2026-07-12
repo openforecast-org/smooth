@@ -89,7 +89,7 @@
 #' @rdname ces
 #' @export
 ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequency(y)),
-                initial=c("backcasting","optimal","two-stage","complete"), a=NULL, b=NULL,
+                initial=c("backcasting","optimal","two-stage","complete","gradient"), a=NULL, b=NULL,
                 loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                 h=0, holdout=FALSE, bounds=c("admissible","none"), silent=TRUE,
                 model=NULL, xreg=NULL, regressors=c("use","select","adapt"), initialX=NULL, ...){
@@ -505,7 +505,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                   elements$matF, elements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations, "n");
+                                  any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -990,7 +990,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                               matF, vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations, "n");
+                              any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;

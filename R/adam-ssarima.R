@@ -109,7 +109,7 @@
 #' @export
 ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(y)),
                     constant=FALSE, arma=NULL, model=NULL,
-                    initial=c("backcasting","optimal","two-stage","complete"),
+                    initial=c("backcasting","optimal","two-stage","complete","gradient"),
                     loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                     h=0, holdout=FALSE, bounds=c("admissible","usual","none"), silent=TRUE,
                     xreg=NULL, regressors=c("use","select","adapt"), initialX=NULL,
@@ -436,7 +436,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                                   elements$matF, elements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations, "n");
+                                  any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -1130,7 +1130,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                               matF, vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations, "n");
+                              any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;

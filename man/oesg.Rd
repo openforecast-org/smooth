@@ -7,7 +7,7 @@
 oesg(y, modelA = "MNN", modelB = modelA, lags = c(frequency(y)),
   persistenceA = NULL, persistenceB = persistenceA, phiA = NULL,
   phiB = phiA, initial = c("backcasting", "optimal", "two-stage",
-  "complete"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
+  "complete", "gradient"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
   holdout = FALSE, bounds = c("usual", "admissible", "none"),
   etsA = c("conventional", "adam"), etsB = etsA, xregA = NULL,
   xregB = NULL, regressorsA = c("use", "select"),

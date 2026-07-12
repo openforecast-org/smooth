@@ -155,11 +155,12 @@
 #' models. Alternatively, you can set \code{initial="complete"} backcasting,
 #' which means that all states (including explanatory variables) are initialised
 #' via backcasting. Finally, \code{initial="gradient"} solves for the initial
-#' states by least squares (a single linear solve at fixed persistence), which is
-#' exact for additive ETS and avoids the divergence that backcasting can exhibit
-#' for seasonal models with a trend and a large seasonal smoothing parameter. This
-#' option currently supports additive ETS models (no ARIMA/xreg, single
-#' seasonality); other specifications fall back to backcasting.
+#' states by least squares: a single linear solve for additive ETS (exact,
+#' because the residuals are then affine in the initial state) or a Gauss-Newton
+#' iteration for multiplicative / mixed ETS. It avoids the divergence that
+#' backcasting can exhibit for additive seasonal models with a trend and a large
+#' seasonal smoothing parameter. This option currently supports ETS models (no
+#' ARIMA/xreg, single seasonality); other specifications fall back to backcasting.
 #'
 #' If a use provides a list of values, it is recommended to use the named one and
 #' to provide the initial components that are available. For example:
@@ -335,22 +336,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                  loss=c("likelihood","MSE","MAE","HAM","LASSO","RIDGE","MSEh","TMSE","GTMSE","MSCE","GPL"),
                  outliers=c("ignore","use","select"), level=0.99,
                  h=0, holdout=FALSE,
-                 persistence=NULL, phi=NULL, initial=c("backcasting","optimal","two-stage","complete"), arma=NULL,
+                 persistence=NULL, phi=NULL, initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
                  ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
                  silent=TRUE, ets=c("conventional","adam"), ...){
     # Copyright (C) 2019 - Inf  Ivan Svetunkov
 
     # Start measuring the time of calculations
     startTime <- Sys.time();
-
-    # Gradient initialisation is orchestrated as a wrapper around the existing
-    # provided-initial path (see adam-gradient.R), so the core estimation code
-    # below is left untouched. Only a user-specified initial="gradient" triggers
-    # it; the default multi-value vector does not.
-    if(is.character(initial) && length(initial)==1 && !is.na(initial) &&
-       identical(initial, "gradient")){
-        return(adam_gradient(match.call(), parent.frame()));
-    }
 
     cl <- match.call();
     # Record the parental environment. Needed for ARIMA initialisation
@@ -771,11 +763,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # print(profilesRecentTable)
 
         #### Fitter and the losses calculation ####
-        adamFitted <- adamCpp$fit(adamElements$matVt, adamElements$matWt,
-                                  adamElements$matF, adamElements$vecG,
-                                  indexLookupTable, profilesRecentTable,
-                                  yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations, "n");
+        adamFitted <- adam_fitOrGradient(adamElements$matVt, adamElements$matWt,
+                                         adamElements$matF, adamElements$vecG,
+                                         indexLookupTable, profilesRecentTable,
+                                         yInSample, ot, initialType, nIterations, adamCpp,
+                                         etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                                         componentsNumberETS, componentsNumberETSSeasonal,
+                                         componentsNumberETSNonSeasonal, lagsModel, lagsModelMax);
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -1144,11 +1138,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 profilesRecentTable[] <- adamElements$matVt[,1:lagsModelMax];
 
                 # Fit the model again to extract the fitted values
-                adamFitted <- adamCpp$fit(adamElements$matVt, adamElements$matWt,
-                                          adamElements$matF, adamElements$vecG,
-                                          indexLookupTable, profilesRecentTable,
-                                          yInSample, ot,
-                                          any(initialType==c("complete","backcasting")), nIterations, "n");
+                adamFitted <- adam_fitOrGradient(adamElements$matVt, adamElements$matWt,
+                                                 adamElements$matF, adamElements$vecG,
+                                                 indexLookupTable, profilesRecentTable,
+                                                 yInSample, ot, initialType, nIterations, adamCpp,
+                                                 etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                                                 componentsNumberETS, componentsNumberETSSeasonal,
+                                                 componentsNumberETSNonSeasonal, lagsModel, lagsModelMax);
                 logLikReturn[] <- logLikReturn - sum(log(abs(adamFitted$fitted)));
             }
 
@@ -1535,7 +1531,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
         nStatesBackcasting <- 0;
         # Calculate the number of degrees of freedom coming from states in case of backcasting
-        if(any(initialType==c("backcasting","complete"))){
+        if(any(initialType==c("backcasting","complete","gradient"))){
             # Fill in the matrices. This is now needed for the correct calculation of the df
             adamFilled <- filler(B,
                                  etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
@@ -1644,11 +1640,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             profilesRecentTable[] <- adamCreated$matVt[,1:lagsModelMax];
 
             # Fit the model to the data
-            adamFitted <- adamCpp$fit(adamCreated$matVt, adamCreated$matWt,
-                                      adamCreated$matF, adamCreated$vecG,
-                                      indexLookupTable, profilesRecentTable,
-                                      yInSample, ot,
-                                      any(initialType==c("complete","backcasting")), nIterations, "n");
+            adamFitted <- adam_fitOrGradient(adamCreated$matVt, adamCreated$matWt,
+                                             adamCreated$matF, adamCreated$vecG,
+                                             indexLookupTable, profilesRecentTable,
+                                             yInSample, ot, initialType, nIterations, adamCpp,
+                                             etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                                             componentsNumberETS, componentsNumberETSSeasonal,
+                                             componentsNumberETSNonSeasonal, lagsModel, lagsModelMax);
 
             # Extract the errors correctly
             errors <- switch(distributionNew,
@@ -1923,11 +1921,12 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         profilesRecentInitial <- matVt[,1:lagsModelMax, drop=FALSE];
 
         # Fit the model to the data
-        adamFitted <- adamCpp$fit(matVt, matWt,
-                                  matF, vecG,
-                                  indexLookupTable, profilesRecentTable,
-                                  yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations, "n");
+        adamFitted <- adam_fitOrGradient(matVt, matWt, matF, vecG,
+                                         indexLookupTable, profilesRecentTable,
+                                         yInSample, ot, initialType, nIterations, adamCpp,
+                                         etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                                         componentsNumberETS, componentsNumberETSSeasonal,
+                                         componentsNumberETSNonSeasonal, lagsModel, lagsModelMax);
 
         matVt[] <- adamFitted$states;
 
@@ -5007,7 +5006,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 
     # If this is backcasting, do sampling with moving origin
     changeOrigin <- FALSE;
-    if(any(object$initialType==c("backcasting","complete"))){
+    if(any(object$initialType==c("backcasting","complete","gradient"))){
         changeOrigin[] <- TRUE;
     }
 

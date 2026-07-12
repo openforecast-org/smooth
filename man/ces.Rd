@@ -7,15 +7,15 @@
 \usage{
 ces(y, seasonality = c("none", "simple", "partial", "full"),
   lags = c(frequency(y)), initial = c("backcasting", "optimal",
-  "two-stage", "complete"), a = NULL, b = NULL, loss = c("likelihood",
-  "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"), h = 0,
-  holdout = FALSE, bounds = c("admissible", "none"), silent = TRUE,
-  model = NULL, xreg = NULL, regressors = c("use", "select", "adapt"),
-  initialX = NULL, ...)
+  "two-stage", "complete", "gradient"), a = NULL, b = NULL,
+  loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
+  "MSCE", "GPL"), h = 0, holdout = FALSE, bounds = c("admissible",
+  "none"), silent = TRUE, model = NULL, xreg = NULL,
+  regressors = c("use", "select", "adapt"), initialX = NULL, ...)
 
 auto.ces(y, seasonality = c("none", "simple", "partial", "full"),
   lags = c(frequency(y)), initial = c("backcasting", "optimal",
-  "two-stage", "complete"), ic = c("AICc", "AIC", "BIC", "BICc"),
+  "two-stage", "complete", "gradient"), ic = c("AICc", "AIC", "BIC", "BICc"),
   loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
   "MSCE", "GPL"), h = 0, holdout = FALSE, bounds = c("admissible",
   "none"), silent = TRUE, xreg = NULL, regressors = c("use", "select",
@@ -199,7 +199,7 @@ Springer-Verlag. \doi{10.1007/978-3-540-71918-2}.
 \itemize{
 \item  Svetunkov, I., Kourentzes, N., & Ord, J. K. (2022).
 Complex exponential smoothing. Naval Research Logistics, 69(8),
-1108–1123. https://doi.org/10.1002/nav.22074
+1108<e2><80><93>1123. https://doi.org/10.1002/nav.22074
 }
 }
 \seealso{

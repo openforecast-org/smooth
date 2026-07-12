@@ -23,7 +23,8 @@ auto.adam <- function(data, model="ZXZ", lags=c(frequency(data)),
                       distribution=c("dnorm","dlaplace","ds","dgnorm","dlnorm","dinvgauss","dgamma"),
                       outliers=c("ignore","use","select"), level=0.99,
                       h=0, holdout=FALSE,
-                      persistence=NULL, phi=NULL, initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
+                      persistence=NULL, phi=NULL,
+                      initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
                       ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
                       silent=TRUE, parallel=FALSE, ets=c("conventional","adam"), ...){
     # Copyright (C) 2020 - Inf  Ivan Svetunkov

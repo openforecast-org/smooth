@@ -164,6 +164,16 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("indexLookupTable"),
             py::arg("arrayProfilesRecent"),
             py::arg("backcast"))
+        .def("gradientSolve", &adamCore::gradientSolve,
+            py::arg("matrixYt"),
+            py::arg("matrixOt"),
+            py::arg("matrixWt"),
+            py::arg("matrixF"),
+            py::arg("vectorG"),
+            py::arg("indexLookupTable"),
+            py::arg("profile"),
+            py::arg("probeBasis"),
+            py::arg("nIterations"))
         .def("reforecast", &adamCore::reforecast,
             py::arg("arrayErrors"),
             py::arg("arrayOt"),

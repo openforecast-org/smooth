@@ -2,60 +2,63 @@
 
 Direct port of ``R/adam-gradient.R``. Given fixed persistence (the current
 ``mat_f`` / ``vec_g``) and a seeded recent profile, this solves for the initial
-state that minimises the in-sample SSE. In a Single Source of Error model the
-residuals are, at fixed persistence, an affine function of the initial state for
-additive models (exact one-shot least squares) and a smooth nonlinear function
-otherwise (Gauss-Newton). It never runs the backcasting backward pass.
+state that minimises the in-sample SSE. It never runs the backcasting backward
+pass.
 
-The forward-pass oracle is ``adam_cpp.reapply(backcast=False)``: each slice of
-the profile cube is one probe, run through the same forward machinery the final
-fit uses, in a single C++ call. The least-squares solve is the shared C++
-``_ols.ols`` (pivoted QR with rank cutoff) — identical to R's ``olsCpp`` — so the
-two languages return bit-for-bit the same result.
+All the numerical work happens in C++ (``adam_cpp.gradientSolve``, shared with
+the R build for exact parity): for additive ETS the residuals are affine in the
+initial state, so the design is propagated analytically alongside a single
+forward pass and solved by one pivoted-QR least squares; otherwise
+finite-difference Gauss-Newton with a Levenberg-Marquardt fallback is used.
+The solve is stateless — a deterministic function of its inputs.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from smooth.adam_general import _ols  # type: ignore[attr-defined]
 
-
-def adam_gradient_layout(
+def adam_gradient_probe_basis(
     ets_model,
     arima_model,
     xreg_model,
-    e_type,
     t_type,
     s_type,
     components_number_ets_seasonal,
     components_number_ets_non_seasonal,
+    n_components,
     lags_model,
     lags_model_max,
 ):
-    """Build the free-initial probe map for gradient initialisation of an ETS model.
+    """Build the probe basis for gradient initialisation of an ETS model.
 
-    Returns ``None`` when the model is out of scope (ARIMA / xreg / non-ETS), so
-    the caller falls back to backcasting. Mirrors ``adam_gradientLayout``.
+    A ``(n_components * lags_model_max, n_free)`` 0/1 matrix whose column j marks
+    the profile cells (in column-major order, matching the C++ lookup indices)
+    that move together as one free initial parameter. Level and trend span all
+    head columns; each seasonal cell is its own parameter. Returns ``None`` when
+    the model is out of scope (ARIMA / xreg / non-ETS), so the caller falls back
+    to backcasting. Mirrors ``adam_gradientProbeBasis``.
     """
     if not ets_model or arima_model or xreg_model:
         return None
 
-    probes = []
-    # level: row 0, all head columns move together
-    probes.append({"row": 0, "cols": list(range(lags_model_max))})
-    # trend: row 1
+    def cells_of(row, cols):
+        """Column-major cell indices of profile[row, cols]."""
+        return [row + c * n_components for c in cols]
+
+    probes = [cells_of(0, range(lags_model_max))]
     if t_type != "N":
-        probes.append({"row": 1, "cols": list(range(lags_model_max))})
-    # seasonal: each cell of each seasonal row is a free parameter
+        probes.append(cells_of(1, range(lags_model_max)))
     if s_type != "N" and components_number_ets_seasonal > 0:
         for i in range(components_number_ets_seasonal):
             r = components_number_ets_non_seasonal + i
-            for c in range(int(lags_model[r])):
-                probes.append({"row": r, "cols": [c]})
+            for j in range(int(lags_model[r])):
+                probes.append(cells_of(r, [j]))
 
-    additive = (e_type == "A") and (t_type in ("N", "A")) and (s_type in ("N", "A"))
-    return {"probes": probes, "e_type": e_type, "additive": additive}
+    probe_basis = np.zeros((n_components * lags_model_max, len(probes)), order="F")
+    for j, cells in enumerate(probes):
+        probe_basis[cells, j] = 1.0
+    return probe_basis
 
 
 def adam_gradient_solve(
@@ -67,153 +70,35 @@ def adam_gradient_solve(
     profile,
     y_in_sample,
     ot,
-    layout,
+    probe_basis,
     lags_model_max,
     obs_in_sample,
 ):
     """Solve for the initial recent profile that minimises in-sample SSE.
 
-    Returns the solved recent profile (same shape as ``profile``), or ``None`` on
-    failure. Mirrors ``adam_gradientSolve``.
+    Thin wrapper around the shared C++ ``gradientSolve``. Returns the solved
+    recent profile (same shape as ``profile``), or ``None`` on failure.
+    Mirrors ``adam_gradientSolve``.
     """
-    e_type = layout["e_type"]
-    additive = layout["additive"]
-    probes = layout["probes"]
-    n_free = len(probes)
-    if n_free == 0:
-        return None
-
-    # y_in_sample and ot arrive as length-obs_in_sample vectors; reapply() needs
-    # them as (obs_in_sample, 1) matrices, so reshape once. The same y matrix
-    # broadcasts against the (obs, n_slices) fitted values in the residuals, so it
-    # doubles as the residual operand. vec_g is an (n_components, 1) persistence
-    # column, used as-is. All of these are loop-invariant.
-    profile = np.array(profile, dtype=np.float64)
-    n_components = profile.shape[0]
-    y_matrix = np.asfortranarray(
-        np.asarray(y_in_sample, dtype=np.float64).reshape(obs_in_sample, 1)
+    solved = adam_cpp.gradientSolve(
+        matrixYt=np.asfortranarray(
+            np.asarray(y_in_sample, dtype=np.float64).reshape(obs_in_sample, 1)
+        ),
+        matrixOt=np.asfortranarray(
+            np.asarray(ot, dtype=np.float64).reshape(obs_in_sample, 1)
+        ),
+        matrixWt=np.asfortranarray(mat_wt, dtype=np.float64),
+        matrixF=np.asfortranarray(mat_f, dtype=np.float64),
+        vectorG=np.asfortranarray(vec_g, dtype=np.float64).ravel(),
+        indexLookupTable=np.asfortranarray(index_lookup_table, dtype=np.uint64),
+        profile=np.asfortranarray(profile, dtype=np.float64),
+        probeBasis=np.asfortranarray(probe_basis, dtype=np.float64),
+        nIterations=15,
     )
-    ot_matrix = np.asfortranarray(
-        np.asarray(ot, dtype=np.float64).reshape(obs_in_sample, 1)
-    )
-    mat_wt = np.asarray(mat_wt, dtype=np.float64)
-    mat_f = np.asarray(mat_f, dtype=np.float64)
-    vec_g = np.asarray(vec_g, dtype=np.float64).reshape(n_components, 1)
-    index_lookup_table = np.asfortranarray(index_lookup_table, dtype=np.uint64)
-
-    def residuals_for(prof_list):
-        """Residuals of one forward pass for candidate profiles (slices).
-
-        Returns an ``(obs_in_sample, n_slices)`` array of residuals, or ``None``.
-        """
-        n_slices = len(prof_list)
-        arr_prof = np.zeros((n_components, lags_model_max, n_slices), order="F")
-        for i in range(n_slices):
-            arr_prof[:, :, i] = prof_list[i]
-        # Slice-count varies per call, so these cubes are genuinely per-call.
-        arr_vt = np.zeros(
-            (n_components, obs_in_sample + lags_model_max, n_slices), order="F"
-        )
-        arr_wt = np.repeat(mat_wt[:, :, None], n_slices, axis=2)
-        arr_f = np.repeat(mat_f[:, :, None], n_slices, axis=2)
-        mat_g = np.repeat(vec_g, n_slices, axis=1)
-        try:
-            res = adam_cpp.reapply(
-                matrixYt=y_matrix,
-                matrixOt=ot_matrix,
-                arrayVt=np.asfortranarray(arr_vt),
-                arrayWt=np.asfortranarray(arr_wt),
-                arrayF=np.asfortranarray(arr_f),
-                matrixG=np.asfortranarray(mat_g),
-                indexLookupTable=index_lookup_table,
-                arrayProfilesRecent=np.asfortranarray(arr_prof),
-                backcast=False,
-            )
-        except Exception:
-            return None
-        y_fitted = np.array(res.fitted, dtype=np.float64).reshape(
-            obs_in_sample, n_slices
-        )
-        if not np.all(np.isfinite(y_fitted)):
-            return None
-        if e_type == "M":
-            e = y_matrix / y_fitted - 1.0
-        else:
-            e = y_matrix - y_fitted
-        if not np.all(np.isfinite(e)):
-            return None
-        return e
-
-    def apply_step(prof, step):
-        prof = np.array(prof, dtype=np.float64)
-        for j in range(n_free):
-            p = probes[j]
-            prof[p["row"], p["cols"]] += step[j]
-        return prof
-
-    if additive:
-        # Affine: build the design with unit probes, solve once.
-        slices = [profile]
-        for j in range(n_free):
-            pj = np.array(profile, dtype=np.float64)
-            pp = probes[j]
-            pj[pp["row"], pp["cols"]] += 1.0
-            slices.append(pj)
-        e = residuals_for(slices)
-        if e is None:
-            return None
-        e0 = e[:, 0]
-        design_a = np.zeros((obs_in_sample, n_free), dtype=np.float64)
-        for j in range(n_free):
-            design_a[:, j] = e0 - e[:, j + 1]
-        # Solve min ||e0 - A d|| in C++ (pivoted QR, rank-deficiency aware) so the
-        # result is identical to the R engine that shares the same core.
-        d = np.asarray(_ols.ols(design_a, e0, 1e-7), dtype=np.float64).ravel()
-        d[~np.isfinite(d)] = 0.0
-        return apply_step(profile, d)
-
-    # Nonlinear: Gauss-Newton with finite-difference Jacobian and line search.
-    prof = np.array(profile, dtype=np.float64)
-    e0m = residuals_for([prof])
-    if e0m is None:
+    solved = np.asarray(solved, dtype=np.float64)
+    if solved.size == 0:
         return None
-    e0 = e0m[:, 0]
-    f_cur = float(np.sum(e0**2))
-    for _ in range(15):
-        slices = []
-        hs = np.zeros(n_free, dtype=np.float64)
-        for j in range(n_free):
-            pp = probes[j]
-            h = 1e-4 * max(1.0, abs(prof[pp["row"], pp["cols"][0]]))
-            pj = np.array(prof, dtype=np.float64)
-            pj[pp["row"], pp["cols"]] += h
-            slices.append(pj)
-            hs[j] = h
-        e = residuals_for(slices)
-        if e is None:
-            break
-        jm = np.zeros((obs_in_sample, n_free), dtype=np.float64)
-        for j in range(n_free):
-            jm[:, j] = (e[:, j] - e0) / hs[j]
-        try:
-            step = -np.asarray(_ols.ols(jm, e0, 1e-7), dtype=np.float64).ravel()
-        except Exception:
-            step = np.full(n_free, np.nan)
-        step[~np.isfinite(step)] = 0.0
-        if np.sqrt(np.sum(step**2)) < 1e-8:
-            break
-        improved = False
-        for tt in (1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125):
-            et = residuals_for([apply_step(prof, tt * step)])
-            if et is not None and float(np.sum(et[:, 0] ** 2)) < f_cur:
-                prof = apply_step(prof, tt * step)
-                e0 = et[:, 0]
-                f_cur = float(np.sum(e0**2))
-                improved = True
-                break
-        if not improved:
-            break
-    return prof
+    return solved
 
 
 def adam_fit_or_gradient(
@@ -251,19 +136,19 @@ def adam_fit_or_gradient(
     )
     if is_gradient:
         lags_model_max = int(lags_dict["lags_model_max"])
-        layout = adam_gradient_layout(
+        probe_basis = adam_gradient_probe_basis(
             bool(model_type_dict.get("ets_model", False)),
             bool(model_type_dict.get("arima_model", False)),
             bool(model_type_dict.get("xreg_model", False)),
-            model_type_dict.get("error_type", "A"),
             model_type_dict.get("trend_type", "N"),
             model_type_dict.get("season_type", "N"),
             int(components_dict.get("components_number_ets_seasonal", 0) or 0),
             int(components_dict.get("components_number_ets_non_seasonal", 0) or 0),
+            int(profiles_recent_table.shape[0]),
             lags_dict["lags_model"],
             lags_model_max,
         )
-        if layout is not None:
+        if probe_basis is not None:
             solved = adam_gradient_solve(
                 adam_cpp,
                 mat_wt,
@@ -273,7 +158,7 @@ def adam_fit_or_gradient(
                 profiles_recent_table,
                 y_in_sample,
                 ot,
-                layout,
+                probe_basis,
                 lags_model_max,
                 obs_in_sample,
             )
@@ -289,7 +174,7 @@ def adam_fit_or_gradient(
                     matrixF=mat_f,
                     vectorG=vec_g,
                     indexLookupTable=index_lookup_table,
-                    profilesRecent=solved,
+                    profilesRecent=np.asfortranarray(solved),
                     vectorYt=y_in_sample,
                     vectorOt=ot,
                     backcast=False,

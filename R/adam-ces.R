@@ -721,7 +721,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                 }
             }
 
-            if(all(initialType!=c("backcasting","complete"))){
+            if(all(initialType!=c("backcasting","complete","gradient"))){
                 # Record the level and potential
                 if(seasonality!="simple"){
                     B <- c(B, matVt[1:2,1]);
@@ -997,7 +997,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
     # Write down the recent profile for future use
     profilesRecentTable <- adamFitted$profile;
     matVt[] <- adamFitted$states;
-    if(!any(initialType==c("complete","backcasting"))){
+    if(!any(initialType==c("complete","backcasting","gradient"))){
         profilesRecentInitial <- matVt[,1:lagsModelMax,drop=FALSE];
     }
 

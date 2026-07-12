@@ -154,7 +154,12 @@
 #' explanatory variables are optimised. This is recommended for ETSX and ARIMAX
 #' models. Alternatively, you can set \code{initial="complete"} backcasting,
 #' which means that all states (including explanatory variables) are initialised
-#' via backcasting.
+#' via backcasting. Finally, \code{initial="gradient"} solves for the initial
+#' states by least squares (a single linear solve at fixed persistence), which is
+#' exact for additive ETS and avoids the divergence that backcasting can exhibit
+#' for seasonal models with a trend and a large seasonal smoothing parameter. This
+#' option currently supports additive ETS models (no ARIMA/xreg, single
+#' seasonality); other specifications fall back to backcasting.
 #'
 #' If a use provides a list of values, it is recommended to use the named one and
 #' to provide the initial components that are available. For example:
@@ -337,6 +342,15 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
     # Start measuring the time of calculations
     startTime <- Sys.time();
+
+    # Gradient initialisation is orchestrated as a wrapper around the existing
+    # provided-initial path (see adam-gradient.R), so the core estimation code
+    # below is left untouched. Only a user-specified initial="gradient" triggers
+    # it; the default multi-value vector does not.
+    if(is.character(initial) && length(initial)==1 && !is.na(initial) &&
+       identical(initial, "gradient")){
+        return(adam_gradient(match.call(), parent.frame()));
+    }
 
     cl <- match.call();
     # Record the parental environment. Needed for ARIMA initialisation

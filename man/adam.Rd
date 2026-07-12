@@ -217,7 +217,12 @@ after the backcasting, refining the states. In case of backcasting, the paramete
 explanatory variables are optimised. This is recommended for ETSX and ARIMAX
 models. Alternatively, you can set \code{initial="complete"} backcasting,
 which means that all states (including explanatory variables) are initialised
-via backcasting.
+via backcasting. Finally, \code{initial="gradient"} solves for the initial
+states by least squares (a single linear solve at fixed persistence), which is
+exact for additive ETS and avoids the divergence that backcasting can exhibit
+for seasonal models with a trend and a large seasonal smoothing parameter. This
+option currently supports additive ETS models (no ARIMA/xreg, single
+seasonality); other specifications fall back to backcasting.
 
 If a use provides a list of values, it is recommended to use the named one and
 to provide the initial components that are available. For example:

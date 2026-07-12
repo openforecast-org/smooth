@@ -140,7 +140,7 @@ def ces_cf(
     y_f = np.asfortranarray(y_in_sample, dtype=np.float64).ravel()
     ot_f = np.asfortranarray(ot, dtype=np.float64).ravel()
 
-    backcast = initial_type in ("complete", "backcasting")
+    backcast = initial_type in ("complete", "backcasting", "gradient")
 
     # Call C++ fit — R lines 503-508
     adam_fitted = adam_cpp.fit(

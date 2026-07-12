@@ -1,24 +1,17 @@
-#' @keywords internal
-#' Least-squares initial-state solve for ETS ("gradient" initialisation).
-#'
-#' Given fixed persistence (the current \code{matF} / \code{vecG}) and a seeded
-#' recent profile, this solves for the initial state that minimises the in-sample
-#' SSE. In a Single Source of Error model the residuals are, at fixed persistence,
-#' an affine function of the initial state for additive models (exact one-shot
-#' least squares) and a smooth nonlinear function otherwise (Gauss-Newton). It
-#' does not run the backcasting backward pass at all.
-#'
-#' The forward-pass oracle is \code{adamCore$reapply(backcast=FALSE)}: each slice
-#' of the profile cube is one probe, run through the same forward machinery the
-#' final fit uses, in a single C++ call.
-#'
-#' @param adamCpp The adamCore object.
-#' @param matWt,matF,vecG,indexLookupTable Model matrices for the current params.
-#' @param profile The seeded recent profile (nComponents x lagsModelMax).
-#' @param yInSample,ot The data and occurrence vectors.
-#' @param layout A list describing the free ETS initials (see adam_gradientLayout).
-#' @param lagsModelMax Maximum lag.
-#' @return The solved recent profile (same shape as \code{profile}), or NULL on failure.
+# Internal helper (not exported, not documented for users).
+#
+# Least-squares initial-state solve for ETS ("gradient" initialisation).
+# Given fixed persistence (the current matF / vecG) and a seeded recent profile,
+# this solves for the initial state that minimises the in-sample SSE. In a Single
+# Source of Error model the residuals are, at fixed persistence, an affine
+# function of the initial state for additive models (exact one-shot least
+# squares) and a smooth nonlinear function otherwise (Gauss-Newton). It does not
+# run the backcasting backward pass at all.
+#
+# The forward-pass oracle is adamCpp$reapply(backcast=FALSE): each slice of the
+# profile cube is one probe, run through the same forward machinery the final fit
+# uses, in a single C++ call. Returns the solved recent profile (same shape as
+# `profile`), or NULL on failure.
 adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
                                profile, yInSample, ot, layout, lagsModelMax){
     y <- as.numeric(yInSample)
@@ -121,10 +114,11 @@ adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
     }
 }
 
-#' @keywords internal
-#' Build the free-initial probe map for gradient initialisation of an ETS model.
-#' Returns NULL when the model is out of scope (ARIMA / xreg / non-ETS), so the
-#' caller falls back to backcasting.
+# Internal helper (not exported, not documented for users).
+#
+# Build the free-initial probe map for gradient initialisation of an ETS model.
+# Returns NULL when the model is out of scope (ARIMA / xreg / non-ETS), so the
+# caller falls back to backcasting.
 adam_gradientLayout <- function(etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                 componentsNumberETS, componentsNumberETSSeasonal,
                                 componentsNumberETSNonSeasonal, lagsModel, lagsModelMax){
@@ -149,12 +143,13 @@ adam_gradientLayout <- function(etsModel, arimaModel, xregModel, Etype, Ttype, S
     return(list(probes = probes, Etype = Etype, additive = additive))
 }
 
-#' @keywords internal
-#' Fit dispatcher: runs the gradient initial-state solve when
-#' initialType=="gradient" and the model is in scope (ETS, no ARIMA/xreg),
-#' otherwise the ordinary adamCore$fit (with the backcast flag). Gradient always
-#' fits with backcast=FALSE from the solved initials; it never runs the backward
-#' pass. Out-of-scope gradient models fall back to backcasting.
+# Internal helper (not exported, not documented for users).
+#
+# Fit dispatcher: runs the gradient initial-state solve when
+# initialType=="gradient" and the model is in scope (ETS, no ARIMA/xreg),
+# otherwise the ordinary adamCore$fit (with the backcast flag). Gradient always
+# fits with backcast=FALSE from the solved initials; it never runs the backward
+# pass. Out-of-scope gradient models fall back to backcasting.
 adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profile,
                                yInSample, ot, initialType, nIterations, adamCpp,
                                etsModel, arimaModel, xregModel, Etype, Ttype, Stype,

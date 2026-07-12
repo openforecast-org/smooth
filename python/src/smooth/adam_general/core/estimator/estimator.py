@@ -763,12 +763,18 @@ def estimator(
             adam_cpp=adam_cpp,
         )
 
-        # Run the backcasting fit to update states. Gradient is intentionally
+        # Run the backcasting fit to update states. In-scope ETS gradient is
         # excluded: its initials are re-solved from the pristine msdecompose seed
         # inside preparator(), and running the fit here would overwrite the seed
         # head with evolved states, breaking the (seed-dependent) multiplicative
-        # Gauss-Newton solve downstream.
-        if initials_dict["initial_type"] in ["complete", "backcasting"]:
+        # Gauss-Newton solve downstream. Out-of-scope gradient (ARIMA / xreg)
+        # falls back to backcasting, so it needs this refresh just like
+        # backcasting / complete.
+        run_state_refit = initials_dict["initial_type"] in [
+            "complete",
+            "backcasting",
+        ] or (initials_dict["initial_type"] == "gradient" and not gradient_in_scope)
+        if run_state_refit:
             mat_vt = np.asfortranarray(adam_created["mat_vt"], dtype=np.float64)
             mat_wt = np.asfortranarray(adam_created["mat_wt"], dtype=np.float64)
             mat_f = np.asfortranarray(adam_created["mat_f"], dtype=np.float64)

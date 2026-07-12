@@ -81,3 +81,23 @@ def test_gradient_arima_falls_back_gracefully():
 def test_gradient_nonseasonal():
     m = ADAM(model="ANN", lags=[1], initial="gradient").fit(_Y)
     assert np.all(np.isfinite(np.asarray(m.fitted).ravel()))
+
+
+def test_gradient_msarima_falls_back_to_backcasting():
+    # MSARIMA is not ETS, so initial="gradient" must fall back to backcasting and
+    # produce an identical fit (same as the R side).
+    from smooth import MSARIMA
+
+    orders = {"ar": [1, 0], "i": [1, 0], "ma": [1, 0]}
+    mg = MSARIMA(orders=orders, lags=[1, 12], initial="gradient").fit(_Y)
+    mb = MSARIMA(orders=orders, lags=[1, 12], initial="backcasting").fit(_Y)
+    assert abs(float(mg.loglik) - float(mb.loglik)) < 1e-8
+
+
+def test_gradient_ces_falls_back_to_backcasting():
+    # CES is not ETS, so initial="gradient" must fall back to backcasting.
+    from smooth import CES
+
+    mg = CES(seasonality="full", lags=[1, 12], initial="gradient").fit(_Y)
+    mb = CES(seasonality="full", lags=[1, 12], initial="backcasting").fit(_Y)
+    assert abs(float(mg.loglik) - float(mb.loglik)) < 1e-8

@@ -21,3 +21,5 @@ LICENSE
 conda
 ^\.claude$
 ^plan-initial-gradient\.md$
+^df-fixes\.md$
+^plan-gradient-arbitrary-loss\.md$

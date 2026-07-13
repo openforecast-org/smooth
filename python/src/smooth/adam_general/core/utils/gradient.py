@@ -94,6 +94,7 @@ def adam_gradient_solve(
         profile=np.asfortranarray(profile, dtype=np.float64),
         probeBasis=np.asfortranarray(probe_basis, dtype=np.float64),
         nIterations=15,
+        analytic=True,
     )
     solved = np.asarray(solved, dtype=np.float64)
     if solved.size == 0:

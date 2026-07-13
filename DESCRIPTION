@@ -1,7 +1,7 @@
 Package: smooth
 Type: Package
 Title: Forecasting Using State Space Models
-Version: 4.5.0
+Version: 4.5.1
 Date: 2026-06-19
 Authors@R: person("Ivan", "Svetunkov", email = "ivan@svetunkov.com", role = c("aut", "cre"),
                   comment="Senior Lecturer at Centre for Marketing Analytics and Forecasting, Lancaster University, UK")

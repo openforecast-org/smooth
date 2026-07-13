@@ -16,7 +16,7 @@ adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
                                profile, yInSample, ot, probeBasis, lagsModelMax,
                                obsInSample){
     solved <- adamCpp$gradientSolve(yInSample, ot, matWt, matF, vecG,
-                                    indexLookupTable, profile, probeBasis, 15)
+                                    indexLookupTable, profile, probeBasis, 15, TRUE)
     if(length(solved) == 0){ return(NULL) }
     return(solved)
 }

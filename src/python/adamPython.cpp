@@ -173,7 +173,8 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("indexLookupTable"),
             py::arg("profile"),
             py::arg("probeBasis"),
-            py::arg("nIterations"))
+            py::arg("nIterations"),
+            py::arg("analytic"))
         .def("reforecast", &adamCore::reforecast,
             py::arg("arrayErrors"),
             py::arg("arrayOt"),

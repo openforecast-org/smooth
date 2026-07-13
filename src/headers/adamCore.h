@@ -2,6 +2,7 @@
 #include "adamGeneral.h"
 #include "ssOccurrence.h"
 #include "olsCore.h"
+#include "adamGradient.h"
 
 // ============================================================================
 // STRUCTURE DEFINITIONS
@@ -137,6 +138,93 @@ private:
                            yFit, adamETS);
         }
         return vecErrors.is_finite();
+    }
+
+    // Private helper for gradientSolve(): one forward pass that also propagates
+    // the sensitivities of every profile cell to the free initial parameters
+    // (chain rule through the analytic derivatives in adamGradient.h), producing
+    // the residuals AND the full Jacobian d(residual)/d(theta) in a single pass —
+    // the analytic replacement for the nFree finite-difference probe passes.
+    // sensitivities starts as the probe basis (d(profile cell)/d(theta)).
+    // Returns false when the residuals or the Jacobian go non-finite.
+    bool gradientPassJacobian(arma::mat profilesRecent, arma::mat sensitivities,
+                              arma::mat const &matrixYt, arma::mat const &matrixOt,
+                              arma::mat const &matrixWt, arma::mat const &matrixF,
+                              arma::vec const &vectorG, arma::umat const &indexLookupTable,
+                              arma::vec &vecErrors, arma::mat &jacobian) {
+        int obs = matrixYt.n_rows;
+        int lagsModelMax = max(lags);
+        unsigned int nFree = sensitivities.n_cols;
+
+        // Head refinement: refineHeadFwd walks the level/trend rows via
+        // adamFvalue; the sensitivities follow through its Jacobian.
+        if(lagsModelMax > 1 && T != 'N') {
+            for(int i=1; i<lagsModelMax; i=i+1){
+                arma::uvec cells = indexLookupTable.col(i);
+                arma::vec vNew = adamFvalue(profilesRecent(cells), matrixF, E, T, S,
+                                            nETS, nNonSeasonal, nSeasonal, nArima,
+                                            nComponents, constant);
+                arma::mat sensNew = adamFvalueJac(profilesRecent(cells), matrixF,
+                                                  T, nComponents) *
+                                    sensitivities.rows(cells);
+                profilesRecent(cells.rows(0,1)) = vNew.rows(0,1);
+                sensitivities.rows(cells.rows(0,1)) = sensNew.rows(0,1);
+            }
+        }
+
+        arma::mat jacGv(nComponents, nComponents);
+        arma::vec jacGe(nComponents), jacGy(nComponents);
+        for(int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
+            int idx = i - lagsModelMax;
+            arma::uvec cells = indexLookupTable.col(i);
+            arma::vec vCurrent = profilesRecent(cells);
+            arma::mat sensCurrent = sensitivities.rows(cells);
+            arma::rowvec wRow = matrixWt.row(idx);
+
+            double yFit = adamWvalue(vCurrent, wRow, E, T, S,
+                                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
+                                     nComponents, constant);
+            arma::rowvec dyFit = adamWvalueJac(vCurrent, wRow, E, T, S,
+                                               nComponents, nSeasonal) * sensCurrent;
+            // The mixed-model clamp pins yhat to a constant, so its derivative
+            // vanishes there (finite differences see the same flat spot).
+            if((E=='M' || T=='M' || S=='M') && (yFit<=0)){
+                yFit = 1;
+                dyFit.zeros();
+            }
+            if(matrixOt(idx)!=0){
+                yFit = matrixOt(idx) * yFit;
+                dyFit = matrixOt(idx) * dyFit;
+            }
+            vecErrors(idx) = errorf(matrixYt(idx), yFit, E, matrixOt(idx));
+            arma::rowvec dError(nFree, arma::fill::zeros);
+            if(matrixOt(idx)!=0){
+                // E='A': e = y - yhat; E='M': e = y/yhat - 1
+                if(E=='A'){
+                    dError = -dyFit;
+                }
+                else{
+                    dError = -(matrixYt(idx) / (yFit*yFit)) * dyFit;
+                }
+            }
+            jacobian.row(idx) = dError;
+
+            adamGvalueJac(vCurrent, matrixF, wRow, E, T, S,
+                          nComponents, nSeasonal, vectorG,
+                          vecErrors(idx), yFit, adamETS,
+                          jacGv, jacGe, jacGy);
+            profilesRecent(cells) =
+                adamFvalue(vCurrent, matrixF, E, T, S, nETS, nNonSeasonal,
+                           nSeasonal, nArima, nComponents, constant) +
+                adamGvalue(vCurrent, matrixF, wRow, E, T, S,
+                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
+                           nComponents, constant, vectorG, vecErrors(idx),
+                           yFit, adamETS);
+            sensitivities.rows(cells) =
+                (adamFvalueJac(vCurrent, matrixF, T, nComponents) + jacGv) * sensCurrent +
+                jacGe * dError + jacGy * dyFit;
+        }
+        return vecErrors.is_finite() && jacobian.is_finite();
     }
 
     // Private helper: shared loop control for fit(), omfit(), omfitGeneral()
@@ -864,7 +952,7 @@ public:
                             arma::mat const &matrixWt, arma::mat const &matrixF,
                             arma::vec const &vectorG, arma::umat const &indexLookupTable,
                             arma::mat const &profile, arma::mat const &probeBasis,
-                            unsigned int const &nIterations){
+                            unsigned int const &nIterations, bool const &analytic){
 
         int obs = matrixYt.n_rows;
         int lagsModelMax = max(lags);
@@ -970,16 +1058,28 @@ public:
         for(unsigned int iter=0; iter<nIterations; iter=iter+1){
             sseBeforeIteration = sseCurrent;
             bool jacobianOk = true;
-            for(unsigned int j=0; j<nFree; j=j+1){
-                double h = 1e-4 * std::max(1.0, std::abs(prof(firstCell(j))));
-                arma::mat profProbe = prof + arma::reshape(h * probeBasis.col(j),
-                                                           profile.n_rows, profile.n_cols);
-                if(!gradientPass(profProbe, matrixYt, matrixOt, matrixWt, matrixF,
-                                 vectorG, indexLookupTable, residualsProbe)){
-                    jacobianOk = false;
-                    break;
+            if(analytic){
+                // One pass propagating the exact sensitivities (adamGradient.h)
+                // instead of nFree probe passes. The residuals it returns equal
+                // the ones already held (same forward recursion).
+                jacobianOk = gradientPassJacobian(prof, probeBasis,
+                                                  matrixYt, matrixOt, matrixWt,
+                                                  matrixF, vectorG, indexLookupTable,
+                                                  residualsProbe, jacobian);
+            }
+            else{
+                // Finite-difference fallback (also the validation oracle).
+                for(unsigned int j=0; j<nFree; j=j+1){
+                    double h = 1e-4 * std::max(1.0, std::abs(prof(firstCell(j))));
+                    arma::mat profProbe = prof + arma::reshape(h * probeBasis.col(j),
+                                                               profile.n_rows, profile.n_cols);
+                    if(!gradientPass(profProbe, matrixYt, matrixOt, matrixWt, matrixF,
+                                     vectorG, indexLookupTable, residualsProbe)){
+                        jacobianOk = false;
+                        break;
+                    }
+                    jacobian.col(j) = (residualsProbe - residuals) / h;
                 }
-                jacobian.col(j) = (residualsProbe - residuals) / h;
             }
             if(!jacobianOk){
                 break;

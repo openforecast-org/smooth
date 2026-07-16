@@ -394,7 +394,7 @@ class OM(ADAM):
                         "ic",
                         "bounds",
                         "verbose",
-                        "nlopt_kargs",
+                        "nlopt_kwargs",
                     )
                 }
             )
@@ -430,7 +430,7 @@ class OM(ADAM):
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
         bounds: Literal["usual", "admissible", "none"] = "usual",
         verbose: int = 0,
-        nlopt_kargs: Optional[Dict[str, Any]] = None,
+        nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
         **kwargs,
     ) -> None:
@@ -496,7 +496,7 @@ class OM(ADAM):
             verbose=verbose,
             h=h,
             holdout=holdout,
-            nlopt_kargs=nlopt_kargs,
+            nlopt_kwargs=nlopt_kwargs,
             ets=ets,
             reg_lambda=reg_lambda,
             # ``reg_lambda`` is the user-facing name on OM (mirrors ADAM's
@@ -620,7 +620,7 @@ class OM(ADAM):
                 arma=getattr(self, "arma", None),
                 regressors=getattr(self, "regressors", "use"),
                 verbose=getattr(self, "verbose", 0),
-                nlopt_kargs=getattr(self, "nlopt_kargs", None),
+                nlopt_kwargs=getattr(self, "nlopt_kwargs", None),
             ).fit(y, X)
 
         self._start_time = time.time()
@@ -946,16 +946,16 @@ class OM(ADAM):
             other_value=2.0,
         )
 
-        # Optimisation knobs (subset of nlopt_kargs we care about for OM)
-        kargs = self.nlopt_kargs or {}
+        # Optimisation knobs (subset of nlopt_kwargs we care about for OM)
+        kwargs = self.nlopt_kwargs or {}
 
-        # Respect user-supplied B / lb / ub from nlopt_kargs (mirrors R's
+        # Respect user-supplied B / lb / ub from nlopt_kwargs (mirrors R's
         # adam_checkOptimizer + adam.R:1229-1361 pattern). Named B is supplied
         # as a dict (parameter-name -> value); array-like B is assigned
         # positionally. lb / ub fall back to b_values only when not provided.
-        user_B = kargs.get("B")  # noqa: N806
-        user_lb = kargs.get("lb")
-        user_ub = kargs.get("ub")
+        user_B = kwargs.get("B")  # noqa: N806
+        user_lb = kwargs.get("lb")
+        user_ub = kwargs.get("ub")
 
         B = np.asarray(b_values["B"], dtype=float)  # noqa: N806
         names = b_values.get("names")
@@ -986,12 +986,12 @@ class OM(ADAM):
         ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
             self._model_type, self._arima, self._lags_model
         )
-        algorithm = kargs.get("algorithm", "NLOPT_LN_NELDERMEAD")
-        xtol_rel = kargs.get("xtol_rel", 1e-6)
-        xtol_abs = kargs.get("xtol_abs", 1e-8)
-        ftol_rel = kargs.get("ftol_rel", 1e-8)
-        ftol_abs = kargs.get("ftol_abs", 0)
-        maxeval = kargs.get("maxeval", len(B) * 40)
+        algorithm = kwargs.get("algorithm", "NLOPT_LN_NELDERMEAD")
+        xtol_rel = kwargs.get("xtol_rel", 1e-6)
+        xtol_abs = kwargs.get("xtol_abs", 1e-8)
+        ftol_rel = kwargs.get("ftol_rel", 1e-8)
+        ftol_abs = kwargs.get("ftol_abs", 0)
+        maxeval = kwargs.get("maxeval", len(B) * 40)
         if self._explanatory.get("xreg_model"):
             maxeval = max(maxeval, max(1000, len(B) * 100))
 

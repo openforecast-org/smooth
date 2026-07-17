@@ -107,7 +107,7 @@ class OMG:
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
         bounds: Literal["usual", "admissible", "none"] = "usual",
         verbose: int = 0,
-        nlopt_kargs: Optional[Dict[str, Any]] = None,
+        nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
     ) -> None:
         # Accept callable for user-defined custom loss (same API as ADAM,
@@ -152,7 +152,7 @@ class OMG:
         self.ic = ic
         self.bounds = bounds
         self.verbose = verbose
-        self.nlopt_kargs = nlopt_kargs
+        self.nlopt_kwargs = nlopt_kwargs
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
@@ -677,7 +677,7 @@ class OMG:
             ic=self.ic,
             bounds=self.bounds,
             verbose=0,
-            nlopt_kargs=self.nlopt_kargs,
+            nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
         )
 
@@ -863,7 +863,7 @@ class OMG:
             verbose=self.verbose,
             holdout=self.holdout,
             h=self.h,
-            nlopt_kargs=self.nlopt_kargs,
+            nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
         )
         scaffold._start_time = time.time()
@@ -931,14 +931,14 @@ class OMG:
         self._names_a = list(b_a.get("names") or [])
         self._names_b = list(b_b.get("names") or [])
 
-        # Respect user-supplied B / lb / ub from nlopt_kargs. B is the JOINT
+        # Respect user-supplied B / lb / ub from nlopt_kwargs. B is the JOINT
         # vector spanning A-side then B-side. dict-keyed names are matched
         # against suffixed names ("alpha_A", "alpha_B", ...); array-like B is
         # assigned positionally. lb / ub override positionally.
-        kargs = self.nlopt_kargs or {}
-        user_B = kargs.get("B")  # noqa: N806
-        user_lb = kargs.get("lb")
-        user_ub = kargs.get("ub")
+        kwargs = self.nlopt_kwargs or {}
+        user_B = kwargs.get("B")  # noqa: N806
+        user_lb = kwargs.get("lb")
+        user_ub = kwargs.get("ub")
 
         names_a = b_a.get("names") or []
         names_b = b_b.get("names") or []
@@ -979,13 +979,13 @@ class OMG:
         )
 
     def _optimise(self, B_used, lb, ub, side_a, side_b, n_params_a):
-        kargs = self.nlopt_kargs or {}
-        algorithm = kargs.get("algorithm", "NLOPT_LN_NELDERMEAD")
-        xtol_rel = kargs.get("xtol_rel", 1e-6)
-        xtol_abs = kargs.get("xtol_abs", 1e-8)
-        ftol_rel = kargs.get("ftol_rel", 1e-8)
-        ftol_abs = kargs.get("ftol_abs", 0)
-        maxeval = kargs.get("maxeval", len(B_used) * 40)
+        kwargs = self.nlopt_kwargs or {}
+        algorithm = kwargs.get("algorithm", "NLOPT_LN_NELDERMEAD")
+        xtol_rel = kwargs.get("xtol_rel", 1e-6)
+        xtol_abs = kwargs.get("xtol_abs", 1e-8)
+        ftol_rel = kwargs.get("ftol_rel", 1e-8)
+        ftol_abs = kwargs.get("ftol_abs", 0)
+        maxeval = kwargs.get("maxeval", len(B_used) * 40)
         nlopt_algorithm = getattr(
             nlopt, algorithm.replace("NLOPT_", ""), nlopt.LN_NELDERMEAD
         )
@@ -1034,7 +1034,7 @@ class OMG:
         # own B — otherwise their B is the authoritative starting point.
         # Mirrors the failsafe in R/omg.R: all params 0.001 with the two
         # leading alphas (A-side and B-side) bumped to 0.01.
-        user_B_supplied = kargs.get("B") is not None  # noqa: N806
+        user_B_supplied = kwargs.get("B") is not None  # noqa: N806
         if not user_B_supplied and (not np.isfinite(cf_value) or cf_value >= 1e300):
             B_used[:] = 0.001
             if len(B_used) > 0:
@@ -1397,5 +1397,5 @@ def _build_omg_from_om_kwargs(**om_kwargs) -> OMG:
         ic=om_kwargs.pop("ic", "AICc"),
         bounds=om_kwargs.pop("bounds", "usual"),
         verbose=om_kwargs.pop("verbose", 0),
-        nlopt_kargs=om_kwargs.pop("nlopt_kargs", None),
+        nlopt_kwargs=om_kwargs.pop("nlopt_kwargs", None),
     )

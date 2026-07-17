@@ -145,7 +145,7 @@ def _estimate_model(
     initials_results,
     occurrence_dict,
     components_dict,
-    nlopt_kargs=None,
+    nlopt_kwargs=None,
     smoother="global",
 ):
     """
@@ -203,7 +203,7 @@ def _estimate_model(
         occurrence_dict=occurrence_dict,
         phi_dict=phi_dict_temp,
         components_dict=components_dict,
-        **(nlopt_kargs or {}),
+        **(nlopt_kwargs or {}),
         smoother=smoother,
     )
 
@@ -240,7 +240,7 @@ def _run_branch_and_bound(
     pool_trends,
     check_seasonal,
     check_trend,
-    nlopt_kargs=None,
+    nlopt_kwargs=None,
     smoother="global",
     silent=False,
 ):
@@ -365,7 +365,7 @@ def _run_branch_and_bound(
             initials_results,
             occurrence_dict,
             components_dict,
-            nlopt_kargs=nlopt_kargs,
+            nlopt_kwargs=nlopt_kwargs,
             smoother=smoother,
         )
 
@@ -548,7 +548,7 @@ def _estimate_all_models(
     occurrence_dict,
     components_dict,
     silent=False,
-    nlopt_kargs=None,
+    nlopt_kwargs=None,
     # Pre-computed results from branch-and-bound
     precomputed_results=None,
     precomputed_models=None,
@@ -668,7 +668,7 @@ def _estimate_all_models(
             occurrence_dict=occurrence_dict,
             phi_dict=phi_dict_temp,
             components_dict=components_dict,
-            **(nlopt_kargs or {}),
+            **(nlopt_kwargs or {}),
             smoother=smoother,
         )
         results[j]["IC"] = ic_function(
@@ -701,7 +701,7 @@ def selector(
     initials_results,
     criterion="AICc",
     silent=False,
-    nlopt_kargs=None,
+    nlopt_kwargs=None,
     smoother="global",
 ):
     """
@@ -1005,7 +1005,7 @@ def selector(
                     pool_trends,
                     check_seasonal,
                     check_trend,
-                    nlopt_kargs=nlopt_kargs,
+                    nlopt_kwargs=nlopt_kwargs,
                     smoother=smoother,
                     silent=silent,
                 )
@@ -1053,7 +1053,7 @@ def selector(
         occurrence_dict,
         components_dict,
         silent,
-        nlopt_kargs=nlopt_kargs,
+        nlopt_kwargs=nlopt_kwargs,
         precomputed_results=bb_results,
         precomputed_models=bb_models_tested,
         smoother=smoother,

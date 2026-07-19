@@ -93,7 +93,11 @@ def om_cf(  # noqa: N802
     profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
         :, : lags_dict["lags_model_max"]
     ]
-    mat_vt = np.asfortranarray(adam_elements["mat_vt"], dtype=np.float64)
+    # An explicit copy: the gradient dispatcher overwrites the head of mat_vt
+    # in place, and np.asfortranarray would alias an already-Fortran-ordered
+    # array, leaking the solved initials into the shared creator matrices that
+    # the om preparator later re-seeds from (R's copy-on-modify never leaks it).
+    mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
 
     # 2. Bounds checking (mirror CF's "usual" branch — admissible/none not
     #    used by om() but support graceful pass-through)

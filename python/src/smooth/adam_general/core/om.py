@@ -1060,24 +1060,32 @@ class OM(ADAM):
                 cf_value = 1e100
             return float(cf_value) if np.isfinite(cf_value) else 1e300
 
-        opt = nlopt.opt(nlopt_algorithm, len(B))
-        opt = _configure_optimizer(
-            opt,
-            lb,
-            ub,
-            maxeval,
-            None,
-            xtol_rel=xtol_rel,
-            xtol_abs=xtol_abs,
-            ftol_rel=ftol_rel,
-            ftol_abs=ftol_abs,
-        )
-        opt.set_min_objective(_objective)
-        try:
-            B[:] = opt.optimize(B)
-        except Exception:
-            pass
-        cf_value = opt.last_optimum_value()
+        # Nothing to estimate (e.g. fixed persistence with backcasting /
+        # gradient initials, which are solved inside the fit and never enter
+        # B): skip nlopt — a zero-dimension problem never evaluates the
+        # objective and last_optimum_value() would return +inf. Evaluate the
+        # cost once at the empty B instead. Mirrors R/om.R's length(B)==0 guard.
+        if len(B) == 0:
+            cf_value = _objective(B, None)
+        else:
+            opt = nlopt.opt(nlopt_algorithm, len(B))
+            opt = _configure_optimizer(
+                opt,
+                lb,
+                ub,
+                maxeval,
+                None,
+                xtol_rel=xtol_rel,
+                xtol_abs=xtol_abs,
+                ftol_rel=ftol_rel,
+                ftol_abs=ftol_abs,
+            )
+            opt.set_min_objective(_objective)
+            try:
+                B[:] = opt.optimize(B)
+            except Exception:
+                pass
+            cf_value = opt.last_optimum_value()
 
         # Retry from a small-persistence safe point if the first run hit the
         # infeasibility plateau, but ONLY when the user did NOT supply their

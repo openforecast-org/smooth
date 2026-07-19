@@ -234,13 +234,12 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
         scale <- sqrt(sum(adamFitted$errors^2)/obsInSample);
         cfObjective <- sum(dnorm(x=yInSample, mean=adamFitted$fitted, sd=scale, log=TRUE));
 
-        nStatesBackcasting <- 0;
-        #### This is switched off because in sma() the initial values have almost no effect
-        # on the final values. This is because the weights are 1/n, and the difference
-        # between g=0 and g=1/n is almost non-existent
-
-
-        logLik <- structure(cfObjective, nobs=obsInSample, df=1+nStatesBackcasting, class="logLik");
+        # SMA has a fixed averaging structure (equal 1/order weights, no
+        # estimated smoothing): D = F - g w' = 0, so only the first fitted value
+        # depends on the initials and the order initial states collapse to a
+        # single identifiable level (rank 1). df = 1 (level) + 1 (scale) = 2,
+        # independent of the order (so it does not affect order selection).
+        logLik <- structure(cfObjective, nobs=obsInSample, df=2, class="logLik");
         ICValue <- icFunction(logLik);
 
         return(ICValue);
@@ -319,6 +318,15 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
                      loss="MSE", bounds="none");
 
     smaModel$model <- paste0("SMA(",order,")");
+    # SMA df is 2 regardless of order: one identifiable level initial (the equal
+    # weights collapse the order states, rank 1) plus the scale. The generic
+    # adam "use" path cannot know this, so set it here.
+    smaModel$nParam[] <- 0;
+    smaModel$nParam[1,1] <- 1;
+    smaModel$nParam[1,4] <- 1;
+    smaModel$nParam[1,5] <- 2;
+    smaModel$logLik <- structure(as.numeric(smaModel$logLik), nobs=nobs(smaModel),
+                                 df=2, class="logLik");
     smaModel$timeElapsed <- Sys.time()-startTime;
     smaModel$call <- cl;
     if(orderSelect){

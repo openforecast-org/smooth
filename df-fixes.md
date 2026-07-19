@@ -160,6 +160,13 @@ df_scale    = 1                               # (b) always, continuous response
   (om puts everything in the internal cell; occurrence df for the *demand* side
   propagates via adam's `nParamOccurrence` column — check no double count).
 
+### 2.8b sma  (simple moving average — special fixed structure)
+- Fixed equal weights (1/order), no estimated smoothing. D = F - g w' = 0, so
+  only the first fitted value depends on the initials and the `order` initial
+  states collapse to a single identifiable level (rank 1). df = 1 (level) +
+  1 (scale) = **2**, independent of the order (so order selection is unchanged).
+  The generic adam "use" path cannot know this; set explicitly in `sma()`.
+
 ### 2.9 omg  (two coupled occurrence models A + B)
 - Two om-like ETS models (`nParamsA = length(B_A)`, `nParamsB = length(B_B)`).
   Apply the om treatment (2.8) to **each** side with its own lags/structure; sum.

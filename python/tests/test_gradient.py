@@ -304,3 +304,28 @@ def test_om_loglik_is_bernoulli_not_cost_for_non_likelihood_loss():
     assert abs(float(m.loglik) - bernoulli) < 1e-9
     # lossValue is the MSE, a small number, not the Bernoulli magnitude
     assert m._adam_estimated["CF_value"] < 1.0
+
+
+def test_om_lossvalue_is_the_fitting_loss_even_when_infeasible():
+    # lossValue must be the actual fitting loss on the fitted probabilities,
+    # never the optimiser's infeasibility penalty (1e300) — even when the loss
+    # optimum leaves [0, 1]. Constructed data where odds-ratio MAE goes
+    # infeasible (p < 0), so the guard would otherwise fire.
+    from smooth import OM
+
+    ot = np.tile([0.0, 0.0, 1.0, 0.0, 1.0, 0.0], 20)
+    m = OM(
+        model="MNN",
+        occurrence="odds-ratio",
+        initial="gradient",
+        persistence=0.1,
+        loss="MAE",
+    ).fit(ot)
+    f = np.asarray(m.fitted).ravel()
+    assert abs(float(m.loss_value) - float(np.mean(np.abs(ot - f)))) < 1e-9
+    assert float(m.loss_value) < 1.0  # the MAE, not 1e300
+    # If the fit is infeasible (some p outside [0, 1]) the Bernoulli logLik is
+    # NaN/-inf — surfaced, not clipped; if feasible it is finite. Either way it
+    # is decoupled from lossValue.
+    if f.min() < 0 or f.max() > 1:
+        assert not np.isfinite(float(m.loglik))

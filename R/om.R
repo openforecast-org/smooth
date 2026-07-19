@@ -897,12 +897,24 @@ om <- function(data,
             yfit_vec <- as.numeric(yFitted);
             ll <- sum(ot_vec * log(yfit_vec) + (1 - ot_vec) * log(1 - yfit_vec));
             res$logLikADAMValue <- ll;
-            # The empty-B path carries only $objective; keep the fitting-loss
-            # value as the reported lossValue.
-            if(is.null(res$CFValue)){
-                res$CFValue <- res$objective;
-            }
         }
+
+        # The reported lossValue is the fitting loss evaluated on the final
+        # fitted probabilities, ungated. The infeasibility guard inside the
+        # cost (return 1e300 when p leaves [0,1]) only exists to steer the
+        # optimiser; it must not leak into the reported loss when the loss
+        # optimum itself is infeasible (an MAE/HAM optimum can put p<0). This
+        # keeps lossValue = the actual loss the gradient/optimiser minimised,
+        # while logLik stays the (possibly NaN) Bernoulli — they are allowed to
+        # be misaligned. LASSO/RIDGE/custom keep the optimiser's value (their
+        # penalty terms are not recoverable from the fitted alone).
+        errorsFinal <- as.numeric(yInSample) - as.numeric(yFitted);
+        res$CFValue <- switch(loss,
+                              "likelihood" = -res$logLikADAMValue,
+                              "MSE"  = mean(errorsFinal^2),
+                              "MAE"  = mean(abs(errorsFinal)),
+                              "HAM"  = mean(sqrt(abs(errorsFinal))),
+                              if(is.null(res$CFValue)) res$objective else res$CFValue);
 
         # Forecast
         if(hLocal > 0){

@@ -286,6 +286,21 @@ def om_preparator(
     p_fitted = np.where(np.isnan(p_fitted), 0.0, p_fitted)
     residuals = ot - p_fitted
 
+    # The occurrence model's log-likelihood is ALWAYS the Bernoulli likelihood
+    # of the fitted probabilities. For loss="likelihood" the cost already is
+    # that (up to sign), but the fit-only losses (MSE/MAE/HAM) measure fit, not
+    # likelihood, so the logLik must be recomputed here from the fitted
+    # probabilities rather than taken from -CF. No flooring: an infeasible
+    # fitted probability surfaces as NaN/-inf instead of being clipped.
+    # Mirrors R/om.R's omFinalFit block.
+    if loss != "likelihood":
+        ot_arr = np.asarray(ot, dtype=float).ravel()
+        with np.errstate(invalid="ignore", divide="ignore"):
+            bernoulli_ll = float(
+                np.sum(ot_arr * np.log(p_fitted) + (1 - ot_arr) * np.log(1 - p_fitted))
+            )
+        adam_estimated["log_lik_adam_value"]["value"] = bernoulli_ll
+
     # 4. Initial values dict (use ADAM's _process_initial_values)
     from smooth.adam_general.core.forecaster.preparator import _process_initial_values
 
@@ -1156,14 +1171,15 @@ class OM(ADAM):
         lmm = self._lags_model["lags_model_max"]
         adam_created["mat_vt"][0, :lmm] = self._initials["initial_level"]
 
-        # Compute Bernoulli log-lik analytically with constant probability p=mean(ot)
+        # Compute Bernoulli log-lik analytically with constant probability
+        # p=mean(ot). No flooring: a degenerate all-zero/all-one series
+        # (p at 0 or 1) surfaces as -inf rather than being clipped.
         p = self._initials["initial_level"]
         ot_logical = self._observations["ot_logical"]
-        eps = 1e-15
-        ll = float(
-            np.sum(np.log(max(p, eps)) * ot_logical.sum())
-            + np.sum(np.log(max(1.0 - p, eps)) * (~ot_logical).sum())
-        )
+        with np.errstate(divide="ignore"):
+            ll = float(
+                np.log(p) * ot_logical.sum() + np.log(1.0 - p) * (~ot_logical).sum()
+            )
 
         n_param_estimated = 1  # The level
         self._adam_estimated = {
@@ -1210,6 +1226,13 @@ class OM(ADAM):
             loss=self._general.get("loss", "likelihood"),
         )
         self._prepared["holdout"] = self._general.get("holdout", False)
+        # om_preparator may have replaced the logLik with the Bernoulli value
+        # (for the non-likelihood losses); refresh the information criterion so
+        # it reflects the model likelihood, not the fitting cost.
+        self._ic_selection = ic_function(
+            self._general["ic"],
+            self._adam_estimated["log_lik_adam_value"],
+        )
 
     def _set_om_fitted_attributes(self):
         # Persistence trailing-underscore attrs (alpha/beta/gamma)

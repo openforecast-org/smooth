@@ -884,15 +884,24 @@ om <- function(data,
                                          obsInSample, loss, oType=occurrenceChar);
         yFitted <- omLinkFunction(adamFitted$fitted, nla$Etype, occurrence);
 
-        # For "fixed" occurrence the optimizer never ran, so logLikADAMValue is absent.
-        # Compute the Bernoulli log-likelihood from the constant fitted probability.
-        if(is.null(res$logLikADAMValue)){
+        # The occurrence model's log-likelihood is ALWAYS the Bernoulli
+        # likelihood of the fitted probabilities. For loss="likelihood" the
+        # cost already is that (up to sign), but for the fit-only losses
+        # (MSE/MAE/HAM/...) the cost measures fit, not likelihood, so the
+        # logLik must be computed here from the fitted probabilities rather
+        # than taken from the cost. No flooring: an infeasible fitted
+        # probability surfaces as -Inf instead of being silently clipped.
+        # (The empty-B estimator path also arrives here with logLik absent.)
+        if(is.null(res$logLikADAMValue) || loss != "likelihood"){
             ot_vec   <- as.numeric(yInSample);
             yfit_vec <- as.numeric(yFitted);
-            ll <- sum(ot_vec   * log(pmax(yfit_vec,     1e-15)) +
-                      (1 - ot_vec) * log(pmax(1 - yfit_vec, 1e-15)));
+            ll <- sum(ot_vec * log(yfit_vec) + (1 - ot_vec) * log(1 - yfit_vec));
             res$logLikADAMValue <- ll;
-            res$CFValue <- -ll;
+            # The empty-B path carries only $objective; keep the fitting-loss
+            # value as the reported lossValue.
+            if(is.null(res$CFValue)){
+                res$CFValue <- res$objective;
+            }
         }
 
         # Forecast

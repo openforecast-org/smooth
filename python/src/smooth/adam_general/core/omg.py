@@ -232,7 +232,13 @@ class OMG:
         # building sub-models — _om_from_side reads _log_lik_dict and
         # _ic_value).
         nobs = side_a["observations_dict"]["obs_in_sample"]
-        df = len(B_used)
+        # Both sides' initials count towards df like a single OM, so the
+        # OM-vs-OMG selection is fair (mirrors the om initial-df fix).
+        df = (
+            len(B_used)
+            + side_a["scaffold"]._om_initials_df()
+            + side_b["scaffold"]._om_initials_df()
+        )
         self._log_lik_dict = {"value": self._loglik, "nobs": nobs, "df": df}
         self._ic_value = ic_function(self.ic, self._log_lik_dict)
 

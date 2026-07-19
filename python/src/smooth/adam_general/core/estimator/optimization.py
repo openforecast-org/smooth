@@ -464,5 +464,6 @@ def _calculate_loglik(
     return {
         "value": log_lik_adam_value,
         "nobs": observations_dict["obs_in_sample"],
-        "df": n_param_estimated + (1 if general_dict["loss"] == "likelihood" else 0),
+        # The scale is always an estimated parameter (concentrated likelihood).
+        "df": n_param_estimated + 1,
     }

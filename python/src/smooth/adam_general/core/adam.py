@@ -3479,10 +3479,8 @@ class ADAM:
             )
 
             # Handle likelihood loss case - scale parameter is estimated
-            if self._general["loss"] == "likelihood":
-                n_param.estimated["scale"] = 1
-            else:
-                n_param.estimated["scale"] = 0
+            # The distribution scale is always estimated (concentrated likelihood).
+            n_param.estimated["scale"] = 1
 
             # Update totals
             n_param.update_totals()
@@ -3747,8 +3745,8 @@ class ADAM:
         # Create NParam with weighted average internal params + scale
         n_param = NParam()
         n_param.estimated["internal"] = n_param_weighted
-        if self._general.get("loss") == "likelihood":
-            n_param.estimated["scale"] = 1
+        # The distribution scale is always estimated (concentrated likelihood).
+        n_param.estimated["scale"] = 1
         n_param.update_totals()
         self._n_param = n_param
         self._general["n_param"] = n_param
@@ -3847,10 +3845,8 @@ class ADAM:
             n_param = self._general["n_param"]
             n_param.estimated["internal"] = n_param_estimated
 
-            if self._general["loss"] == "likelihood":
-                n_param.estimated["scale"] = 1
-            else:
-                n_param.estimated["scale"] = 0
+            # The distribution scale is always estimated (concentrated likelihood).
+            n_param.estimated["scale"] = 1
 
             n_param.update_totals()
             self._n_param = n_param

@@ -31,7 +31,9 @@
 #' @param persistence Optional persistence (smoothing) parameter vector.
 #' @param phi Optional damping parameter.
 #' @param initial Initialisation method: \code{"backcasting"}, \code{"optimal"},
-#'   \code{"two-stage"}, or \code{"complete"}.
+#'   \code{"two-stage"}, \code{"complete"}, or \code{"gradient"} (solves the
+#'   initial states by profiling the occurrence loss; falls back to backcasting
+#'   for a custom loss or an out-of-scope specification).
 #' @param arma Optional fixed ARMA parameters.
 #' @param ic Information criterion for model selection.
 #' @param bounds Parameter bounds type.
@@ -112,7 +114,7 @@ om <- function(data,
         # to backcast produces NaN in fitted values (the two seeds disagree).
         # For ``optimal`` / ``provided`` fits, the converged numeric initials
         # ARE the correct seed, so keep the original behaviour for that case.
-        if(any(model$initialType == c("backcasting","complete"))){
+        if(any(model$initialType == c("backcasting","complete","gradient"))){
             initial                <- model$initialType;
             profilesRecentTable    <- NULL;
             profilesRecentProvided <- FALSE;
@@ -866,11 +868,20 @@ om <- function(data,
                                   constantEstimate, adamArchitect$adamCpp,
                                   constantRequired, initialArimaNumber);
         prof <- adamFilled$matVt[, 1:adamArchitect$lagsModelMax, drop=FALSE];
-        adamFitted <- adamArchitect$adamCpp$fit(adamFilled$matVt, adamFilled$matWt, adamFilled$matF, adamFilled$vecG,
-                                                adamArchitect$indexLookupTable, prof,
-                                                as.numeric(ot), as.numeric(ot),
-                                                any(initialType == c("complete","backcasting")),
-                                                nIterations, occurrenceChar);
+        # Same dispatcher as omCF_local: re-solves the gradient initials from
+        # the seed at the optimum (or falls back to backcasting)
+        adamFitted <- adam_fitOrGradient(adamFilled$matVt, adamFilled$matWt,
+                                         adamFilled$matF, adamFilled$vecG,
+                                         adamArchitect$indexLookupTable, prof,
+                                         as.numeric(ot), as.numeric(ot),
+                                         initialType, nIterations, adamArchitect$adamCpp,
+                                         nla$etsModel, nla$arimaModel, xregModel,
+                                         nla$Etype, nla$Ttype, nla$Stype,
+                                         adamArchitect$componentsNumberETS,
+                                         adamArchitect$componentsNumberETSSeasonal,
+                                         adamArchitect$componentsNumberETSNonSeasonal,
+                                         adamArchitect$lagsModel, adamArchitect$lagsModelMax,
+                                         obsInSample, loss, oType=occurrenceChar);
         yFitted <- omLinkFunction(adamFitted$fitted, nla$Etype, occurrence);
 
         # For "fixed" occurrence the optimizer never ran, so logLikADAMValue is absent.
@@ -1757,12 +1768,19 @@ omCF_local <- function(B,
         return(penalty);
     }
     profilesRecentTable[] <- adamElements$matVt[, 1:lagsModelMax];
-    adamFitted <- adamCpp$fit(adamElements$matVt, adamElements$matWt,
-                              adamElements$matF, adamElements$vecG,
-                              indexLookupTable, profilesRecentTable,
-                              as.numeric(ot), as.numeric(ot),
-                              any(initialType == c("complete","backcasting")),
-                              nIterations, occurrenceChar);
+    # Fit dispatcher: for initial="gradient" this solves the initials by
+    # profiling the occurrence loss over the probability residuals (in C++);
+    # otherwise (or when out of scope) it is the ordinary occurrence fit, with
+    # gradient joining the backcasting group as a fall-back.
+    adamFitted <- adam_fitOrGradient(adamElements$matVt, adamElements$matWt,
+                                     adamElements$matF, adamElements$vecG,
+                                     indexLookupTable, profilesRecentTable,
+                                     as.numeric(ot), as.numeric(ot),
+                                     initialType, nIterations, adamCpp,
+                                     etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                                     componentsNumberETS, componentsNumberETSSeasonal,
+                                     componentsNumberETSNonSeasonal, lagsModel, lagsModelMax,
+                                     obsInSample, loss, oType=occurrenceChar);
     yFitted <- omLinkFunction(adamFitted$fitted, Etype, occurrence);
     if(any(is.nan(yFitted)) || any(yFitted<0) || any(yFitted>1)){
         return(1e+300);
@@ -1900,8 +1918,9 @@ coefbootstrap.om <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         method <- "dsr";
     }
 
-    # If this is backcasting, do sampling with moving origin
-    changeOrigin <- any(object$initialType==c("backcasting","complete"));
+    # If this is backcasting (or gradient, which also derives the initials
+    # from the data), do sampling with moving origin
+    changeOrigin <- any(object$initialType==c("backcasting","complete","gradient"));
 
     sampler <- function(indices,size,replace,prob,regressionPure=FALSE,changeOrigin=FALSE){
         if(regressionPure){

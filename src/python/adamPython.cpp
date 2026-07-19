@@ -176,7 +176,8 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("nIterations"),
             py::arg("analytic"),
             py::arg("lossType"),
-            py::arg("lossParams"))
+            py::arg("lossParams"),
+            py::arg("O"))
         .def("reforecast", &adamCore::reforecast,
             py::arg("arrayErrors"),
             py::arg("arrayOt"),

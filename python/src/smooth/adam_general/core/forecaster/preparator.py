@@ -974,6 +974,18 @@ def preparator(
         ...     ...
         ... )
     """
+    # Preserve the pristine seed head across preparator invocations: the
+    # mirror-back below publishes the solved gradient initials into
+    # matrices_dict for initial-value extraction, but a later invocation (e.g.
+    # from predict) must re-run the solve from the original creator seed, as R
+    # does (the caller's matVt is never mutated there)
+    _lags_max_seed = lags_dict["lags_model_max"]
+    if "mat_vt_seed_head" not in matrices_dict:
+        matrices_dict["mat_vt_seed_head"] = matrices_dict["mat_vt"][
+            :, :_lags_max_seed
+        ].copy()
+    matrices_dict["mat_vt"][:, :_lags_max_seed] = matrices_dict["mat_vt_seed_head"]
+
     # 1. Fill matrices with estimated parameters if needed
     matrices_dict = _fill_matrices_if_needed(
         general_dict,
@@ -1030,6 +1042,13 @@ def preparator(
             "backcasting",
         ]
 
+    # The gradient solve needs the current value of the distribution parameter
+    # (e.g. the dgnorm shape); extract it from B before the fit, mirroring R
+    if adam_estimated.get("other_parameter_estimate", False) and len(
+        adam_estimated["B"]
+    ):
+        other = abs(float(adam_estimated["B"][-1]))
+
     # Call the fit (or gradient initial-state solve) with the prepared inputs.
     # For initial="gradient" the dispatcher re-solves the initials from the seed
     # profile and fits with backcast=False; otherwise it is the ordinary fit.
@@ -1052,6 +1071,13 @@ def preparator(
         components_dict=components_dict,
         lags_dict=lags_dict,
         obs_in_sample=observations_dict["obs_in_sample"],
+        loss=general_dict["loss"],
+        distribution=general_dict.get(
+            "distribution_new", general_dict.get("distribution", "default")
+        ),
+        other=other,
+        horizon=general_dict.get("h", 0),
+        multisteps=general_dict.get("multisteps", False),
     )
     # The gradient solve overwrites the head of mat_vt in place; mirror the
     # solved initials back into matrices_dict so downstream initial-value

@@ -218,12 +218,16 @@ explanatory variables are optimised. This is recommended for ETSX and ARIMAX
 models. Alternatively, you can set \code{initial="complete"} backcasting,
 which means that all states (including explanatory variables) are initialised
 via backcasting. Finally, \code{initial="gradient"} solves for the initial
-states by least squares: a single linear solve for additive ETS (exact,
-because the residuals are then affine in the initial state) or a Gauss-Newton
+states by profiling the estimation loss at the current parameters: a single
+linear solve for additive ETS (exact, because the residuals are then affine
+in the initial state; robust and multistep losses are handled by weighted
+least squares sweeps on the same design) or a loss-aware Gauss-Newton
 iteration for multiplicative / mixed ETS. It avoids the divergence that
 backcasting can exhibit for additive seasonal models with a trend and a large
 seasonal smoothing parameter. This option currently supports ETS models (no
-ARIMA/xreg, single seasonality); other specifications fall back to backcasting.
+ARIMA/xreg, single seasonality) and the built-in losses; other specifications
+(including custom loss functions, which cannot be profiled in C++) fall back
+to backcasting.
 
 If a use provides a list of values, it is recommended to use the named one and
 to provide the initial components that are available. For example:

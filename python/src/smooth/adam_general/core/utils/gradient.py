@@ -1,21 +1,72 @@
-"""Least-squares initial-state solve for ETS (``initial="gradient"``).
+"""Initial-state solve for ETS (``initial="gradient"``).
 
 Direct port of ``R/adam-gradient.R``. Given fixed persistence (the current
 ``mat_f`` / ``vec_g``) and a seeded recent profile, this solves for the initial
-state that minimises the in-sample SSE. It never runs the backcasting backward
-pass.
+state that minimises the estimation loss. It never runs the backcasting
+backward pass.
 
 All the numerical work happens in C++ (``adam_cpp.gradientSolve``, shared with
 the R build for exact parity): for additive ETS the residuals are affine in the
 initial state, so the design is propagated analytically alongside a single
-forward pass and solved by one pivoted-QR least squares; otherwise
-finite-difference Gauss-Newton with a Levenberg-Marquardt fallback is used.
-The solve is stateless — a deterministic function of its inputs.
+forward pass and solved by pivoted-QR least squares (with IRLS sweeps or the
+affine multistep designs for the non-SSE losses); otherwise loss-aware
+Gauss-Newton with an analytic Jacobian and a Levenberg-Marquardt fallback is
+used. The solve is stateless — a deterministic function of its inputs.
 """
 
 from __future__ import annotations
 
 import numpy as np
+
+
+def adam_gradient_loss_code(loss, distribution, e_type, other, horizon, multisteps):
+    """Map the estimation loss + distribution pair to the C++ loss code.
+
+    Returns ``(code, params)`` for ``gradientSolve`` (codes documented in
+    ``src/headers/adamGradient.h``), or ``None`` for custom loss functions
+    (which cannot cross into C++), making the caller fall back to backcasting.
+    This table must stay mirror-identical to ``adam_gradientLossCode`` in
+    ``R/adam-gradient.R``. Losses without a matching rho keep the SSE default
+    ``"S"``; the multiplicative likelihood codes (``l``/``g``/``i``) are mapped
+    for ``e_type == "M"`` only.
+    """
+    if loss == "custom" or callable(loss):
+        return None
+    if distribution == "default":
+        if loss == "likelihood":
+            distribution = "dnorm" if e_type == "A" else "dgamma"
+        elif loss in ("MAEh", "MACE", "MAE"):
+            distribution = "dlaplace"
+        elif loss in ("HAMh", "CHAM", "HAM"):
+            distribution = "ds"
+        else:
+            distribution = "dnorm"
+    if multisteps:
+        code = {"MSEh": "h", "TMSE": "T", "GTMSE": "t", "MSCE": "C", "GPL": "P"}.get(
+            loss, "S"
+        )
+        if code != "S" and horizon is not None and horizon >= 1:
+            return code, float(horizon)
+        return "S", 0.0
+    if loss == "MAE":
+        return "A", 0.0
+    if loss == "HAM":
+        return "H", 0.0
+    if loss == "likelihood":
+        code = {
+            "dlaplace": "A",
+            "ds": "H",
+            "dgnorm": "G",
+            "dlnorm": "l" if e_type == "M" else "S",
+            "dgamma": "g" if e_type == "M" else "S",
+            "dinvgauss": "i" if e_type == "M" else "S",
+        }.get(distribution, "S")
+        if code == "G":
+            if other is None or not np.isfinite(other):
+                return "S", 0.0
+            return "G", float(other)
+        return code, 0.0
+    return "S", 0.0
 
 
 def adam_gradient_probe_basis(
@@ -73,11 +124,13 @@ def adam_gradient_solve(
     probe_basis,
     lags_model_max,
     obs_in_sample,
+    loss_code,
 ):
-    """Solve for the initial recent profile that minimises in-sample SSE.
+    """Solve for the initial recent profile that minimises the estimation loss.
 
-    Thin wrapper around the shared C++ ``gradientSolve``. Returns the solved
-    recent profile (same shape as ``profile``), or ``None`` on failure.
+    Thin wrapper around the shared C++ ``gradientSolve``; ``loss_code`` is the
+    ``(code, params)`` pair from :func:`adam_gradient_loss_code`. Returns the
+    solved recent profile (same shape as ``profile``), or ``None`` on failure.
     Mirrors ``adam_gradientSolve``.
     """
     solved = adam_cpp.gradientSolve(
@@ -95,6 +148,8 @@ def adam_gradient_solve(
         probeBasis=np.asfortranarray(probe_basis, dtype=np.float64),
         nIterations=15,
         analytic=True,
+        lossType=loss_code[0],
+        lossParams=np.asarray([loss_code[1]], dtype=np.float64),
     )
     solved = np.asarray(solved, dtype=np.float64)
     if solved.size == 0:
@@ -120,14 +175,20 @@ def adam_fit_or_gradient(
     lags_dict,
     obs_in_sample,
     o_type="n",
+    loss="MSE",
+    distribution="dnorm",
+    other=None,
+    horizon=0,
+    multisteps=False,
 ):
     """Fit dispatcher mirroring ``adam_fitOrGradient``.
 
     Runs the gradient initial-state solve when ``initial_type == "gradient"`` and
-    the model is in scope (ETS, no ARIMA/xreg), otherwise the ordinary
-    ``adam_cpp.fit`` (with the backcast flag). Gradient always fits with
-    ``backcast=False`` from the solved initials and ``n_iterations=1``; it never
-    runs the backward pass. Out-of-scope gradient models fall back to backcasting.
+    the model is in scope (ETS, no ARIMA/xreg, a loss that maps onto a C++ loss
+    code), otherwise the ordinary ``adam_cpp.fit`` (with the backcast flag).
+    Gradient always fits with ``backcast=False`` from the solved initials and
+    ``n_iterations=1``; it never runs the backward pass. Out-of-scope gradient
+    models (including custom loss functions) fall back to backcasting.
 
     ``mat_vt`` is mutated in place (its head columns are overwritten with the
     solved profile) and the C++ fit result is returned.
@@ -136,6 +197,14 @@ def adam_fit_or_gradient(
         isinstance(initial_type, (list, tuple)) and "gradient" in initial_type
     )
     if is_gradient:
+        loss_code = adam_gradient_loss_code(
+            loss,
+            distribution,
+            model_type_dict.get("error_type", "A"),
+            other,
+            horizon,
+            multisteps,
+        )
         lags_model_max = int(lags_dict["lags_model_max"])
         probe_basis = adam_gradient_probe_basis(
             bool(model_type_dict.get("ets_model", False)),
@@ -149,7 +218,7 @@ def adam_fit_or_gradient(
             lags_dict["lags_model"],
             lags_model_max,
         )
-        if probe_basis is not None:
+        if probe_basis is not None and loss_code is not None:
             solved = adam_gradient_solve(
                 adam_cpp,
                 mat_wt,
@@ -162,6 +231,7 @@ def adam_fit_or_gradient(
                 probe_basis,
                 lags_model_max,
                 obs_in_sample,
+                loss_code,
             )
             if solved is not None:
                 mat_vt[:, :lags_model_max] = solved

@@ -382,8 +382,7 @@ def CF(  # noqa: N802
     if (
         arima_checked["arima_model"]
         and any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]])
-        and initials_checked["initial_type"]
-        in ["complete", "backcasting", "gradient"]
+        and initials_checked["initial_type"] in ["complete", "backcasting", "gradient"]
     ):
         seed_row_idx = (
             components_dict["components_number_ets"]
@@ -418,7 +417,11 @@ def CF(  # noqa: N802
     profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
         :, : lags_dict["lags_model_max"]
     ]
-    mat_vt = np.asfortranarray(adam_elements["mat_vt"], dtype=np.float64)
+    # An explicit copy: the gradient dispatcher overwrites the head of mat_vt
+    # in place, and np.asfortranarray would alias an already-Fortran-ordered
+    # array, leaking the solved initials into the shared creator matrices
+    # (R's copy-on-modify semantics never leak them)
+    mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
 
     # Restore the seed row of mat_vt before the next CF call so each
     # optimiser step starts from the same initial state (the C++ fitter may
@@ -595,6 +598,13 @@ def CF(  # noqa: N802
         components_dict=components_dict,
         lags_dict=lags_dict,
         obs_in_sample=observations_dict["obs_in_sample"],
+        loss=general["loss"],
+        distribution=general.get(
+            "distribution_new", general.get("distribution", "default")
+        ),
+        other=other,
+        horizon=general.get("h", 0),
+        multisteps=general["multisteps"],
     )
 
     # adam_fitted.errors = np.repeat()
@@ -1178,7 +1188,8 @@ def log_Lik_ADAM(  # noqa: N802
             # Convert stuff to numpy arrays with float64 - C++ requires that
             y_in_sample = np.asarray(observations_dict["y_in_sample"], dtype=np.float64)
             ot = np.asarray(observations_dict["ot"], dtype=np.float64)
-            mat_vt = np.asfortranarray(adam_elements["mat_vt"], dtype=np.float64)
+            # Explicit copy -- see the matching comment in CF()
+            mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
             mat_wt = np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64)
             mat_f = np.asfortranarray(
                 adam_elements["mat_f"], dtype=np.float64
@@ -1210,6 +1221,15 @@ def log_Lik_ADAM(  # noqa: N802
                 components_dict=components_dict,
                 lags_dict=lags_dict,
                 obs_in_sample=observations_dict["obs_in_sample"],
+                loss=general_dict["loss"],
+                distribution=general_dict.get(
+                    "distribution_new", general_dict.get("distribution", "default")
+                ),
+                # This refit only runs for the multistep losses, whose codes do
+                # not use the distribution parameter
+                other=None,
+                horizon=general_dict.get("h", 0),
+                multisteps=general_dict["multisteps"],
             )
 
             logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))

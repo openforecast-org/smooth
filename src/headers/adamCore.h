@@ -932,19 +932,28 @@ public:
         return result;
     }
 
-    // Method 6b: gradientSolve - least-squares solve for the initial recent
+    // Method 6b: gradientSolve - loss-profiling solve for the initial recent
     // profile (initial="gradient"). Given fixed persistence, finds the initial
-    // state minimising the in-sample SSE. probeBasis maps nFree free parameters
+    // state minimising the estimation loss. probeBasis maps nFree free parameters
     // to profile cells (column j holds 1s on the cells that move together as one
     // parameter; profile candidates are profile + reshape(probeBasis*theta)).
     //
+    // lossType and lossParams select the profiled loss (codes and rho documented
+    // in adamGradient.h; 'S' is the SSE default, exact for likelihood+dnorm).
+    // lossParams(0) carries the dgnorm beta for 'G' and the horizon for the
+    // multistep codes.
+    //
     // For additive ETS the residuals are affine in theta, so the design matrix
     // (the residual sensitivities) is propagated analytically alongside a single
-    // forward pass and the problem is solved by one pivoted-QR least squares.
-    // Otherwise finite-difference Gauss-Newton with a backtracking line search
-    // and a Levenberg-Marquardt fallback is used. The solve is stateless: the
-    // result is a deterministic function of the inputs, which the optimiser
-    // requires and which keeps the R and Python builds bit-identical.
+    // forward pass; SSE is one pivoted-QR least squares, the separable robust
+    // losses are IRLS sweeps on the affine surrogate, and the multistep losses
+    // are solved on the affine multistep design replicated from the ferrors()
+    // recursion. Otherwise Gauss-Newton (analytic or finite-difference Jacobian)
+    // with loss-aware steps, a backtracking line search and a Levenberg-Marquardt
+    // fallback is used; multistep losses fall back to the one-step SSE there.
+    // The solve is stateless: the result is a deterministic function of the
+    // inputs, which the optimiser requires and which keeps the R and Python
+    // builds bit-identical.
     //
     // Returns the solved recent profile, or an empty matrix on failure (the
     // caller then falls back to the backcasting fit).
@@ -952,7 +961,8 @@ public:
                             arma::mat const &matrixWt, arma::mat const &matrixF,
                             arma::vec const &vectorG, arma::umat const &indexLookupTable,
                             arma::mat const &profile, arma::mat const &probeBasis,
-                            unsigned int const &nIterations, bool const &analytic){
+                            unsigned int const &nIterations, bool const &analytic,
+                            char const &lossType, arma::vec const &lossParams){
 
         int obs = matrixYt.n_rows;
         int lagsModelMax = max(lags);
@@ -962,11 +972,32 @@ public:
             return failure;
         }
 
-        // The solve is defined over the in-sample SSE of the same forward pass the
-        // final fit runs, so both branches share gradientPass().
+        // The solve is defined over the same forward pass the final fit runs,
+        // so both branches share gradientPass().
         bool additive = (E=='A') && (T!='M') && (S!='M');
 
         if(additive){
+            // Resolve the effective loss for this branch. The multiplicative
+            // likelihood losses cannot reach it (the wrappers map them for
+            // E='M' only) -- treated defensively as SSE. Multistep losses need
+            // a valid horizon and at least one forecast origin.
+            char L = lossType;
+            double const beta = (lossParams.n_elem>0) ? lossParams(0) : 2.0;
+            int hor = 0;
+            if(L=='l' || L=='g' || L=='i'){
+                L = 'S';
+            }
+            if(gradientLossMultistep(L)){
+                hor = (lossParams.n_elem>0) ? (int)lossParams(0) : 0;
+                if(hor < 1 || obs - hor < 1){
+                    L = 'S';
+                }
+            }
+            bool const multistep = gradientLossMultistep(L);
+            int const nOrigins = multistep ? (obs - hor) : 0;
+            arma::mat msDesign(multistep ? nOrigins*hor : 0, nFree);
+            arma::vec msResiduals(multistep ? nOrigins*hor : 0);
+
             // Affine case: one forward pass propagating the residual sensitivities.
             // S holds d(profile cell)/d(theta) for every profile cell (rows follow
             // the profile's column-major linear indices, which is exactly what
@@ -1020,29 +1051,82 @@ public:
                                          nArima, nXreg, nComponents, constant,
                                          vectorG, residuals(idx), yFit, adamETS);
                 sens.rows(cells) = matrixF * sens.rows(cells) + vectorG * dError;
+
+                // Multistep losses: replicate the ferrors() recursion from the
+                // just-updated buffers -- h no-update forecast steps from every
+                // origin, with the sensitivities following through F. Like
+                // ferrors(), the multistep errors ignore the occurrence.
+                if(multistep && idx < nOrigins){
+                    arma::mat profStep = prof;
+                    arma::mat sensStep = sens;
+                    for(int k=0; k<hor; k=k+1){
+                        arma::uvec const cellsStep = indexLookupTable.col(i+k);
+                        double const yStep =
+                            adamWvalue(profStep(cellsStep), matrixWt.row(idx+k),
+                                       E, T, S, nETS, nNonSeasonal, nSeasonal,
+                                       nArima, nXreg, nComponents, constant);
+                        msResiduals(idx*hor+k) = matrixYt(idx+k) - yStep;
+                        msDesign.row(idx*hor+k) =
+                            matrixWt.row(idx+k) * sensStep.rows(cellsStep);
+                        profStep(cellsStep) =
+                            adamFvalue(profStep(cellsStep), matrixF, E, T, S,
+                                       nETS, nNonSeasonal, nSeasonal, nArima,
+                                       nComponents, constant);
+                        sensStep.rows(cellsStep) = matrixF * sensStep.rows(cellsStep);
+                    }
+                }
             }
 
             if(!residuals.is_finite() || !design.is_finite()){
                 return failure;
             }
-            arma::vec theta = olsCore(design, residuals, 1e-7);
+
+            arma::vec theta;
+            if(multistep){
+                if(!msResiduals.is_finite() || !msDesign.is_finite()){
+                    return failure;
+                }
+                theta = gradientLossMultistepSolve(msDesign, msResiduals,
+                                                   L, hor, nOrigins);
+            }
+            else{
+                // The SSE solution; for the separable robust losses it seeds
+                // the IRLS sweeps on the same affine surrogate.
+                theta = olsCore(design, residuals, 1e-7);
+                theta.elem(arma::find_nonfinite(theta)).zeros();
+                if(L != 'S'){
+                    theta = gradientLossIrls(design, residuals, theta, L, beta);
+                }
+            }
             theta.elem(arma::find_nonfinite(theta)).zeros();
             return profile + arma::reshape(probeBasis * theta,
                                            profile.n_rows, profile.n_cols);
         }
 
-        // Nonlinear case: Gauss-Newton with a finite-difference Jacobian, a
-        // backtracking line search and a Levenberg-Marquardt fallback. The solve
-        // is deliberately stateless (always starts from the seed profile): the
-        // objective must be a deterministic function of the inputs, both for the
-        // optimiser and for exact parity between the R and Python builds.
+        // Nonlinear case: Gauss-Newton with an analytic (or finite-difference)
+        // Jacobian, loss-aware steps, a backtracking line search and a
+        // Levenberg-Marquardt fallback. The solve is deliberately stateless
+        // (always starts from the seed profile): the objective must be a
+        // deterministic function of the inputs, both for the optimiser and for
+        // exact parity between the R and Python builds.
+        //
+        // The multistep losses are out of scope here (their errors are not
+        // affine and would need h extra passes per origin) -- they fall back to
+        // the one-step SSE profile, as does everything the wrappers map to 'S'.
+        char L = lossType;
+        if(gradientLossMultistep(L)){
+            L = 'S';
+        }
+        double const beta = (lossParams.n_elem>0) ? lossParams(0) : 2.0;
+        double lossScale = 0;
+
         arma::mat prof = profile;
         arma::vec residuals(obs);
         if(!gradientPass(prof, matrixYt, matrixOt, matrixWt, matrixF, vectorG,
                          indexLookupTable, residuals)){
             return failure;
         }
-        double sseCurrent = arma::dot(residuals, residuals);
+        double lossCurrent = gradientLossSum(residuals, L, beta, lossScale);
 
         // First profile cell of each probe: the finite-difference step is scaled
         // by the current value there, matching the original R implementation.
@@ -1054,9 +1138,15 @@ public:
 
         arma::mat jacobian(obs, nFree);
         arma::vec residualsProbe(obs);
-        double sseBeforeIteration;
+        double lossBeforeIteration;
         for(unsigned int iter=0; iter<nIterations; iter=iter+1){
-            sseBeforeIteration = sseCurrent;
+            // Refresh the concentrated scale from the current residuals; the
+            // objective is held at this fixed scale within the iteration.
+            if(L=='l' || L=='i'){
+                lossScale = gradientLossScale(residuals, L);
+                lossCurrent = gradientLossSum(residuals, L, beta, lossScale);
+            }
+            lossBeforeIteration = lossCurrent;
             bool jacobianOk = true;
             if(analytic){
                 // One pass propagating the exact sensitivities (adamGradient.h)
@@ -1085,13 +1175,35 @@ public:
                 break;
             }
 
-            arma::vec step = -olsCore(jacobian, residuals, 1e-7);
+            // The step system: plain (J, e) for SSE; rows scaled by the IRLS /
+            // Newton weights with the matching right-hand side otherwise
+            // (gradientLossStepRow). For 'S' this is bit-identical to the
+            // previous SSE-only implementation.
+            arma::mat jacobianStep;
+            arma::vec targetStep;
+            if(L=='S'){
+                jacobianStep = jacobian;
+                targetStep = residuals;
+            }
+            else{
+                arma::vec rowScale(obs);
+                targetStep.set_size(obs);
+                double a, b;
+                for(int t=0; t<obs; t=t+1){
+                    gradientLossStepRow(residuals(t), L, beta, lossScale, a, b);
+                    rowScale(t) = a;
+                    targetStep(t) = b;
+                }
+                jacobianStep = jacobian.each_col() % rowScale;
+            }
+
+            arma::vec step = -olsCore(jacobianStep, targetStep, 1e-7);
             step.elem(arma::find_nonfinite(step)).zeros();
             if(std::sqrt(arma::dot(step, step)) < 1e-8){
                 break;
             }
 
-            // Try the plain Gauss-Newton step with a backtracking line search.
+            // Try the full step with a backtracking line search on the loss.
             bool improved = false;
             double stepSize = 1;
             for(int half=0; half<6; half=half+1){
@@ -1099,29 +1211,29 @@ public:
                                                                profile.n_rows, profile.n_cols);
                 if(gradientPass(profCandidate, matrixYt, matrixOt, matrixWt, matrixF,
                                 vectorG, indexLookupTable, residualsProbe) &&
-                   arma::dot(residualsProbe, residualsProbe) < sseCurrent){
+                   gradientLossSum(residualsProbe, L, beta, lossScale) < lossCurrent){
                     prof = profCandidate;
 
                     residuals = residualsProbe;
-                    sseCurrent = arma::dot(residuals, residuals);
+                    lossCurrent = gradientLossSum(residuals, L, beta, lossScale);
                     improved = true;
                     break;
                 }
                 stepSize = stepSize / 2;
             }
 
-            // Levenberg-Marquardt fallback: when the raw Gauss-Newton step fails
-            // (typically because the Jacobian is ill-conditioned and the step is
-            // wildly oversized), solve the damped normal equations
-            // [J; sqrt(lambda) I] step = [e; 0] with increasing damping until a
-            // step improves the SSE. This keeps the descent property without
+            // Levenberg-Marquardt fallback: when the raw step fails (typically
+            // because the Jacobian is ill-conditioned and the step is wildly
+            // oversized), solve the damped normal equations
+            // [Jw; sqrt(lambda) I] step = [bw; 0] with increasing damping until
+            // a step improves the loss. This keeps the descent property without
             // clipping anything: pure gradient-descent behaviour as lambda grows.
             if(!improved){
-                double lambdaScale = arma::accu(arma::square(jacobian)) / nFree;
+                double lambdaScale = arma::accu(arma::square(jacobianStep)) / nFree;
                 arma::mat jacobianDamped(obs + nFree, nFree, arma::fill::zeros);
-                jacobianDamped.rows(0, obs-1) = jacobian;
+                jacobianDamped.rows(0, obs-1) = jacobianStep;
                 arma::vec residualsDamped(obs + nFree, arma::fill::zeros);
-                residualsDamped.rows(0, obs-1) = residuals;
+                residualsDamped.rows(0, obs-1) = targetStep;
                 for(int power=-2; power<=4 && !improved; power=power+2){
                     double lambda = lambdaScale * std::pow(10.0, power);
                     jacobianDamped.rows(obs, obs+nFree-1) =
@@ -1135,11 +1247,11 @@ public:
                                                                    profile.n_rows, profile.n_cols);
                     if(gradientPass(profCandidate, matrixYt, matrixOt, matrixWt, matrixF,
                                     vectorG, indexLookupTable, residualsProbe) &&
-                       arma::dot(residualsProbe, residualsProbe) < sseCurrent){
+                       gradientLossSum(residualsProbe, L, beta, lossScale) < lossCurrent){
                         prof = profCandidate;
 
                         residuals = residualsProbe;
-                        sseCurrent = arma::dot(residuals, residuals);
+                        lossCurrent = gradientLossSum(residuals, L, beta, lossScale);
                         improved = true;
                     }
                 }
@@ -1147,11 +1259,11 @@ public:
             if(!improved){
                 break;
             }
-            // Diminishing returns: once an iteration improves the SSE by less
+            // Diminishing returns: once an iteration improves the loss by less
             // than a relative 1e-4, further iterations are not worth their
             // Jacobian cost — the warm start carries the remaining convergence
             // across the optimiser's evaluations.
-            if(sseCurrent > sseBeforeIteration * (1 - 1e-4)){
+            if(lossCurrent > lossBeforeIteration * (1 - 1e-4)){
                 break;
             }
         }

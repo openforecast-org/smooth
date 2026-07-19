@@ -286,8 +286,10 @@ def _qqplot_dist(model):
         )
 
     if dist == "dinvgauss":
+        # scipy's invgauss(mu, scale=s) is IG(mean=mu*s, lambda=s); R uses
+        # qinvgauss(mean=1, dispersion=scale), i.e. mu=scale, s=1/scale
         return (
-            sp_stats.invgauss(mu=1, scale=scale),
+            sp_stats.invgauss(mu=scale, scale=1 / scale),
             "QQ-plot of Inverse Gaussian distribution",
         )
 

@@ -529,13 +529,22 @@ class TestADAMLogLikDistribution:
         dlap_ll = float(np.sum(stats.laplace.logpdf(r, 0, b)))
         assert abs(float(m_mae.loglik) - dlap_ll) < 1e-6
 
-    def test_explicit_distribution_is_overridden_by_the_loss(self):
-        # loss=MSE ignores an explicit distribution (mirrors R): MSE always
-        # reports the dnorm likelihood, so distribution="dlaplace" has no effect.
+    def test_explicit_distribution_is_honoured_over_the_loss(self):
+        # An explicit distribution is honoured for the reported logLik, even
+        # when the fitting loss implies a different one (mirrors R): loss=MSE
+        # with distribution="dlaplace" reports the Laplace likelihood, not the
+        # MSE-implied Normal. Only distribution="default" follows the loss.
+        from scipy import stats
+
         y = self._series()
         m_default = ADAM(model="AAA", lags=[12], loss="MSE").fit(y)
         m_lap = ADAM(model="AAA", lags=[12], loss="MSE", distribution="dlaplace").fit(y)
-        assert abs(float(m_default.loglik) - float(m_lap.loglik)) < 1e-9
+        # The two differ: default is Normal, explicit is Laplace.
+        assert abs(float(m_default.loglik) - float(m_lap.loglik)) > 1.0
+        r = np.asarray(m_lap.residuals).ravel()
+        b = np.sum(np.abs(r)) / len(r)
+        dlap_ll = float(np.sum(stats.laplace.logpdf(r, 0, b)))
+        assert abs(float(m_lap.loglik) - dlap_ll) < 1e-6
 
     def test_ds_distribution_is_the_s_not_students_t(self):
         # The S distribution log-density is -log(4 s^2) - sqrt(|x-mu|)/s, not a

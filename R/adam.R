@@ -1006,11 +1006,14 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 return(0);
             }
             else{
-                distributionNew <- switch(loss,
-                                          "MSE"="dnorm",
-                                          "MAE"="dlaplace",
-                                          "HAM"="ds",
-                                          distribution);
+                # `distribution` here is already the resolved distributionNew:
+                # the user's explicit choice, or the loss-implied default
+                # (MSE->dnorm, MAE->dlaplace, HAM->ds) resolved upstream. Use it
+                # as-is so an explicitly-selected distribution is honoured for
+                # the reported logLik even when the fitting loss implies a
+                # different one; only the default falls back to the loss-implied
+                # distribution.
+                distributionNew <- distribution;
 
                 lossNew <- switch(loss,
                                   "MSE"=,"MAE"=,"HAM"="likelihood",

@@ -289,3 +289,18 @@ def test_gradient_om_fixed_persistence_loglik_is_finite():
         on, off = f[_OT == 1], f[_OT == 0]
         expected = float(np.sum(np.log(on)) + np.sum(np.log(1 - off)))
         assert abs(ll - expected) < 1e-6
+
+
+def test_om_loglik_is_bernoulli_not_cost_for_non_likelihood_loss():
+    # For a fit-only loss (MSE), logLik must be the Bernoulli likelihood of the
+    # fitted probabilities, NOT -CF (the MSE). lossValue keeps the MSE. No
+    # flooring of the probabilities.
+    from smooth import OM
+
+    m = OM(model="MNN", occurrence="odds-ratio", initial="optimal", loss="MSE").fit(_OT)
+    f = np.asarray(m.fitted).ravel()
+    with np.errstate(invalid="ignore", divide="ignore"):
+        bernoulli = float(np.sum(_OT * np.log(f) + (1 - _OT) * np.log(1 - f)))
+    assert abs(float(m.loglik) - bernoulli) < 1e-9
+    # lossValue is the MSE, a small number, not the Bernoulli magnitude
+    assert m._adam_estimated["CF_value"] < 1.0

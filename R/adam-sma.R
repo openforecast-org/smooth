@@ -239,12 +239,6 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
         # on the final values. This is because the weights are 1/n, and the difference
         # between g=0 and g=1/n is almost non-existent
 
-        # Calculate the number of degrees of freedom coming from states in case of backcasting
-        # nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll,
-        #                                                FALSE, Stype, componentsNumberETSNonSeasonal,
-        #                                                componentsNumberETSSeasonal, vecG, matF,
-        #                                                obsInSample, lagsModelMax, indexLookupTable,
-        #                                                adamCpp);
 
         logLik <- structure(cfObjective, nobs=obsInSample, df=1+nStatesBackcasting, class="logLik");
         ICValue <- icFunction(logLik);

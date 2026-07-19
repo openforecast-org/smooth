@@ -1,486 +1,272 @@
-# df-fixes: remove fractional df, implement efficient df for backcasting
+# df-fixes: principled degrees-of-freedom accounting across smooth
 
-**Scope:** adam (ETS / ARIMA / regression / mixtures), CES, GUM, SSARIMA, SPARMA, and the
-occurrence models om / omg / oes-family (which currently count backcast initials as zero)
-— R side, Python side, and (optionally, for speed) the shared C++ core.
-**Author of the plan:** based on the theory developed for the backcasting paper
-(Svetunkov & Pritularga, CSDA revision, July 2026). Verified numerically against
-`adam()` in `theory/` scripts of the paper project.
+**Scope:** adam (ETS / ARIMA / regression / mixtures), CES, GUM, SSARIMA, SPARMA,
+and the occurrence models om / omg — R side, Python side. No C++ changes.
 
----
+**Goal:** replace the `length(B) + (loss=="likelihood") + nStatesBackcasting`
+patchwork (plus the fractional `dfForBack` heuristic) with a **structural**,
+**estimate-gated** degrees-of-freedom count that is **identical across
+initialisation methods** and correct for **non-coprime multi-seasonal** models.
 
-## 0. Background: why, and what the correct df is
-
-Current state of the package:
-
-- With `initial="optimal"` the initial states are counted in `nParam` (level + trend +
-  (m-1) per seasonal block + smoothing + sigma).
-- With `initial="backcasting"` the initials are counted as **zero** in `adam()`, and as a
-  **fractional heuristic** (`calculateBackcastingDF()` / `dfDiscounter()`) in CES / GUM /
-  SSARIMA / SPARMA behind the non-default `dfForBack=TRUE` ellipsis flag.
-- Consequence: the same model fitted with the two initialisation methods gets different
-  penalties (e.g. monthly ETS(A,A,A): 17 vs 4), so ICs across the methods are not
-  comparable, and sigma^2 under backcasting is biased.
-
-What the theory says (proven for pure additive SSOE, verified against `adam()`):
-
-1. Backcasting is equivalent to the per-persistence optimal (profile) initialisation up
-   to terms of order `rho(D)^(2T)`, where `D = F - g w'`. Its likelihood flattery
-   ("degrees of freedom") is therefore the **same** as under optimisation.
-2. That df equals the **number of identifiable initial directions**:
-   `df_init = rank(X)`, where `X` is the `T x p` matrix with rows
-   `X_t = w_t' * D_{t-1} * ... * D_1` — the sensitivity of the one-step fitted value to
-   the initial state. For pure additive ETS this rank equals
-   `p - (number of seasonal blocks)`, i.e. exactly the conventional
-   `level + trend + (m-1) per seasonal block` count. For ARIMA / CES / GUM / xreg the
-   rank handles redundancies automatically without per-model conventions.
-3. The fractional, persistence-dependent "discounting" of the df is not supported by the
-   theory: the total is an integer up to `O(rho(D)^{2T})` crumbs at all usable sample
-   sizes. The fractional heuristic must go.
-
-The fix, in one sentence: **backcasting counts its initials exactly like "optimal" does,
-with the count computed generally as `rank(X)`, and the fractional df machinery is
-removed.**
+Everything below is grounded in diagnostics run 2026-07 against the current
+package (probe = rank of the initial-state sensitivity matrix `X`, the theory
+oracle from the backcasting paper).
 
 ---
 
-## 1. Inventory of what exists now (verified 2026-07-13)
+## 0. Principle
 
-Fractional df implementation (to REMOVE):
+df = the number of **identifiable estimated parameters**, computed from the
+model **structure**, not from the optimiser's working vector `length(B)`.
 
-| Where | What |
-|---|---|
-| `R/helper.R` (top of file, ~lines 1–200) | `calculateBackcastingDF()`, `dfDiscounter()`, `dfDiscounterFit()` |
-| `R/adam-ces.R` (~line 882–896) | `nStatesBackcasting` block calling `calculateBackcastingDF` |
-| `R/adam-gum.R` (~line 729–754) | same pattern; note `parametersNumber[1,1]` also uses it |
-| `R/adam-ssarima.R` (~line 982–998) | same pattern |
-| `R/sparma.R` (~line 531–553) | same pattern |
-| `R/adam-sma.R` (~line 243) | commented-out call — delete the comment too |
-| `R/utils-adam.R` (~line 307, 328) | `dfForBack` ellipsis extraction and pass-through |
-| `R/adamGeneral.R` (~line 3002) | `dfForBack = dfForBack` pass-through |
-| `R/globals.R` (~line 9) | `"dfForBack"` in globalVariables |
+Consequences:
 
-Not exported: `dfDiscounter` et al. appear in no `NAMESPACE` entry, no `man/`, no
-`tests/`, no vignettes (checked by grep). Removal is internal-only; still add a NEWS
-line because `dfForBack` was reachable through `...`.
+- **Init-method invariance.** The same model has the same df whether the
+  initials are optimised, backcast, gradient-solved or complete-backcast. Only
+  `initial="provided"` (and per-component provided initials) removes df. This is
+  the comparability requirement — it holds *by construction*, not by patching.
+- **Estimate-gating.** Every term is gated by its own estimate flag. A user may
+  `persistence=list(alpha=0.2)` and estimate β, γ: then α is *not* counted (it is
+  provided), β and γ are. Same for φ, initials (per component / per seasonal
+  block), ARMA, xreg, constant, distribution shape. Provided quantities go to
+  the **Provided** row of the `nParam` table.
+- **Scale is a real parameter.** Every continuous-response model reports a
+  *concentrated* likelihood (Normal / Laplace / S / Gamma / … with the scale
+  concentrated out), so the scale is an estimated parameter for **every loss**,
+  not only `loss="likelihood"`. `df_scale = 1` for continuous engines,
+  unconditionally. **Exception:** Bernoulli occurrence (om / omg) has **no
+  scale** — `df_scale = 0` there (verified: `om$nParam[1,4] == 0`).
 
-Correct-but-special-cased counting (to KEEP, and use as the template):
-
-- `R/adam.R` (~line 1533–1548): the `initial="gradient"` block counts
-  `initialLevelEstimate + trendy*initialTrendEstimate + sum(initialSeasonalEstimate*(lagsModelSeasonal-1))`.
-  The comment there explicitly says backcasting keeps "the historical
-  zero-initial-df accounting" — that historical accounting is what this plan replaces.
-
-Python: no fractional df exists (nothing to remove). Parameter counting lives in
-`python/src/smooth/adam_general/core/utils/n_param.py` (class `NParam`) and is consumed
-in `core/adam.py` (`n_param` property, `_adam_estimated["n_param_estimated"]`) and
-`core/estimator/estimator.py` / `optimization.py`.
-
-Useful existing machinery (to REUSE — do not reinvent):
-
-- `adamCore$fit(matrixVt, matrixWt, matrixF, vectorG, indexLookupTable, profilesRecent,
-  vectorYt, vectorOt, backcast, nIterations, O)` in `src/headers/adamCore.h` — the
-  filter. `dfDiscounterFit()` already demonstrates how to drive it from R with
-  synthetic inputs; the new probe does the same thing with different inputs.
-- `adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample)` — builds
-  `$lookup` (indexLookupTable) and `$recent` (profilesRecent template).
-- `componentsDefiner()`, `etsChecker()`, `cesChecker()`, `gumChecker()`,
-  `ssarimaChecker()` in `R/helper.R` — model-type introspection used by `dfDiscounter`;
-  keep these (they are general helpers, only the three df functions go).
+df is **not** a single universal formula: each engine has its own parameter
+structure (ETS smoothing vs CES complex `a`/`b` vs GUM general matrices vs ARIMA
+polynomials). What is shared is the *conventions* (gating, scale, table layout)
+and *one* piece of new maths — the ETS seasonal identifiability correction.
 
 ---
 
-## 2. Part A — Remove the fractional df
+## 1. The one new piece of maths: ETS seasonal identifiability (inclusion–exclusion)
 
-Order matters: do removal AFTER Part B is implemented and wired, in the same commit or
-branch, so that `nStatesBackcasting` never silently becomes 0 for CES/GUM/SSARIMA.
+Verified: for **additive/ETS** seasonal components the identifiable initial df is
+below the naive `Σ(m_i − 1)` count when seasonal periods share common divisors,
+because a pattern of period `gcd(m_i, m_j)` can move between blocks `i` and `j`
+without changing fitted values. An `m`-periodic component spans frequencies
+`{0, 1/m, …, (m−1)/m}`; two blocks share the `gcd(m_i, m_j)` frequencies. The
+dimension of the sum of these subspaces is inclusion–exclusion over gcd.
 
-A1. In each of `R/adam-ces.R`, `R/adam-gum.R`, `R/adam-ssarima.R`, `R/sparma.R`:
-    locate the block
-
-    ```r
-    nStatesBackcasting <- 0;
-    ...
-    nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll, ...)
-    ```
-
-    and replace the `calculateBackcastingDF(...)` call with the new
-    `dfInitialsBackcasting(...)` (Part B). Do NOT change the surrounding
-    `nParamEstimated <- length(B) + (loss=="likelihood")*1 + nStatesBackcasting;` lines
-    — the wiring stays, only the number changes. In `adam-gum.R` also check
-    `parametersNumber[1,1] <- length(B) + nStatesBackcasting;` (~line 754) stays
-    consistent.
-
-A2. Refactor rather than delete-and-rewrite (see 3.3b for the reuse map):
-    - `calculateBackcastingDF()`: KEEP the function and its signature; REPLACE the body
-      with the rank probe of Part B and RENAME to `dfInitialsBackcasting()`. The
-      signature already carries everything the probe needs, so engine call sites
-      change only the function name (and drop the `dfForBack` argument).
-    - `dfDiscounter(object)`: KEEP the setup half (introspection, `new(adamCore,...)`,
-      `adamProfileCreator()`); REPLACE the discounting half with a call to
-      `dfInitialsBackcasting()`; RENAME to `dfInitials(object)`. This becomes the
-      post-hoc extractor used by the tests (T1--T3).
-    - `dfDiscounterFit()`: DELETE, replacing with the parameterised probe runner
-      inside `dfInitialsBackcasting()` (single in-sample forward pass, real `matWt`,
-      real `vecG`, `y = 0` -- see 3.3).
-    - MUST NOT survive the refactor: the doubled `2T` sample and mirrored
-      `indexLookupTable`, the `1e-100` data trick, the all-ones `matWtBack`, and the
-      (0,1)-region discounting/ratio logic -- all fractional-specific.
-    Do not touch `componentsDefiner()` and the checker functions below them.
-
-A3. Remove the `dfForBack` plumbing:
-    - `R/utils-adam.R`: delete the `dfForBack <- if(is.null(ellipsis$dfForBack)) ...`
-      line and the `dfForBack = dfForBack` element in the returned list.
-    - `R/adamGeneral.R` (~line 3002): delete `dfForBack = dfForBack`.
-    - `R/globals.R`: remove `"dfForBack"` from the globalVariables vector.
-    - grep the whole `R/` tree for `dfForBack` afterwards; zero hits required.
-
-A4. Delete the commented-out call in `R/adam-sma.R` (~line 243).
-
-A5. NEWS: add an entry under the next version, e.g.
-    "Backcasted initial states now count towards the number of estimated parameters
-    exactly as optimised ones do (computed as the rank of the initial-state design).
-    The experimental fractional df (`dfForBack`) is removed. Information criteria of
-    models with `initial='backcasting'` will increase relative to previous versions;
-    model *ranking* within one initialisation method is typically unaffected."
-
----
-
-## 3. Part B — The efficient df: design
-
-### 3.1 The quantity
-
-`df_init = rank(X)`, `X[t, j] =` sensitivity of the one-step fitted value at time `t`
-to initial-state slot `j`. "Slot" = one element of the initial profile: a state `i`
-with lag `l_i` contributes `l_i` slots (`profilesRecent[i, 1:l_i]`). Total slots
-`P = sum(lagsModelAll)`.
-
-### 3.2 The probe: X by running the existing filter — NO new maths in C++
-
-Key identity: run the filter on **zero data** with occurrence 1 and the *estimated*
-persistence. Then the recursion collapses to `v_t = (F - g w_t') v_{t-1}` and the
-fitted values returned by the filter are exactly `yfit_t = w_t' v_{t-1} = X[t, j]` when
-the initial profile is the `j`-th basis vector. So:
+Treating the level as a period-1 block, the identifiable **level + seasonal** df is
 
 ```
-for j in 1..P:
-    profilesRecent <- all zeros; slot j <- 1
-    run adamCore$fit( y = zeros(T), ot = ones(T), matrixWt = REAL matWt,
-                      matrixF = REAL F, vectorG = REAL estimated g,
-                      backcast = FALSE, nIterations = 1 )
-    X[, j] <- fitted values from that run
-df_init <- qr(X)$rank
+IE(L) = Σ_{∅≠S ⊆ L} (−1)^{|S|+1} · gcd(S)          # L = {1} ∪ {estimated seasonal lags}
 ```
 
-This reuses the exact code path that already computes the model fit, so it is correct
-by construction for every engine (ETS, ARIMA, CES, GUM, SSARIMA, SPARMA, xreg) and for
-every lag structure. It is the same trick `dfDiscounterFit()` used, with three crucial
-differences: real `matrixWt` (not ones), real `g` (not unit profile propagation), and
-basis vectors in the profile (not all-ones).
+and the ETS identifiable initial df is `IE(L) + modelIsTrendy·initialTrendEstimate`.
 
-### 3.3 Implementation: refactored function in `R/helper.R`
+Verified exactly against the probe:
 
-`dfInitialsBackcasting()` is `calculateBackcastingDF()` with a new body: keep its
-existing argument list (drop `dfForBack`), which minimises the engine-side diffs.
-Reference body (adjust argument names to the inherited signature):
-
-```r
-# Efficient number of initial-state parameters consumed by backcasting.
-# Equals rank of the T x P sensitivity matrix of fitted values to the
-# initial profile slots; computed by probing the C++ filter with basis
-# initial profiles on zero data. See the backcasting paper for the theory.
-dfInitialsBackcasting <- function(adamCpp, matWt, matF, vecG,
-                                  indexLookupTable, profilesRecentTable,
-                                  lagsModelAll, obsInSample){
-    lagsModelMax <- max(lagsModelAll);
-    nStates <- nrow(profilesRecentTable);
-    slots <- cbind(rep(1:nStates, lagsModelAll),
-                   unlist(lapply(lagsModelAll, seq_len)));
-    P <- nrow(slots);
-    # Zero data: the filter then propagates pure initial-state sensitivities
-    yZero <- matrix(0, obsInSample, 1);
-    otOnes <- matrix(1, obsInSample, 1);
-    matVt <- matrix(0, nStates, obsInSample + lagsModelMax);
-    X <- matrix(0, obsInSample, P);
-    for(j in 1:P){
-        profilesJ <- profilesRecentTable;
-        profilesJ[] <- 0;
-        profilesJ[slots[j,1], slots[j,2]] <- 1;
-        fitJ <- adamCpp$fit(matVt, matWt, matF, vecG,
-                            indexLookupTable, profilesJ,
-                            yZero, otOnes, FALSE, 1, "n");
-        X[, j] <- fitJ$yFitted;
-    }
-    return(qr(X)$rank);
-}
-```
-
-Notes for the implementer (read carefully, these are the mistakes to avoid):
-
-1. **`fitJ$yFitted`** — check the actual name of the fitted-values element in
-   `FitResult` (see `src/headers/adamCore.h` and how `adam-ces.R` consumes
-   `adamCpp$fit(...)`). Use whatever the engines use (`yfit` / `yFitted` / `$fitted`).
-2. **Multiplicative components break on zero data.** For any model with a
-   multiplicative E/T/S component, construct the probe `adamCore` object with the
-   **additive twin**: same `lagsModelAll` and component counts, but characters
-   `E='A'`, `T` mapped `M->A`, `Md->Ad`, `S` mapped `M->A`. This is the first-order
-   (log-scale) approximation and is the documented behaviour. Do NOT feed `1e-100`
-   data to a multiplicative filter and hope — division by near-zero states produces
-   garbage ranks. The additive twin needs its own `new(adamCore, ...)` instantiation
-   inside the helper when `any(c(Etype,Ttype,Stype) %in% c("M","Md"))`; the F, g, w
-   matrices passed in stay the numeric ones from the fitted model.
-3. **`matWt` must be the model's real measurement matrix** (`obsInSample` rows) — this
-   is what makes xreg/ETSX and time-varying measurement correct. Do not pass ones.
-4. **Occurrence:** probe with `ot = 1` always. The occurrence model's own parameters
-   are counted by the oes machinery separately; the initials' identifiability is a
-   property of the deterministic recursion.
-5. **`indexLookupTable`** — pass the in-sample table
-   (`adamProfileCreator(...)$lookup`, columns `1:(obsInSample+lagsModelMax)`), same as
-   the engines use for fitting. No doubling, no mirroring: the probe is a single
-   forward pass.
-6. **Rank tolerance:** `qr()$rank` (LAPACK default) is acceptable. If flakiness is
-   observed for near-unit-root ARIMA, switch to
-   `sum(svd(X)$d > max(dim(X)) * .Machine$double.eps * svd(X)$d[1])`.
-7. **Do not probe when initials are NOT backcast**: `initial="provided"` consumes 0 df
-   (data-independent); `initial="optimal"`/`"two-stage"` are already counted via
-   `length(B)`. The helper is called only under backcasting (and `"complete"`
-   backcasting) — mirror the existing `if(initialType=="backcasting")`-style
-   conditions where `calculateBackcastingDF` is called today.
-
-### 3.3b Reuse map (what to take from the current helper.R)
-
-| Existing code | Reuse | Detail |
+| model | rank(X) | IE formula |
 |---|---|---|
-| `calculateBackcastingDF()` signature | full | already receives `profilesRecentTable`, `lagsModelAll`, `vecG`, `matF`, `obsInSample`, `lagsModelMax`, `indexLookupTable`, `adamCpp` + ETS metadata; only the body changes |
-| `dfDiscounter(object)` setup half | full | lags/components introspection, `new(adamCore, ...)` construction, `adamProfileCreator()` -- becomes the `dfInitials(object)` extractor skeleton |
-| ETS seasonal `(m-1)/m` spreading loop | as inputs | its `componentsNumberETSSeasonal` / `lagsModelAll[...]` indexing is exactly what the 3.4 fast-path formula needs |
-| `new(adamCore, lagsModelAll, Etype, Ttype, Stype, ...)` call in `dfDiscounter` | full | the additive-twin substitution of 3.3 note 2 happens at precisely this call: pass `'A'`/`'Ad'` chars for `M`/`Md` components |
-| `dfDiscounterFit()` internals | shell only | the pattern of building `matVt`/`ot` and calling `adamCpp$fit` with synthetic inputs; every hardcoded input changes (see A2 must-not-survive list) |
+| AAA (1,12) | 13 | 13 |
+| AAA (1,4,8) gcd 4 | 9 | 9 |
+| AAA (1,4,6) gcd 2 | 9 | 9 |
+| AAA (1,3,7) coprime | 10 | 10 |
+| AAA (1,2,4,8) | 9 | 9 |
+| ANA (1,4,8) | 8 | 8 |
 
-### 3.4 Fast path (optional but recommended) — READ THE RESTRICTION
+`gcd` = 2-line Euclid; k seasonal blocks → 2^k−1 subsets (k ≤ 3–4 in practice).
 
-For **pure ETS without xreg** the rank is known analytically, but ONLY with at most
-one seasonal block OR pairwise-coprime seasonal periods:
+**This correction is ETS-only.** Verified that GUM(4,8), SSARIMA(1,4,8),
+ADAM-ARIMA(1,4,8) have `rank(X) == naive optimal count` — no gcd drop. Their
+seasonality is backshift-differencing / general-transition, not the sum-to-zero
+periodic structure. So for every non-ETS engine the identifiable initial df is
+simply the structural initial-state count the engine already computes for
+`optimal`.
 
-```r
-lagsSeas <- lagsModelSeasonal;
-coprime <- length(lagsSeas) <= 1 ||
-           all(apply(combn(lagsSeas, 2), 2, function(x){ gcd(x[1], x[2]) == 1 }));
-if(etsModel && !arimaModel && !xregModel && coprime){
-    return(1 + modelIsTrendy + sum(lagsSeas - 1));
-}
+---
+
+## 2. Per-engine parameter maps (verified against nParam tables)
+
+Each engine fills its `parametersNumber` table (2×5:
+rows Estimated/Provided; cols internal | xreg | occurrence | scale | all) from
+these structural, estimate-gated counts. `nparam(object)` (reads `[1,5]`) is
+**untouched**.
+
+### 2.1 adam — ETS part
+```
+df_persist = persistenceLevelEstimate
+           + modelIsTrendy   · persistenceTrendEstimate
+           + sum(persistenceSeasonalEstimate)          # vector, per block
+           + phiEstimate
+df_init_ETS = IE({1 if initialLevelEstimate} ∪ {m_k : initialSeasonalEstimate[k]})
+            + modelIsTrendy · initialTrendEstimate
+```
+Both gated. `df_init_ETS` uses the IE formula (fixes non-coprime for optimal AND
+backcasting/gradient). The current `initial="gradient"` block (`adam.R:1550`) and
+every `nStatesBackcasting` use the naive `Σ(m−1)` — replaced by `df_init_ETS`.
+
+### 2.2 adam — ARIMA part
+```
+df_arma   = arEstimate·sum(arOrders) + maEstimate·sum(maOrders)
+df_init_AR = <number of estimated ARIMA initial states>   # structural, no IE correction
 ```
 
-**Why the restriction (verified numerically, 2026-07-13):** for seasonal periods with
-a common divisor, any pattern with period `gcd(m1, m2)` can be moved between the two
-seasonal blocks without changing fitted values, so the identifiable count drops by
-`gcd - 1` per pair beyond the usual per-block `-1`. Examples (slots / rank / naive
-`m-1` convention): nested (4, 8): 13 / 8 / 11; (4, 6): 11 / 8 / 9; hourly-weekly
-(24, 168): 193 / **168** / 191 — the naive convention overcounts the standard ADAM
-double-seasonal model by 23 df (46 AIC units). Multi-seasonal models with non-coprime
-periods MUST go through the probe (or a gcd-aware closed form, only after it is
-proven and tested against the probe). This is precisely why the probe, not a lookup
-table of conventions, is the primary mechanism.
+### 2.3 adam — xreg part  (INCLUDES the adapt delta — was missing)
+```
+df_xreg = sum(xregParametersEstimated) · initialXregEstimate          # coefficients
+        + max(xregParametersPersistence) · persistenceXregEstimate    # adapt "delta"
+```
+Verified: ETSX(ANN) `regressors="use"` → xreg cell 2; `regressors="adapt"` → 4
+(2 coefficients + 2 delta persistence). The delta term MUST be counted. Goes in
+`[1,2]` (nParamXreg), exactly as the current `adam.R:2333` does — keep it.
 
-The fast path covers the overwhelming majority of calls at zero cost and makes the
-probe the fallback for ARIMA/CES/GUM/SSARIMA/xreg/multiplicative/multi-seasonal.
-Keep an internal option (e.g. `options(smooth.dfProbe=TRUE)`) to force the probe for
-testing the fast path against it (test T3). Note: R has no base `gcd`; implement the
-two-liner Euclid inside the helper.
-
-### 3.5 Cost budget
-
-The probe runs the C++ filter `P` times, once, after estimation (never inside the
-optimiser loop). For monthly ETS: 14 runs of an O(T) filter — microseconds to
-milliseconds. For high-frequency multi-seasonal (P in the thousands), the probe is
-O(T*P^2)-ish in total; the fast path avoids it for pure ETS, and for the rest emit a
-once-per-session message if `P > 500` (and consider the C++ batch probe, Part E).
-Requirement: default `adam()` fit time regression < 2% (measure in the test suite,
-Part F, T6).
-
----
-
-## 4. Part C — Wiring (R)
-
-C1. `R/adam.R` (~line 1533): the main inconsistency fix. Where the comment currently
-    says backcasting keeps "the historical zero-initial-df accounting", add the
-    backcasting branch:
-
-    ```r
-    if(any(initialType==c("backcasting","complete")) ...){
-        nStatesBackcasting[] <- dfInitialsBackcasting(...);
-    }
-    ```
-
-    keeping the existing `initial="gradient"` branch as is. The objects needed
-    (`adamCpp`, `matWt`, `matF`, `vecG`, `indexLookupTable`, `profilesRecentTable`,
-    `lagsModelAll`, `obsInSample`) are all in scope at that point of `adam.R` — verify
-    names against the local environment (they may be `matWt`/`matrixWt` etc.).
-
-C2. `R/adam-ces.R`, `R/adam-gum.R`, `R/adam-ssarima.R`, `R/sparma.R`: replace the
-    `calculateBackcastingDF` call as per A1. The call sites already have every needed
-    argument (they currently pass more).
-
-C3. Confirm downstream consumers need no change (they key off `nParam`/logLik df):
-    - `R/methods.R` sigma (`df <- obs - nparam(object)`), logLik structure
-      (`df=nparam(object)`), AIC/AICc/BIC via standard generics.
-    - `parametersNumber` matrix rows in each engine — make sure the initials go into
-      the same cell as under `initial="optimal"` (compare with the optimal branch in
-      the same file; for `adam()` this is `parametersNumber[1,1]`).
-
-C4. Documentation: `man-roxygen`/roxygen blocks for `adam`, `ces`, `gum`, `ssarima`,
-    `auto.*` — wherever `initial` is documented, add one sentence: backcasted initials
-    are counted in the number of parameters (rank of the initial-state design), making
-    ICs comparable with `initial="optimal"`. Rebuild man pages.
-
-C5. **Occurrence models: om() / omg() / oes-family (R/om.R, R/omg.R, R/om-oes.R,
-    R/oesg.R, R/auto-om.R).** Status quo (verified): `nParamEstimated <-
-    length(B_used)` (`R/om.R` ~line 727), so with `initial="backcasting"`/`"complete"`
-    the occurrence initials cost ZERO — the plain form of the same inconsistency, no
-    fractional heuristic involved. Since om defaults to `model="ZXZ"` (a full ETS for
-    the occurrence probability), the uncounted df is up to `m+1` per occurrence model.
-    Fixes:
-    - `R/om.R` (~line 727): after `nParamEstimated <- length(B_used);` add, under
-      `if(any(initialType == c("backcasting","complete")))`, the increment by
-      `dfInitialsBackcasting(...)`. The needed objects are in the returned/ambient
-      structures (`adamArchitect`, `adamCreated` carry the adamCore instance and
-      matrices) — reuse them, do not rebuild.
-    - Update the same-file consumers: `parNum[1,1] <- res$nParamEstimated` (~line 1003)
-      and the IC environment `.icEnv$nP <- res$nParamEstimated` (~line 1125) pick the
-      corrected value up automatically — verify, don't edit blindly.
-    - `R/omg.R`: TWO underlying ADAM models (A and B; `jointResult$nParamsA` /
-      `$nParamsB`, ~lines 1070–1095, each with its own `adamArchitectA/B`,
-      `adamCreatedA/B`). Apply the increment to EACH side separately, using each
-      side's own matrices and lag structure.
-    - `R/oesg.R`, `R/om-oes.R`, `R/auto-om.R`: same pattern; locate
-      `nParamEstimated`/`nParams` assignments and treat identically.
-    - **Nonlinearity note:** the occurrence measurement passes through a link
-      (logistic / odds-ratio), so the probe applies to the *underlying* recursion —
-      exactly the additive-twin logic of 3.3 note 2. The occurrence's underlying ETS
-      is often multiplicative (Z components may resolve to M): always route through
-      the twin substitution.
-    - **Propagation for free:** adam's `parametersNumber` has an `nParamOccurrence`
-      column (`R/adam.R` ~line 600) and `n_param_estimated += om_model.nparam` on the
-      Python side — once om counts correctly, intermittent-demand ADAM ICs become
-      consistent with no further changes. Verify with test T8, do not double-count.
-
----
-
-## 5. Part D — Python mirror
-
-Python has no fractional df; only the ADD side applies.
-
-D1. Port `dfInitialsBackcasting` to
-    `python/src/smooth/adam_general/core/utils/n_param.py` (or a sibling
-    `df_initials.py`): same probe loop against the pybind11 filter (see
-    `src/python/adamPython.cpp` for the exposed fit entry point; mirror how
-    `core/estimator/estimator.py` calls it). numpy: `np.linalg.matrix_rank(X)`.
-D2. Wire into the `NParam` accounting where backcasting is the initialisation
-    (search `initial` handling in `core/estimator/initial_values.py` and
-    `core/adam.py` `n_param`), so that `model.n_param` matches R's `nparam()` for the
-    same model/initialisation. Same for the occurrence models
-    (`core/om.py`, `core/omg.py`, `core/auto_om.py`) mirroring C5; the
-    `_adam_estimated["n_param_estimated"] += self._om_model.nparam` line in
-    `core/adam.py` (~line 1166) then propagates it — check for double counting.
-D3. Fast path identical to 3.4.
-D4. Per repo rules: after editing, run from `python/`:
-    `.venv/bin/ruff check src/ && .venv/bin/ruff format src/ && .venv/bin/mypy src/smooth`
-    — all three must pass.
-
----
-
-## 6. Part E — C++ core: nothing required, one optional addition
-
-**No C++ change is required for correctness.** The probe reuses `adamCore::fit`.
-
-Optional (only if profiling shows the R-loop overhead matters for large P): add a
-batch method to `adamCore`:
-
-```cpp
-// Returns obs x P matrix of fitted values from basis initial profiles on zero data.
-// P = sum(lagsModelAll). Reuses fit() internals with vectorYt = zeros.
-arma::mat probeInitials(arma::mat const &matrixWt, arma::mat &matrixF,
-                        arma::vec const &vectorG,
-                        arma::umat const &indexLookupTable,
-                        arma::mat const &profilesTemplate);
+### 2.4 adam — constant / shape / scale
+```
+df_constant = constantEstimate                # -> internal cell
+df_shape    = otherParameterEstimate          # dgnorm/dlgnorm β etc -> scale cell
+df_scale    = 1                               # (b) always, continuous response
 ```
 
-Loop over slots inside C++, filling columns; expose via the existing Rcpp module (see
-how `fit` is exposed in `src/adamGeneral.cpp` / `RcppExports`) and pybind11
-(`src/python/adamPython.cpp`). Keep the R/Python-side loop as the reference
-implementation and add the batch path behind the same interface. Do not modify
-`fit()` itself — zero risk to existing behaviour, zero slowdown of normal fitting.
+### 2.5 CES  (complex smoothing, own initial formula)
+- Smoothing: `a = a0 + i·a1` (2 params if `seasonality != "simple"`, `a$estimate`)
+  plus `b` per seasonal (`2·nSeasonal` for full/simple-complex, `nSeasonal` for
+  partial; `b$estimate`). (`adam-ces.R:1052+`.)
+- Initials (`adam-ces.R:1041`):
+  `2·(seasonality≠"simple") + lagsModelMax·(seasonality≠"none") + lagsModelMax·(seasonality∈{full,simple})`,
+  gated by `initialType` (0 when provided).
+- xreg: `xregNumber + sum(persistenceXreg)` (`adam-ces.R:620`) — same coef+delta shape.
+- **No ETS IE correction** (CES has no multi-seasonal sum-to-zero; single seasonal
+  verified `rank == count`). Backcasting df = the same structural initial count.
+- `df_scale = 1`.
+
+### 2.6 GUM  (general linear SSOE)
+- Estimates elements of `matF`, `matWt`, `vecG` + initials (all in `length(B)`
+  via `filler()`), so the non-initial count is `length(B) − <initials>`; initials
+  = the structural initial-state count.
+- **No IE correction** (verified GUM(4,8) no gcd drop). Backcasting df = the same
+  structural initial count.
+- xreg `xregNumber + sum(persistenceXreg)`; `df_scale = 1`.
+
+### 2.7 SSARIMA / SPARMA
+- ARMA coefficients + structural initial-state count; no IE correction.
+- SPARMA currently `parametersNumber[1,4] = (loss=="likelihood")` (`sparma.R:661`)
+  — update to always 1.
+
+### 2.8 om  (Bernoulli occurrence = ETS on the probability)
+- Inherits the adam-ETS structure: `df_persist` + `df_init_ETS` (IE formula
+  applies — occurrence can be seasonal, e.g. MNM), plus oETSX xreg (coef + delta).
+- **`df_scale = 0`** (Bernoulli, verified `om$nParam[1,4]==0`).
+- Backcasting currently `nParamEstimated = length(B_used)` → initials counted 0.
+  Verified: om(MNM m=12) optimal = 14 (2 smoothing + 12 initials), backcasting = 2.
+  Fix: add `df_init_ETS` under backcasting/complete/gradient. Goes in `[1,1]`
+  (om puts everything in the internal cell; occurrence df for the *demand* side
+  propagates via adam's `nParamOccurrence` column — check no double count).
+
+### 2.9 omg  (two coupled occurrence models A + B)
+- Two om-like ETS models (`nParamsA = length(B_A)`, `nParamsB = length(B_B)`).
+  Apply the om treatment (2.8) to **each** side with its own lags/structure; sum.
+- `df_scale = 0` for both.
 
 ---
 
-## 7. Part F — Testing (testthat + python tests)
+## 3. The shared helper + wiring
 
-Create `tests/testthat/test-df-backcasting.R` (and a mirrored
-`python/tests/test_df_backcasting.py`) with:
-
-T1. **Parity of counts.** For each of: ETS(AAA) monthly, ETS(AAdN), ETSX(ANN)+2 xreg,
-    ARIMA(2,1,2), CES("n"), CES("f"), GUM(orders=c(2),lags=c(1)), SSARIMA(1,1,1)(0,1,1)[12]:
-    fit with `initial="optimal"` and `initial="backcasting"` with the SAME fixed
-    persistence/parameters where the API allows; assert
-    `nparam(fitBackcast) == nparam(fitOptimal)`. (Where optimal counts m-1 per
-    seasonal block, the rank must reproduce it — this is the central invariant.)
-
-T2. **Known ranks.** Assert the probe returns: 1 for ANN, 2 for AAN, `m+1` for AAA
-    (13 monthly, 5 for m=4), 2 for CES(n), `sum(orders)` checks for GUM/SSARIMA
-    computed once and frozen as regression values after manual verification.
-
-T3. **Fast path == probe.** For pure additive ETS across a small grid, assert the
-    analytic shortcut equals the probe result (force probe via the option).
-
-T4. **The oracle statistical test** (the one that has already caught two real bugs):
-    simulate ETS(A,N,N) and ETS(A,A,A) m=4 with known persistence via `sim.es`,
-    fit with `persistence` fixed and `initial="backcasting"`, and check over N=500
-    replications that `mean(sum(residuals^2) - sum(innovations^2))/sigma^2` is within
-    MC error (±4*se) of `-rank(X)`. Skip on CRAN (`skip_on_cran()`), run in CI.
-    This test fails loudly if the backcasting implementation or the df count is wrong.
-
-T5. **Selection regression.** AirPassengers, pool of 30 ETS models, backcasting:
-    the AIC ranking with the new count must equal the ranking obtained by adding
-    `1 + trendy + (m-1)*seasonal` to each model's old k (frozen expected winner: MAM).
-
-T6. **Performance guard.** `system.time` on `adam(AirPassengers, "MAM",
-    initial="backcasting")` before/after: increase < 2%. And one large-P sanity:
-    a double-seasonal model probe completes < 1s.
-
-T7. **No dangling references.** `grep -r "dfForBack\|calculateBackcastingDF\|dfDiscounter" R/ src/ python/src man/` returns nothing.
-
-T8. **Occurrence models.** (a) Parity: `oes`/`om` on a binary series with
-    `initial="optimal"` vs `initial="backcasting"`, same fixed persistence — equal
-    `nparam()`. (b) `omg`: the A- and B-side counts each increase by their own
-    initials rank. (c) Intermittent end-to-end: `adam(y, occurrence=omModel)` totals
-    include the occurrence initials exactly once (no double counting through
-    `nParamOccurrence`). (d) Frozen value: om with monthly seasonal occurrence model
-    counts m+1 more under backcasting than before the fix.
-
-Follow the repo rule: no failing test is dismissable. If T4 fails for a model class,
-that is a bug in that engine's backcasting (this has happened: AAA m=12 with trend,
-and damped trend AAdN — see the paper project's `theory/issue-backcast-aaa12.md`);
-report it, do not loosen the tolerance.
+- **`dfInitialsETS(seasonalLags, levelEstimated, trendy, seasonalEstimated, trendEstimated)`**
+  — R (`R/helper.R`) + Python (`n_param.py`): the IE formula, gated. The ONLY
+  identifiability maths. (Euclid `gcd` inline; R has no base gcd.)
+- **`dfModel(...)`** per engine: sums the engine's structural terms into the
+  `parametersNumber` table (estimated row from estimate flags, provided row from
+  the complementary provided quantities), fills scale per §0, `[1,5]=sum`. One
+  call replaces `nParamEstimated <- length(B) + (loss=="likelihood") + nStatesBackcasting`.
+- The backcasting/complete/gradient initial df = the engine's structural initial
+  count (ETS via `dfInitialsETS`; others via their existing optimal-initial
+  formula) — the **same number optimal uses**, so ICs match across methods.
+- Post-hoc reconstruction from a fitted object (replaces `dfDiscounter`'s role;
+  used only by the test oracle).
 
 ---
 
-## 8. Rollout order
+## 4. Remove the fractional df machinery
 
-1. Part B helper (+ fast path) in R, with T2/T3 tests green.
-2. Part C wiring, engine by engine: adam -> ces -> gum -> ssarima -> sparma; T1 green
-   after each.
-3. Part A removal; T7 green.
-4. T4/T5/T6; NEWS; man pages.
-5. Part D python mirror with its tests + ruff/mypy.
-6. (Optional) Part E batch probe if profiling justifies it.
+After §3 is wired (so counts never silently drop to 0):
 
-Do not reorder 2 and 3: removal before replacement silently zeroes the CES/GUM/SSARIMA
-counts.
+- Delete `calculateBackcastingDF()`, `dfDiscounter()`, `dfDiscounterFit()`
+  (`R/helper.R`). Keep `componentsDefiner()` and the `*Checker()` helpers.
+- Replace the `calculateBackcastingDF(...)` call sites in `adam-ces.R`,
+  `adam-gum.R`, `adam-ssarima.R`, `sparma.R` with the engine `dfModel` path.
+- Remove `dfForBack` plumbing: `utils-adam.R` (ellipsis extract + list element),
+  `adamGeneral.R` pass-through, `globals.R` entry, and the commented `adam-sma.R`
+  line. grep `dfForBack|calculateBackcastingDF|dfDiscounter` over `R/ src/ python/`
+  → zero hits.
 
-## 9. Out of scope (explicitly)
+---
 
-- The df of the smoothing parameters themselves (kappa-based corrections) — separate
-  research line, not part of this fix.
-- Fixing the backcasting defects the oracle test may expose (seasonal+trend m=12,
-  damped trend) — separate issues; the df count is correct regardless.
-- Occurrence-model parameter counting — unchanged.
+## 5. Python mirror
+
+- `dfInitialsETS` in `n_param.py`; `NParam`/`n_param` fills the same cell layout.
+- Wire into adam (`core/adam.py`, `estimator/`), CES, GUM, SSARIMA (their Python
+  homes), and om/omg (`core/om.py`, `core/omg.py`) — mirroring §2. The
+  `_adam_estimated["n_param_estimated"] += om.nparam` propagation stays; check no
+  double count.
+- `df_scale = 1` continuous / `0` occurrence, matching R.
+- ruff / ruff format / mypy clean.
+
+---
+
+## 6. Testing (testthat + pytest)
+
+1. **Init-method invariance:** per engine, `nparam(backcast) == nparam(optimal) ==
+   nparam(gradient)` for the same model/persistence (single & coprime seasonal).
+2. **Non-coprime frozen:** AAA(1,4,8)=… , (1,4,6)=… , (1,2,4,8)=… — optimal AND
+   backcasting equal, and equal the IE value (probe as oracle).
+3. **Estimate-gating:** `persistence=list(alpha=…)` estimating β,γ → α in Provided
+   row, β,γ,initials in Estimated; totals correct. Same for provided initials,
+   φ, constant, shape.
+4. **xreg adapt:** ETSX `regressors="use"` vs `"adapt"` — the adapt case counts
+   the delta persistence (xreg cell larger by the number of adaptive regressors).
+5. **Scale:** every continuous model has `[1,4] ≥ 1` including non-likelihood
+   losses (df up by 1 vs old); om/omg `[1,4] == 0`.
+6. **om/omg:** om(MNM) backcast nparam == optimal nparam (initials now counted);
+   omg A/B each gain their initials; no double count via `nParamOccurrence`.
+7. **Formula == probe** across the ETS grid (probe test-only).
+8. **No dangling refs** (§4 grep).
+9. **Selection regression:** AirPassengers ETS pool, backcasting — ranking stable
+   after the uniform df shift.
+
+---
+
+## 7. Rollout order
+
+1. `dfInitialsETS` + `dfModel` helper (R), with formula==probe tests green.
+2. Wire adam (ETS + ARIMA + xreg-adapt + mixtures); init-invariance + adapt +
+   scale tests green.
+3. Wire CES, GUM, SSARIMA, SPARMA; per-engine tests green.
+4. Wire om, omg (scale=0, initials); occurrence tests green.
+5. Remove fractional machinery (§4); dangling-ref grep clean.
+6. Python mirror (§5) + its tests + ruff/mypy.
+7. NEWS (both), man pages.
+
+---
+
+## 8. NEWS (both packages) — user-facing changes
+
+- Backcasted / gradient / complete initial states now count towards the number of
+  parameters exactly as optimised ones do (structural identifiable count), so
+  information criteria are comparable across `initial=` methods. The experimental
+  fractional df (`dfForBack`) is removed.
+- Non-coprime multi-seasonal models (e.g. lags 4 & 8) now use the correct reduced
+  seasonal df (`Σ m_i − Σ gcd + …`) for **all** init methods, including
+  `initial="optimal"` — their ICs change accordingly.
+- The distribution **scale** is now counted as a parameter for every loss (not
+  only `loss="likelihood"`), since all reported log-likelihoods are concentrated
+  likelihoods. Non-likelihood-loss models' df increases by 1 (AIC by 2).
+  Occurrence models (om/omg, Bernoulli) are unaffected — they have no scale.
+- ICs of `initial="backcasting"` (the default) models will increase relative to
+  previous versions; ranking within one initialisation method is typically
+  unaffected.
+
+---
+
+## 9. Out of scope
+
+- The df of the smoothing parameters themselves (kappa-based corrections).
+- Any change to `nparam()` accessor semantics (reads `nParam[1,5]`; untouched).
+- Backcasting numerical defects (already fixed separately).

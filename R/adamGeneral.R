@@ -3003,8 +3003,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         nIterations = nIterations,
         smoother = smoother,
         FI = FI,
-        stepSize = stepSize,
-        dfForBack = dfForBack
+        stepSize = stepSize
     ));
 }
 

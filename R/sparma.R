@@ -528,25 +528,12 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         CFValue <- CF(B);
     }
 
+    # Identifiable initial-state df of SPARMA: the number of state initials
+    # (= sum of the component lags; xreg counted separately), the same whether
+    # optimised or backcast/complete/gradient. No multi-seasonal redundancy.
     nStatesBackcasting <- 0;
-    # Calculate the number of degrees of freedom coming from states in case of backcasting
-    if(any(initialType==c("backcasting","complete"))){
-        # Fill matrices with parameters from B
-        matricesFilled <- sparmaMatricesFiller(B, matricesCreated,
-                                               arRequired, maRequired, constantRequired,
-                                               arEstimate, maEstimate, constantEstimate,
-                                               arValue, maValue, constantValue,
-                                               lagsModelAll, lagsModelMax,
-                                               nonZeroARI, nonZeroMA,
-                                               componentsNumberARIMA,
-                                               p, q, pLength, qLength,
-                                               initialType);
-
-        nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll,
-                                                       FALSE, Stype, componentsNumberETSNonSeasonal,
-                                                       componentsNumberETSSeasonal, matricesFilled$vecG, matricesFilled$matF,
-                                                       obsInSample, lagsModelMax, indexLookupTable,
-                                                       adamCpp);
+    if(any(initialType==c("backcasting","complete","gradient"))){
+        nStatesBackcasting[] <- sum(lagsModelAll) - xregNumber;
     }
 
     # Parameters estimated + variance
@@ -658,7 +645,8 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         }
     }
 
-    parametersNumber[1,4] <- (loss=="likelihood")*1;
+    # The distribution scale is always estimated (concentrated likelihood).
+    parametersNumber[1,4] <- 1;
     parametersNumber[1,5] <- sum(parametersNumber[1,]);
 
     ##### Return values #####

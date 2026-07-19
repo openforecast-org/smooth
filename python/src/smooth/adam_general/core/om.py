@@ -293,13 +293,34 @@ def om_preparator(
     # probabilities rather than taken from -CF. No flooring: an infeasible
     # fitted probability surfaces as NaN/-inf instead of being clipped.
     # Mirrors R/om.R's omFinalFit block.
+    ot_arr = np.asarray(ot, dtype=float).ravel()
     if loss != "likelihood":
-        ot_arr = np.asarray(ot, dtype=float).ravel()
         with np.errstate(invalid="ignore", divide="ignore"):
             bernoulli_ll = float(
                 np.sum(ot_arr * np.log(p_fitted) + (1 - ot_arr) * np.log(1 - p_fitted))
             )
         adam_estimated["log_lik_adam_value"]["value"] = bernoulli_ll
+
+    # The reported lossValue is the fitting loss evaluated on the final fitted
+    # probabilities, ungated. The infeasibility guard inside om_cf (return 1e300
+    # when p leaves [0,1]) only steers the optimiser; it must not leak into the
+    # reported loss when the loss optimum itself is infeasible (an MAE/HAM
+    # optimum can put p<0). So lossValue stays the actual loss the
+    # gradient/optimiser minimised, while logLik is the (possibly NaN)
+    # Bernoulli — they may be misaligned. LASSO/RIDGE/custom keep the
+    # optimiser's value (their penalty terms are not recoverable here).
+    err_final = ot_arr - p_fitted
+    loss_value = None
+    if loss == "likelihood":
+        loss_value = -adam_estimated["log_lik_adam_value"]["value"]
+    elif loss == "MSE":
+        loss_value = float(np.mean(err_final**2))
+    elif loss == "MAE":
+        loss_value = float(np.mean(np.abs(err_final)))
+    elif loss == "HAM":
+        loss_value = float(np.mean(np.sqrt(np.abs(err_final))))
+    if loss_value is not None:
+        adam_estimated["CF_value"] = loss_value
 
     # 4. Initial values dict (use ADAM's _process_initial_values)
     from smooth.adam_general.core.forecaster.preparator import _process_initial_values

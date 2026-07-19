@@ -84,13 +84,15 @@ def test_gradient_counts_initial_df_like_optimal():
     assert mg.nparam == mo.nparam
 
 
-def test_backcasting_does_not_count_initial_df():
-    # Only gradient (and optimal/two-stage) count the initials as df; backcasting
-    # keeps its historical zero-initial-df accounting, so it reports fewer
-    # parameters than optimal for the same model.
+def test_backcasting_counts_initial_df_like_optimal():
+    # Initial states count towards df identically however they are obtained:
+    # backcasting, gradient and optimal all report the same number of parameters
+    # for the same model (structural df).
     mb = ADAM(model="AAA", lags=[1, 12], initial="backcasting").fit(_Y)
     mo = ADAM(model="AAA", lags=[1, 12], initial="optimal").fit(_Y)
-    assert mb.nparam < mo.nparam
+    mg = ADAM(model="AAA", lags=[1, 12], initial="gradient").fit(_Y)
+    assert mb.nparam == mo.nparam
+    assert mg.nparam == mo.nparam
 
 
 def test_gradient_additive_is_least_squares_optimum():

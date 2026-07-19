@@ -626,8 +626,22 @@ class CES:
         # and then defines logLik as -CFValue before the final fit.
         log_lik_value = -cf_value
 
-        # R's CES does not add extra backcasting df on top of length(B) here.
-        n_param_estimated = len(B) + (1 if self.loss == "likelihood" else 0)
+        # Initials count in the df however obtained (optimised or backcast/
+        # complete/gradient) -- the same identifiable count either way. CES has
+        # no multi-seasonal shared-frequency redundancy, so it is the plain
+        # structural count. The scale is always estimated (concentrated
+        # likelihood). Mirrors R (R/adam-ces.R).
+        ces_initial_count = (
+            2 * (self.seasonality != "simple")
+            + lags_model_max * (self.seasonality != "none")
+            + lags_model_max * (self.seasonality in ("full", "simple"))
+        )
+        n_states_backcasting = (
+            ces_initial_count
+            if initial_type in ("backcasting", "complete", "gradient")
+            else 0
+        )
+        n_param_estimated = len(B) + 1 + n_states_backcasting
 
         # Information criteria (reuse existing utilities)
         self.aic = AIC(log_lik_value, nobs=obs_in_sample, df=n_param_estimated)

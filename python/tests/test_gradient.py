@@ -268,3 +268,24 @@ def test_gradient_om_loss_code_mapping_matches_r():
     assert adam_gradient_om_loss_code("LASSO") == ("S", 0.0)
     assert adam_gradient_om_loss_code("custom") is None
     assert adam_gradient_om_loss_code(lambda a, f, b: 0.0) is None
+
+
+def test_gradient_om_fixed_persistence_loglik_is_finite():
+    # Fixed persistence + gradient (or backcasting) leaves B empty: the
+    # estimator must still evaluate the cost once (mirroring R's length(B)==0
+    # guard) instead of returning nlopt's uninitialised +inf. Regression for
+    # the -inf logLik bug.
+    from smooth import OM
+
+    for ini in ["backcasting", "gradient"]:
+        m = OM(model="MNN", occurrence="odds-ratio", initial=ini, persistence=0.1).fit(
+            _OT
+        )
+        assert len(m._adam_estimated["B"]) == 0
+        ll = float(m.loglik)
+        assert np.isfinite(ll)
+        # logLik must equal the Bernoulli likelihood of the fitted probabilities
+        f = np.asarray(m.fitted).ravel()
+        on, off = f[_OT == 1], f[_OT == 0]
+        expected = float(np.sum(np.log(on)) + np.sum(np.log(1 - off)))
+        assert abs(ll - expected) < 1e-6

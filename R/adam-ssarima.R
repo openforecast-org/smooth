@@ -979,23 +979,18 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         B[] <- res$solution;
         CFValue <- res$objective;
 
+        # Identifiable initial-state df of SSARIMA: the number of state initials
+        # (= sum of the component lags; xreg counted separately in [1,2]), the
+        # same whether optimised or backcast/complete/gradient. No multi-seasonal
+        # shared-frequency redundancy (structural = rank).
         nStatesBackcasting <- 0;
-        # Calculate the number of degrees of freedom coming from states in case of backcasting
-        if(any(initialType==c("backcasting","complete"))){
-            # Obtain the main elements
-            ssarimaFilled <- filler(B, matVt, matF, vecG, matWt,
-                                    arRequired=arRequired, maRequired=maRequired,
-                                    arEstimate=arEstimate, maEstimate=maEstimate);
-
-            nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll,
-                                                           FALSE, Stype, componentsNumberETSNonSeasonal,
-                                                           componentsNumberETSSeasonal, ssarimaFilled$vecG, ssarimaFilled$matF,
-                                                           obsInSample, lagsModelMax, indexLookupTable,
-                                                           adamCpp, dfForBack);
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            nStatesBackcasting[] <- sum(lagsModelAll) - xregNumber;
         }
 
-        # Parameters estimated + variance
-        nParamEstimated <- length(B) + (loss=="likelihood")*1 + nStatesBackcasting;
+        # Parameters estimated + variance. The scale is always an estimated
+        # parameter (every reported logLik is a concentrated likelihood).
+        nParamEstimated <- length(B) + 1 + nStatesBackcasting;
 
         # Prepare for fitting
         elements <- filler(B, matVt, matF, vecG, matWt, arRequired=arRequired, maRequired=maRequired,

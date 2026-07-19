@@ -231,3 +231,40 @@ def test_gradient_custom_loss_falls_back_to_backcasting():
     mb = ADAM(model="AAA", lags=[12], initial="backcasting", loss=loss_fn).fit(_YL)
     mg = ADAM(model="AAA", lags=[12], initial="gradient", loss=loss_fn).fit(_YL)
     assert abs(_loss_value(mg) - _loss_value(mb)) < 1e-8
+
+
+# --- Occurrence models (om) -------------------------------------------------
+
+_OT = np.array(
+    [
+        (1 if v > 0.5 else 0)
+        for v in (0.5 + 0.4 * np.sin(np.arange(120) / 7) + 0.003 * np.arange(120))
+    ],
+    dtype=float,
+)
+
+
+def test_gradient_om_reaches_optimal_quality():
+    from smooth import OM
+
+    for occ in ["odds-ratio", "inverse-odds-ratio", "direct"]:
+        mb = OM(model="MNN", occurrence=occ, initial="backcasting").fit(_OT)
+        mo = OM(model="MNN", occurrence=occ, initial="optimal").fit(_OT)
+        mg = OM(model="MNN", occurrence=occ, initial="gradient").fit(_OT)
+        assert np.isfinite(float(mg.loglik))
+        # Gradient profiles the same likelihood over the initials: at least
+        # backcasting, and within 1% of the fully optimal fit.
+        assert float(mg.loglik) >= float(mb.loglik) - 1e-4
+        assert abs(float(mg.loglik) - float(mo.loglik)) < 0.01 * abs(float(mo.loglik))
+
+
+def test_gradient_om_loss_code_mapping_matches_r():
+    from smooth.adam_general.core.utils.gradient import adam_gradient_om_loss_code
+
+    assert adam_gradient_om_loss_code("likelihood") == ("B", 0.0)
+    assert adam_gradient_om_loss_code("MSE") == ("S", 0.0)
+    assert adam_gradient_om_loss_code("MAE") == ("A", 0.0)
+    assert adam_gradient_om_loss_code("HAM") == ("H", 0.0)
+    assert adam_gradient_om_loss_code("LASSO") == ("S", 0.0)
+    assert adam_gradient_om_loss_code("custom") is None
+    assert adam_gradient_om_loss_code(lambda a, f, b: 0.0) is None

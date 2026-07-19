@@ -483,6 +483,65 @@ inline void adamGvalueJac(arma::vec const &vecVt, arma::mat const &matrixF,
     }
 }
 
+// ---------- Occurrence-model helpers (initial="gradient" for om) ----------
+//
+// The om cost is a function of the fitted probability p = link(yhat)
+// (omLinkFunction in R/om.R) and the binary occurrence o. Both the link and
+// the occurrenceError() update channel (ssOccurrence.h) need derivatives with
+// respect to yhat so the state sensitivities propagate through the occurrence
+// recursion. Occurrence types: 'd' direct, 'o' odds-ratio, 'i' inverse-odds.
+
+// p and dp/dyhat for the occurrence link. The clamp of the direct model has
+// derivative zero on its flat spots (same convention as the mixed-model clamp).
+inline void occurrenceLinkJac(double const &yFit, char const &E, char const &O,
+                              double &p, double &dpdy){
+    double const a = (E=='A') ? std::exp(yFit) : yFit;
+    switch(O){
+    case 'o':
+        p = a / (1 + a);
+        dpdy = (E=='A') ? p * (1 - p) : 1 / ((1 + a) * (1 + a));
+        break;
+    case 'i':
+        p = 1 / (1 + a);
+        dpdy = (E=='A') ? -p * (1 - p) : -1 / ((1 + a) * (1 + a));
+        break;
+    default:
+        // 'd': p = clamp(yhat, 0, 1)
+        p = std::max(std::min(yFit, 1.0), 0.0);
+        dpdy = (yFit > 0 && yFit < 1) ? 1.0 : 0.0;
+    }
+}
+
+// d(e)/d(yhat) for the occurrence error (mirrors occurrenceError() branch by
+// branch; e is the update-channel error the state recursion consumes).
+inline double occurrenceErrorJac(double const &yAct, double const &yFit,
+                                 char const &E, char const &O){
+    double p, dpdy;
+    occurrenceLinkJac(yFit, E, O, p, dpdy);
+    if(O=='d'){
+        if(E=='M'){
+            // e = (c - p)/p with c = o(1-2k)+k
+            double const kappa = 1E-10;
+            double const c = yAct * (1 - 2 * kappa) + kappa;
+            return -c / (p * p) * dpdy;
+        }
+        // E='A': e = o - p
+        return -dpdy;
+    }
+    // 'o' / 'i': e is a transform of u = (1 + o - p)/2, du/dyhat = -dpdy/2
+    double const u = (1 + yAct - p) / 2;
+    double dedu;
+    if(O=='o'){
+        // q = u/(1-u); e = q - 1 (E='M') or log(q) (E='A')
+        dedu = (E=='M') ? 1 / ((1 - u) * (1 - u)) : 1 / (u * (1 - u));
+    }
+    else{
+        // 'i': q = (1-u)/u; e = q - 1 (E='M') or log(q) (E='A')
+        dedu = (E=='M') ? -1 / (u * u) : -1 / (u * (1 - u));
+    }
+    return dedu * (-dpdy / 2);
+}
+
 // ---------- Loss helpers for the arbitrary-loss gradient solve ----------
 //
 // At fixed persistence (and concentrated scale) every supported estimation
@@ -499,6 +558,10 @@ inline void adamGvalueJac(arma::vec const &vecVt, arma::mat const &matrixF,
 //   'l' log-normal, E='M' (likelihood+dlnorm)      rho = (log(1+e)+sigma^2/2)^2
 //   'g' gamma, E='M' (likelihood+dgamma)           rho = (1+e) - log(1+e)
 //   'i' inv. gaussian, E='M' (likelihood+dinvgauss) rho = e^2/(1+e) + s^2 log(1+e)
+//   'B' Bernoulli (om likelihood)                   rho = -log(1-|r|)
+//       (r = o - p is the probability residual; with o in {0,1} the Bernoulli
+//        log-likelihood -[o log(p) + (1-o) log(1-p)] is exactly -log(1-|r|),
+//        so it is separable in r like every other rho here)
 //   'h' MSEh, 'T' TMSE, 't' GTMSE, 'C' MSCE, 'P' GPL: additive multistep losses
 // The scale argument carries sigma for 'l' and the dispersion s^2 for 'i',
 // refreshed from the current residuals via gradientLossScale(); 'g' is
@@ -525,6 +588,10 @@ inline double gradientLossRho(double const &e, char const &L,
         return (1+e) - std::log(std::abs(1+e));
     case 'i':
         return e*e/(1+e) + scale*std::log(std::abs(1+e));
+    case 'B':
+        // Non-finite for |e| >= 1 (saturated probability) by design: the
+        // acceptance checks reject such candidates and the caller falls back.
+        return -std::log(1 - std::abs(e));
     default:
         return e*e;
     }
@@ -597,7 +664,8 @@ inline void gradientLossStepRow(double const &e, char const &L,
     }
     case 'l':
     case 'g':
-    case 'i':{
+    case 'i':
+    case 'B':{
         double psi, psiPrime;
         if(L=='l'){
             double const u = std::log(std::abs(1+e)) + scale*scale/2;
@@ -607,6 +675,12 @@ inline void gradientLossStepRow(double const &e, char const &L,
         else if(L=='g'){
             psi = e/(1+e);
             psiPrime = 1/((1+e)*(1+e));
+        }
+        else if(L=='B'){
+            // rho = -log(1-|e|): psi = sign(e)/(1-|e|), psi' = 1/(1-|e|)^2
+            double const oneAbs = 1 - std::abs(e);
+            psi = ((e>0) - (e<0)) / oneAbs;
+            psiPrime = 1/(oneAbs*oneAbs);
         }
         else{
             psi = e*(2+e)/((1+e)*(1+e)) + scale/(1+e);

@@ -43,6 +43,7 @@ from smooth.adam_general.core.estimator.optimization import (
     _setup_arima_polynomials,
 )
 from smooth.adam_general.core.forecaster import forecaster
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.om_cost import om_cf, om_link_function
 
@@ -207,8 +208,10 @@ def om_preparator(
     adam_cpp,
     occurrence,
     occurrence_char,
+    loss="likelihood",
 ):
-    """OM-specific ``preparator``: runs ``adam_cpp.fit`` with ``O=`` flag and
+    """OM-specific ``preparator``: runs the fit dispatcher with the ``O=`` flag
+    (gradient solve for ``initial="gradient"``, otherwise the ordinary fit) and
     applies the occurrence link function to obtain probabilities.
 
     Returns a dict shaped exactly like the regular ADAM preparator output so
@@ -255,18 +258,25 @@ def om_preparator(
             "backcasting",
         )
 
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt,
-        matrixWt=mat_wt,
-        matrixF=mat_f,
-        vectorG=vec_g,
-        indexLookupTable=index_lookup_table,
-        profilesRecent=profiles_recent_fortran,
-        vectorYt=ot,
-        vectorOt=ot,
-        backcast=backcast_value,
-        nIterations=initials_checked["n_iterations"],
-        O=occurrence_char,
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt,
+        mat_wt=mat_wt,
+        mat_f=mat_f,
+        vec_g=vec_g,
+        index_lookup_table=index_lookup_table,
+        profiles_recent_table=profiles_recent_fortran,
+        y_in_sample=ot,
+        ot=ot,
+        initial_type=initials_checked["initial_type"],
+        n_iterations=initials_checked["n_iterations"],
+        backcast_value=backcast_value,
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
+        o_type=occurrence_char,
+        loss=loss,
     )
 
     # Fitted on probability scale
@@ -1189,6 +1199,7 @@ class OM(ADAM):
             adam_cpp=self._adam_cpp,
             occurrence=self._om_occurrence,
             occurrence_char=self._occurrence_char,
+            loss=self._general.get("loss", "likelihood"),
         )
         self._prepared["holdout"] = self._general.get("holdout", False)
 

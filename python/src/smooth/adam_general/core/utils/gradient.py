@@ -69,6 +69,22 @@ def adam_gradient_loss_code(loss, distribution, e_type, other, horizon, multiste
     return "S", 0.0
 
 
+def adam_gradient_om_loss_code(loss):
+    """Map an occurrence-model (om) loss to the C++ gradientSolve loss code.
+
+    The om losses act on the probability residual ``r = ot - p``: the Bernoulli
+    likelihood is exactly ``-log(1-|r|)`` (code ``"B"``), and MSE/MAE/HAM reuse
+    the standard rho codes on ``r``. Must stay mirror-identical to
+    ``adam_gradientOmLossCode`` in ``R/adam-gradient.R``. Returns ``None`` for
+    custom loss callables (backcasting fallback).
+    """
+    if loss == "custom" or callable(loss):
+        return None
+    return {"likelihood": ("B", 0.0), "MAE": ("A", 0.0), "HAM": ("H", 0.0)}.get(
+        loss, ("S", 0.0)
+    )
+
+
 def adam_gradient_probe_basis(
     ets_model,
     arima_model,
@@ -125,6 +141,7 @@ def adam_gradient_solve(
     lags_model_max,
     obs_in_sample,
     loss_code,
+    o_type="n",
 ):
     """Solve for the initial recent profile that minimises the estimation loss.
 
@@ -150,6 +167,7 @@ def adam_gradient_solve(
         analytic=True,
         lossType=loss_code[0],
         lossParams=np.asarray([loss_code[1]], dtype=np.float64),
+        O=o_type,
     )
     solved = np.asarray(solved, dtype=np.float64)
     if solved.size == 0:
@@ -197,14 +215,22 @@ def adam_fit_or_gradient(
         isinstance(initial_type, (list, tuple)) and "gradient" in initial_type
     )
     if is_gradient:
-        loss_code = adam_gradient_loss_code(
-            loss,
-            distribution,
-            model_type_dict.get("error_type", "A"),
-            other,
-            horizon,
-            multisteps,
-        )
+        # Occurrence models profile their own losses over the probability
+        # residuals; occurrence "fixed" ('f') has no estimated initials and
+        # falls straight through to the backcasting fit.
+        if o_type == "n":
+            loss_code = adam_gradient_loss_code(
+                loss,
+                distribution,
+                model_type_dict.get("error_type", "A"),
+                other,
+                horizon,
+                multisteps,
+            )
+        elif o_type in ("d", "o", "i"):
+            loss_code = adam_gradient_om_loss_code(loss)
+        else:
+            loss_code = None
         lags_model_max = int(lags_dict["lags_model_max"])
         probe_basis = adam_gradient_probe_basis(
             bool(model_type_dict.get("ets_model", False)),
@@ -232,6 +258,7 @@ def adam_fit_or_gradient(
                 lags_model_max,
                 obs_in_sample,
                 loss_code,
+                o_type,
             )
             if solved is not None:
                 mat_vt[:, :lags_model_max] = solved

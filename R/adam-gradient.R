@@ -53,6 +53,24 @@ adam_gradientLossCode <- function(loss, distribution, Etype, other, horizon,
 
 # Internal helper (not exported, not documented for users).
 #
+# Map an occurrence-model (om) loss onto the C++ gradientSolve loss code. The
+# om losses act on the probability residual r = ot - p: the Bernoulli
+# likelihood is exactly -log(1-|r|) (code "B"), and MSE/MAE/HAM reuse the
+# standard rho codes on r. Must stay mirror-identical to
+# adam_gradient_om_loss_code() in the Python build. Returns NULL for custom
+# loss functions (backcasting fallback).
+adam_gradientOmLossCode <- function(loss){
+    if(loss == "custom"){ return(NULL) }
+    code <- switch(loss,
+                   "likelihood"="B",
+                   "MAE"="A",
+                   "HAM"="H",
+                   "S");
+    return(list(code=code, params=0));
+}
+
+# Internal helper (not exported, not documented for users).
+#
 # Initial-state solve for ETS ("gradient" initialisation). Given fixed
 # persistence (the current matF / vecG) and a seeded recent profile, this
 # solves for the initial state that minimises the estimation loss (lossCode
@@ -68,10 +86,14 @@ adam_gradientLossCode <- function(loss, distribution, Etype, other, horizon,
 # the solved recent profile (same shape as `profile`), or NULL on failure.
 adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
                                profile, yInSample, ot, probeBasis, lagsModelMax,
-                               obsInSample, lossCode){
-    solved <- adamCpp$gradientSolve(yInSample, ot, matWt, matF, vecG,
+                               obsInSample, lossCode, oType="n"){
+    # The occurrence path passes ot as a plain numeric vector; gradientSolve
+    # takes column matrices, so coerce (a no-op for the demand path, which
+    # already hands over matrices).
+    solved <- adamCpp$gradientSolve(as.matrix(yInSample), as.matrix(ot),
+                                    matWt, matF, vecG,
                                     indexLookupTable, profile, probeBasis, 15, TRUE,
-                                    lossCode$code, lossCode$params)
+                                    lossCode$code, lossCode$params, oType)
     if(length(solved) == 0){ return(NULL) }
     return(solved)
 }
@@ -123,11 +145,22 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                                etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                componentsNumberETS, componentsNumberETSSeasonal,
                                componentsNumberETSNonSeasonal, lagsModel, lagsModelMax,
-                               obsInSample, loss, distribution, other, horizon,
-                               multisteps){
+                               obsInSample, loss, distribution="dnorm", other=NULL,
+                               horizon=0, multisteps=FALSE, oType="n"){
     if(any(initialType == "gradient")){
-        lossCode <- adam_gradientLossCode(loss, distribution, Etype, other,
-                                          horizon, multisteps)
+        # Occurrence models profile their own losses over the probability
+        # residuals; occurrence "fixed" ('f') has no estimated initials and
+        # falls straight through to the backcasting fit.
+        lossCode <- if(oType == "n"){
+            adam_gradientLossCode(loss, distribution, Etype, other,
+                                  horizon, multisteps)
+        }
+        else if(any(oType == c("d", "o", "i"))){
+            adam_gradientOmLossCode(loss)
+        }
+        else{
+            NULL
+        }
         probeBasis <- adam_gradientProbeBasis(etsModel, arimaModel, xregModel,
                                               Ttype, Stype,
                                               componentsNumberETSSeasonal,
@@ -136,7 +169,7 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
         if(!is.null(probeBasis) && !is.null(lossCode)){
             solved <- adam_gradientSolve(adamCpp, matWt, matF, vecG, indexLookupTable,
                                          profile, yInSample, ot, probeBasis,
-                                         lagsModelMax, obsInSample, lossCode)
+                                         lagsModelMax, obsInSample, lossCode, oType)
             if(!is.null(solved)){
                 matVt[, 1:lagsModelMax] <- solved
                 # A single forward pass from the solved initials (backcast=FALSE).
@@ -144,12 +177,12 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                 # iteration would re-run headFillFwd on the profile already
                 # mutated by the first forward pass and diverge.
                 return(adamCpp$fit(matVt, matWt, matF, vecG, indexLookupTable, solved,
-                                   yInSample, ot, FALSE, 1, "n"))
+                                   yInSample, ot, FALSE, 1, oType))
             }
         }
     }
     return(adamCpp$fit(matVt, matWt, matF, vecG, indexLookupTable, profile,
                        yInSample, ot,
                        any(initialType == c("complete", "backcasting", "gradient")),
-                       nIterations, "n"))
+                       nIterations, oType))
 }

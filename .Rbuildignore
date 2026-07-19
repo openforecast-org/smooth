@@ -23,3 +23,4 @@ conda
 ^plan-initial-gradient\.md$
 ^df-fixes\.md$
 ^plan-gradient-arbitrary-loss\.md$
+^plan-gradient-om\.md$

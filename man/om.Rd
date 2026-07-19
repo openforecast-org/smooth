@@ -49,7 +49,9 @@ or \code{"direct"}.}
 \item{phi}{Optional damping parameter.}
 
 \item{initial}{Initialisation method: \code{"backcasting"}, \code{"optimal"},
-\code{"two-stage"}, or \code{"complete"}.}
+\code{"two-stage"}, \code{"complete"}, or \code{"gradient"} (solves the
+initial states by profiling the occurrence loss; falls back to backcasting
+for a custom loss or an out-of-scope specification).}
 
 \item{arma}{Optional fixed ARMA parameters.}
 

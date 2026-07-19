@@ -234,12 +234,12 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
         scale <- sqrt(sum(adamFitted$errors^2)/obsInSample);
         cfObjective <- sum(dnorm(x=yInSample, mean=adamFitted$fitted, sd=scale, log=TRUE));
 
-        # SMA has a fixed averaging structure (equal 1/order weights, no
-        # estimated smoothing): D = F - g w' = 0, so only the first fitted value
-        # depends on the initials and the order initial states collapse to a
-        # single identifiable level (rank 1). df = 1 (level) + 1 (scale) = 2,
-        # independent of the order (so it does not affect order selection).
-        logLik <- structure(cfObjective, nobs=obsInSample, df=2, class="logLik");
+        # SMA is AR(order) with fixed coefficients 1/order. They sum to 1 (a unit
+        # root), so the model is non-stationary and all `order` initial states
+        # persist and are identifiable (rank(X) = order, verified by the probe).
+        # df = order (backcast initials) + 1 (scale). This grows with the order,
+        # so higher orders are penalised in the IC-based order selection.
+        logLik <- structure(cfObjective, nobs=obsInSample, df=order+1, class="logLik");
         ICValue <- icFunction(logLik);
 
         return(ICValue);
@@ -248,7 +248,9 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
 
     # Select the order of sma
     if(orderSelect){
-        maxOrder <- min(200,obsInSample);
+        # df = order + 1, so cap the order to keep the AICc small-sample
+        # correction (denominator obs - df - 1) well defined and positive.
+        maxOrder <- min(200, max(1, obsInSample-3));
         ICs <- rep(NA,maxOrder);
         if(fast){
             # The lowest bound
@@ -318,15 +320,16 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
                      loss="MSE", bounds="none");
 
     smaModel$model <- paste0("SMA(",order,")");
-    # SMA df is 2 regardless of order: one identifiable level initial (the equal
-    # weights collapse the order states, rank 1) plus the scale. The generic
-    # adam "use" path cannot know this, so set it here.
+    # SMA is AR(order) with fixed unit-root coefficients (1/order): all `order`
+    # initial states are identifiable (rank(X) = order), plus the scale, so
+    # df = order + 1. The generic adam "use" path SMA is built on hardcodes
+    # df = 1, so set the correct value here.
     smaModel$nParam[] <- 0;
-    smaModel$nParam[1,1] <- 1;
+    smaModel$nParam[1,1] <- order;
     smaModel$nParam[1,4] <- 1;
-    smaModel$nParam[1,5] <- 2;
+    smaModel$nParam[1,5] <- order+1;
     smaModel$logLik <- structure(as.numeric(smaModel$logLik), nobs=nobs(smaModel),
-                                 df=2, class="logLik");
+                                 df=order+1, class="logLik");
     smaModel$timeElapsed <- Sys.time()-startTime;
     smaModel$call <- cl;
     if(orderSelect){

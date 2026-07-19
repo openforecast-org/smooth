@@ -160,12 +160,15 @@ df_scale    = 1                               # (b) always, continuous response
   (om puts everything in the internal cell; occurrence df for the *demand* side
   propagates via adam's `nParamOccurrence` column — check no double count).
 
-### 2.8b sma  (simple moving average — special fixed structure)
-- Fixed equal weights (1/order), no estimated smoothing. D = F - g w' = 0, so
-  only the first fitted value depends on the initials and the `order` initial
-  states collapse to a single identifiable level (rank 1). df = 1 (level) +
-  1 (scale) = **2**, independent of the order (so order selection is unchanged).
-  The generic adam "use" path cannot know this; set explicitly in `sma()`.
+### 2.8b sma  (simple moving average = AR(order) with fixed unit-root coefficients)
+- SMA is AR(order) with fixed coefficients 1/order. They sum to 1 (a unit root),
+  so the model is non-stationary and all `order` initial states persist and are
+  identifiable: `rank(X) = order` (verified by the probe for order 1/2/4/12).
+  df = order (backcast initials) + 1 (scale) = **order + 1**. This grows with the
+  order, so higher orders are correctly penalised in order selection (the old
+  constant df = 1 gave no complexity penalty). Set explicitly in `sma()` (the
+  generic adam "use" path it is built on hardcodes df = 1). Cap the searched
+  maxOrder to `obs - 3` so the AICc small-sample correction stays valid.
 
 ### 2.9 omg  (two coupled occurrence models A + B)
 - Two om-like ETS models (`nParamsA = length(B_A)`, `nParamsB = length(B_B)`).

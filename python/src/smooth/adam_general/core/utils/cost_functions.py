@@ -1004,13 +1004,21 @@ def log_Lik_ADAM(  # noqa: N802
         if general_dict["loss"] in ["LASSO", "RIDGE"]:
             return 0
         else:
-            general_dict["distribution_new"] = {
+            # The reported log-likelihood for a fit-only loss is the
+            # concentrated likelihood under the loss-implied distribution
+            # (MSE<->dnorm, MAE<->dlaplace, HAM<->ds), NOT -loss. Mirror R:
+            # remap both the loss AND the distribution and let CF compute the
+            # likelihood. CF reads general["loss"]/["distribution_new"], so the
+            # remap must land on those keys (a copy — general_dict is shared).
+            # An explicitly-supplied `distribution` is intentionally overridden
+            # for these losses, exactly as R does (R/adam.R:1004-1012).
+            general_for_ll = dict(general_dict)
+            general_for_ll["distribution_new"] = {
                 "MSE": "dnorm",
                 "MAE": "dlaplace",
                 "HAM": "ds",
             }.get(general_dict["loss"], general_dict["distribution_new"])
-
-            general_dict["loss_new"] = (
+            general_for_ll["loss"] = (
                 "likelihood"
                 if general_dict["loss"] in ["MSE", "MAE", "HAM"]
                 else general_dict["loss"]
@@ -1031,7 +1039,7 @@ def log_Lik_ADAM(  # noqa: N802
                 constant_dict,
                 observations_dict,
                 profile_dict,
-                general_dict,
+                general_for_ll,
                 adam_cpp,
                 bounds=None,
                 otherParameterEstimate=otherParameterEstimate,

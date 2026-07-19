@@ -1018,6 +1018,11 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     # initial type can be: "o" - optimal, "b" - backcasting, "p" - provided.
     if(any(is.character(initial))){
         initialType[] <- match.arg(initial, c("backcasting","optimal","two-stage","complete","gradient"));
+        # The gradient solve profiles the loss in C++, which a user-provided
+        # loss function cannot cross; the fit falls back to backcasting.
+        if(initialType=="gradient" && loss=="custom" && !silent){
+            message("initial=\"gradient\" is not available for custom loss functions. Backcasting will be used instead.");
+        }
     }
     else if(is.null(initial)){
         if(!silent){

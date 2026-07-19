@@ -1,5 +1,7 @@
 #pragma once
 
+#include "olsCore.h"
+
 // Analytic derivatives of the pure-ETS measurement / transition / update maps
 // (adamWvalue / adamFvalue / adamGvalue from adamGeneral.h), used by
 // adamCore::gradientSolve to propagate initial-state sensitivities in one
@@ -479,4 +481,296 @@ inline void adamGvalueJac(arma::vec const &vecVt, arma::mat const &matrixF,
         }
         // Conventional branches never use yhat: jacGy stays zero.
     }
+}
+
+// ---------- Loss helpers for the arbitrary-loss gradient solve ----------
+//
+// At fixed persistence (and concentrated scale) every supported estimation
+// loss reduces to sum(rho(e_t)) over the errorf residuals, so the initial
+// states can be profiled under the actual loss instead of the one-step SSE
+// surrogate. rho and its derivatives below mirror the R-side loss formulas
+// (CF and adam_scaler) up to positive factors and additive constants, which
+// drop out of the argmin. Loss codes (kept mirror-identical in the R and
+// Python wrapper mapping tables):
+//   'S' SSE (default; MSE / likelihood+dnorm)      rho = e^2
+//   'A' MAE (MAE / likelihood+dlaplace)            rho = |e|
+//   'H' HAM (HAM / likelihood+ds)                  rho = sqrt(|e|)
+//   'G' generalised normal (likelihood+dgnorm)     rho = |e|^beta
+//   'l' log-normal, E='M' (likelihood+dlnorm)      rho = (log(1+e)+sigma^2/2)^2
+//   'g' gamma, E='M' (likelihood+dgamma)           rho = (1+e) - log(1+e)
+//   'i' inv. gaussian, E='M' (likelihood+dinvgauss) rho = e^2/(1+e) + s^2 log(1+e)
+//   'h' MSEh, 'T' TMSE, 't' GTMSE, 'C' MSCE, 'P' GPL: additive multistep losses
+// The scale argument carries sigma for 'l' and the dispersion s^2 for 'i',
+// refreshed from the current residuals via gradientLossScale(); 'g' is
+// scale-free in the argmin (the dispersion only multiplies its rho).
+
+inline bool gradientLossMultistep(char const &L){
+    return L=='h' || L=='T' || L=='t' || L=='C' || L=='P';
+}
+
+inline double gradientLossRho(double const &e, char const &L,
+                              double const &beta, double const &scale){
+    switch(L){
+    case 'A':
+        return std::abs(e);
+    case 'H':
+        return std::sqrt(std::abs(e));
+    case 'G':
+        return std::pow(std::abs(e), beta);
+    case 'l':{
+        double const u = std::log(std::abs(1+e)) + scale*scale/2;
+        return u*u;
+    }
+    case 'g':
+        return (1+e) - std::log(std::abs(1+e));
+    case 'i':
+        return e*e/(1+e) + scale*std::log(std::abs(1+e));
+    default:
+        return e*e;
+    }
+}
+
+// Sum of rho over the residuals. The 'S' case keeps arma::dot so the default
+// SSE path stays bit-identical to the pre-loss-aware implementation.
+inline double gradientLossSum(arma::vec const &errors, char const &L,
+                              double const &beta, double const &scale){
+    if(L=='S'){
+        return arma::dot(errors, errors);
+    }
+    double total = 0;
+    for(arma::uword i=0; i<errors.n_elem; i=i+1){
+        total += gradientLossRho(errors(i), L, beta, scale);
+    }
+    return total;
+}
+
+// Concentrated scale, mirroring adam_scaler(): sigma for 'l', s^2 for 'i'.
+// Residuals at skipped (ot==0) points are exactly zero and contribute nothing,
+// matching the R-side sum over the observed points divided by obsInSample.
+inline double gradientLossScale(arma::vec const &errors, char const &L){
+    double const obs = errors.n_elem;
+    double total = 0;
+    switch(L){
+    case 'l':
+        for(arma::uword i=0; i<errors.n_elem; i=i+1){
+            double const u = std::log(std::abs(1+errors(i)));
+            total += u*u;
+        }
+        return std::sqrt(2*std::abs(1-std::sqrt(std::abs(1-total/obs))));
+    case 'i':
+        for(arma::uword i=0; i<errors.n_elem; i=i+1){
+            total += errors(i)*errors(i)/(1+errors(i));
+        }
+        return total/obs;
+    default:
+        return 0;
+    }
+}
+
+// Row scaling (a) and right-hand side (b) of the loss-aware step system: the
+// least-squares solve of (a % J) d = b yields the IRLS / weighted Gauss-Newton
+// step for the power losses (weight |e|^{p-2}; exact-zero residuals sit at
+// their subgradient optimum and are dropped -- no epsilon floor) and the
+// Gauss-Newton-Newton step for the likelihood losses (rows where rho'' is not
+// positive are dropped). 'S' keeps a=1, b=e: the plain Gauss-Newton system.
+inline void gradientLossStepRow(double const &e, char const &L,
+                                double const &beta, double const &scale,
+                                double &a, double &b){
+    switch(L){
+    case 'A':
+    case 'H':
+    case 'G':{
+        double const p = (L=='A') ? 1.0 : ((L=='H') ? 0.5 : beta);
+        if(e==0){
+            a = 0;
+            b = 0;
+        }
+        else{
+            a = std::sqrt(std::pow(std::abs(e), p-2));
+            b = a*e;
+            if(!std::isfinite(a) || !std::isfinite(b)){
+                a = 0;
+                b = 0;
+            }
+        }
+        break;
+    }
+    case 'l':
+    case 'g':
+    case 'i':{
+        double psi, psiPrime;
+        if(L=='l'){
+            double const u = std::log(std::abs(1+e)) + scale*scale/2;
+            psi = 2*u/(1+e);
+            psiPrime = 2*(1-u)/((1+e)*(1+e));
+        }
+        else if(L=='g'){
+            psi = e/(1+e);
+            psiPrime = 1/((1+e)*(1+e));
+        }
+        else{
+            psi = e*(2+e)/((1+e)*(1+e)) + scale/(1+e);
+            psiPrime = 2/((1+e)*(1+e)*(1+e)) - scale/((1+e)*(1+e));
+        }
+        if(psiPrime<=0 || !std::isfinite(psi) || !std::isfinite(psiPrime)){
+            a = 0;
+            b = 0;
+        }
+        else{
+            a = std::sqrt(psiPrime);
+            b = psi/a;
+        }
+        break;
+    }
+    default:
+        a = 1;
+        b = e;
+    }
+}
+
+// IRLS sweeps for the separable losses on the additive affine surrogate:
+// e(theta) = e0 - D*theta with a constant design D, so every sweep is one
+// weighted QR -- no further model passes. Sweeps are accepted only while the
+// loss decreases (the majorisation holds for p <= 2; the guard also covers
+// dgnorm with beta > 2) and stop on diminishing returns.
+inline arma::vec gradientLossIrls(arma::mat const &design, arma::vec const &residuals,
+                                  arma::vec theta, char const &L, double const &beta){
+    double rhoCurrent = gradientLossSum(residuals - design*theta, L, beta, 0);
+    arma::vec rowScale(residuals.n_elem);
+    for(int sweep=0; sweep<100; sweep=sweep+1){
+        arma::vec const e = residuals - design*theta;
+        double a, b;
+        for(arma::uword i=0; i<e.n_elem; i=i+1){
+            gradientLossStepRow(e(i), L, beta, 0, a, b);
+            rowScale(i) = a;
+        }
+        arma::vec thetaNew = olsCore(design.each_col() % rowScale,
+                                     residuals % rowScale, 1e-7);
+        thetaNew.elem(arma::find_nonfinite(thetaNew)).zeros();
+        double const rhoNew = gradientLossSum(residuals - design*thetaNew, L, beta, 0);
+        if(!(rhoNew < rhoCurrent)){
+            break;
+        }
+        theta = thetaNew;
+        if(rhoNew > rhoCurrent - 1e-8*std::abs(rhoCurrent)){
+            break;
+        }
+        rhoCurrent = rhoNew;
+    }
+    return theta;
+}
+
+// Solvers for the additive multistep losses on the affine multistep surrogate.
+// msDesign / msResiduals are stacked origin-major: row idx*h + k holds the
+// (k+1)-step-ahead residual from origin idx and its design d(yhat)/d(theta),
+// exactly replicating the ferrors() recursion the cost function evaluates.
+// Everything below is pure linear algebra on this stack -- no model passes.
+inline arma::vec gradientLossMultistepSolve(arma::mat const &msDesign,
+                                            arma::vec const &msResiduals,
+                                            char const &L, int const &hor,
+                                            int const &nOrigins){
+    unsigned int const nFree = msDesign.n_cols;
+
+    // MSEh: quadratic in theta on the h-step rows only -- one QR.
+    if(L=='h'){
+        arma::uvec const rowsH =
+            arma::regspace<arma::uvec>(hor-1, hor, nOrigins*hor-1);
+        return olsCore(msDesign.rows(rowsH), msResiduals(rowsH), 1e-7);
+    }
+
+    // MSCE: the cumulative error is the within-origin row sum -- one QR.
+    if(L=='C'){
+        arma::mat designC(nOrigins, nFree);
+        arma::vec residualsC(nOrigins);
+        for(int idx=0; idx<nOrigins; idx=idx+1){
+            designC.row(idx) = arma::sum(msDesign.rows(idx*hor, idx*hor+hor-1), 0);
+            residualsC(idx) = arma::accu(msResiduals.rows(idx*hor, idx*hor+hor-1));
+        }
+        return olsCore(designC, residualsC, 1e-7);
+    }
+
+    // TMSE (also the starting point for GTMSE and GPL): the full stack -- one QR.
+    arma::vec theta = olsCore(msDesign, msResiduals, 1e-7);
+    theta.elem(arma::find_nonfinite(theta)).zeros();
+    if(L=='T'){
+        return theta;
+    }
+
+    // GTMSE: sum(log(SSE_k)). The log is majorised by its tangent, so each MM
+    // sweep is a per-horizon weighted QR with weights 1/SSE_k -- monotone.
+    if(L=='t'){
+        arma::vec rowScale(nOrigins*hor);
+        arma::vec sse(hor);
+        double objective = arma::datum::inf;
+        for(int sweep=0; sweep<30; sweep=sweep+1){
+            arma::vec const e = msResiduals - msDesign*theta;
+            sse.zeros();
+            for(int idx=0; idx<nOrigins; idx=idx+1){
+                for(int k=0; k<hor; k=k+1){
+                    sse(k) += e(idx*hor+k)*e(idx*hor+k);
+                }
+            }
+            if(sse.min() <= 0){
+                break;
+            }
+            double const objectiveNew = arma::accu(arma::log(sse));
+            if(!(objectiveNew < objective)){
+                break;
+            }
+            objective = objectiveNew;
+            for(int idx=0; idx<nOrigins; idx=idx+1){
+                for(int k=0; k<hor; k=k+1){
+                    rowScale(idx*hor+k) = 1/std::sqrt(sse(k));
+                }
+            }
+            arma::vec thetaNew = olsCore(msDesign.each_col() % rowScale,
+                                         msResiduals % rowScale, 1e-7);
+            thetaNew.elem(arma::find_nonfinite(thetaNew)).zeros();
+            theta = thetaNew;
+        }
+        return theta;
+    }
+
+    // GPL: log(det(E'E)). log det is concave in the covariance, so the tangent
+    // majorisation turns each MM sweep into a GLS whitened by chol(Omega)^{-T},
+    // starting from the TMSE solution (the Omega = I sweep). Monotone.
+    if(L=='P'){
+        double objective = arma::datum::inf;
+        arma::mat designW(nOrigins*hor, nFree);
+        arma::vec residualsW(nOrigins*hor);
+        for(int sweep=0; sweep<30; sweep=sweep+1){
+            arma::vec const e = msResiduals - msDesign*theta;
+            arma::mat const errorsMat =
+                arma::reshape(e, hor, nOrigins);
+            arma::mat const omega = errorsMat * errorsMat.t();
+            arma::mat cholUpper;
+            if(!arma::chol(cholUpper, omega)){
+                break;
+            }
+            // Numerically singular covariance: the profiled GPL is at the edge
+            // of its domain and further whitened sweeps are meaningless.
+            if(cholUpper.diag().min() < 1e-8 * cholUpper.diag().max()){
+                break;
+            }
+            double const objectiveNew = 2*arma::accu(arma::log(cholUpper.diag()));
+            if(!(objectiveNew < objective)){
+                break;
+            }
+            objective = objectiveNew;
+            for(int idx=0; idx<nOrigins; idx=idx+1){
+                designW.rows(idx*hor, idx*hor+hor-1) =
+                    arma::solve(arma::trimatl(cholUpper.t()),
+                                msDesign.rows(idx*hor, idx*hor+hor-1));
+                residualsW.rows(idx*hor, idx*hor+hor-1) =
+                    arma::solve(arma::trimatl(cholUpper.t()),
+                                msResiduals.rows(idx*hor, idx*hor+hor-1));
+            }
+            arma::vec thetaNew = olsCore(designW, residualsW, 1e-7);
+            thetaNew.elem(arma::find_nonfinite(thetaNew)).zeros();
+            theta = thetaNew;
+        }
+        return theta;
+    }
+
+    return theta;
 }

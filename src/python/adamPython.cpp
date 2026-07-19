@@ -174,7 +174,9 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("profile"),
             py::arg("probeBasis"),
             py::arg("nIterations"),
-            py::arg("analytic"))
+            py::arg("analytic"),
+            py::arg("lossType"),
+            py::arg("lossParams"))
         .def("reforecast", &adamCore::reforecast,
             py::arg("arrayErrors"),
             py::arg("arrayOt"),

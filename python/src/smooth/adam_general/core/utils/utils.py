@@ -604,8 +604,13 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
         # Implement log-generalized normal distribution
         pass
     elif distribution == "dinvgauss":
+        # scipy's invgauss(mu, scale=s) is IG(mean=mu*s, lambda=s); statmod's
+        # (mean, dispersion) parameterisation maps to mu = mean*dispersion,
+        # s = 1/dispersion. Mirrors R: dinvgauss(y, mean=|fitted|,
+        # dispersion=|scale/fitted|).
+        dispersion = np.abs(scale / y_fitted)
         return stats.invgauss.logpdf(
-            y, mu=np.abs(y_fitted), scale=np.abs(scale / y_fitted)
+            y, mu=np.abs(y_fitted) * dispersion, scale=1 / dispersion
         )
     elif distribution == "dgamma":
         return stats.gamma.logpdf(y, a=1 / scale, scale=scale * np.abs(y_fitted))

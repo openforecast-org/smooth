@@ -15,10 +15,56 @@ from smooth import ADAM
 
 # Seasonal series with trend — the case where backcasting historically drifted.
 _Y = np.array(
-    [10, 12, 15, 13, 16, 18, 20, 19, 22, 25, 28, 30,
-     11, 13, 16, 14, 17, 19, 21, 20, 23, 26, 29, 31,
-     12, 14, 17, 15, 18, 20, 22, 21, 24, 27, 30, 32,
-     13, 15, 18, 16, 19, 21, 23, 22, 25, 28, 31, 33],
+    [
+        10,
+        12,
+        15,
+        13,
+        16,
+        18,
+        20,
+        19,
+        22,
+        25,
+        28,
+        30,
+        11,
+        13,
+        16,
+        14,
+        17,
+        19,
+        21,
+        20,
+        23,
+        26,
+        29,
+        31,
+        12,
+        14,
+        17,
+        15,
+        18,
+        20,
+        22,
+        21,
+        24,
+        27,
+        30,
+        32,
+        13,
+        15,
+        18,
+        16,
+        19,
+        21,
+        23,
+        22,
+        25,
+        28,
+        31,
+        33,
+    ],
     dtype=float,
 )
 
@@ -101,3 +147,87 @@ def test_gradient_ces_falls_back_to_backcasting():
     mg = CES(seasonality="full", lags=[1, 12], initial="gradient").fit(_Y)
     mb = CES(seasonality="full", lags=[1, 12], initial="backcasting").fit(_Y)
     assert abs(float(mg.loglik) - float(mb.loglik)) < 1e-8
+
+
+# --- Loss-aware solve -------------------------------------------------------
+
+_RNG = np.random.default_rng(41)
+_TREND = 100 + np.cumsum(_RNG.normal(0, 2, 72))
+_SEAS = np.tile([5, -3, 2, -4, 6, -6, 3, -1, 2, -2, 4, -6], 6)
+_YL = _TREND + _SEAS
+_YLM = _TREND * np.tile(
+    [1.05, 0.97, 1.02, 0.96, 1.06, 0.94, 1.03, 0.99, 1.02, 0.98, 1.04, 0.94], 6
+)
+
+
+def _loss_value(model):
+    return float(model._adam_estimated["CF_value"])
+
+
+def test_gradient_profiles_robust_one_step_losses():
+    for loss in ["MAE", "HAM"]:
+        mb = ADAM(model="AAA", lags=[12], initial="backcasting", loss=loss).fit(_YL)
+        mg = ADAM(model="AAA", lags=[12], initial="gradient", loss=loss).fit(_YL)
+        assert _loss_value(mg) < _loss_value(mb)
+
+
+def test_gradient_profiles_multiplicative_likelihoods():
+    for dist in [None, "dlnorm", "dinvgauss"]:
+        kw = {} if dist is None else {"distribution": dist}
+        mb = ADAM(model="MAM", lags=[12], initial="backcasting", **kw).fit(_YLM)
+        mg = ADAM(model="MAM", lags=[12], initial="gradient", **kw).fit(_YLM)
+        assert _loss_value(mg) < _loss_value(mb) + 1e-8
+
+
+def test_gradient_solves_additive_multistep_losses():
+    for loss in ["MSEh", "TMSE", "GTMSE", "MSCE", "GPL"]:
+        mb = ADAM(model="AAA", lags=[12], initial="backcasting", loss=loss, h=6).fit(
+            _YL
+        )
+        mg = ADAM(model="AAA", lags=[12], initial="gradient", loss=loss, h=6).fit(_YL)
+        assert _loss_value(mg) < _loss_value(mb)
+
+
+def test_gradient_loss_code_mapping_matches_r():
+    # The mapping table must stay mirror-identical to adam_gradientLossCode in
+    # R/adam-gradient.R -- this pins the full grid.
+    from smooth.adam_general.core.utils.gradient import adam_gradient_loss_code
+
+    grid = [
+        (("MSE", "default", "A", None, 0, False), ("S", 0.0)),
+        (("MAE", "default", "A", None, 0, False), ("A", 0.0)),
+        (("HAM", "default", "A", None, 0, False), ("H", 0.0)),
+        (("likelihood", "default", "A", None, 0, False), ("S", 0.0)),
+        (("likelihood", "default", "M", None, 0, False), ("g", 0.0)),
+        (("likelihood", "dlaplace", "A", None, 0, False), ("A", 0.0)),
+        (("likelihood", "ds", "M", None, 0, False), ("H", 0.0)),
+        (("likelihood", "dgnorm", "A", 1.5, 0, False), ("G", 1.5)),
+        (("likelihood", "dgnorm", "A", None, 0, False), ("S", 0.0)),
+        (("likelihood", "dlnorm", "M", None, 0, False), ("l", 0.0)),
+        (("likelihood", "dlnorm", "A", None, 0, False), ("S", 0.0)),
+        (("likelihood", "dgamma", "M", None, 0, False), ("g", 0.0)),
+        (("likelihood", "dinvgauss", "M", None, 0, False), ("i", 0.0)),
+        (("LASSO", "default", "A", None, 0, False), ("S", 0.0)),
+        (("MSEh", "default", "A", None, 6, True), ("h", 6.0)),
+        (("TMSE", "default", "A", None, 6, True), ("T", 6.0)),
+        (("GTMSE", "default", "A", None, 6, True), ("t", 6.0)),
+        (("MSCE", "default", "A", None, 6, True), ("C", 6.0)),
+        (("GPL", "default", "A", None, 6, True), ("P", 6.0)),
+        (("MAEh", "default", "A", None, 6, True), ("S", 0.0)),
+    ]
+    for args, expected in grid:
+        assert adam_gradient_loss_code(*args) == expected
+    assert adam_gradient_loss_code("custom", "default", "A", None, 0, False) is None
+    assert (
+        adam_gradient_loss_code(lambda a, f, b: 0.0, "default", "A", 0, 0, False)
+        is None
+    )
+
+
+def test_gradient_custom_loss_falls_back_to_backcasting():
+    def loss_fn(actual, fitted, B):  # noqa: N803
+        return float(np.sum(np.abs(actual - fitted) ** 1.5))
+
+    mb = ADAM(model="AAA", lags=[12], initial="backcasting", loss=loss_fn).fit(_YL)
+    mg = ADAM(model="AAA", lags=[12], initial="gradient", loss=loss_fn).fit(_YL)
+    assert abs(_loss_value(mg) - _loss_value(mb)) < 1e-8

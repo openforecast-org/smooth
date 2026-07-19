@@ -95,3 +95,61 @@ test_that("gradient estimates persistence jointly (nested, no backcasting)", {
     expect_true(is.finite(logLik(fG)))
     expect_lt((sum(residuals(fG)^2) - sseTrue) / 100, 5)
 })
+
+# The loss-aware solve: initial="gradient" profiles the actual estimation loss
+# (not the SSE surrogate), so at fixed persistence the gradient fit must never
+# lose to backcasting on the loss itself.
+
+set.seed(41)
+xLoss <- ts(100 + cumsum(rnorm(72, 0, 2)) +
+                rep(c(5, -3, 2, -4, 6, -6, 3, -1, 2, -2, 4, -6), 6), frequency = 12)
+xLossM <- ts((100 + cumsum(rnorm(72, 0, 2))) *
+                 rep(c(1.05, 0.97, 1.02, 0.96, 1.06, 0.94,
+                       1.03, 0.99, 1.02, 0.98, 1.04, 0.94), 6), frequency = 12)
+
+test_that("gradient profiles the robust one-step losses (MAE, HAM)", {
+    for (loss in c("MAE", "HAM")) {
+        fB <- adam(xLoss, "AAA", initial = "backcasting", loss = loss, silent = TRUE)
+        fG <- adam(xLoss, "AAA", initial = "gradient", loss = loss, silent = TRUE)
+        expect_lt(fG$lossValue, fB$lossValue)
+    }
+})
+
+test_that("gradient handles exact zero residuals in the MAE weights", {
+    # A locally constant series produces exact-zero residuals: the IRLS sweep
+    # must drop those rows (no epsilon floor) and stay finite.
+    yTies <- ts(rep(c(100, 100, 100, 105), 20), frequency = 4)
+    fG <- adam(yTies, "ANA", initial = "gradient", loss = "MAE", silent = TRUE)
+    expect_true(is.finite(fG$lossValue))
+})
+
+test_that("gradient profiles the multiplicative likelihoods", {
+    # dgamma (the multiplicative default), dlnorm and dinvgauss get their exact
+    # rho in the Gauss-Newton branch; the likelihood must not lose to backcasting.
+    for (dist in c("default", "dlnorm", "dinvgauss")) {
+        args <- list(data = xLossM, model = "MAM", initial = "backcasting", silent = TRUE)
+        if (dist != "default") { args$distribution <- dist }
+        fB <- do.call(adam, args)
+        args$initial <- "gradient"
+        fG <- do.call(adam, args)
+        expect_lt(fG$lossValue, fB$lossValue + 1e-8)
+    }
+})
+
+test_that("gradient solves the additive multistep losses on the multistep design", {
+    for (loss in c("MSEh", "TMSE", "GTMSE", "MSCE", "GPL")) {
+        fB <- adam(xLoss, "AAA", initial = "backcasting", loss = loss, h = 6,
+                   holdout = FALSE, silent = TRUE)
+        fG <- adam(xLoss, "AAA", initial = "gradient", loss = loss, h = 6,
+                   holdout = FALSE, silent = TRUE)
+        expect_lt(fG$lossValue, fB$lossValue)
+    }
+})
+
+test_that("gradient with a custom loss function falls back to backcasting", {
+    lossCustom <- function(actual, fitted, B) { sum(abs(actual - fitted)^1.5) }
+    fB <- adam(xLoss, "AAA", initial = "backcasting", loss = lossCustom, silent = TRUE)
+    fG <- suppressMessages(adam(xLoss, "AAA", initial = "gradient",
+                                loss = lossCustom, silent = TRUE))
+    expect_equal(fG$lossValue, fB$lossValue, tolerance = 1e-8)
+})

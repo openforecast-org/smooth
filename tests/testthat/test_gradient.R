@@ -73,15 +73,32 @@ test_that("gradient handles multiplicative / mixed ETS via Gauss-Newton", {
     expect_lt(dG, dB + 1)
 })
 
-test_that("gradient falls back to backcasting for unsupported specifications", {
-    # ARIMA is out of scope (no ARIMA/xreg/multi-seasonality yet): the fit must
-    # fall back to backcasting (identical result), even though the requested
-    # initial label stays "gradient".
+test_that("gradient solves additive ARIMA initials to optimal quality", {
+    # Additive ARIMA is in scope: the gradient solve profiles the initials by
+    # least squares (residuals are affine in the initial profile for additive
+    # SSOE), matching the optimal-initials SSE at the same dynamics and beating
+    # backcasting.
     set.seed(1)
     y <- ts(cumsum(rnorm(80, 0.1, 1)) + 100)
-    fB <- adam(y, "NNN", orders = list(ar = c(1), i = c(1), ma = c(1)),
+    af <- list(ar = 0.4, ma = 0.3)
+    fO <- adam(y, "NNN", orders = list(ar = 1, i = 1, ma = 1), arma = af,
+               initial = "optimal", loss = "MSE", silent = TRUE)
+    fB <- adam(y, "NNN", orders = list(ar = 1, i = 1, ma = 1), arma = af,
+               initial = "backcasting", loss = "MSE", silent = TRUE)
+    fG <- adam(y, "NNN", orders = list(ar = 1, i = 1, ma = 1), arma = af,
+               initial = "gradient", loss = "MSE", silent = TRUE)
+    expect_equal(sum(residuals(fG)^2), sum(residuals(fO)^2), tolerance = 1e-3)
+    expect_lt(sum(residuals(fG)^2), sum(residuals(fB)^2))
+})
+
+test_that("multiplicative ARIMA gradient falls back to backcasting", {
+    # Multiplicative ARIMA would take the ETS-only Gauss-Newton Jacobian path,
+    # so it falls back to backcasting (identical result), not the affine solve.
+    set.seed(1)
+    y <- ts(abs(cumsum(rnorm(80, 0.1, 1))) + 100)
+    fB <- adam(y, "MNN", orders = list(ar = 1, i = 1, ma = 1),
                initial = "backcasting", silent = TRUE)
-    fG <- suppressWarnings(adam(y, "NNN", orders = list(ar = c(1), i = c(1), ma = c(1)),
+    fG <- suppressWarnings(adam(y, "MNN", orders = list(ar = 1, i = 1, ma = 1),
                                 initial = "gradient", silent = TRUE))
     expect_equal(logLik(fG), logLik(fB), tolerance = 1e-8)
 })

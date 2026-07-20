@@ -775,7 +775,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -1154,7 +1154,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                  etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                                  componentsNumberETS, componentsNumberETSSeasonal,
                                                  componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                                 loss, distribution, other, horizon, multisteps);
+                                                 loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
                 logLikReturn[] <- logLikReturn - sum(log(abs(adamFitted$fitted)));
             }
 
@@ -1666,7 +1666,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                              etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                              componentsNumberETS, componentsNumberETSSeasonal,
                                              componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                             loss, distributionNew, other, horizon, multisteps);
+                                             loss, distributionNew, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
 
             # Extract the errors correctly
             errors <- switch(distributionNew,
@@ -1954,7 +1954,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
 
         matVt[] <- adamFitted$states;
 

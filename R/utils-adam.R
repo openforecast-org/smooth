@@ -749,8 +749,27 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
             else{
                 matVt[componentsNumberETS+1:componentsNumberARIMA, 1:initialArimaNumber] <-
                     switch(Etype, "A"=0, "M"=1)
-                matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
-                    initialArima[1:initialArimaNumber]
+                # Provided ARIMA initials must be placed the SAME way the
+                # estimated path does (adam_filler): spread
+                # ariPolynomial %*% initials across the ARI rows. The collector
+                # reports initial$arima by reading the last ARI row and dividing
+                # by tail(ariPolynomial), so placing the reported values raw in
+                # the last row (the previous behaviour) dropped that factor and
+                # produced a different state -> a different likelihood for the
+                # same reported parameters. This mirrors the filler exactly, so
+                # providing the collected initials now round-trips.
+                if(!is.null(arimaPolynomials) && nrow(nonZeroARI)>0){
+                    matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
+                        switch(Etype,
+                               "A"=arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
+                                   t(initialArima[1:initialArimaNumber]),
+                               "M"=exp(arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
+                                           t(log(initialArima[1:initialArimaNumber]))))
+                }
+                else{
+                    matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
+                        initialArima[1:initialArimaNumber]
+                }
             }
         }
 

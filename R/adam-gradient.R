@@ -114,13 +114,17 @@ adam_gradientProbeBasis <- function(etsModel, arimaModel, xregModel, Etype, Ttyp
                                     componentsNumberETSSeasonal,
                                     componentsNumberETSNonSeasonal,
                                     componentsNumberETS, componentsNumberARIMA,
-                                    nComponents, lagsModelAll, lagsModelMax){
-    if(xregModel){ return(NULL) }
+                                    nComponents, lagsModelAll, lagsModelMax,
+                                    xregNumber=0, oType="n"){
+    demand <- (oType == "n")
     if(!etsModel && !arimaModel){ return(NULL) }
     additive <- (Etype=="A") && !any(Ttype==c("M","Md")) && (Stype!="M")
-    # ARIMA gradient needs the additive affine branch; multiplicative ARIMA
-    # would take the ETS-only Gauss-Newton path -> fall back.
-    if(arimaModel && !additive){ return(NULL) }
+    # On the demand path (O=="n") the Gauss-Newton branch uses the ETS-only
+    # analytic Jacobian, so multiplicative ARIMA and any xreg fall back. On the
+    # occurrence path the solve drops to the finite-difference Jacobian (fully
+    # general), so ARIMA and xreg initials are solvable there.
+    if(demand && arimaModel && !additive){ return(NULL) }
+    if(demand && xregModel){ return(NULL) }
     # Column-major cell index of profile[row, col] is row + (col-1)*nComponents
     cellsOf <- function(row, cols){ row + (cols - 1) * nComponents }
     probes <- list()
@@ -146,6 +150,15 @@ adam_gradientProbeBasis <- function(etsModel, arimaModel, xregModel, Etype, Ttyp
             }
         }
     }
+    # xreg initial states (the regression coefficients) live in the rows after
+    # the ETS and ARIMA components, each at lag 1. Their measurement/transition
+    # are linear, so the finite-difference solve recovers them exactly.
+    if(xregModel && xregNumber > 0){
+        for(i in 1:xregNumber){
+            r <- componentsNumberETS + componentsNumberARIMA + i
+            probes[[length(probes) + 1]] <- cellsOf(r, 1)
+        }
+    }
     if(length(probes) == 0){ return(NULL) }
     probeBasis <- matrix(0, nComponents * lagsModelMax, length(probes))
     for(j in seq_along(probes)){
@@ -169,7 +182,8 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                                componentsNumberETSNonSeasonal, lagsModel, lagsModelMax,
                                obsInSample, loss, distribution="dnorm", other=NULL,
                                horizon=0, multisteps=FALSE, oType="n",
-                               componentsNumberARIMA=0, lagsModelAll=lagsModel){
+                               componentsNumberARIMA=0, lagsModelAll=lagsModel,
+                               xregNumber=0){
     if(any(initialType == "gradient")){
         # Occurrence models profile their own losses over the probability
         # residuals; occurrence "fixed" ('f') has no estimated initials and
@@ -189,7 +203,8 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                                               componentsNumberETSSeasonal,
                                               componentsNumberETSNonSeasonal,
                                               componentsNumberETS, componentsNumberARIMA,
-                                              nrow(profile), lagsModelAll, lagsModelMax)
+                                              nrow(profile), lagsModelAll, lagsModelMax,
+                                              xregNumber, oType)
         if(!is.null(probeBasis) && !is.null(lossCode)){
             solved <- adam_gradientSolve(adamCpp, matWt, matF, vecG, indexLookupTable,
                                          profile, yInSample, ot, probeBasis,

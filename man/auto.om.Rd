@@ -9,7 +9,7 @@ auto.om(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar
   regressors = c("use", "select", "adapt"), occurrence = c("fixed",
   "odds-ratio", "inverse-odds-ratio", "direct", "general"), h = 0,
   holdout = FALSE, persistence = NULL, phi = NULL,
-  initial = c("backcasting", "optimal", "two-stage", "complete"),
+  initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
   arma = NULL, ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual",
   "admissible", "none"), silent = TRUE, parallel = FALSE,
   ets = c("conventional", "adam"), ...)

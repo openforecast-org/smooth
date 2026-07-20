@@ -62,7 +62,7 @@
 sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                    loss=c("likelihood","MSE","MAE","HAM","LASSO","RIDGE","MSEh","TMSE","GTMSE","MSCE","GPL"),
                    h=0, holdout=FALSE, arma=NULL,
-                   initial=c("backcasting","optimal","two-stage","complete"),
+                   initial=c("backcasting","optimal","two-stage","complete","gradient"),
                    bounds=c("none","usual","admissible"), silent=TRUE, ...) {
 
     # Start timer
@@ -402,7 +402,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                   matricesFilled$matF, matricesFilled$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations, "n");
+                                  any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -571,7 +571,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                               matricesFinal$matF, matricesFinal$vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations, "n");
+                              any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
     # Prepare fitted and error with ts / zoo
     if(any(yClasses=="ts")){

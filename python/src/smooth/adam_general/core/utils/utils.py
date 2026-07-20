@@ -571,12 +571,14 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
         else:  # "M"
             return stats.laplace.logpdf(y, loc=y_fitted, scale=scale * y_fitted)
     elif distribution == "ds":
+        # The S distribution (greybox::ds), NOT Student's t: its log-density is
+        # -log(4 s^2) - sqrt(|x - mu|) / s. scipy has no S distribution.
         if Etype == "A":
-            return stats.t.logpdf(y, df=2, loc=y_fitted, scale=scale)
+            s = scale
+            return -np.log(4 * s**2) - np.sqrt(np.abs(y - y_fitted)) / s
         else:  # "M"
-            return stats.t.logpdf(
-                y, df=2, loc=y_fitted, scale=scale * np.sqrt(y_fitted)
-            )
+            s = scale * np.sqrt(y_fitted)
+            return -np.log(4 * s**2) - np.sqrt(np.abs(y - y_fitted)) / s
     elif distribution == "dgnorm":
         beta = other if other is not None else 2.0
         if Etype == "A":
@@ -597,15 +599,24 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
             np.log(y), loc=np.log(y_fitted), scale=scale
         ) - np.log(y)
     elif distribution == "dls":
-        return stats.t.logpdf(
-            np.log(y), df=2, loc=np.log(y_fitted), scale=scale
-        ) - np.log(y)
+        # Log-S: the S log-density on the log scale, minus log(y) for the
+        # Jacobian. Mirrors R: ds(log(y), log(fitted), scale) - log(y).
+        return (
+            -np.log(4 * scale**2)
+            - np.sqrt(np.abs(np.log(y) - np.log(y_fitted))) / scale
+            - np.log(y)
+        )
     elif distribution == "dlgnorm":
         # Implement log-generalized normal distribution
         pass
     elif distribution == "dinvgauss":
+        # scipy's invgauss(mu, scale=s) is IG(mean=mu*s, lambda=s); statmod's
+        # (mean, dispersion) parameterisation maps to mu = mean*dispersion,
+        # s = 1/dispersion. Mirrors R: dinvgauss(y, mean=|fitted|,
+        # dispersion=|scale/fitted|).
+        dispersion = np.abs(scale / y_fitted)
         return stats.invgauss.logpdf(
-            y, mu=np.abs(y_fitted), scale=np.abs(scale / y_fitted)
+            y, mu=np.abs(y_fitted) * dispersion, scale=1 / dispersion
         )
     elif distribution == "dgamma":
         return stats.gamma.logpdf(y, a=1 / scale, scale=scale * np.abs(y_fitted))

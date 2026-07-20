@@ -1017,7 +1017,12 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     initialType <- "backcasting"
     # initial type can be: "o" - optimal, "b" - backcasting, "p" - provided.
     if(any(is.character(initial))){
-        initialType[] <- match.arg(initial, c("backcasting","optimal","two-stage","complete"));
+        initialType[] <- match.arg(initial, c("backcasting","optimal","two-stage","complete","gradient"));
+        # The gradient solve profiles the loss in C++, which a user-provided
+        # loss function cannot cross; the fit falls back to backcasting.
+        if(initialType=="gradient" && loss=="custom" && !silent){
+            message("initial=\"gradient\" is not available for custom loss functions. Backcasting will be used instead.");
+        }
     }
     else if(is.null(initial)){
         if(!silent){
@@ -2815,11 +2820,11 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     # See if the estimation of the model is not needed (do we estimate anything?)
     if(!any(c(etsModel & c(persistenceLevelEstimate, persistenceTrendEstimate,
                            persistenceSeasonalEstimate, phiEstimate,
-                           all(initialType!=c("complete","backcasting")) & c(initialLevelEstimate,
+                           all(initialType!=c("complete","backcasting","gradient")) & c(initialLevelEstimate,
                                                                              initialTrendEstimate,
                                                                              initialSeasonalEstimate)),
               arimaModel & c(arEstimate, maEstimate,
-                             all(initialType!=c("complete","backcasting")) & initialEstimate & initialArimaEstimate),
+                             all(initialType!=c("complete","backcasting","gradient")) & initialEstimate & initialArimaEstimate),
               xregModel & c(persistenceXregEstimate, (initialType!="complete") & initialXregEstimate),
               constantEstimate,
               otherParameterEstimate))){

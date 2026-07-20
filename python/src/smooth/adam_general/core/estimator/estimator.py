@@ -2,6 +2,7 @@ import nlopt
 import numpy as np
 
 from smooth.adam_general.core.creator import architector, creator, filler, initialiser
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 
 from .optimization import (
     _calculate_loglik,
@@ -648,6 +649,34 @@ def estimator(
 
     n_param_estimated = len(B)
 
+    # For initial="gradient" the ETS initials are not in B, but they are
+    # genuinely solved (by least squares / Gauss-Newton), so they count as
+    # degrees of freedom just like initial="optimal". This applies only in the
+    # gradient solve's scope (pure ETS); with ARIMA or xreg present gradient
+    # falls back to backcasting and keeps the historical zero-initial-df count,
+    # as do backcasting / complete. Mirrors R (R/adam.R).
+    gradient_in_scope = (
+        model_type_dict["ets_model"]
+        and not arima_dict["arima_model"]
+        and not model_type_dict.get("xreg_model", False)
+    )
+    if initials_dict["initial_type"] == "gradient" and gradient_in_scope:
+        seasonal_estimate = initials_dict.get("initial_seasonal_estimate", [])
+        if not isinstance(seasonal_estimate, (list, tuple, np.ndarray)):
+            seasonal_estimate = [seasonal_estimate]
+        lags_model_seasonal = lags_dict.get("lags_model_seasonal", []) or []
+        seasonal_df = sum(
+            bool(est) * (int(lag) - 1)
+            for est, lag in zip(seasonal_estimate, lags_model_seasonal)
+        )
+        n_states_backcasting = (
+            bool(initials_dict.get("initial_level_estimate", True))
+            + model_type_dict["model_is_trendy"]
+            * bool(initials_dict.get("initial_trend_estimate", True))
+            + model_type_dict["model_is_seasonal"] * seasonal_df
+        )
+        n_param_estimated += int(n_states_backcasting)
+
     # Step 11: Calculate log-likelihood
     log_lik_adam_value = _calculate_loglik(
         B,
@@ -734,8 +763,18 @@ def estimator(
             adam_cpp=adam_cpp,
         )
 
-        # Run adam_cpp.fit() with backcasting to update states
-        if initials_dict["initial_type"] in ["complete", "backcasting"]:
+        # Run the backcasting fit to update states. In-scope ETS gradient is
+        # excluded: its initials are re-solved from the pristine msdecompose seed
+        # inside preparator(), and running the fit here would overwrite the seed
+        # head with evolved states, breaking the (seed-dependent) multiplicative
+        # Gauss-Newton solve downstream. Out-of-scope gradient (ARIMA / xreg)
+        # falls back to backcasting, so it needs this refresh just like
+        # backcasting / complete.
+        run_state_refit = initials_dict["initial_type"] in [
+            "complete",
+            "backcasting",
+        ] or (initials_dict["initial_type"] == "gradient" and not gradient_in_scope)
+        if run_state_refit:
             mat_vt = np.asfortranarray(adam_created["mat_vt"], dtype=np.float64)
             mat_wt = np.asfortranarray(adam_created["mat_wt"], dtype=np.float64)
             mat_f = np.asfortranarray(adam_created["mat_f"], dtype=np.float64)
@@ -751,18 +790,23 @@ def estimator(
             )
             ot = np.asfortranarray(observations_dict["ot"], dtype=np.float64)
 
-            adam_cpp.fit(
-                matrixVt=mat_vt,
-                matrixWt=mat_wt,
-                matrixF=mat_f,
-                vectorG=vec_g,
-                indexLookupTable=index_lookup_table,
-                profilesRecent=profiles_recent_table,
-                vectorYt=y_in_sample,
-                vectorOt=ot,
-                backcast=True,
-                nIterations=initials_dict.get("n_iterations", 2) or 2,
-                O="n",
+            adam_fit_or_gradient(
+                adam_cpp=adam_cpp,
+                mat_vt=mat_vt,
+                mat_wt=mat_wt,
+                mat_f=mat_f,
+                vec_g=vec_g,
+                index_lookup_table=index_lookup_table,
+                profiles_recent_table=profiles_recent_table,
+                y_in_sample=y_in_sample,
+                ot=ot,
+                initial_type=initials_dict["initial_type"],
+                n_iterations=initials_dict.get("n_iterations", 2) or 2,
+                backcast_value=True,
+                model_type_dict=model_type_dict,
+                components_dict=components_dict,
+                lags_dict=lags_dict,
+                obs_in_sample=observations_dict["obs_in_sample"],
             )
 
             # Update original matrices

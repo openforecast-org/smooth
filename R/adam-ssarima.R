@@ -109,7 +109,7 @@
 #' @export
 ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(y)),
                     constant=FALSE, arma=NULL, model=NULL,
-                    initial=c("backcasting","optimal","two-stage","complete"),
+                    initial=c("backcasting","optimal","two-stage","complete","gradient"),
                     loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                     h=0, holdout=FALSE, bounds=c("admissible","usual","none"), silent=TRUE,
                     xreg=NULL, regressors=c("use","select","adapt"), initialX=NULL,
@@ -436,7 +436,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                                   elements$matF, elements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations, "n");
+                                  any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -718,7 +718,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                                         # AR and MA values
                                         (arEstimate*sum(arOrders)+maEstimate*sum(maOrders)) +
                                         # initials of ARIMA
-                                        all(initialType!=c("complete","backcasting"))*initialArimaNumber*initialArimaEstimate +
+                                        all(initialType!=c("complete","backcasting","gradient"))*initialArimaNumber*initialArimaEstimate +
                                         # initials of xreg
                                         (initialType!="complete")*xregModel*initialXregEstimate*sum(xregParametersEstimated) +
                                         constantEstimate);
@@ -798,7 +798,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
             }
 
             # ARIMA initials
-            if(all(initialType!=c("complete","backcasting")) && initialArimaEstimate){
+            if(all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
                 B[j+1:initialArimaNumber] <- matVt[1:initialArimaNumber,1];
                 names(B)[j+1:initialArimaNumber] <- paste0("ARIMAState",1:initialArimaNumber);
 
@@ -1130,7 +1130,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                               matF, vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations, "n");
+                              any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;
@@ -1139,7 +1139,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     matVt[] <- adamFitted$states;
 
     # Write down the initials in the recent profile
-    if(!any(initialType==c("complete","backcasting"))){
+    if(!any(initialType==c("complete","backcasting","gradient"))){
         profilesRecentInitial <- matVt[,1,drop=FALSE];
     }
 

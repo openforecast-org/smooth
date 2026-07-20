@@ -96,7 +96,7 @@
 #' @rdname gum
 #' @export
 gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","multiplicative"),
-                initial=c("backcasting","optimal","two-stage","complete"),
+                initial=c("backcasting","optimal","two-stage","complete","gradient"),
                 persistence=NULL, transition=NULL, measurement=rep(1,sum(orders)),
                 loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                 h=0, holdout=FALSE, bounds=c("usual","admissible","none"), silent=TRUE,
@@ -354,7 +354,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                   elements$matF, elements$vecG,
                                   indexLookupTable, profilesRecentTable,
                                   yInSample, ot,
-                                  any(initialType==c("complete","backcasting")), nIterations, "n");
+                                  any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -829,7 +829,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                               matF, vecG,
                               indexLookupTable, profilesRecentTable,
                               yInSample, ot,
-                              any(initialType==c("complete","backcasting")), nIterations, "n");
+                              any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;

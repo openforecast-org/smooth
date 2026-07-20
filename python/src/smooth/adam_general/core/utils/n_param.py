@@ -243,12 +243,13 @@ def count_internal_params(
     elif phi_dict.get("phi_required", False):
         n_provided += 1
 
-    # Initial states — only counted when optimised (optimal/two-stage),
-    # not for backcasting/complete
+    # Initial states — counted for the types that estimate them as free
+    # parameters: optimal, two-stage and gradient (gradient solves them by least
+    # squares). Backcasting / complete keep the historical zero-initial-df count.
     initial_type = initials_checked.get("initial_type", "optimal")
-    initial_optimised = initial_type in ["optimal", "two-stage"]
+    initial_counted = initial_type in ["optimal", "two-stage", "gradient"]
 
-    if initial_optimised and initials_checked.get("initial_estimate", True):
+    if initial_counted and initials_checked.get("initial_estimate", True):
         # Level initial
         if initials_checked.get("initial_level_estimate", True):
             n_estimated += 1

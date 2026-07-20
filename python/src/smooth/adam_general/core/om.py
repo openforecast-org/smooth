@@ -43,6 +43,7 @@ from smooth.adam_general.core.estimator.optimization import (
     _setup_arima_polynomials,
 )
 from smooth.adam_general.core.forecaster import forecaster
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.om_cost import om_cf, om_link_function
 
@@ -207,8 +208,10 @@ def om_preparator(
     adam_cpp,
     occurrence,
     occurrence_char,
+    loss="likelihood",
 ):
-    """OM-specific ``preparator``: runs ``adam_cpp.fit`` with ``O=`` flag and
+    """OM-specific ``preparator``: runs the fit dispatcher with the ``O=`` flag
+    (gradient solve for ``initial="gradient"``, otherwise the ordinary fit) and
     applies the occurrence link function to obtain probabilities.
 
     Returns a dict shaped exactly like the regular ADAM preparator output so
@@ -255,18 +258,25 @@ def om_preparator(
             "backcasting",
         )
 
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt,
-        matrixWt=mat_wt,
-        matrixF=mat_f,
-        vectorG=vec_g,
-        indexLookupTable=index_lookup_table,
-        profilesRecent=profiles_recent_fortran,
-        vectorYt=ot,
-        vectorOt=ot,
-        backcast=backcast_value,
-        nIterations=initials_checked["n_iterations"],
-        O=occurrence_char,
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt,
+        mat_wt=mat_wt,
+        mat_f=mat_f,
+        vec_g=vec_g,
+        index_lookup_table=index_lookup_table,
+        profiles_recent_table=profiles_recent_fortran,
+        y_in_sample=ot,
+        ot=ot,
+        initial_type=initials_checked["initial_type"],
+        n_iterations=initials_checked["n_iterations"],
+        backcast_value=backcast_value,
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
+        o_type=occurrence_char,
+        loss=loss,
     )
 
     # Fitted on probability scale
@@ -275,6 +285,42 @@ def om_preparator(
     p_fitted = om_link_function(raw_fitted, error_type, occurrence)
     p_fitted = np.where(np.isnan(p_fitted), 0.0, p_fitted)
     residuals = ot - p_fitted
+
+    # The occurrence model's log-likelihood is ALWAYS the Bernoulli likelihood
+    # of the fitted probabilities. For loss="likelihood" the cost already is
+    # that (up to sign), but the fit-only losses (MSE/MAE/HAM) measure fit, not
+    # likelihood, so the logLik must be recomputed here from the fitted
+    # probabilities rather than taken from -CF. No flooring: an infeasible
+    # fitted probability surfaces as NaN/-inf instead of being clipped.
+    # Mirrors R/om.R's omFinalFit block.
+    ot_arr = np.asarray(ot, dtype=float).ravel()
+    if loss != "likelihood":
+        with np.errstate(invalid="ignore", divide="ignore"):
+            bernoulli_ll = float(
+                np.sum(ot_arr * np.log(p_fitted) + (1 - ot_arr) * np.log(1 - p_fitted))
+            )
+        adam_estimated["log_lik_adam_value"]["value"] = bernoulli_ll
+
+    # The reported lossValue is the fitting loss evaluated on the final fitted
+    # probabilities, ungated. The infeasibility guard inside om_cf (return 1e300
+    # when p leaves [0,1]) only steers the optimiser; it must not leak into the
+    # reported loss when the loss optimum itself is infeasible (an MAE/HAM
+    # optimum can put p<0). So lossValue stays the actual loss the
+    # gradient/optimiser minimised, while logLik is the (possibly NaN)
+    # Bernoulli — they may be misaligned. LASSO/RIDGE/custom keep the
+    # optimiser's value (their penalty terms are not recoverable here).
+    err_final = ot_arr - p_fitted
+    loss_value = None
+    if loss == "likelihood":
+        loss_value = -adam_estimated["log_lik_adam_value"]["value"]
+    elif loss == "MSE":
+        loss_value = float(np.mean(err_final**2))
+    elif loss == "MAE":
+        loss_value = float(np.mean(np.abs(err_final)))
+    elif loss == "HAM":
+        loss_value = float(np.mean(np.sqrt(np.abs(err_final))))
+    if loss_value is not None:
+        adam_estimated["CF_value"] = loss_value
 
     # 4. Initial values dict (use ADAM's _process_initial_values)
     from smooth.adam_general.core.forecaster.preparator import _process_initial_values
@@ -1050,24 +1096,32 @@ class OM(ADAM):
                 cf_value = 1e100
             return float(cf_value) if np.isfinite(cf_value) else 1e300
 
-        opt = nlopt.opt(nlopt_algorithm, len(B))
-        opt = _configure_optimizer(
-            opt,
-            lb,
-            ub,
-            maxeval,
-            None,
-            xtol_rel=xtol_rel,
-            xtol_abs=xtol_abs,
-            ftol_rel=ftol_rel,
-            ftol_abs=ftol_abs,
-        )
-        opt.set_min_objective(_objective)
-        try:
-            B[:] = opt.optimize(B)
-        except Exception:
-            pass
-        cf_value = opt.last_optimum_value()
+        # Nothing to estimate (e.g. fixed persistence with backcasting /
+        # gradient initials, which are solved inside the fit and never enter
+        # B): skip nlopt — a zero-dimension problem never evaluates the
+        # objective and last_optimum_value() would return +inf. Evaluate the
+        # cost once at the empty B instead. Mirrors R/om.R's length(B)==0 guard.
+        if len(B) == 0:
+            cf_value = _objective(B, None)
+        else:
+            opt = nlopt.opt(nlopt_algorithm, len(B))
+            opt = _configure_optimizer(
+                opt,
+                lb,
+                ub,
+                maxeval,
+                None,
+                xtol_rel=xtol_rel,
+                xtol_abs=xtol_abs,
+                ftol_rel=ftol_rel,
+                ftol_abs=ftol_abs,
+            )
+            opt.set_min_objective(_objective)
+            try:
+                B[:] = opt.optimize(B)
+            except Exception:
+                pass
+            cf_value = opt.last_optimum_value()
 
         # Retry from a small-persistence safe point if the first run hit the
         # infeasibility plateau, but ONLY when the user did NOT supply their
@@ -1138,14 +1192,15 @@ class OM(ADAM):
         lmm = self._lags_model["lags_model_max"]
         adam_created["mat_vt"][0, :lmm] = self._initials["initial_level"]
 
-        # Compute Bernoulli log-lik analytically with constant probability p=mean(ot)
+        # Compute Bernoulli log-lik analytically with constant probability
+        # p=mean(ot). No flooring: a degenerate all-zero/all-one series
+        # (p at 0 or 1) surfaces as -inf rather than being clipped.
         p = self._initials["initial_level"]
         ot_logical = self._observations["ot_logical"]
-        eps = 1e-15
-        ll = float(
-            np.sum(np.log(max(p, eps)) * ot_logical.sum())
-            + np.sum(np.log(max(1.0 - p, eps)) * (~ot_logical).sum())
-        )
+        with np.errstate(divide="ignore"):
+            ll = float(
+                np.log(p) * ot_logical.sum() + np.log(1.0 - p) * (~ot_logical).sum()
+            )
 
         n_param_estimated = 1  # The level
         self._adam_estimated = {
@@ -1189,8 +1244,16 @@ class OM(ADAM):
             adam_cpp=self._adam_cpp,
             occurrence=self._om_occurrence,
             occurrence_char=self._occurrence_char,
+            loss=self._general.get("loss", "likelihood"),
         )
         self._prepared["holdout"] = self._general.get("holdout", False)
+        # om_preparator may have replaced the logLik with the Bernoulli value
+        # (for the non-likelihood losses); refresh the information criterion so
+        # it reflects the model likelihood, not the fitting cost.
+        self._ic_selection = ic_function(
+            self._general["ic"],
+            self._adam_estimated["log_lik_adam_value"],
+        )
 
     def _set_om_fitted_attributes(self):
         # Persistence trailing-underscore attrs (alpha/beta/gamma)

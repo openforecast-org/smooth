@@ -191,7 +191,7 @@
 #' @export
 msarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1),
                     constant=FALSE, arma=NULL, model=NULL,
-                    initial=c("backcasting","optimal","two-stage","complete"),
+                    initial=c("backcasting","optimal","two-stage","complete","gradient"),
                     ic=c("AICc","AIC","BIC","BICc"),
                     loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                     h=0, holdout=FALSE,

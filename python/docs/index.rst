@@ -144,7 +144,7 @@ Optimization Settings
 ---------------------
 
 The ADAM and ES classes use the NLopt library for parameter optimization. You can
-customize the optimization behavior via the ``nlopt_kargs`` parameter:
+customize the optimization behavior via the ``nlopt_kwargs`` parameter:
 
 .. code-block:: python
 
@@ -152,7 +152,7 @@ customize the optimization behavior via the ``nlopt_kargs`` parameter:
 
    model = ADAM(
        model="AAN",
-       nlopt_kargs={
+       nlopt_kwargs={
            "print_level": 1,        # Print optimization progress
            "xtol_rel": 1e-8,        # Relative parameter tolerance
            "algorithm": "NLOPT_LN_SBPLX"  # Use Subplex algorithm

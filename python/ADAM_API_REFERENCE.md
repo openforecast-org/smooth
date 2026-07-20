@@ -64,7 +64,7 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 | `nlopt_initial` | `dict \| None` | `None` | Initial values for NLopt optimizer |
 | `nlopt_upper` | `dict \| None` | `None` | Upper bounds for optimizer |
 | `nlopt_lower` | `dict \| None` | `None` | Lower bounds for optimizer |
-| `nlopt_kargs` | `dict \| None` | `None` | Extra NLopt options: `print_level`, `xtol_rel`, `xtol_abs`, `ftol_rel`, `ftol_abs`, `algorithm` |
+| `nlopt_kwargs` | `dict \| None` | `None` | Extra NLopt options: `print_level`, `xtol_rel`, `xtol_abs`, `ftol_rel`, `ftol_abs`, `algorithm` |
 
 ### Other
 

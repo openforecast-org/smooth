@@ -36,12 +36,45 @@ test_that("opg returns a full PSD matrix with estimated initials", {
     expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-6))
 })
 
-test_that("opg falls back to the Hessian for out-of-scope (ARIMA) models", {
+test_that("opg covers ARIMA (arma + estimated initials)", {
     m <- suppressWarnings(adam(BJsales, "NNN", orders = list(ar = 1, i = 1, ma = 1),
                                initial = "optimal"))
-    vO <- suppressWarnings(vcov(m, opg = TRUE))     # falls back, warns
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_equal(nrow(vO), length(coef(m)))
+    fin <- is.finite(diag(vO))
+    expect_true(all(eigen(vO[fin, fin, drop = FALSE], only.values = TRUE)$values > -1e-6))
+})
+
+test_that("opg covers xreg (ETSX regression coefficients)", {
+    set.seed(1)
+    xdf <- data.frame(y = as.numeric(AirPassengers), z1 = rnorm(144), z2 = rnorm(144))
+    m <- suppressWarnings(adam(xdf, "ANN", regressors = "use", initial = "optimal"))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_equal(nrow(vO), length(coef(m)))
+    expect_true(all(is.finite(sqrt(diag(vO)))))
+})
+
+test_that("opg perturbs only dynamics for backcasting (initials re-derived)", {
+    # Initials are not free parameters under backcasting, so the OPG covariance
+    # spans the dynamics (persistence) only -- the same set the Hessian FI does.
+    m <- suppressWarnings(adam(BJsales, "NNN", orders = list(ar = 1, i = 1, ma = 1),
+                               initial = "backcasting"))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_equal(rownames(vO), names(coef(m)))       # arma only, no ARIMAState rows
+    expect_false(any(grepl("^ARIMAState", rownames(vO))))
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
+})
+
+test_that("opg falls back to the Hessian when the refit cannot reproduce", {
+    # regressors="select" is re-selected on refit, so the reproduction guard
+    # fails and the OPG path falls back to the Hessian covariance.
+    set.seed(1)
+    xdf <- data.frame(y = as.numeric(AirPassengers),
+                      z1 = rnorm(144), z2 = rnorm(144), z3 = rnorm(144))
+    m <- suppressWarnings(adam(xdf, "ANN", regressors = "select", initial = "optimal"))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))       # falls back, warns
     vH <- suppressWarnings(vcov(m))
-    expect_equal(dim(vO), dim(vH))                  # same shape as the Hessian path
+    expect_equal(dim(vO), dim(vH))
 })
 
 test_that("opg=FALSE leaves the default covariance unchanged", {

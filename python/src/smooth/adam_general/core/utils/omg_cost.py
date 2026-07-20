@@ -203,9 +203,16 @@ def omg_cf(  # noqa: N802
     loss: str = "likelihood",
     loss_function=None,
     reg_lambda: Optional[float] = None,
+    return_fitted: bool = False,
 ):
     """OMG cost function — joint Bernoulli likelihood on combined probability
     (or a single-step / regularised / custom loss).
+
+    With ``return_fitted=True`` the coupled probability vector is returned
+    instead of the scalar loss, so the final object's fitted values (and the
+    Bernoulli logLik computed from them) come from the same coupled recursion
+    the optimiser minimised — not the standalone per-side refit. Mirrors
+    ``omgCF_local``'s ``returnFitted``.
 
     ``side_a`` and ``side_b`` are dicts collecting everything ``filler`` and
     ``adam_cpp.omfitGeneral`` need for the two sub-models. ``n_params_a``
@@ -367,6 +374,12 @@ def omg_cf(  # noqa: N802
         e_a,
         e_b,
     )
+
+    # The coupled fitted probability, returned directly for the final object so
+    # its fitted values and Bernoulli logLik come from the same recursion the
+    # optimiser minimised (mirrors omgCF_local's returnFitted).
+    if return_fitted:
+        return p_combined
 
     # Infeasibility guard: NaN or boundary p means the parameters are
     # inconsistent with the data — return a uniform large penalty so the

@@ -6,7 +6,6 @@ utils::globalVariables(c(
 
   # Variables injected via list2env() in adam.R, adamGeneral.R, om.R, omg.R, ssarima.R, ces.R, gum.R
   "B", "FI",
-  "dfForBack",
   "initialXregProvided",
   "lb", "ub",
   "otherReturned",

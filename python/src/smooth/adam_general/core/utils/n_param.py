@@ -5,7 +5,39 @@ This module provides the NParam class for tracking estimated and provided parame
 across different model components (internal, xreg, occurrence, scale).
 """
 
-from typing import Dict
+from itertools import combinations
+from math import gcd
+from typing import Dict, Sequence
+
+
+def df_initials_ets_level_seasonal(
+    seasonal_lags: Sequence[int], level_estimated: bool
+) -> int:
+    """Identifiable degrees of freedom of the ETS level + seasonal initials.
+
+    A period-m seasonal component spans the frequencies {0, 1/m, ..., (m-1)/m},
+    and two blocks share the gcd(m_i, m_j) of them; the dimension of the sum of
+    these cyclic subspaces is the inclusion-exclusion over gcd of every non-empty
+    subset. The level enters as a period-1 block. For a single seasonal m this
+    returns m (= level + (m-1)); for coprime periods the naive sum(m_i-1)+level;
+    for non-coprime periods it drops by the shared-frequency overlap. Mirrors
+    ``dfInitialsETSLevelSeasonal`` in ``R/helper.R``.
+    """
+    blocks = []
+    if level_estimated:
+        blocks.append(1)
+    blocks.extend(int(m) for m in seasonal_lags)
+    if not blocks:
+        return 0
+    total = 0
+    for k in range(1, len(blocks) + 1):
+        sign = 1 if (k % 2 == 1) else -1
+        for combo in combinations(blocks, k):
+            g = combo[0]
+            for x in combo[1:]:
+                g = gcd(g, x)
+            total += sign * g
+    return total
 
 
 class NParam:

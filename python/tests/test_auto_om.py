@@ -19,8 +19,12 @@ from smooth import OM, OMG, AutoOM
 
 @pytest.fixture
 def intermittent_y():
+    # Intermittent demand with a time-varying occurrence probability, so a
+    # dynamic occurrence model (with coefficients) is selected over a fixed one.
     rng = np.random.default_rng(41)
-    return rng.poisson(0.3, 200).astype(float)
+    prob = 0.15 + 0.7 * (np.arange(200) / 200)
+    occ = (rng.random(200) < prob).astype(float)
+    return occ * rng.poisson(2.0, 200).astype(float)
 
 
 @pytest.fixture

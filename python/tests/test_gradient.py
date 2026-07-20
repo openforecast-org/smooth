@@ -84,13 +84,15 @@ def test_gradient_counts_initial_df_like_optimal():
     assert mg.nparam == mo.nparam
 
 
-def test_backcasting_does_not_count_initial_df():
-    # Only gradient (and optimal/two-stage) count the initials as df; backcasting
-    # keeps its historical zero-initial-df accounting, so it reports fewer
-    # parameters than optimal for the same model.
+def test_backcasting_counts_initial_df_like_optimal():
+    # Initial states count towards df identically however they are obtained:
+    # backcasting, gradient and optimal all report the same number of parameters
+    # for the same model (structural df).
     mb = ADAM(model="AAA", lags=[1, 12], initial="backcasting").fit(_Y)
     mo = ADAM(model="AAA", lags=[1, 12], initial="optimal").fit(_Y)
-    assert mb.nparam < mo.nparam
+    mg = ADAM(model="AAA", lags=[1, 12], initial="gradient").fit(_Y)
+    assert mb.nparam == mo.nparam
+    assert mg.nparam == mo.nparam
 
 
 def test_gradient_additive_is_least_squares_optimum():
@@ -129,24 +131,38 @@ def test_gradient_nonseasonal():
     assert np.all(np.isfinite(np.asarray(m.fitted).ravel()))
 
 
-def test_gradient_msarima_falls_back_to_backcasting():
-    # MSARIMA is not ETS, so initial="gradient" must fall back to backcasting and
-    # produce an identical fit (same as the R side).
+def test_gradient_msarima_solves_additive_arima_initials():
+    # MSARIMA is an additive SSOE model, so initial="gradient" profiles the
+    # ARIMA initials by least squares (matching optimal at fixed dynamics and
+    # differing from backcasting), same as the R side.
     from smooth import MSARIMA
 
-    orders = {"ar": [1, 0], "i": [1, 0], "ma": [1, 0]}
-    mg = MSARIMA(orders=orders, lags=[1, 12], initial="gradient").fit(_Y)
-    mb = MSARIMA(orders=orders, lags=[1, 12], initial="backcasting").fit(_Y)
-    assert abs(float(mg.loglik) - float(mb.loglik)) < 1e-8
+    def sse(m):
+        return float(np.sum(np.asarray(m.residuals) ** 2))
+
+    af = {"ar": [0.4], "ma": [0.3]}
+    kw = dict(orders={"ar": [1], "i": [1], "ma": [1]}, lags=[1], arma=af, loss="MSE")
+    mo = MSARIMA(initial="optimal", **kw).fit(_Y)
+    mb = MSARIMA(initial="backcasting", **kw).fit(_Y)
+    mg = MSARIMA(initial="gradient", **kw).fit(_Y)
+    assert abs(sse(mg) - sse(mo)) < 1e-2 * max(1.0, sse(mo))
+    assert abs(sse(mg) - sse(mb)) > 1e-5
 
 
-def test_gradient_ces_falls_back_to_backcasting():
-    # CES is not ETS, so initial="gradient" must fall back to backcasting.
+def test_gradient_ces_solves_additive_ssoe_initials():
+    # CES is an additive SSOE model, so initial="gradient" profiles the initials
+    # by least squares (residuals are affine in the initial profile): it must run
+    # (not fall back), differ from backcasting, and not lose on in-sample SSE.
     from smooth import CES
 
-    mg = CES(seasonality="full", lags=[1, 12], initial="gradient").fit(_Y)
-    mb = CES(seasonality="full", lags=[1, 12], initial="backcasting").fit(_Y)
-    assert abs(float(mg.loglik) - float(mb.loglik)) < 1e-8
+    def sse(m):
+        return float(np.sum(np.asarray(m.residuals) ** 2))
+
+    mg = CES(seasonality="none", initial="gradient", loss="MSE").fit(_Y)
+    mb = CES(seasonality="none", initial="backcasting", loss="MSE").fit(_Y)
+    assert np.isfinite(sse(mg))
+    assert abs(sse(mg) - sse(mb)) > 1e-6  # genuinely solved, not a fallback
+    assert sse(mg) <= sse(mb) * 1.001 + 1e-6  # no worse than backcasting
 
 
 # --- Loss-aware solve -------------------------------------------------------
@@ -256,6 +272,82 @@ def test_gradient_om_reaches_optimal_quality():
         # backcasting, and within 1% of the fully optimal fit.
         assert float(mg.loglik) >= float(mb.loglik) - 1e-4
         assert abs(float(mg.loglik) - float(mo.loglik)) < 0.01 * abs(float(mo.loglik))
+
+
+def test_gradient_om_arima_solves():
+    # Occurrence ARIMA is in scope on the occurrence path (finite-difference
+    # Gauss-Newton, the analytic companions being ETS-only). The gradient fit
+    # must run, stay finite, and beat backcasting on the likelihood.
+    from scipy.special import expit
+
+    from smooth import OM
+
+    rng = np.random.default_rng(11)
+    p = expit(0.5 + np.cumsum(rng.normal(0, 0.15, 120)))
+    ot = rng.binomial(1, p)
+    y = ot * (10 + rng.normal(size=120))
+    kw = dict(
+        model="MNN", occurrence="odds-ratio", orders={"ar": [1], "i": [1], "ma": [1]}
+    )
+    mb = OM(initial="backcasting", **kw).fit(y)
+    mg = OM(initial="gradient", **kw).fit(y)
+    assert np.isfinite(float(mg.loglik))
+    assert float(mg.loglik) >= float(mb.loglik) - 1e-4
+    assert abs(float(mg.loglik) - float(mb.loglik)) > 1e-6  # genuinely solved
+
+
+def test_gradient_om_xreg_solves():
+    # xreg coefficients are solved initials on the occurrence path. odds-ratio
+    # keeps the probability bounded (the 'direct' seed can saturate and then
+    # correctly falls back). At fixed persistence gradient reaches optimal
+    # quality and differs from backcasting.
+    import pandas as pd
+    from scipy.special import expit
+
+    from smooth import OM
+
+    rng = np.random.default_rng(22)
+    n = 150
+    x1 = rng.normal(size=n)
+    x2 = np.cumsum(rng.normal(0, 0.3, n))
+    p = expit(-0.3 + 0.8 * x1 + 0.5 * x2)
+    o = rng.binomial(1, p)
+    df = pd.DataFrame({"y": o * (20 + rng.normal(size=n)), "x1": x1, "x2": x2})
+    kw = dict(model="ANN", occurrence="odds-ratio", persistence=0.05)
+    mb = OM(initial="backcasting", **kw).fit(df)
+    mg = OM(initial="gradient", **kw).fit(df)
+    assert np.isfinite(float(mg.loglik))
+    assert abs(float(mg.loglik) - float(mb.loglik)) > 1e-6
+    assert float(mg.loglik) >= float(mb.loglik) - 1e-6
+
+
+def test_gradient_omg_solves_coupled_initials():
+    # omg couples two occurrence sub-models through one probability, so the two
+    # initial profiles are solved jointly (gradientSolveGeneral). It must run,
+    # stay finite and differ from backcasting on ETS and ARIMA sub-models.
+    from scipy.special import expit
+
+    from smooth import OMG
+
+    rng = np.random.default_rng(7)
+    p = expit(0.3 + np.cumsum(rng.normal(0, 0.12, 120)))
+    ot = rng.binomial(1, p)
+    y = ot * (15 + rng.normal(size=120))
+    eb = OMG(model_a="MNN", model_b="MNN", initial="backcasting").fit(y)
+    eg = OMG(model_a="MNN", model_b="MNN", initial="gradient").fit(y)
+    assert np.isfinite(float(eg.loglik))
+    assert abs(float(eg.loglik) - float(eb.loglik)) > 1e-6
+
+    arima = dict(
+        model_a="NNN",
+        model_b="NNN",
+        orders_a={"ar": [1], "i": [1], "ma": [1]},
+        orders_b={"ar": [1], "i": [1], "ma": [1]},
+    )
+    ab = OMG(initial="backcasting", **arima).fit(y)
+    ag = OMG(initial="gradient", **arima).fit(y)
+    assert np.isfinite(float(ag.loglik))
+    assert abs(float(ag.loglik) - float(ab.loglik)) > 1e-6
 
 
 def test_gradient_om_loss_code_mapping_matches_r():

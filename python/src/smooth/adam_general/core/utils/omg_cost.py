@@ -20,6 +20,106 @@ from numpy.linalg import eigvals
 from smooth.adam_general.core.creator import filler
 
 
+def _side_probe_basis(side, elem, o_type="g"):
+    """Per-side probe basis for the coupled occurrence gradient solve.
+
+    Marks each side's free initial cells (ETS / ARIMA / xreg) exactly as the
+    single-model dispatcher does; ``o_type="g"`` opens the occurrence path
+    (ARIMA + xreg solvable via the finite-difference Jacobian). Mirrors the
+    per-side ``adam_gradientProbeBasis`` calls in R's ``omgCF_local``.
+    """
+    from smooth.adam_general.core.utils.gradient import adam_gradient_probe_basis
+
+    mt = side["model_type_dict"]
+    cd = side["components_dict"]
+    ld = side["lags_dict"]
+    return adam_gradient_probe_basis(
+        bool(mt.get("ets_model", False)),
+        bool(mt.get("arima_model", False)),
+        bool(mt.get("xreg_model", False)),
+        mt.get("trend_type", "N"),
+        mt.get("season_type", "N"),
+        int(cd.get("components_number_ets_seasonal", 0) or 0),
+        int(cd.get("components_number_ets_non_seasonal", 0) or 0),
+        int(elem["mat_vt"].shape[0]),
+        ld["lags_model"],
+        int(ld["lags_model_max"]),
+        mt.get("error_type", "A"),
+        int(cd.get("components_number_ets", 0) or 0),
+        int(cd.get("components_number_arima", 0) or 0),
+        ld.get("lags_model_all", ld["lags_model"]),
+        int(side["explanatory"].get("xreg_number", 0) or 0),
+        o_type,
+    )
+
+
+def _omg_gradient_profiles(side_a, side_b, elem_a, elem_b, ot, loss, adam_ets=False):
+    """Coupled gradient solve of the two occurrence initial profiles.
+
+    Returns ``(profileA, profileB)`` from ``adamCore.gradientSolveGeneral`` when
+    the model is in scope (a mappable loss and at least one solvable side), or
+    ``None`` to fall back to the ordinary coupled fit. Mirrors the gradient
+    branch of R's ``omgCF_local``.
+    """
+    from smooth.adam_general.core.utils.gradient import adam_gradient_om_loss_code
+
+    loss_code = adam_gradient_om_loss_code(loss)
+    if loss_code is None:
+        return None
+    pb_a = _side_probe_basis(side_a, elem_a)
+    pb_b = _side_probe_basis(side_b, elem_b)
+    if pb_a is None and pb_b is None:
+        return None
+
+    def _f(x, dtype=np.float64):
+        return np.asfortranarray(x, dtype=dtype)
+
+    n_a = int(elem_a["mat_vt"].shape[0])
+    n_b = int(elem_b["mat_vt"].shape[0])
+    if pb_a is None:
+        pb_a = np.zeros((n_a, 0), order="F")
+    if pb_b is None:
+        pb_b = np.zeros((n_b, 0), order="F")
+
+    solved = side_a["adam_cpp"].gradientSolveGeneral(
+        matrixVtA=_f(elem_a["mat_vt"]),
+        matrixWtA=_f(elem_a["mat_wt"]),
+        matrixFA=_f(elem_a["mat_f"]),
+        vectorGA=_f(elem_a["vec_g"]),
+        indexLookupTableA=_f(side_a["profile"]["index_lookup_table"], np.uint64),
+        profileA=_f(side_a["profile"]["profiles_recent_table"]),
+        probeBasisA=_f(pb_a),
+        EB=side_b["model_type_dict"]["error_type"],
+        TB=side_b["model_type_dict"]["trend_type"],
+        SB=side_b["model_type_dict"]["season_type"],
+        nNonSeasonalB=int(
+            side_b["components_dict"]["components_number_ets_non_seasonal"]
+        ),
+        nSeasonalB=int(side_b["components_dict"]["components_number_ets_seasonal"]),
+        nETSB=int(side_b["components_dict"]["components_number_ets"]),
+        nArimaB=int(side_b["components_dict"].get("components_number_arima", 0)),
+        nXregB=int(side_b["explanatory"].get("xreg_number", 0)),
+        nComponentsB=int(side_b["components_dict"]["components_number_all"]),
+        constantB=bool(side_b["constant"].get("constant_required", False)),
+        adamETSB=bool(adam_ets),
+        matrixVtB=_f(elem_b["mat_vt"]),
+        matrixWtB=_f(elem_b["mat_wt"]),
+        matrixFB=_f(elem_b["mat_f"]),
+        vectorGB=_f(elem_b["vec_g"]),
+        indexLookupTableB=_f(side_b["profile"]["index_lookup_table"], np.uint64),
+        profileB=_f(side_b["profile"]["profiles_recent_table"]),
+        probeBasisB=_f(pb_b),
+        vectorOt=_f(ot),
+        nIterations=15,
+        lossType=loss_code[0],
+    )
+    prof_a = np.asarray(solved.profileA, dtype=np.float64)
+    prof_b = np.asarray(solved.profileB, dtype=np.float64)
+    if prof_a.size == 0 or prof_b.size == 0:
+        return None
+    return prof_a, prof_b
+
+
 def omg_link_function(fitted_a, fitted_b, error_type_a, error_type_b):
     """Combine the raw fitted outputs of two sub-models into a probability.
 
@@ -103,9 +203,16 @@ def omg_cf(  # noqa: N802
     loss: str = "likelihood",
     loss_function=None,
     reg_lambda: Optional[float] = None,
+    return_fitted: bool = False,
 ):
     """OMG cost function — joint Bernoulli likelihood on combined probability
     (or a single-step / regularised / custom loss).
+
+    With ``return_fitted=True`` the coupled probability vector is returned
+    instead of the scalar loss, so the final object's fitted values (and the
+    Bernoulli logLik computed from them) come from the same coupled recursion
+    the optimiser minimised — not the standalone per-side refit. Mirrors
+    ``omgCF_local``'s ``returnFitted``.
 
     ``side_a`` and ``side_b`` are dicts collecting everything ``filler`` and
     ``adam_cpp.omfitGeneral`` need for the two sub-models. ``n_params_a``
@@ -203,12 +310,30 @@ def omg_cf(  # noqa: N802
         return np.asfortranarray(x, dtype=dtype)
 
     initials_a = side_a["initials"]
-    if isinstance(initials_a["initial_type"], list):
-        backcast = any(
-            t in ("complete", "backcasting") for t in initials_a["initial_type"]
-        )
+    init_type_a = initials_a["initial_type"]
+    if isinstance(init_type_a, list):
+        backcast = any(t in ("complete", "backcasting") for t in init_type_a)
+        is_gradient = "gradient" in init_type_a
     else:
-        backcast = initials_a["initial_type"] in ("complete", "backcasting")
+        backcast = init_type_a in ("complete", "backcasting")
+        is_gradient = init_type_a == "gradient"
+
+    # initial="gradient": solve both occurrence initials jointly over the shared
+    # probability residual (coupled Gauss-Newton in C++), then run one forward
+    # pass from the solved profiles. Gradient joins the backcasting group as a
+    # fall-back when out of scope. Mirrors R's omgCF_local.
+    prof_a_used = side_a["profile"]["profiles_recent_table"]
+    prof_b_used = side_b["profile"]["profiles_recent_table"]
+    grad_backcast = backcast or is_gradient
+    grad_n_iter = int(initials_a["n_iterations"])
+    if is_gradient:
+        solved = _omg_gradient_profiles(
+            side_a, side_b, elem_a, elem_b, ot, loss, adam_ets
+        )
+        if solved is not None:
+            prof_a_used, prof_b_used = solved
+            grad_backcast = False
+            grad_n_iter = 1
 
     res = side_a["adam_cpp"].omfitGeneral(
         matrixVtA=_f(elem_a["mat_vt"]),
@@ -216,7 +341,7 @@ def omg_cf(  # noqa: N802
         matrixFA=_f(elem_a["mat_f"]),
         vectorGA=_f(elem_a["vec_g"]),
         indexLookupTableA=_f(side_a["profile"]["index_lookup_table"], np.uint64),
-        profilesRecentA=_f(side_a["profile"]["profiles_recent_table"]),
+        profilesRecentA=_f(prof_a_used),
         EB=side_b["model_type_dict"]["error_type"],
         TB=side_b["model_type_dict"]["trend_type"],
         SB=side_b["model_type_dict"]["season_type"],
@@ -235,10 +360,10 @@ def omg_cf(  # noqa: N802
         matrixFB=_f(elem_b["mat_f"]),
         vectorGB=_f(elem_b["vec_g"]),
         indexLookupTableB=_f(side_b["profile"]["index_lookup_table"], np.uint64),
-        profilesRecentB=_f(side_b["profile"]["profiles_recent_table"]),
+        profilesRecentB=_f(prof_b_used),
         vectorOt=ot,
-        backcast=backcast,
-        nIterations=int(initials_a["n_iterations"]),
+        backcast=grad_backcast,
+        nIterations=grad_n_iter,
     )
 
     e_a = side_a["model_type_dict"]["error_type"]
@@ -249,6 +374,12 @@ def omg_cf(  # noqa: N802
         e_a,
         e_b,
     )
+
+    # The coupled fitted probability, returned directly for the final object so
+    # its fitted values and Bernoulli logLik come from the same recursion the
+    # optimiser minimised (mirrors omgCF_local's returnFitted).
+    if return_fitted:
+        return p_combined
 
     # Infeasibility guard: NaN or boundary p means the parameters are
     # inconsistent with the data — return a uniform large penalty so the

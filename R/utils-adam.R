@@ -304,7 +304,6 @@ adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags,
     smoother <- if(is.null(ellipsis$smoother)) "global" else ellipsis$smoother
     FI <- if(is.null(ellipsis$FI)) FALSE else ellipsis$FI
     stepSize <- if(is.null(ellipsis$stepSize)) .Machine$double.eps^(1/4) else ellipsis$stepSize
-    dfForBack <- if(is.null(ellipsis$dfForBack)) FALSE else ellipsis$dfForBack
 
     return(list(
         maxeval = maxeval,
@@ -324,8 +323,7 @@ adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags,
         nIterations = nIterations,
         smoother = smoother,
         FI = FI,
-        stepSize = stepSize,
-        dfForBack = dfForBack
+        stepSize = stepSize
     ))
 }
 

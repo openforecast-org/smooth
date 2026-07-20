@@ -36,6 +36,14 @@ struct OmFitGeneralResult {
     arma::mat profileB;
 };
 
+// Result structure for the coupled (general) occurrence gradient solve: the
+// two solved recent profiles. An empty pair signals failure (caller falls back
+// to backcasting).
+struct GradientSolveGeneralResult {
+    arma::mat profileA;
+    arma::mat profileB;
+};
+
 // Result structure for forecaster
 struct ForecastResult {
     arma::vec forecast;
@@ -332,6 +340,69 @@ private:
             sensitivities.rows(cells) =
                 (adamFvalueJac(vCurrent, matrixF, T, nComponents) + jacGv) * sensCurrent +
                 jacGe * dError + jacGy * dyFit;
+        }
+        return vecResiduals.is_finite() && jacobian.is_finite();
+    }
+
+    // Linear-state occurrence Jacobian: for an additive-error occurrence
+    // sub-model (E='A', no multiplicative trend/season) the whole state -> yhat
+    // map is linear (yhat = w'v, transition F*v, update F*v + g*e) over the FULL
+    // component vector -- ETS, ARIMA, xreg and constant alike. So the exact
+    // sensitivities need no per-branch ETS companions (which cover ETS columns
+    // only): d(yhat) = w'*S, and the update Jacobian is F*S + g*d(e). Only the
+    // occurrence link/error stay nonlinear (occurrenceLinkJac / occurrenceErrorJac).
+    // This replaces the finite-difference Jacobian for occurrence models with
+    // ARIMA / xreg, and is bit-identical to gradientPassJacobianOccurrence for
+    // pure additive ETS (there jacGv = jacGy = 0, jacGe = g). Multiplicative-error
+    // occurrence still uses the companion pass (pure ETS) or FD (with extras).
+    bool gradientPassJacobianOccurrenceLinear(arma::mat profilesRecent, arma::mat sensitivities,
+                                              arma::mat const &matrixYt,
+                                              arma::mat const &matrixWt, arma::mat const &matrixF,
+                                              arma::vec const &vectorG,
+                                              arma::umat const &indexLookupTable, char const &O,
+                                              arma::vec &vecResiduals, arma::mat &jacobian) {
+        int obs = matrixYt.n_rows;
+        int lagsModelMax = max(lags);
+
+        // Head refinement: walk the level/trend rows across the head columns
+        // (linear transition => sensitivities follow through F).
+        if(lagsModelMax > 1 && T != 'N') {
+            for(int i=1; i<lagsModelMax; i=i+1){
+                arma::uvec cells = indexLookupTable.col(i);
+                arma::vec vNew = adamFvalue(profilesRecent(cells), matrixF, E, T, S,
+                                            nETS, nNonSeasonal, nSeasonal, nArima,
+                                            nComponents, constant);
+                arma::mat sensNew = matrixF * sensitivities.rows(cells);
+                profilesRecent(cells.rows(0,1)) = vNew.rows(0,1);
+                sensitivities.rows(cells.rows(0,1)) = sensNew.rows(0,1);
+            }
+        }
+
+        double p, dpdy;
+        for(int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
+            int idx = i - lagsModelMax;
+            arma::uvec cells = indexLookupTable.col(i);
+            arma::vec vCurrent = profilesRecent(cells);
+            arma::mat sensCurrent = sensitivities.rows(cells);
+            arma::rowvec wRow = matrixWt.row(idx);
+
+            double yFit = adamWvalue(vCurrent, wRow, E, T, S,
+                                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
+                                     nComponents, constant);
+            arma::rowvec const dyFit = wRow * sensCurrent;   // linear: d(yhat) = w'S
+            double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
+            occurrenceLinkJac(yFit, E, O, p, dpdy);
+            vecResiduals(idx) = matrixYt(idx) - p;
+            jacobian.row(idx) = -dpdy * dyFit;
+            arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O) * dyFit;
+
+            profilesRecent(cells) =
+                adamFvalue(vCurrent, matrixF, E, T, S, nETS, nNonSeasonal,
+                           nSeasonal, nArima, nComponents, constant) +
+                adamGvalue(vCurrent, matrixF, wRow, E, T, S,
+                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
+                           nComponents, constant, vectorG, error, yFit, adamETS);
+            sensitivities.rows(cells) = matrixF * sensCurrent + vectorG * dError;
         }
         return vecResiduals.is_finite() && jacobian.is_finite();
     }
@@ -754,6 +825,326 @@ public:
         result.fittedB   = vecBfit;
         result.errorsB   = vecErrorsB;
         result.profileB  = profilesRecentB;
+        return result;
+    }
+
+    // Method 6c: gradientSolveGeneral - the coupled ("general") occurrence
+    // analog of gradientSolve. The two occurrence sub-models A and B share a
+    // single fitted probability p = aFit/(aFit+bFit) (occurrenceError O='g'),
+    // so their initial profiles are cross-coupled and the probability is a
+    // nonlinear logistic of both fitted values. The solve minimises the loss on
+    // the probability residual r = o - p jointly over both initial profiles by
+    // Gauss-Newton with a finite-difference Jacobian (the coupled analytic
+    // sensitivities are not available; FD drives the same loop through the fully
+    // general omfitGeneral residual pass, so it covers ETS / ARIMA / xreg on
+    // either side). Line search + Levenberg-Marquardt fallback mirror
+    // gradientSolve. Stateless: always starts from the seed profiles, so the
+    // objective is a deterministic function of the inputs (R/Python parity).
+    // A's structural params come from this instance's members (as in
+    // omfitGeneral); B's are passed explicitly.
+    GradientSolveGeneralResult gradientSolveGeneral(
+            arma::mat const &matrixVtA, arma::mat const &matrixWtA,
+            arma::mat &matrixFA, arma::vec const &vectorGA,
+            arma::umat const &indexLookupTableA, arma::mat const &profileA,
+            arma::mat const &probeBasisA,
+            char const &EB, char const &TB, char const &SB,
+            unsigned int const &nNonSeasonalB, unsigned int const &nSeasonalB,
+            unsigned int const &nETSB, unsigned int const &nArimaB,
+            unsigned int const &nXregB, unsigned int const &nComponentsB,
+            bool const &constantB, bool const &adamETSB,
+            arma::mat const &matrixVtB, arma::mat const &matrixWtB,
+            arma::mat &matrixFB, arma::vec const &vectorGB,
+            arma::umat const &indexLookupTableB, arma::mat const &profileB,
+            arma::mat const &probeBasisB,
+            arma::vec const &vectorOt,
+            unsigned int const &nIterations, char const &lossType){
+
+        int obs = vectorOt.n_rows;
+        unsigned int nFreeA = probeBasisA.n_cols;
+        unsigned int nFreeB = probeBasisB.n_cols;
+        unsigned int nFree = nFreeA + nFreeB;
+        GradientSolveGeneralResult failure;   // empty profiles => caller falls back
+        if(nFree == 0){
+            return failure;
+        }
+
+        // Only the probability-residual losses are defined here; anything else
+        // (including the multistep codes) collapses to the SSE surrogate on r.
+        char L = lossType;
+        if(L!='B' && L!='A' && L!='H' && L!='G'){
+            L = 'S';
+        }
+        double const beta = 2.0;
+        double const lossScale = 0;
+
+        // r = o - p from one coupled forward pass (backcast=false, one sweep):
+        // exactly the recursion the final fit runs from the solved initials.
+        auto combinedResiduals = [&](arma::mat const &profACur,
+                                     arma::mat const &profBCur,
+                                     arma::vec &res) -> bool {
+            OmFitGeneralResult fg = omfitGeneral(
+                matrixVtA, matrixWtA, matrixFA, vectorGA,
+                indexLookupTableA, profACur,
+                EB, TB, SB, nNonSeasonalB, nSeasonalB, nETSB, nArimaB,
+                nXregB, nComponentsB, constantB, adamETSB,
+                matrixVtB, matrixWtB, matrixFB, vectorGB,
+                indexLookupTableB, profBCur, vectorOt, false, 1);
+            for(int idx=0; idx<obs; idx=idx+1){
+                double aFit = (E=='A')  ? std::exp(fg.fittedA(idx)) : fg.fittedA(idx);
+                double bFit = (EB=='A') ? std::exp(fg.fittedB(idx)) : fg.fittedB(idx);
+                double p = aFit / (aFit + bFit);
+                res(idx) = vectorOt(idx) - p;
+                if(!std::isfinite(p) || p<=0 || p>=1){
+                    return false;
+                }
+            }
+            return res.is_finite();
+        };
+
+        // Analytic coupled Jacobian: when both sub-models are additive-error and
+        // linear-state (E='A', no multiplicative trend/season), one forward pass
+        // propagates the exact joint sensitivities instead of nFree finite-
+        // difference passes. Each side's state map is linear (yhat = w'v,
+        // v' = F v + g e); the coupling enters only through the shared
+        // probability p = aFit/(aFit+bFit) and the occurrenceError('g') split
+        // (errorA/errorB), whose derivatives w.r.t. both fitted values are known
+        // in closed form. Mirrors omfitGeneral's forward recursion (side A head
+        // refined, side B plain) so its residuals match combinedResiduals.
+        bool const bothLinear = (E=='A' && T!='M' && S!='M') &&
+                                (EB=='A' && TB!='M' && SB!='M');
+        auto combinedJacobian = [&](arma::mat const &profACur, arma::mat const &profBCur,
+                                    arma::vec &res, arma::mat &jac) -> bool {
+            int lagsModelMaxA = max(lags);
+            arma::mat profA = profACur, profB = profBCur;
+            arma::mat sensA(profA.n_elem, nFree, arma::fill::zeros);
+            arma::mat sensB(profB.n_elem, nFree, arma::fill::zeros);
+            if(nFreeA > 0){ sensA.cols(0, nFreeA-1) = probeBasisA; }
+            if(nFreeB > 0){ sensB.cols(nFreeA, nFree-1) = probeBasisB; }
+
+            // Head refinement: side A walks level/trend through F (sensitivities
+            // follow); side B is a plain copy in omfitGeneral, so it is untouched.
+            if(lagsModelMaxA > 1 && T != 'N'){
+                for(int i=1; i<lagsModelMaxA; i=i+1){
+                    arma::uvec cA = indexLookupTableA.col(i);
+                    arma::vec vNew = adamFvalue(profA(cA), matrixFA, E, T, S,
+                                                nETS, nNonSeasonal, nSeasonal, nArima,
+                                                nComponents, constant);
+                    arma::mat sNew = matrixFA * sensA.rows(cA);
+                    profA(cA.rows(0,1)) = vNew.rows(0,1);
+                    sensA.rows(cA.rows(0,1)) = sNew.rows(0,1);
+                }
+            }
+
+            for(int i=lagsModelMaxA; i<obs+lagsModelMaxA; i=i+1){
+                int idx = i - lagsModelMaxA;
+                arma::uvec cA = indexLookupTableA.col(i), cB = indexLookupTableB.col(i);
+                arma::vec vA = profA(cA), vB = profB(cB);
+                arma::mat sA = sensA.rows(cA), sB = sensB.rows(cB);
+                arma::rowvec wA = matrixWtA.row(idx), wB = matrixWtB.row(idx);
+
+                double fitA = adamWvalue(vA, wA, E, T, S, nETS, nNonSeasonal,
+                                         nSeasonal, nArima, nXreg, nComponents, constant);
+                double fitB = adamWvalue(vB, wB, EB, TB, SB, nETSB, nNonSeasonalB,
+                                         nSeasonalB, nArimaB, nXregB, nComponentsB, constantB);
+                arma::rowvec dfitA = wA * sA;
+                arma::rowvec dfitB = wB * sB;
+
+                double aFit = (E=='A')  ? std::exp(fitA) : fitA;
+                double bFit = (EB=='A') ? std::exp(fitB) : fitB;
+                double denom = aFit + bFit;
+                double p = aFit / denom;
+                res(idx) = vectorOt(idx) - p;
+                if(!std::isfinite(p) || p<=0 || p>=1){
+                    return false;
+                }
+                // dp/dfit = [+/- aFit*bFit / denom^2] * d(fit-transform)
+                double daA = (E=='A')  ? aFit : 1.0;
+                double dbB = (EB=='A') ? bFit : 1.0;
+                arma::rowvec dp = (bFit/(denom*denom)*daA) * dfitA
+                                - (aFit/(denom*denom)*dbB) * dfitB;
+                jac.row(idx) = -dp;
+
+                // occurrenceError('g'): u=(1+o-p)/2; errorA/errorB per side type.
+                double u = (1.0 + vectorOt(idx) - p) / 2.0;
+                double eA = (E=='A')  ? std::log(u/(1-u)) : (u/(1-u) - 1);
+                double eB = (EB=='A') ? std::log((1-u)/u) : ((1-u)/u - 1);
+                double dEAdu = (E=='A')  ?  1.0/(u*(1-u)) : 1.0/((1-u)*(1-u));
+                double dEBdu = (EB=='A') ? -1.0/(u*(1-u)) : -1.0/(u*u);
+                arma::rowvec dEA = (dEAdu * -0.5) * dp;
+                arma::rowvec dEB = (dEBdu * -0.5) * dp;
+
+                profA(cA) = adamFvalue(vA, matrixFA, E, T, S, nETS, nNonSeasonal,
+                                       nSeasonal, nArima, nComponents, constant) +
+                            adamGvalue(vA, matrixFA, wA, E, T, S, nETS, nNonSeasonal,
+                                       nSeasonal, nArima, nXreg, nComponents, constant,
+                                       vectorGA, eA, fitA, adamETS);
+                sensA.rows(cA) = matrixFA * sA + vectorGA * dEA;
+                profB(cB) = adamFvalue(vB, matrixFB, EB, TB, SB, nETSB, nNonSeasonalB,
+                                       nSeasonalB, nArimaB, nComponentsB, constantB) +
+                            adamGvalue(vB, matrixFB, wB, EB, TB, SB, nETSB, nNonSeasonalB,
+                                       nSeasonalB, nArimaB, nXregB, nComponentsB, constantB,
+                                       vectorGB, eB, fitB, adamETSB);
+                sensB.rows(cB) = matrixFB * sB + vectorGB * dEB;
+            }
+            return res.is_finite() && jac.is_finite();
+        };
+
+        // Apply a joint step: its first nFreeA entries move profileA along
+        // probeBasisA, the rest move profileB along probeBasisB.
+        auto applyStep = [&](arma::vec const &step, arma::mat &profAOut,
+                             arma::mat &profBOut){
+            if(nFreeA > 0){
+                profAOut = profAOut + arma::reshape(probeBasisA * step.head(nFreeA),
+                                                    profAOut.n_rows, profAOut.n_cols);
+            }
+            if(nFreeB > 0){
+                profBOut = profBOut + arma::reshape(probeBasisB * step.tail(nFreeB),
+                                                    profBOut.n_rows, profBOut.n_cols);
+            }
+        };
+
+        arma::mat profA = profileA;
+        arma::mat profB = profileB;
+        arma::vec residuals(obs);
+        if(!combinedResiduals(profA, profB, residuals)){
+            return failure;
+        }
+        double lossCurrent = gradientLossSum(residuals, L, beta, lossScale);
+        if(!std::isfinite(lossCurrent)){
+            return failure;
+        }
+
+        // Per-free-parameter finite-difference step, scaled by the current value
+        // of the first perturbed profile cell (A cells for j<nFreeA, else B).
+        arma::uvec firstCellA(nFreeA), firstCellB(nFreeB);
+        for(unsigned int j=0; j<nFreeA; j=j+1){
+            arma::uvec nz = arma::find(probeBasisA.col(j));
+            firstCellA(j) = nz(0);
+        }
+        for(unsigned int j=0; j<nFreeB; j=j+1){
+            arma::uvec nz = arma::find(probeBasisB.col(j));
+            firstCellB(j) = nz(0);
+        }
+
+        arma::mat jacobian(obs, nFree);
+        arma::vec residualsProbe(obs);
+        double lossBeforeIteration;
+        for(unsigned int iter=0; iter<nIterations; iter=iter+1){
+            lossBeforeIteration = lossCurrent;
+            bool jacobianOk = true;
+            if(bothLinear){
+                // One analytic pass (residualsProbe equals the held residuals).
+                jacobianOk = combinedJacobian(profA, profB, residualsProbe, jacobian);
+            }
+            else{
+                // Finite-difference Jacobian: nFree coupled residual passes.
+                for(unsigned int j=0; j<nFree && jacobianOk; j=j+1){
+                    arma::mat profAProbe = profA;
+                    arma::mat profBProbe = profB;
+                    double h;
+                    if(j < nFreeA){
+                        h = 1e-4 * std::max(1.0, std::abs(profA(firstCellA(j))));
+                        profAProbe = profA + arma::reshape(h * probeBasisA.col(j),
+                                                           profA.n_rows, profA.n_cols);
+                    }
+                    else{
+                        unsigned int jb = j - nFreeA;
+                        h = 1e-4 * std::max(1.0, std::abs(profB(firstCellB(jb))));
+                        profBProbe = profB + arma::reshape(h * probeBasisB.col(jb),
+                                                           profB.n_rows, profB.n_cols);
+                    }
+                    if(!combinedResiduals(profAProbe, profBProbe, residualsProbe)){
+                        jacobianOk = false;
+                        break;
+                    }
+                    jacobian.col(j) = (residualsProbe - residuals) / h;
+                }
+            }
+            if(!jacobianOk || !jacobian.is_finite()){
+                break;
+            }
+
+            // Loss-aware step system (mirrors gradientSolve): plain (J, r) for
+            // SSE, row-scaled otherwise.
+            arma::mat jacobianStep;
+            arma::vec targetStep;
+            if(L=='S'){
+                jacobianStep = jacobian;
+                targetStep = residuals;
+            }
+            else{
+                arma::vec rowScale(obs);
+                targetStep.set_size(obs);
+                double a, b;
+                for(int t=0; t<obs; t=t+1){
+                    gradientLossStepRow(residuals(t), L, beta, lossScale, a, b);
+                    rowScale(t) = a;
+                    targetStep(t) = b;
+                }
+                jacobianStep = jacobian.each_col() % rowScale;
+            }
+
+            arma::vec step = -olsCore(jacobianStep, targetStep, 1e-7);
+            step.elem(arma::find_nonfinite(step)).zeros();
+            if(std::sqrt(arma::dot(step, step)) < 1e-8){
+                break;
+            }
+
+            bool improved = false;
+            double stepSize = 1;
+            for(int half=0; half<6; half=half+1){
+                arma::mat profACand = profA, profBCand = profB;
+                applyStep(stepSize * step, profACand, profBCand);
+                if(combinedResiduals(profACand, profBCand, residualsProbe) &&
+                   gradientLossSum(residualsProbe, L, beta, lossScale) < lossCurrent){
+                    profA = profACand;
+                    profB = profBCand;
+                    residuals = residualsProbe;
+                    lossCurrent = gradientLossSum(residuals, L, beta, lossScale);
+                    improved = true;
+                    break;
+                }
+                stepSize = stepSize / 2;
+            }
+
+            if(!improved){
+                double lambdaScale = arma::accu(arma::square(jacobianStep)) / nFree;
+                arma::mat jacobianDamped(obs + nFree, nFree, arma::fill::zeros);
+                jacobianDamped.rows(0, obs-1) = jacobianStep;
+                arma::vec residualsDamped(obs + nFree, arma::fill::zeros);
+                residualsDamped.rows(0, obs-1) = targetStep;
+                for(int power=-2; power<=4 && !improved; power=power+2){
+                    double lambda = lambdaScale * std::pow(10.0, power);
+                    jacobianDamped.rows(obs, obs+nFree-1) =
+                        std::sqrt(lambda) * arma::eye(nFree, nFree);
+                    step = -olsCore(jacobianDamped, residualsDamped, 1e-7);
+                    step.elem(arma::find_nonfinite(step)).zeros();
+                    if(std::sqrt(arma::dot(step, step)) < 1e-8){
+                        break;
+                    }
+                    arma::mat profACand = profA, profBCand = profB;
+                    applyStep(step, profACand, profBCand);
+                    if(combinedResiduals(profACand, profBCand, residualsProbe) &&
+                       gradientLossSum(residualsProbe, L, beta, lossScale) < lossCurrent){
+                        profA = profACand;
+                        profB = profBCand;
+                        residuals = residualsProbe;
+                        lossCurrent = gradientLossSum(residuals, L, beta, lossScale);
+                        improved = true;
+                    }
+                }
+            }
+            if(!improved){
+                break;
+            }
+            if(lossCurrent > lossBeforeIteration * (1 - 1e-4)){
+                break;
+            }
+        }
+
+        GradientSolveGeneralResult result;
+        result.profileA = profA;
+        result.profileB = profB;
         return result;
     }
 
@@ -1234,6 +1625,22 @@ public:
         if(O!='n' && L!='B' && L!='A' && L!='H' && L!='G'){
             L = 'S';
         }
+        // The analytic Jacobian companions (adamGradient.h) cover pure ETS only.
+        // For occurrence models with ARIMA / xreg / constant components, the
+        // exact sensitivities are not available, so fall back to the
+        // finite-difference Jacobian, which drives the same Gauss-Newton loop
+        // through the fully general residual pass (adamW/F/Gvalue). The demand
+        // path (O=='n') keeps its affine/analytic branches unchanged.
+        // Additive-error occurrence (E='A', no multiplicative trend/season) is
+        // linear in the full component vector, so its exact Jacobian is
+        // available for ARIMA / xreg / constant too (gradientPassJacobianOccurrenceLinear).
+        // Only multiplicative-error occurrence WITH extra components has no
+        // analytic companion and drops to finite differences.
+        bool const occurrenceLinear = (E=='A') && (T!='M') && (S!='M');
+        bool useAnalytic = analytic;
+        if(O!='n' && !occurrenceLinear && (nArima>0 || nXreg>0 || constant)){
+            useAnalytic = false;
+        }
         double const beta = (lossParams.n_elem>0) ? lossParams(0) : 2.0;
         double lossScale = 0;
 
@@ -1281,7 +1688,7 @@ public:
             }
             lossBeforeIteration = lossCurrent;
             bool jacobianOk = true;
-            if(analytic){
+            if(useAnalytic){
                 // One pass propagating the exact sensitivities (adamGradient.h)
                 // instead of nFree probe passes. The residuals it returns equal
                 // the ones already held (same forward recursion).
@@ -1290,6 +1697,16 @@ public:
                                                       matrixYt, matrixOt, matrixWt,
                                                       matrixF, vectorG, indexLookupTable,
                                                       residualsProbe, jacobian);
+                }
+                else if(occurrenceLinear){
+                    // Additive-error occurrence: exact linear-state Jacobian,
+                    // covering ARIMA / xreg / constant (bit-identical to the
+                    // companion pass for pure additive ETS).
+                    jacobianOk = gradientPassJacobianOccurrenceLinear(prof, probeBasis,
+                                                                      matrixYt, matrixWt,
+                                                                      matrixF, vectorG,
+                                                                      indexLookupTable, O,
+                                                                      residualsProbe, jacobian);
                 }
                 else{
                     jacobianOk = gradientPassJacobianOccurrence(prof, probeBasis,

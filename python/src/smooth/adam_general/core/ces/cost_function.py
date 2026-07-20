@@ -142,18 +142,51 @@ def ces_cf(
 
     backcast = initial_type in ("complete", "backcasting", "gradient")
 
-    # Call C++ fit — R lines 503-508
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt_f,
-        matrixWt=mat_wt_f,
-        matrixF=mat_f_f,
-        vectorG=vec_g_f,
-        indexLookupTable=ilt_f,
-        profilesRecent=prt_f,
-        vectorYt=y_f,
-        vectorOt=ot_f,
-        backcast=backcast,
-        nIterations=int(n_iterations),
+    # Additive SSOE: initial="gradient" profiles the initials by least squares
+    # (the CES state-space is linear/additive); otherwise the ordinary fit.
+    from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt_f,
+        mat_wt=mat_wt_f,
+        mat_f=mat_f_f,
+        vec_g=vec_g_f,
+        index_lookup_table=ilt_f,
+        profiles_recent_table=prt_f,
+        y_in_sample=y_f,
+        ot=ot_f,
+        initial_type=initial_type,
+        n_iterations=int(n_iterations),
+        backcast_value=backcast,
+        model_type_dict={
+            "ets_model": False,
+            "arima_model": True,
+            "xreg_model": bool(xreg_model),
+            "error_type": "A",
+            "trend_type": "N",
+            "season_type": "N",
+            "model_is_trendy": False,
+            "model_is_seasonal": False,
+        },
+        components_dict={
+            "components_number_ets": 0,
+            "components_number_ets_seasonal": 0,
+            "components_number_ets_non_seasonal": 0,
+            "components_number_arima": int(components_number),
+        },
+        lags_dict={
+            "lags_model_max": int(lags_model_max),
+            "lags_model": lags_model_all,
+            "lags_model_all": lags_model_all,
+            "lags_model_seasonal": lags_model_seasonal,
+        },
+        obs_in_sample=obs_in_sample,
+        o_type="n",
+        loss=loss,
+        distribution="dnorm",
+        horizon=h or 0,
+        multisteps=multisteps,
     )
 
     errors = np.array(adam_fitted.errors).ravel()

@@ -26,7 +26,7 @@ from smooth import ADAM
 DATA_PATH = Path(__file__).parent / "data" / "etsx_data.csv"
 
 # R reference values (adam, smoother="global", no holdout)
-R_AIC = 339.2135
+R_AIC = 343.2135
 R_FITTED_5 = [15.24117, 11.48431, 10.92935, 13.08419, 11.19438]
 R_FORECAST_3 = [10.91767, 7.99035, 9.92983]
 R_COEF_ALPHA = 0.00890
@@ -214,7 +214,7 @@ def test_etsx_initial_backcasting(etsx_data):
     assert abs(B[0] - 0.00890) < 0.02
     assert abs(B[2] - 1.91508) < 0.1
     assert abs(B[3] - (-1.46058)) < 0.1
-    assert abs(model.aic - 339.2135) < 1.0
+    assert abs(model.aic - 343.2135) < 1.0
     assert abs(model.fitted.values[0] - 15.241) < 0.5
 
 
@@ -228,7 +228,7 @@ def test_etsx_initial_complete_no_xreg_in_b(etsx_data):
     # "complete" B must have 2 fewer params (the 2 xreg coefs are excluded)
     assert len(model_co.coef) == len(model_bc.coef) - 2
     # AIC and fitted[0] should be close to R reference (smoother="global")
-    assert abs(model_co.aic - 335.2486) < 1.5
+    assert abs(model_co.aic - 343.2875) < 1.5
     assert abs(model_co.fitted.values[0] - 15.265) < 0.5
 
 

@@ -3,6 +3,7 @@ import numpy as np
 
 from smooth.adam_general.core.creator import architector, creator, filler, initialiser
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+from smooth.adam_general.core.utils.n_param import df_initials_ets_level_seasonal
 
 from .optimization import (
     _calculate_loglik,
@@ -649,33 +650,63 @@ def estimator(
 
     n_param_estimated = len(B)
 
-    # For initial="gradient" the ETS initials are not in B, but they are
-    # genuinely solved (by least squares / Gauss-Newton), so they count as
-    # degrees of freedom just like initial="optimal". This applies only in the
-    # gradient solve's scope (pure ETS); with ARIMA or xreg present gradient
-    # falls back to backcasting and keeps the historical zero-initial-df count,
-    # as do backcasting / complete. Mirrors R (R/adam.R).
+    # Gradient is in scope (solved in C++) only for pure ETS; with ARIMA or xreg
+    # it falls back to backcasting. Used below for the state-refit decision.
     gradient_in_scope = (
         model_type_dict["ets_model"]
         and not arima_dict["arima_model"]
         and not model_type_dict.get("xreg_model", False)
     )
-    if initials_dict["initial_type"] == "gradient" and gradient_in_scope:
+
+    # Initial states consume the SAME degrees of freedom however they are
+    # obtained (optimised, backcast, complete-backcast or gradient-solved): the
+    # identifiable count of the initial-state design. Under "optimal" the
+    # initials sit in B (at the naive seasonal count), so only the ETS seasonal
+    # cross-block redundancy is SUBTRACTED; otherwise the identifiable count is
+    # ADDED (B carries no initials). Mirrors R (R/adam.R estimator).
+    ets_redundancy = 0
+    df_initials = 0
+    if model_type_dict["ets_model"]:
+        level_est = bool(initials_dict.get("initial_level_estimate", True))
         seasonal_estimate = initials_dict.get("initial_seasonal_estimate", [])
         if not isinstance(seasonal_estimate, (list, tuple, np.ndarray)):
             seasonal_estimate = [seasonal_estimate]
         lags_model_seasonal = lags_dict.get("lags_model_seasonal", []) or []
-        seasonal_df = sum(
-            bool(est) * (int(lag) - 1)
+        seasonal_lags_estimated = [
+            int(lag)
             for est, lag in zip(seasonal_estimate, lags_model_seasonal)
+            if bool(est)
+        ]
+        df_level_seasonal = df_initials_ets_level_seasonal(
+            seasonal_lags_estimated, level_est
         )
-        n_states_backcasting = (
-            bool(initials_dict.get("initial_level_estimate", True))
-            + model_type_dict["model_is_trendy"]
-            * bool(initials_dict.get("initial_trend_estimate", True))
-            + model_type_dict["model_is_seasonal"] * seasonal_df
+        naive_level_seasonal = level_est + (
+            model_type_dict["model_is_seasonal"]
+            * sum(
+                bool(est) * (int(lag) - 1)
+                for est, lag in zip(seasonal_estimate, lags_model_seasonal)
+            )
         )
-        n_param_estimated += int(n_states_backcasting)
+        ets_redundancy = naive_level_seasonal - df_level_seasonal
+        df_initials = df_level_seasonal + model_type_dict["model_is_trendy"] * bool(
+            initials_dict.get("initial_trend_estimate", True)
+        )
+    if arima_dict["arima_model"]:
+        df_initials += int(initials_dict.get("initial_arima_number", 0)) * bool(
+            initials_dict.get("initial_arima_estimate", True)
+        )
+    # xreg initials are backcast only under "complete"; otherwise the xreg
+    # coefficients are in B and already counted there.
+    if model_type_dict.get("xreg_model", False) and (
+        initials_dict["initial_type"] == "complete"
+    ):
+        df_initials += int(explanatory_dict.get("xreg_number", 0)) * bool(
+            initials_dict.get("initial_xreg_estimate", True)
+        )
+    if initials_dict["initial_type"] in ("backcasting", "complete", "gradient"):
+        n_param_estimated += int(df_initials)
+    else:
+        n_param_estimated -= int(ets_redundancy)
 
     # Step 11: Calculate log-likelihood
     log_lik_adam_value = _calculate_loglik(

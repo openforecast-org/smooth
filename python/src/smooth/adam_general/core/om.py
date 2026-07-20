@@ -277,6 +277,7 @@ def om_preparator(
         obs_in_sample=observations_dict["obs_in_sample"],
         o_type=occurrence_char,
         loss=loss,
+        xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
     )
 
     # Fitted on probability scale
@@ -785,6 +786,52 @@ class OM(ADAM):
     # Internal: estimation paths
     # ------------------------------------------------------------------
 
+    def _om_initials_df(self):
+        """Identifiable initial-state df added when initials are not in B.
+
+        For backcasting/complete/gradient returns the identifiable initial df
+        (ETS inclusion-exclusion + trend + ARIMA); for optimal returns minus the
+        ETS seasonal cross-block redundancy. Mirrors the adam/R estimator; the
+        occurrence model is Bernoulli, so there is no scale term here.
+        """
+        from smooth.adam_general.core.utils.n_param import (
+            df_initials_ets_level_seasonal,
+        )
+
+        mt = self._model_type
+        ini = self._initials
+        init_type = ini.get("initial_type")
+        ets_redundancy = 0
+        df_initials = 0
+        if mt.get("ets_model", True):
+            level_est = bool(ini.get("initial_level_estimate", True))
+            seas_est = ini.get("initial_seasonal_estimate", [])
+            if not isinstance(seas_est, (list, tuple, np.ndarray)):
+                seas_est = [seas_est]
+            lags_seasonal = self._lags_model.get("lags_model_seasonal", []) or []
+            seas_lags_est = [
+                int(lag) for est, lag in zip(seas_est, lags_seasonal) if bool(est)
+            ]
+            df_level_seasonal = df_initials_ets_level_seasonal(seas_lags_est, level_est)
+            naive_level_seasonal = level_est + (
+                mt.get("model_is_seasonal", False)
+                * sum(
+                    bool(est) * (int(lag) - 1)
+                    for est, lag in zip(seas_est, lags_seasonal)
+                )
+            )
+            ets_redundancy = naive_level_seasonal - df_level_seasonal
+            df_initials = df_level_seasonal + mt.get("model_is_trendy", False) * bool(
+                ini.get("initial_trend_estimate", True)
+            )
+        if self._arima.get("arima_model", False):
+            df_initials += int(ini.get("initial_arima_number", 0)) * bool(
+                ini.get("initial_arima_estimate", True)
+            )
+        if init_type in ("backcasting", "complete", "gradient"):
+            return int(df_initials)
+        return -int(ets_redundancy)
+
     def _build_om_artifacts(self):
         """Run architector → creator → om_initial_transform; return artifacts.
 
@@ -1150,7 +1197,10 @@ class OM(ADAM):
                 pass
             cf_value = opt2.last_optimum_value()
 
-        n_param_estimated = len(B)
+        # Initial states consume the same df however obtained (mirrors adam/R):
+        # added when backcast/complete/gradient (not in B), redundancy subtracted
+        # when optimised. The occurrence model is Bernoulli -- no scale.
+        n_param_estimated = len(B) + self._om_initials_df()
         log_lik_value = -float(cf_value)
 
         self._adam_estimated = {

@@ -177,173 +177,45 @@ smoothEigens <- function(persistence, transition, measurement,
 # and model type) at parameter values perturbed via the model's own call, so the
 # selected ETS/ARIMA structure and lags are preserved. Returns the covariance
 # matrix, or NULL to signal the caller to fall back to the Hessian.
-covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
-    B <- coef(object);
-    parametersNames <- names(B);
-    nParam <- length(B);
+# Shared OPG assembly. Central-differences the per-observation log-likelihood
+# over the estimated parameters, forms J = sum_t s_t s_t' (PSD by construction)
+# and inverts it, dropping directions with (near-)zero information (the
+# brokenVariables logic of the Hessian path). `perturbedPointLik(nameJ, delta)`
+# is an engine-specific closure that returns the per-observation log-likelihood
+# vector for the model rebuilt with parameter nameJ perturbed by delta -- with
+# nameJ=NULL, delta=0 giving the base fit -- or NULL on failure. A reproduction
+# guard requires the base fit to reproduce the object's likelihood, so an
+# engine/refit that cannot rebuild the model exactly falls back to the Hessian.
+covarOPGCore <- function(object, parametersNames, perturbedPointLik,
+                         stepSize=.Machine$double.eps^(1/4)){
+    nParam <- length(parametersNames);
     if(nParam==0 || object$loss!="likelihood"){
         return(NULL);
     }
+    obsInSample <- nobs(object);
+    B <- coef(object)[parametersNames];
 
-    # Initial states are estimated parameters ONLY for initial="optimal". For
-    # backcasting / gradient / complete they are derived, not free, so they must
-    # not be perturbed: the score is taken over the dynamics parameters
-    # (persistence / phi / arma) only, and the initials are re-derived (via the
-    # model's own initialType) at every perturbed evaluation.
-    initialType <- object$initialType;
-    initialsEstimated <- identical(initialType, "optimal");
-
-    persistenceNames <- names(object$persistence);
-    armaAr <- object$arma$ar;
-    armaMa <- object$arma$ma;
-    armaNames <- c(names(armaAr), names(armaMa));
-    initialList <- object$initial;
-    xregInitNames <- names(initialList$xreg);
-
-    # Which engine fitted this object: the state-space ARIMA engines (ssarima,
-    # sparma) use their own ARIMA representation, so they must be re-fitted with
-    # their own function (an adam() refit would reconstruct a different model).
-    # CES and GUM have their own parameterisations (complex smoothing, free
-    # transition) whose perturbation maps are not yet implemented; they return
-    # NULL here and the caller falls back to the Hessian.
-    engine <- if(ssarimaChecker(object)){ "ssarima"; }
-              else if(sparmaChecker(object)){ "sparma"; }
-              else if(cesChecker(object) || gumChecker(object)){ NULL; }
-              else { "adam"; }
-    if(is.null(engine)){
-        return(NULL);
-    }
-
-    # Structural refit arguments reconstructed from the object.
-    modelString <- modelType(object);
-    modelLags <- object$lags;
-    modelOrders <- if(!is.null(object$orders)){ object$orders; } else { NULL; }
-    regressorsMode <- object$regressors;
-
-    # Per-observation log-likelihood of the model rebuilt at a perturbed
-    # parameter set: everything provided (empty B, single evaluation), the
-    # selected structure and lags preserved. Initials are re-derived for
-    # non-optimal initialisation.
-    evalPointLik <- function(persistence, phi, arma, initialArg){
-        if(engine=="adam"){
-            args <- list(data=object$data, model=modelString, lags=modelLags,
-                         persistence=persistence, phi=phi, initial=initialArg,
-                         h=0, FI=FALSE, silent=TRUE);
-            if(!is.null(regressorsMode)){ args$regressors <- regressorsMode; }
-        }
-        else if(engine=="ssarima"){
-            # ssarima's data argument is named `y`, and it takes explicit lags.
-            args <- list(y=object$data, lags=modelLags, initial=initialArg,
-                         h=0, FI=FALSE, silent=TRUE);
-        }
-        else{
-            # sparma: data argument is `data`, no lags argument.
-            args <- list(data=object$data, initial=initialArg,
-                         h=0, FI=FALSE, silent=TRUE);
-        }
-        if(!is.null(modelOrders)){ args$orders <- modelOrders; }
-        if(length(arma)>0){ args$arma <- arma; }
-        modelLocal <- try(suppressWarnings(do.call(engine, args)), silent=TRUE);
-        if(inherits(modelLocal,"try-error")){
-            return(NULL);
-        }
-        return(as.numeric(pointLik(modelLocal)));
-    }
-
-    # For optimal the perturbed initial list is passed; otherwise the initialType
-    # string, so the initials are re-derived at the perturbed dynamics.
-    baseArma <- if(length(armaNames)>0){ object$arma; } else { list(); }
-    baseInitialArg <- if(initialsEstimated){ initialList; } else { initialType; }
-
-    # Reproduction guard: the reconstructed model at the UNPERTURBED parameters
-    # must reproduce the object's likelihood. If not (e.g. regressors="select"/
-    # "adapt", or any structure the refit cannot rebuild exactly), the scores
-    # would be meaningless, so fall back to the Hessian path.
-    baseLik <- evalPointLik(object$persistence, object$phi, baseArma, baseInitialArg);
-    if(is.null(baseLik) ||
+    baseLik <- perturbedPointLik(NULL, 0);
+    if(is.null(baseLik) || length(baseLik)!=obsInSample ||
        !isTRUE(all.equal(sum(baseLik), as.numeric(logLik(object)), tolerance=1e-4))){
         return(NULL);
     }
 
-    obsInSample <- nobs(object);
     scores <- matrix(NA_real_, obsInSample, nParam, dimnames=list(NULL, parametersNames));
-
-    # Build the perturbed parameter set for one named parameter.
-    perturbSet <- function(nameJ, delta){
-        persistence <- object$persistence;
-        phi <- object$phi;
-        arma <- baseArma;
-        initialArg <- baseInitialArg;
-        if(nameJ %in% persistenceNames){
-            persistence[nameJ] <- persistence[nameJ]+delta;
-        }
-        else if(nameJ=="phi"){
-            phi <- phi+delta;
-        }
-        else if(nameJ %in% names(armaAr)){
-            arma$ar[nameJ] <- arma$ar[nameJ]+delta;
-        }
-        else if(nameJ %in% names(armaMa)){
-            arma$ma[nameJ] <- arma$ma[nameJ]+delta;
-        }
-        else if(initialsEstimated){
-            # Initial-state parameter (estimated only under initial="optimal").
-            if(nameJ=="level"){
-                initialArg$level <- initialArg$level+delta;
-            }
-            else if(nameJ=="trend"){
-                initialArg$trend <- initialArg$trend+delta;
-            }
-            else if(substr(nameJ,1,8)=="seasonal"){
-                idx <- as.integer(sub("^seasonal_?","",nameJ));
-                if(is.list(initialArg$seasonal)){
-                    initialArg$seasonal[[1]][idx] <- initialArg$seasonal[[1]][idx]+delta;
-                }
-                else{
-                    initialArg$seasonal[idx] <- initialArg$seasonal[idx]+delta;
-                }
-            }
-            else if(substr(nameJ,1,10)=="ARIMAState"){
-                idx <- as.integer(sub("^ARIMAState","",nameJ));
-                initialArg$arima[idx] <- initialArg$arima[idx]+delta;
-            }
-            else if(nameJ %in% xregInitNames){
-                initialArg$xreg[nameJ] <- initialArg$xreg[nameJ]+delta;
-            }
-            else{
-                return(NULL);
-            }
-        }
-        else{
-            # A non-dynamics parameter with non-optimal initials should not occur.
-            return(NULL);
-        }
-        return(list(persistence=persistence, phi=phi, arma=arma, initialArg=initialArg));
-    }
-
     for(j in seq_len(nParam)){
-        nameJ <- parametersNames[j];
         hStep <- stepSize*max(1, abs(B[j]));
-        setUp <- perturbSet(nameJ, hStep);
-        setDown <- perturbSet(nameJ, -hStep);
-        if(is.null(setUp) || is.null(setDown)){
-            return(NULL);
-        }
-        likUp <- evalPointLik(setUp$persistence, setUp$phi, setUp$arma, setUp$initialArg);
-        likDown <- evalPointLik(setDown$persistence, setDown$phi, setDown$arma, setDown$initialArg);
+        likUp <- perturbedPointLik(parametersNames[j], hStep);
+        likDown <- perturbedPointLik(parametersNames[j], -hStep);
         if(is.null(likUp) || is.null(likDown) ||
            length(likUp)!=obsInSample || length(likDown)!=obsInSample){
             return(NULL);
         }
         scores[,j] <- (likUp-likDown)/(2*hStep);
     }
-
     if(any(!is.finite(scores))){
         return(NULL);
     }
 
-    # J = S'S is PSD by construction. Drop directions with (near-)zero
-    # information, matching the brokenVariables logic of the Hessian path.
     J <- crossprod(scores);
     diagJ <- diag(J);
     keep <- diagJ > max(diagJ)*1e-10 & is.finite(diagJ);
@@ -356,4 +228,105 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
         vcovMatrix[keep,keep] <- vcovKeep;
     }
     return(vcovMatrix);
+}
+
+# OPG covariance for the ETS / ARIMA family (adam and the state-space ARIMA
+# engine ssarima). Initial states are estimated parameters ONLY for
+# initial="optimal"; for backcasting / gradient / complete they are derived, so
+# the score spans the dynamics (persistence / phi / arma) only and the initials
+# are re-derived (via the model's own initialType) at each perturbed evaluation.
+# CES / GUM / sparma have their own parameterisations and dedicated functions
+# (covarOPGces / covarOPGgum / covarOPGsparma).
+covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    engine <- if(ssarimaChecker(object)){ "ssarima"; } else { "adam"; }
+
+    initialType <- object$initialType;
+    initialsEstimated <- identical(initialType, "optimal");
+    persistenceNames <- names(object$persistence);
+    armaAr <- object$arma$ar;
+    armaMa <- object$arma$ma;
+    initialList <- object$initial;
+    xregInitNames <- names(initialList$xreg);
+
+    modelLags <- object$lags;
+    modelString <- modelType(object);
+    modelOrders <- if(!is.null(object$orders)){ object$orders; } else { NULL; }
+    regressorsMode <- object$regressors;
+    baseArma <- if(length(c(names(armaAr), names(armaMa)))>0){ object$arma; } else { list(); }
+    baseInitialArg <- if(initialsEstimated){ initialList; } else { initialType; }
+
+    refit <- function(persistence, phi, arma, initialArg){
+        if(engine=="adam"){
+            args <- list(data=object$data, model=modelString, lags=modelLags,
+                         persistence=persistence, phi=phi, initial=initialArg,
+                         h=0, FI=FALSE, silent=TRUE);
+            if(!is.null(regressorsMode)){ args$regressors <- regressorsMode; }
+        }
+        else{
+            # ssarima: data argument is named `y`.
+            args <- list(y=object$data, lags=modelLags, initial=initialArg,
+                         h=0, FI=FALSE, silent=TRUE);
+        }
+        if(!is.null(modelOrders)){ args$orders <- modelOrders; }
+        if(length(arma)>0){ args$arma <- arma; }
+        modelLocal <- try(suppressWarnings(do.call(engine, args)), silent=TRUE);
+        if(inherits(modelLocal,"try-error")){
+            return(NULL);
+        }
+        return(as.numeric(pointLik(modelLocal)));
+    }
+
+    perturbedPointLik <- function(nameJ, delta){
+        persistence <- object$persistence;
+        phi <- object$phi;
+        arma <- baseArma;
+        initialArg <- baseInitialArg;
+        if(!is.null(nameJ)){
+            if(nameJ %in% persistenceNames){
+                persistence[nameJ] <- persistence[nameJ]+delta;
+            }
+            else if(nameJ=="phi"){
+                phi <- phi+delta;
+            }
+            else if(nameJ %in% names(armaAr)){
+                arma$ar[nameJ] <- arma$ar[nameJ]+delta;
+            }
+            else if(nameJ %in% names(armaMa)){
+                arma$ma[nameJ] <- arma$ma[nameJ]+delta;
+            }
+            else if(initialsEstimated){
+                if(nameJ=="level"){
+                    initialArg$level <- initialArg$level+delta;
+                }
+                else if(nameJ=="trend"){
+                    initialArg$trend <- initialArg$trend+delta;
+                }
+                else if(substr(nameJ,1,8)=="seasonal"){
+                    idx <- as.integer(sub("^seasonal_?","",nameJ));
+                    if(is.list(initialArg$seasonal)){
+                        initialArg$seasonal[[1]][idx] <- initialArg$seasonal[[1]][idx]+delta;
+                    }
+                    else{
+                        initialArg$seasonal[idx] <- initialArg$seasonal[idx]+delta;
+                    }
+                }
+                else if(substr(nameJ,1,10)=="ARIMAState"){
+                    idx <- as.integer(sub("^ARIMAState","",nameJ));
+                    initialArg$arima[idx] <- initialArg$arima[idx]+delta;
+                }
+                else if(nameJ %in% xregInitNames){
+                    initialArg$xreg[nameJ] <- initialArg$xreg[nameJ]+delta;
+                }
+                else{
+                    return(NULL);
+                }
+            }
+            else{
+                return(NULL);
+            }
+        }
+        return(refit(persistence, phi, arma, initialArg));
+    }
+
+    return(covarOPGCore(object, names(coef(object)), perturbedPointLik, stepSize));
 }

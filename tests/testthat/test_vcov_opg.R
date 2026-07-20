@@ -98,8 +98,26 @@ test_that("opg for ssarima backcasting spans dynamics only", {
     expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
 })
 
-test_that("opg falls back for CES / GUM (bespoke parameterisations)", {
-    mc <- suppressWarnings(ces(AirPassengers, seasonality = "none",
+test_that("opg covers non-seasonal CES (complex smoothing + initials)", {
+    m <- suppressWarnings(ces(AirPassengers, seasonality = "none",
+                              initial = "optimal", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    vH <- suppressWarnings(vcov(m))
+    expect_false(isTRUE(all.equal(vO, vH, tolerance = 1e-6)))  # genuinely OPG
+    fin <- is.finite(diag(vO))
+    expect_true(all(eigen(vO[fin, fin, drop = FALSE], only.values = TRUE)$values > -1e-6))
+})
+
+test_that("opg for CES backcasting spans the smoothing parameters only", {
+    m <- suppressWarnings(ces(AirPassengers, seasonality = "none",
+                              initial = "backcasting", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_equal(rownames(vO), names(coef(m)))          # alpha_0, alpha_1 only
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
+})
+
+test_that("opg falls back for seasonal CES and GUM (unmapped structures)", {
+    mc <- suppressWarnings(ces(AirPassengers, seasonality = "full", lags = 12,
                                initial = "optimal", h = 0))
     expect_equal(dim(suppressWarnings(vcov(mc, opg = TRUE))),
                  dim(suppressWarnings(vcov(mc))))

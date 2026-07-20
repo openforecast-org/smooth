@@ -5163,12 +5163,18 @@ vcov.adam <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
     else if(opg){
         # OPG / BHHH covariance: PSD by construction, so it returns finite
         # standard errors for boundary-but-identified parameters where the
-        # observed Hessian is indefinite. Falls back to the Hessian path (below)
-        # when the reconstruction is out of the v1 scope (e.g. xreg/ARIMA
-        # initials) or numerically fails.
-        vcovOPG <- covarOPG(object, stepSize=if(is.null(ellipsis$stepSize)){
-                                                 .Machine$double.eps^(1/4);
-                                             } else { ellipsis$stepSize; });
+        # observed Hessian is indefinite. Dispatched to the engine-specific
+        # implementation (CES has its own parameterisation); everything else
+        # (adam, ssarima) uses covarOPG. Falls back to the Hessian path (below)
+        # when the reconstruction cannot be reproduced or numerically fails.
+        opgStepSize <- if(is.null(ellipsis$stepSize)){
+                           .Machine$double.eps^(1/4);
+                       } else { ellipsis$stepSize; };
+        vcovOPG <- if(cesChecker(object)){
+                       covarOPGces(object, stepSize=opgStepSize);
+                   } else {
+                       covarOPG(object, stepSize=opgStepSize);
+                   };
         if(!is.null(vcovOPG)){
             return(vcovOPG);
         }

@@ -330,3 +330,61 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
 
     return(covarOPGCore(object, names(coef(object)), perturbedPointLik, stepSize));
 }
+
+# OPG covariance for CES. CES has its own parameterisation: the smoothing
+# parameters are complex (a, and b for seasonal models) with the coefficients
+# alpha_0 / alpha_1 = Re(a) / Im(a) (and beta_0 / beta_1 = Re(b) / Im(b)); the
+# remaining coefficients are the initial states, stored in `profileInitial`.
+# ces() re-fitted with model=<perturbed clone> holds all of them (it reads
+# parameters$a, parameters$b and profileInitial), so the clone is perturbed
+# directly. Mirrors how the CES Hessian FI is computed (via model=object).
+covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    parametersNames <- names(coef(object));
+    aValue <- object$parameters$a;
+    bValue <- object$parameters$b;
+    # Initial-state coefficients: everything that is not a smoothing parameter.
+    dynamicsNames <- grep("^(alpha|beta)_[01]$", parametersNames, value=TRUE);
+    initialNames <- setdiff(parametersNames, dynamicsNames);
+
+    # The clean coef -> profileInitial mapping (one coefficient per stored state)
+    # holds for the non-seasonal model. Seasonal CES stores its initial states
+    # across the seasonal lags with fewer free coefficients than stored values,
+    # so the flat mapping would perturb the wrong cells; fall back to the Hessian
+    # there. Backcasting (no estimated initials) is unaffected.
+    if(length(initialNames)>0 &&
+       length(initialNames)!=length(as.numeric(object$profileInitial))){
+        return(NULL);
+    }
+
+    perturbedPointLik <- function(nameJ, delta){
+        clone <- object;
+        if(!is.null(nameJ)){
+            if(nameJ=="alpha_0"){
+                clone$parameters$a <- complex(real=Re(aValue)+delta, imaginary=Im(aValue));
+            }
+            else if(nameJ=="alpha_1"){
+                clone$parameters$a <- complex(real=Re(aValue), imaginary=Im(aValue)+delta);
+            }
+            else if(nameJ=="beta_0"){
+                clone$parameters$b <- complex(real=Re(bValue)+delta, imaginary=Im(bValue));
+            }
+            else if(nameJ=="beta_1"){
+                clone$parameters$b <- complex(real=Re(bValue), imaginary=Im(bValue)+delta);
+            }
+            else{
+                idx <- match(nameJ, initialNames);
+                if(is.na(idx)){ return(NULL); }
+                clone$profileInitial[idx] <- clone$profileInitial[idx]+delta;
+            }
+        }
+        modelLocal <- try(suppressWarnings(
+            ces(object$data, seasonality=object$seasonality, lags=object$lags,
+                model=clone, h=0)), silent=TRUE);
+        if(inherits(modelLocal,"try-error")){
+            return(NULL);
+        }
+        return(as.numeric(pointLik(modelLocal)));
+    }
+
+    return(covarOPGCore(object, parametersNames, perturbedPointLik, stepSize));
+}

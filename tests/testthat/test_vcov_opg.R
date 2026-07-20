@@ -144,6 +144,16 @@ test_that("opg covers GUM (persistence g + transition F + vt initials)", {
     expect_true(all(eigen(vOs[fins, fins, drop = FALSE], only.values = TRUE)$values > -1e-6))
 })
 
+test_that("opg falls back for sparma (unresolved reproduction)", {
+    # sparma does not reproduce exactly even via model=object, so the OPG
+    # reproduction guard routes it to the Hessian (a follow-up once sparma's
+    # own reconstruction is fixed).
+    m <- suppressWarnings(sparma(BJsales, orders = list(ar = 1, ma = 1),
+                                 initial = "optimal", h = 0))
+    expect_equal(dim(suppressWarnings(vcov(m, opg = TRUE))),
+                 dim(suppressWarnings(vcov(m))))
+})
+
 test_that("opg=FALSE leaves the default covariance unchanged", {
     m <- suppressWarnings(adam(AirPassengers, "ANN", initial = "optimal"))
     expect_equal(suppressWarnings(vcov(m)), suppressWarnings(vcov(m, opg = FALSE)))

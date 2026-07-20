@@ -226,6 +226,15 @@ test_that("gradient solves the coupled omg initials (ETS / ARIMA)", {
               initial = "gradient", silent = TRUE)
     expect_true(is.finite(logLik(aG)))
     expect_false(isTRUE(all.equal(as.numeric(logLik(aB)), as.numeric(logLik(aG)))))
+
+    # The reported fitted is the coupled probability, so its Bernoulli must
+    # equal the reported logLik exactly (fitted and logLik mutually consistent).
+    otv <- as.numeric(y != 0)
+    for (mdl in list(fB, fG, aB, aG)) {
+        pf <- as.numeric(mdl$fitted)
+        ll <- sum(otv * log(pf) + (1 - otv) * log(1 - pf))
+        expect_equal(as.numeric(logLik(mdl)), ll, tolerance = 1e-9)
+    }
 })
 
 test_that("gradient solves additive SSOE initials for CES/GUM/SSARIMA/SPARMA", {

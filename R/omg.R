@@ -652,7 +652,11 @@ omg <- function(data,
             ot=ot, otLogical=otLogical, obsInSample=obsInSample,
             nIterations=nIterations,
             nParamsA=nParamsA,
-            loss=loss, lossFunction=omgUserLossFunction, lambda=lambda)
+            loss=loss, lossFunction=omgUserLossFunction, lambda=lambda,
+            # nloptr's .checkfunargs requires every eval_f formal to be present;
+            # the optimiser passes FALSE (returns the loss). The final coupled
+            # fitted is obtained by re-calling omgCF_local with this overridden.
+            returnFitted=FALSE)
 
         # --------------------------------------------------------------
         # FI placeholder. Populated when modelDo=="use" and ellipsis$FI is
@@ -1118,10 +1122,18 @@ omg <- function(data,
     EtypeA <- errorType(modelA)
     EtypeB <- errorType(modelB)
 
-    yFittedA  <- as.vector(modelA$fitted)
-    yFittedB  <- as.vector(modelB$fitted)
+    # The top-level fitted probability comes from the coupled recursion the
+    # optimiser minimised (re-run omgCF_local at the final B), not the standalone
+    # per-side refits. modelA/modelB are kept only for the sub-model diagnostics.
+    pCoupled  <- do.call(omgCF_local,
+                         c(list(B=c(jointResult$B_A, jointResult$B_B)),
+                           modifyList(jointResult$nloptrArgs, list(returnFitted=TRUE))))
     yFitted   <- modelA$fitted
-    yFitted[] <- omgLinkFunction(yFittedA, yFittedB, EtypeA, EtypeB)
+    yFitted[] <- pCoupled
+    # logLik is the Bernoulli of that same coupled probability, so $fitted and
+    # $logLik stay mutually consistent for every loss (mirrors om()).
+    otNumeric <- as.numeric(oInSample)
+    logLikOMG <- sum(otNumeric * log(pCoupled) + (1 - otNumeric) * log(1 - pCoupled))
 
     if(h > 0) {
         yForecast <- modelA$forecast;
@@ -1165,7 +1177,7 @@ omg <- function(data,
         occurrence  = "general",
         lags        = lags,
         lossValue   = jointResult$CFValue,
-        logLik      = jointResult$logLikValue,
+        logLik      = logLikOMG,
         nParam      = {
             nParamMat <- matrix(0, 2, 5,
                                 dimnames=list(c("Estimated","Provided"),
@@ -1280,7 +1292,8 @@ omgCF_local <- function(B,
                         nIterations, nParamsA,
                         loss = "likelihood",
                         lossFunction = NULL,
-                        lambda = 0) {
+                        lambda = 0,
+                        returnFitted = FALSE) {
 
     B_A <- B[seq_len(nParamsA)]
     B_B <- B[seq_len(length(B) - nParamsA) + nParamsA]
@@ -1416,6 +1429,14 @@ omgCF_local <- function(B,
         gradNIter)
 
     pCombined <- omgLinkFunction(res$fittedA, res$fittedB, EtypeA, EtypeB)
+
+    # The coupled fitted probability. Returned directly for the final object so
+    # its $fitted (and the Bernoulli logLik computed from it) come from the same
+    # coupled recursion the optimiser minimised — not the standalone per-side
+    # refit, which only approximates it.
+    if(returnFitted){
+        return(pCombined)
+    }
 
     if(any(is.nan(pCombined)) || any(pCombined <= 0) || any(pCombined >= 1)) {
         return(1e+300)

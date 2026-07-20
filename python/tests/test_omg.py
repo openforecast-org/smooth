@@ -90,9 +90,9 @@ class TestLossMenu:
 
     @pytest.mark.parametrize("loss", ["LASSO", "RIDGE"])
     def test_regularised_losses_fit(self, intermittent_y, loss):
-        m = OMG(
-            model_a="ANN", model_b="ANN", loss=loss, reg_lambda=0.3
-        ).fit(intermittent_y)
+        m = OMG(model_a="ANN", model_b="ANN", loss=loss, reg_lambda=0.3).fit(
+            intermittent_y
+        )
         assert m.loss == loss
         assert np.isfinite(m.loss_value)
         assert m.reg_lambda == 0.3
@@ -161,19 +161,16 @@ class TestFitBasic:
         a = fitted_omg.actuals
         assert set(np.unique(a)).issubset({0.0, 1.0})
 
-    def test_fitted_is_link_of_submodel_raw_outputs(self, intermittent_y, fitted_omg):
-        """p = aFit/(aFit+bFit) must be consistent with sub-model fitted."""
-        from smooth.adam_general.core.utils.omg_cost import omg_link_function
-
-        e_a = fitted_omg._side_a["model_type_dict"]["error_type"]
-        e_b = fitted_omg._side_b["model_type_dict"]["error_type"]
-        p_check = omg_link_function(
-            fitted_omg.model_a._prepared["y_fitted_raw"],
-            fitted_omg.model_b._prepared["y_fitted_raw"],
-            e_a,
-            e_b,
-        )
-        np.testing.assert_allclose(fitted_omg.fitted, p_check, atol=1e-12)
+    def test_fitted_bernoulli_matches_reported_loglik(self, fitted_omg):
+        """The reported fitted is the coupled probability, so its Bernoulli
+        log-likelihood must equal the reported logLik exactly (fitted and
+        logLik are mutually consistent, mirroring R's omgCF_local returnFitted).
+        The standalone sub-model refits only approximate the coupled fit."""
+        p = np.asarray(fitted_omg.fitted, dtype=float).ravel()
+        ot = np.asarray(fitted_omg._ot, dtype=float).ravel()
+        assert np.all(p > 0) and np.all(p < 1)
+        ll = float(np.sum(ot * np.log(p) + (1.0 - ot) * np.log(1.0 - p)))
+        np.testing.assert_allclose(float(fitted_omg.loglik), ll, atol=1e-9)
 
 
 # --------------------------------------------------------------------------

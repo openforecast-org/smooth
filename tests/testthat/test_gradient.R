@@ -170,3 +170,25 @@ test_that("gradient with a custom loss function falls back to backcasting", {
                                 loss = lossCustom, silent = TRUE))
     expect_equal(fG$lossValue, fB$lossValue, tolerance = 1e-8)
 })
+
+test_that("gradient solves additive SSOE initials for CES/GUM/SSARIMA/SPARMA", {
+    # These are additive SSOE models, so the affine least-squares gradient solve
+    # applies: it must run (not fall back), differ from backcasting, and not lose
+    # to backcasting on the in-sample SSE.
+    set.seed(1)
+    y <- ts(100 + cumsum(rnorm(120, 0, 2)))
+    engines <- list(
+        SSARIMA = function(i) ssarima(y, orders = list(ar = 1, i = 1, ma = 1), lags = 1,
+                                      initial = i, loss = "MSE", silent = TRUE),
+        SPARMA  = function(i) sparma(y, orders = list(ar = 1, ma = 1), lags = 1,
+                                     initial = i, loss = "MSE", silent = TRUE),
+        GUM     = function(i) gum(y, orders = 2, lags = 1, initial = i, loss = "MSE", silent = TRUE),
+        CES     = function(i) ces(y, seasonality = "none", initial = i, loss = "MSE", silent = TRUE))
+    for(fn in engines){
+        mb <- fn("backcasting"); mg <- fn("gradient")
+        sseB <- sum(residuals(mb)^2); sseG <- sum(residuals(mg)^2)
+        expect_true(is.finite(sseG))
+        expect_false(isTRUE(all.equal(sseB, sseG, tolerance = 1e-6)))  # genuinely solved
+        expect_lte(sseG, sseB * 1.001 + 1e-6)                          # no worse than backcasting
+    }
+})

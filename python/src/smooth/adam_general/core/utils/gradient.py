@@ -96,31 +96,53 @@ def adam_gradient_probe_basis(
     n_components,
     lags_model,
     lags_model_max,
+    e_type="A",
+    components_number_ets=0,
+    components_number_arima=0,
+    lags_model_all=None,
 ):
-    """Build the probe basis for gradient initialisation of an ETS model.
+    """Build the probe basis for gradient initialisation.
 
     A ``(n_components * lags_model_max, n_free)`` 0/1 matrix whose column j marks
-    the profile cells (in column-major order, matching the C++ lookup indices)
-    that move together as one free initial parameter. Level and trend span all
-    head columns; each seasonal cell is its own parameter. Returns ``None`` when
-    the model is out of scope (ARIMA / xreg / non-ETS), so the caller falls back
-    to backcasting. Mirrors ``adam_gradientProbeBasis``.
+    the profile cells (column-major, matching the C++ lookup indices) that move
+    together as one free initial parameter. ETS: level and trend span all head
+    columns, each seasonal cell is its own parameter. ARIMA: each state's lag
+    slots are free parameters (the rank-revealing solve drops redundant
+    directions) -- included only for ADDITIVE models (the exact affine
+    least-squares branch). Multiplicative ARIMA and xreg fall back (``None``).
+    Mirrors ``adam_gradientProbeBasis``.
     """
-    if not ets_model or arima_model or xreg_model:
+    if xreg_model:
         return None
+    if not ets_model and not arima_model:
+        return None
+    additive = e_type == "A" and t_type not in ("M", "Md") and s_type != "M"
+    if arima_model and not additive:
+        return None
+    if lags_model_all is None:
+        lags_model_all = lags_model
 
     def cells_of(row, cols):
         """Column-major cell indices of profile[row, cols]."""
         return [row + c * n_components for c in cols]
 
-    probes = [cells_of(0, range(lags_model_max))]
-    if t_type != "N":
-        probes.append(cells_of(1, range(lags_model_max)))
-    if s_type != "N" and components_number_ets_seasonal > 0:
-        for i in range(components_number_ets_seasonal):
-            r = components_number_ets_non_seasonal + i
-            for j in range(int(lags_model[r])):
+    probes = []
+    if ets_model:
+        probes.append(cells_of(0, range(lags_model_max)))
+        if t_type != "N":
+            probes.append(cells_of(1, range(lags_model_max)))
+        if s_type != "N" and components_number_ets_seasonal > 0:
+            for i in range(components_number_ets_seasonal):
+                r = components_number_ets_non_seasonal + i
+                for j in range(int(lags_model_all[r])):
+                    probes.append(cells_of(r, [j]))
+    if arima_model and components_number_arima > 0:
+        for i in range(components_number_arima):
+            r = components_number_ets + i
+            for j in range(int(lags_model_all[r])):
                 probes.append(cells_of(r, [j]))
+    if not probes:
+        return None
 
     probe_basis = np.zeros((n_components * lags_model_max, len(probes)), order="F")
     for j, cells in enumerate(probes):
@@ -243,6 +265,10 @@ def adam_fit_or_gradient(
             int(profiles_recent_table.shape[0]),
             lags_dict["lags_model"],
             lags_model_max,
+            model_type_dict.get("error_type", "A"),
+            int(components_dict.get("components_number_ets", 0) or 0),
+            int(components_dict.get("components_number_arima", 0) or 0),
+            lags_dict.get("lags_model_all", lags_dict["lags_model"]),
         )
         if probe_basis is not None and loss_code is not None:
             solved = adam_gradient_solve(

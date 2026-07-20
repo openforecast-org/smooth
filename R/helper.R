@@ -409,3 +409,47 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
 }
+
+# OPG covariance for GUM. Its coefficients split across three slots that gum()
+# re-fitted with model=<perturbed clone> reads: the persistence g1..gK (vector
+# persistence), the free transition matrix F<row><col> (transition, row-major),
+# and the initial states vt1..vtK (held via the coefficient vector B, and only
+# estimated under initial="optimal"). The clone is perturbed in the matching
+# slot -- the same mechanism the GUM Hessian FI uses (model=object).
+covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    parameterValues <- coef(object);
+    parametersNames <- names(parameterValues);
+    persistenceNames <- names(object$persistence);
+    transitionDim <- ncol(object$transition);
+    transitionNames <- grep("^F", parametersNames, value=TRUE);   # row-major order
+
+    perturbedPointLik <- function(j, delta){
+        clone <- object;
+        if(!is.null(j)){
+            nameJ <- parametersNames[j];
+            if(nameJ %in% persistenceNames){
+                clone$persistence[nameJ] <- clone$persistence[nameJ]+delta;
+            }
+            else if(substr(nameJ,1,1)=="F"){
+                k <- match(nameJ, transitionNames);
+                clone$transition[((k-1) %/% transitionDim)+1,
+                                 ((k-1) %% transitionDim)+1] <-
+                    clone$transition[((k-1) %/% transitionDim)+1,
+                                     ((k-1) %% transitionDim)+1]+delta;
+            }
+            else{
+                # Initial state (vt): held through the coefficient vector B.
+                clone$B[nameJ] <- clone$B[nameJ]+delta;
+            }
+        }
+        modelLocal <- try(suppressWarnings(
+            gum(object$data, orders=object$orders, lags=object$lags,
+                model=clone, h=0)), silent=TRUE);
+        if(inherits(modelLocal,"try-error")){
+            return(NULL);
+        }
+        return(as.numeric(pointLik(modelLocal)));
+    }
+
+    return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
+}

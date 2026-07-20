@@ -350,11 +350,16 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         # Write down the initials in the recent profile
         matVt[,1:lagsModelMax] <- profilesRecentTable[] <- elements$vt;
 
-        adamFitted <- adamCpp$fit(matVt, elements$matWt,
-                                  elements$matF, elements$vecG,
-                                  indexLookupTable, profilesRecentTable,
-                                  yInSample, ot,
-                                  any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
+        # Additive SSOE: initial="gradient" profiles the state initials by least
+        # squares (falls back to backcasting for a multiplicative GUM).
+        adamFitted <- adam_fitOrGradient(matVt, elements$matWt,
+                                         elements$matF, elements$vecG,
+                                         indexLookupTable, profilesRecentTable,
+                                         yInSample, ot, initialType, nIterations, adamCpp,
+                                         FALSE, TRUE, xregModel, Etype, "N", "N",
+                                         0, 0, 0, lagsModelAll, lagsModelMax,
+                                         obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
+                                         componentsNumberARIMA, lagsModelAll);
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -726,21 +731,18 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         B[] <- res$solution;
         CFValue <- res$objective;
 
+        # Identifiable initial-state df of GUM: the number of GUM state initials
+        # (= sum of the component lags; xreg is counted separately in [1,2]),
+        # the same whether they are optimised or backcast/complete/gradient. GUM
+        # has no multi-seasonal shared-frequency redundancy (structural = rank).
         nStatesBackcasting <- 0;
-        # Calculate the number of degrees of freedom coming from states in case of backcasting
-        if(any(initialType==c("backcasting","complete"))){
-            # Obtain the elements of GUM
-            gumFilled <- filler(B, matVt[,1:lagsModelMax,drop=FALSE], matF, vecG, matWt);
-
-            nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll,
-                                                           FALSE, Stype, componentsNumberETSNonSeasonal,
-                                                           componentsNumberETSSeasonal, gumFilled$vecG, gumFilled$matF,
-                                                           obsInSample, lagsModelMax, indexLookupTable,
-                                                           adamCpp, dfForBack);
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            nStatesBackcasting[] <- sum(lagsModelAll) - xregNumber;
         }
 
-        # Parameters estimated + variance
-        nParamEstimated <- length(B) + (loss=="likelihood")*1 + nStatesBackcasting;
+        # Parameters estimated + variance. The scale is always an estimated
+        # parameter (every reported logLik is a concentrated likelihood).
+        nParamEstimated <- length(B) + 1 + nStatesBackcasting;
 
         # Prepare for fitting
         elements <- filler(B, matVt[,1:lagsModelMax,drop=FALSE], matF, vecG, matWt);
@@ -825,11 +827,14 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     logLikValue <- structure(logLikFunction(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt),
                              nobs=obsInSample, df=nParamEstimated, class="logLik");
 
-    adamFitted <- adamCpp$fit(matVt, matWt,
-                              matF, vecG,
-                              indexLookupTable, profilesRecentTable,
-                              yInSample, ot,
-                              any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
+    adamFitted <- adam_fitOrGradient(matVt, matWt,
+                                     matF, vecG,
+                                     indexLookupTable, profilesRecentTable,
+                                     yInSample, ot, initialType, nIterations, adamCpp,
+                                     FALSE, TRUE, xregModel, Etype, "N", "N",
+                                     0, 0, 0, lagsModelAll, lagsModelMax,
+                                     obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
+                                     componentsNumberARIMA, lagsModelAll);
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;

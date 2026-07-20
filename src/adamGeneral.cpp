@@ -47,6 +47,14 @@ namespace Rcpp {
         );
     }
 
+    // Wrapper for GradientSolveGeneralResult
+    template <> SEXP wrap(const GradientSolveGeneralResult& result) {
+        return List::create(
+            Named("profileA") = result.profileA,
+            Named("profileB") = result.profileB
+        );
+    }
+
     // Wrapper for ForecastResult
     template <> SEXP wrap(const ForecastResult& result) {
         return List::create(
@@ -103,5 +111,6 @@ RCPP_MODULE(adamCore_module) {
     .method("simulate", &adamCore::simulate)
     .method("reapply", &adamCore::reapply)
     .method("gradientSolve", &adamCore::gradientSolve)
+    .method("gradientSolveGeneral", &adamCore::gradientSolveGeneral)
     .method("reforecast", &adamCore::reforecast);
 }

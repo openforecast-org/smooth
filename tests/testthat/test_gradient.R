@@ -73,15 +73,32 @@ test_that("gradient handles multiplicative / mixed ETS via Gauss-Newton", {
     expect_lt(dG, dB + 1)
 })
 
-test_that("gradient falls back to backcasting for unsupported specifications", {
-    # ARIMA is out of scope (no ARIMA/xreg/multi-seasonality yet): the fit must
-    # fall back to backcasting (identical result), even though the requested
-    # initial label stays "gradient".
+test_that("gradient solves additive ARIMA initials to optimal quality", {
+    # Additive ARIMA is in scope: the gradient solve profiles the initials by
+    # least squares (residuals are affine in the initial profile for additive
+    # SSOE), matching the optimal-initials SSE at the same dynamics and beating
+    # backcasting.
     set.seed(1)
     y <- ts(cumsum(rnorm(80, 0.1, 1)) + 100)
-    fB <- adam(y, "NNN", orders = list(ar = c(1), i = c(1), ma = c(1)),
+    af <- list(ar = 0.4, ma = 0.3)
+    fO <- adam(y, "NNN", orders = list(ar = 1, i = 1, ma = 1), arma = af,
+               initial = "optimal", loss = "MSE", silent = TRUE)
+    fB <- adam(y, "NNN", orders = list(ar = 1, i = 1, ma = 1), arma = af,
+               initial = "backcasting", loss = "MSE", silent = TRUE)
+    fG <- adam(y, "NNN", orders = list(ar = 1, i = 1, ma = 1), arma = af,
+               initial = "gradient", loss = "MSE", silent = TRUE)
+    expect_equal(sum(residuals(fG)^2), sum(residuals(fO)^2), tolerance = 1e-3)
+    expect_lt(sum(residuals(fG)^2), sum(residuals(fB)^2))
+})
+
+test_that("multiplicative ARIMA gradient falls back to backcasting", {
+    # Multiplicative ARIMA would take the ETS-only Gauss-Newton Jacobian path,
+    # so it falls back to backcasting (identical result), not the affine solve.
+    set.seed(1)
+    y <- ts(abs(cumsum(rnorm(80, 0.1, 1))) + 100)
+    fB <- adam(y, "MNN", orders = list(ar = 1, i = 1, ma = 1),
                initial = "backcasting", silent = TRUE)
-    fG <- suppressWarnings(adam(y, "NNN", orders = list(ar = c(1), i = c(1), ma = c(1)),
+    fG <- suppressWarnings(adam(y, "MNN", orders = list(ar = 1, i = 1, ma = 1),
                                 initial = "gradient", silent = TRUE))
     expect_equal(logLik(fG), logLik(fB), tolerance = 1e-8)
 })
@@ -152,4 +169,92 @@ test_that("gradient with a custom loss function falls back to backcasting", {
     fG <- suppressMessages(adam(xLoss, "AAA", initial = "gradient",
                                 loss = lossCustom, silent = TRUE))
     expect_equal(fG$lossValue, fB$lossValue, tolerance = 1e-8)
+})
+
+test_that("gradient solves om ARIMA and xreg initials (occurrence)", {
+    # Occurrence models with ARIMA / xreg components profile the probability
+    # residual over the initials via the finite-difference Gauss-Newton solve
+    # (the analytic Jacobian companions are ETS-only). At fixed persistence the
+    # gradient fit must reach optimal-quality likelihood and differ from
+    # backcasting. odds-ratio keeps the probability bounded (no saturation).
+    set.seed(11)
+    pp <- plogis(0.5 + cumsum(rnorm(120, 0, 0.15)))
+    ot <- rbinom(120, 1, pp); y <- ot * (10 + rnorm(120))
+    # ARIMA(1,1,1) with fixed arma and persistence -> a clean fixed-dynamics solve
+    fO <- om(y, model = "NNN", occurrence = "odds-ratio", orders = list(ar = 1, i = 1, ma = 1),
+             arma = list(ar = 0.3, ma = 0.2), initial = "optimal", silent = TRUE)
+    fB <- om(y, model = "NNN", occurrence = "odds-ratio", orders = list(ar = 1, i = 1, ma = 1),
+             arma = list(ar = 0.3, ma = 0.2), initial = "backcasting", silent = TRUE)
+    fG <- om(y, model = "NNN", occurrence = "odds-ratio", orders = list(ar = 1, i = 1, ma = 1),
+             arma = list(ar = 0.3, ma = 0.2), initial = "gradient", silent = TRUE)
+    expect_true(is.finite(logLik(fG)))
+    expect_gt(as.numeric(logLik(fG)), as.numeric(logLik(fB)))            # beats backcasting
+    expect_gt(as.numeric(logLik(fG)), as.numeric(logLik(fO)) - 0.5)      # ~optimal quality
+
+    # xreg (odds-ratio, fixed persistence): the coefficients are solved initials.
+    set.seed(22)
+    nn <- 150; x1 <- rnorm(nn); x2 <- cumsum(rnorm(nn, 0, 0.3))
+    p2 <- plogis(-0.3 + 0.8 * x1 + 0.5 * x2); o2 <- rbinom(nn, 1, p2)
+    xdata <- data.frame(y = o2 * (20 + rnorm(nn)), x1 = x1, x2 = x2)
+    gB <- om(xdata, model = "ANN", occurrence = "odds-ratio", persistence = 0.05,
+             initial = "backcasting", silent = TRUE)
+    gG <- om(xdata, model = "ANN", occurrence = "odds-ratio", persistence = 0.05,
+             initial = "gradient", silent = TRUE)
+    expect_true(is.finite(logLik(gG)))
+    expect_false(isTRUE(all.equal(as.numeric(logLik(gB)), as.numeric(logLik(gG)))))
+    expect_gte(as.numeric(logLik(gG)), as.numeric(logLik(gB)) - 1e-6)
+})
+
+test_that("gradient solves the coupled omg initials (ETS / ARIMA)", {
+    # omg couples two occurrence sub-models through one shared probability, so
+    # the two initial profiles are solved jointly by the coupled Gauss-Newton
+    # solve (gradientSolveGeneral). It must run (not fall back), stay finite and
+    # differ from backcasting, on both ETS and ARIMA sub-models.
+    set.seed(7)
+    pp <- plogis(0.3 + cumsum(rnorm(120, 0, 0.12)))
+    ot <- rbinom(120, 1, pp); y <- ot * (15 + rnorm(120))
+    fB <- omg(y, modelA = "MNN", modelB = "MNN", initial = "backcasting", silent = TRUE)
+    fG <- omg(y, modelA = "MNN", modelB = "MNN", initial = "gradient", silent = TRUE)
+    expect_true(is.finite(logLik(fG)))
+    expect_false(isTRUE(all.equal(as.numeric(logLik(fB)), as.numeric(logLik(fG)))))
+
+    aB <- omg(y, modelA = "NNN", modelB = "NNN",
+              ordersA = list(ar = 1, i = 1, ma = 1), ordersB = list(ar = 1, i = 1, ma = 1),
+              initial = "backcasting", silent = TRUE)
+    aG <- omg(y, modelA = "NNN", modelB = "NNN",
+              ordersA = list(ar = 1, i = 1, ma = 1), ordersB = list(ar = 1, i = 1, ma = 1),
+              initial = "gradient", silent = TRUE)
+    expect_true(is.finite(logLik(aG)))
+    expect_false(isTRUE(all.equal(as.numeric(logLik(aB)), as.numeric(logLik(aG)))))
+
+    # The reported fitted is the coupled probability, so its Bernoulli must
+    # equal the reported logLik exactly (fitted and logLik mutually consistent).
+    otv <- as.numeric(y != 0)
+    for (mdl in list(fB, fG, aB, aG)) {
+        pf <- as.numeric(mdl$fitted)
+        ll <- sum(otv * log(pf) + (1 - otv) * log(1 - pf))
+        expect_equal(as.numeric(logLik(mdl)), ll, tolerance = 1e-9)
+    }
+})
+
+test_that("gradient solves additive SSOE initials for CES/GUM/SSARIMA/SPARMA", {
+    # These are additive SSOE models, so the affine least-squares gradient solve
+    # applies: it must run (not fall back), differ from backcasting, and not lose
+    # to backcasting on the in-sample SSE.
+    set.seed(1)
+    y <- ts(100 + cumsum(rnorm(120, 0, 2)))
+    engines <- list(
+        SSARIMA = function(i) ssarima(y, orders = list(ar = 1, i = 1, ma = 1), lags = 1,
+                                      initial = i, loss = "MSE", silent = TRUE),
+        SPARMA  = function(i) sparma(y, orders = list(ar = 1, ma = 1), lags = 1,
+                                     initial = i, loss = "MSE", silent = TRUE),
+        GUM     = function(i) gum(y, orders = 2, lags = 1, initial = i, loss = "MSE", silent = TRUE),
+        CES     = function(i) ces(y, seasonality = "none", initial = i, loss = "MSE", silent = TRUE))
+    for(fn in engines){
+        mb <- fn("backcasting"); mg <- fn("gradient")
+        sseB <- sum(residuals(mb)^2); sseG <- sum(residuals(mg)^2)
+        expect_true(is.finite(sseG))
+        expect_false(isTRUE(all.equal(sseB, sseG, tolerance = 1e-6)))  # genuinely solved
+        expect_lte(sseG, sseB * 1.001 + 1e-6)                          # no worse than backcasting
+    }
 })

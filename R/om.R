@@ -726,7 +726,35 @@ om <- function(data,
         B_used <- res$solution;
         names(B_used) <- names(BValues$B);
         CFValue <- res$objective;
-        nParamEstimated <- length(B_used);
+
+        # Initial states consume the same df however obtained (mirrors adam):
+        # added when backcast/complete/gradient (not in B), redundancy subtracted
+        # when optimised. The occurrence model is Bernoulli, so there is no scale
+        # parameter. See dfInitialsETSLevelSeasonal().
+        etsRedundancy <- 0;
+        dfInitials <- 0;
+        if(etsModel){
+            seasonalLagsEstimated <- if(modelIsSeasonal){
+                lagsModelSeasonal[as.logical(initialSeasonalEstimate)];
+            } else {
+                numeric(0);
+            }
+            dfLevelSeasonal <- dfInitialsETSLevelSeasonal(seasonalLagsEstimated,
+                                                          as.logical(initialLevelEstimate));
+            naiveLevelSeasonal <- initialLevelEstimate +
+                modelIsSeasonal*sum(initialSeasonalEstimate*(lagsModelSeasonal-1));
+            etsRedundancy <- naiveLevelSeasonal - dfLevelSeasonal;
+            dfInitials <- dfLevelSeasonal + modelIsTrendy*initialTrendEstimate;
+        }
+        if(arimaModel){
+            dfInitials <- dfInitials + initialArimaNumber*initialArimaEstimate;
+        }
+        nStatesBackcasting <- 0;
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            nStatesBackcasting <- dfInitials;
+            etsRedundancy <- 0;
+        }
+        nParamEstimated <- length(B_used) + nStatesBackcasting - etsRedundancy;
         logLikValue <- -CFValue;
 
         # Fisher Information is NOT computed inside omEstimator. The canonical
@@ -881,7 +909,10 @@ om <- function(data,
                                          adamArchitect$componentsNumberETSSeasonal,
                                          adamArchitect$componentsNumberETSNonSeasonal,
                                          adamArchitect$lagsModel, adamArchitect$lagsModelMax,
-                                         obsInSample, loss, oType=occurrenceChar);
+                                         obsInSample, loss, oType=occurrenceChar,
+                                         componentsNumberARIMA=componentsNumberARIMA,
+                                         lagsModelAll=adamArchitect$lagsModelAll,
+                                         xregNumber=xregNumber);
         yFitted <- omLinkFunction(adamFitted$fitted, nla$Etype, occurrence);
 
         # The occurrence model's log-likelihood is ALWAYS the Bernoulli
@@ -1801,7 +1832,9 @@ omCF_local <- function(B,
                                      etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                      componentsNumberETS, componentsNumberETSSeasonal,
                                      componentsNumberETSNonSeasonal, lagsModel, lagsModelMax,
-                                     obsInSample, loss, oType=occurrenceChar);
+                                     obsInSample, loss, oType=occurrenceChar,
+                                     componentsNumberARIMA=componentsNumberARIMA,
+                                     lagsModelAll=lagsModelAll, xregNumber=xregNumber);
     yFitted <- omLinkFunction(adamFitted$fitted, Etype, occurrence);
     if(any(is.nan(yFitted)) || any(yFitted<0) || any(yFitted>1)){
         return(1e+300);

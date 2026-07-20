@@ -226,13 +226,49 @@ class OMG:
         self._cf_value = float(cf_value)
         self._B_joint = np.array(B_used, dtype=float)
         self._n_params_a = n_params_a
-        self._loglik = -self._cf_value
+
+        # Coupled fitted probability, from the same recursion the optimiser
+        # minimised (re-run omg_cf at the final B). Its Bernoulli is the logLik,
+        # so fitted and logLik stay mutually consistent for every loss — the
+        # standalone per-side refits (model_a/model_b below) only approximate it
+        # and are kept for sub-model diagnostics. Mirrors R's omgCF_local.
+        ot = np.asarray(side_a["observations_dict"]["ot"], dtype=np.float64)
+        self._fitted_combined = np.asarray(
+            omg_cf(
+                B_used,
+                side_a=side_a,
+                side_b=side_b,
+                n_params_a=n_params_a,
+                observations_dict=side_a["observations_dict"],
+                bounds=self.bounds,
+                adam_ets=(self.ets == "adam"),
+                loss=self.loss,  # type: ignore[arg-type]
+                loss_function=self.loss_function,
+                reg_lambda=self.reg_lambda,
+                return_fitted=True,
+            ),
+            dtype=np.float64,
+        ).ravel()
+        self._residuals_combined = ot - self._fitted_combined
+        self._ot = ot
+        self._loglik = float(
+            np.sum(
+                ot * np.log(self._fitted_combined)
+                + (1.0 - ot) * np.log(1.0 - self._fitted_combined)
+            )
+        )
 
         # Information-criterion bookkeeping mirrors OM (must be set before
         # building sub-models — _om_from_side reads _log_lik_dict and
         # _ic_value).
         nobs = side_a["observations_dict"]["obs_in_sample"]
-        df = len(B_used)
+        # Both sides' initials count towards df like a single OM, so the
+        # OM-vs-OMG selection is fair (mirrors the om initial-df fix).
+        df = (
+            len(B_used)
+            + side_a["scaffold"]._om_initials_df()
+            + side_b["scaffold"]._om_initials_df()
+        )
         self._log_lik_dict = {"value": self._loglik, "nobs": nobs, "df": df}
         self._ic_value = ic_function(self.ic, self._log_lik_dict)
 
@@ -242,24 +278,6 @@ class OMG:
         self.model_b = self._om_from_side(
             side_b, B_used[n_params_a:], "inverse-odds-ratio"
         )
-
-        # Combined probability built from each sub-model's raw fitted values
-        # through the OMG link function. Fall back to the joint omfitGeneral
-        # result when individual re-fits produce NaN (can happen for certain
-        # ARIMA configurations during backcasting).
-        raw_a = np.asarray(self.model_a._prepared["y_fitted_raw"]).ravel()
-        raw_b = np.asarray(self.model_b._prepared["y_fitted_raw"]).ravel()
-        e_a = side_a["model_type_dict"]["error_type"]
-        e_b = side_b["model_type_dict"]["error_type"]
-        if np.any(np.isnan(raw_a)) or np.any(np.isnan(raw_b)):
-            self._fitted_combined = self._joint_fitted(
-                B_used, side_a, side_b, n_params_a
-            )
-        else:
-            self._fitted_combined = omg_link_function(raw_a, raw_b, e_a, e_b)
-        ot = np.asarray(side_a["observations_dict"]["ot"], dtype=np.float64)
-        self._residuals_combined = ot - self._fitted_combined
-        self._ot = ot
         # Preserve the raw input y for ``actuals`` — equivalent to R's
         # storing the original series on the omg object so that ``actuals(omg)``
         # returns the same type and content as ``actuals(om)`` would.
@@ -1065,105 +1083,6 @@ class OMG:
     # ---------------------------------------------------------------------
     # Build per-sub-model OM objects from the joint estimate
     # ---------------------------------------------------------------------
-
-    def _joint_fitted(self, B_used, side_a, side_b, n_params_a):
-        """Run omfitGeneral with the final optimised B and return p_combined.
-
-        Uses the same joint C++ path as the cost function, which is numerically
-        stable even when individual sub-model re-fits (om_preparator) would
-        diverge (e.g. certain ARIMA configurations during backcasting).
-        """
-
-        def _f(x, dtype=np.float64):
-            return np.asfortranarray(x, dtype=dtype)
-
-        B_A = B_used[:n_params_a]
-        B_B = B_used[n_params_a:]
-
-        from smooth.adam_general.core.creator import filler
-
-        elem_a = filler(
-            B_A,
-            model_type_dict=side_a["model_type_dict"],
-            components_dict=side_a["components_dict"],
-            lags_dict=side_a["lags_dict"],
-            matrices_dict=side_a["matrices_dict"],
-            persistence_checked=side_a["persistence"],
-            initials_checked=side_a["initials"],
-            arima_checked=side_a["arima"],
-            explanatory_checked=side_a["explanatory"],
-            phi_dict=side_a["phi"],
-            constants_checked=side_a["constant"],
-            adam_cpp=side_a["adam_cpp"],
-        )
-        elem_b = filler(
-            B_B,
-            model_type_dict=side_b["model_type_dict"],
-            components_dict=side_b["components_dict"],
-            lags_dict=side_b["lags_dict"],
-            matrices_dict=side_b["matrices_dict"],
-            persistence_checked=side_b["persistence"],
-            initials_checked=side_b["initials"],
-            arima_checked=side_b["arima"],
-            explanatory_checked=side_b["explanatory"],
-            phi_dict=side_b["phi"],
-            constants_checked=side_b["constant"],
-            adam_cpp=side_b["adam_cpp"],
-        )
-        side_a["profile"]["profiles_recent_table"][:] = elem_a["mat_vt"][
-            :, : side_a["lags_dict"]["lags_model_max"]
-        ]
-        side_b["profile"]["profiles_recent_table"][:] = elem_b["mat_vt"][
-            :, : side_b["lags_dict"]["lags_model_max"]
-        ]
-
-        initials_a = side_a["initials"]
-        if isinstance(initials_a["initial_type"], list):
-            backcast = any(
-                t in ("complete", "backcasting") for t in initials_a["initial_type"]
-            )
-        else:
-            backcast = initials_a["initial_type"] in ("complete", "backcasting")
-
-        ot = np.asarray(side_a["observations_dict"]["ot"], dtype=np.float64)
-        res = side_a["adam_cpp"].omfitGeneral(
-            matrixVtA=_f(elem_a["mat_vt"]),
-            matrixWtA=_f(elem_a["mat_wt"]),
-            matrixFA=_f(elem_a["mat_f"]),
-            vectorGA=_f(elem_a["vec_g"]),
-            indexLookupTableA=_f(side_a["profile"]["index_lookup_table"], np.uint64),
-            profilesRecentA=_f(side_a["profile"]["profiles_recent_table"]),
-            EB=side_b["model_type_dict"]["error_type"],
-            TB=side_b["model_type_dict"]["trend_type"],
-            SB=side_b["model_type_dict"]["season_type"],
-            nNonSeasonalB=int(
-                side_b["components_dict"]["components_number_ets_non_seasonal"]
-            ),
-            nSeasonalB=int(side_b["components_dict"]["components_number_ets_seasonal"]),
-            nETSB=int(side_b["components_dict"]["components_number_ets"]),
-            nArimaB=int(side_b["components_dict"].get("components_number_arima", 0)),
-            nXregB=int(side_b["explanatory"].get("xreg_number", 0)),
-            nComponentsB=int(side_b["components_dict"]["components_number_all"]),
-            constantB=bool(side_b["constant"].get("constant_required", False)),
-            adamETSB=False,
-            matrixVtB=_f(elem_b["mat_vt"]),
-            matrixWtB=_f(elem_b["mat_wt"]),
-            matrixFB=_f(elem_b["mat_f"]),
-            vectorGB=_f(elem_b["vec_g"]),
-            indexLookupTableB=_f(side_b["profile"]["index_lookup_table"], np.uint64),
-            profilesRecentB=_f(side_b["profile"]["profiles_recent_table"]),
-            vectorOt=ot,
-            backcast=backcast,
-            nIterations=int(initials_a["n_iterations"]),
-        )
-        e_a = side_a["model_type_dict"]["error_type"]
-        e_b = side_b["model_type_dict"]["error_type"]
-        return omg_link_function(
-            np.asarray(res.fittedA).ravel(),
-            np.asarray(res.fittedB).ravel(),
-            e_a,
-            e_b,
-        )
 
     def _om_from_side(self, side, B, occurrence_str) -> OM:
         scaffold: OM = side["scaffold"]

@@ -197,6 +197,7 @@ def om_cf(  # noqa: N802
         obs_in_sample=observations_dict["obs_in_sample"],
         o_type=occurrence_char,
         loss=general.get("loss", "likelihood"),
+        xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
     )
 
     # 4. Apply link function to raw fitted output

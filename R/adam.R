@@ -775,7 +775,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -1154,7 +1154,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                  etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                                  componentsNumberETS, componentsNumberETSSeasonal,
                                                  componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                                 loss, distribution, other, horizon, multisteps);
+                                                 loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
                 logLikReturn[] <- logLikReturn - sum(log(abs(adamFitted$fitted)));
             }
 
@@ -1539,22 +1539,45 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             CFValue[] <- 0;
         }
 
+        # Initial states consume the SAME degrees of freedom however they are
+        # obtained (optimised, backcast, complete-backcast or gradient-solved):
+        # the identifiable count of the initial-state design. Under "optimal"
+        # the initials sit in B (at the naive seasonal count), so only the ETS
+        # seasonal cross-block redundancy is SUBTRACTED; otherwise the identifiable
+        # count is ADDED (B carries no initials). See dfInitialsETSLevelSeasonal().
         nStatesBackcasting <- 0;
-        # With initial="gradient" the ETS initials are solved by least squares
-        # rather than placed in the optimiser's B vector, but they are genuinely
-        # estimated and still consume degrees of freedom. Count them exactly as
-        # initial="optimal" does, so the information criteria are comparable.
-        # This applies only in the gradient solve's scope (pure ETS); with ARIMA
-        # or xreg present gradient falls back to backcasting, so it keeps the
-        # historical zero-initial-df accounting there, as do backcasting/complete.
-        if(any(initialType=="gradient") && etsModel && !arimaModel && !xregModel){
-            nStatesBackcasting[] <- initialLevelEstimate +
-                                    modelIsTrendy*initialTrendEstimate +
-                                    modelIsSeasonal*
-                                        sum(initialSeasonalEstimate*(lagsModelSeasonal-1));
+        etsRedundancy <- 0;
+        dfInitials <- 0;
+        if(etsModel){
+            seasonalLagsEstimated <- if(modelIsSeasonal){
+                lagsModelSeasonal[as.logical(initialSeasonalEstimate)];
+            } else {
+                numeric(0);
+            }
+            dfLevelSeasonal <- dfInitialsETSLevelSeasonal(seasonalLagsEstimated,
+                                                          as.logical(initialLevelEstimate));
+            naiveLevelSeasonal <- initialLevelEstimate +
+                modelIsSeasonal*sum(initialSeasonalEstimate*(lagsModelSeasonal-1));
+            etsRedundancy <- naiveLevelSeasonal - dfLevelSeasonal;
+            dfInitials <- dfLevelSeasonal + modelIsTrendy*initialTrendEstimate;
+        }
+        if(arimaModel){
+            # The ARIMA initials estimated under "optimal" number initialArimaNumber
+            # (= max ARIMA lag); this equals the identifiable rank of the ARIMA
+            # initial-state design (the over-parameterised lower lags are redundant).
+            dfInitials <- dfInitials + initialArimaNumber*initialArimaEstimate;
+        }
+        # xreg initials are backcast only under "complete"; otherwise the xreg
+        # coefficients are in B and already counted there.
+        if(xregModel && any(initialType=="complete")){
+            dfInitials <- dfInitials + xregNumber*initialXregEstimate;
+        }
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            nStatesBackcasting <- dfInitials;
+            etsRedundancy <- 0;
         }
 
-        nParamEstimated <- length(B) + nStatesBackcasting;
+        nParamEstimated <- length(B) + nStatesBackcasting - etsRedundancy;
         # Return a proper logLik class
         logLikADAMValue <- structure(logLikADAM(B,
                                                 etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal, yInSample,
@@ -1579,8 +1602,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                 bounds, loss, lossFunction, distributionNew, horizon, multisteps,
                                                 denominator, yDenominator, other, otherParameterEstimate, lambda,
                                                 arPolynomialMatrix, maPolynomialMatrix, adamCpp),
-                                     # In case of likelihood, we typically have one more parameter to estimate - scale.
-                                     nobs=obsInSample,df=nParamEstimated+(loss=="likelihood"),class="logLik");
+                                     # The distribution scale is always an estimated
+                                     # parameter: every reported logLik is a concentrated
+                                     # likelihood, so the scale counts for every loss.
+                                     nobs=obsInSample,df=nParamEstimated+1,class="logLik");
         xregIndex <- 1;
         #### If we do variables selection, do it here, then reestimate the model. ####
         if(regressors=="select"){
@@ -1641,7 +1666,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                              etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                              componentsNumberETS, componentsNumberETSSeasonal,
                                              componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                             loss, distributionNew, other, horizon, multisteps);
+                                             loss, distributionNew, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
 
             # Extract the errors correctly
             errors <- switch(distributionNew,
@@ -1929,7 +1954,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
 
         matVt[] <- adamFitted$states;
 
@@ -2334,10 +2359,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 max(xregParametersPersistence)*persistenceXregEstimate;
             parametersNumber[1,1] <- parametersNumber[1,1] - parametersNumber[1,2];
         }
-        # If we used likelihood, scale was estimated
-        if((loss=="likelihood")){
-            parametersNumber[1,4] <- 1;
-        }
+        # The distribution scale is always estimated (concentrated likelihood).
+        parametersNumber[1,4] <- 1;
         parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
         parametersNumber[2,5] <- sum(parametersNumber[2,1:4]);
     }
@@ -2411,10 +2434,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             parametersNumber[1,2] <- xregNumber*initialXregEstimate + xregNumber*persistenceXregEstimate;
             parametersNumber[1,1] <- parametersNumber[1,1] - parametersNumber[1,2];
         }
-        # If we used likelihood, scale was estimated
-        if((loss=="likelihood")){
-            parametersNumber[1,4] <- 1;
-        }
+        # The distribution scale is always estimated (concentrated likelihood).
+        parametersNumber[1,4] <- 1;
         parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
         parametersNumber[2,5] <- sum(parametersNumber[2,1:4]);
     }
@@ -2561,10 +2582,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             if(xregModel){
                 parametersNumber[1,2] <- xregNumber*initialXregEstimate + xregNumber*persistenceXregEstimate;
             }
-            # If we used likelihood, scale was estimated
-            if((loss=="likelihood")){
-                parametersNumber[1,4] <- 1;
-            }
+            # The distribution scale is always estimated (concentrated likelihood).
+            parametersNumber[1,4] <- 1;
             parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
             parametersNumber[2,5] <- sum(parametersNumber[2,1:4]);
 

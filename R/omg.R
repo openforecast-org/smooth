@@ -652,7 +652,11 @@ omg <- function(data,
             ot=ot, otLogical=otLogical, obsInSample=obsInSample,
             nIterations=nIterations,
             nParamsA=nParamsA,
-            loss=loss, lossFunction=omgUserLossFunction, lambda=lambda)
+            loss=loss, lossFunction=omgUserLossFunction, lambda=lambda,
+            # nloptr's .checkfunargs requires every eval_f formal to be present;
+            # the optimiser passes FALSE (returns the loss). The final coupled
+            # fitted is obtained by re-calling omgCF_local with this overridden.
+            returnFitted=FALSE)
 
         # --------------------------------------------------------------
         # FI placeholder. Populated when modelDo=="use" and ellipsis$FI is
@@ -905,12 +909,26 @@ omg <- function(data,
                                   checker$constantRequired, checker$initialArimaNumber)
 
         prof <- adamFilled$matVt[, seq_len(adamArchitect$lagsModelMax), drop=FALSE]
-        adamFitted <- adamArchitect$adamCpp$fit(
+        # Each side is reported as a standalone occurrence fit (as for
+        # backcasting/optimal); for initial="gradient" the dispatcher solves the
+        # side's initials by profiling its own occurrence loss. Non-gradient
+        # initials fall straight through to the ordinary fit with the same
+        # backcast flag, so backcasting/optimal are unchanged.
+        adamFitted <- adam_fitOrGradient(
             adamFilled$matVt, adamFilled$matWt, adamFilled$matF, adamFilled$vecG,
             adamArchitect$indexLookupTable, prof,
             as.numeric(ot), as.numeric(ot),
-            any(checker$initialType == c("complete","backcasting")),
-            nIterations, occurrenceChar)
+            checker$initialType, nIterations, adamArchitect$adamCpp,
+            checker$etsModel, checker$arimaModel, checker$xregModel,
+            checker$Etype, checker$Ttype, checker$Stype,
+            adamArchitect$componentsNumberETS,
+            adamArchitect$componentsNumberETSSeasonal,
+            adamArchitect$componentsNumberETSNonSeasonal,
+            adamArchitect$lagsModel, adamArchitect$lagsModelMax,
+            obsInSample, loss, oType=occurrenceChar,
+            componentsNumberARIMA=checker$componentsNumberARIMA,
+            lagsModelAll=adamArchitect$lagsModelAll,
+            xregNumber=checker$xregNumber)
 
         yFitted <- adamFitted$fitted
 
@@ -1104,10 +1122,18 @@ omg <- function(data,
     EtypeA <- errorType(modelA)
     EtypeB <- errorType(modelB)
 
-    yFittedA  <- as.vector(modelA$fitted)
-    yFittedB  <- as.vector(modelB$fitted)
+    # The top-level fitted probability comes from the coupled recursion the
+    # optimiser minimised (re-run omgCF_local at the final B), not the standalone
+    # per-side refits. modelA/modelB are kept only for the sub-model diagnostics.
+    pCoupled  <- do.call(omgCF_local,
+                         c(list(B=c(jointResult$B_A, jointResult$B_B)),
+                           modifyList(jointResult$nloptrArgs, list(returnFitted=TRUE))))
     yFitted   <- modelA$fitted
-    yFitted[] <- omgLinkFunction(yFittedA, yFittedB, EtypeA, EtypeB)
+    yFitted[] <- pCoupled
+    # logLik is the Bernoulli of that same coupled probability, so $fitted and
+    # $logLik stay mutually consistent for every loss (mirrors om()).
+    otNumeric <- as.numeric(oInSample)
+    logLikOMG <- sum(otNumeric * log(pCoupled) + (1 - otNumeric) * log(1 - pCoupled))
 
     if(h > 0) {
         yForecast <- modelA$forecast;
@@ -1151,7 +1177,7 @@ omg <- function(data,
         occurrence  = "general",
         lags        = lags,
         lossValue   = jointResult$CFValue,
-        logLik      = jointResult$logLikValue,
+        logLik      = logLikOMG,
         nParam      = {
             nParamMat <- matrix(0, 2, 5,
                                 dimnames=list(c("Estimated","Provided"),
@@ -1266,7 +1292,8 @@ omgCF_local <- function(B,
                         nIterations, nParamsA,
                         loss = "likelihood",
                         lossFunction = NULL,
-                        lambda = 0) {
+                        lambda = 0,
+                        returnFitted = FALSE) {
 
     B_A <- B[seq_len(nParamsA)]
     B_B <- B[seq_len(length(B) - nParamsA) + nParamsA]
@@ -1342,20 +1369,74 @@ omgCF_local <- function(B,
     profilesRecentTableA[] <- elemA$matVt[, seq_len(lagsModelMaxA)]
     profilesRecentTableB[] <- elemB$matVt[, seq_len(lagsModelMaxB)]
 
+    # initial="gradient": profile the two occurrence initials jointly by the
+    # coupled least-squares/Gauss-Newton solve (adamCppA$gradientSolveGeneral)
+    # over the shared probability residual, then run one forward pass from the
+    # solved profiles. Otherwise (or out of scope / custom loss) fall back to
+    # the ordinary coupled fit, with gradient joining the backcasting group.
+    useProfA <- profilesRecentTableA
+    useProfB <- profilesRecentTableB
+    gradBackcast <- any(initialTypeA == c("complete","backcasting","gradient"))
+    gradNIter <- nIterations
+    if(any(initialTypeA == "gradient")){
+        lossCode <- adam_gradientOmLossCode(loss)
+        pbA <- adam_gradientProbeBasis(etsModelA, arimaModelA, xregModelA,
+                                       EtypeA, TtypeA, StypeA,
+                                       componentsNumberETSSeasonalA,
+                                       componentsNumberETSNonSeasonalA,
+                                       componentsNumberETSA, componentsNumberARIMAA,
+                                       nrow(profilesRecentTableA), lagsModelAllA,
+                                       lagsModelMaxA, xregNumberA, "g")
+        pbB <- adam_gradientProbeBasis(etsModelB, arimaModelB, xregModelB,
+                                       EtypeB, TtypeB, StypeB,
+                                       componentsNumberETSSeasonalB,
+                                       componentsNumberETSNonSeasonalB,
+                                       componentsNumberETSB, componentsNumberARIMAB,
+                                       nrow(profilesRecentTableB), lagsModelAllB,
+                                       lagsModelMaxB, xregNumberB, "g")
+        if(!is.null(lossCode) && (!is.null(pbA) || !is.null(pbB))){
+            if(is.null(pbA)){ pbA <- matrix(0, nrow(profilesRecentTableA), 0) }
+            if(is.null(pbB)){ pbB <- matrix(0, nrow(profilesRecentTableB), 0) }
+            solved <- adamCppA$gradientSolveGeneral(
+                elemA$matVt, elemA$matWt, elemA$matF, elemA$vecG,
+                indexLookupTableA, profilesRecentTableA, pbA,
+                EtypeB, TtypeB, StypeB,
+                nNonSeasonalB, nSeasonalB, nETSB, nArimaB, nXregB, nComponentsB,
+                constantRequiredB, adamETSB_flag,
+                elemB$matVt, elemB$matWt, elemB$matF, elemB$vecG,
+                indexLookupTableB, profilesRecentTableB, pbB,
+                as.numeric(ot), 15L, lossCode$code)
+            if(length(solved$profileA) > 0 && length(solved$profileB) > 0){
+                useProfA <- solved$profileA
+                useProfB <- solved$profileB
+                gradBackcast <- FALSE
+                gradNIter <- 1
+            }
+        }
+    }
+
     res <- adamCppA$omfitGeneral(
         elemA$matVt, elemA$matWt, elemA$matF, elemA$vecG,
-        indexLookupTableA, profilesRecentTableA,
+        indexLookupTableA, useProfA,
         EtypeB, TtypeB, StypeB,
         nNonSeasonalB, nSeasonalB, nETSB,
         nArimaB, nXregB, nComponentsB,
         constantRequiredB, adamETSB_flag,
         elemB$matVt, elemB$matWt, elemB$matF, elemB$vecG,
-        indexLookupTableB, profilesRecentTableB,
+        indexLookupTableB, useProfB,
         as.numeric(ot),
-        any(initialTypeA == c("complete","backcasting")),
-        nIterations)
+        gradBackcast,
+        gradNIter)
 
     pCombined <- omgLinkFunction(res$fittedA, res$fittedB, EtypeA, EtypeB)
+
+    # The coupled fitted probability. Returned directly for the final object so
+    # its $fitted (and the Bernoulli logLik computed from it) come from the same
+    # coupled recursion the optimiser minimised — not the standalone per-side
+    # refit, which only approximates it.
+    if(returnFitted){
+        return(pCombined)
+    }
 
     if(any(is.nan(pCombined)) || any(pCombined <= 0) || any(pCombined >= 1)) {
         return(1e+300)

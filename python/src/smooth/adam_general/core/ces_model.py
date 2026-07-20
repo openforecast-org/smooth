@@ -519,18 +519,50 @@ class CES:
         profiles_recent_table[:] = elements["vt"]
         profiles_recent_initial = elements["vt"].copy()
 
-        # Final C++ fit — R lines 985-996
-        adam_fitted = adam_cpp.fit(
-            matrixVt=np.asfortranarray(mat_vt, dtype=np.float64),
-            matrixWt=np.asfortranarray(mat_wt, dtype=np.float64),
-            matrixF=np.asfortranarray(mat_f, dtype=np.float64),
-            vectorG=np.asfortranarray(vec_g.ravel(), dtype=np.float64),
-            indexLookupTable=np.asfortranarray(index_lookup_table, dtype=np.uint64),
-            profilesRecent=np.asfortranarray(profiles_recent_table, dtype=np.float64),
-            vectorYt=np.asfortranarray(y_in_sample, dtype=np.float64).ravel(),
-            vectorOt=np.asfortranarray(ot, dtype=np.float64).ravel(),
-            backcast=initial_type in ("complete", "backcasting", "gradient"),
-            nIterations=int(n_iterations),
+        # Final fit — additive SSOE gradient solve for initial="gradient".
+        from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+
+        adam_fitted = adam_fit_or_gradient(
+            adam_cpp=adam_cpp,
+            mat_vt=np.asfortranarray(mat_vt, dtype=np.float64),
+            mat_wt=np.asfortranarray(mat_wt, dtype=np.float64),
+            mat_f=np.asfortranarray(mat_f, dtype=np.float64),
+            vec_g=np.asfortranarray(vec_g.ravel(), dtype=np.float64),
+            index_lookup_table=np.asfortranarray(index_lookup_table, dtype=np.uint64),
+            profiles_recent_table=np.asfortranarray(
+                profiles_recent_table, dtype=np.float64
+            ),
+            y_in_sample=np.asfortranarray(y_in_sample, dtype=np.float64).ravel(),
+            ot=np.asfortranarray(ot, dtype=np.float64).ravel(),
+            initial_type=initial_type,
+            n_iterations=int(n_iterations),
+            backcast_value=initial_type in ("complete", "backcasting", "gradient"),
+            model_type_dict={
+                "ets_model": False,
+                "arima_model": True,
+                "xreg_model": bool(xreg_model),
+                "error_type": "A",
+                "trend_type": "N",
+                "season_type": "N",
+                "model_is_trendy": False,
+                "model_is_seasonal": False,
+            },
+            components_dict={
+                "components_number_ets": 0,
+                "components_number_ets_seasonal": 0,
+                "components_number_ets_non_seasonal": 0,
+                "components_number_arima": int(components_number),
+            },
+            lags_dict={
+                "lags_model_max": int(lags_model_max),
+                "lags_model": lags_model_all,
+                "lags_model_all": lags_model_all,
+                "lags_model_seasonal": lags_model_seasonal,
+            },
+            obs_in_sample=obs_in_sample,
+            o_type="n",
+            loss=self.loss,
+            distribution="dnorm",
         )
 
         errors = np.array(adam_fitted.errors).ravel()
@@ -626,8 +658,22 @@ class CES:
         # and then defines logLik as -CFValue before the final fit.
         log_lik_value = -cf_value
 
-        # R's CES does not add extra backcasting df on top of length(B) here.
-        n_param_estimated = len(B) + (1 if self.loss == "likelihood" else 0)
+        # Initials count in the df however obtained (optimised or backcast/
+        # complete/gradient) -- the same identifiable count either way. CES has
+        # no multi-seasonal shared-frequency redundancy, so it is the plain
+        # structural count. The scale is always estimated (concentrated
+        # likelihood). Mirrors R (R/adam-ces.R).
+        ces_initial_count = (
+            2 * (self.seasonality != "simple")
+            + lags_model_max * (self.seasonality != "none")
+            + lags_model_max * (self.seasonality in ("full", "simple"))
+        )
+        n_states_backcasting = (
+            ces_initial_count
+            if initial_type in ("backcasting", "complete", "gradient")
+            else 0
+        )
+        n_param_estimated = len(B) + 1 + n_states_backcasting
 
         # Information criteria (reuse existing utilities)
         self.aic = AIC(log_lik_value, nobs=obs_in_sample, df=n_param_estimated)

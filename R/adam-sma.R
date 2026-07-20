@@ -234,19 +234,12 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
         scale <- sqrt(sum(adamFitted$errors^2)/obsInSample);
         cfObjective <- sum(dnorm(x=yInSample, mean=adamFitted$fitted, sd=scale, log=TRUE));
 
-        nStatesBackcasting <- 0;
-        #### This is switched off because in sma() the initial values have almost no effect
-        # on the final values. This is because the weights are 1/n, and the difference
-        # between g=0 and g=1/n is almost non-existent
-
-        # Calculate the number of degrees of freedom coming from states in case of backcasting
-        # nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll,
-        #                                                FALSE, Stype, componentsNumberETSNonSeasonal,
-        #                                                componentsNumberETSSeasonal, vecG, matF,
-        #                                                obsInSample, lagsModelMax, indexLookupTable,
-        #                                                adamCpp);
-
-        logLik <- structure(cfObjective, nobs=obsInSample, df=1+nStatesBackcasting, class="logLik");
+        # SMA is AR(order) with fixed coefficients 1/order. They sum to 1 (a unit
+        # root), so the model is non-stationary and all `order` initial states
+        # persist and are identifiable (rank(X) = order, verified by the probe).
+        # df = order (backcast initials) + 1 (scale). This grows with the order,
+        # so higher orders are penalised in the IC-based order selection.
+        logLik <- structure(cfObjective, nobs=obsInSample, df=order+1, class="logLik");
         ICValue <- icFunction(logLik);
 
         return(ICValue);
@@ -255,7 +248,9 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
 
     # Select the order of sma
     if(orderSelect){
-        maxOrder <- min(200,obsInSample);
+        # df = order + 1, so cap the order to keep the AICc small-sample
+        # correction (denominator obs - df - 1) well defined and positive.
+        maxOrder <- min(200, max(1, obsInSample-3));
         ICs <- rep(NA,maxOrder);
         if(fast){
             # The lowest bound
@@ -325,6 +320,16 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
                      loss="MSE", bounds="none");
 
     smaModel$model <- paste0("SMA(",order,")");
+    # SMA is AR(order) with fixed unit-root coefficients (1/order): all `order`
+    # initial states are identifiable (rank(X) = order), plus the scale, so
+    # df = order + 1. The generic adam "use" path SMA is built on hardcodes
+    # df = 1, so set the correct value here.
+    smaModel$nParam[] <- 0;
+    smaModel$nParam[1,1] <- order;
+    smaModel$nParam[1,4] <- 1;
+    smaModel$nParam[1,5] <- order+1;
+    smaModel$logLik <- structure(as.numeric(smaModel$logLik), nobs=nobs(smaModel),
+                                 df=order+1, class="logLik");
     smaModel$timeElapsed <- Sys.time()-startTime;
     smaModel$call <- cl;
     if(orderSelect){

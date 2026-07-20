@@ -239,7 +239,7 @@ class TestRComparisonWithR:
         smaller model has the strictly lower AICc and is what Python's
         `AutoMSARIMA` selects.
         """
-        expected_aicc = 1101.64
+        expected_aicc = 1139.06
         assert np.isclose(fitted_seasonal.aicc, expected_aicc, rtol=1e-3), (
             f"AICc {fitted_seasonal.aicc:.4f} differs from expected {expected_aicc}"
         )

@@ -398,11 +398,15 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         profilesRecentTable[] <- matricesFilled$matVt[,1:lagsModelMax];
 
         # Fit using C++ function
-        adamFitted <- adamCpp$fit(matricesFilled$matVt, matricesFilled$matWt,
-                                  matricesFilled$matF, matricesFilled$vecG,
-                                  indexLookupTable, profilesRecentTable,
-                                  yInSample, ot,
-                                  any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
+        # Additive SSOE: initial="gradient" profiles the initials by least squares.
+        adamFitted <- adam_fitOrGradient(matricesFilled$matVt, matricesFilled$matWt,
+                                         matricesFilled$matF, matricesFilled$vecG,
+                                         indexLookupTable, profilesRecentTable,
+                                         yInSample, ot, initialType, nIterations, adamCpp,
+                                         FALSE, TRUE, FALSE, "A", "N", "N",
+                                         0, 0, 0, lagsModelAll, lagsModelMax,
+                                         obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
+                                         componentsNumberARIMA, lagsModelAll);
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -528,25 +532,12 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         CFValue <- CF(B);
     }
 
+    # Identifiable initial-state df of SPARMA: the number of state initials
+    # (= sum of the component lags; xreg counted separately), the same whether
+    # optimised or backcast/complete/gradient. No multi-seasonal redundancy.
     nStatesBackcasting <- 0;
-    # Calculate the number of degrees of freedom coming from states in case of backcasting
-    if(any(initialType==c("backcasting","complete"))){
-        # Fill matrices with parameters from B
-        matricesFilled <- sparmaMatricesFiller(B, matricesCreated,
-                                               arRequired, maRequired, constantRequired,
-                                               arEstimate, maEstimate, constantEstimate,
-                                               arValue, maValue, constantValue,
-                                               lagsModelAll, lagsModelMax,
-                                               nonZeroARI, nonZeroMA,
-                                               componentsNumberARIMA,
-                                               p, q, pLength, qLength,
-                                               initialType);
-
-        nStatesBackcasting[] <- calculateBackcastingDF(profilesRecentTable, lagsModelAll,
-                                                       FALSE, Stype, componentsNumberETSNonSeasonal,
-                                                       componentsNumberETSSeasonal, matricesFilled$vecG, matricesFilled$matF,
-                                                       obsInSample, lagsModelMax, indexLookupTable,
-                                                       adamCpp);
+    if(any(initialType==c("backcasting","complete","gradient"))){
+        nStatesBackcasting[] <- sum(lagsModelAll) - xregNumber;
     }
 
     # Parameters estimated + variance
@@ -567,11 +558,14 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     profilesRecentInitial[] <- profilesRecentTable[] <- matricesFinal$matVt[,1:lagsModelMax];
 
     # Fit using C++ function
-    adamFitted <- adamCpp$fit(matricesFinal$matVt, matricesFinal$matWt,
-                              matricesFinal$matF, matricesFinal$vecG,
-                              indexLookupTable, profilesRecentTable,
-                              yInSample, ot,
-                              any(initialType==c("complete","backcasting","gradient")), nIterations, "n");
+    adamFitted <- adam_fitOrGradient(matricesFinal$matVt, matricesFinal$matWt,
+                                     matricesFinal$matF, matricesFinal$vecG,
+                                     indexLookupTable, profilesRecentTable,
+                                     yInSample, ot, initialType, nIterations, adamCpp,
+                                     FALSE, TRUE, FALSE, "A", "N", "N",
+                                     0, 0, 0, lagsModelAll, lagsModelMax,
+                                     obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
+                                     componentsNumberARIMA, lagsModelAll);
 
     # Prepare fitted and error with ts / zoo
     if(any(yClasses=="ts")){
@@ -658,7 +652,8 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         }
     }
 
-    parametersNumber[1,4] <- (loss=="likelihood")*1;
+    # The distribution scale is always estimated (concentrated likelihood).
+    parametersNumber[1,4] <- 1;
     parametersNumber[1,5] <- sum(parametersNumber[1,]);
 
     ##### Return values #####

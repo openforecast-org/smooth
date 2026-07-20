@@ -41,6 +41,11 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("errorsB",  &OmFitGeneralResult::errorsB)
         .def_readonly("profileB", &OmFitGeneralResult::profileB);
 
+    // Bind GradientSolveGeneralResult struct
+    py::class_<GradientSolveGeneralResult>(m, "GradientSolveGeneralResult")
+        .def_readonly("profileA", &GradientSolveGeneralResult::profileA)
+        .def_readonly("profileB", &GradientSolveGeneralResult::profileB);
+
     // Bind ForecastResult struct
     py::class_<ForecastResult>(m, "ForecastResult")
         .def_readonly("forecast", &ForecastResult::forecast);
@@ -178,6 +183,35 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("lossType"),
             py::arg("lossParams"),
             py::arg("O"))
+        .def("gradientSolveGeneral", &adamCore::gradientSolveGeneral,
+            py::arg("matrixVtA"),
+            py::arg("matrixWtA"),
+            py::arg("matrixFA"),
+            py::arg("vectorGA"),
+            py::arg("indexLookupTableA"),
+            py::arg("profileA"),
+            py::arg("probeBasisA"),
+            py::arg("EB"),
+            py::arg("TB"),
+            py::arg("SB"),
+            py::arg("nNonSeasonalB"),
+            py::arg("nSeasonalB"),
+            py::arg("nETSB"),
+            py::arg("nArimaB"),
+            py::arg("nXregB"),
+            py::arg("nComponentsB"),
+            py::arg("constantB"),
+            py::arg("adamETSB"),
+            py::arg("matrixVtB"),
+            py::arg("matrixWtB"),
+            py::arg("matrixFB"),
+            py::arg("vectorGB"),
+            py::arg("indexLookupTableB"),
+            py::arg("profileB"),
+            py::arg("probeBasisB"),
+            py::arg("vectorOt"),
+            py::arg("nIterations"),
+            py::arg("lossType"))
         .def("reforecast", &adamCore::reforecast,
             py::arg("arrayErrors"),
             py::arg("arrayOt"),

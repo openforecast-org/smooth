@@ -100,6 +100,8 @@ def adam_gradient_probe_basis(
     components_number_ets=0,
     components_number_arima=0,
     lags_model_all=None,
+    xreg_number=0,
+    o_type="n",
 ):
     """Build the probe basis for gradient initialisation.
 
@@ -108,16 +110,21 @@ def adam_gradient_probe_basis(
     together as one free initial parameter. ETS: level and trend span all head
     columns, each seasonal cell is its own parameter. ARIMA: each state's lag
     slots are free parameters (the rank-revealing solve drops redundant
-    directions) -- included only for ADDITIVE models (the exact affine
-    least-squares branch). Multiplicative ARIMA and xreg fall back (``None``).
+    directions). xreg: each regression coefficient (row after ETS+ARIMA, lag 1).
+
+    On the demand path (``o_type == "n"``) the Gauss-Newton branch uses the
+    ETS-only analytic Jacobian, so multiplicative ARIMA and any xreg fall back
+    (``None``). On the occurrence path the solve drops to the finite-difference
+    Jacobian (fully general), so ARIMA and xreg initials are solvable there.
     Mirrors ``adam_gradientProbeBasis``.
     """
-    if xreg_model:
-        return None
+    demand = o_type == "n"
     if not ets_model and not arima_model:
         return None
     additive = e_type == "A" and t_type not in ("M", "Md") and s_type != "M"
-    if arima_model and not additive:
+    if demand and arima_model and not additive:
+        return None
+    if demand and xreg_model:
         return None
     if lags_model_all is None:
         lags_model_all = lags_model
@@ -141,6 +148,10 @@ def adam_gradient_probe_basis(
             r = components_number_ets + i
             for j in range(int(lags_model_all[r])):
                 probes.append(cells_of(r, [j]))
+    if xreg_model and xreg_number > 0:
+        for i in range(xreg_number):
+            r = components_number_ets + components_number_arima + i
+            probes.append(cells_of(r, [0]))
     if not probes:
         return None
 
@@ -220,6 +231,7 @@ def adam_fit_or_gradient(
     other=None,
     horizon=0,
     multisteps=False,
+    xreg_number=0,
 ):
     """Fit dispatcher mirroring ``adam_fitOrGradient``.
 
@@ -269,6 +281,8 @@ def adam_fit_or_gradient(
             int(components_dict.get("components_number_ets", 0) or 0),
             int(components_dict.get("components_number_arima", 0) or 0),
             lags_dict.get("lags_model_all", lags_dict["lags_model"]),
+            int(xreg_number or 0),
+            o_type,
         )
         if probe_basis is not None and loss_code is not None:
             solved = adam_gradient_solve(

@@ -277,6 +277,7 @@ def om_preparator(
         obs_in_sample=observations_dict["obs_in_sample"],
         o_type=occurrence_char,
         loss=loss,
+        xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
     )
 
     # Fitted on probability scale

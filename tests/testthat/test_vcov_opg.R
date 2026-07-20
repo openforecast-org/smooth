@@ -77,6 +77,38 @@ test_that("opg falls back to the Hessian when the refit cannot reproduce", {
     expect_equal(dim(vO), dim(vH))
 })
 
+test_that("opg covers the state-space ARIMA engine (ssarima)", {
+    # ssarima uses its own ARIMA representation, so the OPG refit is dispatched
+    # to ssarima() (not adam()); it must compute a PSD covariance rather than
+    # fall back to the Hessian.
+    m <- suppressWarnings(ssarima(BJsales, orders = list(ar = 1, i = 1, ma = 1),
+                                  initial = "optimal", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    vH <- suppressWarnings(vcov(m))
+    expect_false(isTRUE(all.equal(vO, vH, tolerance = 1e-6)))  # genuinely OPG
+    fin <- is.finite(diag(vO))
+    expect_true(all(eigen(vO[fin, fin, drop = FALSE], only.values = TRUE)$values > -1e-6))
+})
+
+test_that("opg for ssarima backcasting spans dynamics only", {
+    m <- suppressWarnings(ssarima(BJsales, orders = list(ar = 2, i = 1, ma = 1),
+                                  initial = "backcasting", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_false(any(grepl("^ARIMAState", rownames(vO))))     # initials re-derived
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
+})
+
+test_that("opg falls back for CES / GUM (bespoke parameterisations)", {
+    mc <- suppressWarnings(ces(AirPassengers, seasonality = "none",
+                               initial = "optimal", h = 0))
+    expect_equal(dim(suppressWarnings(vcov(mc, opg = TRUE))),
+                 dim(suppressWarnings(vcov(mc))))
+    mg <- suppressWarnings(gum(AirPassengers, orders = 2, lags = 1,
+                               initial = "optimal", h = 0))
+    expect_equal(dim(suppressWarnings(vcov(mg, opg = TRUE))),
+                 dim(suppressWarnings(vcov(mg))))
+})
+
 test_that("opg=FALSE leaves the default covariance unchanged", {
     m <- suppressWarnings(adam(AirPassengers, "ANN", initial = "optimal"))
     expect_equal(suppressWarnings(vcov(m)), suppressWarnings(vcov(m, opg = FALSE)))

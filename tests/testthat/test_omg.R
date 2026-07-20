@@ -60,11 +60,16 @@ test_that("omg() fitted values are in (0, 1)", {
     expect_true(all(fp > 0 & fp < 1))
 })
 
-test_that("omg() fitted values equal pA / (pA + pB)", {
-    pA       <- as.numeric(testModel$modelA$fitted)
-    pB       <- as.numeric(testModel$modelB$fitted)
-    expected <- pA / (pA + pB)
-    expect_equal(as.numeric(testModel$fitted), expected, tolerance=1e-10)
+test_that("omg() fitted is the coupled probability, consistent with logLik", {
+    # The reported fitted is the coupled probability from the recursion the
+    # optimiser minimised (not the standalone per-side refit), so its Bernoulli
+    # log-likelihood equals the reported logLik exactly. modelA/modelB stay
+    # standalone fits for parameter diagnostics.
+    pf <- as.numeric(testModel$fitted)
+    ot <- as.numeric(y != 0)
+    expect_true(all(pf > 0 & pf < 1))
+    ll <- sum(ot * log(pf) + (1 - ot) * log(1 - pf))
+    expect_equal(ll, as.numeric(logLik(testModel)), tolerance = 1e-9)
 })
 
 # 6. Holdout and forecast

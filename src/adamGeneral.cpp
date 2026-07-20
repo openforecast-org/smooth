@@ -102,5 +102,6 @@ RCPP_MODULE(adamCore_module) {
     .method("ferrors", &adamCore::ferrors)
     .method("simulate", &adamCore::simulate)
     .method("reapply", &adamCore::reapply)
+    .method("gradientSolve", &adamCore::gradientSolve)
     .method("reforecast", &adamCore::reforecast);
 }

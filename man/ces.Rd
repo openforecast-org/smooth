@@ -7,15 +7,15 @@
 \usage{
 ces(y, seasonality = c("none", "simple", "partial", "full"),
   lags = c(frequency(y)), initial = c("backcasting", "optimal",
-  "two-stage", "complete"), a = NULL, b = NULL, loss = c("likelihood",
-  "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"), h = 0,
-  holdout = FALSE, bounds = c("admissible", "none"), silent = TRUE,
-  model = NULL, xreg = NULL, regressors = c("use", "select", "adapt"),
-  initialX = NULL, ...)
+  "two-stage", "complete", "gradient"), a = NULL, b = NULL,
+  loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
+  "MSCE", "GPL"), h = 0, holdout = FALSE, bounds = c("admissible",
+  "none"), silent = TRUE, model = NULL, xreg = NULL,
+  regressors = c("use", "select", "adapt"), initialX = NULL, ...)
 
 auto.ces(y, seasonality = c("none", "simple", "partial", "full"),
   lags = c(frequency(y)), initial = c("backcasting", "optimal",
-  "two-stage", "complete"), ic = c("AICc", "AIC", "BIC", "BICc"),
+  "two-stage", "complete", "gradient"), ic = c("AICc", "AIC", "BIC", "BICc"),
   loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
   "MSCE", "GPL"), h = 0, holdout = FALSE, bounds = c("admissible",
   "none"), silent = TRUE, xreg = NULL, regressors = c("use", "select",

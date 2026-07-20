@@ -10,7 +10,7 @@ om(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar =
   occurrence = c("auto", "fixed", "odds-ratio", "inverse-odds-ratio",
   "direct", "general"), loss = c("likelihood", "MSE", "MAE", "HAM", "LASSO",
   "RIDGE"), h = 0, holdout = FALSE, persistence = NULL, phi = NULL,
-  initial = c("backcasting", "optimal", "two-stage", "complete"),
+  initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
   arma = NULL, ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual",
   "admissible", "none"), ets = c("conventional", "adam"), silent = TRUE,
   ...)
@@ -49,7 +49,9 @@ or \code{"direct"}.}
 \item{phi}{Optional damping parameter.}
 
 \item{initial}{Initialisation method: \code{"backcasting"}, \code{"optimal"},
-\code{"two-stage"}, or \code{"complete"}.}
+\code{"two-stage"}, \code{"complete"}, or \code{"gradient"} (solves the
+initial states by profiling the occurrence loss; falls back to backcasting
+for a custom loss or an out-of-scope specification).}
 
 \item{arma}{Optional fixed ARMA parameters.}
 

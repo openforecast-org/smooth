@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import scaler
 
 from ._helpers import _safe_create_index
@@ -973,6 +974,18 @@ def preparator(
         ...     ...
         ... )
     """
+    # Preserve the pristine seed head across preparator invocations: the
+    # mirror-back below publishes the solved gradient initials into
+    # matrices_dict for initial-value extraction, but a later invocation (e.g.
+    # from predict) must re-run the solve from the original creator seed, as R
+    # does (the caller's matVt is never mutated there)
+    _lags_max_seed = lags_dict["lags_model_max"]
+    if "mat_vt_seed_head" not in matrices_dict:
+        matrices_dict["mat_vt_seed_head"] = matrices_dict["mat_vt"][
+            :, :_lags_max_seed
+        ].copy()
+    matrices_dict["mat_vt"][:, :_lags_max_seed] = matrices_dict["mat_vt_seed_head"]
+
     # 1. Fill matrices with estimated parameters if needed
     matrices_dict = _fill_matrices_if_needed(
         general_dict,
@@ -1029,22 +1042,49 @@ def preparator(
             "backcasting",
         ]
 
-    # Call adam_cpp.fit() with the prepared inputs
+    # The gradient solve needs the current value of the distribution parameter
+    # (e.g. the dgnorm shape); extract it from B before the fit, mirroring R
+    if adam_estimated.get("other_parameter_estimate", False) and len(
+        adam_estimated["B"]
+    ):
+        other = abs(float(adam_estimated["B"][-1]))
+
+    # Call the fit (or gradient initial-state solve) with the prepared inputs.
+    # For initial="gradient" the dispatcher re-solves the initials from the seed
+    # profile and fits with backcast=False; otherwise it is the ordinary fit.
     # Note: E, T, S, nNonSeasonal, nSeasonal, nArima, nXreg, constant are set
-    # during adamCore construction
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt,
-        matrixWt=mat_wt,
-        matrixF=mat_f,
-        vectorG=vec_g,
-        indexLookupTable=index_lookup_table,
-        profilesRecent=profiles_recent_table_fortran,
-        vectorYt=y_in_sample,
-        vectorOt=ot,
-        backcast=backcast_value_prep,
-        nIterations=initials_checked["n_iterations"],
-        O="n",
+    # during adamCore construction.
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt,
+        mat_wt=mat_wt,
+        mat_f=mat_f,
+        vec_g=vec_g,
+        index_lookup_table=index_lookup_table,
+        profiles_recent_table=profiles_recent_table_fortran,
+        y_in_sample=y_in_sample,
+        ot=ot,
+        initial_type=initials_checked["initial_type"],
+        n_iterations=initials_checked["n_iterations"],
+        backcast_value=backcast_value_prep,
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
+        loss=general_dict["loss"],
+        distribution=general_dict.get(
+            "distribution_new", general_dict.get("distribution", "default")
+        ),
+        other=other,
+        horizon=general_dict.get("h", 0),
+        multisteps=general_dict.get("multisteps", False),
     )
+    # The gradient solve overwrites the head of mat_vt in place; mirror the
+    # solved initials back into matrices_dict so downstream initial-value
+    # extraction reports them (not the discarded seed).
+    matrices_dict["mat_vt"][:, : lags_dict["lags_model_max"]] = mat_vt[
+        :, : lags_dict["lags_model_max"]
+    ]
     # 5. Correct negative or NaN values in multiplicative components
     matrices_dict, profiles_dict = _correct_multiplicative_components(
         matrices_dict, profiles_dict, model_type_dict, components_dict

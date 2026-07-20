@@ -5,7 +5,7 @@
 \title{Combination of forecasts of state space models}
 \usage{
 smoothCombine(y, models = NULL, initial = c("backcasting", "optimal",
-  "two-stage", "complete"), ic = c("AICc", "AIC", "BIC", "BICc"),
+  "two-stage", "complete", "gradient"), ic = c("AICc", "AIC", "BIC", "BICc"),
   loss = c("MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE", "MSCE"), h = 10,
   holdout = FALSE, cumulative = FALSE, interval = c("none", "prediction",
   "confidence", "simulated", "approximate", "semiparametric", "nonparametric",

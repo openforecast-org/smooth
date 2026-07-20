@@ -4053,7 +4053,9 @@ class ADAM:
             adam_estimated=self._adam_estimated,
             adam_cpp=self._adam_cpp,
             bounds="usual",
-            other=None,
+            # The current dgnorm shape, so the gradient initial-state solve in
+            # preparator() profiles the same loss the estimation used
+            other=getattr(self, "gnorm_shape", None),
         )
 
     def _auto_predict(self):
@@ -4172,7 +4174,9 @@ class ADAM:
             adam_cpp=self._adam_cpp,
             # Optional parameters
             bounds="usual",
-            other=None,
+            # The current dgnorm shape, so the gradient initial-state solve in
+            # preparator() profiles the same loss the estimation used
+            other=getattr(self, "gnorm_shape", None),
         )
 
     def _execute_prediction(

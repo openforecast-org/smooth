@@ -14,6 +14,7 @@ import numpy as np
 from numpy.linalg import eigvals
 
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 
 
 def om_link_function(x, error_type, occurrence):
@@ -92,7 +93,11 @@ def om_cf(  # noqa: N802
     profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
         :, : lags_dict["lags_model_max"]
     ]
-    mat_vt = np.asfortranarray(adam_elements["mat_vt"], dtype=np.float64)
+    # An explicit copy: the gradient dispatcher overwrites the head of mat_vt
+    # in place, and np.asfortranarray would alias an already-Fortran-ordered
+    # array, leaking the solved initials into the shared creator matrices that
+    # the om preparator later re-seeds from (R's copy-on-modify never leaks it).
+    mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
 
     # 2. Bounds checking (mirror CF's "usual" branch — admissible/none not
     #    used by om() but support graceful pass-through)
@@ -169,18 +174,29 @@ def om_cf(  # noqa: N802
             "backcasting",
         )
 
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt,
-        matrixWt=mat_wt,
-        matrixF=mat_f,
-        vectorG=vec_g,
-        indexLookupTable=index_lookup_table,
-        profilesRecent=profiles_recent_table,
-        vectorYt=ot,
-        vectorOt=ot,
-        backcast=backcast_value,
-        nIterations=initials_checked["n_iterations"],
-        O=occurrence_char,
+    # Fit dispatcher: for initial="gradient" this solves the initials by
+    # profiling the occurrence loss over the probability residuals (in C++);
+    # otherwise the ordinary occurrence fit, with gradient joining the
+    # backcasting group as a fall-back. Mirrors R's omCF_local routing.
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt,
+        mat_wt=mat_wt,
+        mat_f=mat_f,
+        vec_g=vec_g,
+        index_lookup_table=index_lookup_table,
+        profiles_recent_table=profiles_recent_table,
+        y_in_sample=ot,
+        ot=ot,
+        initial_type=initials_checked["initial_type"],
+        n_iterations=initials_checked["n_iterations"],
+        backcast_value=backcast_value,
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
+        o_type=occurrence_char,
+        loss=general.get("loss", "likelihood"),
     )
 
     # 4. Apply link function to raw fitted output

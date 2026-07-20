@@ -428,3 +428,48 @@ test_that("om() accepts a callable for custom loss", {
     expect_true(is.function(m$lossFunction))
     expect_true(is.finite(m$lossValue))
 })
+
+test_that("initial=\"gradient\" solves the om initials by profiling the loss", {
+    set.seed(5)
+    ot <- ts(rbinom(120, 1, plogis(seq(-1, 1.5, length.out=120))))
+    for(occ in c("odds-ratio","inverse-odds-ratio","direct")){
+        mB <- om(ot, model="MNN", occurrence=occ, initial="backcasting", silent=TRUE)
+        mO <- om(ot, model="MNN", occurrence=occ, initial="optimal", silent=TRUE)
+        mG <- om(ot, model="MNN", occurrence=occ, initial="gradient", silent=TRUE)
+        expect_equal(mG$initialType, "gradient")
+        expect_true(is.finite(logLik(mG)))
+        # Gradient must at least match backcasting and land near the optimal
+        # fit (it profiles the same likelihood over the initials).
+        expect_gte(as.numeric(logLik(mG)), as.numeric(logLik(mB)) - 1e-4)
+        expect_lt(abs(as.numeric(logLik(mG)) - as.numeric(logLik(mO))),
+                  0.01 * abs(as.numeric(logLik(mO))))
+    }
+})
+
+test_that("om gradient minimises the chosen loss over the initials", {
+    set.seed(5)
+    otRaw <- rbinom(120, 1, plogis(seq(-1, 1.5, length.out=120)))
+    ot <- ts(otRaw)
+    mg <- om(ot, model="MNN", occurrence="odds-ratio", initial="gradient",
+             persistence=0.1, loss="MSE", silent=TRUE)
+    grid <- seq(0.05, 3, by=0.02)
+    mseGrid <- min(sapply(grid, function(l){
+        m <- suppressWarnings(om(ot, model="MNN", occurrence="odds-ratio",
+                                 persistence=0.1, initial=list(level=l),
+                                 loss="MSE", silent=TRUE))
+        mean((otRaw - fitted(m))^2)
+    }))
+    # The analytic solve must match or beat the coarse grid optimum.
+    expect_lte(mean((otRaw - fitted(mg))^2), mseGrid + 1e-6)
+})
+
+test_that("om gradient falls back to backcasting for a custom loss", {
+    set.seed(5)
+    ot <- ts(rbinom(120, 1, plogis(seq(-1, 1.5, length.out=120))))
+    lossCustom <- function(actual, fitted, B){ sum(abs(actual - fitted)) }
+    mB <- om(ot, model="MNN", occurrence="odds-ratio", initial="backcasting",
+             loss=lossCustom, silent=TRUE)
+    mG <- suppressMessages(om(ot, model="MNN", occurrence="odds-ratio",
+                              initial="gradient", loss=lossCustom, silent=TRUE))
+    expect_equal(mG$lossValue, mB$lossValue, tolerance = 1e-8)
+})

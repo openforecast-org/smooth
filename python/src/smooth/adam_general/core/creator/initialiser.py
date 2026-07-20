@@ -320,7 +320,10 @@ def initialiser(
             + arima_checked["ma_estimate"] * sum(arima_checked["ma_orders"] or [])
         )
         + model_type_dict["ets_model"]
-        * (initials_checked["initial_type"] not in ["backcasting", "complete"])
+        * (
+            initials_checked["initial_type"]
+            not in ["backcasting", "complete", "gradient"]
+        )
         * (
             initials_checked["initial_level_estimate"]
             + (
@@ -335,7 +338,10 @@ def initialiser(
                 )
             )
         )
-        + (initials_checked["initial_type"] not in ["backcasting", "complete"])
+        + (
+            initials_checked["initial_type"]
+            not in ["backcasting", "complete", "gradient"]
+        )
         * arima_checked["arima_model"]
         * (initials_checked["initial_arima_number"] or 0)
         * initials_checked["initial_arima_estimate"]
@@ -378,7 +384,8 @@ def initialiser(
                         and model_type_dict["season_type"] == "A"
                     )
                     or (
-                        initials_checked["initial_type"] in ["complete", "backcasting"]
+                        initials_checked["initial_type"]
+                        in ["complete", "backcasting", "gradient"]
                         and (
                             (
                                 model_type_dict["error_type"] == "M"
@@ -428,7 +435,11 @@ def initialiser(
                     model_type_dict["error_type"] == "M"
                     and model_type_dict["trend_type"] == "A"
                 ):
-                    if initials_checked["initial_type"] in ["complete", "backcasting"]:
+                    if initials_checked["initial_type"] in [
+                        "complete",
+                        "backcasting",
+                        "gradient",
+                    ]:
                         #  Match R:
                         # c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))
                         # [which(persistenceEstimateVector)]
@@ -648,7 +659,8 @@ def initialiser(
 
     if (
         model_type_dict["ets_model"]
-        and initials_checked["initial_type"] not in ["backcasting", "complete"]
+        and initials_checked["initial_type"]
+        not in ["backcasting", "complete", "gradient"]
         and initials_checked["initial_estimate"]
     ):
         if initials_checked["initial_level_estimate"]:
@@ -716,7 +728,7 @@ def initialiser(
                 names.extend([f"seasonal_{m}" for m in range(1, temp_lag)])
                 j += temp_lag - 1
     if (
-        initials_checked["initial_type"] not in ["backcasting", "complete"]
+        initials_checked["initial_type"] not in ["backcasting", "complete", "gradient"]
         and arima_checked["arima_model"]
         and initials_checked["initial_arima_estimate"]
     ):

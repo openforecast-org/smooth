@@ -293,7 +293,7 @@ adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags,
 
     if(is.null(ellipsis$nIterations)){
         nIterations <- 1
-        if(any(initialType==c("complete","backcasting"))){
+        if(any(initialType==c("complete","backcasting","gradient"))){
             nIterations[] <- 2
         }
     }
@@ -913,7 +913,7 @@ adam_filler <- function(B,
     }
 
     # Initials of ETS if something needs to be estimated
-    if(etsModel && all(initialType!=c("complete","backcasting")) && initialEstimate){
+    if(etsModel && all(initialType!=c("complete","backcasting","gradient")) && initialEstimate){
         i <- 1
         if(initialLevelEstimate){
             j[] <- j+1
@@ -944,7 +944,7 @@ adam_filler <- function(B,
 
     # Initials of ARIMA
     if(arimaModel){
-        if(all(initialType!=c("complete","backcasting")) && initialArimaEstimate){
+        if(all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
             matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
                 switch(Etype,
                        "A"=arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
@@ -1020,13 +1020,13 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
                                 # AR and MA values
                                 arimaModel*(arEstimate*sum(arOrders)+maEstimate*sum(maOrders)) +
                                 # initials of ETS
-                                etsModel*all(initialType!=c("complete","backcasting"))*
+                                etsModel*all(initialType!=c("complete","backcasting","gradient"))*
                                 (initialLevelEstimate +
                                      (modelIsTrendy*initialTrendEstimate) +
                                      (modelIsSeasonal*
                                           sum(initialSeasonalEstimate*(lagsModelSeasonal-1)))) +
                                 # initials of ARIMA
-                                all(initialType!=c("complete","backcasting"))*
+                                all(initialType!=c("complete","backcasting","gradient"))*
                                 arimaModel*initialArimaNumber*initialArimaEstimate +
                                 # initials of xreg
                                 (initialType!="complete")*xregModel*initialXregEstimate*
@@ -1041,7 +1041,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
                 # A special type of model which is not safe: AAM, MAA, MAM
                 if((Etype=="A" && Ttype=="A" && Stype=="M") ||
                    (Etype=="A" && Ttype=="M" && Stype=="A") ||
-                   (any(initialType==c("complete","backcasting")) &&
+                   (any(initialType==c("complete","backcasting","gradient")) &&
                     ((Etype=="M" && Ttype=="A" && Stype=="A") ||
                      (Etype=="M" && Ttype=="A" && Stype=="M")))){
                     B[1:sum(persistenceEstimateVector)] <-
@@ -1055,7 +1055,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
                             which(persistenceEstimateVector)]
                 }
                 else if(Etype=="M" && Ttype=="A"){
-                    if(any(initialType==c("complete","backcasting"))){
+                    if(any(initialType==c("complete","backcasting","gradient"))){
                         B[1:sum(persistenceEstimateVector)] <-
                             c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))[
                                 which(persistenceEstimateVector)]
@@ -1210,7 +1210,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     }
 
     # Initials
-    if(etsModel && all(initialType!=c("complete","backcasting")) && initialEstimate){
+    if(etsModel && all(initialType!=c("complete","backcasting","gradient")) && initialEstimate){
         if(initialLevelEstimate){
             j[] <- j+1
             B[j] <- matVt[1,1]
@@ -1278,7 +1278,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     }
 
     # ARIMA initials
-    if(arimaModel && all(initialType!=c("complete","backcasting")) && initialArimaEstimate){
+    if(arimaModel && all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
         B[j+1:initialArimaNumber] <-
             head(matVt[componentsNumberETS+componentsNumberARIMA,1:lagsModelMax],
                  initialArimaNumber)

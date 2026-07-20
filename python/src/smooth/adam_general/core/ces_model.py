@@ -286,7 +286,7 @@ class CES:
 
         # Match R/adamGeneral.R: backcasting / complete use two iterations,
         # optimal / provided paths use one.
-        if initial_type in ("backcasting", "complete"):
+        if initial_type in ("backcasting", "complete", "gradient"):
             n_iterations = 2
         else:
             n_iterations = 1
@@ -529,7 +529,7 @@ class CES:
             profilesRecent=np.asfortranarray(profiles_recent_table, dtype=np.float64),
             vectorYt=np.asfortranarray(y_in_sample, dtype=np.float64).ravel(),
             vectorOt=np.asfortranarray(ot, dtype=np.float64).ravel(),
-            backcast=initial_type in ("complete", "backcasting"),
+            backcast=initial_type in ("complete", "backcasting", "gradient"),
             nIterations=int(n_iterations),
         )
 

@@ -5,6 +5,7 @@ from numpy.linalg import eigvals
 
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import (
     calculate_entropy,
     calculate_likelihood,
@@ -381,7 +382,7 @@ def CF(  # noqa: N802
     if (
         arima_checked["arima_model"]
         and any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]])
-        and initials_checked["initial_type"] in ["complete", "backcasting"]
+        and initials_checked["initial_type"] in ["complete", "backcasting", "gradient"]
     ):
         seed_row_idx = (
             components_dict["components_number_ets"]
@@ -416,7 +417,11 @@ def CF(  # noqa: N802
     profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
         :, : lags_dict["lags_model_max"]
     ]
-    mat_vt = np.asfortranarray(adam_elements["mat_vt"], dtype=np.float64)
+    # An explicit copy: the gradient dispatcher overwrites the head of mat_vt
+    # in place, and np.asfortranarray would alias an already-Fortran-ordered
+    # array, leaking the solved initials into the shared creator matrices
+    # (R's copy-on-modify semantics never leak them)
+    mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
 
     # Restore the seed row of mat_vt before the next CF call so each
     # optimiser step starts from the same initial state (the C++ fitter may
@@ -573,21 +578,33 @@ def CF(  # noqa: N802
     else:
         backcast_value = initials_checked["initial_type"] in ["complete", "backcasting"]
 
-    # Call adam_cpp.fit() using the new class-based interface
-    #  Parameters that were passed to adam_fitter are now stored in adam_cpp (E, T, S,
-    # etc.)
-    adam_fitted = adam_cpp.fit(
-        matrixVt=mat_vt,
-        matrixWt=mat_wt,
-        matrixF=mat_f,
-        vectorG=vec_g,
-        indexLookupTable=index_lookup_table,
-        profilesRecent=profiles_recent_table,
-        vectorYt=y_in_sample,
-        vectorOt=ot,
-        backcast=backcast_value,
-        nIterations=initials_checked["n_iterations"],
-        O="n",
+    # Call adam_cpp.fit() (or the gradient initial-state solve) via the shared
+    # dispatcher — parity with R's adam_fitOrGradient. Parameters that were passed
+    # to adam_fitter are now stored in adam_cpp (E, T, S, etc.).
+    adam_fitted = adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=mat_vt,
+        mat_wt=mat_wt,
+        mat_f=mat_f,
+        vec_g=vec_g,
+        index_lookup_table=index_lookup_table,
+        profiles_recent_table=profiles_recent_table,
+        y_in_sample=y_in_sample,
+        ot=ot,
+        initial_type=initials_checked["initial_type"],
+        n_iterations=initials_checked["n_iterations"],
+        backcast_value=backcast_value,
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
+        loss=general["loss"],
+        distribution=general.get(
+            "distribution_new", general.get("distribution", "default")
+        ),
+        other=other,
+        horizon=general.get("h", 0),
+        multisteps=general["multisteps"],
     )
 
     # adam_fitted.errors = np.repeat()
@@ -987,13 +1004,18 @@ def log_Lik_ADAM(  # noqa: N802
         if general_dict["loss"] in ["LASSO", "RIDGE"]:
             return 0
         else:
-            general_dict["distribution_new"] = {
-                "MSE": "dnorm",
-                "MAE": "dlaplace",
-                "HAM": "ds",
-            }.get(general_dict["loss"], general_dict["distribution_new"])
-
-            general_dict["loss_new"] = (
+            # The reported log-likelihood for a fit-only loss is the
+            # concentrated likelihood, NOT -loss. Remap the loss to
+            # "likelihood" and let CF compute it (CF reads general["loss"]/
+            # ["distribution_new"], so the remap must land on those keys — a
+            # copy, general_dict is shared). distribution_new is already
+            # resolved upstream (the user's explicit choice, or the loss-implied
+            # default: MSE->dnorm, MAE->dlaplace, HAM->ds), so it is used as-is:
+            # an explicitly-selected distribution is honoured for the logLik
+            # even when the loss implies a different one; only the default falls
+            # back to the loss-implied distribution. Mirrors R/adam.R:1009-1017.
+            general_for_ll = dict(general_dict)
+            general_for_ll["loss"] = (
                 "likelihood"
                 if general_dict["loss"] in ["MSE", "MAE", "HAM"]
                 else general_dict["loss"]
@@ -1014,7 +1036,7 @@ def log_Lik_ADAM(  # noqa: N802
                 constant_dict,
                 observations_dict,
                 profile_dict,
-                general_dict,
+                general_for_ll,
                 adam_cpp,
                 bounds=None,
                 otherParameterEstimate=otherParameterEstimate,
@@ -1171,7 +1193,8 @@ def log_Lik_ADAM(  # noqa: N802
             # Convert stuff to numpy arrays with float64 - C++ requires that
             y_in_sample = np.asarray(observations_dict["y_in_sample"], dtype=np.float64)
             ot = np.asarray(observations_dict["ot"], dtype=np.float64)
-            mat_vt = np.asfortranarray(adam_elements["mat_vt"], dtype=np.float64)
+            # Explicit copy -- see the matching comment in CF()
+            mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
             mat_wt = np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64)
             mat_f = np.asfortranarray(
                 adam_elements["mat_f"], dtype=np.float64
@@ -1186,18 +1209,32 @@ def log_Lik_ADAM(  # noqa: N802
                 profile_dict["profiles_recent_table"], dtype=np.float64
             )
 
-            adam_fitted = adam_cpp.fit(
-                matrixVt=mat_vt,
-                matrixWt=mat_wt,
-                matrixF=mat_f,
-                vectorG=vec_g,
-                indexLookupTable=index_lookup_table,
-                profilesRecent=profiles_recent_table,
-                vectorYt=y_in_sample,
-                vectorOt=ot,
-                backcast=backcast_value_log,
-                nIterations=initials_dict["n_iterations"],
-                O="n",
+            adam_fitted = adam_fit_or_gradient(
+                adam_cpp=adam_cpp,
+                mat_vt=mat_vt,
+                mat_wt=mat_wt,
+                mat_f=mat_f,
+                vec_g=vec_g,
+                index_lookup_table=index_lookup_table,
+                profiles_recent_table=profiles_recent_table,
+                y_in_sample=y_in_sample,
+                ot=ot,
+                initial_type=initials_dict["initial_type"],
+                n_iterations=initials_dict["n_iterations"],
+                backcast_value=backcast_value_log,
+                model_type_dict=model_type_dict,
+                components_dict=components_dict,
+                lags_dict=lags_dict,
+                obs_in_sample=observations_dict["obs_in_sample"],
+                loss=general_dict["loss"],
+                distribution=general_dict.get(
+                    "distribution_new", general_dict.get("distribution", "default")
+                ),
+                # This refit only runs for the multistep losses, whose codes do
+                # not use the distribution parameter
+                other=None,
+                horizon=general_dict.get("h", 0),
+                multisteps=general_dict["multisteps"],
             )
 
             logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))

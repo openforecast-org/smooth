@@ -12,9 +12,10 @@ omg(data, modelA = "MNN", modelB = modelA, ordersA = list(ar = c(0), i =
   phiB = phiA, armaA = NULL, armaB = armaA, etsA = c("conventional",
   "adam"), etsB = etsA, lags = c(frequency(data)), h = 0,
   holdout = FALSE, initial = c("backcasting", "optimal", "two-stage",
-  "complete"), loss = c("likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE"),
-  ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual", "admissible",
-  "none"), model = NULL, silent = TRUE, ...)
+  "complete", "gradient"), loss = c("likelihood", "MSE", "MAE", "HAM",
+  "LASSO", "RIDGE"), ic = c("AICc", "AIC", "BIC", "BICc"),
+  bounds = c("usual", "admissible", "none"), model = NULL, silent = TRUE,
+  ...)
 }
 \arguments{
 \item{data}{Binary time series (0/1), vector or data frame.}

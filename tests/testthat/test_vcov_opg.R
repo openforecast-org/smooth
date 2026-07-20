@@ -116,11 +116,18 @@ test_that("opg for CES backcasting spans the smoothing parameters only", {
     expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
 })
 
-test_that("opg falls back for seasonal CES and GUM (unmapped structures)", {
-    mc <- suppressWarnings(ces(AirPassengers, seasonality = "full", lags = 12,
-                               initial = "optimal", h = 0))
-    expect_equal(dim(suppressWarnings(vcov(mc, opg = TRUE))),
-                 dim(suppressWarnings(vcov(mc))))
+test_that("opg covers seasonal CES (level/potential rows + seasonal cells)", {
+    m <- suppressWarnings(ces(AirPassengers, seasonality = "full", lags = 12,
+                              initial = "optimal", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    vH <- suppressWarnings(vcov(m))
+    expect_equal(dim(vO), c(length(coef(m)), length(coef(m))))
+    expect_false(isTRUE(all.equal(vO, vH, tolerance = 1e-6)))  # genuinely OPG
+    fin <- is.finite(diag(vO))
+    expect_true(all(eigen(vO[fin, fin, drop = FALSE], only.values = TRUE)$values > -1e-6))
+})
+
+test_that("opg falls back for GUM (bespoke parameterisation)", {
     mg <- suppressWarnings(gum(AirPassengers, orders = 2, lags = 1,
                                initial = "optimal", h = 0))
     expect_equal(dim(suppressWarnings(vcov(mg, opg = TRUE))),

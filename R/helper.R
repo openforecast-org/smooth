@@ -180,20 +180,22 @@ smoothEigens <- function(persistence, transition, measurement,
 # Shared OPG assembly. Central-differences the per-observation log-likelihood
 # over the estimated parameters, forms J = sum_t s_t s_t' (PSD by construction)
 # and inverts it, dropping directions with (near-)zero information (the
-# brokenVariables logic of the Hessian path). `perturbedPointLik(nameJ, delta)`
-# is an engine-specific closure that returns the per-observation log-likelihood
-# vector for the model rebuilt with parameter nameJ perturbed by delta -- with
-# nameJ=NULL, delta=0 giving the base fit -- or NULL on failure. A reproduction
-# guard requires the base fit to reproduce the object's likelihood, so an
-# engine/refit that cannot rebuild the model exactly falls back to the Hessian.
-covarOPGCore <- function(object, parametersNames, perturbedPointLik,
+# brokenVariables logic of the Hessian path). `perturbedPointLik(j, delta)` is an
+# engine-specific closure that returns the per-observation log-likelihood vector
+# for the model rebuilt with the j-th parameter perturbed by delta -- with
+# j=NULL, delta=0 giving the base fit -- or NULL on failure. Indexing by position
+# (not name) supports engines whose coefficients share names (seasonal CES).
+# `parameterValues` is the named coefficient vector (for the step sizes and the
+# result dimnames). A reproduction guard requires the base fit to reproduce the
+# object's likelihood, so a refit that cannot rebuild the model falls back.
+covarOPGCore <- function(object, parameterValues, perturbedPointLik,
                          stepSize=.Machine$double.eps^(1/4)){
-    nParam <- length(parametersNames);
+    parametersNames <- names(parameterValues);
+    nParam <- length(parameterValues);
     if(nParam==0 || object$loss!="likelihood"){
         return(NULL);
     }
     obsInSample <- nobs(object);
-    B <- coef(object)[parametersNames];
 
     baseLik <- perturbedPointLik(NULL, 0);
     if(is.null(baseLik) || length(baseLik)!=obsInSample ||
@@ -201,11 +203,11 @@ covarOPGCore <- function(object, parametersNames, perturbedPointLik,
         return(NULL);
     }
 
-    scores <- matrix(NA_real_, obsInSample, nParam, dimnames=list(NULL, parametersNames));
+    scores <- matrix(NA_real_, obsInSample, nParam);
     for(j in seq_len(nParam)){
-        hStep <- stepSize*max(1, abs(B[j]));
-        likUp <- perturbedPointLik(parametersNames[j], hStep);
-        likDown <- perturbedPointLik(parametersNames[j], -hStep);
+        hStep <- stepSize*max(1, abs(parameterValues[j]));
+        likUp <- perturbedPointLik(j, hStep);
+        likDown <- perturbedPointLik(j, -hStep);
         if(is.null(likUp) || is.null(likDown) ||
            length(likUp)!=obsInSample || length(likDown)!=obsInSample){
             return(NULL);
@@ -276,12 +278,14 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
         return(as.numeric(pointLik(modelLocal)));
     }
 
-    perturbedPointLik <- function(nameJ, delta){
+    parametersNames <- names(coef(object));
+    perturbedPointLik <- function(j, delta){
         persistence <- object$persistence;
         phi <- object$phi;
         arma <- baseArma;
         initialArg <- baseInitialArg;
-        if(!is.null(nameJ)){
+        if(!is.null(j)){
+            nameJ <- parametersNames[j];
             if(nameJ %in% persistenceNames){
                 persistence[nameJ] <- persistence[nameJ]+delta;
             }
@@ -328,7 +332,7 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
         return(refit(persistence, phi, arma, initialArg));
     }
 
-    return(covarOPGCore(object, names(coef(object)), perturbedPointLik, stepSize));
+    return(covarOPGCore(object, coef(object), perturbedPointLik, stepSize));
 }
 
 # OPG covariance for CES. CES has its own parameterisation: the smoothing
@@ -339,26 +343,43 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
 # parameters$a, parameters$b and profileInitial), so the clone is perturbed
 # directly. Mirrors how the CES Hessian FI is computed (via model=object).
 covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
-    parametersNames <- names(coef(object));
+    parameterValues <- coef(object);
+    parametersNames <- names(parameterValues);
     aValue <- object$parameters$a;
     bValue <- object$parameters$b;
-    # Initial-state coefficients: everything that is not a smoothing parameter.
-    dynamicsNames <- grep("^(alpha|beta)_[01]$", parametersNames, value=TRUE);
-    initialNames <- setdiff(parametersNames, dynamicsNames);
+    seasonalityType <- object$seasonality;
 
-    # The clean coef -> profileInitial mapping (one coefficient per stored state)
-    # holds for the non-seasonal model. Seasonal CES stores its initial states
-    # across the seasonal lags with fewer free coefficients than stored values,
-    # so the flat mapping would perturb the wrong cells; fall back to the Hessian
-    # there. Backcasting (no estimated initials) is unaffected.
-    if(length(initialNames)>0 &&
-       length(initialNames)!=length(as.numeric(object$profileInitial))){
-        return(NULL);
+    # The smoothing coefficients (alpha_0/alpha_1 = Re/Im of a, beta_0/beta_1 =
+    # Re/Im of b) come first; the rest are initial states in profileInitial
+    # (states x head lags). The seasonal initial coefficients are unnamed, so the
+    # initials are mapped BY POSITION: the non-seasonal states (level, potential;
+    # absent for seasonality="simple") are a single free value each, repeated
+    # across the head columns -- perturbing one perturbs the whole row; the
+    # seasonal states fill their rows across the head columns in column-major
+    # order (verified against coef()).
+    nSmoothing <- sum(grepl("^(alpha|beta)_[01]$", parametersNames));
+    profile <- object$profileInitial;
+    nCol <- ncol(profile);
+    nNonSeasonalRows <- if(identical(seasonalityType, "simple")){ 0L } else { 2L };
+    seasonalRows <- if(nrow(profile)>nNonSeasonalRows){
+                        (nNonSeasonalRows+1):nrow(profile);
+                    } else { integer(0); }
+    nSeasonalRows <- length(seasonalRows);
+
+    # The profileInitial cells perturbed by the k-th initial coefficient.
+    initialCells <- function(k){
+        if(k<=nNonSeasonalRows){
+            return(list(rows=k, cols=seq_len(nCol)));   # constant state -> whole row
+        }
+        ks <- k-nNonSeasonalRows;
+        list(rows=seasonalRows[((ks-1) %% nSeasonalRows)+1],
+             cols=((ks-1) %/% nSeasonalRows)+1);
     }
 
-    perturbedPointLik <- function(nameJ, delta){
+    perturbedPointLik <- function(j, delta){
         clone <- object;
-        if(!is.null(nameJ)){
+        if(!is.null(j)){
+            nameJ <- parametersNames[j];
             if(nameJ=="alpha_0"){
                 clone$parameters$a <- complex(real=Re(aValue)+delta, imaginary=Im(aValue));
             }
@@ -372,13 +393,13 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
                 clone$parameters$b <- complex(real=Re(bValue), imaginary=Im(bValue)+delta);
             }
             else{
-                idx <- match(nameJ, initialNames);
-                if(is.na(idx)){ return(NULL); }
-                clone$profileInitial[idx] <- clone$profileInitial[idx]+delta;
+                cell <- initialCells(j-nSmoothing);
+                clone$profileInitial[cell$rows, cell$cols] <-
+                    clone$profileInitial[cell$rows, cell$cols]+delta;
             }
         }
         modelLocal <- try(suppressWarnings(
-            ces(object$data, seasonality=object$seasonality, lags=object$lags,
+            ces(object$data, seasonality=seasonalityType, lags=object$lags,
                 model=clone, h=0)), silent=TRUE);
         if(inherits(modelLocal,"try-error")){
             return(NULL);
@@ -386,5 +407,5 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
         return(as.numeric(pointLik(modelLocal)));
     }
 
-    return(covarOPGCore(object, parametersNames, perturbedPointLik, stepSize));
+    return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
 }

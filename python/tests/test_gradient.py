@@ -131,24 +131,38 @@ def test_gradient_nonseasonal():
     assert np.all(np.isfinite(np.asarray(m.fitted).ravel()))
 
 
-def test_gradient_msarima_falls_back_to_backcasting():
-    # MSARIMA is not ETS, so initial="gradient" must fall back to backcasting and
-    # produce an identical fit (same as the R side).
+def test_gradient_msarima_solves_additive_arima_initials():
+    # MSARIMA is an additive SSOE model, so initial="gradient" profiles the
+    # ARIMA initials by least squares (matching optimal at fixed dynamics and
+    # differing from backcasting), same as the R side.
     from smooth import MSARIMA
 
-    orders = {"ar": [1, 0], "i": [1, 0], "ma": [1, 0]}
-    mg = MSARIMA(orders=orders, lags=[1, 12], initial="gradient").fit(_Y)
-    mb = MSARIMA(orders=orders, lags=[1, 12], initial="backcasting").fit(_Y)
-    assert abs(float(mg.loglik) - float(mb.loglik)) < 1e-8
+    def sse(m):
+        return float(np.sum(np.asarray(m.residuals) ** 2))
+
+    af = {"ar": [0.4], "ma": [0.3]}
+    kw = dict(orders={"ar": [1], "i": [1], "ma": [1]}, lags=[1], arma=af, loss="MSE")
+    mo = MSARIMA(initial="optimal", **kw).fit(_Y)
+    mb = MSARIMA(initial="backcasting", **kw).fit(_Y)
+    mg = MSARIMA(initial="gradient", **kw).fit(_Y)
+    assert abs(sse(mg) - sse(mo)) < 1e-2 * max(1.0, sse(mo))
+    assert abs(sse(mg) - sse(mb)) > 1e-5
 
 
-def test_gradient_ces_falls_back_to_backcasting():
-    # CES is not ETS, so initial="gradient" must fall back to backcasting.
+def test_gradient_ces_solves_additive_ssoe_initials():
+    # CES is an additive SSOE model, so initial="gradient" profiles the initials
+    # by least squares (residuals are affine in the initial profile): it must run
+    # (not fall back), differ from backcasting, and not lose on in-sample SSE.
     from smooth import CES
 
-    mg = CES(seasonality="full", lags=[1, 12], initial="gradient").fit(_Y)
-    mb = CES(seasonality="full", lags=[1, 12], initial="backcasting").fit(_Y)
-    assert abs(float(mg.loglik) - float(mb.loglik)) < 1e-8
+    def sse(m):
+        return float(np.sum(np.asarray(m.residuals) ** 2))
+
+    mg = CES(seasonality="none", initial="gradient", loss="MSE").fit(_Y)
+    mb = CES(seasonality="none", initial="backcasting", loss="MSE").fit(_Y)
+    assert np.isfinite(sse(mg))
+    assert abs(sse(mg) - sse(mb)) > 1e-6  # genuinely solved, not a fallback
+    assert sse(mg) <= sse(mb) * 1.001 + 1e-6  # no worse than backcasting
 
 
 # --- Loss-aware solve -------------------------------------------------------

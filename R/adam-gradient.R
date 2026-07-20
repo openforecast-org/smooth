@@ -100,31 +100,53 @@ adam_gradientSolve <- function(adamCpp, matWt, matF, vecG, indexLookupTable,
 
 # Internal helper (not exported, not documented for users).
 #
-# Build the probe basis for gradient initialisation of an ETS model: a
-# (nComponents*lagsModelMax x nFree) 0/1 matrix whose column j marks the profile
-# cells (in column-major order, matching the C++ lookup indices) that move
-# together as one free initial parameter. Level and trend span all head columns;
-# each seasonal cell is its own parameter. Returns NULL when the model is out of
-# scope (ARIMA / xreg / non-ETS), so the caller falls back to backcasting.
-adam_gradientProbeBasis <- function(etsModel, arimaModel, xregModel, Ttype, Stype,
+# Build the probe basis for gradient initialisation: a (nComponents*lagsModelMax
+# x nFree) 0/1 matrix whose column j marks the profile cells (column-major,
+# matching the C++ lookup indices) that move together as one free initial
+# parameter. ETS: level and trend span all head columns (they are walked forward
+# across the head cycle), each seasonal cell is its own parameter. ARIMA: each
+# state's lag slots are free parameters (the rank-revealing solve drops the
+# redundant directions). ARIMA is only included for ADDITIVE models (E='A', no
+# multiplicative components): those use the exact affine least-squares branch,
+# whose residuals are affine in the initial profile. Multiplicative ARIMA (whose
+# Gauss-Newton Jacobian is ETS-only) and xreg fall back to backcasting (NULL).
+adam_gradientProbeBasis <- function(etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                     componentsNumberETSSeasonal,
                                     componentsNumberETSNonSeasonal,
-                                    nComponents, lagsModel, lagsModelMax){
-    if(!etsModel || arimaModel || xregModel){ return(NULL) }
+                                    componentsNumberETS, componentsNumberARIMA,
+                                    nComponents, lagsModelAll, lagsModelMax){
+    if(xregModel){ return(NULL) }
+    if(!etsModel && !arimaModel){ return(NULL) }
+    additive <- (Etype=="A") && !any(Ttype==c("M","Md")) && (Stype!="M")
+    # ARIMA gradient needs the additive affine branch; multiplicative ARIMA
+    # would take the ETS-only Gauss-Newton path -> fall back.
+    if(arimaModel && !additive){ return(NULL) }
     # Column-major cell index of profile[row, col] is row + (col-1)*nComponents
     cellsOf <- function(row, cols){ row + (cols - 1) * nComponents }
-    probes <- list(cellsOf(1, 1:lagsModelMax))
-    if(Ttype != "N"){
-        probes[[length(probes) + 1]] <- cellsOf(2, 1:lagsModelMax)
+    probes <- list()
+    if(etsModel){
+        probes[[length(probes) + 1]] <- cellsOf(1, 1:lagsModelMax)   # level (walked)
+        if(Ttype != "N"){
+            probes[[length(probes) + 1]] <- cellsOf(2, 1:lagsModelMax) # trend (walked)
+        }
+        if(Stype != "N" && componentsNumberETSSeasonal > 0){
+            for(i in 1:componentsNumberETSSeasonal){
+                r <- componentsNumberETSNonSeasonal + i
+                for(j in 1:lagsModelAll[r]){
+                    probes[[length(probes) + 1]] <- cellsOf(r, j)
+                }
+            }
+        }
     }
-    if(Stype != "N" && componentsNumberETSSeasonal > 0){
-        for(i in 1:componentsNumberETSSeasonal){
-            r <- componentsNumberETSNonSeasonal + i
-            for(j in 1:lagsModel[r]){
+    if(arimaModel && componentsNumberARIMA > 0){
+        for(i in 1:componentsNumberARIMA){
+            r <- componentsNumberETS + i
+            for(j in 1:lagsModelAll[r]){
                 probes[[length(probes) + 1]] <- cellsOf(r, j)
             }
         }
     }
+    if(length(probes) == 0){ return(NULL) }
     probeBasis <- matrix(0, nComponents * lagsModelMax, length(probes))
     for(j in seq_along(probes)){
         probeBasis[probes[[j]], j] <- 1
@@ -146,7 +168,8 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                                componentsNumberETS, componentsNumberETSSeasonal,
                                componentsNumberETSNonSeasonal, lagsModel, lagsModelMax,
                                obsInSample, loss, distribution="dnorm", other=NULL,
-                               horizon=0, multisteps=FALSE, oType="n"){
+                               horizon=0, multisteps=FALSE, oType="n",
+                               componentsNumberARIMA=0, lagsModelAll=lagsModel){
     if(any(initialType == "gradient")){
         # Occurrence models profile their own losses over the probability
         # residuals; occurrence "fixed" ('f') has no estimated initials and
@@ -162,10 +185,11 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
             NULL
         }
         probeBasis <- adam_gradientProbeBasis(etsModel, arimaModel, xregModel,
-                                              Ttype, Stype,
+                                              Etype, Ttype, Stype,
                                               componentsNumberETSSeasonal,
                                               componentsNumberETSNonSeasonal,
-                                              nrow(profile), lagsModel, lagsModelMax)
+                                              componentsNumberETS, componentsNumberARIMA,
+                                              nrow(profile), lagsModelAll, lagsModelMax)
         if(!is.null(probeBasis) && !is.null(lossCode)){
             solved <- adam_gradientSolve(adamCpp, matWt, matF, vecG, indexLookupTable,
                                          profile, yInSample, ot, probeBasis,

@@ -274,6 +274,82 @@ def test_gradient_om_reaches_optimal_quality():
         assert abs(float(mg.loglik) - float(mo.loglik)) < 0.01 * abs(float(mo.loglik))
 
 
+def test_gradient_om_arima_solves():
+    # Occurrence ARIMA is in scope on the occurrence path (finite-difference
+    # Gauss-Newton, the analytic companions being ETS-only). The gradient fit
+    # must run, stay finite, and beat backcasting on the likelihood.
+    from scipy.special import expit
+
+    from smooth import OM
+
+    rng = np.random.default_rng(11)
+    p = expit(0.5 + np.cumsum(rng.normal(0, 0.15, 120)))
+    ot = rng.binomial(1, p)
+    y = ot * (10 + rng.normal(size=120))
+    kw = dict(
+        model="MNN", occurrence="odds-ratio", orders={"ar": [1], "i": [1], "ma": [1]}
+    )
+    mb = OM(initial="backcasting", **kw).fit(y)
+    mg = OM(initial="gradient", **kw).fit(y)
+    assert np.isfinite(float(mg.loglik))
+    assert float(mg.loglik) >= float(mb.loglik) - 1e-4
+    assert abs(float(mg.loglik) - float(mb.loglik)) > 1e-6  # genuinely solved
+
+
+def test_gradient_om_xreg_solves():
+    # xreg coefficients are solved initials on the occurrence path. odds-ratio
+    # keeps the probability bounded (the 'direct' seed can saturate and then
+    # correctly falls back). At fixed persistence gradient reaches optimal
+    # quality and differs from backcasting.
+    import pandas as pd
+    from scipy.special import expit
+
+    from smooth import OM
+
+    rng = np.random.default_rng(22)
+    n = 150
+    x1 = rng.normal(size=n)
+    x2 = np.cumsum(rng.normal(0, 0.3, n))
+    p = expit(-0.3 + 0.8 * x1 + 0.5 * x2)
+    o = rng.binomial(1, p)
+    df = pd.DataFrame({"y": o * (20 + rng.normal(size=n)), "x1": x1, "x2": x2})
+    kw = dict(model="ANN", occurrence="odds-ratio", persistence=0.05)
+    mb = OM(initial="backcasting", **kw).fit(df)
+    mg = OM(initial="gradient", **kw).fit(df)
+    assert np.isfinite(float(mg.loglik))
+    assert abs(float(mg.loglik) - float(mb.loglik)) > 1e-6
+    assert float(mg.loglik) >= float(mb.loglik) - 1e-6
+
+
+def test_gradient_omg_solves_coupled_initials():
+    # omg couples two occurrence sub-models through one probability, so the two
+    # initial profiles are solved jointly (gradientSolveGeneral). It must run,
+    # stay finite and differ from backcasting on ETS and ARIMA sub-models.
+    from scipy.special import expit
+
+    from smooth import OMG
+
+    rng = np.random.default_rng(7)
+    p = expit(0.3 + np.cumsum(rng.normal(0, 0.12, 120)))
+    ot = rng.binomial(1, p)
+    y = ot * (15 + rng.normal(size=120))
+    eb = OMG(model_a="MNN", model_b="MNN", initial="backcasting").fit(y)
+    eg = OMG(model_a="MNN", model_b="MNN", initial="gradient").fit(y)
+    assert np.isfinite(float(eg.loglik))
+    assert abs(float(eg.loglik) - float(eb.loglik)) > 1e-6
+
+    arima = dict(
+        model_a="NNN",
+        model_b="NNN",
+        orders_a={"ar": [1], "i": [1], "ma": [1]},
+        orders_b={"ar": [1], "i": [1], "ma": [1]},
+    )
+    ab = OMG(initial="backcasting", **arima).fit(y)
+    ag = OMG(initial="gradient", **arima).fit(y)
+    assert np.isfinite(float(ag.loglik))
+    assert abs(float(ag.loglik) - float(ab.loglik)) > 1e-6
+
+
 def test_gradient_om_loss_code_mapping_matches_r():
     from smooth.adam_general.core.utils.gradient import adam_gradient_om_loss_code
 

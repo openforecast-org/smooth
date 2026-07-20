@@ -662,7 +662,7 @@ class ADAM:
         nlopt_initial: Optional[Dict[str, Any]] = None,
         nlopt_upper: Optional[Dict[str, Any]] = None,
         nlopt_lower: Optional[Dict[str, Any]] = None,
-        nlopt_kargs: Optional[Dict[str, Any]] = None,
+        nlopt_kwargs: Optional[Dict[str, Any]] = None,
         # specific to losses or distributions
         reg_lambda: Optional[float] = None,
         gnorm_shape: Optional[float] = None,
@@ -768,7 +768,7 @@ class ADAM:
             Upper bounds for optimization parameters for NLopt solver.
         nlopt_lower : Optional[Dict[str, Any]], default=None
             Lower bounds for optimization parameters for NLopt solver.
-        nlopt_kargs : Optional[Dict[str, Any]], default=None
+        nlopt_kwargs : Optional[Dict[str, Any]], default=None
             Additional keyword arguments for optimization. Supported keys:
 
             - ``print_level`` (int): Verbosity level for optimization progress
@@ -794,7 +794,7 @@ class ADAM:
 
             Example::
 
-                model = ADAM(model="AAN", nlopt_kargs={
+                model = ADAM(model="AAN", nlopt_kwargs={
                     "print_level": 1,
                     "xtol_rel": 1e-8,
                     "algorithm": "NLOPT_LN_SBPLX"
@@ -843,7 +843,7 @@ class ADAM:
         self.nlopt_initial = nlopt_initial
         self.nlopt_upper = nlopt_upper
         self.nlopt_lower = nlopt_lower
-        self.nlopt_kargs = nlopt_kargs
+        self.nlopt_kwargs = nlopt_kwargs
         self.reg_lambda = reg_lambda
         self.gnorm_shape = gnorm_shape
         self.smoother = smoother
@@ -863,11 +863,11 @@ class ADAM:
             self.lambda_param = lambda_param
 
         # Handle 'print_level' from kwargs for convenience
-        # Users can pass print_level=1 directly or via nlopt_kargs={'print_level': 1}
+        # Users can pass print_level=1 directly or via nlopt_kwargs={'print_level': 1}
         if "print_level" in kwargs:
-            if self.nlopt_kargs is None:
-                self.nlopt_kargs = {}
-            self.nlopt_kargs["print_level"] = kwargs["print_level"]
+            if self.nlopt_kwargs is None:
+                self.nlopt_kwargs = {}
+            self.nlopt_kwargs["print_level"] = kwargs["print_level"]
 
         # Store profile parameters
         self.profiles_recent_provided = profiles_recent_provided
@@ -3369,7 +3369,7 @@ class ADAM:
             else:
                 other_value = float(self.gnorm_shape)
 
-            nlopt_params = self.nlopt_kargs if self.nlopt_kargs else {}
+            nlopt_params = self.nlopt_kwargs if self.nlopt_kwargs else {}
             self._adam_estimated = estimator(
                 general_dict=self._general,
                 model_type_dict=self._model_type,
@@ -3542,7 +3542,7 @@ class ADAM:
             initials_results=self._initials,
             criterion=self._general["ic"],
             silent=self.verbose == 0,
-            nlopt_kargs=self.nlopt_kargs,
+            nlopt_kwargs=self.nlopt_kwargs,
             smoother=self.smoother,
         )
         # print(self._adam_selected)

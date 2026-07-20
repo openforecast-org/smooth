@@ -72,7 +72,7 @@ class AutoOM:
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
         bounds: Literal["usual", "admissible", "none"] = "usual",
         verbose: int = 0,
-        nlopt_kargs: Optional[Dict[str, Any]] = None,
+        nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
         arima_select: bool = False,
         ar_order: Union[int, List[int]] = 3,
@@ -101,7 +101,7 @@ class AutoOM:
         self.ic = ic
         self.bounds = bounds
         self.verbose = verbose
-        self.nlopt_kargs = nlopt_kargs
+        self.nlopt_kwargs = nlopt_kwargs
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
@@ -123,7 +123,7 @@ class AutoOM:
             ic=self.ic,
             bounds=self.bounds,
             verbose=self.verbose,
-            nlopt_kargs=self.nlopt_kargs,
+            nlopt_kwargs=self.nlopt_kwargs,
         )
 
     def _build_candidate(self, occ: str) -> Union[OM, OMG]:

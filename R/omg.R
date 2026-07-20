@@ -905,12 +905,26 @@ omg <- function(data,
                                   checker$constantRequired, checker$initialArimaNumber)
 
         prof <- adamFilled$matVt[, seq_len(adamArchitect$lagsModelMax), drop=FALSE]
-        adamFitted <- adamArchitect$adamCpp$fit(
+        # Each side is reported as a standalone occurrence fit (as for
+        # backcasting/optimal); for initial="gradient" the dispatcher solves the
+        # side's initials by profiling its own occurrence loss. Non-gradient
+        # initials fall straight through to the ordinary fit with the same
+        # backcast flag, so backcasting/optimal are unchanged.
+        adamFitted <- adam_fitOrGradient(
             adamFilled$matVt, adamFilled$matWt, adamFilled$matF, adamFilled$vecG,
             adamArchitect$indexLookupTable, prof,
             as.numeric(ot), as.numeric(ot),
-            any(checker$initialType == c("complete","backcasting")),
-            nIterations, occurrenceChar)
+            checker$initialType, nIterations, adamArchitect$adamCpp,
+            checker$etsModel, checker$arimaModel, checker$xregModel,
+            checker$Etype, checker$Ttype, checker$Stype,
+            adamArchitect$componentsNumberETS,
+            adamArchitect$componentsNumberETSSeasonal,
+            adamArchitect$componentsNumberETSNonSeasonal,
+            adamArchitect$lagsModel, adamArchitect$lagsModelMax,
+            obsInSample, loss, oType=occurrenceChar,
+            componentsNumberARIMA=checker$componentsNumberARIMA,
+            lagsModelAll=adamArchitect$lagsModelAll,
+            xregNumber=checker$xregNumber)
 
         yFitted <- adamFitted$fitted
 
@@ -1342,18 +1356,64 @@ omgCF_local <- function(B,
     profilesRecentTableA[] <- elemA$matVt[, seq_len(lagsModelMaxA)]
     profilesRecentTableB[] <- elemB$matVt[, seq_len(lagsModelMaxB)]
 
+    # initial="gradient": profile the two occurrence initials jointly by the
+    # coupled least-squares/Gauss-Newton solve (adamCppA$gradientSolveGeneral)
+    # over the shared probability residual, then run one forward pass from the
+    # solved profiles. Otherwise (or out of scope / custom loss) fall back to
+    # the ordinary coupled fit, with gradient joining the backcasting group.
+    useProfA <- profilesRecentTableA
+    useProfB <- profilesRecentTableB
+    gradBackcast <- any(initialTypeA == c("complete","backcasting","gradient"))
+    gradNIter <- nIterations
+    if(any(initialTypeA == "gradient")){
+        lossCode <- adam_gradientOmLossCode(loss)
+        pbA <- adam_gradientProbeBasis(etsModelA, arimaModelA, xregModelA,
+                                       EtypeA, TtypeA, StypeA,
+                                       componentsNumberETSSeasonalA,
+                                       componentsNumberETSNonSeasonalA,
+                                       componentsNumberETSA, componentsNumberARIMAA,
+                                       nrow(profilesRecentTableA), lagsModelAllA,
+                                       lagsModelMaxA, xregNumberA, "g")
+        pbB <- adam_gradientProbeBasis(etsModelB, arimaModelB, xregModelB,
+                                       EtypeB, TtypeB, StypeB,
+                                       componentsNumberETSSeasonalB,
+                                       componentsNumberETSNonSeasonalB,
+                                       componentsNumberETSB, componentsNumberARIMAB,
+                                       nrow(profilesRecentTableB), lagsModelAllB,
+                                       lagsModelMaxB, xregNumberB, "g")
+        if(!is.null(lossCode) && (!is.null(pbA) || !is.null(pbB))){
+            if(is.null(pbA)){ pbA <- matrix(0, nrow(profilesRecentTableA), 0) }
+            if(is.null(pbB)){ pbB <- matrix(0, nrow(profilesRecentTableB), 0) }
+            solved <- adamCppA$gradientSolveGeneral(
+                elemA$matVt, elemA$matWt, elemA$matF, elemA$vecG,
+                indexLookupTableA, profilesRecentTableA, pbA,
+                EtypeB, TtypeB, StypeB,
+                nNonSeasonalB, nSeasonalB, nETSB, nArimaB, nXregB, nComponentsB,
+                constantRequiredB, adamETSB_flag,
+                elemB$matVt, elemB$matWt, elemB$matF, elemB$vecG,
+                indexLookupTableB, profilesRecentTableB, pbB,
+                as.numeric(ot), 15L, lossCode$code)
+            if(length(solved$profileA) > 0 && length(solved$profileB) > 0){
+                useProfA <- solved$profileA
+                useProfB <- solved$profileB
+                gradBackcast <- FALSE
+                gradNIter <- 1
+            }
+        }
+    }
+
     res <- adamCppA$omfitGeneral(
         elemA$matVt, elemA$matWt, elemA$matF, elemA$vecG,
-        indexLookupTableA, profilesRecentTableA,
+        indexLookupTableA, useProfA,
         EtypeB, TtypeB, StypeB,
         nNonSeasonalB, nSeasonalB, nETSB,
         nArimaB, nXregB, nComponentsB,
         constantRequiredB, adamETSB_flag,
         elemB$matVt, elemB$matWt, elemB$matF, elemB$vecG,
-        indexLookupTableB, profilesRecentTableB,
+        indexLookupTableB, useProfB,
         as.numeric(ot),
-        any(initialTypeA == c("complete","backcasting")),
-        nIterations)
+        gradBackcast,
+        gradNIter)
 
     pCombined <- omgLinkFunction(res$fittedA, res$fittedB, EtypeA, EtypeB)
 

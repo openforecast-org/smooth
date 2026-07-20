@@ -909,7 +909,10 @@ om <- function(data,
                                          adamArchitect$componentsNumberETSSeasonal,
                                          adamArchitect$componentsNumberETSNonSeasonal,
                                          adamArchitect$lagsModel, adamArchitect$lagsModelMax,
-                                         obsInSample, loss, oType=occurrenceChar);
+                                         obsInSample, loss, oType=occurrenceChar,
+                                         componentsNumberARIMA=componentsNumberARIMA,
+                                         lagsModelAll=adamArchitect$lagsModelAll,
+                                         xregNumber=xregNumber);
         yFitted <- omLinkFunction(adamFitted$fitted, nla$Etype, occurrence);
 
         # The occurrence model's log-likelihood is ALWAYS the Bernoulli
@@ -1829,7 +1832,9 @@ omCF_local <- function(B,
                                      etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                      componentsNumberETS, componentsNumberETSSeasonal,
                                      componentsNumberETSNonSeasonal, lagsModel, lagsModelMax,
-                                     obsInSample, loss, oType=occurrenceChar);
+                                     obsInSample, loss, oType=occurrenceChar,
+                                     componentsNumberARIMA=componentsNumberARIMA,
+                                     lagsModelAll=lagsModelAll, xregNumber=xregNumber);
     yFitted <- omLinkFunction(adamFitted$fitted, Etype, occurrence);
     if(any(is.nan(yFitted)) || any(yFitted<0) || any(yFitted>1)){
         return(1e+300);

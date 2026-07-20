@@ -200,6 +200,20 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
     initialList <- object$initial;
     xregInitNames <- names(initialList$xreg);
 
+    # Which engine fitted this object: the state-space ARIMA engines (ssarima,
+    # sparma) use their own ARIMA representation, so they must be re-fitted with
+    # their own function (an adam() refit would reconstruct a different model).
+    # CES and GUM have their own parameterisations (complex smoothing, free
+    # transition) whose perturbation maps are not yet implemented; they return
+    # NULL here and the caller falls back to the Hessian.
+    engine <- if(ssarimaChecker(object)){ "ssarima"; }
+              else if(sparmaChecker(object)){ "sparma"; }
+              else if(cesChecker(object) || gumChecker(object)){ NULL; }
+              else { "adam"; }
+    if(is.null(engine)){
+        return(NULL);
+    }
+
     # Structural refit arguments reconstructed from the object.
     modelString <- modelType(object);
     modelLags <- object$lags;
@@ -208,16 +222,28 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
 
     # Per-observation log-likelihood of the model rebuilt at a perturbed
     # parameter set: everything provided (empty B, single evaluation), the
-    # selected ETS/ARIMA structure and lags preserved. Initials are re-derived
-    # for non-optimal initialisation.
+    # selected structure and lags preserved. Initials are re-derived for
+    # non-optimal initialisation.
     evalPointLik <- function(persistence, phi, arma, initialArg){
-        args <- list(data=object$data, model=modelString, lags=modelLags,
-                     persistence=persistence, phi=phi, initial=initialArg,
-                     h=0, FI=FALSE, silent=TRUE);
+        if(engine=="adam"){
+            args <- list(data=object$data, model=modelString, lags=modelLags,
+                         persistence=persistence, phi=phi, initial=initialArg,
+                         h=0, FI=FALSE, silent=TRUE);
+            if(!is.null(regressorsMode)){ args$regressors <- regressorsMode; }
+        }
+        else if(engine=="ssarima"){
+            # ssarima's data argument is named `y`, and it takes explicit lags.
+            args <- list(y=object$data, lags=modelLags, initial=initialArg,
+                         h=0, FI=FALSE, silent=TRUE);
+        }
+        else{
+            # sparma: data argument is `data`, no lags argument.
+            args <- list(data=object$data, initial=initialArg,
+                         h=0, FI=FALSE, silent=TRUE);
+        }
         if(!is.null(modelOrders)){ args$orders <- modelOrders; }
         if(length(arma)>0){ args$arma <- arma; }
-        if(!is.null(regressorsMode)){ args$regressors <- regressorsMode; }
-        modelLocal <- try(suppressWarnings(do.call("adam", args)), silent=TRUE);
+        modelLocal <- try(suppressWarnings(do.call(engine, args)), silent=TRUE);
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }

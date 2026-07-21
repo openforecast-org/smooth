@@ -1078,6 +1078,7 @@ def preparator(
         other=other,
         horizon=general_dict.get("h", 0),
         multisteps=general_dict.get("multisteps", False),
+        xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
     )
     # The gradient solve overwrites the head of mat_vt in place; mirror the
     # solved initials back into matrices_dict so downstream initial-value

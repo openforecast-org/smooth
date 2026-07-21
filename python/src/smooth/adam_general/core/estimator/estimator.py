@@ -838,6 +838,7 @@ def estimator(
                 components_dict=components_dict,
                 lags_dict=lags_dict,
                 obs_in_sample=observations_dict["obs_in_sample"],
+                xreg_number=int(explanatory_dict.get("xreg_number", 0) or 0),
             )
 
             # Update original matrices

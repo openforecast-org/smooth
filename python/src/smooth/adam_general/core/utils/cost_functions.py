@@ -605,6 +605,7 @@ def CF(  # noqa: N802
         other=other,
         horizon=general.get("h", 0),
         multisteps=general["multisteps"],
+        xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
     )
 
     # adam_fitted.errors = np.repeat()
@@ -1235,6 +1236,7 @@ def log_Lik_ADAM(  # noqa: N802
                 other=None,
                 horizon=general_dict.get("h", 0),
                 multisteps=general_dict["multisteps"],
+                xreg_number=int(explanatory_dict.get("xreg_number", 0) or 0),
             )
 
             logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))

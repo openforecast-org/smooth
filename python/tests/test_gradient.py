@@ -131,6 +131,50 @@ def test_gradient_nonseasonal():
     assert np.all(np.isfinite(np.asarray(m.fitted).ravel()))
 
 
+def test_gradient_solves_additive_xreg_initials():
+    # xreg coefficients are additional affine directions in the initial-state
+    # design, so the additive least-squares solve recovers them exactly
+    # (matching optimal, beating backcasting).
+    rng = np.random.default_rng(5)
+    n = 120
+    z1 = rng.standard_normal(n)
+    z2 = rng.standard_normal(n)
+    y = (
+        100
+        + np.cumsum(rng.standard_normal(n) * 2)
+        + 3 * z1
+        - 2 * z2
+        + rng.standard_normal(n) * 3
+    )
+    X = np.column_stack([z1, z2])
+    g = ADAM(model="ANN", regressors="use", initial="gradient").fit(y, X)
+    o = ADAM(model="ANN", regressors="use", initial="optimal").fit(y, X)
+    b = ADAM(model="ANN", regressors="use", initial="backcasting").fit(y, X)
+    # Reaches optimal quality (the affine solve is exact) at the same df, and is
+    # never worse than backcasting.
+    assert np.isclose(float(g.loglik), float(o.loglik), atol=1e-3)
+    assert g.nparam == o.nparam
+    assert float(g.loglik) >= float(b.loglik) - 1e-4
+
+
+def test_gradient_multiplicative_xreg_falls_back():
+    rng = np.random.default_rng(6)
+    n = 120
+    z1 = rng.standard_normal(n)
+    z2 = rng.standard_normal(n)
+    y = np.abs(
+        100
+        + np.cumsum(rng.standard_normal(n) * 2)
+        + 3 * z1
+        - 2 * z2
+        + rng.standard_normal(n) * 3
+    )
+    X = np.column_stack([z1, z2])
+    g = ADAM(model="MNN", regressors="use", initial="gradient").fit(y, X)
+    b = ADAM(model="MNN", regressors="use", initial="backcasting").fit(y, X)
+    assert np.isclose(float(g.loglik), float(b.loglik), atol=1e-6)
+
+
 def test_gradient_msarima_solves_additive_arima_initials():
     # MSARIMA is an additive SSOE model, so initial="gradient" profiles the
     # ARIMA initials by least squares (matching optimal at fixed dynamics and

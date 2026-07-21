@@ -86,9 +86,9 @@ def _r_outputs_for(scenario):
         "   list(series=as.numeric(y),"
         "        coef=as.numeric(coef(m)),"
         "        coef_names=names(coef(m)),"
-        "        vcov=as.matrix(vcov(m)),"
-        "        confint=as.matrix(confint(m, level=0.95)),"
-        "        confint_rownames=rownames(confint(m, level=0.95))) }"
+        "        vcov=as.matrix(vcov(m, type='hessian')),"
+        "        confint=as.matrix(confint(m, level=0.95, type='hessian')),"
+        "        confint_rownames=rownames(confint(m, level=0.95, type='hessian'))) }"
     )
     return r_dict(expr)
 
@@ -165,7 +165,7 @@ def test_vcov_matches_r_at_same_b(scenario, r_outputs):
 @pytest.mark.parametrize("scenario", list(SCENARIOS))
 def test_confint_matches_r(scenario, r_outputs):
     m = _python_fit(scenario, r_outputs)
-    ci = m.confint(level=0.95)
+    ci = m.confint(level=0.95, type="hessian")
     r_ci = np.asarray(r_outputs[scenario]["confint"], dtype=float)
     r_rownames = list(r_outputs[scenario]["confint_rownames"])
 
@@ -189,7 +189,7 @@ def test_confint_matches_r(scenario, r_outputs):
 
 def test_summary_layout_and_significance(r_outputs):
     m = _python_fit("aan", r_outputs)
-    s = str(m.summary())
+    s = str(m.summary(type="hessian"))
     for marker in (
         "Model estimated using",
         "Coefficients:",
@@ -206,7 +206,7 @@ def test_summary_layout_and_significance(r_outputs):
 def test_print_and_summary_are_separate(r_outputs):
     m = _python_fit("aan", r_outputs)
     concise = str(m)  # print.adam-style
-    full = str(m.summary())  # summary.adam-style
+    full = str(m.summary(type="hessian"))  # summary.adam-style
     assert concise != full
     # Concise report carries the persistence-vector marker; the summary doesn't.
     assert "Persistence vector" in concise

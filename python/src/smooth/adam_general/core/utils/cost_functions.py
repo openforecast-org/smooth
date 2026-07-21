@@ -140,6 +140,7 @@ def CF(  # noqa: N802
     arPolynomialMatrix=None,
     maPolynomialMatrix=None,
     regressors=None,
+    return_fitted=False,
 ):
     """
     Cost Function for ADAM model parameter estimation.
@@ -606,6 +607,16 @@ def CF(  # noqa: N802
         horizon=general.get("h", 0),
         multisteps=general["multisteps"],
     )
+
+    # The in-sample fitted values and errors at this B, returned directly for
+    # the OPG covariance: the caller recomputes the concentrated scale (via
+    # scaler) and forms the per-observation likelihood. Mirrors om_cf/omg_cf's
+    # return_fitted.
+    if return_fitted:
+        return (
+            np.asarray(adam_fitted.fitted).ravel(),
+            np.asarray(adam_fitted.errors).ravel(),
+        )
 
     # adam_fitted.errors = np.repeat()
 

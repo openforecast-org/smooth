@@ -773,6 +773,119 @@ def numerical_hessian(callable_, B, step_size=None):  # noqa: N803
     return np.asarray(_hessian_cpp(lambda b: float(callable_(b)), B, h))
 
 
+def resolve_covar_type(type_, bootstrap=False):
+    """Resolve the covariance ``type`` for the vcov/confint/summary methods.
+
+    Mirrors R's ``covarTypeResolver``: ``type`` is one of ``"opg"`` (the
+    default), ``"hessian"`` or ``"bootstrap"``. The deprecated ``bootstrap=True``
+    switch maps to ``"bootstrap"`` with a ``DeprecationWarning``.
+    """
+    import warnings
+
+    if bootstrap:
+        warnings.warn(
+            "bootstrap=True is deprecated; use type='bootstrap' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return "bootstrap"
+    if type_ is None:
+        return "opg"
+    if type_ not in ("opg", "hessian", "bootstrap"):
+        raise ValueError(
+            f"type must be one of 'opg', 'hessian', 'bootstrap'; got {type_!r}"
+        )
+    return type_
+
+
+def covar_opg(parameter_values, point_lik_at, obs_in_sample, loglik, step_size=None):
+    """OPG / BHHH covariance ``J^-1`` with ``J = sum_t s_t s_t'``.
+
+    Direct translation of R's ``covarOPGCore`` (R/helper.R). The per-observation
+    score ``s_t`` of the log-likelihood is estimated by central differences of
+    ``point_lik_at`` (a callable mapping a parameter vector to the length-``T``
+    per-observation log-likelihood), and the covariance is the inverse of the
+    outer-product-of-gradients matrix ``J``. ``J`` is positive semi-definite by
+    construction, so the covariance is finite at boundary estimates where the
+    observed Hessian is indefinite.
+
+    A reproduction guard requires ``point_lik_at(parameter_values)`` to sum to
+    ``loglik`` (else returns ``None``, so the caller falls back to the Hessian).
+    At an active bound one perturbation side may leave the feasible region and
+    return a non-finite vector; the difference then drops to one-sided against
+    the reproduced base. Directions with a (near-)zero score are dropped and
+    given an infinite variance (unidentified parameters).
+
+    Returns
+    -------
+    numpy.ndarray or None
+        The ``len(B) x len(B)`` covariance, or ``None`` if the reproduction
+        guard trips or a score cannot be evaluated.
+    """
+    b_values = np.asarray(parameter_values, dtype=float)
+    n_param = len(b_values)
+    if n_param == 0:
+        return None
+    h_default = step_size if step_size else float(np.finfo(float).eps ** 0.25)
+
+    base_lik = point_lik_at(b_values)
+    if (
+        base_lik is None
+        or len(base_lik) != obs_in_sample
+        or not np.isclose(float(np.sum(base_lik)), float(loglik), atol=1e-4, rtol=0.0)
+    ):
+        return None
+    base_lik = np.asarray(base_lik, dtype=float)
+
+    def _side_ok(vec):
+        return (
+            vec is not None and len(vec) == obs_in_sample and np.all(np.isfinite(vec))
+        )
+
+    scores = np.full((obs_in_sample, n_param), np.nan)
+    for j in range(n_param):
+        h_step = h_default * max(1.0, abs(b_values[j]))
+        up = b_values.copy()
+        up[j] += h_step
+        down = b_values.copy()
+        down[j] -= h_step
+        lik_up = point_lik_at(up)
+        lik_down = point_lik_at(down)
+        up_ok = _side_ok(lik_up)
+        down_ok = _side_ok(lik_down)
+        if up_ok and down_ok:
+            scores[:, j] = (np.asarray(lik_up) - np.asarray(lik_down)) / (2 * h_step)
+        elif up_ok:
+            scores[:, j] = (np.asarray(lik_up) - base_lik) / h_step
+        elif down_ok:
+            scores[:, j] = (base_lik - np.asarray(lik_down)) / h_step
+        else:
+            return None
+
+    if not np.all(np.isfinite(scores)):
+        return None
+
+    j_matrix = scores.T @ scores
+    diag_j = np.diag(j_matrix)
+    keep = (diag_j > np.max(diag_j) * 1e-10) & np.isfinite(diag_j)
+    vcov = np.full((n_param, n_param), np.inf)
+    if np.any(keep):
+        j_keep = j_matrix[np.ix_(keep, keep)]
+        try:
+            vcov_keep = np.linalg.solve(j_keep, np.eye(j_keep.shape[0]))
+        except np.linalg.LinAlgError:
+            # Ill-conditioned: Moore-Penrose pseudo-inverse via symmetric eigen,
+            # dropping the (near-)zero-eigenvalue directions. Still PSD.
+            vals, vecs = np.linalg.eigh(j_keep)
+            positive = vals > np.max(vals) * 1e-10
+            if not np.any(positive):
+                return None
+            vecs_keep = vecs[:, positive]
+            vcov_keep = vecs_keep @ (vecs_keep.T / vals[positive][:, None])
+        vcov[np.ix_(keep, keep)] = vcov_keep
+    return vcov
+
+
 def invert_fisher_information(FI):  # noqa: N803
     """Invert an observed Fisher Information matrix to a covariance matrix.
 

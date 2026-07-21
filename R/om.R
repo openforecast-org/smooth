@@ -2080,14 +2080,16 @@ coefbootstrap.om <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 }
 
 #' @export
-vcov.om <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
+vcov.om <- function(object, type=c("opg","hessian","bootstrap"),
+                    bootstrap=FALSE, heuristics=NULL, ...){
     ellipsis <- list(...);
+    type <- covarTypeResolver(type, bootstrap);
 
     if(!is.null(heuristics) && is.numeric(heuristics)){
         return(diag(abs(coef(object)) * heuristics));
     }
 
-    if(bootstrap){
+    if(type=="bootstrap"){
         return(coefbootstrap(object, ...)$vcov);
     }
 
@@ -2101,7 +2103,7 @@ vcov.om <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
     # returns finite standard errors at boundary estimates where the observed
     # Fisher Information (below) is indefinite. Falls back to the Hessian if the
     # reproduction guard trips (covarOPGom returns NULL).
-    if(opg){
+    if(type=="opg"){
         vcovOPG <- covarOPGom(object, stepSize=stepSize);
         if(!is.null(vcovOPG)){
             return(vcovOPG);

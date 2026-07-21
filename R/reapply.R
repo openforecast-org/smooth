@@ -18,8 +18,15 @@
 #' @param nsim Number of paths to generate (number of simulations to do).
 #' @param h Forecast horizon.
 #' @param newdata The new data needed in order to produce forecasts.
-#' @param bootstrap The logical, which determines, whether to use bootstrap for the
-#' covariance matrix of parameters or not.
+#' @param type The type of covariance matrix of parameters to use for the
+#' refitting. One of \code{"opg"} (the default, the OPG / BHHH estimator
+#' \eqn{J=\sum_t s_t s_t'} built from the per-observation scores, positive
+#' semi-definite by construction), \code{"hessian"} (the observed Fisher
+#' Information, i.e. the inverse numerical Hessian of the log-likelihood) or
+#' \code{"bootstrap"}. See \link[stats]{vcov} on the fitted model for details.
+#' @param bootstrap Deprecated in favour of \code{type="bootstrap"}. The logical,
+#' which determines, whether to use bootstrap for the covariance matrix of
+#' parameters or not. \code{bootstrap=TRUE} still works but issues a warning.
 #' @param heuristics The value for proportion to use for heuristic estimation of the
 #' standard deviation of parameters. If \code{NULL}, it is not used.
 #' @param occurrence The vector containing the future occurrence variable
@@ -58,6 +65,12 @@
 #' columns and different states (obtained from \code{reapply()} function) in the
 #' third dimension.
 #'
+#' @references \itemize{
+#' \item Berndt, E., Hall, B., Hall, R., & Hausman, J. (1974). Estimation and
+#' Inference in Nonlinear Structural Models. Annals of Economic and Social
+#' Measurement, 3(4), 653--665. (The OPG / BHHH covariance estimator used by
+#' \code{type="opg"}.)
+#' }
 #' @seealso \link[smooth]{forecast.smooth}
 #' @examples
 #'
@@ -72,10 +85,12 @@
 #'
 #' @rdname reapply
 #' @export reapply
-reapply <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ...) UseMethod("reapply")
+reapply <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+                    bootstrap=FALSE, heuristics=NULL, ...) UseMethod("reapply")
 
 #' @export
-reapply.default <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ...){
+reapply.default <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+                            bootstrap=FALSE, heuristics=NULL, ...){
     warning(paste0("The method is not implemented for the object of the class ",class(object)[1]),
             call.=FALSE);
     return(structure(list(states=object$states, fitted=fitted(object)),
@@ -84,7 +99,9 @@ reapply.default <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL,
 
 #' @importFrom MASS mvrnorm
 #' @export
-reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ...){
+reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+                         bootstrap=FALSE, heuristics=NULL, ...){
+    type <- covarTypeResolver(type, bootstrap);
     # Start measuring the time of calculations
     startTime <- Sys.time();
     parametersNames <- names(coef(object));
@@ -92,7 +109,22 @@ reapply.adam <- function(object, nsim=1000, bootstrap=FALSE, heuristics=NULL, ..
     # Check whether we deal with adam ETS or the conventional
     adamETS <- adamETSChecker(object);
 
-    vcovAdam <- suppressWarnings(vcov(object, bootstrap=bootstrap, heuristics=heuristics, nsim=nsim, ...));
+    vcovAdam <- suppressWarnings(vcov(object, type=type, heuristics=heuristics, nsim=nsim, ...));
+    # The OPG covariance (the default) returns an infinite variance for a
+    # parameter the data does not identify (e.g. an initial that washes out when
+    # its smoothing parameter is at a bound). Such parameters cannot be
+    # resampled, so hold them at their point estimate — zero their row/column —
+    # before the multivariate-normal draw.
+    nonFiniteVar <- !is.finite(diag(vcovAdam));
+    if(any(nonFiniteVar)){
+        warning(paste0("The covariance of ",
+                       paste0(parametersNames[nonFiniteVar], collapse=", "),
+                       " is not finite (the data does not identify these), ",
+                       "so they are held at their estimates in the refit."),
+                call.=FALSE, immediate.=TRUE);
+        vcovAdam[nonFiniteVar,] <- 0;
+        vcovAdam[,nonFiniteVar] <- 0;
+    }
     # Check if the matrix is positive definite
     vcovEigen <- min(eigen(vcovAdam, only.values=TRUE)$values);
     if(vcovEigen<0){
@@ -943,9 +975,11 @@ reforecast.default <- function(object, h=10, newdata=NULL, occurrence=NULL,
 reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                             interval=c("prediction", "confidence", "none"),
                             level=0.95, side=c("both","upper","lower"), cumulative=FALSE,
-                            nsim=100, bootstrap=FALSE, heuristics=NULL, ...){
+                            nsim=100, type=c("opg","hessian","bootstrap"),
+                            bootstrap=FALSE, heuristics=NULL, ...){
+    type <- covarTypeResolver(type, bootstrap);
 
-    objectRefitted <- reapply(object, nsim=nsim, bootstrap=bootstrap, heuristics=heuristics, ...);
+    objectRefitted <- reapply(object, nsim=nsim, type=type, heuristics=heuristics, ...);
     ellipsis <- list(...);
 
     # Check whether we deal with adam ETS or the conventional

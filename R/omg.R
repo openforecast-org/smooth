@@ -1755,11 +1755,13 @@ coefbootstrap.omg <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 }
 
 #' @export
-confint.omg <- function(object, parm, level=0.95, bootstrap=FALSE, ...){
+confint.omg <- function(object, parm, level=0.95,
+                        type=c("opg","hessian","bootstrap"), bootstrap=FALSE, ...){
+    type <- covarTypeResolver(type, bootstrap)
     confintNames <- c(paste0((1-level)/2*100,"%"),
                       paste0((1+level)/2*100,"%"))
 
-    if(bootstrap){
+    if(type=="bootstrap"){
         # Empirical bootstrap quantiles, mirroring confint.adam.
         coefValues <- coefbootstrap(object, ...)
         out <- cbind(sqrt(diag(coefValues$vcov)),
@@ -1768,7 +1770,7 @@ confint.omg <- function(object, parm, level=0.95, bootstrap=FALSE, ...){
         colnames(out) <- c("S.E.", confintNames)
     }
     else{
-        V  <- vcov(object, ...)               # JOINT covariance (vcov.omg)
+        V  <- vcov(object, type=type, ...)    # JOINT covariance (vcov.omg)
         SE <- sqrt(abs(diag(V)))
 
         coefJoint <- c(object$modelA$B, object$modelB$B)
@@ -1798,15 +1800,17 @@ confint.omg <- function(object, parm, level=0.95, bootstrap=FALSE, ...){
 }
 
 #' @export
-vcov.omg <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
+vcov.omg <- function(object, type=c("opg","hessian","bootstrap"),
+                     bootstrap=FALSE, heuristics=NULL, ...){
     ellipsis <- list(...)
+    type <- covarTypeResolver(type, bootstrap)
 
     if(!is.null(heuristics) && is.numeric(heuristics)){
         # Heuristic shortcut over the joint coef vector
         return(diag(abs(c(object$modelA$B, object$modelB$B)) * heuristics))
     }
 
-    if(bootstrap){
+    if(type=="bootstrap"){
         return(coefbootstrap(object, ...)$vcov)
     }
 
@@ -1820,7 +1824,7 @@ vcov.omg <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
     # PSD by construction, so it returns finite standard errors at boundary
     # estimates where the observed Fisher Information is indefinite. Falls back
     # to the Hessian if the reproduction guard trips (covarOPGomg returns NULL).
-    if(opg){
+    if(type=="opg"){
         vcovOPG <- covarOPGomg(object, stepSize=stepSize)
         if(!is.null(vcovOPG)){
             return(vcovOPG)
@@ -1965,8 +1969,10 @@ print.omg <- function(x, digits=4, ...) {
 }
 
 #' @export
-summary.omg <- function(object, level=0.95, bootstrap=FALSE, ...) {
-    ci <- confint(object, level=level, bootstrap=bootstrap, ...)   # joint table, A:/B: rows
+summary.omg <- function(object, level=0.95,
+                        type=c("opg","hessian","bootstrap"), bootstrap=FALSE, ...) {
+    type <- covarTypeResolver(type, bootstrap)
+    ci <- confint(object, level=level, type=type, ...)   # joint table, A:/B: rows
 
     nParamsA <- length(object$modelA$B)
     idxA <- seq_len(nParamsA)

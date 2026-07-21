@@ -1596,6 +1596,27 @@ class OM(ADAM):
         self._check_is_fitted()
         return float(self._adam_estimated["log_lik_adam_value"]["value"])
 
+    def point_lik(self, log: bool = True) -> NDArray:
+        """Per-observation log-likelihood of the occurrence model.
+
+        Bernoulli contribution of each observation: ``log(p_t)`` when the
+        event occurred (``o_t = 1``) and ``log(1 - p_t)`` otherwise, where
+        ``p_t`` is the fitted occurrence probability. Mirrors R's
+        ``pointLik.om`` (R/methods.R:598). ``sum(point_lik())`` equals
+        :attr:`loglik`. With ``log=False`` the densities themselves are
+        returned.
+        """
+        self._check_is_fitted()
+        ot = np.asarray(self._observations["ot"], dtype=float).ravel()
+        p = np.asarray(self.fitted, dtype=float).ravel()
+        ot_logical = ot == 1
+        lik_values = np.empty(len(ot), dtype=float)
+        lik_values[ot_logical] = np.log(p[ot_logical])
+        lik_values[~ot_logical] = np.log(1.0 - p[~ot_logical])
+        if not log:
+            lik_values = np.exp(lik_values)
+        return lik_values
+
     # ------------------------------------------------------------------
     # Inference (overrides ADAM's FI path because om_cf — not the ADAM
     # likelihood — is the cost the OM optimiser minimised)

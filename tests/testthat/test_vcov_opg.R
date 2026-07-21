@@ -181,6 +181,20 @@ test_that("opg covers sparse-order sparma (phi2 with phi1 absent)", {
     expect_true(all(eigen(vO[fin, fin, drop = FALSE], only.values = TRUE)$values > -1e-6))
 })
 
+test_that("type=hessian for sparse-order sparma uses the native FI (no adam crash)", {
+    # adam(model=<sparma>) cannot rebuild the sparse-order ARIMA polynomial (an
+    # NA tail), which used to abort the Hessian vcov. sparma now has a native
+    # numerical-Hessian FI, so type="hessian" returns a finite covariance.
+    m <- suppressWarnings(sparma(BJsales, orders = list(ar = 2, ma = 1),
+                                 initial = "optimal", h = 0))
+    vH <- suppressWarnings(vcov(m, type = "hessian"))
+    expect_equal(dim(vH), c(length(coef(m)), length(coef(m))))
+    expect_true(all(is.finite(vH)))
+    # Genuinely the observed FI, distinct from the OPG covariance.
+    expect_false(isTRUE(all.equal(vH, suppressWarnings(vcov(m, type = "opg")),
+                                  tolerance = 1e-6)))
+})
+
 test_that("opg for sparma backcasting spans the arma parameters only", {
     m <- suppressWarnings(sparma(BJsales, orders = list(ar = 2, ma = 1),
                                  initial = "backcasting", h = 0))

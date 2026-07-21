@@ -574,6 +574,97 @@ covarOPGsparma <- function(object, stepSize=.Machine$double.eps^(1/4)){
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
 }
 
+# Re-fit a sparma model with its free coefficients set to `pars` (the arma
+# phi/theta and, under initial="optimal", the ARIMA state initials), returning
+# the fitted object or NULL on failure. sparma() holds the supplied arma and
+# initials (see covarOPGsparma), so this reproduces the fit at `pars`.
+sparmaModelAtParams <- function(object, pars){
+    parametersNames <- names(coef(object));
+    armaArNames <- names(object$arma$ar);
+    armaMaNames <- names(object$arma$ma);
+    initialsEstimated <- identical(object$initialType, "optimal");
+    freeInitial <- coef(object)[grepl("^initial", parametersNames)];
+    arma <- object$arma;
+    initialArg <- if(initialsEstimated){ as.numeric(freeInitial); } else { object$initialType; }
+    for(k in seq_along(pars)){
+        nameJ <- parametersNames[k];
+        if(nameJ %in% armaArNames){
+            arma$ar[nameJ] <- pars[k];
+        }
+        else if(nameJ %in% armaMaNames){
+            arma$ma[nameJ] <- pars[k];
+        }
+        else if(initialsEstimated && grepl("^initial", nameJ)){
+            idx <- as.integer(sub("^initial", "", nameJ));
+            initialArg[idx] <- pars[k];
+        }
+    }
+    modelLocal <- try(suppressWarnings(
+        sparma(object$data, orders=object$orders, arma=arma,
+               initial=initialArg, h=0)), silent=TRUE);
+    if(inherits(modelLocal,"try-error")){
+        return(NULL);
+    }
+    return(modelLocal);
+}
+
+# Observed Fisher Information covariance for sparma. adam(model=<sparma>) chokes
+# on the sparse-order ARIMA polynomial reconstruction (utils-adam.R ariPolynomial
+# tail is NA), so the FI is built natively here: a central-difference numerical
+# Hessian of the log-likelihood at the estimate, negated (the observed FI) and
+# inverted. Reuses the same coefficient->refit map as the OPG path. Returns NULL
+# (so vcov falls back) if any refit fails or the FI is singular.
+covarFIsparma <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    parameterValues <- coef(object);
+    parametersNames <- names(parameterValues);
+    nParam <- length(parameterValues);
+    if(nParam==0 || object$loss!="likelihood"){
+        return(NULL);
+    }
+    logLikAt <- function(pars){
+        modelLocal <- sparmaModelAtParams(object, pars);
+        if(is.null(modelLocal)){
+            return(NA_real_);
+        }
+        return(as.numeric(logLik(modelLocal)));
+    }
+
+    hStep <- stepSize*pmax(1, abs(parameterValues));
+    f0 <- logLikAt(parameterValues);
+    hessian <- matrix(NA_real_, nParam, nParam,
+                      dimnames=list(parametersNames, parametersNames));
+    for(i in seq_len(nParam)){
+        pUp <- pDown <- parameterValues;
+        pUp[i] <- pUp[i]+hStep[i];
+        pDown[i] <- pDown[i]-hStep[i];
+        hessian[i,i] <- (logLikAt(pUp)-2*f0+logLikAt(pDown))/(hStep[i]^2);
+    }
+    if(nParam>1){
+        for(i in seq_len(nParam-1)){
+            for(j in (i+1):nParam){
+                pUU <- pUD <- pDU <- pDD <- parameterValues;
+                pUU[i] <- pUU[i]+hStep[i]; pUU[j] <- pUU[j]+hStep[j];
+                pUD[i] <- pUD[i]+hStep[i]; pUD[j] <- pUD[j]-hStep[j];
+                pDU[i] <- pDU[i]-hStep[i]; pDU[j] <- pDU[j]+hStep[j];
+                pDD[i] <- pDD[i]-hStep[i]; pDD[j] <- pDD[j]-hStep[j];
+                value <- (logLikAt(pUU)-logLikAt(pUD)-logLikAt(pDU)+logLikAt(pDD))/
+                    (4*hStep[i]*hStep[j]);
+                hessian[i,j] <- hessian[j,i] <- value;
+            }
+        }
+    }
+    if(any(!is.finite(hessian))){
+        return(NULL);
+    }
+    # Observed Fisher Information is the negative Hessian of the log-likelihood.
+    vcovMatrix <- try(solve(-hessian), silent=TRUE);
+    if(inherits(vcovMatrix,"try-error")){
+        return(NULL);
+    }
+    dimnames(vcovMatrix) <- list(parametersNames, parametersNames);
+    return(vcovMatrix);
+}
+
 # Mutate a fitted adam-family clone's structured parameter slot named nameJ by
 # delta: the persistence (alpha/beta/gamma...), phi, arma (ar/ma) and -- only
 # when the initials are estimated (initialType=="optimal") -- the initial states

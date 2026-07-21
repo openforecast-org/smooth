@@ -812,7 +812,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
 }
 
 #' @export
-reapply.adamCombined <- function(object, nsim=1000, bootstrap=FALSE, ...){
+reapply.adamCombined <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+                                 bootstrap=FALSE, heuristics=NULL, ...){
+    type <- covarTypeResolver(type, bootstrap);
     startTime <- Sys.time();
 
     # Remove ICw, which are lower than 0.001
@@ -827,7 +829,8 @@ reapply.adamCombined <- function(object, nsim=1000, bootstrap=FALSE, ...){
         if(object$ICw[i]==0){
             next;
         }
-        yRefitted[[i]] <- reapply(object$models[[i]], nsim=1000, bootstrap=FALSE, ...)$refitted;
+        yRefitted[[i]] <- reapply(object$models[[i]], nsim=nsim, type=type,
+                                  heuristics=heuristics, ...)$refitted;
     }
 
     # Get rid of specific models to save RAM

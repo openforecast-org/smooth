@@ -80,7 +80,7 @@
 #' @importFrom stats AIC BIC cov decompose median coef optimize nlminb cor var simulate lm as.formula residuals
 #' @importFrom stats dbeta qnorm qt qlnorm quantile rbinom rlnorm rnorm rt runif plnorm pnorm
 #' @importFrom stats deltat end frequency is.ts start time ts
-#' @importFrom utils packageVersion
+#' @importFrom utils packageVersion combn modifyList
 #' @importFrom greybox xregExpander stepwise qs qlaplace ps plaplace ds dlaplace graphmaker measures hm
 #' @useDynLib smooth
 NULL

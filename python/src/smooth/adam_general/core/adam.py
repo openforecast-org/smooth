@@ -5127,7 +5127,9 @@ class ADAM:
         vcov_df = self.vcov(type=cov_type, heuristics=heuristics, **vcov_call_kwargs)
         coef = np.asarray(self.coef, dtype=float)
         coef_names = list(self.coef_names)
-        vcov_arr = np.asarray(vcov_df, dtype=float)
+        # ``np.asarray`` can return a read-only view into the DataFrame's block;
+        # copy so the non-finite row/column zeroing below can write in place.
+        vcov_arr = np.array(vcov_df, dtype=float)
         # The OPG covariance (the default) returns an infinite variance for a
         # parameter the data does not identify (e.g. an initial that washes out
         # when its smoothing parameter is at a bound). Such parameters cannot be

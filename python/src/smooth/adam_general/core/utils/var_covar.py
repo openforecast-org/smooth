@@ -867,6 +867,14 @@ def covar_opg(parameter_values, point_lik_at, obs_in_sample, loglik, step_size=N
 
     j_matrix = scores.T @ scores
     diag_j = np.diag(j_matrix)
+    # Drop parameters whose per-observation scores carry (near-)zero information
+    # relative to the best-identified one: at a boundary MLE such a parameter is
+    # only weakly identified (its OPG score is tiny at the optimum even though it
+    # still enters the likelihood), so its OPG variance is enormous. Reporting an
+    # infinite variance flags it as effectively unidentified -- a clearer signal
+    # than a huge finite number, and it makes reapply()/reforecast() hold the
+    # parameter at its estimate rather than inject nonsense-wide draws. Use
+    # type="hessian" for a finite (still large) standard error there.
     keep = (diag_j > np.max(diag_j) * 1e-10) & np.isfinite(diag_j)
     vcov = np.full((n_param, n_param), np.inf)
     if np.any(keep):

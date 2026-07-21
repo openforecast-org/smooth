@@ -203,16 +203,32 @@ covarOPGCore <- function(object, parameterValues, perturbedPointLik,
         return(NULL);
     }
 
+    sideOK <- function(lik){
+        return(!is.null(lik) && length(lik)==obsInSample && all(is.finite(lik)));
+    }
     scores <- matrix(NA_real_, obsInSample, nParam);
     for(j in seq_len(nParam)){
         hStep <- stepSize*max(1, abs(parameterValues[j]));
         likUp <- perturbedPointLik(j, hStep);
         likDown <- perturbedPointLik(j, -hStep);
-        if(is.null(likUp) || is.null(likDown) ||
-           length(likUp)!=obsInSample || length(likDown)!=obsInSample){
+        upOK <- sideOK(likUp);
+        downOK <- sideOK(likDown);
+        # Central difference when both sides are valid; at an active bound one
+        # side steps out of the feasible region (e.g. a negative persistence in
+        # an occurrence link) and returns NaN, so fall back to the one-sided
+        # difference against the reproduced base likelihood there.
+        if(upOK && downOK){
+            scores[,j] <- (likUp-likDown)/(2*hStep);
+        }
+        else if(upOK){
+            scores[,j] <- (likUp-baseLik)/hStep;
+        }
+        else if(downOK){
+            scores[,j] <- (baseLik-likDown)/hStep;
+        }
+        else{
             return(NULL);
         }
-        scores[,j] <- (likUp-likDown)/(2*hStep);
     }
     if(any(!is.finite(scores))){
         return(NULL);
@@ -535,6 +551,128 @@ covarOPGsparma <- function(object, stepSize=.Machine$double.eps^(1/4)){
         modelLocal <- try(suppressWarnings(
             sparma(object$data, orders=object$orders, arma=arma,
                    initial=initialArg, h=0)), silent=TRUE);
+        if(inherits(modelLocal,"try-error")){
+            return(NULL);
+        }
+        return(as.numeric(pointLik(modelLocal)));
+    }
+
+    return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
+}
+
+# Mutate a fitted adam-family clone's structured parameter slot named nameJ by
+# delta: the persistence (alpha/beta/gamma...), phi, arma (ar/ma) and -- only
+# when the initials are estimated (initialType=="optimal") -- the initial states
+# (level, trend, seasonal, ARIMAState, xreg). Returns the mutated clone, or NULL
+# if nameJ is not a recognised free slot (e.g. an initial under a derived
+# initialType, where the states are re-derived rather than held). Shared by the
+# om / omg OPG, whose engines re-enter via model=<clone> reading these slots.
+perturbAdamClone <- function(clone, nameJ, delta, initialsEstimated){
+    persistenceNames <- names(clone$persistence);
+    armaArNames <- names(clone$arma$ar);
+    armaMaNames <- names(clone$arma$ma);
+    xregInitNames <- names(clone$initial$xreg);
+    if(nameJ %in% persistenceNames){
+        clone$persistence[nameJ] <- clone$persistence[nameJ]+delta;
+    }
+    else if(nameJ=="phi"){
+        clone$phi <- clone$phi+delta;
+    }
+    else if(nameJ %in% armaArNames){
+        clone$arma$ar[nameJ] <- clone$arma$ar[nameJ]+delta;
+    }
+    else if(nameJ %in% armaMaNames){
+        clone$arma$ma[nameJ] <- clone$arma$ma[nameJ]+delta;
+    }
+    else if(initialsEstimated){
+        if(nameJ=="level"){
+            clone$initial$level <- clone$initial$level+delta;
+        }
+        else if(nameJ=="trend"){
+            clone$initial$trend <- clone$initial$trend+delta;
+        }
+        else if(substr(nameJ,1,8)=="seasonal"){
+            idx <- as.integer(sub("^seasonal_?","",nameJ));
+            if(is.list(clone$initial$seasonal)){
+                clone$initial$seasonal[[1]][idx] <- clone$initial$seasonal[[1]][idx]+delta;
+            }
+            else{
+                clone$initial$seasonal[idx] <- clone$initial$seasonal[idx]+delta;
+            }
+        }
+        else if(substr(nameJ,1,10)=="ARIMAState"){
+            idx <- as.integer(sub("^ARIMAState","",nameJ));
+            clone$initial$arima[idx] <- clone$initial$arima[idx]+delta;
+        }
+        else if(nameJ %in% xregInitNames){
+            clone$initial$xreg[nameJ] <- clone$initial$xreg[nameJ]+delta;
+        }
+        else{
+            return(NULL);
+        }
+    }
+    else{
+        return(NULL);
+    }
+    return(clone);
+}
+
+# OPG covariance for the occurrence model om(). om is an adam occurrence model
+# (Bernoulli pointLik: log p when o_t=1, log(1-p) otherwise) that re-enters via
+# model=<fitted object>, reading its structured persistence / phi / arma /
+# initial slots and skipping the optimiser. The clone is perturbed one slot at a
+# time and re-fitted; under initial="optimal" the held initials are perturbed as
+# free parameters, while for backcasting / complete / gradient they are absent
+# from coef() and re-derived, so the score spans the dynamics only.
+covarOPGom <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    parameterValues <- coef(object);
+    parametersNames <- names(parameterValues);
+    initialsEstimated <- identical(object$initialType, "optimal");
+
+    perturbedPointLik <- function(j, delta){
+        clone <- object;
+        if(!is.null(j)){
+            clone <- perturbAdamClone(clone, parametersNames[j], delta, initialsEstimated);
+            if(is.null(clone)){
+                return(NULL);
+            }
+        }
+        modelLocal <- try(suppressWarnings(
+            om(object$data, model=clone, h=0, formula=formula(object))), silent=TRUE);
+        if(inherits(modelLocal,"try-error")){
+            return(NULL);
+        }
+        return(as.numeric(pointLik(modelLocal)));
+    }
+
+    return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
+}
+
+# OPG covariance for the coupled general occurrence model omg(). The two ETS
+# occurrence sub-models A and B are estimated jointly against a single coupled
+# Bernoulli probability, so the parameter vector is the concatenation of the
+# sub-model coefficient vectors c(modelA$B, modelB$B) and the per-observation
+# score is of that shared coupled likelihood. omg re-enters via model=<clone>,
+# reading each sub-model's B, so the joint vector is perturbed one coefficient
+# at a time (routed to modelA$B or modelB$B by the A/B split) and re-fitted.
+covarOPGomg <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    bA <- object$modelA$B;
+    bB <- object$modelB$B;
+    nA <- length(bA);
+    parameterValues <- c(bA, bB);
+    yData <- object$modelA$data;
+
+    perturbedPointLik <- function(j, delta){
+        clone <- object;
+        if(!is.null(j)){
+            if(j<=nA){
+                clone$modelA$B[j] <- clone$modelA$B[j]+delta;
+            }
+            else{
+                clone$modelB$B[j-nA] <- clone$modelB$B[j-nA]+delta;
+            }
+        }
+        modelLocal <- try(suppressWarnings(omg(yData, model=clone, h=0)), silent=TRUE);
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }

@@ -84,20 +84,26 @@ omg <- function(data,
     # canonical entry for vcov(omg_obj): vcov re-calls omg(..., model=obj,
     # FI=TRUE, stepSize=...).
     if(is.omg(model)){
-        # A-side
+        # A-side. Persistence / phi / arma are NOT re-supplied as fixed values:
+        # the fitted joint B already carries every estimated coefficient, and
+        # providing a value flips its *Estimate flag off in the checker, which
+        # makes adam_filler stop consuming that slot from B and shifts the whole
+        # vector -- corrupting the initial-state seed (a boundary alpha=0 would
+        # push the level to 0 on the re-fit). Keeping them estimated lets B feed
+        # every value back 1:1, so vcov()'s re-fit reproduces the original fit.
         modelA       <- modelType(model$modelA)
-        persistenceA <- model$modelA$persistence
-        phiA         <- model$modelA$phi
-        armaA        <- model$modelA$arma
+        persistenceA <- NULL
+        phiA         <- NULL
+        armaA        <- NULL
         ordersA      <- model$modelA$orders
         regressorsA  <- model$modelA$regressors
         constantA    <- if(is.null(model$modelA$constant)) FALSE else model$modelA$constant
         if(is.null(formulaA)) { formulaA <- formula(model$modelA) }
         # B-side
         modelB       <- modelType(model$modelB)
-        persistenceB <- model$modelB$persistence
-        phiB         <- model$modelB$phi
-        armaB        <- model$modelB$arma
+        persistenceB <- NULL
+        phiB         <- NULL
+        armaB        <- NULL
         ordersB      <- model$modelB$orders
         regressorsB  <- model$modelB$regressors
         constantB    <- if(is.null(model$modelB$constant)) FALSE else model$modelB$constant
@@ -848,16 +854,31 @@ omg <- function(data,
         }
 
         B_joint <- res$solution
-        names(B_joint) <- c(names(BValuesA$B), names(BValuesB$B))
+        # On the use / re-entry path the joint B comes from ellipsis$B -- the
+        # full fitted parameter vector, which includes coefficients the
+        # initialiser drops when persistence / initials arrive as "provided"
+        # (e.g. a boundary alpha=0). Split it at the fitted-object A-count
+        # (nParamsA_use) with the injected names, not the reduced initialiser
+        # layout, or the two sides misalign (A loses a param, B gains it).
+        useReentry <- !is.null(nParamsA_use)
+        splitA <- if(useReentry){ nParamsA_use } else { nParamsA }
+        jointNames <- if(useReentry && length(names(ellipsis$B)) == length(B_joint)){
+                          names(ellipsis$B)
+                      } else {
+                          c(names(BValuesA$B), names(BValuesB$B))
+                      }
+        if(length(jointNames) == length(B_joint)){
+            names(B_joint) <- jointNames
+        }
         CFValue <- res$objective
 
         return(list(
-            B_A       = B_joint[seq_len(nParamsA)],
-            B_B       = B_joint[seq_len(length(B_joint) - nParamsA) + nParamsA],
+            B_A       = B_joint[seq_len(splitA)],
+            B_B       = B_joint[seq_len(length(B_joint) - splitA) + splitA],
             CFValue   = CFValue,
             logLikValue = -CFValue,
-            nParamsA  = nParamsA,
-            nParamsB  = length(B_joint) - nParamsA,
+            nParamsA  = splitA,
+            nParamsB  = length(B_joint) - splitA,
             adamArchitectA = adamArchitectA,
             adamArchitectB = adamArchitectB,
             adamCreatedA   = adamCreatedA,
@@ -1777,7 +1798,7 @@ confint.omg <- function(object, parm, level=0.95, bootstrap=FALSE, ...){
 }
 
 #' @export
-vcov.omg <- function(object, bootstrap=FALSE, heuristics=NULL, ...){
+vcov.omg <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
     ellipsis <- list(...)
 
     if(!is.null(heuristics) && is.numeric(heuristics)){
@@ -1789,12 +1810,26 @@ vcov.omg <- function(object, bootstrap=FALSE, heuristics=NULL, ...){
         return(coefbootstrap(object, ...)$vcov)
     }
 
-    h <- if(any(!is.na(object$forecast))) length(object$forecast) else 0
     stepSize <- if(is.null(ellipsis$stepSize)) {
         .Machine$double.eps^(1/4)
     } else {
         ellipsis$stepSize
     }
+
+    # OPG / BHHH covariance J = sum_t s_t s_t' over the coupled Bernoulli score.
+    # PSD by construction, so it returns finite standard errors at boundary
+    # estimates where the observed Fisher Information is indefinite. Falls back
+    # to the Hessian if the reproduction guard trips (covarOPGomg returns NULL).
+    if(opg){
+        vcovOPG <- covarOPGomg(object, stepSize=stepSize)
+        if(!is.null(vcovOPG)){
+            return(vcovOPG)
+        }
+        warning("The OPG covariance could not be computed for this omg model; ",
+                "falling back to the observed Fisher Information.", call.=FALSE)
+    }
+
+    h <- if(any(!is.na(object$forecast))) length(object$forecast) else 0
 
     # Data is stored on the sub-models, not at the omg top level.
     yData <- object$modelA$data

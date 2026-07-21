@@ -190,6 +190,55 @@ test_that("opg for sparma backcasting spans the arma parameters only", {
     expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
 })
 
+test_that("opg covers the occurrence model om (Bernoulli score)", {
+    set.seed(42)
+    yb <- rbinom(140, 1, 0.55)
+    m <- suppressWarnings(om(yb, "ANN", occurrence = "odds-ratio", initial = "optimal", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    vH <- suppressWarnings(vcov(m))
+    expect_equal(dim(vO), c(length(coef(m)), length(coef(m))))
+    expect_false(isTRUE(all.equal(vO, vH, tolerance = 1e-6)))  # genuinely OPG
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-6))
+    expect_true(all(is.finite(sqrt(diag(vO)))))
+})
+
+test_that("opg for om backcasting spans the dynamics only", {
+    set.seed(7)
+    yb <- rbinom(140, 1, 0.5)
+    m <- suppressWarnings(om(yb, "AAN", occurrence = "odds-ratio", initial = "backcasting", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_false(any(grepl("^level$|^trend$", rownames(vO))))  # initials re-derived
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
+})
+
+test_that("opg covers the coupled occurrence model omg (joint score)", {
+    # Exercises the one-sided-difference fallback: the coupled occurrence link
+    # returns NaN for a negative persistence, so a boundary alpha=0 can only be
+    # differenced on the feasible side.
+    set.seed(11)
+    yb <- rbinom(150, 1, 0.5)
+    m <- suppressWarnings(omg(yb, modelA = "ANN", modelB = "ANN", initial = "optimal", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    vH <- suppressWarnings(vcov(m))
+    nJoint <- length(c(m$modelA$B, m$modelB$B))
+    expect_equal(dim(vO), c(nJoint, nJoint))
+    expect_false(isTRUE(all.equal(vO, vH, tolerance = 1e-6)))  # genuinely OPG
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-6))
+    expect_true(all(is.finite(sqrt(diag(vO)))))
+})
+
+test_that("omg re-fit via model= reproduces the original fit (optimal + backcasting)", {
+    # Regression guard for the joint-B re-entry: providing persistence used to
+    # flip its Estimate flag off and shift the seed, corrupting the re-fit.
+    set.seed(3)
+    yb <- rbinom(130, 1, 0.5)
+    for (init in c("optimal", "backcasting")) {
+        m <- suppressWarnings(omg(yb, modelA = "AAN", modelB = "ANN", initial = init, h = 0))
+        r <- suppressWarnings(omg(m$modelA$data, model = m, h = 0))
+        expect_equal(as.numeric(logLik(r)), as.numeric(logLik(m)), tolerance = 1e-6)
+    }
+})
+
 test_that("opg=FALSE leaves the default covariance unchanged", {
     m <- suppressWarnings(adam(AirPassengers, "ANN", initial = "optimal"))
     expect_equal(suppressWarnings(vcov(m)), suppressWarnings(vcov(m, opg = FALSE)))

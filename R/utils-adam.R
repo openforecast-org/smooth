@@ -983,7 +983,11 @@ adam_filler <- function(B,
         }
     }
 
-    # Initials of the xreg
+    # Initials of the xreg. Kept in B for every initial type except "complete"
+    # (backcast). Under "gradient" the affine / GN initial-state solve overwrites
+    # the xreg cells of matVt, so the B entry is a no-op there (mirrors how the
+    # occurrence path handles a gradient-solved xreg); it still counts once
+    # towards the parameter total via length(B).
     if(xregModel && (initialType!="complete") && initialEstimate && initialXregEstimate){
         xregNumberToEstimate <- sum(xregParametersEstimated)
         matVt[componentsNumberETS+componentsNumberARIMA+which(xregParametersEstimated==1),
@@ -1045,7 +1049,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
                                 # initials of ARIMA
                                 all(initialType!=c("complete","backcasting","gradient"))*
                                 arimaModel*initialArimaNumber*initialArimaEstimate +
-                                # initials of xreg
+                                # initials of xreg (in B unless backcast under "complete")
                                 (initialType!="complete")*xregModel*initialXregEstimate*
                                 sum(xregParametersEstimated) +
                                 constantEstimate + otherParameterEstimate)
@@ -1320,8 +1324,8 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
         j[] <- j+initialArimaNumber
     }
 
-    # Initials of the xreg
-    if(initialType!="complete" && initialXregEstimate){
+    # Initials of the xreg (excluded from B only under "complete")
+    if((initialType!="complete") && initialXregEstimate){
         xregNumberToEstimate <- sum(xregParametersEstimated)
         B[j+1:xregNumberToEstimate] <-
             matVt[componentsNumberETS+componentsNumberARIMA+

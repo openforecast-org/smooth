@@ -103,6 +103,39 @@ test_that("multiplicative ARIMA gradient falls back to backcasting", {
     expect_equal(logLik(fG), logLik(fB), tolerance = 1e-8)
 })
 
+test_that("gradient solves additive xreg initials to optimal quality", {
+    # The xreg coefficients are additional affine directions in the initial-state
+    # design, so the same least-squares solve recovers them exactly (matching
+    # optimal, beating backcasting) for both static and adaptive regressors.
+    set.seed(5)
+    n <- 120; z1 <- rnorm(n); z2 <- rnorm(n)
+    y <- 100 + cumsum(rnorm(n, 0, 2)) + 3 * z1 - 2 * z2 + rnorm(n, 0, 3)
+    xdf <- data.frame(y = y, z1 = z1, z2 = z2)
+    fO <- adam(xdf, "ANN", regressors = "use", initial = "optimal", silent = TRUE)
+    fG <- adam(xdf, "ANN", regressors = "use", initial = "gradient", silent = TRUE)
+    fB <- adam(xdf, "ANN", regressors = "use", initial = "backcasting", silent = TRUE)
+    # Matching optimal is the regression guard: before the xreg-threading fix the
+    # solve left the regression coefficients at the creator seed (grad != opt).
+    expect_equal(as.numeric(logLik(fG)), as.numeric(logLik(fO)), tolerance = 1e-3)
+    expect_equal(nparam(fG), nparam(fO))            # same degrees of freedom
+    expect_gte(as.numeric(logLik(fG)), as.numeric(logLik(fB)) - 1e-4)  # never worse
+    # Adaptive regressors: still solved (adaptive delta stays in the optimiser).
+    fGa <- adam(xdf, "ANN", regressors = "adapt", initial = "gradient", silent = TRUE)
+    fOa <- adam(xdf, "ANN", regressors = "adapt", initial = "optimal", silent = TRUE)
+    expect_equal(as.numeric(logLik(fGa)), as.numeric(logLik(fOa)), tolerance = 0.05)
+})
+
+test_that("multiplicative xreg gradient falls back to backcasting", {
+    set.seed(6)
+    n <- 120; z1 <- rnorm(n); z2 <- rnorm(n)
+    y <- abs(100 + cumsum(rnorm(n, 0, 2)) + 3 * z1 - 2 * z2 + rnorm(n, 0, 3))
+    xdf <- data.frame(y = y, z1 = z1, z2 = z2)
+    fB <- adam(xdf, "MNN", regressors = "use", initial = "backcasting", silent = TRUE)
+    fG <- suppressWarnings(adam(xdf, "MNN", regressors = "use",
+                                initial = "gradient", silent = TRUE))
+    expect_equal(logLik(fG), logLik(fB), tolerance = 1e-8)
+})
+
 test_that("gradient estimates persistence jointly (nested, no backcasting)", {
     # Persistence not provided: the optimiser estimates it while the initials
     # are solved by gradient each evaluation. Must recover a healthy fit on the

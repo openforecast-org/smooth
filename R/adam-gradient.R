@@ -117,14 +117,16 @@ adam_gradientProbeBasis <- function(etsModel, arimaModel, xregModel, Etype, Ttyp
                                     nComponents, lagsModelAll, lagsModelMax,
                                     xregNumber=0, oType="n"){
     demand <- (oType == "n")
-    if(!etsModel && !arimaModel){ return(NULL) }
+    if(!etsModel && !arimaModel && !xregModel){ return(NULL) }
     additive <- (Etype=="A") && !any(Ttype==c("M","Md")) && (Stype!="M")
-    # On the demand path (O=="n") the Gauss-Newton branch uses the ETS-only
-    # analytic Jacobian, so multiplicative ARIMA and any xreg fall back. On the
-    # occurrence path the solve drops to the finite-difference Jacobian (fully
-    # general), so ARIMA and xreg initials are solvable there.
-    if(demand && arimaModel && !additive){ return(NULL) }
-    if(demand && xregModel){ return(NULL) }
+    # ARIMA and xreg initials are solved by the exact affine least-squares branch
+    # for ADDITIVE-error models (their residuals are affine in the initial
+    # state). Multiplicative-error ARIMA / xreg would need the Gauss-Newton
+    # branch with a finite-difference Jacobian, whose noise makes the outer
+    # persistence objective jagged and can converge catastrophically, so they
+    # fall back to backcasting on the demand path. (The occurrence path solves
+    # both via finite differences over a bounded probability residual.)
+    if(demand && !additive && (arimaModel || xregModel)){ return(NULL) }
     # Column-major cell index of profile[row, col] is row + (col-1)*nComponents
     cellsOf <- function(row, cols){ row + (cols - 1) * nComponents }
     probes <- list()

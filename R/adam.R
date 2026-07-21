@@ -4442,12 +4442,14 @@ arPolinomialsBounds <- function(arPolynomialMatrix,arPolynomial,variableNumber){
 
 # Confidence intervals
 #' @export
-confint.adam <- function(object, parm, level=0.95, bootstrap=FALSE, ...){
+confint.adam <- function(object, parm, level=0.95,
+                         type=c("opg","hessian","bootstrap"), bootstrap=FALSE, ...){
+    type <- covarTypeResolver(type, bootstrap);
     parameters <- coef(object);
     confintNames <- c(paste0((1-level)/2*100,"%"),
                       paste0((1+level)/2*100,"%"));
 
-    if(bootstrap){
+    if(type=="bootstrap"){
         coefValues <- coefbootstrap(object, ...);
         adamReturn <- cbind(sqrt(diag(coefValues$vcov)),
                             apply(coefValues$coefficients,2,quantile,probs=(1-level)/2),
@@ -4455,7 +4457,7 @@ confint.adam <- function(object, parm, level=0.95, bootstrap=FALSE, ...){
         colnames(adamReturn) <- c("S.E.",confintNames);
     }
     else{
-        adamVcov <- vcov(object, ...);
+        adamVcov <- vcov(object, type=type, ...);
         adamSD <- sqrt(abs(diag(adamVcov)));
         parametersNames <- names(adamSD);
         nParam <- length(adamSD);
@@ -4683,7 +4685,9 @@ sigma.adam <- function(object, ...){
 }
 
 #' @export
-summary.adam <- function(object, level=0.95, bootstrap=FALSE, ...){
+summary.adam <- function(object, level=0.95,
+                         type=c("opg","hessian","bootstrap"), bootstrap=FALSE, ...){
+    type <- covarTypeResolver(type, bootstrap);
     ourReturn <- list(model=object$model,responseName=all.vars(formula(object))[1]);
 
     occurrence <- NULL;
@@ -4706,7 +4710,7 @@ summary.adam <- function(object, level=0.95, bootstrap=FALSE, ...){
     # Collect parameters and their standard errors
     parametersValues <- coef(object);
     if(!is.null(parametersValues)){
-        parametersConfint <- confint(object, level=level, bootstrap=bootstrap, ...);
+        parametersConfint <- confint(object, level=level, type=type, ...);
         # Record the type of bootstrap done
         ellipsis <- list(...);
         if(!is.null(ellipsis$method)){
@@ -5147,8 +5151,10 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 }
 
 #' @export
-vcov.adam <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
+vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
+                      bootstrap=FALSE, heuristics=NULL, ...){
     ellipsis <- list(...);
+    type <- covarTypeResolver(type, bootstrap);
 
     # Heuristics is to set variance equal to sqrt(heuristics)% of values
     if(!is.null(heuristics)){
@@ -5157,10 +5163,10 @@ vcov.adam <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
         }
     }
 
-    if(bootstrap){
+    if(type=="bootstrap"){
         return(coefbootstrap(object, ...)$vcov);
     }
-    else if(opg){
+    else if(type=="opg"){
         # OPG / BHHH covariance: PSD by construction, so it returns finite
         # standard errors for boundary-but-identified parameters where the
         # observed Hessian is indefinite. Dispatched to the engine-specific

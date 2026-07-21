@@ -1,5 +1,19 @@
 #### Helper functions used by adam() and others
 
+# Resolve the covariance `type` for the vcov()/confint()/summary()/reapply()/
+# reforecast() methods, honouring the deprecated `bootstrap=TRUE` switch for one
+# release cycle. `type` is one of "opg" (OPG / BHHH, the default), "hessian"
+# (the observed Fisher Information) or "bootstrap". A logical `bootstrap=TRUE`
+# maps to "bootstrap" with a deprecation warning.
+covarTypeResolver <- function(type, bootstrap=FALSE){
+    if(isTRUE(bootstrap)){
+        warning("`bootstrap=TRUE` is deprecated; use `type=\"bootstrap\"` instead.",
+                call.=FALSE);
+        return("bootstrap");
+    }
+    return(match.arg(type, c("opg","hessian","bootstrap")));
+}
+
 #### Identifiable degrees of freedom of ETS initial states ####
 # Greatest common divisor (Euclid) -- base R has none.
 dfGCD <- function(a, b){

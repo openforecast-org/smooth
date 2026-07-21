@@ -5058,6 +5058,7 @@ class ADAM:
     def reapply(
         self,
         nsim: int = 1000,
+        type=None,  # noqa: A002
         bootstrap: bool = False,
         heuristics: Optional[float] = None,
         seed: Optional[int] = None,
@@ -5117,15 +5118,25 @@ class ADAM:
         # R forwards ``nsim=nsim`` to ``vcov`` when ``bootstrap=TRUE`` so
         # the bootstrap covariance uses the same replicate count as the
         # reapply MVN draw (R/reapply.R:95).
+        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+
+        cov_type = resolve_covar_type(type, bootstrap)
         vcov_call_kwargs = dict(vcov_kwargs)
-        if bootstrap and "nsim" not in vcov_call_kwargs:
+        if cov_type == "bootstrap" and "nsim" not in vcov_call_kwargs:
             vcov_call_kwargs["nsim"] = nsim
-        vcov_df = self.vcov(
-            bootstrap=bootstrap, heuristics=heuristics, **vcov_call_kwargs
-        )
+        vcov_df = self.vcov(type=cov_type, heuristics=heuristics, **vcov_call_kwargs)
         coef = np.asarray(self.coef, dtype=float)
         coef_names = list(self.coef_names)
         vcov_arr = np.asarray(vcov_df, dtype=float)
+        # The OPG covariance (the default) returns an infinite variance for a
+        # parameter the data does not identify (e.g. an initial that washes out
+        # when its smoothing parameter is at a bound). Such parameters cannot be
+        # resampled, so hold them at their point estimate (zero their row/column)
+        # before the multivariate-normal draw. Mirrors R's reapply.adam.
+        non_finite = ~np.isfinite(np.diag(vcov_arr))
+        if np.any(non_finite):
+            vcov_arr[non_finite, :] = 0.0
+            vcov_arr[:, non_finite] = 0.0
         vcov_arr = _psd_correct(vcov_arr)
 
         # 2. MVN sample (R/reapply.R:251)
@@ -5723,6 +5734,7 @@ class ADAM:
         side: Literal["both", "upper", "lower"] = "both",
         cumulative: bool = False,
         nsim: int = 100,
+        type=None,  # noqa: A002
         bootstrap: bool = False,
         heuristics: Optional[float] = None,
         seed: Optional[int] = None,
@@ -5808,6 +5820,7 @@ class ADAM:
         # 1. Reapply to get per-draw states / profile / measurement / etc.
         refitted = self.reapply(
             nsim=nsim,
+            type=type,
             bootstrap=bootstrap,
             heuristics=heuristics,
             seed=seed,

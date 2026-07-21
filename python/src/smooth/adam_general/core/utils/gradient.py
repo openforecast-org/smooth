@@ -119,12 +119,16 @@ def adam_gradient_probe_basis(
     Mirrors ``adam_gradientProbeBasis``.
     """
     demand = o_type == "n"
-    if not ets_model and not arima_model:
+    if not ets_model and not arima_model and not xreg_model:
         return None
     additive = e_type == "A" and t_type not in ("M", "Md") and s_type != "M"
-    if demand and arima_model and not additive:
-        return None
-    if demand and xreg_model:
+    # ARIMA and xreg initials are solved by the exact affine least-squares branch
+    # for ADDITIVE-error models. Multiplicative-error ARIMA / xreg would need the
+    # finite-difference Gauss-Newton branch, whose noise makes the outer
+    # persistence objective jagged and can converge catastrophically, so they
+    # fall back to backcasting on the demand path (the occurrence path solves
+    # both via finite differences over a bounded probability residual).
+    if demand and not additive and (arima_model or xreg_model):
         return None
     if lags_model_all is None:
         lags_model_all = lags_model

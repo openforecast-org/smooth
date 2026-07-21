@@ -775,7 +775,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber);
 
         if(!multisteps){
             if(loss=="likelihood"){
@@ -1154,7 +1154,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                  etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                                  componentsNumberETS, componentsNumberETSSeasonal,
                                                  componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                                 loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
+                                                 loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber);
                 logLikReturn[] <- logLikReturn - sum(log(abs(adamFitted$fitted)));
             }
 
@@ -1567,8 +1567,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             # initial-state design (the over-parameterised lower lags are redundant).
             dfInitials <- dfInitials + initialArimaNumber*initialArimaEstimate;
         }
-        # xreg initials are backcast only under "complete"; otherwise the xreg
-        # coefficients are in B and already counted there.
+        # xreg initials are backcast (outside B) only under "complete"; for
+        # every other type -- including "gradient", where the affine solve
+        # overwrites the xreg cells but the B entry is retained as a no-op -- the
+        # xreg coefficients are in B and already counted in length(B).
         if(xregModel && any(initialType=="complete")){
             dfInitials <- dfInitials + xregNumber*initialXregEstimate;
         }
@@ -1666,7 +1668,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                              etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                              componentsNumberETS, componentsNumberETSSeasonal,
                                              componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                             loss, distributionNew, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
+                                             loss, distributionNew, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber);
 
             # Extract the errors correctly
             errors <- switch(distributionNew,
@@ -1954,7 +1956,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber);
 
         matVt[] <- adamFitted$states;
 

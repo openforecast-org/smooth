@@ -223,9 +223,21 @@ covarOPGCore <- function(object, parameterValues, perturbedPointLik,
     keep <- diagJ > max(diagJ)*1e-10 & is.finite(diagJ);
     vcovMatrix <- matrix(Inf, nParam, nParam, dimnames=list(parametersNames, parametersNames));
     if(any(keep)){
-        vcovKeep <- try(solve(J[keep,keep,drop=FALSE]), silent=TRUE);
+        Jkeep <- J[keep,keep,drop=FALSE];
+        vcovKeep <- try(solve(Jkeep), silent=TRUE);
         if(inherits(vcovKeep,"try-error")){
-            return(NULL);
+            # Ill-conditioned (collinear parameters): the plain inverse fails, so
+            # use the Moore-Penrose pseudo-inverse via the symmetric eigen-
+            # decomposition, dropping the (near-)zero-eigenvalue directions. Still
+            # PSD; the parameters spanning the collinear null space get a pooled
+            # variance rather than a spurious solve() failure.
+            eigenJ <- eigen(Jkeep, symmetric=TRUE);
+            positive <- eigenJ$values > max(eigenJ$values)*1e-10;
+            if(!any(positive)){
+                return(NULL);
+            }
+            vectorsKeep <- eigenJ$vectors[,positive,drop=FALSE];
+            vcovKeep <- vectorsKeep %*% (t(vectorsKeep)/eigenJ$values[positive]);
         }
         vcovMatrix[keep,keep] <- vcovKeep;
     }
@@ -410,41 +422,72 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
 }
 
-# OPG covariance for GUM. Its coefficients split across three slots that gum()
-# re-fitted with model=<perturbed clone> reads: the persistence g1..gK (vector
-# persistence), the free transition matrix F<row><col> (transition, row-major),
-# and the initial states vt1..vtK (held via the coefficient vector B, and only
-# estimated under initial="optimal"). The clone is perturbed in the matching
-# slot -- the same mechanism the GUM Hessian FI uses (model=object).
+# OPG covariance for GUM. Its coefficients are the persistence g1..gK, the free
+# transition matrix F<row><col> (row-major) and the initial states vt1..vtK
+# (estimated only under initial="optimal"). Initials are perturbed as free
+# parameters only for optimal, where the model is re-fitted from a perturbed
+# clone (gum() reads persistence, transition and -- for the initials -- the
+# coefficient vector B, the same mechanism the GUM Hessian FI uses). For
+# backcasting / gradient / complete the initials are derived, so the score spans
+# g / F only and the initials are re-derived by re-fitting with the perturbed
+# persistence / transition provided and the model's own initialType.
 covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
     parameterValues <- coef(object);
     parametersNames <- names(parameterValues);
     persistenceNames <- names(object$persistence);
     transitionDim <- ncol(object$transition);
     transitionNames <- grep("^F", parametersNames, value=TRUE);   # row-major order
+    initialsEstimated <- identical(object$initialType, "optimal");
+
+    perturbTransitionCell <- function(transition, nameJ, delta){
+        k <- match(nameJ, transitionNames);
+        row <- ((k-1) %/% transitionDim)+1;
+        col <- ((k-1) %% transitionDim)+1;
+        transition[row,col] <- transition[row,col]+delta;
+        return(transition);
+    }
 
     perturbedPointLik <- function(j, delta){
-        clone <- object;
-        if(!is.null(j)){
-            nameJ <- parametersNames[j];
-            if(nameJ %in% persistenceNames){
-                clone$persistence[nameJ] <- clone$persistence[nameJ]+delta;
+        if(initialsEstimated){
+            clone <- object;
+            if(!is.null(j)){
+                nameJ <- parametersNames[j];
+                if(nameJ %in% persistenceNames){
+                    clone$persistence[nameJ] <- clone$persistence[nameJ]+delta;
+                }
+                else if(substr(nameJ,1,1)=="F"){
+                    clone$transition <- perturbTransitionCell(clone$transition, nameJ, delta);
+                }
+                else{
+                    # Initial state (vt): held through the coefficient vector B.
+                    clone$B[nameJ] <- clone$B[nameJ]+delta;
+                }
             }
-            else if(substr(nameJ,1,1)=="F"){
-                k <- match(nameJ, transitionNames);
-                clone$transition[((k-1) %/% transitionDim)+1,
-                                 ((k-1) %% transitionDim)+1] <-
-                    clone$transition[((k-1) %/% transitionDim)+1,
-                                     ((k-1) %% transitionDim)+1]+delta;
-            }
-            else{
-                # Initial state (vt): held through the coefficient vector B.
-                clone$B[nameJ] <- clone$B[nameJ]+delta;
-            }
+            modelLocal <- try(suppressWarnings(
+                gum(object$data, orders=object$orders, lags=object$lags,
+                    model=clone, h=0)), silent=TRUE);
         }
-        modelLocal <- try(suppressWarnings(
-            gum(object$data, orders=object$orders, lags=object$lags,
-                model=clone, h=0)), silent=TRUE);
+        else{
+            # Re-derive the initials: perturb only the provided dynamics.
+            persistence <- object$persistence;
+            transition <- object$transition;
+            if(!is.null(j)){
+                nameJ <- parametersNames[j];
+                if(nameJ %in% persistenceNames){
+                    persistence[nameJ] <- persistence[nameJ]+delta;
+                }
+                else if(substr(nameJ,1,1)=="F"){
+                    transition <- perturbTransitionCell(transition, nameJ, delta);
+                }
+                else{
+                    return(NULL);
+                }
+            }
+            modelLocal <- try(suppressWarnings(
+                gum(object$data, orders=object$orders, lags=object$lags,
+                    persistence=persistence, transition=transition,
+                    initial=object$initialType, h=0)), silent=TRUE);
+        }
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }

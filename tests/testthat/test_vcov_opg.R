@@ -144,6 +144,19 @@ test_that("opg covers GUM (persistence g + transition F + vt initials)", {
     expect_true(all(eigen(vOs[fins, fins, drop = FALSE], only.values = TRUE)$values > -1e-6))
 })
 
+test_that("opg for GUM backcasting spans dynamics only and stays PSD", {
+    # Requires the empty-B fix (providing g + F + backcasting no longer errors)
+    # and the pseudo-inverse fallback for the ill-conditioned score matrix.
+    m <- suppressWarnings(gum(AirPassengers, orders = 2, lags = 1,
+                              initial = "backcasting", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    vH <- suppressWarnings(vcov(m))
+    expect_equal(rownames(vO), names(coef(m)))          # g / F only, no vt
+    expect_false(any(grepl("^vt", rownames(vO))))
+    expect_false(isTRUE(all.equal(vO, vH, tolerance = 1e-6)))  # genuinely OPG
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-6))
+})
+
 test_that("opg falls back for sparma (unresolved reproduction)", {
     # sparma does not reproduce exactly even via model=object, so the OPG
     # reproduction guard routes it to the Hessian (a follow-up once sparma's

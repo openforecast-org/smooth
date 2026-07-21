@@ -2602,6 +2602,81 @@ class ADAM:
         self._check_is_fitted()
         return self._adam_estimated["log_lik_adam_value"]["value"]
 
+    def point_lik(self, log: bool = True) -> NDArray:
+        """Per-observation log-likelihood of the fitted model.
+
+        Mirrors R's ``pointLik.adam`` (R/adam.R:7298): the log-density of each
+        in-sample observation under the fitted distribution and scale, so
+        ``sum(point_lik())`` equals :attr:`loglik`. For an occurrence
+        (intermittent) model the demand-size density is combined with the
+        occurrence Bernoulli contribution and the zero observations carry the
+        differential-entropy term, exactly as R does. With ``log=False`` the
+        densities themselves are returned.
+        """
+        from smooth.adam_general.core.utils.utils import (
+            calculate_entropy,
+            calculate_likelihood,
+        )
+
+        self._check_is_fitted()
+        y = np.asarray(self.actuals, dtype=float).ravel()
+        obs = len(y)
+        distribution = self._general.get(
+            "distribution_new", self._general.get("distribution", "dnorm")
+        )
+        e_type = self.error_type
+        scale = self.scale
+        other = None
+        if isinstance(getattr(self, "other", None), dict):
+            other = self.other.get(
+                "shape", self.other.get("nu", self.other.get("alpha"))
+            )
+
+        occurrence_model = bool(self._occurrence.get("occurrence_model", False))
+        if occurrence_model:
+            p_fitted = np.asarray(self._occurrence["p_fitted"], dtype=float).ravel()
+            y_fitted = np.asarray(self.fitted, dtype=float).ravel() / p_fitted
+            ot_logical = y != 0
+        else:
+            y_fitted = np.asarray(self.fitted, dtype=float).ravel()
+            ot_logical = np.ones(obs, dtype=bool)
+
+        lik_values = np.zeros(obs, dtype=float)
+        # calculate_likelihood reshapes y to a column, so y_fitted must be a
+        # column too (otherwise the density broadcasts to an n x n matrix).
+        lik_values[ot_logical] = np.asarray(
+            calculate_likelihood(
+                distribution,
+                e_type,
+                y[ot_logical],
+                y_fitted[ot_logical].reshape(-1, 1),
+                scale,
+                other,
+            ),
+            dtype=float,
+        ).ravel()
+
+        if occurrence_model:
+            # Differential entropy for the unobserved (zero) demand sizes, then
+            # add the occurrence-model Bernoulli contribution (mirrors R).
+            zero = ~ot_logical
+            if np.any(zero):
+                lik_values[zero] = -np.asarray(
+                    calculate_entropy(distribution, scale, other, 1.0, y_fitted[zero]),
+                    dtype=float,
+                ).ravel()
+            om_model = self._occurrence.get("oes_model") or self._occurrence.get(
+                "occurrence"
+            )
+            if hasattr(om_model, "point_lik"):
+                lik_values = (
+                    lik_values + np.asarray(om_model.point_lik(), dtype=float).ravel()
+                )
+
+        if not log:
+            lik_values = np.exp(lik_values)
+        return lik_values
+
     @property
     def aic(self) -> float:
         """

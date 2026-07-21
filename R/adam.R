@@ -5192,6 +5192,19 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
                 "(unsupported parameter type or numerical failure); ",
                 "falling back to the Hessian-based covariance.", call.=FALSE);
     }
+    # sparma stores a sparse-order ARIMA that adam(model=object) cannot rebuild
+    # (its ARIMA-polynomial reconstruction yields an NA), so the observed Fisher
+    # Information is computed natively via a numerical Hessian of the sparma
+    # log-likelihood rather than the adam FI path below.
+    if(sparmaChecker(object)){
+        fiStepSize <- if(is.null(ellipsis$stepSize)){
+                          .Machine$double.eps^(1/4);
+                      } else { ellipsis$stepSize; };
+        vcovSparmaFI <- covarFIsparma(object, stepSize=fiStepSize);
+        if(!is.null(vcovSparmaFI)){
+            return(vcovSparmaFI);
+        }
+    }
     {
         # If the forecast is in numbers, then use its length as a horizon
         if(any(!is.na(object$forecast))){

@@ -704,32 +704,42 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
 
         nloptrArgs <- list(matVt=matVt, matF=matF, vecG=vecG, matWt=matWt);
 
-        # First run of BOBYQA to get better values of B
-        opts <- list(algorithm=algorithm0, xtol_rel=xtol_rel0, xtol_abs=xtol_abs0,
-                     ftol_rel=ftol_rel0, ftol_abs=ftol_abs0,
-                     maxeval=maxeval0, maxtime=maxtime0, print_level=print_level);
-        res <- do.call(nloptr, c(list(x0=B, eval_f=CF, opts=opts), nloptrArgs));
-        res$call <- quote(nloptr(x0=B, eval_f=CF, opts=opts));
-
-        if(print_level_hidden>0){
-            print(res);
+        if(length(B)==0){
+            # Nothing to estimate (persistence, transition and initials all
+            # provided): evaluate the cost once instead of calling nloptr with a
+            # zero-length x0, which errors ("x0 must have length > 0"). Mirrors
+            # the empty-B guard in om().
+            CFValue <- do.call(CF, c(list(B), nloptrArgs));
+            res <- NULL;
         }
+        else{
+            # First run of BOBYQA to get better values of B
+            opts <- list(algorithm=algorithm0, xtol_rel=xtol_rel0, xtol_abs=xtol_abs0,
+                         ftol_rel=ftol_rel0, ftol_abs=ftol_abs0,
+                         maxeval=maxeval0, maxtime=maxtime0, print_level=print_level);
+            res <- do.call(nloptr, c(list(x0=B, eval_f=CF, opts=opts), nloptrArgs));
+            res$call <- quote(nloptr(x0=B, eval_f=CF, opts=opts));
 
-        B[] <- res$solution;
+            if(print_level_hidden>0){
+                print(res);
+            }
 
-        # Tuning the best obtained values using Nelder-Mead
-        opts <- list(algorithm=algorithm, xtol_rel=xtol_rel, xtol_abs=xtol_abs,
-                     ftol_rel=ftol_rel, ftol_abs=ftol_abs,
-                     maxeval=maxevalUsed, maxtime=maxtime, print_level=print_level);
-        res <- suppressWarnings(do.call(nloptr, c(list(x0=B, eval_f=CF, opts=opts), nloptrArgs)));
-        res$call <- quote(nloptr(x0=B, eval_f=CF, opts=opts));
+            B[] <- res$solution;
 
-        if(print_level_hidden>0){
-            print(res);
+            # Tuning the best obtained values using Nelder-Mead
+            opts <- list(algorithm=algorithm, xtol_rel=xtol_rel, xtol_abs=xtol_abs,
+                         ftol_rel=ftol_rel, ftol_abs=ftol_abs,
+                         maxeval=maxevalUsed, maxtime=maxtime, print_level=print_level);
+            res <- suppressWarnings(do.call(nloptr, c(list(x0=B, eval_f=CF, opts=opts), nloptrArgs)));
+            res$call <- quote(nloptr(x0=B, eval_f=CF, opts=opts));
+
+            if(print_level_hidden>0){
+                print(res);
+            }
+
+            B[] <- res$solution;
+            CFValue <- res$objective;
         }
-
-        B[] <- res$solution;
-        CFValue <- res$objective;
 
         # Identifiable initial-state df of GUM: the number of GUM state initials
         # (= sum of the component lags; xreg is counted separately in [1,2]),

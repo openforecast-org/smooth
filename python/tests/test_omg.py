@@ -172,6 +172,16 @@ class TestFitBasic:
         ll = float(np.sum(ot * np.log(p) + (1.0 - ot) * np.log(1.0 - p)))
         np.testing.assert_allclose(float(fitted_omg.loglik), ll, atol=1e-9)
 
+    def test_point_lik_sums_to_loglik(self, fitted_omg):
+        """point_lik() is the per-observation Bernoulli of the coupled
+        probability; it must sum to the reported logLik (mirrors R pointLik.om
+        dispatched on an omg object)."""
+        pl = fitted_omg.point_lik()
+        assert pl.shape == (fitted_omg.nobs,)
+        np.testing.assert_allclose(
+            float(np.sum(pl)), float(fitted_omg.loglik), atol=1e-9
+        )
+
 
 # --------------------------------------------------------------------------
 # Sub-model inspection

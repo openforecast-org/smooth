@@ -349,6 +349,24 @@ class OMG:
     def loglik(self) -> float:
         return self._loglik
 
+    def point_lik(self, log: bool = True) -> NDArray:
+        """Per-observation log-likelihood of the coupled occurrence model.
+
+        Bernoulli contribution of each observation against the coupled fitted
+        probability: ``log(p_t)`` when ``o_t = 1`` and ``log(1 - p_t)``
+        otherwise. Mirrors R's ``pointLik.om`` dispatched on an ``omg`` object
+        (R/methods.R:598), so ``sum(point_lik())`` equals :attr:`loglik`.
+        """
+        ot = np.asarray(self.actuals, dtype=float).ravel()
+        p = np.asarray(self.fitted, dtype=float).ravel()
+        ot_logical = ot == 1
+        lik_values = np.empty(len(ot), dtype=float)
+        lik_values[ot_logical] = np.log(p[ot_logical])
+        lik_values[~ot_logical] = np.log(1.0 - p[~ot_logical])
+        if not log:
+            lik_values = np.exp(lik_values)
+        return lik_values
+
     @property
     def occurrence(self) -> str:
         return "general"

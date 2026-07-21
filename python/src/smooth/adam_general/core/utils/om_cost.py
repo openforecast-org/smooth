@@ -61,6 +61,7 @@ def om_cf(  # noqa: N802
     arPolynomialMatrix=None,  # noqa: N803
     maPolynomialMatrix=None,  # noqa: N803
     regressors=None,
+    return_fitted=False,
 ):
     """OM cost function (Bernoulli log-likelihood or MSE on binary indicators).
 
@@ -205,6 +206,12 @@ def om_cf(  # noqa: N802
     p_fitted = om_link_function(
         np.asarray(adam_fitted.fitted).ravel(), error_type, occurrence
     )
+
+    # The fitted probability at this B, returned directly for the OPG covariance
+    # (its per-observation Bernoulli score); the caller applies its own
+    # feasibility check. Mirrors omg_cf's return_fitted.
+    if return_fitted:
+        return p_fitted
 
     # Infeasibility guard (NOT a clipping hack): if the link function
     # produced NaN or values outside [0, 1], the parameters at this point

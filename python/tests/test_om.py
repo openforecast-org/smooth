@@ -460,3 +460,26 @@ class TestRegressions:
         m.fit(intermittent_y)
         # The model must have fitted — no crash, no error
         assert m.fitted.shape == intermittent_y.shape
+
+
+class TestOMvcovType:
+    def _y(self):
+        rng = np.random.default_rng(9)
+        return rng.binomial(1, 0.6, 160).astype(float)
+
+    def test_opg_default_psd_and_genuine(self):
+        m = OM(model="ANN", occurrence="odds-ratio", initial="optimal").fit(self._y())
+        v_opg = m.vcov(type="opg").values
+        v_h = m.vcov(type="hessian").values
+        np.testing.assert_allclose(m.vcov().values, v_opg)
+        assert np.all(np.linalg.eigvalsh((v_opg + v_opg.T) / 2) > -1e-6)
+        assert not np.allclose(v_opg, v_h, atol=1e-6)
+
+    def test_bootstrap_deprecated(self):
+        import warnings
+
+        m = OM(model="ANN", occurrence="odds-ratio", initial="optimal").fit(self._y())
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            m.vcov(bootstrap=True, nsim=20)
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)

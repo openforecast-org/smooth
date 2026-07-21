@@ -542,34 +542,100 @@ class OMG:
         self._fi_cache = self._fisher_information_matrix()
         return self._fi_cache
 
-    def vcov(self, bootstrap: bool = False, step_size=None, **boot_kwargs):
+    def _opg_covariance(self, step_size=None):
+        """OPG / BHHH covariance of the joint OMG coefficients, or None.
+
+        The per-observation score is that of the coupled Bernoulli likelihood:
+        ``omg_cf(b, return_fitted=True)`` gives the coupled fitted probability at
+        a perturbed ``b``, whose Bernoulli log-density is differenced. Mirrors
+        R's ``covarOPGomg``.
+        """
+        from smooth.adam_general.core.utils.var_covar import covar_opg
+
+        side_a = self._side_a
+        side_b = self._side_b
+        n_params_a = int(self._n_params_a)
+        observations = side_a["observations_dict"]
+        adam_ets = self.ets == "adam"
+        ot = np.asarray(self.actuals, dtype=float).ravel()
+
+        def point_lik_at(b):
+            p = omg_cf(
+                B=np.asarray(b, dtype=float),
+                side_a=side_a,
+                side_b=side_b,
+                n_params_a=n_params_a,
+                observations_dict=observations,
+                bounds="none",
+                adam_ets=adam_ets,
+                loss=self.loss,  # type: ignore[arg-type]
+                loss_function=self.loss_function,
+                reg_lambda=self.reg_lambda,
+                return_fitted=True,
+            )
+            p = np.asarray(p, dtype=float).ravel()
+            if (
+                p.shape[0] != ot.shape[0]
+                or not np.all(np.isfinite(p))
+                or np.any(p <= 0.0)
+                or np.any(p >= 1.0)
+            ):
+                return None
+            return np.where(ot == 1, np.log(p), np.log(1.0 - p))
+
+        return covar_opg(
+            self._B_joint, point_lik_at, ot.shape[0], float(self.loglik), step_size
+        )
+
+    def vcov(self, type=None, bootstrap: bool = False, step_size=None, **boot_kwargs):  # noqa: A002
         """Joint variance–covariance matrix for both OMG sub-models.
 
-        Mirrors R's ``vcov.omg``: inverts the joint observed FI, retrying with
-        a coarser finite-difference step if any parameters look "broken"
-        (all-zero or NaN rows). Rows/cols are prefixed ``A:`` / ``B:``.
+        Mirrors R's ``vcov.omg``. ``type`` selects the estimator: ``"opg"`` (the
+        default, the OPG/BHHH covariance of the coupled Bernoulli score, PSD by
+        construction), ``"hessian"`` (the observed Fisher Information) or
+        ``"bootstrap"``. Rows/cols are prefixed ``A:`` / ``B:``.
 
         Parameters
         ----------
+        type : {"opg", "hessian", "bootstrap"}, optional
+            Covariance estimator; defaults to ``"opg"``.
         bootstrap : bool, default=False
-            If True, delegate to :meth:`coefbootstrap` and return the
-            empirical replicate covariance instead of the Fisher-based one.
+            Deprecated alias for ``type="bootstrap"`` (warns).
         step_size : float, optional
-            Finite-difference step for the Fisher Information.
+            Finite-difference step.
         **boot_kwargs
-            Forwarded to :meth:`coefbootstrap` when ``bootstrap=True``.
+            Forwarded to :meth:`coefbootstrap` for the bootstrap type.
 
         Returns
         -------
         pandas.DataFrame
             Joint covariance matrix with prefixed row/col names.
         """
+        import warnings
+
         import pandas as pd
 
-        from smooth.adam_general.core.utils.var_covar import invert_fisher_information
+        from smooth.adam_general.core.utils.var_covar import (
+            invert_fisher_information,
+            resolve_covar_type,
+        )
 
-        if bootstrap:
+        cov_type = resolve_covar_type(type, bootstrap)
+        names = self.coef_names
+
+        if cov_type == "bootstrap":
             return self.coefbootstrap(**boot_kwargs).vcov
+
+        if cov_type == "opg":
+            cov_opg = self._opg_covariance(step_size=step_size)
+            if cov_opg is not None:
+                return pd.DataFrame(cov_opg, index=names, columns=names)
+            warnings.warn(
+                "The OPG covariance could not be computed for this omg model; "
+                "falling back to the observed Fisher Information.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
         FI = np.asarray(self._fisher_information_matrix(step_size=step_size))  # noqa: N806
         broken = np.all(FI == 0, axis=1) | np.any(np.isnan(FI), axis=1)
@@ -588,6 +654,7 @@ class OMG:
         self,
         parm=None,
         level: float = 0.95,
+        type=None,  # noqa: A002
         bootstrap: bool = False,
         step_size=None,
         **boot_kwargs,
@@ -619,10 +686,13 @@ class OMG:
         import pandas as pd
         from scipy import stats as scipy_stats
 
+        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+
+        cov_type = resolve_covar_type(type, bootstrap)
         names = self.coef_names
         params = np.asarray(self._B_joint, dtype=float)
 
-        if bootstrap:
+        if cov_type == "bootstrap":
             from smooth.adam_general.core.utils.bootstrap import (
                 bootstrap_confint_frame,
             )
@@ -631,7 +701,7 @@ class OMG:
             return bootstrap_confint_frame(boot, names, params, level, parm)
         n_a = int(self._n_params_a)
 
-        V = self.vcov(step_size=step_size).to_numpy()  # noqa: N806
+        V = self.vcov(type=cov_type, step_size=step_size).to_numpy()  # noqa: N806
         se = np.sqrt(np.abs(np.diag(V)))
 
         nobs = int(self.nobs)
@@ -665,17 +735,18 @@ class OMG:
             out = out.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
         return out
 
-    def summary(self, level: float = 0.95, digits: int = 4):
+    def summary(self, level: float = 0.95, digits: int = 4, type=None):  # noqa: A002
         """Coefficient-table summary for the joint occurrence model.
 
         Mirrors R's ``summary.omg``: two coefficient tables (one per
         sub-model), each with significance indicators based on whether zero
         falls inside the CI, followed by a shared footer (sample size, total
-        estimated parameters, loss value, AICc/BICc).
+        estimated parameters, loss value, AICc/BICc). ``type`` selects the
+        covariance estimator for the standard errors (default ``"opg"``).
         """
         from smooth.adam_general.core.utils.printing import OMGSummary
 
-        return OMGSummary(self, level=level, digits=digits)
+        return OMGSummary(self, level=level, digits=digits, type=type)
 
     def _bootstrap_clone_kwargs(self) -> Dict[str, Any]:
         """Snapshot the init kwargs needed to instantiate a fresh OMG for refit.

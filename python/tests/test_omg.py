@@ -488,3 +488,17 @@ class TestInferenceMethods:
         fitted_omg.fit(intermittent_y)
         V2 = fitted_omg.vcov().to_numpy()
         np.testing.assert_allclose(V1, V2, atol=1e-6, rtol=1e-4)
+
+
+class TestOMGvcovType:
+    def _y(self):
+        rng = np.random.default_rng(13)
+        return rng.binomial(1, 0.5, 160).astype(float)
+
+    def test_opg_default_psd_and_genuine(self):
+        m = OMG(model_a="ANN", model_b="ANN", initial="optimal").fit(self._y())
+        v_opg = m.vcov(type="opg").values
+        v_h = m.vcov(type="hessian").values
+        np.testing.assert_allclose(m.vcov().values, v_opg)
+        assert np.all(np.linalg.eigvalsh((v_opg + v_opg.T) / 2) > -1e-6)
+        assert not np.allclose(v_opg, v_h, atol=1e-6)

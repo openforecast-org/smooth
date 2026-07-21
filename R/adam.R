@@ -5174,6 +5174,8 @@ vcov.adam <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
                        covarOPGces(object, stepSize=opgStepSize);
                    } else if(gumChecker(object)){
                        covarOPGgum(object, stepSize=opgStepSize);
+                   } else if(sparmaChecker(object)){
+                       covarOPGsparma(object, stepSize=opgStepSize);
                    } else {
                        covarOPG(object, stepSize=opgStepSize);
                    };

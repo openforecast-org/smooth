@@ -496,3 +496,50 @@ covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
 }
+
+# OPG covariance for the sparse ARMA engine. The coefficients are the free AR
+# (phi<k>) and MA (theta<k>) parameters and, under initial="optimal", the ARIMA
+# state initials (initial1..initialN). sparma() holds provided arma coefficients
+# (arEstimate=FALSE fills matF / vecG from them) and, for the initials, accepts
+# the free state values directly (front-padded to the dense companion length
+# internally), so the model is re-fitted with the perturbed arma / initials
+# supplied. For backcasting / gradient / complete the initials are derived, so
+# the score spans the arma parameters only and the initials are re-derived.
+covarOPGsparma <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    parameterValues <- coef(object);
+    parametersNames <- names(parameterValues);
+    armaArNames <- names(object$arma$ar);
+    armaMaNames <- names(object$arma$ma);
+    initialsEstimated <- identical(object$initialType, "optimal");
+    freeInitial <- parameterValues[grepl("^initial", parametersNames)];
+
+    perturbedPointLik <- function(j, delta){
+        arma <- object$arma;
+        initialArg <- if(initialsEstimated){ as.numeric(freeInitial); } else { object$initialType; }
+        if(!is.null(j)){
+            nameJ <- parametersNames[j];
+            if(nameJ %in% armaArNames){
+                arma$ar[nameJ] <- arma$ar[nameJ]+delta;
+            }
+            else if(nameJ %in% armaMaNames){
+                arma$ma[nameJ] <- arma$ma[nameJ]+delta;
+            }
+            else if(initialsEstimated && grepl("^initial", nameJ)){
+                idx <- as.integer(sub("^initial", "", nameJ));
+                initialArg[idx] <- initialArg[idx]+delta;
+            }
+            else{
+                return(NULL);
+            }
+        }
+        modelLocal <- try(suppressWarnings(
+            sparma(object$data, orders=object$orders, arma=arma,
+                   initial=initialArg, h=0)), silent=TRUE);
+        if(inherits(modelLocal,"try-error")){
+            return(NULL);
+        }
+        return(as.numeric(pointLik(modelLocal)));
+    }
+
+    return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
+}

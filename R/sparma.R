@@ -71,7 +71,11 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
 
     # ===== ARGUMENT VALIDATION =====
     loss <- match.arg(loss);
-    initial <- match.arg(initial);
+    # A numeric `initial` provides the initial states directly (held, not
+    # estimated); only match.arg the character initialisation methods.
+    if(is.character(initial)){
+        initial <- match.arg(initial);
+    }
     bounds <- match.arg(bounds);
 
     ellipsis <- list(...);
@@ -104,6 +108,19 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     # Rerecord in case this was amended
     orders$ar <- p;
     orders$ma <- q;
+
+    # A numeric `initial` supplies the free ARIMA state initials (one per
+    # distinct lag, as coef() / profileInitial report them). The checker
+    # validates the length against the dense companion form (max order), so
+    # front-pad with zeros -- the filler only reads the leading free entries.
+    if(is.numeric(initial)){
+        arimaLagsSparse <- sort(unique(c(p[p>0], q[q>0])));
+        arimaNumberDense <- max(c(p, q));
+        if(length(initial)==length(arimaLagsSparse) &&
+           length(initial)<arimaNumberDense){
+            initial <- c(initial, rep(0, arimaNumberDense-length(initial)));
+        }
+    }
 
     if(any(p<0) || any(q<0)) {
         stop("Orders must be non-negative");
@@ -172,17 +189,20 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         if(length(arma)==2){
             armaParameters <- arma;
 
+            # Providing arma coefficients HOLDS them (the creator fills matF /
+            # vecG from armaParameters when !arEstimate); a NULL side is
+            # estimated if the model requires it.
             if(is.null(armaParameters$ar)){
+                arEstimate <- arRequired;
+            }
+            else{
                 arEstimate <- FALSE;
             }
-            else{
-                arEstimate <- TRUE;
-            }
             if(is.null(armaParameters$ma)){
-                maEstimate <- FALSE;
+                maEstimate <- maRequired;
             }
             else{
-                maEstimate <- TRUE;
+                maEstimate <- FALSE;
             }
         }
         else{
@@ -341,6 +361,13 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
             matricesCreated$matVt[nonZeroARI[,1], 1:componentsNumberARIMA] <- B[idx+c(1:componentsNumberARIMA)];
             # MA components are zero, so don't bother
             idx[] <- idx + componentsNumberARIMA;
+        }
+        else if(initialType=="provided"){
+            # Provided initial states: place them directly (SPARMA collects the
+            # initials straight from matVt, so no transform is needed), so a
+            # fitted model's initials round-trip when supplied back.
+            matricesCreated$matVt[nonZeroARI[,1], 1:componentsNumberARIMA] <-
+                initialArima[1:componentsNumberARIMA];
         }
 
         # Extract constant
@@ -529,7 +556,10 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         }
     }
     else{
+        # Everything provided (held arma + provided initials): nothing to
+        # optimise, so evaluate the cost once and record no optimiser result.
         CFValue <- CF(B);
+        res <- NULL;
     }
 
     # Identifiable initial-state df of SPARMA: the number of state initials

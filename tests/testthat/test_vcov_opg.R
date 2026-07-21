@@ -157,14 +157,37 @@ test_that("opg for GUM backcasting spans dynamics only and stays PSD", {
     expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-6))
 })
 
-test_that("opg falls back for sparma (unresolved reproduction)", {
-    # sparma does not reproduce exactly even via model=object, so the OPG
-    # reproduction guard routes it to the Hessian (a follow-up once sparma's
-    # own reconstruction is fixed).
+test_that("opg covers sparma (held arma + provided initials round-trip)", {
+    # sparma now holds provided arma coefficients and re-accepts its own initial
+    # states (front-padded to the dense companion length), so the OPG refit
+    # reproduces the fit and returns a genuine (non-Hessian) PSD covariance.
     m <- suppressWarnings(sparma(BJsales, orders = list(ar = 1, ma = 1),
                                  initial = "optimal", h = 0))
-    expect_equal(dim(suppressWarnings(vcov(m, opg = TRUE))),
-                 dim(suppressWarnings(vcov(m))))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    vH <- suppressWarnings(vcov(m))
+    expect_equal(dim(vO), c(length(coef(m)), length(coef(m))))
+    expect_false(isTRUE(all.equal(vO, vH, tolerance = 1e-6)))  # genuinely OPG
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-6))
+})
+
+test_that("opg covers sparse-order sparma (phi2 with phi1 absent)", {
+    # The sparse AR structure (only phi2 free) exercises the dense->sparse
+    # initial mapping; OPG must still produce a PSD covariance of the right size.
+    m <- suppressWarnings(sparma(BJsales, orders = list(ar = 2, ma = 1),
+                                 initial = "optimal", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_equal(dim(vO), c(length(coef(m)), length(coef(m))))
+    fin <- is.finite(diag(vO))
+    expect_true(all(eigen(vO[fin, fin, drop = FALSE], only.values = TRUE)$values > -1e-6))
+})
+
+test_that("opg for sparma backcasting spans the arma parameters only", {
+    m <- suppressWarnings(sparma(BJsales, orders = list(ar = 2, ma = 1),
+                                 initial = "backcasting", h = 0))
+    vO <- suppressWarnings(vcov(m, opg = TRUE))
+    expect_equal(rownames(vO), names(coef(m)))         # phi2, theta1 -- no initials
+    expect_false(any(grepl("^initial", rownames(vO))))
+    expect_true(all(eigen(vO, only.values = TRUE)$values > -1e-8))
 })
 
 test_that("opg=FALSE leaves the default covariance unchanged", {

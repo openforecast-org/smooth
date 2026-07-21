@@ -2080,7 +2080,7 @@ coefbootstrap.om <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 }
 
 #' @export
-vcov.om <- function(object, bootstrap=FALSE, heuristics=NULL, ...){
+vcov.om <- function(object, bootstrap=FALSE, opg=FALSE, heuristics=NULL, ...){
     ellipsis <- list(...);
 
     if(!is.null(heuristics) && is.numeric(heuristics)){
@@ -2091,12 +2091,26 @@ vcov.om <- function(object, bootstrap=FALSE, heuristics=NULL, ...){
         return(coefbootstrap(object, ...)$vcov);
     }
 
-    h <- if(any(!is.na(object$forecast))) length(object$forecast) else 0;
     stepSize <- if(is.null(ellipsis$stepSize)) {
         .Machine$double.eps^(1/4);
     } else {
         ellipsis$stepSize;
     };
+
+    # OPG / BHHH covariance J = sum_t s_t s_t' -- PSD by construction, so it
+    # returns finite standard errors at boundary estimates where the observed
+    # Fisher Information (below) is indefinite. Falls back to the Hessian if the
+    # reproduction guard trips (covarOPGom returns NULL).
+    if(opg){
+        vcovOPG <- covarOPGom(object, stepSize=stepSize);
+        if(!is.null(vcovOPG)){
+            return(vcovOPG);
+        }
+        warning("The OPG covariance could not be computed for this om model; ",
+                "falling back to the observed Fisher Information.", call.=FALSE);
+    }
+
+    h <- if(any(!is.na(object$forecast))) length(object$forecast) else 0;
 
     modelReturn <- suppressWarnings(
         om(object$data, h=h, model=object,

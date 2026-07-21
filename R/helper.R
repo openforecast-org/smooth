@@ -250,6 +250,14 @@ covarOPGCore <- function(object, parameterValues, perturbedPointLik,
 
     J <- crossprod(scores);
     diagJ <- diag(J);
+    # Drop parameters whose per-observation scores carry (near-)zero information
+    # relative to the best-identified one: at a boundary MLE such a parameter is
+    # only weakly identified (its OPG score is tiny at the optimum even though it
+    # still enters the likelihood), so its OPG variance is enormous. Reporting an
+    # infinite variance flags it as effectively unidentified -- a clearer signal
+    # than a huge finite number, and it makes reapply()/reforecast() hold the
+    # parameter at its estimate rather than inject nonsense-wide draws. Use
+    # type="hessian" for a finite (still large) standard error there.
     keep <- diagJ > max(diagJ)*1e-10 & is.finite(diagJ);
     vcovMatrix <- matrix(Inf, nParam, nParam, dimnames=list(parametersNames, parametersNames));
     if(any(keep)){

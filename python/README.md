@@ -3,11 +3,11 @@
 [![PyPI version](https://img.shields.io/pypi/v/smooth.svg)](https://pypi.org/project/smooth/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/smooth.svg)](https://pypi.org/project/smooth/)
 [![Python versions](https://img.shields.io/pypi/pyversions/smooth.svg)](https://pypi.org/project/smooth/)
-[![Python CI](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml/badge.svg)](https://github.com/config-i1/smooth/actions/workflows/python_ci.yml)
+[![Python CI](https://github.com/openforecast-org/smooth/actions/workflows/python_ci.yml/badge.svg)](https://github.com/openforecast-org/smooth/actions/workflows/python_ci.yml)
 [![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 [![License: LGPL-2.1](https://img.shields.io/badge/License-LGPL--2.1-blue.svg)](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
 
-![hex-sticker of the smooth package for Python](https://github.com/config-i1/smooth/blob/master/python/img/smooth-python-web.png?raw=true)
+![hex-sticker of the smooth package for Python](https://github.com/openforecast-org/smooth/blob/master/python/img/smooth-python-web.png?raw=true)
 
 Python implementation of the **smooth** package for forecasting and time series analysis using Single Source of Error (SSOE) state-space models.
 
@@ -15,19 +15,19 @@ Every wheel published to PyPI is signed via [Sigstore](https://www.sigstore.dev/
 
 ```bash
 pip install pypi-attestations
-pypi-attestations verify pypi --repository https://github.com/config-i1/smooth smooth-*.whl
+pypi-attestations verify pypi --repository https://github.com/openforecast-org/smooth smooth-*.whl
 ```
 
 The package includes the following models:
 
 - [ADAM](https://openforecast.org/adam/) - Augmented Dynamic Adaptive Model, uniting exponential smoothing, ARIMA and regression, implemented in the `ADAM` class.
-- [ETS](https://github.com/config-i1/smooth/wiki/ES) - Exponential Smoothing in the SSOE state space form, implemented in the `ES` class.
-- [CES](https://github.com/config-i1/smooth/wiki/CES) - Complex Exponential Smoothing with complex-valued smoothing parameters, implemented in the `CES` class (fixed seasonality type) and `AutoCES` class (automatic seasonality selection).
-- [MSARIMA](https://github.com/config-i1/smooth/wiki/MSARIMA) - Multiple seasonal ARIMA in state space form, implemented in the `MSARIMA` class (fixed orders) and `AutoMSARIMA` class (automatic order selection).
-- [OM](https://github.com/config-i1/smooth/wiki/OM) - Occurrence Model for intermittent demand, implemented in the `OM` class (plus `OMG` for the general two-component model and `AutoOM` for automatic type selection).
-- [SMA](https://github.com/config-i1/smooth/wiki/SMA) - Simple Moving Average in state-space form (an AR(m) model with fixed coefficients), implemented in the `SMA` class with automatic order selection.
+- [ETS](https://github.com/openforecast-org/smooth/wiki/ES) - Exponential Smoothing in the SSOE state space form, implemented in the `ES` class.
+- [CES](https://github.com/openforecast-org/smooth/wiki/CES) - Complex Exponential Smoothing with complex-valued smoothing parameters, implemented in the `CES` class (fixed seasonality type) and `AutoCES` class (automatic seasonality selection).
+- [MSARIMA](https://github.com/openforecast-org/smooth/wiki/MSARIMA) - Multiple seasonal ARIMA in state space form, implemented in the `MSARIMA` class (fixed orders) and `AutoMSARIMA` class (automatic order selection).
+- [OM](https://github.com/openforecast-org/smooth/wiki/OM) - Occurrence Model for intermittent demand, implemented in the `OM` class (plus `OMG` for the general two-component model and `AutoOM` for automatic type selection).
+- [SMA](https://github.com/openforecast-org/smooth/wiki/SMA) - Simple Moving Average in state-space form (an AR(m) model with fixed coefficients), implemented in the `SMA` class with automatic order selection.
 
-The package also provides standalone data generators that mirror R's `sim.*` family — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, and `sim_oes` — plus a `.simulate()` method on fitted `ADAM`, `OM`, and `OMG` objects. See [Simulation Functions](https://github.com/config-i1/smooth/wiki/Simulation-Functions).
+The package also provides standalone data generators that mirror R's `sim.*` family — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, and `sim_oes` — plus a `.simulate()` method on fitted `ADAM`, `OM`, and `OMG` objects. See [Simulation Functions](https://github.com/openforecast-org/smooth/wiki/Simulation-Functions).
 
 All of these are implemented with the support of the following features:
 
@@ -38,7 +38,7 @@ All of these are implemented with the support of the following features:
 - Fine tuning of any elements of ADAM/ETS/ARIMA/Regression
 - A variety of prediction interval construction methods
 
-Like the R version, the Python **smooth** depends on the [**greybox**](https://github.com/config-i1/greybox) package for distributions, information criteria, regressor selection, and the LOWESS smoother. It is installed automatically as a dependency.
+Like the R version, the Python **smooth** depends on the [**greybox**](https://github.com/openforecast-org/greybox) package for distributions, information criteria, regressor selection, and the LOWESS smoother. It is installed automatically as a dependency.
 
 
 ## Installation
@@ -50,10 +50,10 @@ pip install smooth
 
 **From source (development):**
 ```bash
-pip install "git+https://github.com/config-i1/smooth.git@master#subdirectory=python"
+pip install "git+https://github.com/openforecast-org/smooth.git@master#subdirectory=python"
 ```
 
-See the [Installation Guide](https://github.com/config-i1/smooth/wiki/Installation) for platform-specific instructions.
+See the [Installation Guide](https://github.com/openforecast-org/smooth/wiki/Installation) for platform-specific instructions.
 
 
 ## System Requirements
@@ -189,20 +189,20 @@ print(auto.best_model_.model_name)
 
 ## Documentation
 
-- [GitHub Wiki](https://github.com/config-i1/smooth/wiki) - Full documentation
-- [ADAM](https://github.com/config-i1/smooth/wiki/ADAM) - Main unified ETS/ARIMA framework
-- [Installation Guide](https://github.com/config-i1/smooth/wiki/Installation) - Dependencies and troubleshooting
+- [GitHub Wiki](https://github.com/openforecast-org/smooth/wiki) - Full documentation
+- [ADAM](https://github.com/openforecast-org/smooth/wiki/ADAM) - Main unified ETS/ARIMA framework
+- [Installation Guide](https://github.com/openforecast-org/smooth/wiki/Installation) - Dependencies and troubleshooting
 
 The pages below document the models and their Python classes:
 
-- [ADAM](https://github.com/config-i1/smooth/wiki/ADAM) — Augmented Dynamic Adaptive Model — unified ETS/ARIMA/regression framework
-- [AutoADAM](https://github.com/config-i1/smooth/wiki/AutoADAM) — Automatic ADAM with distribution and ARIMA order selection
-- [ES](https://github.com/config-i1/smooth/wiki/ES) — Exponential Smoothing (ETS) wrapper for ADAM
-- [CES](https://github.com/config-i1/smooth/wiki/CES) — Complex Exponential Smoothing (`CES`, `AutoCES`)
-- [MSARIMA](https://github.com/config-i1/smooth/wiki/MSARIMA) — Multiple Seasonal ARIMA (fixed orders) and automatic selection (`AutoMSARIMA`)
-- [OM](https://github.com/config-i1/smooth/wiki/OM) — Occurrence Model for intermittent demand (`OM`, `OMG`, `AutoOM`)
-- [SMA](https://github.com/config-i1/smooth/wiki/SMA) — Simple Moving Average in state-space form with automatic order selection
-- [Simulation Functions](https://github.com/config-i1/smooth/wiki/Simulation-Functions) — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, `sim_oes`, and the `.simulate()` method on fitted models
+- [ADAM](https://github.com/openforecast-org/smooth/wiki/ADAM) — Augmented Dynamic Adaptive Model — unified ETS/ARIMA/regression framework
+- [AutoADAM](https://github.com/openforecast-org/smooth/wiki/AutoADAM) — Automatic ADAM with distribution and ARIMA order selection
+- [ES](https://github.com/openforecast-org/smooth/wiki/ES) — Exponential Smoothing (ETS) wrapper for ADAM
+- [CES](https://github.com/openforecast-org/smooth/wiki/CES) — Complex Exponential Smoothing (`CES`, `AutoCES`)
+- [MSARIMA](https://github.com/openforecast-org/smooth/wiki/MSARIMA) — Multiple Seasonal ARIMA (fixed orders) and automatic selection (`AutoMSARIMA`)
+- [OM](https://github.com/openforecast-org/smooth/wiki/OM) — Occurrence Model for intermittent demand (`OM`, `OMG`, `AutoOM`)
+- [SMA](https://github.com/openforecast-org/smooth/wiki/SMA) — Simple Moving Average in state-space form with automatic order selection
+- [Simulation Functions](https://github.com/openforecast-org/smooth/wiki/Simulation-Functions) — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, `sim_oes`, and the `.simulate()` method on fitted models
 
 **Book:** Svetunkov, I. (2023). *Forecasting and Analytics with the Augmented Dynamic Adaptive Model (ADAM)*. Chapman and Hall/CRC. Online: https://openforecast.org/adam/
 

@@ -23,7 +23,7 @@ body:
     attributes:
       label: Where is the improvement needed?
       description: Provide a link to the documentation page or the path to the file in the repo.
-      placeholder: "e.g., https://github.com/config-i1/smooth/wiki/ADAM or /R/adam.R"
+      placeholder: "e.g., https://github.com/openforecast-org/smooth/wiki/ADAM or /R/adam.R"
     validations:
       required: true
   - type: textarea

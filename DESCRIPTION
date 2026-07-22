@@ -5,8 +5,8 @@ Version: 4.5.1
 Date: 2026-06-19
 Authors@R: person("Ivan", "Svetunkov", email = "ivan@svetunkov.com", role = c("aut", "cre"),
                   comment="Senior Lecturer at Centre for Marketing Analytics and Forecasting, Lancaster University, UK")
-URL: https://github.com/config-i1/smooth
-BugReports: https://github.com/config-i1/smooth/issues
+URL: https://github.com/openforecast-org/smooth
+BugReports: https://github.com/openforecast-org/smooth/issues
 Language: en-GB
 Description: Functions implementing Single Source of Error state space models for purposes of time series analysis and forecasting.
              The package includes ADAM (Svetunkov, 2023, <https://openforecast.org/adam/>),

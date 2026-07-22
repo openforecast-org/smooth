@@ -37,7 +37,7 @@ case "$1" in
         sleep 5
 
         echo "=== Computing SHA256 ==="
-        HASH=$(curl -sL "https://github.com/config-i1/smooth/archive/refs/tags/v1.0.0.tar.gz" | sha256sum | awk '{print $1}')
+        HASH=$(curl -sL "https://github.com/openforecast-org/smooth/archive/refs/tags/v1.0.0.tar.gz" | sha256sum | awk '{print $1}')
         echo "SHA256: ${HASH}"
 
         echo "=== Updating meta.yaml ==="

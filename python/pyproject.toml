@@ -51,11 +51,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage      = "https://github.com/config-i1/smooth"
+Homepage      = "https://github.com/openforecast-org/smooth"
 Documentation = "https://openforecast.org/smooth-py/"
-Repository    = "https://github.com/config-i1/smooth"
-Issues        = "https://github.com/config-i1/smooth/issues"
-Changelog     = "https://github.com/config-i1/smooth/blob/Python/python/NEWS.md"
+Repository    = "https://github.com/openforecast-org/smooth"
+Issues        = "https://github.com/openforecast-org/smooth/issues"
+Changelog     = "https://github.com/openforecast-org/smooth/blob/Python/python/NEWS.md"
 "R package"   = "https://cran.r-project.org/package=smooth"
 
 [tool.setuptools.packages.find]

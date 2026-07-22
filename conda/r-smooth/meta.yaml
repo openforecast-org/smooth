@@ -64,7 +64,7 @@ test:
     - "\"%R%\" -e \"library('smooth')\""   # [win]
 
 about:
-  home: https://github.com/config-i1/smooth
+  home: https://github.com/openforecast-org/smooth
   license: LGPL-2.1-only
   license_family: LGPL
   license_file:
@@ -75,7 +75,7 @@ about:
     purposes of time series analysis and forecasting. The package includes
     ADAM, Exponential Smoothing, SARIMA, Complex Exponential Smoothing,
     Simple Moving Average, and several simulation functions.
-  dev_url: https://github.com/config-i1/smooth
+  dev_url: https://github.com/openforecast-org/smooth
 
 extra:
   recipe-maintainers:

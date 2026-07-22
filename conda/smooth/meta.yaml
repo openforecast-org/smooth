@@ -7,7 +7,7 @@ package:
   version: {{ version }}
 
 source:
-  - url: https://github.com/config-i1/smooth/archive/refs/tags/v{{ version }}.tar.gz
+  - url: https://github.com/openforecast-org/smooth/archive/refs/tags/v{{ version }}.tar.gz
     sha256: REPLACE_WITH_ACTUAL_HASH
     folder: .
   - url: https://github.com/RUrlus/carma/archive/v{{ carma_version }}.tar.gz
@@ -55,7 +55,7 @@ test:
     - python -c "from smooth.adam_general.core.adam import ADAM; import numpy as np; y = np.array([10,12,15,13,16,18,20,19,22,25,28,30]); m = ADAM(model='ANN', lags=[1]); m.fit(y); fc = m.predict(h=3); assert len(fc.mean) == 3"
 
 about:
-  home: https://github.com/config-i1/smooth
+  home: https://github.com/openforecast-org/smooth
   license: LGPL-2.1-only
   license_family: LGPL
   license_file: LICENSE
@@ -65,7 +65,7 @@ about:
     (Augmented Dynamic Adaptive Model) for time series forecasting using
     state space models, including ETS, ARIMA, and regression in a unified
     Single Source of Error framework.
-  dev_url: https://github.com/config-i1/smooth
+  dev_url: https://github.com/openforecast-org/smooth
 
 extra:
   recipe-maintainers:

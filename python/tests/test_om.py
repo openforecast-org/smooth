@@ -59,17 +59,20 @@ class TestInit:
 
     def test_init_auto_returns_autoOM_instance(self):
         from smooth import AutoOM
+
         m = OM(occurrence="auto")
         assert isinstance(m, AutoOM)
 
     def test_auto_fit_returns_om_or_omg(self, intermittent_y):
         from smooth import OMG, AutoOM
+
         m = OM(model="MNN", occurrence="auto", lags=[1]).fit(intermittent_y)
         assert isinstance(m, (OM, OMG))
         assert not isinstance(m, AutoOM)
 
     def test_init_general_returns_omg(self):
         from smooth import OMG
+
         m = OM(occurrence="general")
         assert isinstance(m, OMG)
 
@@ -96,9 +99,9 @@ class TestLossMenu:
 
     @pytest.mark.parametrize("loss", ["LASSO", "RIDGE"])
     def test_regularised_losses_fit(self, intermittent_y, loss):
-        m = OM(
-            model="MNN", occurrence="odds-ratio", loss=loss, reg_lambda=0.3
-        ).fit(intermittent_y)
+        m = OM(model="MNN", occurrence="odds-ratio", loss=loss, reg_lambda=0.3).fit(
+            intermittent_y
+        )
         assert m.loss_ == loss
         assert np.isfinite(m.loss_value)
         assert m.reg_lambda == 0.3
@@ -109,9 +112,7 @@ class TestLossMenu:
 
             return float(_np.sum(_np.abs(actual - fitted) ** 3))
 
-        m = OM(
-            model="MNN", occurrence="odds-ratio", loss=cube_abs
-        ).fit(intermittent_y)
+        m = OM(model="MNN", occurrence="odds-ratio", loss=cube_abs).fit(intermittent_y)
         assert m.loss_ == "custom"
         assert np.isfinite(m.loss_value)
 
@@ -234,6 +235,19 @@ class TestProperties:
             fitted_model.orders,
             fitted_model.time_elapsed,
         )
+
+    def test_point_lik_sums_to_loglik(self, fitted_model):
+        pl = fitted_model.point_lik()
+        assert pl.shape == (fitted_model.nobs,)
+        assert np.isclose(np.sum(pl), fitted_model.loglik)
+
+    def test_point_lik_is_bernoulli(self, binary_y):
+        m = OM(model="ANN", occurrence="odds-ratio", initial="optimal").fit(binary_y)
+        ot = np.asarray(m._observations["ot"], dtype=float).ravel()
+        p = np.asarray(m.fitted, dtype=float).ravel()
+        expected = np.where(ot == 1, np.log(p), np.log(1.0 - p))
+        assert np.allclose(m.point_lik(), expected)
+        assert np.allclose(m.point_lik(log=False), np.exp(expected))
 
 
 # --------------------------------------------------------------------------
@@ -446,3 +460,26 @@ class TestRegressions:
         m.fit(intermittent_y)
         # The model must have fitted — no crash, no error
         assert m.fitted.shape == intermittent_y.shape
+
+
+class TestOMvcovType:
+    def _y(self):
+        rng = np.random.default_rng(9)
+        return rng.binomial(1, 0.6, 160).astype(float)
+
+    def test_opg_default_psd_and_genuine(self):
+        m = OM(model="ANN", occurrence="odds-ratio", initial="optimal").fit(self._y())
+        v_opg = m.vcov(type="opg").values
+        v_h = m.vcov(type="hessian").values
+        np.testing.assert_allclose(m.vcov().values, v_opg)
+        assert np.all(np.linalg.eigvalsh((v_opg + v_opg.T) / 2) > -1e-6)
+        assert not np.allclose(v_opg, v_h, atol=1e-6)
+
+    def test_bootstrap_deprecated(self):
+        import warnings
+
+        m = OM(model="ANN", occurrence="odds-ratio", initial="optimal").fit(self._y())
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            m.vcov(bootstrap=True, nsim=20)
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)

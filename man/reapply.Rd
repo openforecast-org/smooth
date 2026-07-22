@@ -5,7 +5,8 @@
 \alias{reforecast}
 \title{Reapply the model with randomly generated initial parameters and produce forecasts}
 \usage{
-reapply(object, nsim = 1000, bootstrap = FALSE, heuristics = NULL, ...)
+reapply(object, nsim = 1000, type = c("opg", "hessian", "bootstrap"),
+  bootstrap = FALSE, heuristics = NULL, ...)
 
 reforecast(object, h = 10, newdata = NULL, occurrence = NULL,
   interval = c("prediction", "confidence", "none"), level = 0.95,
@@ -17,8 +18,16 @@ reforecast(object, h = 10, newdata = NULL, occurrence = NULL,
 
 \item{nsim}{Number of paths to generate (number of simulations to do).}
 
-\item{bootstrap}{The logical, which determines, whether to use bootstrap for the
-covariance matrix of parameters or not.}
+\item{type}{The type of covariance matrix of parameters to use for the
+refitting. One of \code{"opg"} (the default, the OPG / BHHH estimator
+\eqn{J=\sum_t s_t s_t'} built from the per-observation scores, positive
+semi-definite by construction), \code{"hessian"} (the observed Fisher
+Information, i.e. the inverse numerical Hessian of the log-likelihood) or
+\code{"bootstrap"}. See \link[stats]{vcov} on the fitted model for details.}
+
+\item{bootstrap}{Deprecated in favour of \code{type="bootstrap"}. The logical,
+which determines, whether to use bootstrap for the covariance matrix of
+parameters or not. \code{bootstrap=TRUE} still works but issues a warning.}
 
 \item{heuristics}{The value for proportion to use for heuristic estimation of the
 standard deviation of parameters. If \code{NULL}, it is not used.}
@@ -93,6 +102,14 @@ plot(refittedModel)
 
 ourForecast <- reforecast(ourModel, nsim=50)
 
+}
+\references{
+\itemize{
+\item Berndt, E., Hall, B., Hall, R., & Hausman, J. (1974). Estimation and
+Inference in Nonlinear Structural Models. Annals of Economic and Social
+Measurement, 3(4), 653--665. (The OPG / BHHH covariance estimator used by
+\code{type="opg"}.)
+}
 }
 \seealso{
 \link[smooth]{forecast.smooth}

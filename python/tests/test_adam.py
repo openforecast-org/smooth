@@ -555,3 +555,67 @@ class TestADAMLogLikDistribution:
         s = np.sum(np.sqrt(np.abs(r))) / (len(r) * 2)
         s_ll = float(np.sum(-np.log(4 * s**2) - np.sqrt(np.abs(r)) / s))
         assert abs(float(m.loglik) - s_ll) < 1e-6
+
+
+class TestADAMPointLik:
+    """point_lik() mirrors R's pointLik.adam: per-observation log-likelihood
+    that sums to loglik. R-parity is covered in the comparison suite; here we
+    check the self-consistency invariant across distributions."""
+
+    def _series(self):
+        np.random.seed(3)
+        return 100.0 + np.cumsum(np.random.randn(120)) + np.arange(120) * 0.2
+
+    @pytest.mark.parametrize(
+        "model,dist",
+        [
+            ("AAN", "dnorm"),
+            ("AAN", "dlaplace"),
+            ("MNN", "dgamma"),
+            ("MNN", "dlnorm"),
+        ],
+    )
+    def test_point_lik_sums_to_loglik(self, model, dist):
+        y = np.abs(self._series())
+        m = ADAM(model=model, lags=[1], distribution=dist, initial="optimal").fit(y)
+        pl = np.asarray(m.point_lik()).ravel()
+        assert pl.shape == (m.nobs,)
+        assert np.isclose(np.sum(pl), float(m.loglik))
+        assert np.allclose(m.point_lik(log=False), np.exp(pl))
+
+
+class TestADAMvcovType:
+    """vcov type= parameter: opg (default) is PSD and distinct from hessian;
+    bootstrap= is deprecated."""
+
+    def _series(self):
+        np.random.seed(5)
+        return 100.0 + np.cumsum(np.random.randn(120)) + np.arange(120) * 0.3
+
+    def test_opg_is_default_and_psd(self):
+        m = ADAM(model="AAN", lags=[1], initial="optimal").fit(self._series())
+        v_default = m.vcov()
+        v_opg = m.vcov(type="opg")
+        np.testing.assert_allclose(v_default.values, v_opg.values)
+        sym = (v_opg.values + v_opg.values.T) / 2
+        assert np.all(np.linalg.eigvalsh(sym) > -1e-6)
+
+    def test_opg_differs_from_hessian(self):
+        m = ADAM(model="AAN", lags=[1], initial="optimal").fit(self._series())
+        v_opg = m.vcov(type="opg").values
+        v_h = m.vcov(type="hessian").values
+        assert not np.allclose(v_opg, v_h, atol=1e-6)
+
+    def test_bootstrap_true_deprecated(self):
+        import warnings
+
+        m = ADAM(model="ANN", lags=[1], initial="optimal").fit(self._series())
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            m.vcov(bootstrap=True, nsim=20)
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)
+
+    def test_invalid_type_raises(self):
+        m = ADAM(model="ANN", lags=[1], initial="optimal").fit(self._series())
+        with pytest.raises(ValueError, match="type must be one of"):
+            m.vcov(type="nonsense")

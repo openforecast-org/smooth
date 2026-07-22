@@ -101,9 +101,9 @@ def r_outputs(intermittent_y):
         )
         expr = (
             f"{{ m <- {r_call};"
-            f" ci <- confint(m, level=0.95);"
+            f" ci <- confint(m, level=0.95, type='hessian');"
             "  list(coef=" + coef_expr + ","
-            "       vcov=as.matrix(vcov(m)),"
+            "       vcov=as.matrix(vcov(m, type='hessian')),"
             "       confint=as.matrix(ci),"
             "       confint_rownames=rownames(ci)) }"
         )
@@ -140,7 +140,7 @@ def test_coef_values_match_r(scenario, intermittent_y, r_outputs):
 @pytest.mark.parametrize("scenario", list(SCENARIOS))
 def test_vcov_shape_matches_r(scenario, intermittent_y, r_outputs):
     m = _python_fit(scenario, intermittent_y)
-    V = m.vcov().to_numpy()
+    V = m.vcov(type="hessian").to_numpy()
     r_V = np.asarray(r_outputs[scenario]["vcov"], dtype=float)
     assert V.shape == r_V.shape, f"{scenario}: vcov shape {V.shape} != R {r_V.shape}"
 
@@ -148,7 +148,7 @@ def test_vcov_shape_matches_r(scenario, intermittent_y, r_outputs):
 @pytest.mark.parametrize("scenario", list(SCENARIOS))
 def test_vcov_values_match_r(scenario, intermittent_y, r_outputs):
     m = _python_fit(scenario, intermittent_y)
-    V = m.vcov().to_numpy()
+    V = m.vcov(type="hessian").to_numpy()
     r_V = np.asarray(r_outputs[scenario]["vcov"], dtype=float)
     np.testing.assert_allclose(
         V,
@@ -162,7 +162,7 @@ def test_vcov_values_match_r(scenario, intermittent_y, r_outputs):
 @pytest.mark.parametrize("scenario", list(SCENARIOS))
 def test_confint_se_matches_r(scenario, intermittent_y, r_outputs):
     m = _python_fit(scenario, intermittent_y)
-    ci = m.confint(level=0.95)
+    ci = m.confint(level=0.95, type="hessian")
     r_ci = np.asarray(r_outputs[scenario]["confint"], dtype=float)
     np.testing.assert_allclose(
         ci.iloc[:, 0].to_numpy(),
@@ -176,7 +176,7 @@ def test_confint_se_matches_r(scenario, intermittent_y, r_outputs):
 @pytest.mark.parametrize("scenario", list(SCENARIOS))
 def test_confint_bounds_match_r(scenario, intermittent_y, r_outputs):
     m = _python_fit(scenario, intermittent_y)
-    ci = m.confint(level=0.95)
+    ci = m.confint(level=0.95, type="hessian")
     r_ci = np.asarray(r_outputs[scenario]["confint"], dtype=float)
     np.testing.assert_allclose(
         ci.iloc[:, 1:].to_numpy(),
@@ -204,7 +204,7 @@ def test_summary_renders_for_each_scenario(intermittent_y):
     """Sanity: ``summary()`` produces a non-empty string for every scenario."""
     for scenario in SCENARIOS:
         m = _python_fit(scenario, intermittent_y)
-        text = str(m.summary())
+        text = str(m.summary(type="hessian"))
         assert len(text) > 50, f"{scenario}: summary unexpectedly short"
         if scenario.startswith("om_"):
             assert "Occurrence model" in text

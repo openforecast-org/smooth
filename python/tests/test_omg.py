@@ -172,6 +172,16 @@ class TestFitBasic:
         ll = float(np.sum(ot * np.log(p) + (1.0 - ot) * np.log(1.0 - p)))
         np.testing.assert_allclose(float(fitted_omg.loglik), ll, atol=1e-9)
 
+    def test_point_lik_sums_to_loglik(self, fitted_omg):
+        """point_lik() is the per-observation Bernoulli of the coupled
+        probability; it must sum to the reported logLik (mirrors R pointLik.om
+        dispatched on an omg object)."""
+        pl = fitted_omg.point_lik()
+        assert pl.shape == (fitted_omg.nobs,)
+        np.testing.assert_allclose(
+            float(np.sum(pl)), float(fitted_omg.loglik), atol=1e-9
+        )
+
 
 # --------------------------------------------------------------------------
 # Sub-model inspection
@@ -478,3 +488,17 @@ class TestInferenceMethods:
         fitted_omg.fit(intermittent_y)
         V2 = fitted_omg.vcov().to_numpy()
         np.testing.assert_allclose(V1, V2, atol=1e-6, rtol=1e-4)
+
+
+class TestOMGvcovType:
+    def _y(self):
+        rng = np.random.default_rng(13)
+        return rng.binomial(1, 0.5, 160).astype(float)
+
+    def test_opg_default_psd_and_genuine(self):
+        m = OMG(model_a="ANN", model_b="ANN", initial="optimal").fit(self._y())
+        v_opg = m.vcov(type="opg").values
+        v_h = m.vcov(type="hessian").values
+        np.testing.assert_allclose(m.vcov().values, v_opg)
+        assert np.all(np.linalg.eigvalsh((v_opg + v_opg.T) / 2) > -1e-6)
+        assert not np.allclose(v_opg, v_h, atol=1e-6)

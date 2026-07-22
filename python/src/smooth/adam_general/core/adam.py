@@ -2602,6 +2602,81 @@ class ADAM:
         self._check_is_fitted()
         return self._adam_estimated["log_lik_adam_value"]["value"]
 
+    def point_lik(self, log: bool = True) -> NDArray:
+        """Per-observation log-likelihood of the fitted model.
+
+        Mirrors R's ``pointLik.adam`` (R/adam.R:7298): the log-density of each
+        in-sample observation under the fitted distribution and scale, so
+        ``sum(point_lik())`` equals :attr:`loglik`. For an occurrence
+        (intermittent) model the demand-size density is combined with the
+        occurrence Bernoulli contribution and the zero observations carry the
+        differential-entropy term, exactly as R does. With ``log=False`` the
+        densities themselves are returned.
+        """
+        from smooth.adam_general.core.utils.utils import (
+            calculate_entropy,
+            calculate_likelihood,
+        )
+
+        self._check_is_fitted()
+        y = np.asarray(self.actuals, dtype=float).ravel()
+        obs = len(y)
+        distribution = self._general.get(
+            "distribution_new", self._general.get("distribution", "dnorm")
+        )
+        e_type = self.error_type
+        scale = self.scale
+        other = None
+        if isinstance(getattr(self, "other", None), dict):
+            other = self.other.get(
+                "shape", self.other.get("nu", self.other.get("alpha"))
+            )
+
+        occurrence_model = bool(self._occurrence.get("occurrence_model", False))
+        if occurrence_model:
+            p_fitted = np.asarray(self._occurrence["p_fitted"], dtype=float).ravel()
+            y_fitted = np.asarray(self.fitted, dtype=float).ravel() / p_fitted
+            ot_logical = y != 0
+        else:
+            y_fitted = np.asarray(self.fitted, dtype=float).ravel()
+            ot_logical = np.ones(obs, dtype=bool)
+
+        lik_values = np.zeros(obs, dtype=float)
+        # calculate_likelihood reshapes y to a column, so y_fitted must be a
+        # column too (otherwise the density broadcasts to an n x n matrix).
+        lik_values[ot_logical] = np.asarray(
+            calculate_likelihood(
+                distribution,
+                e_type,
+                y[ot_logical],
+                y_fitted[ot_logical].reshape(-1, 1),
+                scale,
+                other,
+            ),
+            dtype=float,
+        ).ravel()
+
+        if occurrence_model:
+            # Differential entropy for the unobserved (zero) demand sizes, then
+            # add the occurrence-model Bernoulli contribution (mirrors R).
+            zero = ~ot_logical
+            if np.any(zero):
+                lik_values[zero] = -np.asarray(
+                    calculate_entropy(distribution, scale, other, 1.0, y_fitted[zero]),
+                    dtype=float,
+                ).ravel()
+            om_model = self._occurrence.get("oes_model") or self._occurrence.get(
+                "occurrence"
+            )
+            if hasattr(om_model, "point_lik"):
+                lik_values = (
+                    lik_values + np.asarray(om_model.point_lik(), dtype=float).ravel()
+                )
+
+        if not log:
+            lik_values = np.exp(lik_values)
+        return lik_values
+
     @property
     def aic(self) -> float:
         """
@@ -4330,44 +4405,170 @@ class ADAM:
             ),
         )
 
-    def vcov(self, bootstrap=False, heuristics=None, step_size=None, **boot_kwargs):
+    def _opg_covariance(self, step_size=None):
+        """OPG / BHHH covariance of the ADAM coefficients, or None.
+
+        The per-observation score is that of the concentrated log-likelihood:
+        ``CF(b, return_fitted=True)`` refits at a perturbed ``b`` and returns the
+        fitted values and errors, from which the concentrated scale and the
+        per-observation density are recomputed (via ``scaler`` /
+        ``calculate_likelihood``). Mirrors R's ``covarOPG``. Returns None (so
+        vcov falls back to the Hessian) for non-likelihood losses or occurrence
+        (intermittent) models, which R also routes to the Hessian.
+        """
+        from smooth.adam_general.core.estimator.optimization import (
+            _setup_arima_polynomials,
+        )
+        from smooth.adam_general.core.utils.cost_functions import CF
+        from smooth.adam_general.core.utils.utils import calculate_likelihood, scaler
+        from smooth.adam_general.core.utils.var_covar import covar_opg
+
+        if self._general.get("loss") != "likelihood":
+            return None
+        if self._occurrence.get("occurrence_model", False):
+            return None
+
+        ar_poly, ma_poly = _setup_arima_polynomials(
+            self._model_type, self._arima, self._lags_model
+        )
+        obs_dict = self._observations
+        ot_logical = np.asarray(obs_dict["ot_logical"]).ravel()
+        obs = int(obs_dict["obs_in_sample"])
+        y = np.asarray(obs_dict["y_in_sample"]).ravel()
+        distribution = self._general.get(
+            "distribution_new", self._general.get("distribution", "dnorm")
+        )
+        e_type = self._model_type["error_type"]
+        other = None
+        if isinstance(getattr(self, "other", None), dict):
+            other = self.other.get(
+                "shape", self.other.get("nu", self.other.get("alpha"))
+            )
+        other_est = self._adam_estimated.get("other_parameter_estimate", False)
+
+        def point_lik_at(b):
+            result = CF(
+                np.asarray(b, dtype=float),
+                self._model_type,
+                self._components,
+                self._lags_model,
+                self._adam_created,
+                self._persistence,
+                self._initials,
+                self._arima,
+                self._explanatory,
+                self._phi_internal,
+                self._constant,
+                self._observations,
+                self._profile,
+                self._general,
+                self._adam_cpp,
+                bounds="none",
+                other=other,
+                otherParameterEstimate=other_est,
+                arPolynomialMatrix=ar_poly,
+                maPolynomialMatrix=ma_poly,
+                regressors=self._explanatory.get("regressors"),
+                return_fitted=True,
+            )
+            if not isinstance(result, tuple):
+                return None
+            fitted, errors = result
+            fitted = np.asarray(fitted, dtype=float).ravel()
+            errors = np.asarray(errors, dtype=float).ravel()
+            if not np.all(np.isfinite(fitted)):
+                return None
+            scale = scaler(
+                distribution, e_type, errors[ot_logical], fitted[ot_logical], obs, other
+            )
+            lik = np.asarray(
+                calculate_likelihood(
+                    distribution,
+                    e_type,
+                    y[ot_logical],
+                    fitted[ot_logical].reshape(-1, 1),
+                    scale,
+                    other,
+                ),
+                dtype=float,
+            ).ravel()
+            vec = np.zeros(obs, dtype=float)
+            vec[ot_logical] = lik
+            if not np.all(np.isfinite(vec)):
+                return None
+            return vec
+
+        return covar_opg(
+            np.asarray(self.coef, dtype=float),
+            point_lik_at,
+            obs,
+            float(self.loglik),
+            step_size,
+        )
+
+    def vcov(
+        self,
+        type=None,
+        bootstrap=False,
+        heuristics=None,
+        step_size=None,
+        **boot_kwargs,  # noqa: A002
+    ):
         """Variance-covariance matrix of the estimated parameters.
 
-        Mirrors R's ``vcov.adam``: inverts the observed Fisher Information,
-        excluding non-informative ("broken") parameters and retrying with a
-        larger finite-difference step if any are detected.
+        Mirrors R's ``vcov.adam``. ``type`` selects the estimator: ``"opg"`` (the
+        default, the OPG/BHHH covariance built from the per-observation scores,
+        PSD by construction and finite at boundary estimates), ``"hessian"`` (the
+        observed Fisher Information) or ``"bootstrap"``.
 
         Parameters
         ----------
+        type : {"opg", "hessian", "bootstrap"}, optional
+            Covariance estimator; defaults to ``"opg"``.
         bootstrap : bool, default=False
-            If True, delegate to :meth:`coefbootstrap` and return the
-            empirical replicate covariance instead of the Fisher-based one.
+            Deprecated alias for ``type="bootstrap"`` (warns).
         heuristics : float, optional
             If given, returns ``diag(abs(coef) * heuristics)``.
         step_size : float, optional
-            Finite-difference step for the Fisher Information.
+            Finite-difference step.
         **boot_kwargs
-            Forwarded to :meth:`coefbootstrap` when ``bootstrap=True``
-            (``nsim``, ``size``, ``replace``, ``method``, ``seed``, …).
+            Forwarded to :meth:`coefbootstrap` for the bootstrap type.
 
         Returns
         -------
         pandas.DataFrame
             Covariance matrix indexed/columned by :attr:`coef_names`.
         """
+        import warnings
+
         import pandas as pd
 
-        from smooth.adam_general.core.utils.var_covar import invert_fisher_information
+        from smooth.adam_general.core.utils.var_covar import (
+            invert_fisher_information,
+            resolve_covar_type,
+        )
 
         self._check_is_fitted()
         names = self.coef_names
-
-        if bootstrap:
-            return self.coefbootstrap(**boot_kwargs).vcov
+        cov_type = resolve_covar_type(type, bootstrap)
 
         if heuristics is not None:
             cov = np.diag(np.abs(np.asarray(self.coef, dtype=float)) * heuristics)
             return pd.DataFrame(cov, index=names, columns=names)
+
+        if cov_type == "bootstrap":
+            return self.coefbootstrap(**boot_kwargs).vcov
+
+        if cov_type == "opg":
+            cov_opg = self._opg_covariance(step_size=step_size)
+            if cov_opg is not None:
+                return pd.DataFrame(cov_opg, index=names, columns=names)
+            warnings.warn(
+                "The OPG covariance could not be computed for this model; "
+                "falling back to the observed Fisher Information.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
         FI = np.asarray(self._fisher_information_matrix(step_size=step_size))
         # R retries with a coarser step when variables look "broken".
@@ -4402,7 +4603,13 @@ class ADAM:
         raise ValueError(f"Unknown persistence parameter: {name}")
 
     def confint(
-        self, parm=None, level=0.95, bootstrap=False, step_size=None, **boot_kwargs
+        self,
+        parm=None,
+        level=0.95,
+        type=None,  # noqa: A002
+        bootstrap=False,
+        step_size=None,
+        **boot_kwargs,
     ):
         """Confidence intervals for the estimated parameters.
 
@@ -4435,11 +4642,14 @@ class ADAM:
         """
         import pandas as pd
 
+        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+
         self._check_is_fitted()
+        cov_type = resolve_covar_type(type, bootstrap)
         names = self.coef_names
         params = np.asarray(self.coef, dtype=float)
 
-        if bootstrap:
+        if cov_type == "bootstrap":
             from smooth.adam_general.core.utils.bootstrap import (
                 bootstrap_confint_frame,
             )
@@ -4447,7 +4657,7 @@ class ADAM:
             boot = self.coefbootstrap(**boot_kwargs)
             return bootstrap_confint_frame(boot, names, params, level, parm)
 
-        V = self.vcov(step_size=step_size).to_numpy()
+        V = self.vcov(type=cov_type, step_size=step_size).to_numpy()
         se = np.sqrt(np.abs(np.diag(V)))
 
         nobs = self.nobs
@@ -4610,7 +4820,7 @@ class ADAM:
                 lo[k] = max(b1 - params[k], lo[k])
                 hi[k] = min(b2 - params[k], hi[k])
 
-    def summary(self, level: float = 0.95, digits: int = 4):
+    def summary(self, level: float = 0.95, digits: int = 4, type=None):  # noqa: A002
         """
         Generate a coefficient-table summary of the fitted model.
 
@@ -4626,6 +4836,8 @@ class ADAM:
             Confidence level for the coefficient intervals.
         digits : int, default=4
             Number of decimal places for numeric output.
+        type : {"opg", "hessian", "bootstrap"}, optional
+            Covariance estimator for the standard errors; defaults to ``"opg"``.
 
         Returns
         -------
@@ -4641,7 +4853,7 @@ class ADAM:
         from smooth.adam_general.core.utils.printing import ADAMSummary
 
         self._check_is_fitted()
-        return ADAMSummary(self, level=level, digits=digits)
+        return ADAMSummary(self, level=level, digits=digits, type=type)
 
     def coefbootstrap(
         self,
@@ -4846,6 +5058,7 @@ class ADAM:
     def reapply(
         self,
         nsim: int = 1000,
+        type=None,  # noqa: A002
         bootstrap: bool = False,
         heuristics: Optional[float] = None,
         seed: Optional[int] = None,
@@ -4905,15 +5118,27 @@ class ADAM:
         # R forwards ``nsim=nsim`` to ``vcov`` when ``bootstrap=TRUE`` so
         # the bootstrap covariance uses the same replicate count as the
         # reapply MVN draw (R/reapply.R:95).
+        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+
+        cov_type = resolve_covar_type(type, bootstrap)
         vcov_call_kwargs = dict(vcov_kwargs)
-        if bootstrap and "nsim" not in vcov_call_kwargs:
+        if cov_type == "bootstrap" and "nsim" not in vcov_call_kwargs:
             vcov_call_kwargs["nsim"] = nsim
-        vcov_df = self.vcov(
-            bootstrap=bootstrap, heuristics=heuristics, **vcov_call_kwargs
-        )
+        vcov_df = self.vcov(type=cov_type, heuristics=heuristics, **vcov_call_kwargs)
         coef = np.asarray(self.coef, dtype=float)
         coef_names = list(self.coef_names)
-        vcov_arr = np.asarray(vcov_df, dtype=float)
+        # ``np.asarray`` can return a read-only view into the DataFrame's block;
+        # copy so the non-finite row/column zeroing below can write in place.
+        vcov_arr = np.array(vcov_df, dtype=float)
+        # The OPG covariance (the default) returns an infinite variance for a
+        # parameter the data does not identify (e.g. an initial that washes out
+        # when its smoothing parameter is at a bound). Such parameters cannot be
+        # resampled, so hold them at their point estimate (zero their row/column)
+        # before the multivariate-normal draw. Mirrors R's reapply.adam.
+        non_finite = ~np.isfinite(np.diag(vcov_arr))
+        if np.any(non_finite):
+            vcov_arr[non_finite, :] = 0.0
+            vcov_arr[:, non_finite] = 0.0
         vcov_arr = _psd_correct(vcov_arr)
 
         # 2. MVN sample (R/reapply.R:251)
@@ -5511,6 +5736,7 @@ class ADAM:
         side: Literal["both", "upper", "lower"] = "both",
         cumulative: bool = False,
         nsim: int = 100,
+        type=None,  # noqa: A002
         bootstrap: bool = False,
         heuristics: Optional[float] = None,
         seed: Optional[int] = None,
@@ -5596,6 +5822,7 @@ class ADAM:
         # 1. Reapply to get per-draw states / profile / measurement / etc.
         refitted = self.reapply(
             nsim=nsim,
+            type=type,
             bootstrap=bootstrap,
             heuristics=heuristics,
             seed=seed,

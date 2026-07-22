@@ -990,13 +990,19 @@ class ADAMSummary:
     ``str()``/``repr()``) renders the report.
     """
 
-    def __init__(self, model: Any, level: float = 0.95, digits: int = 4):
+    def __init__(
+        self,
+        model: Any,
+        level: float = 0.95,
+        digits: int = 4,
+        type=None,  # noqa: A002
+    ):
         import pandas as pd
 
         self.digits = digits
         self.level = level
 
-        ci = model.confint(level=level)
+        ci = model.confint(level=level, type=type)
         estimate = np.asarray(model.coef, dtype=float)
         lo_col, hi_col = ci.columns[1], ci.columns[2]
         coefficients = pd.DataFrame(
@@ -1111,13 +1117,19 @@ class OMGSummary:
     criteria.
     """
 
-    def __init__(self, model: Any, level: float = 0.95, digits: int = 4):
+    def __init__(
+        self,
+        model: Any,
+        level: float = 0.95,
+        digits: int = 4,
+        type=None,  # noqa: A002
+    ):
         import pandas as pd
 
         self.digits = digits
         self.level = level
 
-        ci = model.confint(level=level)
+        ci = model.confint(level=level, type=type)
         coef = np.asarray(model.coef, dtype=float)
         names = list(ci.index)
         lo_col, hi_col = ci.columns[1], ci.columns[2]

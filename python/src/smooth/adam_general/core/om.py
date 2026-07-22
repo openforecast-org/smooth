@@ -1596,6 +1596,27 @@ class OM(ADAM):
         self._check_is_fitted()
         return float(self._adam_estimated["log_lik_adam_value"]["value"])
 
+    def point_lik(self, log: bool = True) -> NDArray:
+        """Per-observation log-likelihood of the occurrence model.
+
+        Bernoulli contribution of each observation: ``log(p_t)`` when the
+        event occurred (``o_t = 1``) and ``log(1 - p_t)`` otherwise, where
+        ``p_t`` is the fitted occurrence probability. Mirrors R's
+        ``pointLik.om`` (R/methods.R:598). ``sum(point_lik())`` equals
+        :attr:`loglik`. With ``log=False`` the densities themselves are
+        returned.
+        """
+        self._check_is_fitted()
+        ot = np.asarray(self._observations["ot"], dtype=float).ravel()
+        p = np.asarray(self.fitted, dtype=float).ravel()
+        ot_logical = ot == 1
+        lik_values = np.empty(len(ot), dtype=float)
+        lik_values[ot_logical] = np.log(p[ot_logical])
+        lik_values[~ot_logical] = np.log(1.0 - p[~ot_logical])
+        if not log:
+            lik_values = np.exp(lik_values)
+        return lik_values
+
     # ------------------------------------------------------------------
     # Inference (overrides ADAM's FI path because om_cf — not the ADAM
     # likelihood — is the cost the OM optimiser minimised)
@@ -1667,17 +1688,89 @@ class OM(ADAM):
 
         return numerical_hessian(_cost, self.coef, step_size=step_size)
 
-    def summary(self, level: float = 0.95, digits: int = 4):
+    def _opg_covariance(self, step_size=None):
+        """OPG / BHHH covariance of the occurrence-model coefficients, or None.
+
+        Overrides ADAM's density-based OPG with the Bernoulli score:
+        ``om_cf(b, return_fitted=True)`` gives the fitted occurrence probability
+        at a perturbed ``b``, whose Bernoulli log-density is differenced. Mirrors
+        R's ``covarOPGom``. Returns None (so vcov falls back to the Hessian) for
+        non-likelihood losses, which R also routes to the Hessian.
+        """
+        from smooth.adam_general.core.utils.var_covar import covar_opg
+
+        self._check_is_fitted()
+        if self._general.get("loss", "likelihood") != "likelihood":
+            return None
+
+        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
+            self._model_type, self._arima, self._lags_model
+        )
+        general_for_cf = dict(self._general)
+        general_for_cf["loss"] = self._general.get("loss", "likelihood")
+        pristine = getattr(self, "_fi_pristine", None)
+        ot = np.asarray(self._observations["ot"], dtype=float).ravel()
+
+        def point_lik_at(b):
+            if pristine is not None:
+                self._adam_created["mat_vt"][...] = pristine["mat_vt"]
+                self._profile["profiles_recent_table"][...] = pristine[
+                    "profiles_recent_table"
+                ]
+            p = om_cf(
+                B=np.asarray(b, dtype=float),
+                model_type_dict=self._model_type,
+                components_dict=self._components,
+                lags_dict=self._lags_model,
+                matrices_dict=self._adam_created,
+                persistence_checked=self._persistence,
+                initials_checked=self._initials,
+                arima_checked=self._arima,
+                explanatory_checked=self._explanatory,
+                phi_dict=self._phi_internal,
+                constants_checked=self._constant,
+                observations_dict=self._observations,
+                profile_dict=self._profile,
+                general=general_for_cf,
+                adam_cpp=self._adam_cpp,
+                occurrence=self._om_occurrence,
+                occurrence_char=self._occurrence_char,
+                bounds="none",
+                arPolynomialMatrix=ar_polynomial_matrix,
+                maPolynomialMatrix=ma_polynomial_matrix,
+                regressors=self._explanatory.get("regressors"),
+                return_fitted=True,
+            )
+            p = np.asarray(p, dtype=float).ravel()
+            if (
+                p.shape[0] != ot.shape[0]
+                or not np.all(np.isfinite(p))
+                or np.any(p <= 0.0)
+                or np.any(p >= 1.0)
+            ):
+                return None
+            return np.where(ot == 1, np.log(p), np.log(1.0 - p))
+
+        return covar_opg(
+            np.asarray(self.coef, dtype=float),
+            point_lik_at,
+            ot.shape[0],
+            float(self.loglik),
+            step_size,
+        )
+
+    def summary(self, level: float = 0.95, digits: int = 4, type=None):  # noqa: A002
         """Coefficient-table summary, mirroring R's ``summary.om``.
 
         Identical content to :meth:`ADAM.summary`, but the printed report is
         prefixed by an ``"Occurrence model"`` header (R's ``summary.om``
-        prepends the same line before delegating to ``summary.adam``).
+        prepends the same line before delegating to ``summary.adam``). ``type``
+        selects the covariance estimator for the SEs (default ``"opg"``).
         """
         from smooth.adam_general.core.utils.printing import OMSummary
 
         self._check_is_fitted()
-        return OMSummary(self, level=level, digits=digits)
+        return OMSummary(self, level=level, digits=digits, type=type)
 
     def simulate(
         self,

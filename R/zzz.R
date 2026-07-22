@@ -15,7 +15,7 @@
       }
       else if(randomNumber==4){
         startUpMessage <- paste0(startUpMessage,"\nAny thoughts or suggestions about the package? ",
-                                 "Have you found a bug? File an issue on github: https://github.com/config-i1/smooth/issues");
+                                 "Have you found a bug? File an issue on github: https://github.com/openforecast-org/smooth/issues");
       }
     }
     startUpMessage <- paste0(startUpMessage,"\n");

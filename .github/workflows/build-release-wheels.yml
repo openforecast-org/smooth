@@ -254,7 +254,7 @@ jobs:
 
             ```bash
             pip install pypi-attestations
-            pypi-attestations verify pypi --repository https://github.com/config-i1/smooth smooth-*.whl
+            pypi-attestations verify pypi --repository https://github.com/openforecast-org/smooth smooth-*.whl
             ```
 
             ## What's Changed

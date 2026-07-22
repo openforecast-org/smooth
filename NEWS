@@ -230,7 +230,7 @@ smooth v4.0.0 (Release data: 2023-09-15)
 =======
 
 Changes:
-* Starting from v4.0.0, the smooth package for R will be released under the LGPLv2.1 license. The source of the older version of the software under the GPL(>=2) is available here: https://github.com/config-i1/smooth/releases/tag/v3.2.2
+* Starting from v4.0.0, the smooth package for R will be released under the LGPLv2.1 license. The source of the older version of the software under the GPL(>=2) is available here: https://github.com/openforecast-org/smooth/releases/tag/v3.2.2
 
 
 smooth v3.2.2 (Release data: 2023-09-15)
@@ -1448,7 +1448,7 @@ Changes:
 * Removed "TFL" as a cost function type and "asymmetric" as intervals type. The functions still accept these parameters, but the parameters are now hidden, because currently they are not ready for wide audience.
 * Changed how number of parameters is calculated when initials are provided. They should be counted in. Only backcasting now excludes initials in calculation of number of parameters.
 * Prepared vignette for es(), ces(), ssarima(), ges(), sma() and sim.es(). This now includes examples with some comments.
-* Uploaded documentation for the package to github (https://github.com/config-i1/smooth/smooth.pdf). This will be published as working paper and will be available via ResearchGate.
+* Uploaded documentation for the package to github (https://github.com/openforecast-org/smooth/smooth.pdf). This will be published as working paper and will be available via ResearchGate.
 
 Bugfixes:
 

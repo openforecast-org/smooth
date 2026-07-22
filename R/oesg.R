@@ -24,6 +24,11 @@
 #' @param bounds Parameter bounds type.
 #' @param etsA ETS type for sub-model A: \code{"conventional"} or \code{"adam"}.
 #' @param etsB ETS type for sub-model B. Defaults to \code{etsA}.
+#' @param smoother The smoother used by \link[smooth]{msdecompose} to obtain the
+#' initial level, trend and seasonal indices (and the seasonal profiles for
+#' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+#' \code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+#' \code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.
 #' @param xregA Optional numeric vector or matrix of exogenous regressors for
 #'   sub-model A, aligned with \code{y}.
 #' @param xregB Optional numeric vector or matrix of exogenous regressors for
@@ -53,6 +58,7 @@ oesg <- function(y, modelA="MNN", modelB=modelA,
                  h=0, holdout=FALSE,
                  bounds=c("usual","admissible","none"),
                  etsA=c("conventional","adam"), etsB=etsA,
+                 smoother=c("default","ma","lowess","supsmu","global"),
                  xregA=NULL, xregB=NULL,
                  regressorsA=c("use","select"), regressorsB=regressorsA,
                  silent=TRUE, ...) {
@@ -100,7 +106,7 @@ oesg <- function(y, modelA="MNN", modelB=modelA,
                     persistenceA=persistenceA, persistenceB=persistenceB,
                     phiA=phiA, phiB=phiB,
                     initial=initial, ic=ic, h=h, holdout=holdout,
-                    bounds=bounds, etsA=etsA, etsB=etsB,
+                    bounds=bounds, etsA=etsA, etsB=etsB, smoother=smoother,
                     regressorsA=regressorsA, regressorsB=regressorsB,
                     silent=silent, ...);
     ourModel$call <- cl;

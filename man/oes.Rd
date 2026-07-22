@@ -9,8 +9,9 @@ oes(y, model = "MNN", lags = c(frequency(y)), persistence = NULL,
   "complete", "gradient"), occurrence = c("auto", "fixed", "odds-ratio",
   "inverse-odds-ratio", "direct", "general"), ic = c("AICc", "AIC", "BIC",
   "BICc"), h = 0, holdout = FALSE, bounds = c("usual", "admissible",
-  "none"), ets = c("conventional", "adam"), xreg = NULL,
-  regressors = c("use", "select"), silent = TRUE, ...)
+  "none"), ets = c("conventional", "adam"), smoother = c("default", "ma",
+  "lowess", "supsmu", "global"), xreg = NULL, regressors = c("use",
+  "select"), silent = TRUE, ...)
 }
 \arguments{
 \item{y}{Univariate numeric vector or time-series. Non-binary input is
@@ -43,6 +44,12 @@ withheld.}
 \item{bounds}{Parameter bounds type.}
 
 \item{ets}{Type of ETS model: \code{"conventional"} or \code{"adam"}.}
+
+\item{smoother}{The smoother used by \link[smooth]{msdecompose} to obtain the
+initial level, trend and seasonal indices (and the seasonal profiles for
+multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+\code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+\code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.}
 
 \item{xreg}{Optional numeric vector or matrix of exogenous regressors, aligned
 with \code{y}. Merged with \code{y} into a multi-column data matrix before

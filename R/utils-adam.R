@@ -301,7 +301,12 @@ adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags,
         nIterations <- ellipsis$nIterations
     }
 
-    smoother <- if(is.null(ellipsis$smoother)) "global" else ellipsis$smoother
+    smoother <- if(is.null(ellipsis$smoother)) "default" else ellipsis$smoother
+    # smoother="default" resolves to the centred moving average for the optimal
+    # initialisation and to the global model for every other initialisation.
+    if(smoother=="default"){
+        smoother <- if(initialType=="optimal") "ma" else "global"
+    }
     FI <- if(is.null(ellipsis$FI)) FALSE else ellipsis$FI
     stepSize <- if(is.null(ellipsis$stepSize)) .Machine$double.eps^(1/4) else ellipsis$stepSize
 

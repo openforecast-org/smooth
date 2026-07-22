@@ -18,8 +18,9 @@ adam(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar =
   level = 0.99, h = 0, holdout = FALSE, persistence = NULL,
   phi = NULL, initial = c("backcasting", "optimal", "two-stage",
   "complete", "gradient"), arma = NULL, ic = c("AICc", "AIC", "BIC",
-  "BICc"), bounds = c("usual", "admissible", "none"), silent = TRUE,
-  ets = c("conventional", "adam"), ...)
+  "BICc"), bounds = c("usual", "admissible", "none"),
+  smoother = c("default", "ma", "lowess", "supsmu", "global"),
+  silent = TRUE, ets = c("conventional", "adam"), ...)
 
 \method{simulate}{adam}(object, nsim = 1, seed = NULL,
   obs = nobs(object), ...)
@@ -249,6 +250,16 @@ estimation. Can be either \code{admissible} - guaranteeing the stability of the
 model, \code{usual} - restricting the values with (0, 1) or \code{none} - no
 restrictions (potentially dangerous).}
 
+\item{smoother}{The smoother used by the \link[smooth]{msdecompose} function to
+obtain the initial states - the level and the trend, together with the initial
+seasonal indices (and the seasonal profiles in the case of multiple seasonal
+models). \code{smoother="default"} (the default) resolves to \code{"ma"} (the
+centred moving average) when \code{initial="optimal"} and to \code{"global"}
+(a global model fitted to the data) for every other initialisation method. The
+other values \code{"ma"}, \code{"lowess"} (\link[stats]{lowess}), \code{"supsmu"}
+(\link[stats]{supsmu}) and \code{"global"} force the respective smoother
+irrespective of the initialisation.}
+
 \item{silent}{Specifies, whether to provide the progress of the function or not.
 If \code{TRUE}, then the function will print what it does and how much it has
 already done.}
@@ -297,10 +308,7 @@ If equal to 41, then the detailed results of the optimisation are returned.
 }
 You can read more about these parameters by running the function
 \link[nloptr]{nloptr.print.options}.
-It is also possible to regulate what smoother to use to get initial seasonal indices
-from the \link[smooth]{msdecompose} function via the \code{smoother} parameter. The default
-value is \code{smoother="lowess"}.
-Finally, the parameter \code{lambda} for LASSO / RIDGE, \code{alpha} for the Asymmetric
+The parameter \code{lambda} for LASSO / RIDGE, \code{alpha} for the Asymmetric
 Laplace, \code{shape} for the Generalised Normal and \code{nu} for Student's distributions
 can be provided here as well.}
 

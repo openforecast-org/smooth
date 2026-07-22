@@ -42,8 +42,24 @@ def _r_filter_mean(x):
     return s
 
 
-# Default smoother for ADAM/ES model initialisation (msdecompose keeps "lowess")
-SMOOTHER_DEFAULT: Literal["lowess", "ma", "global"] = "global"
+# Smoother choices for ADAM/ES/OM/OMG initialisation. "default" resolves to "ma"
+# for initial="optimal" and to "global" for every other initialisation method.
+# (msdecompose itself keeps its own "lowess" default.)
+SmootherType = Literal["default", "ma", "lowess", "supsmu", "global"]
+SMOOTHER_DEFAULT: SmootherType = "default"
+
+
+def resolve_smoother(smoother: str, initial_type: str) -> str:
+    """Resolve smoother="default" to the initialisation-specific smoother.
+
+    Mirrors R's adam_checkOptimizer(): "default" becomes "ma" (centred moving
+    average) for the optimal initialisation and "global" (a global model fitted
+    to the data) for every other initialisation method. Any explicit smoother is
+    returned unchanged.
+    """
+    if smoother != "default":
+        return smoother
+    return "ma" if initial_type == "optimal" else "global"
 
 
 def msdecompose(y, lags=[12], type="additive", smoother="lowess"):

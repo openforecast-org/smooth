@@ -9,9 +9,10 @@ oesg(y, modelA = "MNN", modelB = modelA, lags = c(frequency(y)),
   phiB = phiA, initial = c("backcasting", "optimal", "two-stage",
   "complete", "gradient"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
   holdout = FALSE, bounds = c("usual", "admissible", "none"),
-  etsA = c("conventional", "adam"), etsB = etsA, xregA = NULL,
-  xregB = NULL, regressorsA = c("use", "select"),
-  regressorsB = regressorsA, silent = TRUE, ...)
+  etsA = c("conventional", "adam"), etsB = etsA, smoother = c("default",
+  "ma", "lowess", "supsmu", "global"), xregA = NULL, xregB = NULL,
+  regressorsA = c("use", "select"), regressorsB = regressorsA,
+  silent = TRUE, ...)
 }
 \arguments{
 \item{y}{Univariate numeric vector or time series. Non-binary input is
@@ -46,6 +47,12 @@ Defaults to \code{persistenceA}.}
 \item{etsA}{ETS type for sub-model A: \code{"conventional"} or \code{"adam"}.}
 
 \item{etsB}{ETS type for sub-model B. Defaults to \code{etsA}.}
+
+\item{smoother}{The smoother used by \link[smooth]{msdecompose} to obtain the
+initial level, trend and seasonal indices (and the seasonal profiles for
+multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+\code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+\code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.}
 
 \item{xregA}{Optional numeric vector or matrix of exogenous regressors for
 sub-model A, aligned with \code{y}.}

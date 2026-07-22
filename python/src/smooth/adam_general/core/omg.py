@@ -30,6 +30,7 @@ from smooth.adam_general.core.om import (
 )
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.omg_cost import omg_cf, omg_link_function
+from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT, SmootherType
 
 
 def _omg_refit_one_replicate(
@@ -109,6 +110,7 @@ class OMG:
         verbose: int = 0,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
+        smoother: SmootherType = SMOOTHER_DEFAULT,
     ) -> None:
         # Accept callable for user-defined custom loss (same API as ADAM,
         # mirrors R/adamGeneral.R:574-602): signature
@@ -156,6 +158,14 @@ class OMG:
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
+        if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
+            raise ValueError(
+                f"Invalid smoother: {smoother!r}. Must be one of "
+                "'default', 'ma', 'lowess', 'supsmu', 'global'."
+            )
+        # The scaffold OM built in _build_side resolves "default" per side using
+        # the shared initialisation, so both sub-models get the same smoother.
+        self.smoother = smoother
 
     # ---------------------------------------------------------------------
     # Public API
@@ -972,6 +982,7 @@ class OMG:
             h=self.h,
             nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
+            smoother=self.smoother,
         )
         scaffold._start_time = time.time()
         requested = (

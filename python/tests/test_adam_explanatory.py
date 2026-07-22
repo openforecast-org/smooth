@@ -239,11 +239,12 @@ def test_etsx_initial_optimal(etsx_data):
     model.fit(y, X)
     B = model.coef
     # For "optimal", B = [alpha, beta, level_init, trend_init, x1, x2]
-    # R (smoother="global"): x1=1.91839, x2=-1.47938, AIC=338.46, fitted[0]=14.956
-    assert abs(B[-2] - 1.91839) < 0.15
-    assert abs(B[-1] - (-1.47938)) < 0.15
-    assert abs(model.aic - 338.4623) < 2.0
-    assert abs(model.fitted.values[0] - 14.956) < 0.5
+    # R (smoother="default" -> "ma" for optimal): x1=1.87839, x2=-1.51349,
+    # AIC=349.552, fitted[0]=14.682.
+    assert abs(B[-2] - 1.87839) < 0.15
+    assert abs(B[-1] - (-1.51349)) < 0.15
+    assert abs(model.aic - 349.552) < 2.0
+    assert abs(model.fitted.values[0] - 14.682) < 0.5
 
 
 def test_etsx_initial_two_stage(etsx_data):

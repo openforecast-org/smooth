@@ -259,7 +259,9 @@ class TestADAMAirPassengersInitialTypes:
         model = ADAM(model="ANA", lags=[12], initial="optimal")
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 588.474062
+        # smoother="default" seeds optimal seasonals from the "ma" decomposition
+        # (R parity: adam(AirPassengers,"ANA",initial="optimal")$lossValue).
+        expected_loss = 595.3086
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"ANA optimal loss {actual_loss} differs from expected {expected_loss}"
@@ -289,7 +291,9 @@ class TestADAMAirPassengersInitialTypes:
         model = ADAM(model="AAA", lags=[12], initial="optimal")
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 569.312991
+        # smoother="default" seeds optimal seasonals from the "ma" decomposition
+        # (R parity: adam(AirPassengers,"AAA",initial="optimal")$lossValue).
+        expected_loss = 567.467
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAA optimal loss {actual_loss} differs from expected {expected_loss}"

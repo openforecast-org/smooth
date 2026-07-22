@@ -9,8 +9,9 @@ es(y, model = "ZXZ", lags = c(frequency(y)), persistence = NULL,
   "complete", "gradient"), initialSeason = NULL, ic = c("AICc", "AIC",
   "BIC", "BICc"), loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE",
   "GTMSE", "MSCE", "GPL"), h = 0, holdout = FALSE, bounds = c("usual",
-  "admissible", "none"), silent = TRUE, xreg = NULL,
-  regressors = c("use", "select"), initialX = NULL, ...)
+  "admissible", "none"), smoother = c("default", "ma", "lowess", "supsmu",
+  "global"), silent = TRUE, xreg = NULL, regressors = c("use", "select"),
+  initialX = NULL, ...)
 }
 \arguments{
 \item{y}{Vector or ts object, containing data needed to be forecasted.}
@@ -98,6 +99,16 @@ the end of the data.}
 letter can be used instead of the whole word. \code{"usual"} implies restrictions on
 the smoothing parameter, guaranteeing that the exponential smoothing behaves
 as an averaging model. \code{"admissible"} guarantee that the model is stable.}
+
+\item{smoother}{The smoother used by the \link[smooth]{msdecompose} function to
+obtain the initial states - the level and the trend, together with the initial
+seasonal indices (and the seasonal profiles in the case of multiple seasonal
+models). \code{smoother="default"} (the default) resolves to \code{"ma"} (the
+centred moving average) when \code{initial="optimal"} and to \code{"global"}
+(a global model fitted to the data) for every other initialisation method. The
+other values \code{"ma"}, \code{"lowess"} (\link[stats]{lowess}), \code{"supsmu"}
+(\link[stats]{supsmu}) and \code{"global"} force the respective smoother
+irrespective of the initialisation.}
 
 \item{silent}{accepts \code{TRUE} and \code{FALSE}. If FALSE, the function
 will print its progress and produce a plot at the end.}

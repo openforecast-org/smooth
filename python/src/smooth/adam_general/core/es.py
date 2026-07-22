@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from numpy.typing import NDArray
 
 from smooth.adam_general.core.adam import ADAM, LOSS_OPTIONS
+from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT, SmootherType
 
 
 class ES(ADAM):
@@ -168,12 +169,18 @@ class ES(ADAM):
         h: Optional[int] = None,
         holdout: bool = False,
         bounds: Literal["usual", "admissible", "none"] = "usual",
+        smoother: SmootherType = SMOOTHER_DEFAULT,
         verbose: int = 0,
         regressors: Literal["use", "select"] = "use",
         initial_X: Optional[NDArray] = None,
         **kwargs,
     ) -> None:
-        """Initialize ES model with ETS-specific parameters."""
+        """Initialize ES model with ETS-specific parameters.
+
+        ``smoother`` controls the msdecompose smoother used to obtain the initial
+        level, trend and seasonal components; "default" (the default) uses "ma"
+        for ``initial="optimal"`` and "global" otherwise.
+        """
         _blocked = {
             "ar_order",
             "i_order",
@@ -215,6 +222,7 @@ class ES(ADAM):
             holdout=holdout,
             bounds=bounds,
             constant=False,
+            smoother=smoother,
             verbose=verbose,
             regressors=regressors,
             ets="conventional",

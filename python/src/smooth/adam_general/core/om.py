@@ -46,6 +46,7 @@ from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.om_cost import om_cf, om_link_function
+from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT, SmootherType
 
 # Map user-facing occurrence string to the single-character flag the C++
 # adamCore.fit() expects via its ``O=`` parameter (see src/headers/adamCore.h).
@@ -479,6 +480,7 @@ class OM(ADAM):
         verbose: int = 0,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
+        smoother: SmootherType = SMOOTHER_DEFAULT,
         **kwargs,
     ) -> None:
         if occurrence in ("auto", "general"):
@@ -545,6 +547,7 @@ class OM(ADAM):
             holdout=holdout,
             nlopt_kwargs=nlopt_kwargs,
             ets=ets,
+            smoother=smoother,
             reg_lambda=reg_lambda,
             # ``reg_lambda`` is the user-facing name on OM (mirrors ADAM's
             # public surface), but the cost function reads
@@ -894,7 +897,7 @@ class OM(ADAM):
             self._phi_internal,
             components_dict,
             self._explanatory,
-            smoother=self.smoother,
+            smoother=self._resolve_smoother(),
         )
 
         # Apply occurrence-specific transform of the initial state vector
@@ -974,7 +977,7 @@ class OM(ADAM):
             self._phi_internal,
             self._components,
             self._explanatory,
-            smoother=self.smoother,
+            smoother=self._resolve_smoother(),
         )
 
         adam_created["mat_vt"] = om_initial_transform(

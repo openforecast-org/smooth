@@ -36,6 +36,11 @@
 #'   \code{FI=TRUE} alongside computes the observed Fisher information
 #'   over the joint parameter vector (the path used by
 #'   \code{vcov.omg}).
+#' @param smoother The smoother used by \link[smooth]{msdecompose} to obtain the
+#' initial level, trend and seasonal indices (and the seasonal profiles for
+#' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+#' \code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+#' \code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.
 #' @param silent If \code{TRUE}, suppress output.
 #' @param ... Additional arguments passed to the optimiser.
 #'
@@ -69,6 +74,7 @@ omg <- function(data,
                 ic = c("AICc","AIC","BIC","BICc"),
                 bounds = c("usual","admissible","none"),
                 model = NULL,
+                smoother = c("default","ma","lowess","supsmu","global"),
                 silent = TRUE, ...) {
 
     startTime <- Sys.time()
@@ -77,6 +83,10 @@ omg <- function(data,
     # Capture ellipsis early so FI / stepSize / B / lb / ub passed via ...
     # are visible to the fitted-object intake below.
     ellipsis <- list(...)
+    # The msdecompose() smoother for the initial states, passed via ellipsis so
+    # the internal adam_checkOptimizer() resolves "default" once initialType is known.
+    smoother <- match.arg(smoother)
+    ellipsis$smoother <- smoother
 
     # If a fitted omg object is passed via `model`, lift its parameters out
     # of model$modelA / model$modelB and set modelDo_user="use" so the

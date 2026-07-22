@@ -29,6 +29,11 @@
 #'   withheld.
 #' @param bounds Parameter bounds type.
 #' @param ets Type of ETS model: \code{"conventional"} or \code{"adam"}.
+#' @param smoother The smoother used by \link[smooth]{msdecompose} to obtain the
+#' initial level, trend and seasonal indices (and the seasonal profiles for
+#' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+#' \code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+#' \code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.
 #' @param xreg Optional numeric vector or matrix of exogenous regressors, aligned
 #'   with \code{y}. Merged with \code{y} into a multi-column data matrix before
 #'   being passed to \link[smooth]{om}.
@@ -56,6 +61,7 @@ oes <- function(y, model="MNN", lags=c(frequency(y)),
                 h=0, holdout=FALSE,
                 bounds=c("usual","admissible","none"),
                 ets=c("conventional","adam"),
+                smoother=c("default","ma","lowess","supsmu","global"),
                 xreg=NULL, regressors=c("use","select"),
                 silent=TRUE, ...){
 
@@ -96,7 +102,7 @@ oes <- function(y, model="MNN", lags=c(frequency(y)),
                    persistence=persistence, phi=phi,
                    initial=initial, occurrence=occurrence,
                    ic=ic, h=h, holdout=holdout,
-                   bounds=bounds, ets=ets,
+                   bounds=bounds, ets=ets, smoother=smoother,
                    regressors=regressors,
                    silent=silent, ...);
     ourModel$call <- cl;

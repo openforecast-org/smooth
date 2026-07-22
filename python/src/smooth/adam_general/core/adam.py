@@ -18,7 +18,11 @@ from smooth.adam_general.core.estimator import (
 from smooth.adam_general.core.forecaster import forecaster, preparator
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
-from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT
+from smooth.adam_general.core.utils.utils import (
+    SMOOTHER_DEFAULT,
+    SmootherType,
+    resolve_smoother,
+)
 
 # Note: adam_cpp instance is stored in self and passed to forecasting functions
 
@@ -666,7 +670,7 @@ class ADAM:
         # specific to losses or distributions
         reg_lambda: Optional[float] = None,
         gnorm_shape: Optional[float] = None,
-        smoother: Literal["lowess", "ma", "global"] = SMOOTHER_DEFAULT,
+        smoother: SmootherType = SMOOTHER_DEFAULT,
         ets: Literal["conventional", "adam"] = "conventional",
         **kwargs,
     ) -> None:
@@ -803,15 +807,18 @@ class ADAM:
             Regularization parameter specifically for LASSO/RIDGE losses.
         gnorm_shape : Optional[float], default=None
             Shape parameter 's' for the generalized normal distribution.
-        smoother : Literal["lowess", "ma", "global"], default="global"
-            Smoother type for time series decomposition in initial state estimation.
+        smoother : {"default", "ma", "lowess", "supsmu", "global"}, default="default"
+            The smoother used by ``msdecompose`` to obtain the initial states -
+            the level and the trend, together with the initial seasonal indices
+            (and the seasonal profiles for multiple seasonal models).
 
-            - "lowess": Uses LOWESS (Locally Weighted Scatterplot Smoothing) for both
-              trend and seasonal pattern extraction. This is the default.
-            - "ma": Uses simple moving average for both trend and seasonality.
-            - "global": Uses lowess for trend and "ma" (moving average) for seasonality.
-              Provides robust trend estimation while avoiding lowess instability for
-              small seasonal samples.
+            - "default": resolves to "ma" when ``initial="optimal"`` and to
+              "global" for every other initialisation method. This is the default.
+            - "ma": centred moving average for both trend and seasonality.
+            - "lowess": LOWESS (Locally Weighted Scatterplot Smoothing).
+            - "supsmu": Friedman's super smoother (uses LOWESS in Python).
+            - "global": a global model fitted to the data (moving average for the
+              seasonal pattern), robust for small seasonal samples.
         """
         # Start time for measuring computation duration
         self._start_time = time.time()
@@ -846,6 +853,11 @@ class ADAM:
         self.nlopt_kwargs = nlopt_kwargs
         self.reg_lambda = reg_lambda
         self.gnorm_shape = gnorm_shape
+        if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
+            raise ValueError(
+                f"Invalid smoother: {smoother!r}. Must be one of "
+                "'default', 'ma', 'lowess', 'supsmu', 'global'."
+            )
         self.smoother = smoother
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
@@ -1549,6 +1561,23 @@ class ADAM:
         """
         self._check_is_fitted()
         return self._prepared.get("initial_value", {})
+
+    def _resolve_smoother(self) -> str:
+        """The msdecompose smoother to use, resolving "default".
+
+        "default" becomes "ma" for the optimal initialisation and "global"
+        otherwise. Called from the creator/estimator/preparator, i.e. after the
+        parameters checker has populated ``_initials`` with the resolved
+        ``initial_type``; falls back to ``self.initial`` if it has not.
+        """
+        initials = getattr(self, "_initials", None)
+        if isinstance(initials, dict) and initials.get("initial_type") is not None:
+            initial_type = initials["initial_type"]
+        elif isinstance(self.initial, str):
+            initial_type = self.initial
+        else:
+            initial_type = "provided"
+        return resolve_smoother(self.smoother, initial_type)
 
     @property
     def initial_type(self) -> str:
@@ -3461,7 +3490,7 @@ class ADAM:
                 phi_dict=self._phi_internal,
                 components_dict=self._components,
                 multisteps=self._general.get("multisteps", False),
-                smoother=self.smoother,
+                smoother=self._resolve_smoother(),
                 adam_ets=(self.ets == "adam"),
                 other=other_value,
                 other_parameter_estimate=other_parameter_estimate,
@@ -3510,7 +3539,7 @@ class ADAM:
             phi_dict=self._phi_internal,
             components_dict=self._components,
             explanatory_checked=self._explanatory,
-            smoother=self.smoother,
+            smoother=self._resolve_smoother(),
         )
 
         # Calculate information criterion
@@ -3618,7 +3647,7 @@ class ADAM:
             criterion=self._general["ic"],
             silent=self.verbose == 0,
             nlopt_kwargs=self.nlopt_kwargs,
-            smoother=self.smoother,
+            smoother=self._resolve_smoother(),
         )
         # print(self._adam_selected)
         # print(self._adam_selected["ic_selection"])
@@ -3739,7 +3768,7 @@ class ADAM:
                 phi_dict=phi_dict,
                 components_dict=components_dict,
                 explanatory_checked=self._explanatory,
-                smoother=self.smoother,
+                smoother=self._resolve_smoother(),
             )
 
             # Make copy of general_dict for preparator
@@ -3891,7 +3920,7 @@ class ADAM:
             phi_dict=self._phi_internal,
             components_dict=self._components,
             explanatory_checked=self._explanatory,
-            smoother=self.smoother,
+            smoother=self._resolve_smoother(),
         )
 
         # Store created matrices

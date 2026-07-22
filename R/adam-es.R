@@ -89,6 +89,15 @@
 #' letter can be used instead of the whole word. \code{"usual"} implies restrictions on
 #' the smoothing parameter, guaranteeing that the exponential smoothing behaves
 #' as an averaging model. \code{"admissible"} guarantee that the model is stable.
+#' @param smoother The smoother used by the \link[smooth]{msdecompose} function to
+#' obtain the initial states - the level and the trend, together with the initial
+#' seasonal indices (and the seasonal profiles in the case of multiple seasonal
+#' models). \code{smoother="default"} (the default) resolves to \code{"ma"} (the
+#' centred moving average) when \code{initial="optimal"} and to \code{"global"}
+#' (a global model fitted to the data) for every other initialisation method. The
+#' other values \code{"ma"}, \code{"lowess"} (\link[stats]{lowess}), \code{"supsmu"}
+#' (\link[stats]{supsmu}) and \code{"global"} force the respective smoother
+#' irrespective of the initialisation.
 #' @param ...  Other non-documented parameters. For example \code{FI=TRUE} will
 #' make the function also produce Fisher Information matrix, which then can be
 #' used to calculated variances of smoothing parameters and initial states of
@@ -227,6 +236,7 @@ es <- function(y, model="ZXZ", lags=c(frequency(y)), persistence=NULL, phi=NULL,
                loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                h=0, holdout=FALSE,
                bounds=c("usual","admissible","none"),
+               smoother=c("default","ma","lowess","supsmu","global"),
                silent=TRUE,
                xreg=NULL, regressors=c("use","select"), initialX=NULL, ...){
     # Copyright (C) 2022 - Inf  Ivan Svetunkov
@@ -404,7 +414,7 @@ es <- function(y, model="ZXZ", lags=c(frequency(y)), persistence=NULL, phi=NULL,
 
     ourModel <- adam(data=data, model=model, lags=lags, persistence=persistence, phi=phi,
                      loss=loss, h=h, holdout=holdout, initial=initialValue,
-                     ic=ic, bounds=bounds, distribution="dnorm",
+                     ic=ic, bounds=bounds, distribution="dnorm", smoother=smoother,
                      silent=silent, regressors=regressors[1], ets="conventional", ...);
     ourModel$call <- cl;
     ourModel$timeElapsed=Sys.time()-startTime;

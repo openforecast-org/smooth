@@ -14,8 +14,9 @@ omg(data, modelA = "MNN", modelB = modelA, ordersA = list(ar = c(0), i =
   holdout = FALSE, initial = c("backcasting", "optimal", "two-stage",
   "complete", "gradient"), loss = c("likelihood", "MSE", "MAE", "HAM",
   "LASSO", "RIDGE"), ic = c("AICc", "AIC", "BIC", "BICc"),
-  bounds = c("usual", "admissible", "none"), model = NULL, silent = TRUE,
-  ...)
+  bounds = c("usual", "admissible", "none"), model = NULL,
+  smoother = c("default", "ma", "lowess", "supsmu", "global"),
+  silent = TRUE, ...)
 }
 \arguments{
 \item{data}{Binary time series (0/1), vector or data frame.}
@@ -76,6 +77,12 @@ per-side parameters are lifted from \code{model$modelA} and
 \code{FI=TRUE} alongside computes the observed Fisher information
 over the joint parameter vector (the path used by
 \code{vcov.omg}).}
+
+\item{smoother}{The smoother used by \link[smooth]{msdecompose} to obtain the
+initial level, trend and seasonal indices (and the seasonal profiles for
+multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+\code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+\code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.}
 
 \item{silent}{If \code{TRUE}, suppress output.}
 

@@ -38,6 +38,11 @@
 #' @param ic Information criterion for model selection.
 #' @param bounds Parameter bounds type.
 #' @param ets Type of ETS model: \code{"conventional"} or \code{"adam"}.
+#' @param smoother The smoother used by \link[smooth]{msdecompose} to obtain the
+#' initial level, trend and seasonal indices (and the seasonal profiles for
+#' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+#' \code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+#' \code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.
 #' @param silent If \code{TRUE}, suppresses output and plot.
 #' @param ... Additional arguments passed to the optimiser (\code{maxeval},
 #'   \code{xtol_rel}, \code{algorithm}, \code{print_level}).
@@ -70,6 +75,7 @@ om <- function(data,
                ic = c("AICc","AIC","BIC","BICc"),
                bounds = c("usual","admissible","none"),
                ets = c("conventional","adam"),
+               smoother = c("default","ma","lowess","supsmu","global"),
                silent = TRUE, ...){
 
     startTime <- Sys.time();
@@ -78,6 +84,10 @@ om <- function(data,
     # Capture ellipsis early so FI / stepSize / B / lb / ub passed via ...
     # are visible downstream. Mirrors adam.R.
     ellipsis <- list(...);
+    # The msdecompose() smoother for the initial states, passed via ellipsis so
+    # the internal adam_checkOptimizer() resolves "default" once initialType is known.
+    smoother <- match.arg(smoother);
+    ellipsis$smoother <- smoother;
 
     # If a fitted om object is passed via `model`, lift its parameters out
     # and set modelDo="use" so the optimiser is skipped. Mirrors

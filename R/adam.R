@@ -197,6 +197,15 @@
 #' estimation. Can be either \code{admissible} - guaranteeing the stability of the
 #' model, \code{usual} - restricting the values with (0, 1) or \code{none} - no
 #' restrictions (potentially dangerous).
+#' @param smoother The smoother used by the \link[smooth]{msdecompose} function to
+#' obtain the initial states - the level and the trend, together with the initial
+#' seasonal indices (and the seasonal profiles in the case of multiple seasonal
+#' models). \code{smoother="default"} (the default) resolves to \code{"ma"} (the
+#' centred moving average) when \code{initial="optimal"} and to \code{"global"}
+#' (a global model fitted to the data) for every other initialisation method. The
+#' other values \code{"ma"}, \code{"lowess"} (\link[stats]{lowess}), \code{"supsmu"}
+#' (\link[stats]{supsmu}) and \code{"global"} force the respective smoother
+#' irrespective of the initialisation.
 #' @param ets Parameter determining, which ETS formulation to use. If \code{ets="conventional"},
 #' the one from Hyndman et al. (2008) is used. In case of \code{ets="adam"}, ADAM reformulation
 #' that updates multiplicative components differently is used. The latter is closer
@@ -240,10 +249,7 @@
 #' }
 #' You can read more about these parameters by running the function
 #' \link[nloptr]{nloptr.print.options}.
-#' It is also possible to regulate what smoother to use to get initial seasonal indices
-#' from the \link[smooth]{msdecompose} function via the \code{smoother} parameter. The default
-#' value is \code{smoother="lowess"}.
-#' Finally, the parameter \code{lambda} for LASSO / RIDGE, \code{alpha} for the Asymmetric
+#' The parameter \code{lambda} for LASSO / RIDGE, \code{alpha} for the Asymmetric
 #' Laplace, \code{shape} for the Generalised Normal and \code{nu} for Student's distributions
 #' can be provided here as well.
 #'
@@ -343,6 +349,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                  persistence=NULL, phi=NULL,
                  initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
                  ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
+                 smoother=c("default","ma","lowess","supsmu","global"),
                  silent=TRUE, ets=c("conventional","adam"), ...){
     # Copyright (C) 2019 - Inf  Ivan Svetunkov
 
@@ -353,6 +360,12 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
     # Record the parental environment. Needed for ARIMA initialisation
     env <- parent.frame();
     ellipsis <- list(...);
+    # The smoother used by msdecompose() to obtain the initial states (level,
+    # trend and seasonal components). Passed via ellipsis so the internal
+    # adam_checkOptimizer() can resolve "default" once the initialisation type
+    # is known.
+    smoother <- match.arg(smoother);
+    ellipsis$smoother <- smoother;
     # Assume that the model is not provided
     profilesRecentProvided <- FALSE;
     profilesRecentTable <- NULL;

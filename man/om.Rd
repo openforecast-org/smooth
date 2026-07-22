@@ -12,8 +12,9 @@ om(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar =
   "RIDGE"), h = 0, holdout = FALSE, persistence = NULL, phi = NULL,
   initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
   arma = NULL, ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual",
-  "admissible", "none"), ets = c("conventional", "adam"), silent = TRUE,
-  ...)
+  "admissible", "none"), ets = c("conventional", "adam"),
+  smoother = c("default", "ma", "lowess", "supsmu", "global"),
+  silent = TRUE, ...)
 }
 \arguments{
 \item{data}{Numeric vector, time series, or data frame. Non-binary input is
@@ -60,6 +61,12 @@ for a custom loss or an out-of-scope specification).}
 \item{bounds}{Parameter bounds type.}
 
 \item{ets}{Type of ETS model: \code{"conventional"} or \code{"adam"}.}
+
+\item{smoother}{The smoother used by \link[smooth]{msdecompose} to obtain the
+initial level, trend and seasonal indices (and the seasonal profiles for
+multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
+\code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
+\code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.}
 
 \item{silent}{If \code{TRUE}, suppresses output and plot.}
 

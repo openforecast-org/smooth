@@ -930,8 +930,16 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         CFValue <- CF(B, matVt, matF, vecG, a, b);
         res <- NULL;
 
-        # Only variance is estimated
-        nParamEstimated <- (loss=="likelihood")*1;
+        # Nothing is optimised, but backcast / complete / gradient initials are
+        # still determined from the data and consume df exactly as in the
+        # estimated branch above (line 888-902); the scale is always estimated.
+        nStatesBackcasting <- 0;
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            nStatesBackcasting[] <- 2*(seasonality!="simple") +
+                                    lagsModelMax*(seasonality!="none") +
+                                    lagsModelMax*any(seasonality==c("full","simple"));
+        }
+        nParamEstimated <- nStatesBackcasting + 1;
 
         initialXregEstimate <- initialXregEstimateOriginal;
     }

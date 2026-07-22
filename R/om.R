@@ -1543,6 +1543,21 @@ om <- function(data,
             }
         }
 
+        # Degrees of freedom for the "use" path: nothing is optimised, but the
+        # backcast / complete / gradient initial states are still determined from
+        # the data and consume df. The occurrence model is Bernoulli, so there is
+        # no scale. "fixed" occurrence instead estimates a single probability
+        # level (nParamEstimated=1, set above); every other use case counts its
+        # backcast initials here.
+        if(occurrenceType != "fixed"){
+            nParamEstimated <- dfInitialsBackcast(etsModel, modelIsSeasonal, modelIsTrendy,
+                                                  lagsModelSeasonal, initialLevelEstimate,
+                                                  initialTrendEstimate, initialSeasonalEstimate,
+                                                  arimaModel, initialArimaNumber, initialArimaEstimate,
+                                                  xregModel, xregNumber, initialXregEstimate,
+                                                  initialType);
+        }
+
         estimatorResult <- list(
             B=if(is.null(ellipsis$B)) numeric(0) else ellipsis$B,
             CFValue=0, nParamEstimated=nParamEstimated,

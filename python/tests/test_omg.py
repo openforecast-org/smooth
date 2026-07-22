@@ -252,8 +252,15 @@ class TestProperties:
     def test_nobs(self, intermittent_y, fitted_omg):
         assert fitted_omg.nobs == len(intermittent_y)
 
-    def test_nparam_equals_coef_length(self, fitted_omg):
-        assert fitted_omg.nparam == len(fitted_omg.coef)
+    def test_nparam_counts_backcast_initials(self, fitted_omg):
+        # nparam is the model's degrees of freedom: the jointly-optimised
+        # coefficients PLUS each side's backcast/complete/gradient initial
+        # states (which are not carried in `coef`). It therefore equals the sum
+        # of the two sub-models' nparam and is >= the joint coefficient count.
+        assert fitted_omg.nparam == (
+            fitted_omg.model_a.nparam + fitted_omg.model_b.nparam
+        )
+        assert fitted_omg.nparam >= len(fitted_omg.coef)
 
     def test_lags_used(self, fitted_omg):
         assert fitted_omg.lags_used == [1]
@@ -451,7 +458,10 @@ class TestInferenceMethods:
 
     def test_vcov_is_square_and_named(self, fitted_omg):
         V = fitted_omg.vcov()
-        n = fitted_omg.nparam
+        # vcov is over the estimable (jointly-optimised) coefficients, whose
+        # count is len(coef_names) — not nparam, which additionally counts the
+        # backcast initial states that have no sampling covariance.
+        n = len(fitted_omg.coef_names)
         assert V.shape == (n, n)
         assert list(V.index) == fitted_omg.coef_names
         assert list(V.columns) == fitted_omg.coef_names

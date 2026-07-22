@@ -332,6 +332,44 @@ adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags,
     ))
 }
 
+#### Degrees of freedom of backcast / complete / gradient initial states ####
+# The identifiable count of the initial-state design when the initials are
+# obtained by backcasting, complete backcasting or the gradient solve. Those
+# initials are determined from the data, so they consume degrees of freedom
+# exactly as optimised ones do (see dfInitialsETSLevelSeasonal()). Returns 0
+# for initialType="optimal" (initials sit in B and are counted via length(B),
+# with the seasonal redundancy handled by the caller) and for "provided".
+# Shared by the estimator-free "use" paths of adam()/om() and by omg().
+#' @keywords internal
+dfInitialsBackcast <- function(etsModel, modelIsSeasonal, modelIsTrendy,
+                               lagsModelSeasonal, initialLevelEstimate,
+                               initialTrendEstimate, initialSeasonalEstimate,
+                               arimaModel, initialArimaNumber, initialArimaEstimate,
+                               xregModel, xregNumber, initialXregEstimate,
+                               initialType){
+    if(!any(initialType==c("backcasting","complete","gradient"))){
+        return(0);
+    }
+    dfInitials <- 0;
+    if(etsModel){
+        seasonalLagsEstimated <- if(modelIsSeasonal){
+            lagsModelSeasonal[as.logical(initialSeasonalEstimate)];
+        } else {
+            numeric(0);
+        }
+        dfInitials <- dfInitialsETSLevelSeasonal(seasonalLagsEstimated,
+                                                 as.logical(initialLevelEstimate)) +
+            modelIsTrendy*initialTrendEstimate;
+    }
+    if(arimaModel){
+        dfInitials <- dfInitials + initialArimaNumber*initialArimaEstimate;
+    }
+    if(xregModel && any(initialType=="complete")){
+        dfInitials <- dfInitials + xregNumber*initialXregEstimate;
+    }
+    return(dfInitials);
+}
+
 #### Model architecture and initial matrix creation ####
 #' @keywords internal
 adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeasonal,

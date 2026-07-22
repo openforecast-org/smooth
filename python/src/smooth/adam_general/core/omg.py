@@ -411,7 +411,12 @@ class OMG:
 
     @property
     def nparam(self) -> int:
-        return int(len(self._B_joint))
+        # Both sides' backcast / complete / gradient initial states consume df
+        # exactly as the optimised parameters do, so nparam must match the df
+        # used for the information criteria (``_log_lik_dict["df"]``), not just
+        # the length of the joint optimised vector. The occurrence model is
+        # Bernoulli, so there is no scale parameter to exclude.
+        return int(self._log_lik_dict["df"])
 
     @property
     def aic(self) -> float:
@@ -1198,7 +1203,11 @@ class OMG:
             "B": np.asarray(B, dtype=float),
             "B_names": side_names if len(side_names) == len(B) else None,
             "CF_value": self._cf_value,
-            "n_param_estimated": int(len(B)),
+            # This side's backcast / complete / gradient initial states consume
+            # df on top of its optimised parameters (mirrors R's per-side
+            # nParamEstimatedA/B), so the sub-model's nparam stays consistent
+            # with a standalone OM fit of the same side.
+            "n_param_estimated": int(len(B)) + int(scaffold._om_initials_df()),
             "log_lik_adam_value": dict(self._log_lik_dict),
             "arima_polynomials": side["matrices_dict"].get("arima_polynomials"),
             "adam_cpp": side["adam_cpp"],

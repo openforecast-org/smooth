@@ -42,6 +42,7 @@ When coding, use the best practice, focusing on the following principles:
 When writing R code specifically:
 - Always use explicit `return(object)` at the end of every function.
 - Always wrap `if`, `for`, and `while` bodies in `{}`, even for single-line bodies: `if (...) { ... }`.
+- Never expose internal (non-exported) functions via roxygen. Do not give them a roxygen title/description block or an `@export` — a title/description makes `roxygen2::roxygenise()` generate a `man/*.Rd` page for them, which leaks the helper into the documentation. Use plain `#` comments for the explanation and, if a roxygen tag is needed, only `#' @keywords internal` (with no title), matching the other internal helpers (e.g. `adam_checkOptimizer`).
 
 
 ## R Package Development

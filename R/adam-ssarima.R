@@ -1052,8 +1052,15 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                       arEstimate=arEstimate, maEstimate=maEstimate);
         res <- NULL;
 
-        # Only variance is estimated
-        nParamEstimated <- 1;
+        # Nothing is optimised, but backcast / complete / gradient initials are
+        # still determined from the data and consume df exactly as in the
+        # estimated branch above (line 992-999); the scale is always estimated.
+        nStatesBackcasting <- 0;
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            nStatesBackcasting[] <- sum(lagsModelAll) - xregNumber;
+        }
+        nParamEstimated <- nStatesBackcasting + 1;
+        parametersNumber[1,1] <- nStatesBackcasting;
 
         initialType <- initialOriginal;
         initialXregEstimate <- initialXregEstimateOriginal;

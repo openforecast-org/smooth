@@ -783,8 +783,15 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         CFValue <- CF(B, matVt, matF, vecG, matWt);
         res <- NULL;
 
-        # Only variance is estimated
-        nParamEstimated <- 1;
+        # Nothing is optimised, but backcast / complete / gradient initials are
+        # still determined from the data and consume df exactly as in the
+        # estimated branch above (line 748-755); the scale is always estimated.
+        nStatesBackcasting <- 0;
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            nStatesBackcasting[] <- sum(lagsModelAll) - xregNumber;
+        }
+        nParamEstimated <- nStatesBackcasting + 1;
+        parametersNumber[1,1] <- nStatesBackcasting;
 
         initialXregEstimate <- initialXregEstimateOriginal;
     }

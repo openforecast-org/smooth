@@ -882,6 +882,27 @@ omg <- function(data,
         }
         CFValue <- res$objective
 
+        # Degrees of freedom per side. nParamsA/nParamsB are the B-split lengths
+        # (optimised parameters) and MUST stay so — they index B_joint. The df
+        # counts additionally include the backcast / complete / gradient initial
+        # states, which are determined from the data and consume df exactly as
+        # optimised ones do (mirrors om(); the occurrence model is Bernoulli, so
+        # no scale). Provided persistence / initials contribute nothing.
+        dfInitialsA <- dfInitialsBackcast(checkerA$etsModel, checkerA$Stype!="N",
+                                          checkerA$Ttype!="N", checkerA$lagsModelSeasonal,
+                                          checkerA$initialLevelEstimate, checkerA$initialTrendEstimate,
+                                          checkerA$initialSeasonalEstimate, checkerA$arimaModel,
+                                          checkerA$initialArimaNumber, checkerA$initialArimaEstimate,
+                                          checkerA$xregModel, checkerA$xregNumber,
+                                          checkerA$initialXregEstimate, checkerA$initialType)
+        dfInitialsB <- dfInitialsBackcast(checkerB$etsModel, checkerB$Stype!="N",
+                                          checkerB$Ttype!="N", checkerB$lagsModelSeasonal,
+                                          checkerB$initialLevelEstimate, checkerB$initialTrendEstimate,
+                                          checkerB$initialSeasonalEstimate, checkerB$arimaModel,
+                                          checkerB$initialArimaNumber, checkerB$initialArimaEstimate,
+                                          checkerB$xregModel, checkerB$xregNumber,
+                                          checkerB$initialXregEstimate, checkerB$initialType)
+
         return(list(
             B_A       = B_joint[seq_len(splitA)],
             B_B       = B_joint[seq_len(length(B_joint) - splitA) + splitA],
@@ -889,6 +910,8 @@ omg <- function(data,
             logLikValue = -CFValue,
             nParamsA  = splitA,
             nParamsB  = length(B_joint) - splitA,
+            nParamEstimatedA = splitA + dfInitialsA,
+            nParamEstimatedB = (length(B_joint) - splitA) + dfInitialsB,
             adamArchitectA = adamArchitectA,
             adamArchitectB = adamArchitectB,
             adamCreatedA   = adamCreatedA,
@@ -1122,7 +1145,7 @@ omg <- function(data,
 
     resA <- list(
         B               = jointResult$B_A,
-        nParamEstimated = jointResult$nParamsA,
+        nParamEstimated = jointResult$nParamEstimatedA,
         logLikADAMValue = NULL,
         CFValue         = 0,
         FI              = NULL,
@@ -1136,7 +1159,7 @@ omg <- function(data,
 
     resB <- list(
         B               = jointResult$B_B,
-        nParamEstimated = jointResult$nParamsB,
+        nParamEstimated = jointResult$nParamEstimatedB,
         logLikADAMValue = NULL,
         CFValue         = 0,
         FI              = NULL,
@@ -1214,7 +1237,7 @@ omg <- function(data,
                                 dimnames=list(c("Estimated","Provided"),
                                               c("nParamInternal","nParamXreg","nParamOccurrence",
                                                 "nParamScale","nParamAll")))
-            nParamMat[1,1] <- jointResult$nParamsA + jointResult$nParamsB
+            nParamMat[1,1] <- jointResult$nParamEstimatedA + jointResult$nParamEstimatedB
             nParamMat[1,5] <- nParamMat[1,1]
             nParamMat[2,1:4] <- modelA$nParam[2,1:4] + modelB$nParam[2,1:4]
             nParamMat[2,5]   <- sum(nParamMat[2,1:4])

@@ -2701,7 +2701,20 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                       arPolynomialMatrix=NULL, maPolynomialMatrix=NULL,
                       adamCpp);
 
-        parametersNumber[1,1] <- parametersNumber[1,5] <- 1;
+        # Degrees of freedom for the "use" path. Nothing is optimised, but the
+        # backcast / complete / gradient initial states are still determined from
+        # the data and consume df exactly as the optimised ones do, as does the
+        # always-estimated distribution scale. Provided persistence / initials
+        # contribute nothing.
+        parametersNumber[1,1] <- dfInitialsBackcast(etsModel, modelIsSeasonal, modelIsTrendy,
+                                                    lagsModelSeasonal, initialLevelEstimate,
+                                                    initialTrendEstimate, initialSeasonalEstimate,
+                                                    arimaModel, initialArimaNumber, initialArimaEstimate,
+                                                    xregModel, xregNumber, initialXregEstimate,
+                                                    initialType);
+        # The distribution scale is always an estimated parameter.
+        parametersNumber[1,4] <- 1;
+        parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
         logLikADAMValue <- structure(logLikADAM(B=0,
                                                 etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal, yInSample,
                                                 ot, otLogical, occurrenceModel, pFitted, obsInSample,

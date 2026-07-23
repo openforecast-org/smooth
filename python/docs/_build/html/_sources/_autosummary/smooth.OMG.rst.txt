@@ -14,8 +14,17 @@
    :toctree:
    :template: method.rst
 
+   ~OMG.coefbootstrap
+   ~OMG.confint
    ~OMG.fit
+   ~OMG.multicov
+   ~OMG.point_lik
    ~OMG.predict
+   ~OMG.rstandard
+   ~OMG.rstudent
+   ~OMG.simulate
+   ~OMG.summary
+   ~OMG.vcov
 
 
 
@@ -33,7 +42,9 @@
    ~OMG.bic
    ~OMG.bicc
    ~OMG.coef
+   ~OMG.coef_names
    ~OMG.distribution_
+   ~OMG.fisher_information_
    ~OMG.fitted
    ~OMG.holdout_data
    ~OMG.lags_used

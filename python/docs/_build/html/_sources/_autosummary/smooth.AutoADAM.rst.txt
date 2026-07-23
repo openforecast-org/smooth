@@ -14,16 +14,24 @@
    :toctree:
    :template: method.rst
 
+   ~AutoADAM.coefbootstrap
+   ~AutoADAM.confint
    ~AutoADAM.fit
+   ~AutoADAM.multicov
    ~AutoADAM.outlierdummy
    ~AutoADAM.plot
+   ~AutoADAM.point_lik
    ~AutoADAM.predict
    ~AutoADAM.predict_intervals
+   ~AutoADAM.reapply
+   ~AutoADAM.reforecast
    ~AutoADAM.rmultistep
    ~AutoADAM.rstandard
    ~AutoADAM.rstudent
    ~AutoADAM.select_best_model
+   ~AutoADAM.simulate
    ~AutoADAM.summary
+   ~AutoADAM.vcov
 
 
 
@@ -41,10 +49,12 @@
    ~AutoADAM.bic
    ~AutoADAM.bicc
    ~AutoADAM.coef
+   ~AutoADAM.coef_names
    ~AutoADAM.constant_value
    ~AutoADAM.data
    ~AutoADAM.distribution_
    ~AutoADAM.error_type
+   ~AutoADAM.fisher_information_
    ~AutoADAM.fitted
    ~AutoADAM.holdout_data
    ~AutoADAM.ic_weights

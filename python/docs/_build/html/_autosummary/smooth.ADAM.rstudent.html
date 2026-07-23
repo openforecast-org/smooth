@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
@@ -80,6 +81,12 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -102,6 +109,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
@@ -157,13 +165,12 @@ Degrees of freedom: <code class="docutils literal notranslate"><span class="pre"
 where <code class="docutils literal notranslate"><span class="pre">log_e</span> <span class="pre">=</span> <span class="pre">log(e)</span> <span class="pre">-</span> <span class="pre">mean(log</span> <span class="pre">e)</span> <span class="pre">-</span> <span class="pre">σ²/2</span></code></p></li>
 <li><p><strong>dinvgauss / dgamma</strong>: <code class="docutils literal notranslate"><span class="pre">e[i]</span> <span class="pre">/</span> <span class="pre">mean(e[-i])</span></code></p></li>
 </ul>
-<p>Mirrors R’s <code class="docutils literal notranslate"><span class="pre">rstudent.adam()</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Studentised residuals, length <code class="docutils literal notranslate"><span class="pre">nobs</span></code>.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>NDArray</p>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code></span></p>
 </dd>
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>ValueError</strong> – If the model has not been fitted yet.</p>

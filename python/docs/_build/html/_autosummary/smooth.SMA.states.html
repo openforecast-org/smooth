@@ -1,0 +1,276 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.SMA.states &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.SMA.time_elapsed" href="smooth.SMA.time_elapsed.html" />
+    <link rel="prev" title="smooth.SMA.sigma" href="smooth.SMA.sigma.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.html#smooth.SMA"><code class="docutils literal notranslate"><span class="pre">SMA</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.coefbootstrap.html">smooth.SMA.coefbootstrap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.confint.html">smooth.SMA.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.multicov.html">smooth.SMA.multicov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.outlierdummy.html">smooth.SMA.outlierdummy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.plot.html">smooth.SMA.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.point_lik.html">smooth.SMA.point_lik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.reapply.html">smooth.SMA.reapply</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.reforecast.html">smooth.SMA.reforecast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.rmultistep.html">smooth.SMA.rmultistep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.rstandard.html">smooth.SMA.rstandard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.rstudent.html">smooth.SMA.rstudent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.select_best_model.html">smooth.SMA.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.simulate.html">smooth.SMA.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.vcov.html">smooth.SMA.vcov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.actuals.html">smooth.SMA.actuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.aic.html">smooth.SMA.aic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.aicc.html">smooth.SMA.aicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.b_value.html">smooth.SMA.b_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.bic.html">smooth.SMA.bic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.bicc.html">smooth.SMA.bicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.coef.html">smooth.SMA.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.coef_names.html">smooth.SMA.coef_names</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.constant_value.html">smooth.SMA.constant_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.data.html">smooth.SMA.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.distribution_.html">smooth.SMA.distribution_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.error_type.html">smooth.SMA.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.fisher_information_.html">smooth.SMA.fisher_information_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.fitted.html">smooth.SMA.fitted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.holdout_data.html">smooth.SMA.holdout_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.ic_weights.html">smooth.SMA.ic_weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.initial_type.html">smooth.SMA.initial_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.initial_value.html">smooth.SMA.initial_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.is_combined.html">smooth.SMA.is_combined</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.lags_used.html">smooth.SMA.lags_used</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.loglik.html">smooth.SMA.loglik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.loss_.html">smooth.SMA.loss_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.loss_value.html">smooth.SMA.loss_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.measurement.html">smooth.SMA.measurement</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.model_name.html">smooth.SMA.model_name</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.model_type.html">smooth.SMA.model_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.models.html">smooth.SMA.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.n_param.html">smooth.SMA.n_param</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.nobs.html">smooth.SMA.nobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.nparam.html">smooth.SMA.nparam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.om_model.html">smooth.SMA.om_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.orders.html">smooth.SMA.orders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.persistence_vector.html">smooth.SMA.persistence_vector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.phi_.html">smooth.SMA.phi_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.profile.html">smooth.SMA.profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.residuals.html">smooth.SMA.residuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.scale.html">smooth.SMA.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.sigma.html">smooth.SMA.sigma</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">smooth.SMA.states</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.SMA.states"><code class="docutils literal notranslate"><span class="pre">SMA.states</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.time_elapsed.html">smooth.SMA.time_elapsed</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.transition.html">smooth.SMA.transition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="smooth.SMA.html">smooth.SMA</a></li>
+      <li class="breadcrumb-item active">smooth.SMA.states</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.SMA.states.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-sma-states">
+<h1>smooth.SMA.states<a class="headerlink" href="#smooth-sma-states" title="Link to this heading"></a></h1>
+<dl class="py property">
+<dt class="sig sig-object py" id="smooth.SMA.states">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">SMA.</span></span><span class="sig-name descname"><span class="pre">states</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NDArray</span></span><a class="headerlink" href="#smooth.SMA.states" title="Link to this definition"></a></dt>
+<dd><p>$states).</p>
+<p>The state matrix stores the evolution of all model components including
+level, trend (if present), seasonal components (if present), and ARIMA
+states (if present). Each column represents a different state component,
+and each row represents a time point.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>2D array of shape (n_states, obs_in_sample + 1). Columns represent
+level, trend (if model has trend), and seasonal components (if model
+has seasonality, one column per lag).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>NDArray</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If the model has not been fitted yet.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;AAA&quot;</span><span class="p">,</span> <span class="n">lags</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">states</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">states</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">level</span> <span class="o">=</span> <span class="n">states</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>  <span class="c1"># Level component over time</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>State matrix containing component values over time (R</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.SMA.sigma.html" class="btn btn-neutral float-left" title="smooth.SMA.sigma" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.SMA.time_elapsed.html" class="btn btn-neutral float-right" title="smooth.SMA.time_elapsed" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

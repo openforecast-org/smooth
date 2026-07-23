@@ -1,0 +1,260 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.AutoMSARIMA.fisher_information_ &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.AutoMSARIMA.fitted" href="smooth.AutoMSARIMA.fitted.html" />
+    <link rel="prev" title="smooth.AutoMSARIMA.error_type" href="smooth.AutoMSARIMA.error_type.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.html#smooth.AutoMSARIMA"><code class="docutils literal notranslate"><span class="pre">AutoMSARIMA</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.coefbootstrap.html">smooth.AutoMSARIMA.coefbootstrap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.confint.html">smooth.AutoMSARIMA.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.multicov.html">smooth.AutoMSARIMA.multicov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.outlierdummy.html">smooth.AutoMSARIMA.outlierdummy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.plot.html">smooth.AutoMSARIMA.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.point_lik.html">smooth.AutoMSARIMA.point_lik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.predict_intervals.html">smooth.AutoMSARIMA.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.reapply.html">smooth.AutoMSARIMA.reapply</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.reforecast.html">smooth.AutoMSARIMA.reforecast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.rmultistep.html">smooth.AutoMSARIMA.rmultistep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.rstandard.html">smooth.AutoMSARIMA.rstandard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.rstudent.html">smooth.AutoMSARIMA.rstudent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.select_best_model.html">smooth.AutoMSARIMA.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.simulate.html">smooth.AutoMSARIMA.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.summary.html">smooth.AutoMSARIMA.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.vcov.html">smooth.AutoMSARIMA.vcov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.actuals.html">smooth.AutoMSARIMA.actuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.aic.html">smooth.AutoMSARIMA.aic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.aicc.html">smooth.AutoMSARIMA.aicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.b_value.html">smooth.AutoMSARIMA.b_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.bic.html">smooth.AutoMSARIMA.bic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.bicc.html">smooth.AutoMSARIMA.bicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.coef.html">smooth.AutoMSARIMA.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.coef_names.html">smooth.AutoMSARIMA.coef_names</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.constant_value.html">smooth.AutoMSARIMA.constant_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.data.html">smooth.AutoMSARIMA.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.distribution_.html">smooth.AutoMSARIMA.distribution_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.error_type.html">smooth.AutoMSARIMA.error_type</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">smooth.AutoMSARIMA.fisher_information_</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.AutoMSARIMA.fisher_information_"><code class="docutils literal notranslate"><span class="pre">AutoMSARIMA.fisher_information_</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.fitted.html">smooth.AutoMSARIMA.fitted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.holdout_data.html">smooth.AutoMSARIMA.holdout_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.ic_weights.html">smooth.AutoMSARIMA.ic_weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.initial_type.html">smooth.AutoMSARIMA.initial_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.initial_value.html">smooth.AutoMSARIMA.initial_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.is_combined.html">smooth.AutoMSARIMA.is_combined</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.lags_used.html">smooth.AutoMSARIMA.lags_used</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.loglik.html">smooth.AutoMSARIMA.loglik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.loss_.html">smooth.AutoMSARIMA.loss_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.loss_value.html">smooth.AutoMSARIMA.loss_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.measurement.html">smooth.AutoMSARIMA.measurement</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.model_name.html">smooth.AutoMSARIMA.model_name</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.model_type.html">smooth.AutoMSARIMA.model_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.models.html">smooth.AutoMSARIMA.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.n_param.html">smooth.AutoMSARIMA.n_param</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.nobs.html">smooth.AutoMSARIMA.nobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.nparam.html">smooth.AutoMSARIMA.nparam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.om_model.html">smooth.AutoMSARIMA.om_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.orders.html">smooth.AutoMSARIMA.orders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.persistence_vector.html">smooth.AutoMSARIMA.persistence_vector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.phi_.html">smooth.AutoMSARIMA.phi_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.profile.html">smooth.AutoMSARIMA.profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.residuals.html">smooth.AutoMSARIMA.residuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.scale.html">smooth.AutoMSARIMA.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.sigma.html">smooth.AutoMSARIMA.sigma</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.states.html">smooth.AutoMSARIMA.states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.time_elapsed.html">smooth.AutoMSARIMA.time_elapsed</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.transition.html">smooth.AutoMSARIMA.transition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+      <li class="breadcrumb-item active">smooth.AutoMSARIMA.fisher_information_</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.AutoMSARIMA.fisher_information_.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-automsarima-fisher-information">
+<h1>smooth.AutoMSARIMA.fisher_information_<a class="headerlink" href="#smooth-automsarima-fisher-information" title="Link to this heading"></a></h1>
+<dl class="py property">
+<dt class="sig sig-object py" id="smooth.AutoMSARIMA.fisher_information_">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">AutoMSARIMA.</span></span><span class="sig-name descname"><span class="pre">fisher_information_</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NDArray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#smooth.AutoMSARIMA.fisher_information_" title="Link to this definition"></a></dt>
+<dd><p>Observed Fisher Information matrix at the estimated parameters.</p>
+<p>Computed only when the model was constructed with <code class="docutils literal notranslate"><span class="pre">fi=True</span></code> (mirrors
+R’s <code class="docutils literal notranslate"><span class="pre">adam(...,</span> <span class="pre">FI=TRUE)$FI</span></code>); otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>. The matrix is the
+negative Hessian of the log-likelihood evaluated at the estimated
+coefficient vector <a class="reference internal" href="smooth.AutoMSARIMA.coef.html#smooth.AutoMSARIMA.coef" title="smooth.AutoMSARIMA.coef"><code class="xref py py-attr docutils literal notranslate"><span class="pre">coef</span></code></a>, with rows/columns in the same order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">len(coef)</span> <span class="pre">×</span> <span class="pre">len(coef)</span></code> symmetric matrix, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if
+<code class="docutils literal notranslate"><span class="pre">fi=False</span></code>.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>NDArray or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.AutoMSARIMA.error_type.html" class="btn btn-neutral float-left" title="smooth.AutoMSARIMA.error_type" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.AutoMSARIMA.fitted.html" class="btn btn-neutral float-right" title="smooth.AutoMSARIMA.fitted" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

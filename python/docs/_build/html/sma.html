@@ -1,0 +1,362 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMA &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="MSARIMA and AutoMSARIMA" href="msarima.html" />
+    <link rel="prev" title="AutoADAM" href="autoadam.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.html">smooth.SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">SMA</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#smooth.SMA"><code class="docutils literal notranslate"><span class="pre">SMA</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.SMA.model"><code class="docutils literal notranslate"><span class="pre">SMA.model</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.SMA.ICs_"><code class="docutils literal notranslate"><span class="pre">SMA.ICs_</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-usage">Example Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#order-selection">Order selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#references">References</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">SMA</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/sma.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sma">
+<h1>SMA<a class="headerlink" href="#sma" title="Link to this heading"></a></h1>
+<p>Simple moving average in single-source-of-error state space form, with
+optional automatic order selection.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="smooth.SMA">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">SMA</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fast</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.SMA" title="Link to this definition"></a></dt>
+<dd><p>Simple Moving Average in Single Source of Error state space form.</p>
+<p>SMA(m) is an AR(m) state-space model where every AR coefficient is fixed
+at 1/m. It is implemented as a thin wrapper over <a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a> with
+<code class="docutils literal notranslate"><span class="pre">model=&quot;NNN&quot;</span></code> and the AR vector hard-coded, so it inherits the full
+ADAM fit / predict / diagnostics surface (multi-step forecasts,
+prediction intervals, residual diagnostics). If <code class="docutils literal notranslate"><span class="pre">order</span></code> is left
+unspecified, the order is selected automatically by information
+criterion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>order</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Order of the moving average. If None, selected automatically using
+the information criterion (ternary search when <code class="docutils literal notranslate"><span class="pre">fast=True</span></code>,
+sequential scan when <code class="docutils literal notranslate"><span class="pre">fast=False</span></code>).</p></li>
+<li><p><strong>ic</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'AIC'</span></code>, <code class="docutils literal notranslate"><span class="pre">'AICc'</span></code>, <code class="docutils literal notranslate"><span class="pre">'BIC'</span></code>, <code class="docutils literal notranslate"><span class="pre">'BICc'</span></code>]</span>) – Information criterion used for automatic order selection.</p></li>
+<li><p><strong>h</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Forecast horizon (used with <code class="docutils literal notranslate"><span class="pre">holdout=True</span></code> to reserve a test set).</p></li>
+<li><p><strong>holdout</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether to hold out the last <code class="docutils literal notranslate"><span class="pre">h</span></code> observations for validation.</p></li>
+<li><p><strong>fast</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – If True, use ternary search for order selection (fast, finds a local
+minimum). If False, evaluate all orders 1 … min(200, T) sequentially.
+When a pandas Series with a DatetimeIndex is passed, the inferred
+seasonal period is always evaluated as a candidate regardless of this flag.</p></li>
+<li><p><strong>verbose</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Verbosity level. 0 = silent.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to ADAM (e.g. <code class="docutils literal notranslate"><span class="pre">n_iterations</span></code>).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="smooth.SMA.model">
+<span class="sig-name descname"><span class="pre">model</span></span><a class="headerlink" href="#smooth.SMA.model" title="Link to this definition"></a></dt>
+<dd><p>Model name, e.g. <code class="docutils literal notranslate"><span class="pre">&quot;SMA(3)&quot;</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="smooth.SMA.ICs_">
+<span class="sig-name descname"><span class="pre">ICs_</span></span><a class="headerlink" href="#smooth.SMA.ICs_" title="Link to this definition"></a></dt>
+<dd><p>IC values for each evaluated order (only present after auto-selection).
+Keys are order integers, values are IC floats.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM</span></code></a></dt><dd><p>Parent class; all ADAM attributes are available after <code class="docutils literal notranslate"><span class="pre">fit()</span></code>.</p>
+</dd>
+<dt><a class="reference internal" href="msarima.html#smooth.MSARIMA" title="smooth.MSARIMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MSARIMA</span></code></a></dt><dd><p>General multiple-seasonal ARIMA wrapper.</p>
+</dd>
+</dl>
+</div>
+<p class="rubric">Examples</p>
+<p>Fixed order:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SMA</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">60</span><span class="p">))</span> <span class="o">+</span> <span class="mi">100</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">SMA</span><span class="p">(</span><span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">h</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fc</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fc</span><span class="o">.</span><span class="n">mean</span>
+</pre></div>
+</div>
+<p>Auto-selected order:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">SMA</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>   <span class="c1"># e.g. &quot;SMA(3)&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">ICs_</span><span class="p">)</span>
+</pre></div>
+</div>
+<p class="rubric">References</p>
+<ul class="simple">
+<li><p>Svetunkov, I., &amp; Petropoulos, F. (2017). Old dog, new tricks: a
+modelling view of simple moving averages. International Journal of
+Production Research. <a class="reference external" href="https://doi.org/10.1080/00207543.2017.1380326">https://doi.org/10.1080/00207543.2017.1380326</a></p></li>
+</ul>
+</dd></dl>
+
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">SMA(m)</span></code> is the classical simple moving average expressed as an AR(<code class="docutils literal notranslate"><span class="pre">m</span></code>)
+state-space model with every autoregressive coefficient fixed at <code class="docutils literal notranslate"><span class="pre">1/m</span></code>.
+Wrapping the moving average inside the ADAM framework — rather than treating
+it as a rolling window — gives several practical advantages:</p>
+<ul class="simple">
+<li><p><strong>Multi-step forecasts</strong> are produced recursively from the state vector,
+not by repeating the last observation.</p></li>
+<li><p><strong>Forecast variance and prediction intervals</strong> follow directly from the
+state-space recursion, so intervals widen with the horizon as they should.</p></li>
+<li><p><strong>Automatic order selection</strong> is available: when <code class="docutils literal notranslate"><span class="pre">order</span></code> is left
+unspecified, <code class="docutils literal notranslate"><span class="pre">SMA</span></code> evaluates a range of orders and picks the one that
+minimises an information criterion (default <code class="docutils literal notranslate"><span class="pre">AICc</span></code>).</p></li>
+<li><p><strong>Full ADAM API</strong> is inherited — <code class="docutils literal notranslate"><span class="pre">.fit()</span></code>, <code class="docutils literal notranslate"><span class="pre">.predict()</span></code>, residual
+diagnostics, and the <code class="docutils literal notranslate"><span class="pre">ForecastResult</span></code> return type all behave exactly as
+for <a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a>.</p></li>
+</ul>
+<p>Internally <code class="docutils literal notranslate"><span class="pre">SMA</span></code> calls <a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a> with <code class="docutils literal notranslate"><span class="pre">model=&quot;NNN&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ar_order=m</span></code>, <code class="docutils literal notranslate"><span class="pre">arma={&quot;ar&quot;:</span> <span class="pre">[1/m]</span> <span class="pre">*</span> <span class="pre">m}</span></code>, <code class="docutils literal notranslate"><span class="pre">initial=&quot;backcasting&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">loss=&quot;MSE&quot;</span></code>, and <code class="docutils literal notranslate"><span class="pre">distribution=&quot;dnorm&quot;</span></code>. These are fixed and cannot be
+overridden — use <a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a> or <a class="reference internal" href="msarima.html#smooth.MSARIMA" title="smooth.MSARIMA"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSARIMA</span></code></a> directly if you need
+arbitrary AR coefficients.</p>
+</section>
+<section id="example-usage">
+<h2>Example Usage<a class="headerlink" href="#example-usage" title="Link to this heading"></a></h2>
+<p>Fixed order:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">SMA</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">60</span><span class="p">))</span> <span class="o">+</span> <span class="mi">100</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SMA</span><span class="p">(</span><span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">h</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>              <span class="c1"># e.g. &quot;SMA(4)&quot;</span>
+
+<span class="n">fc</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="s2">&quot;prediction&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">fc</span><span class="o">.</span><span class="n">mean</span>
+<span class="n">fc</span><span class="o">.</span><span class="n">lower</span><span class="p">,</span> <span class="n">fc</span><span class="o">.</span><span class="n">upper</span>
+</pre></div>
+</div>
+<p>Automatically selected order:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">SMA</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>          <span class="c1"># order=None → auto-select</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>        <span class="c1"># e.g. &quot;SMA(3)&quot;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">ICs_</span><span class="p">)</span>         <span class="c1"># {1: ic_1, 2: ic_2, ...} for evaluated orders</span>
+</pre></div>
+</div>
+<p>With holdout for validation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">SMA</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">holdout</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>              <span class="c1"># last 12 observations reserved as test set</span>
+<span class="n">fc</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="order-selection">
+<h2>Order selection<a class="headerlink" href="#order-selection" title="Link to this heading"></a></h2>
+<p>When <code class="docutils literal notranslate"><span class="pre">order</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>, <code class="docutils literal notranslate"><span class="pre">SMA</span></code> searches over orders
+<code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">…</span> <span class="pre">min(200,</span> <span class="pre">T)</span></code> using the criterion given by <code class="docutils literal notranslate"><span class="pre">ic</span></code> (one of <code class="docutils literal notranslate"><span class="pre">&quot;AIC&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;AICc&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;BIC&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;BICc&quot;</span></code>). Two search modes are available:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fast=True</span></code> (default) — <strong>ternary search</strong>, which converges to a local
+IC minimum without evaluating every order. Fast on long series. When the
+input is a pandas <code class="docutils literal notranslate"><span class="pre">Series</span></code> with a <code class="docutils literal notranslate"><span class="pre">DatetimeIndex</span></code>, the inferred
+seasonal period is also evaluated explicitly so seasonal moving averages
+are never missed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fast=False</span></code> — <strong>sequential scan</strong> of every candidate order. Slower but
+guaranteed to find the global minimum within the search range.</p></li>
+</ul>
+<p>The IC values from the search are stored on the fitted object as <code class="docutils literal notranslate"><span class="pre">ICs_</span></code>
+(a dict keyed by order).</p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<p>Svetunkov, I., &amp; Petropoulos, F. (2017). <em>Old dog, new tricks: a modelling
+view of simple moving averages.</em> International Journal of Production
+Research. <a class="reference external" href="https://doi.org/10.1080/00207543.2017.1380326">https://doi.org/10.1080/00207543.2017.1380326</a></p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="_autosummary/smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a> — Underlying unified state-space framework</p></li>
+<li><p><a class="reference internal" href="msarima.html#smooth.MSARIMA" title="smooth.MSARIMA"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSARIMA</span></code></a> — General multiple-seasonal ARIMA wrapper</p></li>
+<li><p><a class="reference internal" href="_autosummary/smooth.ES.html#smooth.ES" title="smooth.ES"><code class="xref py py-class docutils literal notranslate"><span class="pre">ES</span></code></a> — Exponential smoothing</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="autoadam.html" class="btn btn-neutral float-left" title="AutoADAM" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="msarima.html" class="btn btn-neutral float-right" title="MSARIMA and AutoMSARIMA" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

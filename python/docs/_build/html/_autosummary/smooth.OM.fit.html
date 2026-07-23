@@ -19,8 +19,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="smooth.OM.outlierdummy" href="smooth.OM.outlierdummy.html" />
-    <link rel="prev" title="smooth.OM" href="smooth.OM.html" /> 
+    <link rel="next" title="smooth.OM.multicov" href="smooth.OM.multicov.html" />
+    <link rel="prev" title="smooth.OM.confint" href="smooth.OM.confint.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
@@ -77,6 +78,12 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -102,6 +109,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
@@ -165,7 +173,7 @@ via <code class="docutils literal notranslate"><span class="pre">preparator()</s
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>y</strong> (<em>array-like</em><em>, </em><em>shape</em><em> (</em><em>T</em><em>,</em><em>)</em>) – <p>Time series data to fit. Can be:</p>
+<li><p><strong>y</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code></span>) – <p>Time series data to fit. Can be:</p>
 <ul>
 <li><p><code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code>: Shape (T,) for univariate time series</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">pandas.Series</span></code>: Will use index for time information if DatetimeIndex</p></li>
@@ -179,7 +187,7 @@ T ≥ 3 × (number of parameters)</p></li>
 <li><p><strong>Frequency</strong>: Auto-detected from pandas Series with DatetimeIndex</p></li>
 </ul>
 </p></li>
-<li><p><strong>X</strong> (<em>array-like</em><em>, </em><em>shape</em><em> (</em><em>T</em><em>, </em><em>n_features</em><em>)</em><em>, </em><em>optional</em>) – <p>External regressors (explanatory variables). If provided:</p>
+<li><p><strong>X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – <p>External regressors (explanatory variables). If provided:</p>
 <ul>
 <li><p>Must have same length as <code class="docutils literal notranslate"><span class="pre">y</span></code> (T observations)</p></li>
 <li><p>Each column is a separate regressor</p></li>
@@ -357,8 +365,8 @@ complex models.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="smooth.OM.html" class="btn btn-neutral float-left" title="smooth.OM" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="smooth.OM.outlierdummy.html" class="btn btn-neutral float-right" title="smooth.OM.outlierdummy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="smooth.OM.confint.html" class="btn btn-neutral float-left" title="smooth.OM.confint" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.OM.multicov.html" class="btn btn-neutral float-right" title="smooth.OM.multicov" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

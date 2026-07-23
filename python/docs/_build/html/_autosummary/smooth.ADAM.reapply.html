@@ -1,0 +1,286 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.ADAM.reapply &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.ADAM.reforecast" href="smooth.ADAM.reforecast.html" />
+    <link rel="prev" title="smooth.ADAM.predict_intervals" href="smooth.ADAM.predict_intervals.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.html#smooth.ADAM"><code class="docutils literal notranslate"><span class="pre">ADAM</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.coefbootstrap.html">smooth.ADAM.coefbootstrap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.confint.html">smooth.ADAM.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.multicov.html">smooth.ADAM.multicov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.point_lik.html">smooth.ADAM.point_lik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">smooth.ADAM.reapply</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.ADAM.reapply"><code class="docutils literal notranslate"><span class="pre">ADAM.reapply()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.reforecast.html">smooth.ADAM.reforecast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.rmultistep.html">smooth.ADAM.rmultistep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.simulate.html">smooth.ADAM.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.vcov.html">smooth.ADAM.vcov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.actuals.html">smooth.ADAM.actuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.aic.html">smooth.ADAM.aic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.aicc.html">smooth.ADAM.aicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.b_value.html">smooth.ADAM.b_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.bic.html">smooth.ADAM.bic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.bicc.html">smooth.ADAM.bicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.coef.html">smooth.ADAM.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.coef_names.html">smooth.ADAM.coef_names</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.constant_value.html">smooth.ADAM.constant_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.data.html">smooth.ADAM.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.distribution_.html">smooth.ADAM.distribution_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.error_type.html">smooth.ADAM.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.fisher_information_.html">smooth.ADAM.fisher_information_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.fitted.html">smooth.ADAM.fitted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.holdout_data.html">smooth.ADAM.holdout_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.ic_weights.html">smooth.ADAM.ic_weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.initial_type.html">smooth.ADAM.initial_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.initial_value.html">smooth.ADAM.initial_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.is_combined.html">smooth.ADAM.is_combined</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.lags_used.html">smooth.ADAM.lags_used</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.loglik.html">smooth.ADAM.loglik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.loss_.html">smooth.ADAM.loss_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.loss_value.html">smooth.ADAM.loss_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.measurement.html">smooth.ADAM.measurement</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.model_name.html">smooth.ADAM.model_name</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.model_type.html">smooth.ADAM.model_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.models.html">smooth.ADAM.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.n_param.html">smooth.ADAM.n_param</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.nobs.html">smooth.ADAM.nobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.nparam.html">smooth.ADAM.nparam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.om_model.html">smooth.ADAM.om_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.orders.html">smooth.ADAM.orders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.persistence_vector.html">smooth.ADAM.persistence_vector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.phi_.html">smooth.ADAM.phi_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.profile.html">smooth.ADAM.profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.residuals.html">smooth.ADAM.residuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.scale.html">smooth.ADAM.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.sigma.html">smooth.ADAM.sigma</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.states.html">smooth.ADAM.states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.time_elapsed.html">smooth.ADAM.time_elapsed</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.transition.html">smooth.ADAM.transition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="smooth.ADAM.html">smooth.ADAM</a></li>
+      <li class="breadcrumb-item active">smooth.ADAM.reapply</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.ADAM.reapply.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-adam-reapply">
+<h1>smooth.ADAM.reapply<a class="headerlink" href="#smooth-adam-reapply" title="Link to this heading"></a></h1>
+<dl class="py method">
+<dt class="sig sig-object py" id="smooth.ADAM.reapply">
+<span class="sig-prename descclassname"><span class="pre">ADAM.</span></span><span class="sig-name descname"><span class="pre">reapply</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nsim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bootstrap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heuristics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">vcov_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.ADAM.reapply" title="Link to this definition"></a></dt>
+<dd><p>Re-run the model on the in-sample data for <code class="docutils literal notranslate"><span class="pre">nsim</span></code> parameter draws.</p>
+<p>Python port of R’s <code class="docutils literal notranslate"><span class="pre">reapply.adam</span></code> (R/reapply.R:87-778). Samples
+<code class="docutils literal notranslate"><span class="pre">nsim</span></code> parameter vectors from a multivariate normal centred on
+<a class="reference internal" href="smooth.ADAM.coef.html#smooth.ADAM.coef" title="smooth.ADAM.coef"><code class="xref py py-attr docutils literal notranslate"><span class="pre">coef</span></code></a> with covariance from <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a>, clips each draw to
+the admissible region, then re-runs the shared C++ ADAM kernel
+(<code class="docutils literal notranslate"><span class="pre">adamCore::reapply</span></code>) once per draw. The resulting per-draw
+fitted paths, states, transition / measurement matrices,
+persistence vectors, and final profiles are returned in a
+<code class="xref py py-class docutils literal notranslate"><span class="pre">ReapplyResult</span></code>
+with array shapes matching R exactly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of parameter draws.</p></li>
+<li><p><strong>bootstrap</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Forwarded to <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a>. <code class="docutils literal notranslate"><span class="pre">True</span></code> uses the empirical
+covariance from <a class="reference internal" href="smooth.ADAM.coefbootstrap.html#smooth.ADAM.coefbootstrap" title="smooth.ADAM.coefbootstrap"><code class="xref py py-meth docutils literal notranslate"><span class="pre">coefbootstrap()</span></code></a> instead of the analytical
+inverse-Fisher matrix.</p></li>
+<li><p><strong>heuristics</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]</span>) – Forwarded to <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a> — heuristic diagonal proportion
+(<code class="docutils literal notranslate"><span class="pre">vcov</span> <span class="pre">=</span> <span class="pre">diag(|coef|</span> <span class="pre">*</span> <span class="pre">heuristics)</span></code>) when set.</p></li>
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Seed for the MVN sampler. Makes the draw reproducible.</p></li>
+<li><p><strong>**vcov_kwargs</strong> – Forwarded to <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a> (<code class="docutils literal notranslate"><span class="pre">step_size</span></code>, bootstrap kwargs).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Container with <code class="docutils literal notranslate"><span class="pre">time_elapsed</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">states</span></code> <code class="docutils literal notranslate"><span class="pre">(c,</span> <span class="pre">n+L,</span>
+<span class="pre">nsim)</span></code>, <code class="docutils literal notranslate"><span class="pre">refitted</span></code> <code class="docutils literal notranslate"><span class="pre">(n,</span> <span class="pre">nsim)</span></code>, <code class="docutils literal notranslate"><span class="pre">fitted</span></code>, <code class="docutils literal notranslate"><span class="pre">model</span></code>,
+<code class="docutils literal notranslate"><span class="pre">transition</span></code> <code class="docutils literal notranslate"><span class="pre">(c,</span> <span class="pre">c,</span> <span class="pre">nsim)</span></code>, <code class="docutils literal notranslate"><span class="pre">measurement</span></code> <code class="docutils literal notranslate"><span class="pre">(n,</span> <span class="pre">c,</span>
+<span class="pre">nsim)</span></code>, <code class="docutils literal notranslate"><span class="pre">persistence</span></code> <code class="docutils literal notranslate"><span class="pre">(c,</span> <span class="pre">nsim)</span></code>, <code class="docutils literal notranslate"><span class="pre">profile</span></code> <code class="docutils literal notranslate"><span class="pre">(c,</span> <span class="pre">L,</span>
+<span class="pre">nsim)</span></code>, <code class="docutils literal notranslate"><span class="pre">random_parameters</span></code> <code class="docutils literal notranslate"><span class="pre">(nsim,</span> <span class="pre">k)</span></code> and <code class="docutils literal notranslate"><span class="pre">nsim</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ReapplyResult</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Covers ETS (with <code class="docutils literal notranslate"><span class="pre">bounds=&quot;usual&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;admissible&quot;</span></code> or
+<code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code>) and pure / mixed ARIMA models. External regressors
+(<code class="docutils literal notranslate"><span class="pre">X</span></code>) are still rejected — that branch arrives in a follow-up.</p>
+</dd></dl>
+
+<hr class="docutils" />
+<p><strong>Parent Class:</strong> <a class="reference internal" href="smooth.ADAM.html#smooth.ADAM" title="smooth.ADAM"><code class="xref py py-class docutils literal notranslate"><span class="pre">ADAM</span></code></a></p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.ADAM.predict_intervals.html" class="btn btn-neutral float-left" title="smooth.ADAM.predict_intervals" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.ADAM.reforecast.html" class="btn btn-neutral float-right" title="smooth.ADAM.reforecast" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

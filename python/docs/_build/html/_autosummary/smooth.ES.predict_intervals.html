@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="smooth.ES.rmultistep" href="smooth.ES.rmultistep.html" />
+    <link rel="next" title="smooth.ES.reapply" href="smooth.ES.reapply.html" />
     <link rel="prev" title="smooth.ES.predict" href="smooth.ES.predict.html" /> 
 </head>
 
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
@@ -80,6 +81,12 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -102,6 +109,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
@@ -144,15 +152,15 @@
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>h</strong> (<em>int</em>) – Forecast horizon (number of steps to forecast).</p></li>
-<li><p><strong>X</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – Exogenous variables for the forecast period.</p></li>
-<li><p><strong>levels</strong> (<em>List</em><em>[</em><em>float</em><em>]</em><em>, </em><em>default=</em><em>[</em><em>0.8</em><em>, </em><em>0.95</em><em>]</em>) – Confidence levels for prediction intervals. Each level produces
+<li><p><strong>h</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Forecast horizon (number of steps to forecast).</p></li>
+<li><p><strong>X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Exogenous variables for the forecast period.</p></li>
+<li><p><strong>levels</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]</span>) – Confidence levels for prediction intervals. Each level produces
 a pair of lower/upper columns in the output DataFrame. For
 example, <code class="docutils literal notranslate"><span class="pre">levels=[0.8,</span> <span class="pre">0.95]</span></code> with <code class="docutils literal notranslate"><span class="pre">side=&quot;both&quot;</span></code> yields
 columns <code class="docutils literal notranslate"><span class="pre">&quot;lower_0.1&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;lower_0.025&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;upper_0.9&quot;</span></code>,
 <code class="docutils literal notranslate"><span class="pre">&quot;upper_0.975&quot;</span></code>.</p></li>
-<li><p><strong>side</strong> (<em>Literal</em><em>[</em><em>&quot;both&quot;</em><em>, </em><em>&quot;upper&quot;</em><em>, </em><em>&quot;lower&quot;</em><em>]</em><em>, </em><em>default=&quot;both&quot;</em>) – Which side(s) of the intervals to return.</p></li>
-<li><p><strong>nsim</strong> (<em>int</em><em>, </em><em>default=10000</em>) – Number of simulations for simulation-based intervals.</p></li>
+<li><p><strong>side</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'both'</span></code>, <code class="docutils literal notranslate"><span class="pre">'upper'</span></code>, <code class="docutils literal notranslate"><span class="pre">'lower'</span></code>]</span>) – Which side(s) of the intervals to return.</p></li>
+<li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of simulations for simulation-based intervals.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -173,7 +181,7 @@ columns <code class="docutils literal notranslate"><span class="pre">&quot;lower
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="smooth.ES.predict.html" class="btn btn-neutral float-left" title="smooth.ES.predict" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="smooth.ES.rmultistep.html" class="btn btn-neutral float-right" title="smooth.ES.rmultistep" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="smooth.ES.reapply.html" class="btn btn-neutral float-right" title="smooth.ES.reapply" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

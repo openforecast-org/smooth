@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.html">smooth.OM</a></li>
@@ -77,6 +78,12 @@
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -99,11 +106,11 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">lowess</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#smooth.lowess"><code class="docutils literal notranslate"><span class="pre">lowess()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#example-usage">Example Usage</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#parameters">Parameters</a></li>
@@ -142,80 +149,6 @@
   <section id="lowess">
 <h1>lowess<a class="headerlink" href="#lowess" title="Link to this heading"></a></h1>
 <p>LOWESS (Locally Weighted Scatterplot Smoothing) for robust nonparametric regression.</p>
-<dl class="py function">
-<dt class="sig sig-object py" id="smooth.lowess">
-<span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">lowess</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6666666666666666</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.lowess" title="Link to this definition"></a></dt>
-<dd><p>LOWESS smoother that exactly matches R’s stats::lowess function.</p>
-<p>Performs locally weighted polynomial regression using Cleveland’s LOWESS algorithm.
-This implementation produces results identical to R’s stats::lowess function.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>x</strong> (<em>array-like</em>) – The x values for the data. Can also be a 2D array or list with two elements,
-in which case the first column/element is used as x and second as y.</p></li>
-<li><p><strong>y</strong> (<em>array-like</em><em>, </em><em>optional</em>) – The y values for the data. If None, x must contain both x and y values
-as a 2D array or a list/tuple of two arrays.</p></li>
-<li><p><strong>f</strong> (<em>float</em><em>, </em><em>default=2/3</em>) – The smoother span. This gives the proportion of points in the plot which
-influence the smooth at each value. Larger values give more smoothness.</p></li>
-<li><p><strong>iter</strong> (<em>int</em><em>, </em><em>default=3</em>) – The number of robustifying iterations which should be performed.
-Using smaller values of iter will make lowess run faster.</p></li>
-<li><p><strong>delta</strong> (<em>float</em><em>, </em><em>optional</em>) – Values within delta of each other are treated as being at the same point.
-If None (default), uses 0.01 * (max(x) - min(x)), matching R’s default.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A dictionary with two keys matching R’s lowess output:
-- ‘x’: The sorted x values
-- ‘y’: The smoothed y values corresponding to the sorted x values</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>dict</p>
-</dd>
-</dl>
-<p class="rubric">Notes</p>
-<p>This function is a direct port of R’s stats::lowess, which implements
-Cleveland’s (1979) LOWESS algorithm. The algorithm uses locally weighted
-polynomial regression with a tricube weight function and iterative
-reweighting for robustness to outliers.</p>
-<p>The function returns results in the same format as R’s lowess: a list/dict
-with ‘x’ and ‘y’ components, where x is sorted and y contains the
-corresponding smoothed values.</p>
-<p class="rubric">References</p>
-<p>Cleveland, W.S. (1979) “Robust Locally Weighted Regression and Smoothing
-Scatterplots”. Journal of the American Statistical Association 74(368): 829-836.</p>
-<div class="admonition seealso">
-<p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">smooth.adam_general.lowess_cpp</span></code></dt><dd><p>Direct C++ lowess function (unsorted output)</p>
-</dd>
-<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">smooth.adam_general.core.utils.utils.lowess_r</span></code></dt><dd><p>Pure Python implementation</p>
-</dd>
-</dl>
-</div>
-<p class="rubric">Examples</p>
-<p>Basic usage with separate x and y arrays:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">lowess</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.1</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.9</span><span class="p">,</span> <span class="mf">4.2</span><span class="p">,</span> <span class="mf">4.8</span><span class="p">,</span> <span class="mf">6.1</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">7.9</span><span class="p">,</span> <span class="mf">9.2</span><span class="p">,</span> <span class="mf">9.8</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">lowess</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>  <span class="c1"># Sorted x values</span>
-<span class="go">array([ 1.,  2.,  3.,  4.,  5.,  6.,  7.,  8.,  9., 10.])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span>  <span class="c1"># Smoothed y values</span>
-<span class="go">array([...])</span>
-</pre></div>
-</div>
-<p>With custom smoother span:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">lowess</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">f</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>Using a 2D array input (like R’s behavior):</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">xy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">lowess</span><span class="p">(</span><span class="n">xy</span><span class="p">)</span>
-</pre></div>
-</div>
-</dd></dl>
-
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>LOWESS is a nonparametric regression method that combines polynomial regression
@@ -225,8 +158,8 @@ with local weighting. It is particularly useful for:</p>
 <li><p><strong>Robust estimation</strong> that is resistant to outliers</p></li>
 <li><p><strong>Exploratory data analysis</strong> to reveal underlying trends</p></li>
 </ul>
-<p>The implementation exactly matches R’s <code class="docutils literal notranslate"><span class="pre">stats::lowess</span></code> function, ensuring
-reproducibility across R and Python workflows.</p>
+<p>Output is deterministic: the returned <code class="docutils literal notranslate"><span class="pre">x</span></code> values are sorted in ascending
+order and <code class="docutils literal notranslate"><span class="pre">y</span></code> contains the smoothed values aligned to that sorted <code class="docutils literal notranslate"><span class="pre">x</span></code>.</p>
 </section>
 <section id="example-usage">
 <h2>Example Usage<a class="headerlink" href="#example-usage" title="Link to this heading"></a></h2>
@@ -266,7 +199,7 @@ reproducibility across R and Python workflows.</p>
 <span class="n">result_robust</span> <span class="o">=</span> <span class="n">lowess</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y_outliers</span><span class="p">,</span> <span class="nb">iter</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Using 2D input (R-style):</p>
+<p>Using 2D input (single array containing both x and y):</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Combine x and y into 2D array</span>
 <span class="n">xy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">])</span>
 
@@ -325,7 +258,6 @@ Scatterplots”. <em>Journal of the American Statistical Association</em> 74(368
 <h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="msdecompose.html"><span class="doc">msdecompose</span></a> - Uses LOWESS internally for trend extraction</p></li>
-<li><p>R’s <code class="docutils literal notranslate"><span class="pre">stats::lowess</span></code> - Equivalent R function</p></li>
 </ul>
 </section>
 </section>

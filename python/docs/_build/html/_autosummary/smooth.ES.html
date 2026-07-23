@@ -20,7 +20,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="smooth.ES.fit" href="smooth.ES.fit.html" />
+    <link rel="next" title="smooth.ES.coefbootstrap" href="smooth.ES.coefbootstrap.html" />
     <link rel="prev" title="smooth.AutoADAM.transition" href="smooth.AutoADAM.transition.html" /> 
 </head>
 
@@ -48,16 +48,24 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">smooth.ES</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#smooth.ES"><code class="docutils literal notranslate"><span class="pre">ES</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.coefbootstrap.html">smooth.ES.coefbootstrap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.confint.html">smooth.ES.confint</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.multicov.html">smooth.ES.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.outlierdummy.html">smooth.ES.outlierdummy</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.plot.html">smooth.ES.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.point_lik.html">smooth.ES.point_lik</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.reapply.html">smooth.ES.reapply</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.reforecast.html">smooth.ES.reforecast</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.rmultistep.html">smooth.ES.rmultistep</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.rstandard.html">smooth.ES.rstandard</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.rstudent.html">smooth.ES.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.simulate.html">smooth.ES.simulate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.vcov.html">smooth.ES.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.actuals.html">smooth.ES.actuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.aic.html">smooth.ES.aic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.aicc.html">smooth.ES.aicc</a></li>
@@ -65,10 +73,12 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.bic.html">smooth.ES.bic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.bicc.html">smooth.ES.bicc</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.coef.html">smooth.ES.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.coef_names.html">smooth.ES.coef_names</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.constant_value.html">smooth.ES.constant_value</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.data.html">smooth.ES.data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.distribution_.html">smooth.ES.distribution_</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.error_type.html">smooth.ES.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.fisher_information_.html">smooth.ES.fisher_information_</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.fitted.html">smooth.ES.fitted</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.holdout_data.html">smooth.ES.holdout_data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.ic_weights.html">smooth.ES.ic_weights</a></li>
@@ -99,6 +109,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.transition.html">smooth.ES.transition</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
@@ -130,6 +141,12 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -152,6 +169,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
@@ -186,7 +204,7 @@
 <h1>smooth.ES<a class="headerlink" href="#smooth-es" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="smooth.ES">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">ES</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ZXZ'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_season</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.ES" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">ES</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ZXZ'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_season</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smoother</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.ES" title="Link to this definition"></a></dt>
 <dd><p>Exponential Smoothing in Single Source of Error (SSOE) state space model.</p>
 <p>This class is a wrapper around ADAM that provides a simplified interface
 for pure ETS (Error, Trend, Seasonal) models without ARIMA components.
@@ -209,7 +227,7 @@ It uses normal distribution for errors and conventional ETS formulation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>List</em><em>[</em><em>str</em><em>]</em><em>]</em><em>, </em><em>default=&quot;ZXZ&quot;</em>) – <p>The type of ETS model. The first letter stands for the type of error
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>]]</span>) – <p>The type of ETS model. The first letter stands for the type of error
 (“A” or “M”), the second for trend (“N”, “A”, “Ad”, “M” or “Md”),
 and the third for seasonality (“N”, “A” or “M”).</p>
 <p>Examples: “ANN”, “AAN”, “AAdN”, “AAA”, “AAdA”, “MAdM”</p>
@@ -221,28 +239,28 @@ and the third for seasonality (“N”, “A” or “M”).</p>
 - “CCC”: Combination of all models using AIC weights</p>
 <p>Can also be a list of model names for custom model pool.</p>
 </p></li>
-<li><p><strong>lags</strong> (<em>Optional</em><em>[</em><em>Union</em><em>[</em><em>int</em><em>, </em><em>List</em><em>[</em><em>int</em><em>]</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – Seasonal period(s). Can be a single integer or a list of integers.
+<li><p><strong>lags</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]]</span>) – Seasonal period(s). Can be a single integer or a list of integers.
 E.g., <code class="docutils literal notranslate"><span class="pre">lags=12</span></code> is equivalent to <code class="docutils literal notranslate"><span class="pre">lags=[12]</span></code>.
 For monthly data with annual seasonality: <code class="docutils literal notranslate"><span class="pre">lags=12</span></code> or <code class="docutils literal notranslate"><span class="pre">lags=[1,</span> <span class="pre">12]</span></code>.
 If None, defaults to [1] (no seasonality).</p></li>
-<li><p><strong>persistence</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – Fixed persistence (smoothing) parameters. If None, estimated.
+<li><p><strong>persistence</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]]</span>) – Fixed persistence (smoothing) parameters. If None, estimated.
 Keys: “alpha” (level), “beta” (trend), “gamma” (seasonal).</p></li>
-<li><p><strong>phi</strong> (<em>Optional</em><em>[</em><em>float</em><em>]</em><em>, </em><em>default=None</em>) – Damping parameter for damped trend models. If None, estimated when applicable.</p></li>
-<li><p><strong>initial</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em><em>, </em><em>default=&quot;backcasting&quot;</em>) – Method for initializing states or dictionary of fixed initial values.
+<li><p><strong>phi</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]</span>) – Damping parameter for damped trend models. If None, estimated when applicable.</p></li>
+<li><p><strong>initial</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>], <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>]</span>) – Method for initializing states or dictionary of fixed initial values.
 String options: “backcasting”, “optimal”, “complete”, “two-stage”</p></li>
-<li><p><strong>initial_season</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – Initial values for seasonal components. If None, estimated.
+<li><p><strong>initial_season</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Initial values for seasonal components. If None, estimated.
 Length should be (seasonal_period - 1) for each seasonal component.</p></li>
-<li><p><strong>ic</strong> (<em>Literal</em><em>[</em><em>&quot;AIC&quot;</em><em>, </em><em>&quot;AICc&quot;</em><em>, </em><em>&quot;BIC&quot;</em><em>, </em><em>&quot;BICc&quot;</em><em>]</em><em>, </em><em>default=&quot;AICc&quot;</em>) – Information criterion for model selection.</p></li>
-<li><p><strong>loss</strong> (<em>LOSS_OPTIONS</em><em>, </em><em>default=&quot;likelihood&quot;</em>) – Loss function for parameter estimation.</p></li>
-<li><p><strong>h</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em><em>, </em><em>default=None</em>) – Forecast horizon. Can also be set in predict().</p></li>
-<li><p><strong>holdout</strong> (<em>bool</em><em>, </em><em>default=False</em>) – Whether to use holdout sample for validation.</p></li>
-<li><p><strong>bounds</strong> (<em>Literal</em><em>[</em><em>&quot;usual&quot;</em><em>, </em><em>&quot;admissible&quot;</em><em>, </em><em>&quot;none&quot;</em><em>]</em><em>, </em><em>default=&quot;usual&quot;</em>) – Parameter bounds type:
+<li><p><strong>ic</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'AIC'</span></code>, <code class="docutils literal notranslate"><span class="pre">'AICc'</span></code>, <code class="docutils literal notranslate"><span class="pre">'BIC'</span></code>, <code class="docutils literal notranslate"><span class="pre">'BICc'</span></code>]</span>) – Information criterion for model selection.</p></li>
+<li><p><strong>loss</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'likelihood'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GPL'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MSE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MAE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'HAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MSEh'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MAEh'</span></code>, <code class="docutils literal notranslate"><span class="pre">'HAMh'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MSCE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MACE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'CHAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'TMSE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'TMAE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'THAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GTMSE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GTAME'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GTHAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'LASSO'</span></code>, <code class="docutils literal notranslate"><span class="pre">'RIDGE'</span></code>]</span>) – Loss function for parameter estimation.</p></li>
+<li><p><strong>h</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Forecast horizon. Can also be set in predict().</p></li>
+<li><p><strong>holdout</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether to use holdout sample for validation.</p></li>
+<li><p><strong>bounds</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'usual'</span></code>, <code class="docutils literal notranslate"><span class="pre">'admissible'</span></code>, <code class="docutils literal notranslate"><span class="pre">'none'</span></code>]</span>) – Parameter bounds type:
 - “usual”: Standard smoothing parameter constraints
 - “admissible”: Stability constraints
 - “none”: No constraints</p></li>
-<li><p><strong>verbose</strong> (<em>int</em><em>, </em><em>default=0</em>) – Verbosity level. 0 = silent.</p></li>
-<li><p><strong>regressors</strong> (<em>Literal</em><em>[</em><em>&quot;use&quot;</em><em>, </em><em>&quot;select&quot;</em><em>]</em><em>, </em><em>default=&quot;use&quot;</em>) – How to handle external regressors.</p></li>
-<li><p><strong>initial_X</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – Initial values for regressor coefficients.</p></li>
+<li><p><strong>verbose</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Verbosity level. 0 = silent.</p></li>
+<li><p><strong>regressors</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'use'</span></code>, <code class="docutils literal notranslate"><span class="pre">'select'</span></code>]</span>) – How to handle external regressors.</p></li>
+<li><p><strong>initial_X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Initial values for regressor coefficients.</p></li>
 <li><p><strong>**kwargs</strong> – Additional arguments passed to ADAM.</p></li>
 </ul>
 </dd>
@@ -300,20 +318,38 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
 <p class="rubric">Methods</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.coefbootstrap.html#smooth.ES.coefbootstrap" title="smooth.ES.coefbootstrap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coefbootstrap</span></code></a>([nsim, size, replace, prob, ...])</p></td>
+<td><p>Bootstrap the coefficient sampling distribution by refitting subsamples.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.confint.html#smooth.ES.confint" title="smooth.ES.confint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">confint</span></code></a>([parm, level, type, bootstrap, ...])</p></td>
+<td><p>Confidence intervals for the estimated parameters.</p></td>
+</tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.fit.html#smooth.ES.fit" title="smooth.ES.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>(y[, X])</p></td>
 <td><p>Fit the ADAM model to time series data.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.outlierdummy.html#smooth.ES.outlierdummy" title="smooth.ES.outlierdummy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">outlierdummy</span></code></a>([level, type])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.multicov.html#smooth.ES.multicov" title="smooth.ES.multicov"><code class="xref py py-obj docutils literal notranslate"><span class="pre">multicov</span></code></a>([type, h, nsim])</p></td>
+<td><p>Covariance matrix of multi-step-ahead forecast errors.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.outlierdummy.html#smooth.ES.outlierdummy" title="smooth.ES.outlierdummy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">outlierdummy</span></code></a>([level, type])</p></td>
 <td><p>Detect outliers and return a matrix of indicator dummy variables.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.plot.html#smooth.ES.plot" title="smooth.ES.plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot</span></code></a>([which, level, legend, lowess])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.plot.html#smooth.ES.plot" title="smooth.ES.plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot</span></code></a>([which, level, legend, lowess])</p></td>
 <td><p>Diagnostic plots for the fitted ADAM model (R: <code class="docutils literal notranslate"><span class="pre">plot.adam</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.point_lik.html#smooth.ES.point_lik" title="smooth.ES.point_lik"><code class="xref py py-obj docutils literal notranslate"><span class="pre">point_lik</span></code></a>([log])</p></td>
+<td><p>Per-observation log-likelihood of the fitted model.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.predict.html#smooth.ES.predict" title="smooth.ES.predict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict</span></code></a>(h[, X, interval, level, side, ...])</p></td>
 <td><p>Generate forecasts using the fitted ADAM model.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.predict_intervals.html#smooth.ES.predict_intervals" title="smooth.ES.predict_intervals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict_intervals</span></code></a>(h[, X, levels, side, nsim])</p></td>
 <td><p>Generate prediction intervals using the fitted ADAM model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.reapply.html#smooth.ES.reapply" title="smooth.ES.reapply"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reapply</span></code></a>([nsim, type, bootstrap, heuristics, ...])</p></td>
+<td><p>Re-run the model on the in-sample data for <code class="docutils literal notranslate"><span class="pre">nsim</span></code> parameter draws.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.reforecast.html#smooth.ES.reforecast" title="smooth.ES.reforecast"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reforecast</span></code></a>([h, X, occurrence, interval, ...])</p></td>
+<td><p>Produce <code class="docutils literal notranslate"><span class="pre">h</span></code>-step-ahead forecasts via Monte-Carlo reforecasting.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.rmultistep.html#smooth.ES.rmultistep" title="smooth.ES.rmultistep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rmultistep</span></code></a>([h])</p></td>
 <td><p>Return the (T-h) × h matrix of rolling in-sample multistep forecast errors.</p></td>
@@ -327,8 +363,14 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.select_best_model.html#smooth.ES.select_best_model" title="smooth.ES.select_best_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">select_best_model</span></code></a>()</p></td>
 <td><p>Select the best model based on information criteria and update model parameters.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.summary.html#smooth.ES.summary" title="smooth.ES.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([digits])</p></td>
-<td><p>Generate a formatted summary of the fitted model.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.simulate.html#smooth.ES.simulate" title="smooth.ES.simulate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulate</span></code></a>([nsim, seed, obs, randomizer])</p></td>
+<td><p>Re-simulate <code class="docutils literal notranslate"><span class="pre">obs</span></code> observations from the fitted model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.summary.html#smooth.ES.summary" title="smooth.ES.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([level, digits, type])</p></td>
+<td><p>Generate a coefficient-table summary of the fitted model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.vcov.html#smooth.ES.vcov" title="smooth.ES.vcov"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vcov</span></code></a>([type, bootstrap, heuristics, step_size])</p></td>
+<td><p>Variance-covariance matrix of the estimated parameters.</p></td>
 </tr>
 </tbody>
 </table>
@@ -356,17 +398,23 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.coef.html#smooth.ES.coef" title="smooth.ES.coef"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coef</span></code></a></p></td>
 <td><p>Return estimated coefficients (parameter vector B).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.constant_value.html#smooth.ES.constant_value" title="smooth.ES.constant_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_value</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.coef_names.html#smooth.ES.coef_names" title="smooth.ES.coef_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coef_names</span></code></a></p></td>
+<td><p>Parameter names aligned with <code class="xref py py-attr docutils literal notranslate"><span class="pre">coef</span></code> (the B vector).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.constant_value.html#smooth.ES.constant_value" title="smooth.ES.constant_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_value</span></code></a></p></td>
 <td><p>$constant).</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.data.html#smooth.ES.data" title="smooth.ES.data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.data.html#smooth.ES.data" title="smooth.ES.data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span></code></a></p></td>
 <td><p>$data).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.distribution_.html#smooth.ES.distribution_" title="smooth.ES.distribution_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">distribution_</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.distribution_.html#smooth.ES.distribution_" title="smooth.ES.distribution_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">distribution_</span></code></a></p></td>
 <td><p>$distribution).</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.error_type.html#smooth.ES.error_type" title="smooth.ES.error_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_type</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.error_type.html#smooth.ES.error_type" title="smooth.ES.error_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_type</span></code></a></p></td>
 <td><p>'A' (additive) or 'M' (multiplicative).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.fisher_information_.html#smooth.ES.fisher_information_" title="smooth.ES.fisher_information_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fisher_information_</span></code></a></p></td>
+<td><p>Observed Fisher Information matrix at the estimated parameters.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.fitted.html#smooth.ES.fitted" title="smooth.ES.fitted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted</span></code></a></p></td>
 <td><p>Return in-sample fitted values.</p></td>
@@ -438,10 +486,10 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
 <td><p>Return model residuals (errors from fitting).</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.scale.html#smooth.ES.scale" title="smooth.ES.scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale</span></code></a></p></td>
-<td><p>$scale).</p></td>
+<td><p>Internal optimisation scale of the error distribution (R: <code class="docutils literal notranslate"><span class="pre">adam_obj$scale</span></code>).</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.sigma.html#smooth.ES.sigma" title="smooth.ES.sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma</span></code></a></p></td>
-<td><p>Return scale/standard error estimate.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sigma(adam_obj)</span></code>).</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.states.html#smooth.ES.states" title="smooth.ES.states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">states</span></code></a></p></td>
 <td><p>$states).</p></td>
@@ -461,7 +509,7 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="smooth.AutoADAM.transition.html" class="btn btn-neutral float-left" title="smooth.AutoADAM.transition" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="smooth.ES.fit.html" class="btn btn-neutral float-right" title="smooth.ES.fit" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="smooth.ES.coefbootstrap.html" class="btn btn-neutral float-right" title="smooth.ES.coefbootstrap" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

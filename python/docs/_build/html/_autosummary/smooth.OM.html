@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="smooth.OM.fit" href="smooth.OM.fit.html" />
+    <link rel="next" title="smooth.OM.coefbootstrap" href="smooth.OM.coefbootstrap.html" />
     <link rel="prev" title="smooth.AutoMSARIMA.transition" href="smooth.AutoMSARIMA.transition.html" /> 
 </head>
 
@@ -46,20 +46,29 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">smooth.OM</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#smooth.OM"><code class="docutils literal notranslate"><span class="pre">OM</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.coefbootstrap.html">smooth.OM.coefbootstrap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.confint.html">smooth.OM.confint</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.multicov.html">smooth.OM.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.outlierdummy.html">smooth.OM.outlierdummy</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.plot.html">smooth.OM.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.point_lik.html">smooth.OM.point_lik</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.predict_intervals.html">smooth.OM.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.reapply.html">smooth.OM.reapply</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.reforecast.html">smooth.OM.reforecast</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.rmultistep.html">smooth.OM.rmultistep</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.rstandard.html">smooth.OM.rstandard</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.rstudent.html">smooth.OM.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.select_best_model.html">smooth.OM.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.simulate.html">smooth.OM.simulate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.summary.html">smooth.OM.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.vcov.html">smooth.OM.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.actuals.html">smooth.OM.actuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.aic.html">smooth.OM.aic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.aicc.html">smooth.OM.aicc</a></li>
@@ -67,10 +76,12 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.bic.html">smooth.OM.bic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.bicc.html">smooth.OM.bicc</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.coef.html">smooth.OM.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.coef_names.html">smooth.OM.coef_names</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.constant_value.html">smooth.OM.constant_value</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.data.html">smooth.OM.data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.distribution_.html">smooth.OM.distribution_</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.error_type.html">smooth.OM.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.fisher_information_.html">smooth.OM.fisher_information_</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.fitted.html">smooth.OM.fitted</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.holdout_data.html">smooth.OM.holdout_data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.ic_weights.html">smooth.OM.ic_weights</a></li>
@@ -131,6 +142,12 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -153,6 +170,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
@@ -187,25 +205,37 @@
 <h1>smooth.OM<a class="headerlink" href="#smooth-om" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="smooth.OM">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">OM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ZXZ'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ar_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ma_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">occurrence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'odds-ratio'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlopt_kargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ets</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'conventional'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.OM" title="Link to this definition"></a></dt>
-<dd><p>Occurrence model — Python port of R’s <code class="docutils literal notranslate"><span class="pre">om()</span></code>.</p>
-<p>Inherits the ADAM API surface and overrides the bits that differ:
-cost function (Bernoulli likelihood with link transform), distribution
-(always <code class="docutils literal notranslate"><span class="pre">&quot;plogis&quot;</span></code>), scale (<code class="docutils literal notranslate"><span class="pre">nan</span></code>), and model-name format
-(<code class="docutils literal notranslate"><span class="pre">&quot;oETS(...)[F|O|I|D]&quot;</span></code>).</p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">smooth.</span></span><span class="sig-name descname"><span class="pre">OM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ZXZ'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ar_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ma_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orders</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'use'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">occurrence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'odds-ratio'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'likelihood'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reg_lambda</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holdout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'backcasting'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'AICc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'usual'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlopt_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ets</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'conventional'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smoother</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'default'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.OM" title="Link to this definition"></a></dt>
+<dd><p>Occurrence model — state-space model for the probability of demand occurrence.</p>
+<p>Inherits the ADAM API surface and overrides the bits that differ for an
+occurrence model: cost function (Bernoulli likelihood applied to the
+link-transformed fitted values), distribution (always <code class="docutils literal notranslate"><span class="pre">&quot;plogis&quot;</span></code>),
+scale (<code class="docutils literal notranslate"><span class="pre">nan</span></code>), and model-name format (<code class="docutils literal notranslate"><span class="pre">&quot;oETS(...)[F|O|I|D]&quot;</span></code>).</p>
 </dd></dl>
 
 <p class="rubric">Methods</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.coefbootstrap.html#smooth.OM.coefbootstrap" title="smooth.OM.coefbootstrap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coefbootstrap</span></code></a>([nsim, size, replace, prob, ...])</p></td>
+<td><p>Bootstrap the coefficient sampling distribution by refitting subsamples.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.confint.html#smooth.OM.confint" title="smooth.OM.confint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">confint</span></code></a>([parm, level, type, bootstrap, ...])</p></td>
+<td><p>Confidence intervals for the estimated parameters.</p></td>
+</tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.fit.html#smooth.OM.fit" title="smooth.OM.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>(y[, X])</p></td>
 <td><p>Fit the ADAM model to time series data.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.outlierdummy.html#smooth.OM.outlierdummy" title="smooth.OM.outlierdummy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">outlierdummy</span></code></a>([level, type])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.multicov.html#smooth.OM.multicov" title="smooth.OM.multicov"><code class="xref py py-obj docutils literal notranslate"><span class="pre">multicov</span></code></a>([type, h, nsim])</p></td>
+<td><p>Covariance matrix of multi-step-ahead forecast errors.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.outlierdummy.html#smooth.OM.outlierdummy" title="smooth.OM.outlierdummy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">outlierdummy</span></code></a>([level, type])</p></td>
 <td><p>Detect outliers and return a matrix of indicator dummy variables.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.plot.html#smooth.OM.plot" title="smooth.OM.plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot</span></code></a>([which, level, legend, lowess])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.plot.html#smooth.OM.plot" title="smooth.OM.plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot</span></code></a>([which, level, legend, lowess])</p></td>
 <td><p>Diagnostic plots for the fitted ADAM model (R: <code class="docutils literal notranslate"><span class="pre">plot.adam</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.point_lik.html#smooth.OM.point_lik" title="smooth.OM.point_lik"><code class="xref py py-obj docutils literal notranslate"><span class="pre">point_lik</span></code></a>([log])</p></td>
+<td><p>Per-observation log-likelihood of the occurrence model.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.predict.html#smooth.OM.predict" title="smooth.OM.predict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict</span></code></a>(h[, X, interval, level, side, ...])</p></td>
 <td><p>Probability forecast for the occurrence model.</p></td>
@@ -213,20 +243,32 @@ cost function (Bernoulli likelihood with link transform), distribution
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.predict_intervals.html#smooth.OM.predict_intervals" title="smooth.OM.predict_intervals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict_intervals</span></code></a>(h[, X, levels, side, nsim])</p></td>
 <td><p>Generate prediction intervals using the fitted ADAM model.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.reapply.html#smooth.OM.reapply" title="smooth.OM.reapply"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reapply</span></code></a>([nsim, type, bootstrap, heuristics, ...])</p></td>
+<td><p>Re-run the model on the in-sample data for <code class="docutils literal notranslate"><span class="pre">nsim</span></code> parameter draws.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.reforecast.html#smooth.OM.reforecast" title="smooth.OM.reforecast"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reforecast</span></code></a>([h, X, occurrence, interval, ...])</p></td>
+<td><p>Produce <code class="docutils literal notranslate"><span class="pre">h</span></code>-step-ahead forecasts via Monte-Carlo reforecasting.</p></td>
+</tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.rmultistep.html#smooth.OM.rmultistep" title="smooth.OM.rmultistep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rmultistep</span></code></a>([h])</p></td>
 <td><p>Return the (T-h) × h matrix of rolling in-sample multistep forecast errors.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.rstandard.html#smooth.OM.rstandard" title="smooth.OM.rstandard"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rstandard</span></code></a>()</p></td>
-<td><p>Return standardised residuals.</p></td>
+<td><p>Pearson standardised residuals for the occurrence model.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.rstudent.html#smooth.OM.rstudent" title="smooth.OM.rstudent"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rstudent</span></code></a>()</p></td>
-<td><p>Return studentised (leave-one-out) residuals.</p></td>
+<td><p>Pearson studentised (leave-one-out) residuals for the occurrence model.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.select_best_model.html#smooth.OM.select_best_model" title="smooth.OM.select_best_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">select_best_model</span></code></a>()</p></td>
 <td><p>Select the best model based on information criteria and update model parameters.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.summary.html#smooth.OM.summary" title="smooth.OM.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([digits])</p></td>
-<td><p>Generate a formatted summary of the fitted model.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.simulate.html#smooth.OM.simulate" title="smooth.OM.simulate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulate</span></code></a>([nsim, seed, obs, randomizer])</p></td>
+<td><p>Re-simulate probabilities + 0/1 occurrence indicators.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.summary.html#smooth.OM.summary" title="smooth.OM.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([level, digits, type])</p></td>
+<td><p>Coefficient-table summary, mirroring R's <code class="docutils literal notranslate"><span class="pre">summary.om</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.vcov.html#smooth.OM.vcov" title="smooth.OM.vcov"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vcov</span></code></a>([type, bootstrap, heuristics, step_size])</p></td>
+<td><p>Variance-covariance matrix of the estimated parameters.</p></td>
 </tr>
 </tbody>
 </table>
@@ -234,7 +276,7 @@ cost function (Bernoulli likelihood with link transform), distribution
 <table class="autosummary longtable docutils align-default">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.actuals.html#smooth.OM.actuals" title="smooth.OM.actuals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">actuals</span></code></a></p></td>
-<td><p>Binary 0/1 occurrence indicator (matches R's <code class="docutils literal notranslate"><span class="pre">actuals.om</span></code>).</p></td>
+<td><p>In-sample actuals.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.aic.html#smooth.OM.aic" title="smooth.OM.aic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">aic</span></code></a></p></td>
 <td><p>Return Akaike Information Criterion.</p></td>
@@ -254,17 +296,23 @@ cost function (Bernoulli likelihood with link transform), distribution
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.coef.html#smooth.OM.coef" title="smooth.OM.coef"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coef</span></code></a></p></td>
 <td><p>Return estimated coefficients (parameter vector B).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.constant_value.html#smooth.OM.constant_value" title="smooth.OM.constant_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_value</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.coef_names.html#smooth.OM.coef_names" title="smooth.OM.coef_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coef_names</span></code></a></p></td>
+<td><p>Parameter names aligned with <code class="xref py py-attr docutils literal notranslate"><span class="pre">coef</span></code> (the B vector).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.constant_value.html#smooth.OM.constant_value" title="smooth.OM.constant_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_value</span></code></a></p></td>
 <td><p>$constant).</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.data.html#smooth.OM.data" title="smooth.OM.data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.data.html#smooth.OM.data" title="smooth.OM.data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span></code></a></p></td>
 <td><p>$data).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.distribution_.html#smooth.OM.distribution_" title="smooth.OM.distribution_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">distribution_</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.distribution_.html#smooth.OM.distribution_" title="smooth.OM.distribution_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">distribution_</span></code></a></p></td>
 <td><p>Always <code class="docutils literal notranslate"><span class="pre">&quot;plogis&quot;</span></code> for occurrence models.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.error_type.html#smooth.OM.error_type" title="smooth.OM.error_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_type</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.error_type.html#smooth.OM.error_type" title="smooth.OM.error_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_type</span></code></a></p></td>
 <td><p>'A' (additive) or 'M' (multiplicative).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.fisher_information_.html#smooth.OM.fisher_information_" title="smooth.OM.fisher_information_"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fisher_information_</span></code></a></p></td>
+<td><p>Observed Fisher Information matrix at the estimated parameters.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.fitted.html#smooth.OM.fitted" title="smooth.OM.fitted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted</span></code></a></p></td>
 <td><p>In-sample fitted <em>probabilities</em> in [0, 1].</p></td>
@@ -342,10 +390,10 @@ cost function (Bernoulli likelihood with link transform), distribution
 <td><p><code class="docutils literal notranslate"><span class="pre">ot</span> <span class="pre">-</span> <span class="pre">p_fitted</span></code> (binary indicator minus fitted probability).</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.scale.html#smooth.OM.scale" title="smooth.OM.scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale</span></code></a></p></td>
-<td><p>Always NaN for occurrence models (no continuous error scale).</p></td>
+<td><p>Link-scale residual std-dev — alias for <code class="xref py py-attr docutils literal notranslate"><span class="pre">sigma</span></code>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.OM.sigma.html#smooth.OM.sigma" title="smooth.OM.sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma</span></code></a></p></td>
-<td><p>Same as <code class="xref py py-attr docutils literal notranslate"><span class="pre">scale</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sqrt(mean(residuals²))</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.OM.states.html#smooth.OM.states" title="smooth.OM.states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">states</span></code></a></p></td>
 <td><p>$states).</p></td>
@@ -365,7 +413,7 @@ cost function (Bernoulli likelihood with link transform), distribution
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="smooth.AutoMSARIMA.transition.html" class="btn btn-neutral float-left" title="smooth.AutoMSARIMA.transition" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="smooth.OM.fit.html" class="btn btn-neutral float-right" title="smooth.OM.fit" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="smooth.OM.coefbootstrap.html" class="btn btn-neutral float-right" title="smooth.OM.coefbootstrap" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

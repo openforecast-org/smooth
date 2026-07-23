@@ -14,16 +14,24 @@
    :toctree:
    :template: method.rst
 
+   ~ADAM.coefbootstrap
+   ~ADAM.confint
    ~ADAM.fit
+   ~ADAM.multicov
    ~ADAM.outlierdummy
    ~ADAM.plot
+   ~ADAM.point_lik
    ~ADAM.predict
    ~ADAM.predict_intervals
+   ~ADAM.reapply
+   ~ADAM.reforecast
    ~ADAM.rmultistep
    ~ADAM.rstandard
    ~ADAM.rstudent
    ~ADAM.select_best_model
+   ~ADAM.simulate
    ~ADAM.summary
+   ~ADAM.vcov
 
 
 
@@ -41,10 +49,12 @@
    ~ADAM.bic
    ~ADAM.bicc
    ~ADAM.coef
+   ~ADAM.coef_names
    ~ADAM.constant_value
    ~ADAM.data
    ~ADAM.distribution_
    ~ADAM.error_type
+   ~ADAM.fisher_information_
    ~ADAM.fitted
    ~ADAM.holdout_data
    ~ADAM.ic_weights

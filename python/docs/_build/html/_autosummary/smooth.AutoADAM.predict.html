@@ -20,7 +20,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="smooth.AutoADAM.predict_intervals" href="smooth.AutoADAM.predict_intervals.html" />
-    <link rel="prev" title="smooth.AutoADAM.plot" href="smooth.AutoADAM.plot.html" /> 
+    <link rel="prev" title="smooth.AutoADAM.point_lik" href="smooth.AutoADAM.point_lik.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
@@ -80,6 +81,12 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -102,6 +109,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
@@ -137,17 +145,15 @@
 <h1>smooth.AutoADAM.predict<a class="headerlink" href="#smooth-autoadam-predict" title="Link to this heading"></a></h1>
 <dl class="py method">
 <dt class="sig sig-object py" id="smooth.AutoADAM.predict">
-<span class="sig-prename descclassname"><span class="pre">AutoADAM.</span></span><span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">h</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'none'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">side</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'both'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cumulative</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nsim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">occurrence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scenarios</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.AutoADAM.predict" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">AutoADAM.</span></span><span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">h</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'none'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">side</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'both'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cumulative</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nsim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">occurrence</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scenarios</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.AutoADAM.predict" title="Link to this definition"></a></dt>
 <dd><p>Generate forecasts using the fitted ADAM model.</p>
-<p>Matches R’s <code class="docutils literal notranslate"><span class="pre">forecast.adam()</span></code> interface for interval types and
-additional parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>h</strong> (<em>int</em>) – Forecast horizon (number of steps to forecast).</p></li>
-<li><p><strong>X</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – Exogenous variables for the forecast period.
+<li><p><strong>h</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Forecast horizon (number of steps to forecast).</p></li>
+<li><p><strong>X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Exogenous variables for the forecast period.
 Ensure that X covers the entire forecast horizon <code class="docutils literal notranslate"><span class="pre">h</span></code>.</p></li>
-<li><p><strong>interval</strong> (<em>str</em><em>, </em><em>default=&quot;none&quot;</em>) – <p>Type of prediction interval to construct:</p>
+<li><p><strong>interval</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'none'</span></code>, <code class="docutils literal notranslate"><span class="pre">'prediction'</span></code>, <code class="docutils literal notranslate"><span class="pre">'simulated'</span></code>, <code class="docutils literal notranslate"><span class="pre">'approximate'</span></code>, <code class="docutils literal notranslate"><span class="pre">'semiparametric'</span></code>, <code class="docutils literal notranslate"><span class="pre">'nonparametric'</span></code>, <code class="docutils literal notranslate"><span class="pre">'empirical'</span></code>, <code class="docutils literal notranslate"><span class="pre">'confidence'</span></code>, <code class="docutils literal notranslate"><span class="pre">'complete'</span></code>]</span>) – <p>Type of prediction interval to construct:</p>
 <ul>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code>: No intervals, point forecasts only.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;prediction&quot;</span></code>: Automatically selects <code class="docutils literal notranslate"><span class="pre">&quot;simulated&quot;</span></code> or
@@ -161,7 +167,7 @@ Ensure that X covers the entire forecast horizon <code class="docutils literal n
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;complete&quot;</span></code>: Not yet implemented.</p></li>
 </ul>
 </p></li>
-<li><p><strong>level</strong> (<em>float</em><em> or </em><em>list</em><em> of </em><em>float</em><em>, </em><em>default=0.95</em>) – <p>Confidence level(s) for prediction intervals. Accepts a single
+<li><p><strong>level</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>], <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>]</span>) – <p>Confidence level(s) for prediction intervals. Accepts a single
 value (e.g. <code class="docutils literal notranslate"><span class="pre">0.95</span></code>) or a list for multiple simultaneous levels
 (e.g. <code class="docutils literal notranslate"><span class="pre">[0.9,</span> <span class="pre">0.95,</span> <span class="pre">0.99]</span></code>). Values above 1 are treated as
 percentages and divided by 100.</p>
@@ -170,19 +176,23 @@ in the output, where X is the corresponding quantile. For example,
 <code class="docutils literal notranslate"><span class="pre">level=0.95</span></code> with <code class="docutils literal notranslate"><span class="pre">side=&quot;both&quot;</span></code> yields columns
 <code class="docutils literal notranslate"><span class="pre">&quot;lower_0.025&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;upper_0.975&quot;</span></code>.</p>
 </p></li>
-<li><p><strong>side</strong> (<em>str</em><em>, </em><em>default=&quot;both&quot;</em>) – <p>Which side(s) of the intervals to compute:</p>
+<li><p><strong>side</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'both'</span></code>, <code class="docutils literal notranslate"><span class="pre">'upper'</span></code>, <code class="docutils literal notranslate"><span class="pre">'lower'</span></code>]</span>) – <p>Which side(s) of the intervals to compute:</p>
 <ul>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;both&quot;</span></code>: Both lower and upper bounds (default).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;upper&quot;</span></code>: Upper bound only. Column named <code class="docutils literal notranslate"><span class="pre">&quot;upper_&lt;level&gt;&quot;</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;lower&quot;</span></code>: Lower bound only. Column named <code class="docutils literal notranslate"><span class="pre">&quot;lower_&lt;1-level&gt;&quot;</span></code>.</p></li>
 </ul>
 </p></li>
-<li><p><strong>cumulative</strong> (<em>bool</em><em>, </em><em>default=False</em>) – If True, return cumulative (summed) forecasts over the horizon.</p></li>
-<li><p><strong>nsim</strong> (<em>int</em><em>, </em><em>default=10000</em>) – Number of simulations for simulation-based intervals.</p></li>
-<li><p><strong>occurrence</strong> (<em>Optional</em><em>[</em><em>NDArray</em><em>]</em><em>, </em><em>default=None</em>) – External occurrence probabilities for the forecast period.
+<li><p><strong>cumulative</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – If True, return cumulative (summed) forecasts over the horizon.</p></li>
+<li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of simulations for simulation-based intervals.</p></li>
+<li><p><strong>occurrence</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – External occurrence probabilities for the forecast period.
 Overrides the fitted model’s occurrence for forecasting.</p></li>
-<li><p><strong>scenarios</strong> (<em>bool</em><em>, </em><em>default=False</em>) – If True and <code class="docutils literal notranslate"><span class="pre">interval=&quot;simulated&quot;</span></code>, store the raw simulation
+<li><p><strong>scenarios</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – If True and <code class="docutils literal notranslate"><span class="pre">interval=&quot;simulated&quot;</span></code>, store the raw simulation
 matrix in <code class="docutils literal notranslate"><span class="pre">self._general[&quot;_scenarios_matrix&quot;]</span></code>.</p></li>
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Seed forwarded to <a class="reference internal" href="smooth.AutoADAM.reforecast.html#smooth.AutoADAM.reforecast" title="smooth.AutoADAM.reforecast"><code class="xref py py-meth docutils literal notranslate"><span class="pre">reforecast()</span></code></a> when <code class="docutils literal notranslate"><span class="pre">interval</span></code> is
+<code class="docutils literal notranslate"><span class="pre">&quot;complete&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;confidence&quot;</span></code>. Pins the Monte-Carlo
+paths so the interval is reproducible across runs and
+platforms. Ignored for the other <code class="docutils literal notranslate"><span class="pre">interval</span></code> modes.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -192,7 +202,7 @@ matrix in <code class="docutils literal notranslate"><span class="pre">self._gen
 pd.DataFrame.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>ForecastResult</p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code></span></p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>ValueError</strong> – If the model has not been fitted yet or <code class="docutils literal notranslate"><span class="pre">h</span></code> is not set.</p>
@@ -208,7 +218,7 @@ pd.DataFrame.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="smooth.AutoADAM.plot.html" class="btn btn-neutral float-left" title="smooth.AutoADAM.plot" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.AutoADAM.point_lik.html" class="btn btn-neutral float-left" title="smooth.AutoADAM.point_lik" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="smooth.AutoADAM.predict_intervals.html" class="btn btn-neutral float-right" title="smooth.AutoADAM.predict_intervals" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

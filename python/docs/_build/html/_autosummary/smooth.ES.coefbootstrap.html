@@ -1,0 +1,302 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>smooth.ES.coefbootstrap &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="smooth.ES.confint" href="smooth.ES.confint.html" />
+    <link rel="prev" title="smooth.ES" href="smooth.ES.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="smooth.ES.html">smooth.ES</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.html#smooth.ES"><code class="docutils literal notranslate"><span class="pre">ES</span></code></a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">smooth.ES.coefbootstrap</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#smooth.ES.coefbootstrap"><code class="docutils literal notranslate"><span class="pre">ES.coefbootstrap()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.confint.html">smooth.ES.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.multicov.html">smooth.ES.multicov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.outlierdummy.html">smooth.ES.outlierdummy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.plot.html">smooth.ES.plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.point_lik.html">smooth.ES.point_lik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.reapply.html">smooth.ES.reapply</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.reforecast.html">smooth.ES.reforecast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.rmultistep.html">smooth.ES.rmultistep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.rstandard.html">smooth.ES.rstandard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.rstudent.html">smooth.ES.rstudent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.simulate.html">smooth.ES.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.vcov.html">smooth.ES.vcov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.actuals.html">smooth.ES.actuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.aic.html">smooth.ES.aic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.aicc.html">smooth.ES.aicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.b_value.html">smooth.ES.b_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.bic.html">smooth.ES.bic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.bicc.html">smooth.ES.bicc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.coef.html">smooth.ES.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.coef_names.html">smooth.ES.coef_names</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.constant_value.html">smooth.ES.constant_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.data.html">smooth.ES.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.distribution_.html">smooth.ES.distribution_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.error_type.html">smooth.ES.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.fisher_information_.html">smooth.ES.fisher_information_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.fitted.html">smooth.ES.fitted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.holdout_data.html">smooth.ES.holdout_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.ic_weights.html">smooth.ES.ic_weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.initial_type.html">smooth.ES.initial_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.initial_value.html">smooth.ES.initial_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.is_combined.html">smooth.ES.is_combined</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.lags_used.html">smooth.ES.lags_used</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.loglik.html">smooth.ES.loglik</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.loss_.html">smooth.ES.loss_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.loss_value.html">smooth.ES.loss_value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.measurement.html">smooth.ES.measurement</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.model_name.html">smooth.ES.model_name</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.model_type.html">smooth.ES.model_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.models.html">smooth.ES.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.n_param.html">smooth.ES.n_param</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.nobs.html">smooth.ES.nobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.nparam.html">smooth.ES.nparam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.om_model.html">smooth.ES.om_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.orders.html">smooth.ES.orders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.persistence_vector.html">smooth.ES.persistence_vector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.phi_.html">smooth.ES.phi_</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.profile.html">smooth.ES.profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.residuals.html">smooth.ES.residuals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.scale.html">smooth.ES.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.sigma.html">smooth.ES.sigma</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.states.html">smooth.ES.states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.time_elapsed.html">smooth.ES.time_elapsed</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.transition.html">smooth.ES.transition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="smooth.ES.html">smooth.ES</a></li>
+      <li class="breadcrumb-item active">smooth.ES.coefbootstrap</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/smooth.ES.coefbootstrap.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="smooth-es-coefbootstrap">
+<h1>smooth.ES.coefbootstrap<a class="headerlink" href="#smooth-es-coefbootstrap" title="Link to this heading"></a></h1>
+<dl class="py method">
+<dt class="sig sig-object py" id="smooth.ES.coefbootstrap">
+<span class="sig-prename descclassname"><span class="pre">ES.</span></span><span class="sig-name descname"><span class="pre">coefbootstrap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nsim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cr'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#smooth.ES.coefbootstrap" title="Link to this definition"></a></dt>
+<dd><p>Bootstrap the coefficient sampling distribution by refitting subsamples.</p>
+<p>Mirrors R’s <code class="docutils literal notranslate"><span class="pre">coefbootstrap.adam</span></code> (R/adam.R:4850-5113). Draws <code class="docutils literal notranslate"><span class="pre">nsim</span></code>
+case-resamples of the in-sample series, refits the same model on each,
+and returns the empirical covariance / replicate matrix. The dispatch
+in <a class="reference internal" href="smooth.ES.vcov.html#smooth.ES.vcov" title="smooth.ES.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a> and <a class="reference internal" href="smooth.ES.confint.html#smooth.ES.confint" title="smooth.ES.confint"><code class="xref py py-meth docutils literal notranslate"><span class="pre">confint()</span></code></a> forwards <code class="docutils literal notranslate"><span class="pre">bootstrap=True</span></code> here.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of bootstrap replicates.</p></li>
+<li><p><strong>size</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Subsample size per replicate. Defaults to <code class="docutils literal notranslate"><span class="pre">floor(0.75</span> <span class="pre">*</span> <span class="pre">nobs)</span></code>,
+matching R.</p></li>
+<li><p><strong>replace</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Resample with replacement.</p></li>
+<li><p><strong>prob</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Sampling probabilities per observation (uniform if <code class="docutils literal notranslate"><span class="pre">None</span></code>).</p></li>
+<li><p><strong>parallel</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> runs replicates in parallel via <code class="docutils literal notranslate"><span class="pre">joblib.Parallel</span></code>
+(<code class="docutils literal notranslate"><span class="pre">cpu_count</span> <span class="pre">-</span> <span class="pre">1</span></code> workers). An integer specifies the exact
+worker count. Requires the optional <code class="docutils literal notranslate"><span class="pre">joblib</span></code> dependency
+(<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">joblib</span></code> or <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;smooth[parallel]&quot;</span></code>);
+if <code class="docutils literal notranslate"><span class="pre">joblib</span></code> is not importable, a one-line warning is emitted
+and the call falls back to a serial loop.</p></li>
+<li><p><strong>method</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – <code class="docutils literal notranslate"><span class="pre">&quot;cr&quot;</span></code> is case resampling (the implemented path). <code class="docutils literal notranslate"><span class="pre">&quot;dsr&quot;</span></code>
+(data-shape replication, R’s <code class="docutils literal notranslate"><span class="pre">greybox::dsrboot</span></code>) raises
+<code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code>.</p></li>
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Seed for the <code class="xref py py-class docutils literal notranslate"><span class="pre">numpy.random.Generator</span></code> used to draw indices.
+Makes the result reproducible (same indices in serial and
+parallel modes — the optimiser is deterministic given a fixed
+sample).</p></li>
+<li><p><strong>verbose</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Print a one-line progress message every 10% of replicates (in
+parallel mode, forwards <code class="docutils literal notranslate"><span class="pre">verbose=10</span></code> to <code class="docutils literal notranslate"><span class="pre">joblib.Parallel</span></code>).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Container with <code class="docutils literal notranslate"><span class="pre">.vcov</span></code>, <code class="docutils literal notranslate"><span class="pre">.coefficients</span></code>, <code class="docutils literal notranslate"><span class="pre">.method</span></code>,
+<code class="docutils literal notranslate"><span class="pre">.nsim</span></code>, <code class="docutils literal notranslate"><span class="pre">.nsim_effective</span></code>, <code class="docutils literal notranslate"><span class="pre">.size</span></code>, <code class="docutils literal notranslate"><span class="pre">.time_elapsed</span></code>, …
+Mirrors R’s <code class="docutils literal notranslate"><span class="pre">&quot;bootstrap&quot;</span></code> S3 class. <code class="docutils literal notranslate"><span class="pre">.parallel</span></code> reflects
+whether parallel execution actually ran (<code class="docutils literal notranslate"><span class="pre">False</span></code> when we
+fell back due to a missing <code class="docutils literal notranslate"><span class="pre">joblib</span></code>).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>smooth.adam_general.core.utils.bootstrap.BootstrapResult</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Replicates whose refit fails (non-convergence, mismatched parameter
+count) are dropped silently; <code class="docutils literal notranslate"><span class="pre">result.nsim_effective</span></code> reports the
+count that contributed to the variance estimate.</p>
+<p>Bootstrap on a model with external regressors (<code class="docutils literal notranslate"><span class="pre">X</span></code>) is not yet
+supported and will raise.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">m</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;ANN&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">b</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">coefbootstrap</span><span class="p">(</span><span class="n">nsim</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">b</span><span class="o">.</span><span class="n">vcov</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(1, 1)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<hr class="docutils" />
+<p><strong>Parent Class:</strong> <a class="reference internal" href="smooth.ES.html#smooth.ES" title="smooth.ES"><code class="xref py py-class docutils literal notranslate"><span class="pre">ES</span></code></a></p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="smooth.ES.html" class="btn btn-neutral float-left" title="smooth.ES" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.ES.confint.html" class="btn btn-neutral float-right" title="smooth.ES.confint" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

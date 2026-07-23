@@ -14,16 +14,24 @@
    :toctree:
    :template: method.rst
 
+   ~OM.coefbootstrap
+   ~OM.confint
    ~OM.fit
+   ~OM.multicov
    ~OM.outlierdummy
    ~OM.plot
+   ~OM.point_lik
    ~OM.predict
    ~OM.predict_intervals
+   ~OM.reapply
+   ~OM.reforecast
    ~OM.rmultistep
    ~OM.rstandard
    ~OM.rstudent
    ~OM.select_best_model
+   ~OM.simulate
    ~OM.summary
+   ~OM.vcov
 
 
 
@@ -41,10 +49,12 @@
    ~OM.bic
    ~OM.bicc
    ~OM.coef
+   ~OM.coef_names
    ~OM.constant_value
    ~OM.data
    ~OM.distribution_
    ~OM.error_type
+   ~OM.fisher_information_
    ~OM.fitted
    ~OM.holdout_data
    ~OM.ic_weights

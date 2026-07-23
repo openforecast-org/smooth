@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="smooth.AutoMSARIMA.predict" href="smooth.AutoMSARIMA.predict.html" />
+    <link rel="next" title="smooth.AutoMSARIMA.point_lik" href="smooth.AutoMSARIMA.point_lik.html" />
     <link rel="prev" title="smooth.AutoMSARIMA.outlierdummy" href="smooth.AutoMSARIMA.outlierdummy.html" /> 
 </head>
 
@@ -46,22 +46,31 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.html#smooth.AutoMSARIMA"><code class="docutils literal notranslate"><span class="pre">AutoMSARIMA</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.coefbootstrap.html">smooth.AutoMSARIMA.coefbootstrap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.confint.html">smooth.AutoMSARIMA.confint</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.multicov.html">smooth.AutoMSARIMA.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.outlierdummy.html">smooth.AutoMSARIMA.outlierdummy</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">smooth.AutoMSARIMA.plot</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#smooth.AutoMSARIMA.plot"><code class="docutils literal notranslate"><span class="pre">AutoMSARIMA.plot()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.point_lik.html">smooth.AutoMSARIMA.point_lik</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.predict_intervals.html">smooth.AutoMSARIMA.predict_intervals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.reapply.html">smooth.AutoMSARIMA.reapply</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.reforecast.html">smooth.AutoMSARIMA.reforecast</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.rmultistep.html">smooth.AutoMSARIMA.rmultistep</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.rstandard.html">smooth.AutoMSARIMA.rstandard</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.rstudent.html">smooth.AutoMSARIMA.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.select_best_model.html">smooth.AutoMSARIMA.select_best_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.simulate.html">smooth.AutoMSARIMA.simulate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.summary.html">smooth.AutoMSARIMA.summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.vcov.html">smooth.AutoMSARIMA.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.actuals.html">smooth.AutoMSARIMA.actuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.aic.html">smooth.AutoMSARIMA.aic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.aicc.html">smooth.AutoMSARIMA.aicc</a></li>
@@ -69,10 +78,12 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.bic.html">smooth.AutoMSARIMA.bic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.bicc.html">smooth.AutoMSARIMA.bicc</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.coef.html">smooth.AutoMSARIMA.coef</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.coef_names.html">smooth.AutoMSARIMA.coef_names</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.constant_value.html">smooth.AutoMSARIMA.constant_value</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.data.html">smooth.AutoMSARIMA.data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.distribution_.html">smooth.AutoMSARIMA.distribution_</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.error_type.html">smooth.AutoMSARIMA.error_type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.fisher_information_.html">smooth.AutoMSARIMA.fisher_information_</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.fitted.html">smooth.AutoMSARIMA.fitted</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.holdout_data.html">smooth.AutoMSARIMA.holdout_data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoMSARIMA.ic_weights.html">smooth.AutoMSARIMA.ic_weights</a></li>
@@ -132,6 +143,12 @@
 <li class="toctree-l1"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -154,6 +171,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
@@ -212,9 +230,9 @@
 <p>15 — ACF of Squared Residuals</p>
 <p>16 — PACF of Squared Residuals</p>
 </p></li>
-<li><p><strong>level</strong> (<em>float</em><em>, </em><em>optional</em>) – Confidence level for bounds and bands. Default 0.95.</p></li>
-<li><p><strong>legend</strong> (<em>bool</em><em>, </em><em>optional</em>) – Show legend on applicable plots (2, 3, 7, 8, 9). Default False.</p></li>
-<li><p><strong>lowess</strong> (<em>bool</em><em>, </em><em>optional</em>) – Add LOWESS smoothing line to scatter plots. Default True.</p></li>
+<li><p><strong>level</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – Confidence level for bounds and bands. Default 0.95.</p></li>
+<li><p><strong>legend</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Show legend on applicable plots (2, 3, 7, 8, 9). Default False.</p></li>
+<li><p><strong>lowess</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Add LOWESS smoothing line to scatter plots. Default True.</p></li>
 <li><p><strong>**kwargs</strong> – Passed to matplotlib (e.g. <code class="docutils literal notranslate"><span class="pre">figsize</span></code>).</p></li>
 </ul>
 </dd>
@@ -244,7 +262,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="smooth.AutoMSARIMA.outlierdummy.html" class="btn btn-neutral float-left" title="smooth.AutoMSARIMA.outlierdummy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="smooth.AutoMSARIMA.predict.html" class="btn btn-neutral float-right" title="smooth.AutoMSARIMA.predict" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="smooth.AutoMSARIMA.point_lik.html" class="btn btn-neutral float-right" title="smooth.AutoMSARIMA.point_lik" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -14,16 +14,24 @@
    :toctree:
    :template: method.rst
 
+   ~ES.coefbootstrap
+   ~ES.confint
    ~ES.fit
+   ~ES.multicov
    ~ES.outlierdummy
    ~ES.plot
+   ~ES.point_lik
    ~ES.predict
    ~ES.predict_intervals
+   ~ES.reapply
+   ~ES.reforecast
    ~ES.rmultistep
    ~ES.rstandard
    ~ES.rstudent
    ~ES.select_best_model
+   ~ES.simulate
    ~ES.summary
+   ~ES.vcov
 
 
 
@@ -41,10 +49,12 @@
    ~ES.bic
    ~ES.bicc
    ~ES.coef
+   ~ES.coef_names
    ~ES.constant_value
    ~ES.data
    ~ES.distribution_
    ~ES.error_type
+   ~ES.fisher_information_
    ~ES.fitted
    ~ES.holdout_data
    ~ES.ic_weights

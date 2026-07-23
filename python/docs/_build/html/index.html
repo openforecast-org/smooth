@@ -45,6 +45,7 @@
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.html">smooth.ADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.html">smooth.AutoADAM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.html">smooth.SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.html">smooth.MSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.html">smooth.OM</a></li>
@@ -76,6 +77,12 @@
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.summary.html">smooth.ES.summary</a></li>
 </ul>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
 </ul>
@@ -98,6 +105,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="om.html">OM, OMG and AutoOM</a></li>
 <li class="toctree-l1"><a class="reference internal" href="msdecompose.html">msdecompose</a></li>
@@ -143,20 +151,23 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.ES.html#smooth.ES" title="smooth.ES"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ES</span></code></a>([model, lags, persistence, phi, initial, ...])</p></td>
 <td><p>Exponential Smoothing in Single Source of Error (SSOE) state space model.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="msarima.html#smooth.MSARIMA" title="smooth.MSARIMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MSARIMA</span></code></a>([orders, lags, ar_order, i_order, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sma.html#smooth.SMA" title="smooth.SMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SMA</span></code></a>([order, ic, h, holdout, fast, verbose])</p></td>
+<td><p>Simple Moving Average in Single Source of Error state space form.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="msarima.html#smooth.MSARIMA" title="smooth.MSARIMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MSARIMA</span></code></a>([orders, lags, ar_order, i_order, ...])</p></td>
 <td><p>Multiple Seasonal ARIMA in Single Source of Error state space form.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="msarima.html#smooth.AutoMSARIMA" title="smooth.AutoMSARIMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AutoMSARIMA</span></code></a>([lags, ar_order, i_order, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="msarima.html#smooth.AutoMSARIMA" title="smooth.AutoMSARIMA"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AutoMSARIMA</span></code></a>([lags, ar_order, i_order, ...])</p></td>
 <td><p>Automatic Multiple Seasonal ARIMA with order selection.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="om.html#smooth.OM" title="smooth.OM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">OM</span></code></a>([model, lags, ar_order, i_order, ...])</p></td>
-<td><p>Occurrence model — Python port of R's <code class="docutils literal notranslate"><span class="pre">om()</span></code>.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="om.html#smooth.OM" title="smooth.OM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">OM</span></code></a>([model, lags, ar_order, i_order, ...])</p></td>
+<td><p>Occurrence model — state-space model for the probability of demand occurrence.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="om.html#smooth.OMG" title="smooth.OMG"><code class="xref py py-obj docutils literal notranslate"><span class="pre">OMG</span></code></a>([model_a, model_b, lags, orders_a, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="om.html#smooth.OMG" title="smooth.OMG"><code class="xref py py-obj docutils literal notranslate"><span class="pre">OMG</span></code></a>([model_a, model_b, lags, orders_a, ...])</p></td>
 <td><p>General occurrence model — two parallel ETS sub-models combined.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="om.html#smooth.AutoOM" title="smooth.AutoOM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AutoOM</span></code></a>([model, lags, orders, occurrence, h, ...])</p></td>
-<td><p>Automatic occurrence model selection — port of R's <code class="docutils literal notranslate"><span class="pre">auto.om()</span></code>.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="om.html#smooth.AutoOM" title="smooth.AutoOM"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AutoOM</span></code></a>([model, lags, orders, occurrence, h, ...])</p></td>
+<td><p>Automatic occurrence-model selection.</p></td>
 </tr>
 </tbody>
 </table>
@@ -177,8 +188,8 @@
 <tr class="row-even"><td><p><a class="reference internal" href="_autosummary/smooth.ADAM.select_best_model.html#smooth.ADAM.select_best_model" title="smooth.ADAM.select_best_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM.select_best_model</span></code></a>()</p></td>
 <td><p>Select the best model based on information criteria and update model parameters.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.ADAM.summary.html#smooth.ADAM.summary" title="smooth.ADAM.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM.summary</span></code></a>([digits])</p></td>
-<td><p>Generate a formatted summary of the fitted model.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.ADAM.summary.html#smooth.ADAM.summary" title="smooth.ADAM.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM.summary</span></code></a>([level, digits, type])</p></td>
+<td><p>Generate a coefficient-table summary of the fitted model.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="_autosummary/smooth.ADAM.plot.html#smooth.ADAM.plot" title="smooth.ADAM.plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM.plot</span></code></a>([which, level, legend, lowess])</p></td>
 <td><p>Diagnostic plots for the fitted ADAM model (R: <code class="docutils literal notranslate"><span class="pre">plot.adam</span></code>).</p></td>
@@ -231,8 +242,27 @@
 <tr class="row-even"><td><p><a class="reference internal" href="_autosummary/smooth.ES.select_best_model.html#smooth.ES.select_best_model" title="smooth.ES.select_best_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ES.select_best_model</span></code></a>()</p></td>
 <td><p>Select the best model based on information criteria and update model parameters.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.ES.summary.html#smooth.ES.summary" title="smooth.ES.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ES.summary</span></code></a>([digits])</p></td>
-<td><p>Generate a formatted summary of the fitted model.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.ES.summary.html#smooth.ES.summary" title="smooth.ES.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ES.summary</span></code></a>([level, digits, type])</p></td>
+<td><p>Generate a coefficient-table summary of the fitted model.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="sma-methods">
+<h2>SMA Methods<a class="headerlink" href="#sma-methods" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.SMA.fit.html#smooth.SMA.fit" title="smooth.SMA.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SMA.fit</span></code></a>(y[, X])</p></td>
+<td><p>Fit the SMA model to time series data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/smooth.SMA.predict.html#smooth.SMA.predict" title="smooth.SMA.predict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SMA.predict</span></code></a>(h[, X, interval, level, side, ...])</p></td>
+<td><p>Generate forecasts using the fitted ADAM model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.SMA.predict_intervals.html#smooth.SMA.predict_intervals" title="smooth.SMA.predict_intervals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SMA.predict_intervals</span></code></a>(h[, X, levels, side, nsim])</p></td>
+<td><p>Generate prediction intervals using the fitted ADAM model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/smooth.SMA.summary.html#smooth.SMA.summary" title="smooth.SMA.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SMA.summary</span></code></a>([level, digits, type])</p></td>
+<td><p>Generate a coefficient-table summary of the fitted model.</p></td>
 </tr>
 </tbody>
 </table>
@@ -309,12 +339,12 @@
 <section id="optimization-settings">
 <h2>Optimization Settings<a class="headerlink" href="#optimization-settings" title="Link to this heading"></a></h2>
 <p>The ADAM and ES classes use the NLopt library for parameter optimization. You can
-customize the optimization behavior via the <code class="docutils literal notranslate"><span class="pre">nlopt_kargs</span></code> parameter:</p>
+customize the optimization behavior via the <code class="docutils literal notranslate"><span class="pre">nlopt_kwargs</span></code> parameter:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">ADAM</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span>
     <span class="n">model</span><span class="o">=</span><span class="s2">&quot;AAN&quot;</span><span class="p">,</span>
-    <span class="n">nlopt_kargs</span><span class="o">=</span><span class="p">{</span>
+    <span class="n">nlopt_kwargs</span><span class="o">=</span><span class="p">{</span>
         <span class="s2">&quot;print_level&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>        <span class="c1"># Print optimization progress</span>
         <span class="s2">&quot;xtol_rel&quot;</span><span class="p">:</span> <span class="mf">1e-8</span><span class="p">,</span>        <span class="c1"># Relative parameter tolerance</span>
         <span class="s2">&quot;algorithm&quot;</span><span class="p">:</span> <span class="s2">&quot;NLOPT_LN_SBPLX&quot;</span>  <span class="c1"># Use Subplex algorithm</span>

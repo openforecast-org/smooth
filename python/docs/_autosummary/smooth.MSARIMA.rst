@@ -14,16 +14,24 @@
    :toctree:
    :template: method.rst
 
+   ~MSARIMA.coefbootstrap
+   ~MSARIMA.confint
    ~MSARIMA.fit
+   ~MSARIMA.multicov
    ~MSARIMA.outlierdummy
    ~MSARIMA.plot
+   ~MSARIMA.point_lik
    ~MSARIMA.predict
    ~MSARIMA.predict_intervals
+   ~MSARIMA.reapply
+   ~MSARIMA.reforecast
    ~MSARIMA.rmultistep
    ~MSARIMA.rstandard
    ~MSARIMA.rstudent
    ~MSARIMA.select_best_model
+   ~MSARIMA.simulate
    ~MSARIMA.summary
+   ~MSARIMA.vcov
 
 
 
@@ -41,10 +49,12 @@
    ~MSARIMA.bic
    ~MSARIMA.bicc
    ~MSARIMA.coef
+   ~MSARIMA.coef_names
    ~MSARIMA.constant_value
    ~MSARIMA.data
    ~MSARIMA.distribution_
    ~MSARIMA.error_type
+   ~MSARIMA.fisher_information_
    ~MSARIMA.fitted
    ~MSARIMA.holdout_data
    ~MSARIMA.ic_weights

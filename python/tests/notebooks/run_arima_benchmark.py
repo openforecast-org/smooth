@@ -22,7 +22,6 @@ METHODS = [
     ("AutoMSARIMA Opt",  "smooth", {"initial": "optimal"}),
     ("AutoMSARIMA Two",  "smooth", {"initial": "two-stage"}),
     ("statsforecast AutoARIMA", "statsforecast", {}),
-    ("sktime AutoARIMA (pmdarima)", "sktime", {}),
     ("skforecast Arima", "skforecast", {}),
     ("aeon AutoARIMA", "aeon", {}),
 ]

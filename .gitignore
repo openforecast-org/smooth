@@ -177,3 +177,5 @@ dmypy.json
 .claude/*
 !.claude/skills/
 python/tests/speed_tests/benchmark_data/
+# Large benchmark predictive-distribution result arrays (regenerate via the runners)
+python/tests/notebooks/*-dist.npy

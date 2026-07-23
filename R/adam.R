@@ -2705,13 +2705,20 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # backcast / complete / gradient initial states are still determined from
         # the data and consume df exactly as the optimised ones do, as does the
         # always-estimated distribution scale. Provided persistence / initials
-        # contribute nothing.
-        parametersNumber[1,1] <- dfInitialsBackcast(etsModel, modelIsSeasonal, modelIsTrendy,
-                                                    lagsModelSeasonal, initialLevelEstimate,
-                                                    initialTrendEstimate, initialSeasonalEstimate,
-                                                    arimaModel, initialArimaNumber, initialArimaEstimate,
-                                                    xregModel, xregNumber, initialXregEstimate,
-                                                    initialType);
+        # contribute nothing. When a fitted model is reused (adam(data, model)),
+        # the initials come straight from that model (profilesRecentProvided),
+        # so they are provided too and count as zero.
+        if(profilesRecentProvided){
+            parametersNumber[1,1] <- 0;
+        }
+        else{
+            parametersNumber[1,1] <- dfInitialsBackcast(etsModel, modelIsSeasonal, modelIsTrendy,
+                                                        lagsModelSeasonal, initialLevelEstimate,
+                                                        initialTrendEstimate, initialSeasonalEstimate,
+                                                        arimaModel, initialArimaNumber, initialArimaEstimate,
+                                                        xregModel, xregNumber, initialXregEstimate,
+                                                        initialType);
+        }
         # The distribution scale is always an estimated parameter.
         parametersNumber[1,4] <- 1;
         parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);

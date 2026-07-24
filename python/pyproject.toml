@@ -9,9 +9,12 @@ description = "Forecasting and time series analysis with single-source-of-error 
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-    { name = "Ivan Svetunkov", email = "ivan@svetunkov.com" },
+    { name = "Ivan Svetunkov" },
     { name = "Filotas Theodosiou" },
     { name = "Leonidas Tsaprounis" },
+]
+maintainers = [
+    { name = "Ivan Svetunkov", email = "ivan@svetunkov.com" },
 ]
 license = { file = "LICENSE" }
 keywords = [

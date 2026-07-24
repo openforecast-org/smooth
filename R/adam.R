@@ -5191,6 +5191,16 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
     ellipsis <- list(...);
     type <- covarTypeResolver(type, bootstrap);
 
+    # Nothing is estimated directly (e.g. provided persistence together with
+    # backcast / complete / gradient or provided initials): there are no free
+    # parameters, so the covariance is an empty matrix. Without this guard the
+    # FI fall-back reconstructs the provided/backcast values and returns a full
+    # matrix of Inf for them. vcov() must span exactly coef() - the initial
+    # seeds only appear when they are genuinely estimated (initial="optimal").
+    if(length(coef(object))==0){
+        return(matrix(numeric(0), 0, 0));
+    }
+
     # Heuristics is to set variance equal to sqrt(heuristics)% of values
     if(!is.null(heuristics)){
         if(is.numeric(heuristics)){

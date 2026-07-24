@@ -1,4 +1,4 @@
-smooth v4.5.1 (release date: TBA)
+smooth v4.5.1 (Release date: 2026-07-24)
 =======
 
 Changes:
@@ -24,7 +24,7 @@ Bugfixes:
 * `vcov(model, type="hessian")` (and `summary()`/`confint()`) on a **sparse-order** `sparma()` fit — e.g. `orders=list(ar=2, ma=1)`, where a lower-order AR/MA coefficient is absent — no longer errors. The observed-Fisher path re-fitted the model through `adam(model=object)`, whose dense ARIMA-polynomial reconstruction produced an `NA` for the sparse structure (`"missing value where TRUE/FALSE needed"`). `sparma` now computes its observed Fisher Information natively, by a numerical Hessian of its own log-likelihood at the estimate, so `type="hessian"` returns a finite covariance for every order combination. `type="opg"` (the default) was already unaffected.
 * `vcov()` on an `omg()` object (and therefore `confint()`/`summary()`) was computed at a mis-reconstructed re-fit: the covariance path re-supplied each sub-model's persistence/phi/arma as fixed values, which flips their estimate flags off so the filler stops consuming those slots from the joint parameter vector and shifts it — a boundary `alpha=0` pushed a level initial to 0 and the re-fit log-likelihood drifted from the original (e.g. −83.91 vs −83.03). The A/B split of the joint vector also used the initialiser's reduced parameter count instead of the fitted-object count, leaking one side's parameters into the other. The re-entry now keeps every coefficient estimated and fed back from the joint vector, so `omg(model=object)` reproduces the original fit exactly, correcting the reported standard errors.
 
-smooth v4.5.0 (Release data: 2026-06-19)
+smooth v4.5.0 (Release date: 2026-06-19)
 =======
 
 Changes:
@@ -40,7 +40,7 @@ Bugfixes:
 * `om(y, occurrence="general", silent=FALSE)` (and `omg(y, silent=FALSE)`) with the default `h=0` no longer error out in the diagnostic plot. Previously `omg()` left `$forecast=NULL` on the result, and `plot.smooth` would then strip the slot from its `do.call(graphmaker, ...)` call, causing `argument "forecast" is missing, with no default`. Now mirrors `om()`'s convention: when `h=0`, `$forecast` is a one-element `ts(NA)` / `zoo(NA)` placeholder.
 
 
-smooth v4.4.5 (Release data: 2026-05-27)
+smooth v4.4.5 (Release date: 2026-05-27)
 =======
 
 Change:
@@ -60,7 +60,7 @@ Bugfixes:
 * forecast.adam() would not do the correct row repetition for explanatory variables when the new values are not provided.
 
 
-smooth v4.4.1 (Release data: 2026-02-26)
+smooth v4.4.1 (Release date: 2026-02-26)
 =======
 
 Changes:
@@ -71,7 +71,7 @@ Bugfixes:
 * A failsafe for models with lb>B or ub<B.
 
 
-smooth v4.4.0 (Release data: 2026-02-05)
+smooth v4.4.0 (Release date: 2026-02-05)
 =======
 
 Changes:
@@ -95,7 +95,7 @@ Bugfixes:
 * RIDGE/LASSO would not work with X because of the wrong calculation of the denominator.
 
 
-smooth v4.3.2 (Release data: 2025-12-23)
+smooth v4.3.2 (Release date: 2025-12-23)
 =======
 
 Changes:
@@ -113,7 +113,7 @@ Bugfixes:
 * Fixed the issue with reusing the initials in gum, ces, msarima and ssarima.
 
 
-smooth v4.3.1 (Release data: 2025-10-05)
+smooth v4.3.1 (Release date: 2025-10-05)
 =======
 
 Changes:
@@ -134,7 +134,7 @@ Bugfixes:
 * SARIMA(0,1,0) now works on small data, producing Seasonal Naive in adam().
 
 
-smooth v4.3.0 (Release data: 2025-06-30)
+smooth v4.3.0 (Release date: 2025-06-30)
 =======
 
 Changes:
@@ -157,7 +157,7 @@ Bugfixes:
 * Fixes of bugs in adam() with explanatory variables, which are dropped by alm().
 
 
-smooth v4.2.0 (Release data: 2025-04-02)
+smooth v4.2.0 (Release date: 2025-04-02)
 =======
 
 Changes:
@@ -168,7 +168,7 @@ Changes:
 * adamFitter() now has a refineHead parameter, which explicitly says whether the head of the state vector should be refined or not. This is an internal thing, but it is needed by several functions (adam(), ces(), gum()).
 
 
-smooth v4.1.1 (Release data: 2025-02-03)
+smooth v4.1.1 (Release date: 2025-02-03)
 =======
 
 Changes:
@@ -183,7 +183,7 @@ Bugfixes:
 * Tried to fix the issue with UBSAN, but not sure whether it worked, because it is not possible to reproduce it on my PC or github Actions... Just praying that it works.
 
 
-smooth v4.1.0 (Release data: 2024-10-01)
+smooth v4.1.0 (Release date: 2024-10-01)
 =======
 
 Changes:
@@ -196,7 +196,7 @@ Bugfixes:
 * Fix in reapply() for ARIMA.
 
 
-smooth v4.0.2 (Release data: 2024-06-18)
+smooth v4.0.2 (Release date: 2024-06-18)
 =======
 
 Changes:
@@ -209,7 +209,7 @@ Bugfixes:
 * Transition matrix was not correctly set for ARIMA with drift. It is now.
 
 
-smooth v4.0.1 (Release data: 2024-04-01)
+smooth v4.0.1 (Release date: 2024-04-01)
 =======
 
 Changes:
@@ -228,14 +228,14 @@ Bugfixes:
 * Another bugfix in es() and xreg: resolved the issue with the simulated data.
 
 
-smooth v4.0.0 (Release data: 2023-09-15)
+smooth v4.0.0 (Release date: 2023-09-15)
 =======
 
 Changes:
 * Starting from v4.0.0, the smooth package for R will be released under the LGPLv2.1 license. The source of the older version of the software under the GPL(>=2) is available here: https://github.com/openforecast-org/smooth/releases/tag/v3.2.2
 
 
-smooth v3.2.2 (Release data: 2023-09-15)
+smooth v3.2.2 (Release date: 2023-09-15)
 =======
 
 Changes:
@@ -251,7 +251,7 @@ Bugfixes:
 * A fix for adam() with LASSO/RIDGE, where "lambdaOriginal was not found".
 
 
-smooth v3.2.1 (Release data: 2023-06-01)
+smooth v3.2.1 (Release date: 2023-06-01)
 =======
 
 Changes:
@@ -273,7 +273,7 @@ Bugfixes:
 * Fixed a bug with ARIMA(0,d,0) with drift and an initial B becoming outside of bounds.
 
 
-smooth v3.2.0 (Release data: 2023-01-18)
+smooth v3.2.0 (Release date: 2023-01-18)
 =======
 
 Changes:
@@ -307,7 +307,7 @@ Bugfixes:
 * A fix in adam() for provided occurrence and multiplicative models with positive distributions.
 
 
-smooth v3.1.7 (Release data: 2022-05-20)
+smooth v3.1.7 (Release date: 2022-05-20)
 =======
 
 Changes:
@@ -324,7 +324,7 @@ Bugfixes:
 * interval="prediction" would not produce analytical intervals in case of pure additive models. This is now fixed.
 
 
-smooth v3.1.6 (Release data: 2022-03-30)
+smooth v3.1.6 (Release date: 2022-03-30)
 =======
 
 Changes:
@@ -348,7 +348,7 @@ Bugfixes:
 * A fix in case of rbind() of data.frame, when one of variables is ts.
 
 
-smooth v3.1.5 (Release data: 2022-01-26)
+smooth v3.1.5 (Release date: 2022-01-26)
 =======
 
 Changes:
@@ -357,7 +357,7 @@ Changes:
 * Removed Mcomp from suggests.
 
 
-smooth v3.1.4 (Release data: 2021-12-01)
+smooth v3.1.4 (Release date: 2021-12-01)
 =======
 
 Changes:
@@ -368,7 +368,7 @@ Bugfixes:
 * Fixed a bug in the pre-initialisation of parameters of a model with constant.
 
 
-smooth v3.1.3 (Release data: 2021-09-22)
+smooth v3.1.3 (Release date: 2021-09-22)
 =======
 
 Changes:
@@ -394,7 +394,7 @@ Bugfixes:
 * Make sure that the conventional functions (es, ssarima, sma etc) return y as ts.
 
 
-smooth v3.1.2 (Release data: 2021-06-14)
+smooth v3.1.2 (Release date: 2021-06-14)
 =======
 
 Changes:
@@ -431,7 +431,7 @@ Bugfixes:
 * Fix in auto.adam() and ARIMA selection with non-default distributions.
 
 
-smooth v3.1.1 (Release data: 2021-04-16)
+smooth v3.1.1 (Release date: 2021-04-16)
 =======
 
 Changes:
@@ -463,7 +463,7 @@ Bugfixes:
 * A fix for vcov.adam() in case, when Fisher Information contains NaNs.
 
 
-smooth v3.1.0 (Release data: 2021-02-19)
+smooth v3.1.0 (Release date: 2021-02-19)
 =======
 
 Changes:
@@ -483,7 +483,7 @@ Bugfixes:
 * A fix in coefbootstrap and lags variable, when M3 data is used.
 
 
-smooth v3.0.2 (Release data: 2021-01-27)
+smooth v3.0.2 (Release date: 2021-01-27)
 =======
 
 Changes:
@@ -511,7 +511,7 @@ Bugfixes:
 * A bugfix for vcov.adam() in case of regression and is.matrix(data).
 
 
-smooth v3.0.1 (Release data: 2021-01-12)
+smooth v3.0.1 (Release date: 2021-01-12)
 =======
 
 Changes:
@@ -545,7 +545,7 @@ Bugfixes:
 * A bugfix for xreg, Etype="M" and distribution="dnorm".
 
 
-smooth v3.0.0 (Release data: 2020-12-07)
+smooth v3.0.0 (Release date: 2020-12-07)
 =======
 
 Changes:
@@ -584,7 +584,7 @@ Bugfixes:
 * The models checked in branch-and-bound for es() now have aligned types of errors and seasonal components.
 
 
-smooth v2.6.1 (Release data: 2020-07-17)
+smooth v2.6.1 (Release date: 2020-07-17)
 =======
 
 Changes:
@@ -597,7 +597,7 @@ Bugfix:
 * A bugfix in forecast() for oes(), where B would not be found.
 
 
-smooth v2.6.0 (Release data: 2020-06-16)
+smooth v2.6.0 (Release date: 2020-06-16)
 =======
 
 Changes:
@@ -618,14 +618,14 @@ Bugfixes:
 * A fix for auto.ces(), which did not work on zeroes data.
 
 
-smooth v2.5.7 (Release data: 2020-04-06)
+smooth v2.5.7 (Release date: 2020-04-06)
 ==============
 
 Changes:
 * plot.smooth() now also produces standardised and studentised residuals over time.
 
 
-smooth v2.5.6 (Release data: 2020-03-31)
+smooth v2.5.6 (Release date: 2020-03-31)
 ==============
 
 Changes:
@@ -649,7 +649,7 @@ Bugfix:
 * A crude fix for the msdecompose(), when type="multiplicative" and there are zeroes in the data.
 
 
-smooth v2.5.5 (Release data: 2020-01-25)
+smooth v2.5.5 (Release date: 2020-01-25)
 ==============
 
 Changes:
@@ -667,7 +667,7 @@ Bugfix:
 * es() with multiplicative models would fail sometimes in case of bounds="a" because of the negative values. We now restrict the bounds with positive values only.
 
 
-smooth v2.5.4 (Release data: 2019-10-22)
+smooth v2.5.4 (Release date: 2019-10-22)
 ==============
 
 Changes:
@@ -677,7 +677,7 @@ Changes:
 * Updated the description of the bounds parameter in ves().
 
 
-smooth v2.5.3 (Release data: 2019-08-19)
+smooth v2.5.3 (Release date: 2019-08-19)
 ==============
 
 Changes:
@@ -697,7 +697,7 @@ Bugdixes:
 * A bugfix in the calculation of the likelihoods based on GTMSE and aGTMSE losses.
 
 
-smooth v2.5.2 (Release data: 2019-07-24)
+smooth v2.5.2 (Release date: 2019-07-24)
 ==============
 
 Changes:
@@ -720,7 +720,7 @@ Bugfixes:
 * Corrected the names of the columns for errors and fitted values of ves().
 
 
-smooth v2.5.1 (Release data: 2019-06-13)
+smooth v2.5.1 (Release date: 2019-06-13)
 ==============
 
 Changes:
@@ -743,7 +743,7 @@ Bugfixes:
 * A bugfix in the model selection mechanism for oes() (the forecast was set to 10 instead of h).
 
 
-smooth v2.5.0 (Release data: 2019-04-25)
+smooth v2.5.0 (Release date: 2019-04-25)
 ==============
 
 Changes:
@@ -768,7 +768,7 @@ Bugfixes:
 * Fixed a bug in backcasting fitter with "Mat::col(): index out of bounds".
 
 
-smooth v2.4.8 (Release data: 2019-03-10)
+smooth v2.4.8 (Release date: 2019-03-10)
 ==============
 
 Changes:
@@ -788,7 +788,7 @@ Bugfixes:
 * es() would kill R in cases of "MAN" model and small samples. Now it does not do that.
 
 
-smooth v2.4.7 (Release data: 2018-11-30)
+smooth v2.4.7 (Release date: 2018-11-30)
 ==============
 
 Changes:
@@ -809,7 +809,7 @@ Bugfixes
 * Found bug due to which the exogenous variables wer ignored for the forecasts from ETS(M,Z,Z) models.
 
 
-smooth v2.4.6 (Release data: 2018-08-25)
+smooth v2.4.6 (Release date: 2018-08-25)
 ==============
 
 Changes:
@@ -841,7 +841,7 @@ Bugfixes
 * nParam sometimes contained negative values for the "Provided" row.
 
 
-smooth v2.4.5 (Release data: 2018-07-03)
+smooth v2.4.5 (Release date: 2018-07-03)
 ==============
 
 Changes:
@@ -871,7 +871,7 @@ Bugfixes:
 * When a model is reused the nuber of parameters in AIC should be equal to 1 (because only variance is estimated, the rest is provided).
 
 
-smooth v2.4.4 (Release data: 2018-05-31)
+smooth v2.4.4 (Release date: 2018-05-31)
 ==============
 
 Changes:
@@ -895,7 +895,7 @@ Bugfixes:
 * ves() calculated number of parameters incorrectly in some cases.
 
 
-smooth v2.4.3 (Release data: 2018-05-03)
+smooth v2.4.3 (Release date: 2018-05-03)
 ==============
 
 Changes:
@@ -914,7 +914,7 @@ Bugfixes:
 * ges(), ces(), ssarima() had problems with model selection for intermittent because of the ic parameter.
 
 
-smooth v2.4.2 (Release data: 2018-04-03)
+smooth v2.4.2 (Release date: 2018-04-03)
 ==============
 
 Changes:
@@ -933,7 +933,7 @@ Bugfixes:
 * Fix in iss() for the cases when intermittent model is applied to non-intermittent data.
 
 
-smooth v2.4.1 (Release data: 2018-03-04)
+smooth v2.4.1 (Release date: 2018-03-04)
 ==============
 
 Bugfixes:
@@ -944,7 +944,7 @@ Bugfixes:
 * When xreg is invalid and set to NULL, change xregDo to "use".
 
 
-smooth v2.4.0 (Release data: 2018-02-10)
+smooth v2.4.0 (Release date: 2018-02-10)
 ==============
 
 Changes:
@@ -962,7 +962,7 @@ Bugfixes:
 * stepwise() now ignores NAs in the provided data.
 
 
-smooth v2.3.2 (Release data: 2018-01-18)
+smooth v2.3.2 (Release date: 2018-01-18)
 ==============
 
 Changes:
@@ -976,7 +976,7 @@ Bugfixes:
 * ges() added an array to a vector, which caused dozens of warnings. Fixed.
 
 
-smooth v2.3.1 (Release data: 2018-01-13)
+smooth v2.3.1 (Release date: 2018-01-13)
 ==============
 
 Changes:
@@ -991,7 +991,7 @@ Bugfixes:
 * stepwise() now has a more userfriendly Call in the output.
 
 
-smooth v2.3.0 (Release data: 2017-12-23)
+smooth v2.3.0 (Release date: 2017-12-23)
 ==============
 
 Changes:
@@ -1005,7 +1005,7 @@ Bugfixes:
 * Number of parameters in case of xregDo="select" was incorrect.
 
 
-smooth v2.2.2 (Release data: 2017-12-15)
+smooth v2.2.2 (Release date: 2017-12-15)
 ==============
 
 Changes:
@@ -1022,7 +1022,7 @@ Bugfixes:
 * Fixed Likelihood calculation for TSB probability model.
 
 
-smooth v2.2.1 (Release data: 2017-11-15)
+smooth v2.2.1 (Release date: 2017-11-15)
 ==============
 
 Changes:
@@ -1034,7 +1034,7 @@ Bugfixes:
 * Corrected a bug in auto functions with intermittent data.
 
 
-smooth v2.2.0 (Release data: 2017-10-26)
+smooth v2.2.0 (Release date: 2017-10-26)
 ==============
 
 Changes:
@@ -1047,7 +1047,7 @@ Bugfixes:
 * es() sometimes returned smoothing parameters values that did not satisfy the usual constrains.
 * New initialisation of smoothing parameters in es() in case of cfType="HAM".
 
-smooth v2.1.2 (Release data: 2017-09-21)
+smooth v2.1.2 (Release date: 2017-09-21)
 ==============
 
 Changes:
@@ -1060,7 +1060,7 @@ Bugfixes:
 * Check of initials when model is not selected in es().
 * sim.ssarima() did not take correctly into account the provided initials.
 
-smooth v2.1.1 (Release data: 2017-09-04)
+smooth v2.1.1 (Release date: 2017-09-04)
 ==============
 
 Changes:
@@ -1082,7 +1082,7 @@ Bugfixes:
 * Cumulative variance was calculated incorrectly. Now the non-seasonal case is fixed. SEASONAL MODELS STILL HAVE THIS PROBLEM!
 * Found bug in variance calculation for some seasonal models, which caused intervals for SSARIMA, GES and CES to be narrower than needed.
 
-smooth v2.1.0 (Release data: 2017-08-01)
+smooth v2.1.0 (Release date: 2017-08-01)
 ==============
 
 Changes:
@@ -1111,7 +1111,7 @@ Bugfixes:
 * Number of parameters returned by models was not correct, missing exogenous variables and intermittent model.
 
 
-smooth v2.0.1 (Release data: 2017-07-05)
+smooth v2.0.1 (Release date: 2017-07-05)
 ==============
 
 Changes:
@@ -1127,7 +1127,7 @@ Bugfixes:
 * PLS could not be calculated for some cases, when ts object was used.
 
 
-smooth v2.0.0 (Release data: 2017-07-01)
+smooth v2.0.0 (Release date: 2017-07-01)
 ==============
 
 Changes:
@@ -1154,7 +1154,7 @@ Bugfixes:
 * Corrected a problem with initials of iETSX models.
 
 
-smooth v1.9.9 (Release data: 2017-05-03)
+smooth v1.9.9 (Release date: 2017-05-03)
 ==============
 
 Changes:
@@ -1172,7 +1172,7 @@ Bugfixes:
 * datafreq is now used in all the functions.
 
 
-smooth v1.9.1 (Release data: 2017-03-28)
+smooth v1.9.1 (Release date: 2017-03-28)
 ==============
 
 Changes:
@@ -1185,7 +1185,7 @@ Bugfixes:
 * Fixed a problem with prediction intervals construction for binary variables.
 
 
-smooth v1.9.0 (Release data: 2017-03-18)
+smooth v1.9.0 (Release date: 2017-03-18)
 ==============
 
 Changes:
@@ -1195,7 +1195,7 @@ Bugfixes:
 * Fixed bug with cfType="MSTFE" in case of multiplicative errors.
 
 
-smooth v1.8.0 (Release data: 2017-03-12)
+smooth v1.8.0 (Release date: 2017-03-12)
 ==============
 
 Changes:

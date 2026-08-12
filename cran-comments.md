@@ -1,18 +1,16 @@
 ---
 title: "Cran Comments"
 author: "Ivan Svetunkov"
-date: "20 June 2026"
+date: "12 August 2026"
 output: html_document
 ---
 
 ## Version
-This is ``smooth`` package, v4.5.0
-
-This release retires the legacy occurrence-ETS code path.
+This is ``smooth`` package, v4.5.1
 
 
 ## Test environments
-* local Ubuntu 26.04, R 4.6.0
+* local Ubuntu 26.04, R 4.6.1
 * github actions
 * win-builder (devel and release)
 * rhub v2

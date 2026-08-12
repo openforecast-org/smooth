@@ -6705,7 +6705,9 @@ class ADAM:
         lowess : bool, optional
             Add LOWESS smoothing line to scatter plots. Default True.
         **kwargs
-            Passed to matplotlib (e.g. ``figsize``).
+            Passed to matplotlib. ``figsize`` (width, height in inches) and
+            ``dpi`` control the figure size; when omitted, matplotlib's
+            ``rcParams`` are used.
 
         Returns
         -------
@@ -6719,6 +6721,7 @@ class ADAM:
         >>> figs = model.plot()                   # default: which=[1,2,4,6]
         >>> fig  = model.plot(which=7)            # single time-series plot
         >>> figs = model.plot(which=[10, 11])     # ACF and PACF
+        >>> fig  = model.plot(which=7, figsize=(12.8, 4.8))   # 1280x480 px
         """
         from smooth.adam_general.core.plotting import plot_adam
 

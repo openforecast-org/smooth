@@ -118,8 +118,11 @@ def _acf_pacf_bounds(nobs, level):
 
 
 def _make_fig(mpl_figure, **kwargs):
-    figsize = kwargs.pop("figsize", (7, 5))
-    return _attach_canvas(mpl_figure.Figure(figsize=figsize)), kwargs
+    """Create a figure, deferring to rcParams when figsize / dpi are not given."""
+    fig = mpl_figure.Figure(
+        figsize=kwargs.pop("figsize", None), dpi=kwargs.pop("dpi", None)
+    )
+    return _attach_canvas(fig), kwargs
 
 
 def _state_labels(model):
@@ -534,7 +537,13 @@ def _plot8(model, mpl_figure, **kw):
         labels = all_labels[b * batch_size : (b + 1) * batch_size]
         n = len(labels)
 
-        fig = _attach_canvas(mpl_figure.Figure(figsize=kw.get("figsize", (9, 2 * n))))
+        # Height scales with the panel count, so keep it as the fallback rather
+        # than deferring to rcParams, which would squash a tall stack of panels.
+        fig = _attach_canvas(
+            mpl_figure.Figure(
+                figsize=kw.get("figsize") or (9, 2 * n), dpi=kw.get("dpi")
+            )
+        )
         axes = fig.subplots(n, 1, sharex=True)
         if n == 1:
             axes = [axes]
@@ -641,7 +650,11 @@ def plot_adam(model, which, level, legend, lowess, **kwargs):
     lowess : bool
         Draw LOWESS lines on scatter plots.
     **kwargs
-        Passed to matplotlib (e.g. figsize).
+        Passed to matplotlib. ``figsize`` (width, height in inches) and ``dpi``
+        set the figure size; when omitted, matplotlib's ``rcParams`` are used,
+        so ``plt.rcParams["figure.figsize"] = (12, 6)`` applies to every plot.
+        The states plot (``which=12``) keeps its panel-count-dependent height
+        unless ``figsize`` is given explicitly.
 
     Returns
     -------

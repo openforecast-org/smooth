@@ -209,3 +209,7 @@ The pages below document the models and their Python classes:
 ## See Also
 
 - [R package on CRAN](https://cran.r-project.org/package=smooth) - Production-ready R implementation
+
+## About
+
+`smooth` is developed and maintained by OpenForecast, a demand forecasting and inventory management consultancy. The package implements the methods we use in our [consulting](https://openforecast.org/consulting/) and teach in our [training courses](https://openforecast.org/training/).

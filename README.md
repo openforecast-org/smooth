@@ -97,3 +97,7 @@ Full documentation is available on the **[GitHub Wiki](https://github.com/openfo
 - [Installation guide](https://github.com/openforecast-org/smooth/wiki/Installation) - Dependencies and troubleshooting
 
 **Book:** Svetunkov, I. (2023). *Forecasting and Analytics with the Augmented Dynamic Adaptive Model (ADAM)*. Chapman and Hall/CRC. Online: https://openforecast.org/adam/
+
+## About
+
+`smooth` is developed and maintained by OpenForecast, a demand forecasting and inventory management consultancy. The package implements the methods we use in our [consulting](https://openforecast.org/consulting/) and teach in our [training courses](https://openforecast.org/training/).

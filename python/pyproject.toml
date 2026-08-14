@@ -58,12 +58,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage      = "https://github.com/openforecast-org/smooth"
+Homepage      = "https://openforecast.org/"
 Documentation = "https://openforecast.org/smooth-py/"
 Repository    = "https://github.com/openforecast-org/smooth"
 Issues        = "https://github.com/openforecast-org/smooth/issues"
 Changelog     = "https://github.com/openforecast-org/smooth/blob/Python/python/NEWS.md"
 "R package"   = "https://cran.r-project.org/package=smooth"
+ORCID         = "https://orcid.org/0000-0001-7826-0281"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -180,11 +181,11 @@ select = [
     "E501",
     "F",
     "I",    # isort rules
-    "N",    # PEP-8 naming rules 
+    "N",    # PEP-8 naming rules
 ]
 ignore = [
     # uppercase names are used for matrices
-    "N803", # allow uppercase argument names 
+    "N803", # allow uppercase argument names
     "N806", # allow uppercase variable names
 ]
 

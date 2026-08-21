@@ -637,24 +637,30 @@ def _initialize_xreg_states(
     e_type = model_params["e_type"]
     lags_model_max = model_params["lags_model_max"]
 
-    if (
-        e_type == "A"
-        or initials_checked["initial_xreg_provided"]
-        or explanatory_checked["xreg_model_initials"][1] is None
-    ):
-        mat_vt[
-            components_number_ets + components_number_arima : components_number_ets
-            + components_number_arima
-            + explanatory_checked["xreg_number"],
-            0:lags_model_max,
-        ] = explanatory_checked["xreg_model_initials"][0]["initial_xreg"]
-    else:
-        mat_vt[
-            components_number_ets + components_number_arima : components_number_ets
-            + components_number_arima
-            + explanatory_checked["xreg_number"],
-            0:lags_model_max,
-        ] = explanatory_checked["xreg_model_initials"][1]["initial_xreg"]
+    xreg_initials = explanatory_checked["xreg_model_initials"]
+    index = (
+        0
+        if (
+            e_type == "A"
+            or initials_checked["initial_xreg_provided"]
+            or xreg_initials[1] is None
+        )
+        else 1
+    )
+
+    xreg_rows = slice(
+        components_number_ets + components_number_arima,
+        components_number_ets
+        + components_number_arima
+        + explanatory_checked["xreg_number"],
+    )
+    mat_vt[xreg_rows, 0:lags_model_max] = 0
+
+    # The chosen slot can be empty when the creator runs with a flipped Etype
+    # (om() builds the matrices as additive while the model error is "M"), in
+    # which case R's name-based assignment is a no-op and the states stay zero.
+    if xreg_initials[index] is not None:
+        mat_vt[xreg_rows, 0:lags_model_max] = xreg_initials[index]["initial_xreg"]
 
     return mat_vt
 

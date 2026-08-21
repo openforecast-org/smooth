@@ -385,12 +385,6 @@ def _check_model_composition(
         if max_lag <= 1:
             sensible_pool = [m for m in sensible_pool if m[-1] == "N"]
 
-        # Apply multiplicative restrictions if data has non-positive values
-        if not allow_multiplicative:
-            sensible_pool = [m for m in sensible_pool if m[0] == "A"]
-            sensible_pool = [m for m in sensible_pool if m[1] != "M"]
-            sensible_pool = [m for m in sensible_pool if m[-1] != "M"]
-
         models_pool = sensible_pool
 
     elif any(
@@ -400,20 +394,38 @@ def _check_model_composition(
         if not is_combination:
             model_do = "select"
 
-    # Handle multiplicative restrictions
+    # Non-positive data: multiplicative components are not applicable.
+    # Mirrors R/adamGeneral.R (allowMultiplicative block): amend an explicit
+    # pool, switch a selection spec to pure additive, and merely warn when the
+    # user asked for one specific multiplicative model.
     if not allow_multiplicative:
-        if error_type == "M":
+        if models_pool is not None:
+            pool_additive = [m for m in models_pool if "M" not in (m[0], m[1], m[-1])]
+            if len(pool_additive) != len(models_pool):
+                models_pool = pool_additive
+                if not any(c in ("P", "F") for c in model_str):
+                    _warn(
+                        "Only additive models are allowed for your data. "
+                        "Amending the pool.",
+                        silent,
+                    )
+
+        if model_str in ("PPP", "FFF", "YYY") or "Z" in model_str:
             error_type = "A"
-        if trend_type == "M":
-            trend_type = "A"
-        if season_type == "M":
-            season_type = "A"
-        if error_type == "Y":
-            error_type = "X"
-        if trend_type == "Y":
-            trend_type = "X"
-        if season_type == "Y":
-            season_type = "X"
+            trend_type = "X" if trend_type in ("Y", "Z", "P", "F") else trend_type
+            season_type = "X" if season_type in ("Y", "Z", "P", "F") else season_type
+            models_pool = None
+            _warn(
+                "Only additive models are allowed for your data. "
+                "Changing the selection mechanism.",
+                silent,
+            )
+        elif "M" in (error_type, trend_type, season_type):
+            _warn(
+                f"Your data contains non-positive values, so the "
+                f"ETS({model_str}) might break down.",
+                silent,
+            )
 
     # Generate models pool if needed
     # Only pre-generate pool when components are specific (not Z, X, Y)
@@ -546,7 +558,9 @@ def _generate_models_pool(
     )
 
 
-def _check_ets_model(model, distribution, data, silent=False, max_lag=1):
+def _check_ets_model(
+    model, distribution, data, silent=False, max_lag=1, occurrence_model=False
+):
     """
     Check ETS model and validate compatibility with data.
 
@@ -562,15 +576,21 @@ def _check_ets_model(model, distribution, data, silent=False, max_lag=1):
         Whether to suppress warnings
     max_lag : int, default=1
         Maximum lag value. If <= 1, seasonality is not allowed.
+    occurrence_model : bool, default=False
+        Whether an occurrence model is in use. Zeroes are expected there, so
+        only negative values rule multiplicative components out.
 
     Returns
     -------
     dict
         Dictionary with ETS model information
     """
-    # Determine if multiplicative models are allowed
-    data_arr = np.array(data)
-    allow_multiplicative = not np.any(np.asarray(data_arr) <= 0)
+    # Determine if multiplicative models are allowed (R/adamGeneral.R):
+    # zeroes only rule them out when there is no occurrence part.
+    data_arr = np.asarray(data)
+    allow_multiplicative = not np.any(
+        data_arr < 0 if occurrence_model else data_arr <= 0
+    )
 
     # Handle list/tuple of model strings (R: model=c("ANN","AAN","AAA"))
     if isinstance(model, (list, tuple)):
@@ -657,35 +677,6 @@ def _check_ets_model(model, distribution, data, silent=False, max_lag=1):
         model_info = _check_model_composition(
             model, allow_multiplicative, silent, max_lag
         )
-
-        # Check for multiplicative compatibility with data
-        if not allow_multiplicative:
-            if model_info["error_type"] == "M":
-                _warn(
-                    "Switching to additive error because data has non-positive values.",
-                    silent,
-                )
-                model_info["error_type"] = "A"
-            if model_info["trend_type"] == "M":
-                _warn(
-                    "Switching to additive trend because data has non-positive values.",
-                    silent,
-                )
-                model_info["trend_type"] = "A"
-            if model_info["season_type"] == "M":
-                _warn(
-                    "Switching to additive seasonal because data has "
-                    "non-positive values.",
-                    silent,
-                )
-                model_info["season_type"] = "A"
-
-            # Update model string based on changes
-            model_str = f"{model_info['error_type']}{model_info['trend_type']}"
-            if model_info["damped"]:
-                model_str += "d"
-            model_str += model_info["season_type"]
-            model_info["model"] = model_str
 
         # Indicate this is an ETS model
         model_info["ets_model"] = True

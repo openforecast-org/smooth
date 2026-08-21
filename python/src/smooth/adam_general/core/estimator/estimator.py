@@ -569,7 +569,10 @@ def estimator(
     # Set objective function
     opt.set_min_objective(objective_wrapper)
 
-    # Step 9: Run optimization
+    # Step 9: Run optimization. Keep the starting vector: R's nloptr leaves x0
+    # untouched, so the retry below restarts from the initialiser's B, not from
+    # wherever the failed run stopped (R/adam.R estimator).
+    B_start = B.copy()
     B[:] = _run_optimization(opt, B)
     CF_value = opt.last_optimum_value()
 
@@ -580,6 +583,8 @@ def estimator(
     # initial optimisation failed to converge (non-finite or penalty-valued
     # cost function).
     if not np.isfinite(CF_value) or CF_value >= 1e300:
+        B[:] = B_start
+
         # Calculate number of ETS persistence parameters (alpha, beta, gamma)
         components_number_ets = 0
         if model_type_dict["ets_model"]:

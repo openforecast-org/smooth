@@ -2223,9 +2223,11 @@ class ADAM:
         df = obs - self.nparam
         errors = self.residuals.copy().astype(float)
         dist = self.distribution_
-        scale = self.sigma
+        # R's rstandard.adam standardises by extractScale(), the estimated
+        # distribution scale -- not by the df-unbiased sigma() (R/adam.R:5406).
+        scale = self.scale
 
-        if dist == "dnorm":
+        if dist in ("dnorm", "dt"):
             mean_e = np.mean(errors)
             return (errors - mean_e) / (scale * np.sqrt(obs / df))
         elif dist == "ds":
@@ -2328,7 +2330,7 @@ class ADAM:
             return errors / mean_loo
 
         elif dist == "dlnorm":
-            scale = self.sigma
+            scale = self.scale
             log_e = np.log(errors) - np.mean(np.log(errors)) - scale**2 / 2
             total_sq = np.sum(log_e**2)
             denom = np.sqrt((total_sq - log_e**2) / df)
@@ -2512,14 +2514,20 @@ class ADAM:
         return len(self._observations["y_in_sample"])
 
     @property
-    def nparam(self) -> int:
+    def nparam(self) -> float:
         """
         Return number of estimated parameters.
 
+        Mirrors R's ``nparam.smooth`` (R/methods.R:350), which returns the
+        total of the estimated row of the parameters table — the distribution
+        scale included, and the same value R's ``logLik`` reports as its
+        degrees of freedom (R/methods.R:322). For a combination this is the
+        IC-weighted average, so the value can be fractional.
+
         Returns
         -------
-        int
-            Number of parameters estimated during optimization.
+        float
+            Number of parameters estimated during optimization, scale included.
 
         Raises
         ------
@@ -2533,6 +2541,11 @@ class ADAM:
         >>> k = model.nparam
         """
         self._check_is_fitted()
+        n_param = getattr(self, "_n_param", None)
+        if n_param is not None:
+            return n_param.estimated["all"]
+        # Occurrence models keep no parameters table; they are Bernoulli, so
+        # there is no scale to add (R/om.R: parNum[1,4] stays 0).
         return self._adam_estimated["n_param_estimated"]
 
     @property
@@ -2562,13 +2575,13 @@ class ADAM:
         residuals = np.asarray(self.residuals, dtype=float)
         residuals = residuals[np.isfinite(residuals)]
         n_obs = int(self.nobs)
-        # R's ``sigma.adam`` formula is ``df = nobs − (nparam − 1)`` for
-        # likelihood loss (subtract one for the scale parameter R counts
-        # but treats specially). Python's ``self.nparam`` already excludes
-        # the scale parameter, so the equivalent is just ``nobs - nparam``
-        # — no further subtraction needed. For non-likelihood losses R
-        # uses ``nobs - nparam`` directly; same here.
-        n_param = int(self.nparam)
+        # R's ``sigma.adam`` (R/adam.R:4687) drops the scale from nparam for
+        # likelihood loss, since sigma is that scale and must not unbias
+        # itself; other losses use nparam as it stands.
+        n_param = float(self.nparam)
+        loss = self._general.get("loss") if self._general else None
+        if loss == "likelihood":
+            n_param -= 1
         df = n_obs - n_param
         if df <= 0:
             df = n_obs

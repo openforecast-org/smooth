@@ -467,21 +467,19 @@ class TestRComparisonWithR:
         """
         rstandard() reference values for ANN on AirPassengers.
 
-        The scale factor σ√(n/df) is verified, and the first/last residuals
-        are checked against values recorded from the Python implementation
-        (which is verified to match R through loss-value comparison).
+        R's ``rstandard.adam`` divides by ``extractScale(model) * sqrt(n/df)``
+        with ``df = nobs - nparam`` — the estimated distribution scale, not the
+        df-unbiased ``sigma()``. R reports nparam=3, scale=33.59315406 and a
+        factor of 33.94864708 for this model.
         """
         std_res = ann_model.rstandard()
         obs = ann_model.nobs         # 144
-        nparam = ann_model.nparam
-        df = obs - nparam
-        sigma = ann_model.sigma
+        df = obs - ann_model.nparam
 
-        # The scaling factor should satisfy: std(errors - mean) = sigma * sqrt(n/df)
         errors = ann_model.residuals.copy()
         errors -= errors.mean()
-        expected_scale = sigma * np.sqrt(obs / df)
-        actual_scale = errors.std(ddof=0) / std_res.std(ddof=0) * std_res.std(ddof=0)
+        expected_scale = ann_model.scale * np.sqrt(obs / df)
         np.testing.assert_allclose(
             np.std(errors) / np.std(std_res), expected_scale, rtol=1e-6
         )
+        np.testing.assert_allclose(expected_scale, 33.94864708, rtol=1e-6)

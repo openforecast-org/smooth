@@ -545,7 +545,9 @@ def parameters_checker(
     #####################
     # 3) Check ETS Model
     #####################
-    ets_info = _check_ets_model(model, distribution, data, silent, max_lag)
+    ets_info = _check_ets_model(
+        model, distribution, data, silent, max_lag, occurrence_model
+    )
     ets_model = ets_info["ets_model"]
     model_do = ets_info.get("model_do", "estimate")
 
@@ -683,18 +685,8 @@ def parameters_checker(
     #####################
     # 13) Check Model Pool
     #####################
-    # Check if multiplicative models are allowed
-    if hasattr(data, "values"):
-        actual_values = (
-            data.values.flatten() if hasattr(data.values, "flatten") else data.values
-        )
-    else:
-        actual_values = np.asarray(data).flatten()
-
-    allow_multiplicative = not (
-        (any(y <= 0 for y in actual_values if not np.isnan(y)) and not occurrence_model)
-        or (occurrence_model and any(y < 0 for y in actual_values if not np.isnan(y)))
-    )
+    # Whether multiplicative models are allowed (resolved in _check_ets_model)
+    allow_multiplicative = ets_info["allow_multiplicative"]
 
     #  Calculate n_param_max to determine if pool restriction is needed (R lines
     # 2641-2651)

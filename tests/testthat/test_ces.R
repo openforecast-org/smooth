@@ -25,6 +25,18 @@ test_that("Test provided a and b of CES on AirPassengers", {
                  testModel$parameters$b);
 })
 
+# The OPG covariance must work for every seasonality: "partial" carries a real
+# b named "beta" (not the beta_0/beta_1 pair), which used to be missed by the
+# smoothing-coefficient count and threw "subscript out of bounds".
+test_that("vcov(type='opg') works for every CES seasonality", {
+    for (s in c("none", "simple", "partial", "full")) {
+        m <- ces(AirPassengers, seasonality = s, initial = "optimal", silent = TRUE)
+        v <- vcov(m, type = "opg")
+        expect_equal(nrow(v), length(coef(m)))
+        expect_false(any(is.nan(diag(v))))
+    }
+})
+
 # Test selection of exogenous with CES
 test_that("Use exogenous variables for CESX on BJsales", {
     skip_on_cran()

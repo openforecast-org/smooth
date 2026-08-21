@@ -302,6 +302,7 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
 
     modelLags <- object$lags;
     modelString <- modelType(object);
+    seasonalTypeOPG <- substr(modelString, nchar(modelString), nchar(modelString));
     modelOrders <- if(!is.null(object$orders)){ object$orders; } else { NULL; }
     regressorsMode <- object$regressors;
     baseArma <- if(length(c(names(armaAr), names(armaMa)))>0){ object$arma; } else { list(); }
@@ -357,11 +358,29 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
                 }
                 else if(substr(nameJ,1,8)=="seasonal"){
                     idx <- as.integer(sub("^seasonal_?","",nameJ));
+                    # Only the first m-1 seasonal indices are free: the last one
+                    # is determined by the normalisation (sum = 0 additive,
+                    # product = 1 multiplicative), which is exactly how the
+                    # estimator parameterises them. The score must therefore be
+                    # taken along the constrained direction (bump index idx, let
+                    # the last slot absorb it), matching the Hessian, which
+                    # differentiates in B space with the filler applied.
+                    seasonalRenormalise <- function(seasonalValues){
+                        seasonalValues[idx] <- seasonalValues[idx]+delta;
+                        m <- length(seasonalValues);
+                        if(seasonalTypeOPG=="M"){
+                            seasonalValues[m] <- 1/prod(seasonalValues[-m]);
+                        }
+                        else{
+                            seasonalValues[m] <- -sum(seasonalValues[-m]);
+                        }
+                        return(seasonalValues);
+                    }
                     if(is.list(initialArg$seasonal)){
-                        initialArg$seasonal[[1]][idx] <- initialArg$seasonal[[1]][idx]+delta;
+                        initialArg$seasonal[[1]] <- seasonalRenormalise(initialArg$seasonal[[1]]);
                     }
                     else{
-                        initialArg$seasonal[idx] <- initialArg$seasonal[idx]+delta;
+                        initialArg$seasonal <- seasonalRenormalise(initialArg$seasonal);
                     }
                 }
                 else if(substr(nameJ,1,10)=="ARIMAState"){
@@ -407,7 +426,11 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
     # across the head columns -- perturbing one perturbs the whole row; the
     # seasonal states fill their rows across the head columns in column-major
     # order (verified against coef()).
-    nSmoothing <- sum(grepl("^(alpha|beta)_[01]$", parametersNames));
+    # seasonality="partial" carries a REAL b named "beta" (no _0/_1 suffix), so
+    # match the prefix rather than the complex-pair suffix -- otherwise the
+    # initial-state coefficients are indexed from the wrong offset and the
+    # profileInitial lookup runs off the end.
+    nSmoothing <- sum(grepl("^(alpha|beta)", parametersNames));
     profile <- object$profileInitial;
     nCol <- ncol(profile);
     nNonSeasonalRows <- if(identical(seasonalityType, "simple")){ 0L } else { 2L };
@@ -441,6 +464,13 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
             }
             else if(nameJ=="beta_1"){
                 clone$parameters$b <- complex(real=Re(bValue), imaginary=Im(bValue)+delta);
+            }
+            else if(substr(nameJ,1,4)=="beta"){
+                # seasonality="partial": b is real, one value per seasonal lag
+                idx <- if(length(bValue)>1){ match(nameJ, parametersNames[grepl("^beta", parametersNames)]); } else { 1L; }
+                bNew <- bValue;
+                bNew[idx] <- bNew[idx]+delta;
+                clone$parameters$b <- bNew;
             }
             else{
                 cell <- initialCells(j-nSmoothing);

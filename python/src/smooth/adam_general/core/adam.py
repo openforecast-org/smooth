@@ -4418,6 +4418,27 @@ class ADAM:
             return f"ADAM({model_str}, fitted=True)"
         return f"ADAM(model={self.model}, fitted=False)"
 
+    def _adam_created_seeded(self):
+        """``_adam_created`` with the pristine creator seed head restored.
+
+        ``preparator()`` mirrors the prepared/solved initial states back into
+        ``matrices_dict["mat_vt"]`` so the initial-value extraction reports
+        them, which leaves the fitted head — not the creator seed — in the
+        shared matrices. Any later re-fit from that dict would start the
+        backcasting/gradient pass from the wrong seed and profile a different
+        likelihood surface. R never sees this: ``vcov.adam`` re-runs ``adam()``
+        from scratch, and R's copy-on-modify keeps the caller's ``matVt``
+        pristine. Returns a shallow copy so the model's own state is untouched.
+        """
+        created = dict(self._adam_created)
+        seed_head = created.get("mat_vt_seed_head")
+        if seed_head is None:
+            return created
+        mat_vt = np.array(created["mat_vt"], copy=True)
+        mat_vt[:, : np.shape(seed_head)[1]] = seed_head
+        created["mat_vt"] = np.asfortranarray(mat_vt)
+        return created
+
     def _fisher_information_matrix(self, step_size=None):
         """Observed FI at the estimated coefficients (computed if not cached)."""
         from smooth.adam_general.core.utils.var_covar import fisher_information
@@ -4429,7 +4450,7 @@ class ADAM:
             self._model_type,
             self._components,
             self._lags_model,
-            self._adam_created,
+            self._adam_created_seeded(),
             self._persistence,
             self._initials,
             self._arima,
@@ -4487,6 +4508,7 @@ class ADAM:
                 "shape", self.other.get("nu", self.other.get("alpha"))
             )
         other_est = self._adam_estimated.get("other_parameter_estimate", False)
+        created = self._adam_created_seeded()
 
         def point_lik_at(b):
             result = CF(
@@ -4494,7 +4516,7 @@ class ADAM:
                 self._model_type,
                 self._components,
                 self._lags_model,
-                self._adam_created,
+                created,
                 self._persistence,
                 self._initials,
                 self._arima,

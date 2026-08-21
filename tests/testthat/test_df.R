@@ -101,6 +101,23 @@ test_that("CES/GUM/SSARIMA count initials under backcasting", {
     }
 })
 
+# 8b. CES counts its complex smoothing coefficients for every seasonality.
+#     "simple" carries a0+ia1 per seasonal frequency; they were omitted from
+#     the parameters table, so nparam() disagreed with logLik()'s df and
+#     auto.ces() gave CES(simple) a free 2-parameter advantage.
+test_that("CES counts the complex smoothing coefficients", {
+    for (s in c("none", "simple", "partial", "full")) {
+        m <- ces(yS, seasonality = s, initial = "backcasting", silent = TRUE)
+        expect_equal(nparam(m), attr(m$logLik, "df"))
+        expect_equal(nparam(m),
+                     nparam(ces(yS, seasonality = s, initial = "optimal",
+                                silent = TRUE)))
+    }
+    # simple, m=12: 2 smoothing (a0, a1) + 2 x 12 initials + 1 scale
+    expect_equal(nparam(ces(yS, seasonality = "simple", initial = "backcasting",
+                            silent = TRUE)), 27)
+})
+
 # 9. SMA df is order + 1 (AR with unit-root coefficients).
 test_that("sma df is order + 1", {
     yy <- ts(rnorm(120, 100, 3))

@@ -1078,6 +1078,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         }
         else{
             a$value <- complex(real=B[nCoefficients+(1:nSeasonal)*2-1], imaginary=B[nCoefficients+(1:nSeasonal)*2]);
+            # Two real coefficients (a0, a1) per seasonal frequency
+            parametersNumber[1,1] <- parametersNumber[1,1] + 2*nSeasonal;
             if(nSeasonal>1){
                 names(a$value) <- paste0("a0+ia1[",lagsModelSeasonal,"]");
             }

@@ -154,6 +154,30 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         initialOriginal <- initial;
     }
 
+    # Validate the provided b against the seasonality it belongs to. "partial"
+    # carries one real coefficient, "full" a complex pair, and "none"/"simple"
+    # have no b at all -- silently taking Re(b), or letting a wrong-shaped b
+    # reach the cost function (where it only surfaces as a 1e+300 penalty),
+    # would hide a user error rather than report it.
+    if(!is.null(b)){
+        if(any(seasonality==c("none","simple"))){
+            warning(paste0("CES(", seasonality, ") has no second smoothing parameter, ",
+                           "so the provided b is not used. Dropping it."),
+                    call.=FALSE);
+            b <- NULL;
+        }
+        else if(seasonality=="partial" && is.complex(b)){
+            stop(paste0("CES(partial) has a real second smoothing parameter, but b is ",
+                        "complex. Provide a real value, or use seasonality=\"full\" ",
+                        "for a complex b."), call.=FALSE);
+        }
+        else if(seasonality=="full" && !is.complex(b)){
+            stop(paste0("CES(full) has a complex second smoothing parameter, but b is ",
+                        "real. Provide a complex value (e.g. complex(real=, imaginary=)), ",
+                        "or use seasonality=\"partial\" for a real b."), call.=FALSE);
+        }
+    }
+
     a <- list(value=a);
     b <- list(value=b);
 

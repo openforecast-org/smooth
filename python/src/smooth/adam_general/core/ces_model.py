@@ -30,6 +30,40 @@ LOSS_OPTIONS = Literal[
 _CES_NLOPT_WARNING_SHOWN = False
 
 
+def _validate_b(b, seasonality):
+    """Check the provided ``b`` against the seasonality it belongs to.
+
+    "partial" carries one real coefficient, "full" a complex pair, and
+    "none"/"simple" have no ``b`` at all. Letting a wrong-shaped ``b`` through
+    only surfaces later as a 1e+300 penalty masquerading as a fit, and silently
+    taking ``Re(b)`` would hide a user error rather than report it. Mirrors the
+    same guard in R's ``ces()`` (``R/adam-ces.R``).
+    """
+    if b is None:
+        return None
+    if seasonality in ("none", "simple"):
+        warnings.warn(
+            f"CES({seasonality}) has no second smoothing parameter, so the "
+            "provided b is not used. Dropping it.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return None
+    if seasonality == "partial" and isinstance(b, complex):
+        raise ValueError(
+            "CES(partial) has a real second smoothing parameter, but b is "
+            'complex. Provide a real value, or use seasonality="full" for a '
+            "complex b."
+        )
+    if seasonality == "full" and not isinstance(b, complex):
+        raise ValueError(
+            "CES(full) has a complex second smoothing parameter, but b is "
+            "real. Provide a complex value (e.g. complex(re, im)), or use "
+            'seasonality="partial" for a real b.'
+        )
+    return b
+
+
 class CES:
     """
     Complex Exponential Smoothing in state space form.
@@ -137,7 +171,7 @@ class CES:
         self.lags = lags
         self.initial = initial
         self._a_provided = a
-        self._b_provided = b
+        self._b_provided = _validate_b(b, seasonality)
         self.loss = loss
         self.h = h
         self.holdout = holdout

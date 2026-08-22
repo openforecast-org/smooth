@@ -705,6 +705,23 @@ def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
         return 0
 
 
+def _sum_r(values):
+    """``sum()`` with R's accumulator.
+
+    R accumulates ``sum()`` over doubles in a long double register and rounds
+    the result back to double; NumPy's pairwise reduction stays in double and
+    loses the last bits. That is enough to turn an exact likelihood tie between
+    two parameterisations of the same fit -- ANN and MNN coincide when
+    alpha = 0, the multiplicative errors being the additive ones rescaled by a
+    constant level -- into a 1-ulp difference, which then flips the selected
+    model. Squaring still happens in double, as in R.
+
+    ``np.longdouble`` is 80-bit on x86-64 Linux; where the platform makes it an
+    alias of double this degrades to the plain pairwise sum.
+    """
+    return float(np.sum(np.asarray(values, dtype=float), dtype=np.longdouble))
+
+
 def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
     """
     Calculate scale parameter for the provided parameters.
@@ -729,20 +746,26 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         return np.log(np.asarray(x, dtype=np.complex128))
 
     if distribution == "dnorm":
-        return np.linalg.norm(errors) / np.sqrt(obs_in_sample)
+        # sqrt(sum(e^2)/n), not norm(e)/sqrt(n): the second form rounds twice
+        # (once in the irrational sqrt(n), once in the divide) and lands on a
+        # different double. That is enough to break an exact likelihood tie
+        # between two parameterisations of the same fit -- ANN and MNN coincide
+        # when alpha = 0 -- and flip the selected model. Mirrors R's
+        # ``adam_scaler`` (R/utils-adam.R).
+        return np.sqrt(_sum_r(errors**2) / obs_in_sample)
 
     elif distribution == "dlaplace":
-        return np.sum(np.abs(errors)) / obs_in_sample
+        return _sum_r(np.abs(errors)) / obs_in_sample
 
     elif distribution == "ds":
-        return np.sum(np.sqrt(np.abs(errors))) / (obs_in_sample * 2)
+        return _sum_r(np.sqrt(np.abs(errors))) / (obs_in_sample * 2)
 
     elif distribution == "dgnorm":
         beta = other if other is not None else 2.0
-        return (beta * np.sum(np.abs(errors) ** beta) / obs_in_sample) ** (1 / beta)
+        return (beta * _sum_r(np.abs(errors) ** beta) / obs_in_sample) ** (1 / beta)
 
     elif distribution == "dalaplace":
-        return np.sum(errors * (other - (errors <= 0) * 1)) / obs_in_sample
+        return _sum_r(errors * (other - (errors <= 0) * 1)) / obs_in_sample
 
     elif distribution == "dlnorm":
         # Cast 1+errors (or 1+errors/yFitted) to complex so log() of negative
@@ -752,50 +775,50 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
             log_term = np.abs(complex_log(1 + errors / y_fitted))
         else:  # "M"
             log_term = np.abs(complex_log(1 + errors))
-        temp = 1 - np.sqrt(np.abs(1 - np.linalg.norm(log_term) ** 2 / obs_in_sample))
+        temp = 1 - np.sqrt(np.abs(1 - _sum_r(log_term**2) / obs_in_sample))
         return np.sqrt(2 * np.abs(temp))
 
     elif distribution == "dllaplace":
         if Etype == "A":
-            return np.sum(np.abs(complex_log(1 + errors / y_fitted))) / obs_in_sample
+            return _sum_r(np.abs(complex_log(1 + errors / y_fitted))) / obs_in_sample
         else:  # "M"
-            return np.sum(np.abs(complex_log(1 + errors))) / obs_in_sample
+            return _sum_r(np.abs(complex_log(1 + errors))) / obs_in_sample
 
     elif distribution == "dls":
         if Etype == "A":
             return (
-                np.sum(np.sqrt(np.abs(complex_log(1 + errors / y_fitted))))
+                _sum_r(np.sqrt(np.abs(complex_log(1 + errors / y_fitted))))
                 / obs_in_sample
             )
         else:  # "M"
-            return np.sum(np.sqrt(np.abs(complex_log(1 + errors)))) / obs_in_sample
+            return _sum_r(np.sqrt(np.abs(complex_log(1 + errors)))) / obs_in_sample
 
     elif distribution == "dlgnorm":
         if Etype == "A":
             return (
                 other
-                * np.sum(np.abs(complex_log(1 + errors / y_fitted)) ** other)
+                * _sum_r(np.abs(complex_log(1 + errors / y_fitted)) ** other)
                 / obs_in_sample
             ) ** (1 / other)
         else:  # "M"
             return (
-                other * np.sum(np.abs(complex_log(1 + errors)) ** other) / obs_in_sample
+                other * _sum_r(np.abs(complex_log(1 + errors)) ** other) / obs_in_sample
             ) ** (1 / other)
 
     elif distribution == "dinvgauss":
         if Etype == "A":
             return (
-                np.sum((errors / y_fitted) ** 2 / (1 + errors / y_fitted))
+                _sum_r((errors / y_fitted) ** 2 / (1 + errors / y_fitted))
                 / obs_in_sample
             )
         else:  # "M"
-            return np.sum(errors**2 / (1 + errors)) / obs_in_sample
+            return _sum_r(errors**2 / (1 + errors)) / obs_in_sample
 
     elif distribution == "dgamma":
         if Etype == "A":
-            return np.linalg.norm(errors / y_fitted) ** 2 / obs_in_sample
+            return _sum_r((errors / y_fitted) ** 2) / obs_in_sample
         else:  # "M"
-            return np.linalg.norm(errors) ** 2 / obs_in_sample
+            return _sum_r(errors**2) / obs_in_sample
 
     else:
         raise ValueError(f"Unknown distribution: {distribution}")

@@ -460,38 +460,47 @@ class CES:
             "NLOPT_LN_COBYLA": nlopt.LN_COBYLA,
         }
 
-        opt1 = nlopt.opt(algo_map.get(self.algorithm0, nlopt.LN_BOBYQA), len(B))
-        opt1.set_min_objective(objective)
-        opt1.set_lower_bounds(np.full(len(B), -np.inf))
-        opt1.set_upper_bounds(np.full(len(B), np.inf))
-        opt1.set_maxeval(maxeval0_used)
-        opt1.set_xtol_rel(self.xtol_rel0)
-        opt1.set_xtol_abs(self.xtol_abs0)
-        opt1.set_ftol_rel(self.ftol_rel0)
-        opt1.set_ftol_abs(self.ftol_abs0)
-        opt1.set_maxtime(self.maxtime0)
-        try:
-            B = opt1.optimize(B)
-        except nlopt.RoundoffLimited:
-            B = B.copy()
+        if len(B) == 0:
+            # Nothing left to estimate: `a` (and `b`) supplied together with
+            # backcast/complete initials and no xreg leaves an empty parameter
+            # vector. R switches ``modelDo`` to "use" there and evaluates the
+            # cost once instead of optimising (R/adam-ces.R:633-636). nlopt
+            # cannot be constructed with zero dimensions -- it raises
+            # ``invalid_argument`` -- so the optimiser is skipped entirely.
+            cf_value = float(ces_cf(B=B, **cf_kwargs))
+        else:
+            opt1 = nlopt.opt(algo_map.get(self.algorithm0, nlopt.LN_BOBYQA), len(B))
+            opt1.set_min_objective(objective)
+            opt1.set_lower_bounds(np.full(len(B), -np.inf))
+            opt1.set_upper_bounds(np.full(len(B), np.inf))
+            opt1.set_maxeval(maxeval0_used)
+            opt1.set_xtol_rel(self.xtol_rel0)
+            opt1.set_xtol_abs(self.xtol_abs0)
+            opt1.set_ftol_rel(self.ftol_rel0)
+            opt1.set_ftol_abs(self.ftol_abs0)
+            opt1.set_maxtime(self.maxtime0)
+            try:
+                B = opt1.optimize(B)
+            except nlopt.RoundoffLimited:
+                B = B.copy()
 
-        # Stage 2: Nelder-Mead — R lines 866-870
-        opt2 = nlopt.opt(algo_map.get(self.algorithm, nlopt.LN_NELDERMEAD), len(B))
-        opt2.set_min_objective(objective)
-        opt2.set_lower_bounds(np.full(len(B), -np.inf))
-        opt2.set_upper_bounds(np.full(len(B), np.inf))
-        opt2.set_maxeval(maxeval_used)
-        opt2.set_xtol_rel(self.xtol_rel)
-        opt2.set_xtol_abs(self.xtol_abs)
-        opt2.set_ftol_rel(self.ftol_rel)
-        opt2.set_ftol_abs(self.ftol_abs)
-        opt2.set_maxtime(self.maxtime)
-        try:
-            B = opt2.optimize(B)
-        except nlopt.RoundoffLimited:
-            B = B.copy()
+            # Stage 2: Nelder-Mead — R lines 866-870
+            opt2 = nlopt.opt(algo_map.get(self.algorithm, nlopt.LN_NELDERMEAD), len(B))
+            opt2.set_min_objective(objective)
+            opt2.set_lower_bounds(np.full(len(B), -np.inf))
+            opt2.set_upper_bounds(np.full(len(B), np.inf))
+            opt2.set_maxeval(maxeval_used)
+            opt2.set_xtol_rel(self.xtol_rel)
+            opt2.set_xtol_abs(self.xtol_abs)
+            opt2.set_ftol_rel(self.ftol_rel)
+            opt2.set_ftol_abs(self.ftol_abs)
+            opt2.set_maxtime(self.maxtime)
+            try:
+                B = opt2.optimize(B)
+            except nlopt.RoundoffLimited:
+                B = B.copy()
 
-        cf_value = opt2.last_optimum_value()
+            cf_value = opt2.last_optimum_value()
 
         # --- Final fit with optimized B --- R lines 931-996
 

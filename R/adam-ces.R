@@ -921,6 +921,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         if(!exists("matF", inherits=FALSE)){
             cesCreated <- creator(seasonality, xregModel,
                                   lagsModelAll, lagsModelMax, obsAll, lags, yIndexAll, yClasses,
+                                  lagsModelSeasonal, nSeasonal,
                                   componentsNumber, xregNumber, obsInSample, obsStates, xregNames,
                                   yFrequency, xregModelInitials);
 

@@ -1886,6 +1886,14 @@ class ADAM:
         'dlaplace'
         """
         self._check_is_fitted()
+        # A combination spans members with different error types (and hence
+        # different default distributions), so it has no single one. R leaves
+        # it unresolved -- "default" unless the user named one explicitly.
+        if getattr(self, "_is_combined", False):
+            # The constructor arguments are moved into _config during fit(), so
+            # that is where the unresolved request lives.
+            requested = getattr(self, "_config", {}).get("distribution")
+            return requested if requested is not None else "default"
         return self._general.get("distribution_new", self._general.get("distribution"))
 
     @property
@@ -2620,6 +2628,23 @@ class ADAM:
 
         return float(np.sqrt(ss / df))
 
+    def _combined_has_no_likelihood(self, what: str) -> bool:
+        """Warn and report ``nan`` for a quantity a combination does not have.
+
+        R returns NULL from ``logLik()`` on a combined model (with a hint that
+        combinations have no single likelihood), which makes AIC/AICc/BIC/BICc
+        come back empty. Reporting one member's value instead would make a
+        combination look directly comparable to a single model.
+        """
+        if not getattr(self, "_is_combined", False):
+            return False
+        warnings.warn(
+            f"The {what} of this model is unavailable. Hint: did you use combinations?",
+            UserWarning,
+            stacklevel=3,
+        )
+        return True
+
     @property
     def loglik(self) -> float:
         """
@@ -2642,6 +2667,8 @@ class ADAM:
         >>> ll = model.loglik
         """
         self._check_is_fitted()
+        if self._combined_has_no_likelihood("likelihood"):
+            return float("nan")
         return self._adam_estimated["log_lik_adam_value"]["value"]
 
     def point_lik(self, log: bool = True) -> NDArray:
@@ -2743,6 +2770,8 @@ class ADAM:
         self._check_is_fitted()
         from smooth.adam_general.core.utils.ic import AIC
 
+        if self._combined_has_no_likelihood("AIC"):
+            return float("nan")
         log_lik = self._adam_estimated["log_lik_adam_value"]
         return AIC(log_lik["value"], log_lik["nobs"], log_lik["df"])
 
@@ -2770,6 +2799,8 @@ class ADAM:
         self._check_is_fitted()
         from smooth.adam_general.core.utils.ic import AICc
 
+        if self._combined_has_no_likelihood("AICc"):
+            return float("nan")
         log_lik = self._adam_estimated["log_lik_adam_value"]
         return AICc(log_lik["value"], log_lik["nobs"], log_lik["df"])
 
@@ -2797,6 +2828,8 @@ class ADAM:
         self._check_is_fitted()
         from smooth.adam_general.core.utils.ic import BIC
 
+        if self._combined_has_no_likelihood("BIC"):
+            return float("nan")
         log_lik = self._adam_estimated["log_lik_adam_value"]
         return BIC(log_lik["value"], log_lik["nobs"], log_lik["df"])
 
@@ -2824,6 +2857,8 @@ class ADAM:
         self._check_is_fitted()
         from smooth.adam_general.core.utils.ic import BICc
 
+        if self._combined_has_no_likelihood("BICc"):
+            return float("nan")
         log_lik = self._adam_estimated["log_lik_adam_value"]
         return BICc(log_lik["value"], log_lik["nobs"], log_lik["df"])
 
@@ -3828,8 +3863,11 @@ class ADAM:
 
             # Add IC-weighted contribution (using filtered weight for fitted values)
             y_fitted_combined += fitted_values * filtered_weight
+            # ... but the parameter count uses the FULL weights: dropping the
+            # sub-1% members would truncate the (heavily parameterised) tail and
+            # understate the average complexity. Mirrors R (R/adam.R:3134).
             n_param_weighted += (
-                result["adam_estimated"]["n_param_estimated"] * filtered_weight
+                result["adam_estimated"]["n_param_estimated"] * original_weight
             )
 
             # Store for later forecasting

@@ -203,6 +203,42 @@ class TestADAMCombinationProperties:
         assert model.model_name is not None
 
 
+class TestADAMCombinationReporting:
+    """A combination has no single likelihood, IC or distribution (R parity)."""
+
+    def test_likelihood_and_ics_are_unavailable(self, simple_series):
+        """R's logLik() returns NULL for a combination, so the ICs are empty."""
+        model = ADAM(model="CCC", lags=[1])
+        model.fit(simple_series)
+
+        for name in ("loglik", "aic", "aicc", "bic", "bicc"):
+            with pytest.warns(UserWarning, match="did you use combinations"):
+                assert np.isnan(getattr(model, name))
+
+    def test_distribution_stays_unresolved(self, simple_series):
+        """Members span both error types, so no single distribution applies."""
+        model = ADAM(model="CCC", lags=[1])
+        model.fit(simple_series)
+        assert model.distribution_ == "default"
+
+        explicit = ADAM(model="CCC", lags=[1], distribution="dlnorm")
+        explicit.fit(simple_series)
+        assert explicit.distribution_ == "dlnorm"
+
+    def test_nparam_uses_the_full_ic_weights(self, simple_series):
+        """The sub-1% members are dropped from the fitted values, not the df."""
+        model = ADAM(model="CCC", lags=[1])
+        model.fit(simple_series)
+
+        expected = 1.0  # the scale
+        for name, weight in model.ic_weights.items():
+            member = ADAM(model=name, lags=[1])
+            member.fit(simple_series)
+            expected += (member.nparam - 1.0) * weight
+
+        assert model.nparam == pytest.approx(expected, rel=1e-12)
+
+
 class TestADAMCombinationEdgeCases:
     """Tests for edge cases in model combination."""
 

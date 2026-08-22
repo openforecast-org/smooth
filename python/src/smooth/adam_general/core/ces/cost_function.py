@@ -11,6 +11,7 @@ import numpy as np
 
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.ces.filler import ces_filler
+from smooth.adam_general.core.utils.utils import _sum_r
 
 _R_LN_SQRT_2PI = 0.918938533204672741780329736406
 
@@ -197,16 +198,12 @@ def ces_cf(
         if loss == "likelihood":
             # CES scaler: sqrt(sum(errors^2)/obs) — R line 482
             errors_ot = errors[ot_logical]
-            errors_sum = math.fsum(float(error) ** 2 for error in errors_ot)
-            scale = math.sqrt(errors_sum / obs_in_sample)
-            y_ot = y_in_sample[ot_logical]
+            scale = math.sqrt(_sum_r(errors_ot**2) / obs_in_sample)
+            y_ot = np.asarray(y_in_sample, dtype=float)[ot_logical]
             fitted_ot = fitted[ot_logical]
             log_scale = math.log(scale)
-            cf_value = math.fsum(
-                _R_LN_SQRT_2PI
-                + 0.5 * ((float(actual) - float(fitted_value)) / scale) ** 2
-                + log_scale
-                for actual, fitted_value in zip(y_ot, fitted_ot)
+            cf_value = _sum_r(
+                _R_LN_SQRT_2PI + 0.5 * ((y_ot - fitted_ot) / scale) ** 2 + log_scale
             )
         elif loss == "MSE":
             cf_value = np.sum(errors**2) / obs_in_sample

@@ -8,13 +8,12 @@ Bernoulli log-likelihood (or MSE on the binary indicators).
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 from numpy.linalg import eigvals
 
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+from smooth.adam_general.core.utils.utils import _sum_r
 
 
 def om_link_function(x, error_type, occurrence):
@@ -244,16 +243,14 @@ def om_cf(  # noqa: N802
         # the initialiser handed the optimiser a parameter region the model
         # cannot represent, and that should surface, not be hidden.
         #
-        # Aggregate via math.fsum (Shewchuk exact summation) instead of
-        # np.sum (pairwise IEEE-double) to match R's LDOUBLE-accumulator
-        # sum() byte-for-byte at feasible points.  Same ULP-level
-        # difference can otherwise push NLopt's deterministic simplex
-        # into a different basin on flat-loss seasonal OM surfaces.
+        # Aggregate through _sum_r, which accumulates in a long double
+        # register exactly as R's sum() does; NumPy's pairwise IEEE-double
+        # reduction drifts by a ULP per call, and that can push NLopt's
+        # deterministic simplex into a different basin on flat-loss seasonal
+        # OM surfaces.  Vectorised, unlike math.fsum(...tolist()).
         p_on = p_fitted[ot_logical]
         p_off = p_fitted[~ot_logical]
-        cf_value = -(
-            math.fsum(np.log(p_on).tolist()) + math.fsum(np.log(1.0 - p_off).tolist())
-        )
+        cf_value = -(_sum_r(np.log(p_on)) + _sum_r(np.log(1.0 - p_off)))
     elif loss == "MSE":
         cf_value = float(np.mean(residual**2))
     elif loss == "MAE":

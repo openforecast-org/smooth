@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 from numpy.linalg import eigvals
 
@@ -7,6 +5,7 @@ from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import (
+    _sum_r,
     calculate_entropy,
     calculate_likelihood,
     calculate_multistep_loss,
@@ -633,12 +632,13 @@ def CF(  # noqa: N802
                 observations_dict["obs_in_sample"],
                 other,
             )
-            # Calculate the likelihood.  Use math.fsum (Shewchuk exact) to
-            # mirror R's LDOUBLE-accumulator sum() — NumPy's default pairwise
-            # sum drifts by 1 ULP per call against R, which through NLopt's
-            # deterministic simplex moves becomes a different convergence
-            # point on flat ARIMA cost surfaces.  Same class of fix as the
-            # msdecompose summation-order work.
+            # Aggregate through _sum_r: R accumulates sum() in a long double
+            # register, and NumPy's default pairwise sum drifts by 1 ULP per
+            # call against it, which through NLopt's deterministic simplex
+            # moves becomes a different convergence point on flat ARIMA cost
+            # surfaces.  _sum_r *is* that accumulator, so it mirrors R more
+            # literally than exact summation would -- and it stays vectorised,
+            # where math.fsum(...tolist()) walked the array in Python.
             ll = calculate_likelihood(
                 general["distribution_new"],
                 model_type_dict["error_type"],
@@ -647,7 +647,7 @@ def CF(  # noqa: N802
                 scale,
                 other,
             )
-            CFValue = -math.fsum(np.asarray(ll, dtype=np.float64).ravel().tolist())
+            CFValue = -_sum_r(np.asarray(ll, dtype=np.float64).ravel())
             # Differential entropy for the logLik of occurrence model
             if observations_dict.get("occurrence_model", False) or any(
                 ~observations_dict["ot_logical"]

@@ -664,14 +664,14 @@ def CF(  # noqa: N802
                 CFValue += CFValueEntropy
 
         elif general["loss"] == "MSE":
-            CFValue = np.sum(adam_fitted.errors**2) / observations_dict["obs_in_sample"]
+            CFValue = _sum_r(adam_fitted.errors**2) / observations_dict["obs_in_sample"]
         elif general["loss"] == "MAE":
             CFValue = (
-                np.sum(np.abs(adam_fitted.errors)) / observations_dict["obs_in_sample"]
+                _sum_r(np.abs(adam_fitted.errors)) / observations_dict["obs_in_sample"]
             )
         elif general["loss"] == "HAM":
             CFValue = (
-                np.sum(np.sqrt(np.abs(adam_fitted.errors)))
+                _sum_r(np.sqrt(np.abs(adam_fitted.errors)))
                 / observations_dict["obs_in_sample"]
             )
         elif general["loss"] in ["LASSO", "RIDGE"]:

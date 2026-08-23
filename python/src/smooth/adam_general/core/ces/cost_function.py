@@ -11,7 +11,7 @@ import numpy as np
 
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.ces.filler import ces_filler
-from smooth.adam_general.core.utils.utils import _sum_r
+from smooth.adam_general.core.utils.utils import _sum_r, calculate_multistep_loss
 
 _R_LN_SQRT_2PI = 0.918938533204672741780329736406
 
@@ -206,13 +206,13 @@ def ces_cf(
                 _R_LN_SQRT_2PI + 0.5 * ((y_ot - fitted_ot) / scale) ** 2 + log_scale
             )
         elif loss == "MSE":
-            cf_value = np.sum(errors**2) / obs_in_sample
+            cf_value = _sum_r(errors**2) / obs_in_sample
         elif loss == "MAE":
-            cf_value = np.sum(np.abs(errors)) / obs_in_sample
+            cf_value = _sum_r(np.abs(errors)) / obs_in_sample
         elif loss == "HAM":
-            cf_value = np.sum(np.sqrt(np.abs(errors))) / obs_in_sample
+            cf_value = _sum_r(np.sqrt(np.abs(errors))) / obs_in_sample
         else:
-            cf_value = np.sum(errors**2) / obs_in_sample
+            cf_value = _sum_r(errors**2) / obs_in_sample
     else:
         # Multistep errors — R lines 534-555
         adam_errors = adam_cpp.ferrors(
@@ -226,22 +226,9 @@ def ces_cf(
         ).errors
         adam_errors = np.array(adam_errors)
 
-        if loss == "MSEh":
-            cf_value = np.sum(adam_errors[:, h - 1] ** 2) / (obs_in_sample - h)
-        elif loss == "TMSE":
-            cf_value = np.sum(np.sum(adam_errors**2, axis=0) / (obs_in_sample - h))
-        elif loss == "GTMSE":
-            cf_value = np.sum(
-                np.log(np.sum(adam_errors**2, axis=0) / (obs_in_sample - h))
-            )
-        elif loss == "MSCE":
-            cf_value = np.sum(np.sum(adam_errors, axis=1) ** 2) / (obs_in_sample - h)
-        elif loss == "GPL":
-            cf_value = np.log(
-                np.linalg.det(adam_errors.T @ adam_errors / (obs_in_sample - h))
-            )
-        else:
-            cf_value = np.sum(adam_errors**2) / obs_in_sample
+        cf_value = calculate_multistep_loss(
+            loss, np.asarray(adam_errors, dtype=float), obs_in_sample, h
+        )
 
     if np.isnan(cf_value) or np.isinf(cf_value):
         cf_value = 1e300

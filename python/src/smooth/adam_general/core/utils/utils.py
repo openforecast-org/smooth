@@ -667,45 +667,48 @@ def calculate_entropy(distribution, scale, other, obsZero, y_fitted):
 
 
 def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
+    """Multistep loss over the matrix of h-steps-ahead errors.
+
+    Every reduction goes through ``_sum_r`` (``colSums``/``rowSums`` for the
+    per-column and per-row ones), because R accumulates all three in a long
+    double register and a 1-ulp gap here reorders the Nelder-Mead simplex at a
+    near-tie and sends the two optimisers to different optima. The squared
+    sums are written as ``sum(x**2)`` rather than ``norm(x)**2``: the latter
+    takes a square root and squares it back, rounding twice.
+    """
+    denom = obs_in_sample - h
+    last = adam_errors[:, h - 1]
     if loss == "MSEh":
-        return np.linalg.norm(adam_errors[:, h - 1]) ** 2 / (obs_in_sample - h)
+        return _sum_r(last**2) / denom
     elif loss == "TMSE":
-        return np.sum(np.linalg.norm(adam_errors, axis=0) ** 2 / (obs_in_sample - h))
+        return _sum_r(_sum_r(adam_errors**2, axis=0) / denom)
     elif loss == "GTMSE":
-        return np.sum(
-            np.log(np.linalg.norm(adam_errors, axis=0) ** 2 / (obs_in_sample - h))
-        )
+        return _sum_r(np.log(_sum_r(adam_errors**2, axis=0) / denom))
     elif loss == "MSCE":
-        return np.sum(np.sum(adam_errors, axis=1) ** 2) / (obs_in_sample - h)
+        return _sum_r(_sum_r(adam_errors, axis=1) ** 2) / denom
     elif loss == "MAEh":
-        return np.sum(np.abs(adam_errors[:, h - 1])) / (obs_in_sample - h)
+        return _sum_r(np.abs(last)) / denom
     elif loss == "TMAE":
-        return np.sum(np.sum(np.abs(adam_errors), axis=0) / (obs_in_sample - h))
+        return _sum_r(_sum_r(np.abs(adam_errors), axis=0) / denom)
     elif loss == "GTMAE":
-        return np.sum(np.log(np.sum(np.abs(adam_errors), axis=0) / (obs_in_sample - h)))
+        return _sum_r(np.log(_sum_r(np.abs(adam_errors), axis=0) / denom))
     elif loss == "MACE":
-        return np.sum(np.abs(np.sum(adam_errors, axis=1))) / (obs_in_sample - h)
+        return _sum_r(np.abs(_sum_r(adam_errors, axis=1))) / denom
     elif loss == "HAMh":
-        return np.sum(np.sqrt(np.abs(adam_errors[:, h - 1]))) / (obs_in_sample - h)
+        return _sum_r(np.sqrt(np.abs(last))) / denom
     elif loss == "THAM":
-        return np.sum(
-            np.sum(np.sqrt(np.abs(adam_errors)), axis=0) / (obs_in_sample - h)
-        )
+        return _sum_r(_sum_r(np.sqrt(np.abs(adam_errors)), axis=0) / denom)
     elif loss == "GTHAM":
-        return np.sum(
-            np.log(np.sum(np.sqrt(np.abs(adam_errors)), axis=0) / (obs_in_sample - h))
-        )
+        return _sum_r(np.log(_sum_r(np.sqrt(np.abs(adam_errors)), axis=0) / denom))
     elif loss == "CHAM":
-        return np.sum(np.sqrt(np.abs(np.sum(adam_errors, axis=1)))) / (
-            obs_in_sample - h
-        )
+        return _sum_r(np.sqrt(np.abs(_sum_r(adam_errors, axis=1)))) / denom
     elif loss == "GPL":
-        return np.log(np.linalg.det(adam_errors.T @ adam_errors / (obs_in_sample - h)))
+        return np.log(np.linalg.det(adam_errors.T @ adam_errors / denom))
     else:
         return 0
 
 
-def _sum_r(values):
+def _sum_r(values, axis=None):
     """``sum()`` with R's accumulator.
 
     R accumulates ``sum()`` over doubles in a long double register and rounds
@@ -718,8 +721,14 @@ def _sum_r(values):
 
     ``np.longdouble`` is 80-bit on x86-64 Linux; where the platform makes it an
     alias of double this degrades to the plain pairwise sum.
+
+    ``axis`` gives R's ``colSums()`` / ``rowSums()``, which use the same long
+    double accumulator and also round back to double.
     """
-    return float(np.sum(np.asarray(values, dtype=float), dtype=np.longdouble))
+    total = np.sum(np.asarray(values, dtype=float), axis=axis, dtype=np.longdouble)
+    if axis is None:
+        return float(total)
+    return np.asarray(total, dtype=float)
 
 
 def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):

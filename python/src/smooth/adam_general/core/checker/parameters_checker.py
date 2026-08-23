@@ -695,6 +695,39 @@ def parameters_checker(
         ets_info["season_type"] not in ["N", None] and len(lags_model_seasonal) > 0
     )
 
+    # R trims the seasonal entries out of `lags` -- and out of the ARIMA order
+    # vectors aligned with them -- once it knows the ETS part is non-seasonal and
+    # no ARIMA order sits at a seasonal lag (adamGeneral.R:487-493). Without the
+    # trim an unused seasonal lag still reaches the ARIMA initial-state seed,
+    # which then seeds a lag-1 ARI state from a seasonal decomposition instead of
+    # the series level, so `lags=[1, 12]` and `lags=[1]` gave different fits for
+    # the very same model.
+    _seasonal_positions = [i for i, lag in enumerate(validated_lags) if lag > 1]
+    _aligned = [
+        vec
+        for vec in (ar_orders, i_orders, ma_orders)
+        if vec is not None and len(vec) == len(validated_lags)
+    ]
+    if (
+        not model_is_seasonal
+        and _seasonal_positions
+        and not any(vec[i] for vec in _aligned for i in _seasonal_positions)
+    ):
+        keep = [i for i, lag in enumerate(validated_lags) if lag == 1]
+        for name, vec in (
+            ("ar_orders", ar_orders),
+            ("i_orders", i_orders),
+            ("ma_orders", ma_orders),
+        ):
+            if vec is not None and len(vec) == len(validated_lags):
+                arima_info[name] = [vec[i] for i in keep]
+        ar_orders = arima_info["ar_orders"]
+        i_orders = arima_info["i_orders"]
+        ma_orders = arima_info["ma_orders"]
+        validated_lags = [validated_lags[i] for i in keep]
+        lags_model = [lag for lag in lags_model if lag == 1]
+        lags_model_seasonal = []
+
     n_param_max = _calculate_n_param_max(
         ets_model=ets_model,
         persistence_level_estimate=persist_info.get("persistence_level_estimate", True),

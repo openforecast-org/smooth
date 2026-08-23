@@ -379,9 +379,12 @@ class TestADAMARIMAOrders:
         )
 
         arima = m._arima
-        # After prepending lag=1, orders should be [1,0] (non-zero only at lag=1)
-        assert arima["ar_orders"] == [1, 0]
-        assert arima["ma_orders"] == [1, 0]
+        # lag=1 is prepended, which pads the orders to [1, 0]; the seasonal lag
+        # then carries no order and the ETS part is non-seasonal, so lag 12 and
+        # its zero orders are trimmed away entirely, exactly as R does
+        # (adamGeneral.R:487-493, where m$lags is 1 and m$orders$ar is 1).
+        assert arima["ar_orders"] == [1]
+        assert arima["ma_orders"] == [1]
 
     def test_seasonal_only_arima(self, series60):
         """ar_order=[0,1] with lags=[1,12] gives seasonal-only ARIMA at lag=12."""

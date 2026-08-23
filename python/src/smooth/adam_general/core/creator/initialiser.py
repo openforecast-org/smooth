@@ -748,23 +748,31 @@ def initialiser(
                 sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0
             )
             n_arma = n_ar + n_ma
-            if n_arma > 0:
-                arima_polys = adam_polynomialiser(
-                    adam_cpp,
-                    B[arma_start_index : arma_start_index + n_arma],
-                    arima_checked["ar_orders"],
-                    arima_checked["i_orders"],
-                    arima_checked["ma_orders"],
-                    arima_checked["ar_estimate"],
-                    arima_checked["ma_estimate"],
-                    arima_checked["arma_parameters"]
-                    if arima_checked["arma_parameters"]
-                    else [],
-                    lags_dict.get("lags_original", lags_dict["lags"]),
-                )
-                ari_tail = arima_polys["ari_polynomial"][-1]
-                if ari_tail != 0:
-                    B[j : j + initials_checked["initial_arima_number"]] /= ari_tail
+            # Runs for every ARIMA, including a pure ARIMA(0,d,0) with no ARMA
+            # parameters to estimate: the ARI polynomial is built from the
+            # differencing orders alone, and its tail is what sets the sign of
+            # the seed. Guarding this on n_arma > 0 left ARIMA(0,d,0) with an
+            # unnormalised seed, which for odd d is the wrong sign entirely --
+            # (1-B) has tail -1, while (1-B)^2 has tail +1 and hid the bug.
+            # R applies the division unconditionally (utils-adam.R:1352).
+            arima_polys = adam_polynomialiser(
+                adam_cpp,
+                B[arma_start_index : arma_start_index + n_arma]
+                if n_arma > 0
+                else np.zeros(0),
+                arima_checked["ar_orders"],
+                arima_checked["i_orders"],
+                arima_checked["ma_orders"],
+                arima_checked["ar_estimate"],
+                arima_checked["ma_estimate"],
+                arima_checked["arma_parameters"]
+                if arima_checked["arma_parameters"]
+                else [],
+                lags_dict.get("lags_original", lags_dict["lags"]),
+            )
+            ari_tail = arima_polys["ari_polynomial"][-1]
+            if ari_tail != 0:
+                B[j : j + initials_checked["initial_arima_number"]] /= ari_tail
         names.extend(
             [
                 f"ARIMAState{n}"

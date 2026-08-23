@@ -856,14 +856,24 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
                 }
             }
             if(arimaModel && initialArimaEstimate){
+                # Rows carrying the level that the constant now accounts for. A
+                # pure MA has no ARI terms, so nonZeroARI is empty and indexing
+                # by it would debias nothing at all -- leaving the state seeded
+                # at mean(y) while the constant is also mean(y), so the first
+                # fitted value double counted the level. Fall back to every
+                # ARIMA row there; where ARI terms do exist the two sets
+                # coincide anyway.
+                arimaRows <- if(nrow(nonZeroARI)>0){
+                                 componentsNumberETS+nonZeroARI[,2];
+                             } else { componentsNumberETS+1:componentsNumberARIMA; }
                 if(Etype=="A"){
-                    matVt[componentsNumberETS+nonZeroARI[,2],1:initialArimaNumber] <-
-                        matVt[componentsNumberETS+nonZeroARI[,2],1:initialArimaNumber] -
+                    matVt[arimaRows,1:initialArimaNumber] <-
+                        matVt[arimaRows,1:initialArimaNumber] -
                         matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
                 }
                 else{
-                    matVt[componentsNumberETS+nonZeroARI[,2],1:initialArimaNumber] <-
-                        matVt[componentsNumberETS+nonZeroARI[,2],1:initialArimaNumber] /
+                    matVt[arimaRows,1:initialArimaNumber] <-
+                        matVt[arimaRows,1:initialArimaNumber] /
                         matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
                 }
             }
@@ -1005,12 +1015,25 @@ adam_filler <- function(B,
     # Initials of ARIMA
     if(arimaModel){
         if(all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
-            matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
-                switch(Etype,
-                       "A"=arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                           t(B[j+1:initialArimaNumber]),
-                       "M"=exp(arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                                   t(log(B[j+1:initialArimaNumber]))))
+            if(nrow(nonZeroARI)>0){
+                matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
+                    switch(Etype,
+                           "A"=arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
+                               t(B[j+1:initialArimaNumber]),
+                           "M"=exp(arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
+                                       t(log(B[j+1:initialArimaNumber]))))
+            }
+            else{
+                # A pure MA (no AR, no differencing) has an ARI polynomial of
+                # just 1, so nonZeroARI is empty and the indexed assignment
+                # above writes nothing at all: the initial state silently stayed
+                # at the creator seed while B still consumed a degree of freedom
+                # and drifted freely. With the polynomial equal to 1 the general
+                # expression degenerates to B itself, written into the state the
+                # initialiser read it from.
+                matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
+                    B[j+1:initialArimaNumber]
+            }
             j[] <- j+initialArimaNumber
         }
         # This is needed in order to propagate initials of ARIMA to all components

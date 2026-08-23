@@ -2250,7 +2250,6 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
 
     iOrdersICs <- vector("numeric",iCombinations*2);
     iOrdersICs[1] <- ICOriginal;
-    BValues <- vector("list",iCombinations*2);
 
     if(!silent){
         cat("\nSelecting differences... ");
@@ -2273,9 +2272,6 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
                          silent=TRUE);
         if(!inherits(testModel,"try-error")){
             iOrdersICs[d] <- IC(testModel);
-            if(!is.null(testModel$B)){
-                BValues[[d]] <- testModel$B;
-            }
         }
         else{
             iOrdersICs[d] <- Inf;
@@ -2285,11 +2281,17 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
     iBest <- iOrders[d,1:ordersLength];
     constantValue <- iOrders[d,ordersLength+1]==1;
 
+    # The winner is refitted from a cold start, exactly as a direct call with
+    # these orders would be. Carrying the search's parameter vector over as a
+    # warm start made auto.msarima() report a different optimum than msarima()
+    # with the very same orders, which is confusing and not reproducible by the
+    # user. Both are truncated at the same maxeval, so the warm start only moved
+    # the truncation point. It also left bestIC (taken from the cold loop fit
+    # below) describing a different fit than the bestModel returned alongside it.
     bestModel <- testModel <- do.call(fitter,
                                       c(base_call,
                                         list(orders=list(ar=0, i=iBest, ma=0),
-                                             constant=constantValue,
-                                             B=BValues[[d]]),
+                                             constant=constantValue),
                                         dots));
     bestIC <- iOrdersICs[d];
 
@@ -2389,7 +2391,6 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
     }
 
     if(!is.null(additionalModels)){
-        BValues <- vector("list",iCombinations);
         imaOrdersICs <- vector("numeric",iCombinations);
         imaOrdersICs[] <- Inf;
         for(d in 2:nrow(additionalModels)){
@@ -2404,9 +2405,6 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
 
             if(!inherits(testModel,"try-error")){
                 imaOrdersICs[d] <- IC(testModel);
-                if(!is.null(testModel$B)){
-                    BValues[[d]] <- testModel$B;
-                }
             }
             else{
                 imaOrdersICs[d] <- Inf;
@@ -2425,8 +2423,7 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
             bestModel <- do.call(fitter,
                                  c(base_call,
                                    list(orders=list(ar=0, i=iBest, ma=maBest),
-                                        constant=constantValue,
-                                        B=BValues[[d]]),
+                                        constant=constantValue),
                                    dots));
         }
     }

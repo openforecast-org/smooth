@@ -986,6 +986,24 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
             list2env(cesCreated, environment());
         }
 
+        # A re-derived initial has to start its backward pass from the creator
+        # seed. matVt came from the fitted model, and for a seasonal CES
+        # (lagsModelMax>1) its head is the *refined* one, not the seed --
+        # backcasting from there lands on different initials, so the refit does
+        # not reproduce the fit. That reproduction is exactly what
+        # vcov(type="opg") checks before it trusts the scores, which is why the
+        # OPG covariance silently fell back to the Hessian for every seasonal
+        # CES. "none" was unaffected: with lagsModelMax==1 there is no head to
+        # refine, so its states head already was the seed.
+        if(any(initialType==c("backcasting","complete","gradient"))){
+            matVt[,1:lagsModelMax] <-
+                creator(seasonality, xregModel,
+                        lagsModelAll, lagsModelMax, obsAll, lags, yIndexAll, yClasses,
+                        lagsModelSeasonal, nSeasonal,
+                        componentsNumber, xregNumber, obsInSample, obsStates, xregNames,
+                        yFrequency, xregModelInitials)$matVt[,1:lagsModelMax];
+        }
+
         CFValue <- CF(B, matVt, matF, vecG, a, b);
         res <- NULL;
 

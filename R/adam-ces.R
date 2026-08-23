@@ -508,7 +508,11 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
     }
 
     ##### Cost function for CES #####
-    CF <- function(B, matVt, matF, vecG, a, b){
+    # loss / bounds are formals here so that logLikFunction() can re-evaluate the
+    # very same fit under the likelihood, the way adam() re-runs CF with lossNew
+    # (adam.R:1030). nloptr inspects its objective's formals and insists every
+    # one of them be supplied, so it gets the fixed-arity CF() wrapper below.
+    CFgeneric <- function(B, matVt, matF, vecG, a, b, loss, bounds){
         # Obtain the elements of CES
         elements <- filler(B, matVt, matF, vecG, a, b);
 
@@ -592,9 +596,39 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         return(CFValue);
     }
 
+    CF <- function(B, matVt, matF, vecG, a, b){
+        return(CFgeneric(B, matVt, matF, vecG, a, b, loss=loss, bounds=bounds));
+    }
+
     #### Likelihood function ####
+    # The reported logLik is a concentrated likelihood, never -loss. A fit-only
+    # loss still reports the *Normal* likelihood at the fitted parameters: CES is
+    # a Normal-error model throughout -- its scale, its density and its
+    # prediction intervals are all Normal -- so there is no loss-implied
+    # distribution to switch to. This is what es() does, which pins
+    # distribution="dnorm" for the same reason (adam-es.R:417); adam() follows
+    # the loss only because it has a distribution argument to follow.
     logLikFunction <- function(B, matVt, matF, vecG, a, b){
-        return(-CF(B, matVt=matVt, matF=matF, vecG=vecG, a=a, b=b));
+        if(!multisteps){
+            return(-CFgeneric(B, matVt, matF, vecG, a, b,
+                              loss="likelihood", bounds="none"));
+        }
+
+        # Predictive likelihoods of the GPL paper (adam.R:1119-1135).
+        CFValue <- CF(B, matVt=matVt, matF=matF, vecG=vecG, a=a, b=b);
+        logLikValue <- -switch(loss,
+                               "MSEh"=, "TMSE"=, "MSCE"=
+                                   (obsInSample-h)/2*(log(2*pi)+1+log(CFValue)),
+                               "GTMSE"=
+                                   (obsInSample-h)/2*(log(2*pi)+1+CFValue),
+                               #### Divide GPL by h to make it comparable with the univariate ones
+                               "GPL"=
+                                   (obsInSample-h)/2*(h*log(2*pi)+h+CFValue)/h,
+                               CFValue);
+
+        # Rescale from T-h to T, so that the value stays comparable with the
+        # single-step likelihoods.
+        return(logLikValue / (obsInSample-h) * obsInSample);
     }
 
 

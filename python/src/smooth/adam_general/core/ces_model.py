@@ -6,6 +6,7 @@ Self-contained module with its own fit pipeline, reusing adamCore C++ for
 state-space filtering and forecasting.
 """
 
+import math
 import re
 import warnings
 from typing import Any, Dict, List, Literal, Optional, Union, cast
@@ -28,6 +29,48 @@ LOSS_OPTIONS = Literal[
     "likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"
 ]
 _CES_NLOPT_WARNING_SHOWN = False
+
+
+def _pristine(kwargs):
+    """Deep-enough copy of the cost-function arguments.
+
+    ``ces_cf`` writes through ``mat_vt``, ``mat_f``, ``vec_g`` and the profile
+    tables, and the final fit leaves the *fitted* head in them rather than the
+    creator seed, so anything re-evaluated afterwards would profile a different
+    surface than the one that was optimised. R gets this for free from
+    copy-on-modify.
+    """
+    out = {}
+    for key, value in kwargs.items():
+        if isinstance(value, np.ndarray):
+            out[key] = value.copy()
+        elif isinstance(value, dict):
+            out[key] = {
+                k: (v.copy() if isinstance(v, np.ndarray) else v)
+                for k, v in value.items()
+            }
+        else:
+            out[key] = value
+    return out
+
+
+def _ces_multistep_log_lik(cf_value, loss, obs_in_sample, h):
+    """Predictive log-likelihood of the GPL paper for a multistep loss.
+
+    Rescaled from ``T - h`` to ``T`` so it stays comparable with the single-step
+    likelihoods. Mirrors R/adam-ces.R, itself mirroring R/adam.R:1119-1135.
+    """
+    denom = obs_in_sample - h
+    if loss in ("MSEh", "TMSE", "MSCE"):
+        value = denom / 2 * (math.log(2 * math.pi) + 1 + math.log(cf_value))
+    elif loss == "GTMSE":
+        value = denom / 2 * (math.log(2 * math.pi) + 1 + cf_value)
+    elif loss == "GPL":
+        # Divided by h to make it comparable with the univariate ones
+        value = denom / 2 * (h * math.log(2 * math.pi) + h + cf_value) / h
+    else:
+        return -cf_value
+    return -value / denom * obs_in_sample
 
 
 def _validate_b(b, seasonality):
@@ -306,7 +349,9 @@ class CES:
         lags_model_all = ces_lags + [1] * xreg_number
         lags_model_max = max(lags_model_all)
 
-        obs_all = len(y)
+        # The profile lookup table has to span the forecast horizon too, otherwise
+        # the multistep losses walk off the end of it (R/utils-adam.R:107).
+        obs_all = len(y) + (0 if self.holdout else h)
         obs_states = obs_in_sample + lags_model_max
 
         # Occurrence (CES doesn't support occurrence — R line 618)
@@ -482,6 +527,10 @@ class CES:
             multisteps=multisteps,
             adam_cpp=adam_cpp,
         )
+
+        # Snapshot for the likelihood re-evaluation, taken before the optimiser
+        # (and the final fit) write through the shared matrices.
+        ll_kwargs = {**_pristine(cf_kwargs), "loss": "likelihood", "bounds": "none"}
 
         def objective(x, grad):
             return ces_cf(B=x, **cf_kwargs)
@@ -697,9 +746,21 @@ class CES:
         else:
             y_forecast = np.array([np.nan])
 
-        # Log-likelihood — R stores the final optimizer objective as CFValue
-        # and then defines logLik as -CFValue before the final fit.
-        log_lik_value = -cf_value
+        # Log-likelihood. The reported value is a concentrated likelihood, never
+        # -loss. For a fit-only loss it is the *Normal* likelihood re-evaluated
+        # at the fitted parameters: CES is a Normal-error model throughout --
+        # its scale, its density and its prediction intervals are all Normal --
+        # so there is no loss-implied distribution to switch to. This is what
+        # ES does, pinning distribution="dnorm" for the same reason
+        # (R/adam-es.R:417); ADAM follows the loss only because it has a
+        # distribution argument to follow. A multistep loss instead reports the
+        # predictive likelihood of the GPL paper. Mirrors R/adam-ces.R.
+        if multisteps:
+            log_lik_value = _ces_multistep_log_lik(
+                cf_value, self.loss, obs_in_sample, h
+            )
+        else:
+            log_lik_value = -float(ces_cf(B=B, **_pristine(ll_kwargs)))
 
         # Initials count in the df however obtained (optimised or backcast/
         # complete/gradient) -- the same identifiable count either way. CES has

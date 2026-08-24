@@ -356,9 +356,20 @@ def _check_ima_models(
     new_i = new_ma = new_model = None
     new_ic = best_ic
 
-    for combo in itertools.product(*[range(m + 1) for m in max_i]):
-        i_orders = list(combo)
-        ma_orders = [min(d, max_ma[k]) for k, d in enumerate(i_orders)]
+    # R enumerates its iOrders grid with the FIRST lag varying fastest
+    # (utils-adam.R), so walk the product reversed to keep the visiting order --
+    # and therefore the tie-breaking -- identical.
+    for combo in itertools.product(*[range(m + 1) for m in reversed(max_i)]):
+        i_orders = list(reversed(combo))
+
+        # An IMA(d,d) candidate sets the MA order equal to the differencing one,
+        # so it is only usable when d fits under max_ma at EVERY lag. R drops
+        # the row outright rather than lowering the MA order: clamping would
+        # test IMA(d, min(d, maMax)), a different model that R never considers.
+        if any(d > max_ma[k] for k, d in enumerate(i_orders)):
+            continue
+
+        ma_orders = list(i_orders)
 
         if all(m == 0 for m in ma_orders):
             continue

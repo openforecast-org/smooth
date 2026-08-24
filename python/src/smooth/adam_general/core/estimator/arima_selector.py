@@ -273,7 +273,15 @@ def _select_arma_orders(
                     max(max_ar[idx] * lag * 2, len(resids) // 2),
                     len(resids) // 2 - 1,
                 )
-                pacf_vals = pacf(resids, nlags=n_lags_pacf)[1:]
+                # method="ywm" is Yule-Walker on the *biased* (n-divisor)
+                # autocovariances, which is what R's stats::pacf computes.
+                # statsmodels defaults to "ywadjusted" (n-k divisor); at the
+                # long seasonal lags this search probes, that divisor is a
+                # large fraction of the sample and inflates the estimate --
+                # on a 50-point series it reported |pacf| of 0.90 at lag 24
+                # against R's 0.09, so the seasonal AR order was picked off
+                # the wrong peak.
+                pacf_vals = pacf(resids, nlags=n_lags_pacf, method="ywm")[1:]
             except Exception:
                 break
 

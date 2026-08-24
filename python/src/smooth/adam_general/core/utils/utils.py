@@ -291,8 +291,20 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
             weights = np.array([0.5] + [1] * (order - 1) + [0.5]) / order
         half_k = (k - 1) // 2  # e.g., for k=13, half_k=6
         trend = np.full_like(y, np.nan)
-        for i in range(half_k, len(y) - half_k):
-            trend[i] = np.sum(y[i - half_k : i + half_k + 1] * weights)
+        n = len(y)
+        if n < k:
+            return trend
+
+        # R's stats::filter accumulates `z += weights[j] * y[i + nshift - j]`
+        # with j ascending -- sequentially, walking *backwards* across the
+        # window. np.sum is pairwise and lands on a different double, and the
+        # trend feeds the seasonal indices that seed the ARIMA states, where a
+        # few ulps are enough to send NLopt down a different path. cumsum is
+        # the one NumPy reduction that keeps R's order, and it stays
+        # vectorised. (`_r_filter_mean` already does this for the seasonal
+        # indices; k is always odd here, so nshift == half_k.)
+        idx = np.arange(half_k, n - half_k)[:, None] + half_k - np.arange(k)[None, :]
+        trend[half_k : n - half_k] = np.cumsum(y[idx] * weights[None, :], axis=1)[:, -1]
         return trend
 
     def smoothing_function_lowess(y, order):

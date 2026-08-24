@@ -1337,13 +1337,23 @@ class ADAM:
 
             if model_parts:
                 self.model = "+".join(model_parts)
-            else:
-                self.model = ets_str
 
-            if self._constant and self._constant.get("constant_required", False):
-                i_orders = (self._arima or {}).get("i_orders") or []
-                has_drift = is_ets or any(d != 0 for d in i_orders)
-                self.model += " with " + ("drift" if has_drift else "constant")
+                if self._constant and self._constant.get("constant_required", False):
+                    i_orders = (self._arima or {}).get("i_orders") or []
+                    has_drift = is_ets or any(d != 0 for d in i_orders)
+                    self.model += " with " + ("drift" if has_drift else "constant")
+            elif has_xreg:
+                regressors = (self._config or {}).get("regressors", "use")
+                self.model = (
+                    "Dynamic regression" if regressors == "adapt" else "Regression"
+                )
+            else:
+                # Neither ETS nor ARIMA survives: what is left is the constant
+                # on its own. R names this "Constant level" and appends no
+                # suffix (utils-adam.R:1672-1682) -- the constant *is* the model,
+                # so calling it "ANN with constant" both invents an ETS component
+                # that was never estimated and reads as a different model.
+                self.model = "Constant level"
 
     # =========================================================================
     # Extraction properties — convenience accessors over the fitted state.

@@ -17,7 +17,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from smooth.adam_general.core.adam import ADAM, LOSS_OPTIONS
-from smooth.adam_general.core.estimator.arima_selector import arima_selector
+from smooth.adam_general.core.estimator.arima_selector import (
+    _normalize_lags_and_orders,
+    arima_selector,
+)
 
 _POSITIVE_ONLY_DISTS = {"dlnorm", "dinvgauss", "dgamma"}
 
@@ -30,6 +33,101 @@ _ALL_DISTRIBUTIONS = [
     "dinvgauss",
     "dgamma",
 ]
+
+
+def _max_params_count(
+    max_ar, max_i, max_ma, lags, ets_model, initial, xreg_number, regressors
+):
+    """Largest number of parameters the search could ask to estimate.
+
+    Mirrors the ``nParamMax`` expression of R/autoadam.R:254-262, term for term:
+    one for the scale, the ETS persistence and (for optimised initials) the ETS
+    initial states, the ARIMA initial states plus its AR and MA coefficients,
+    and the regressors. Returns the count together with the ARIMA initial-state
+    count, which the caller needs to separate the ARIMA share from the rest.
+    """
+    initial_arima_number = max(
+        sum((a + d) * lag for a, d, lag in zip(max_ar, max_i, lags)),
+        sum(m * lag for m, lag in zip(max_ma, lags)),
+    )
+
+    ets_terms = 0
+    if ets_model and ets_model != "NNN":
+        e_type = ets_model[0] != "N"
+        t_type = ets_model[1] != "N"
+        s_type = ets_model[-1] != "N"
+        damped = len(ets_model) == 4
+        ets_terms = e_type + t_type + s_type * len(lags) + damped
+        if initial in ("optimal", "two-stage"):
+            ets_terms += e_type + t_type + s_type * sum(lags)
+
+    arima_terms = initial_arima_number + sum(max_ar) + sum(max_ma)
+    xreg_terms = xreg_number * (2 if regressors == "adapt" else 1)
+
+    return 1 + ets_terms + arima_terms + xreg_terms, initial_arima_number
+
+
+def _reduce_arima_orders(
+    max_ar,
+    max_i,
+    max_ma,
+    lags,
+    obs_in_sample,
+    ets_model,
+    initial,
+    xreg_number,
+    regressors,
+):
+    """Trim the ARIMA search space until it fits the sample.
+
+    Mirrors R/autoadam.R:264-321. Without it the selector can propose a model
+    with more parameters than there are observations, at which point AICc's
+    ``n - k - 1`` denominator turns negative and its correction term becomes a
+    reward rather than a penalty -- so the most over-parameterised candidate
+    wins by hundreds of units. R has always capped the orders here; Python did
+    not, which is the whole of the difference between the two search paths.
+
+    The reduction walks the highest lag first and takes one order off AR, then
+    I, then MA, recomputing after each step, exactly as R does.
+    """
+    max_ar, max_i, max_ma = list(max_ar), list(max_i), list(max_ma)
+    n_param_max, initial_arima_number = _max_params_count(
+        max_ar, max_i, max_ma, lags, ets_model, initial, xreg_number, regressors
+    )
+    if n_param_max <= obs_in_sample:
+        return max_ar, max_i, max_ma
+
+    # Everything that is not ARIMA cannot be trimmed here; if it alone already
+    # exhausts the sample there is nothing to gain, and R leaves the orders be.
+    non_arima = n_param_max - (initial_arima_number + sum(max_ar) + sum(max_ma))
+    if obs_in_sample <= non_arima:
+        return max_ar, max_i, max_ma
+
+    while n_param_max > obs_in_sample:
+        tails = [
+            idx
+            for orders in (max_ar, max_i, max_ma)
+            for idx in [max((j for j, v in enumerate(orders) if v != 0), default=-1)]
+        ]
+        arima_tail = max(tails)
+        if arima_tail < 0:
+            break
+
+        for orders in (max_ar, max_i, max_ma):
+            if n_param_max > obs_in_sample and orders[arima_tail] > 0:
+                orders[arima_tail] -= 1
+                n_param_max, initial_arima_number = _max_params_count(
+                    max_ar,
+                    max_i,
+                    max_ma,
+                    lags,
+                    ets_model,
+                    initial,
+                    xreg_number,
+                    regressors,
+                )
+
+    return max_ar, max_i, max_ma
 
 
 class AutoADAM(ADAM):
@@ -337,6 +435,28 @@ class AutoADAM(ADAM):
         ets_model = self.model if isinstance(self.model, str) else self.model[0]
         has_ets = ets_model != "NNN"
 
+        # Cap the ARIMA search space to what the sample can carry, once, before
+        # the distribution loop -- the same place R does it (autoadam.R:264).
+        # The maxima on self stay untouched: they are the user's request, and
+        # fit() may be called again on different data.
+        max_ar, max_i, max_ma = self._auto_max_ar, self._auto_max_i, self._auto_max_ma
+        if self._auto_arima_select:
+            norm_lags, max_ar, max_i, max_ma = _normalize_lags_and_orders(
+                lags if lags else [1], max_ar, max_i, max_ma
+            )
+            obs_in_sample = len(y_arr) - (self.h or 0 if self.holdout else 0)
+            max_ar, max_i, max_ma = _reduce_arima_orders(
+                max_ar,
+                max_i,
+                max_ma,
+                norm_lags,
+                obs_in_sample,
+                ets_model,
+                self.initial if isinstance(self.initial, str) else "provided",
+                X.shape[1] if X is not None and getattr(X, "ndim", 1) > 1 else 0,
+                self.regressors,
+            )
+
         verbose = bool(self._auto_verbose)
         if verbose:
             # Mirror R's autoadam.R style: one line, comma-separated as we go.
@@ -371,9 +491,9 @@ class AutoADAM(ADAM):
                 sel = arima_selector(
                     y=y_arr,
                     ets_model=ets_model,
-                    max_ar_orders=self._auto_max_ar,
-                    max_i_orders=self._auto_max_i,
-                    max_ma_orders=self._auto_max_ma,
+                    max_ar_orders=max_ar,
+                    max_i_orders=max_i,
+                    max_ma_orders=max_ma,
                     lags=lags,
                     distribution=dist,
                     ic=self.ic,

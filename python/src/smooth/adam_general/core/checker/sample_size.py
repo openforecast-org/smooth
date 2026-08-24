@@ -93,26 +93,30 @@ def _restrict_models_pool_for_sample_size(
         if allow_multiplicative:
             new_pool.append("MNN")
 
+        # A model belongs to the branch of its *component* letter, not its error
+        # letter: MAN has an additive trend and only a multiplicative error, so
+        # it sits with AAN under "Z"/"X"/"A" -- likewise MAdN with AAdN, and MNA
+        # with ANA. Mirrors R/adamGeneral.R:2483-2507.
         # Enough for trend model
         if obs_nonzero > (5 + n_param_exo):
             if trend_type in ["Z", "X", "A"]:
-                new_pool.append("AAN")
+                new_pool.extend(["AAN", "MAN"])
             if allow_multiplicative and trend_type in ["Z", "Y", "M"]:
-                new_pool.extend(["AMN", "MAN", "MMN"])
+                new_pool.extend(["AMN", "MMN"])
 
         # Enough for damped trend model
         if obs_nonzero > (6 + n_param_exo):
             if trend_type in ["Z", "X", "A"]:
-                new_pool.append("AAdN")
+                new_pool.extend(["AAdN", "MAdN"])
             if allow_multiplicative and trend_type in ["Z", "Y", "M"]:
-                new_pool.extend(["AMdN", "MAdN", "MMdN"])
+                new_pool.extend(["AMdN", "MMdN"])
 
         # Enough for seasonal model
         if obs_nonzero > lags_model_max and lags_model_max != 1:
             if season_type in ["Z", "X", "A"]:
-                new_pool.append("ANA")
+                new_pool.extend(["ANA", "MNA"])
             if allow_multiplicative and season_type in ["Z", "Y", "M"]:
-                new_pool.extend(["ANM", "MNA", "MNM"])
+                new_pool.extend(["ANM", "MNM"])
 
         # Enough for seasonal model with trend
         if (

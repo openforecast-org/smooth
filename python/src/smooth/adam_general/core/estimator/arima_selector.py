@@ -145,9 +145,14 @@ def _select_i_orders(
     best_constant = False
     best_model = initial_model
 
-    for combo in itertools.product(*[range(m + 1) for m in max_i]):
-        i_orders = list(combo)
-        for constant in (False, True):
+    # R lays its iOrders grid out as every I-combination without a constant,
+    # then every combination with one, and within each block the FIRST lag
+    # varies fastest (utils-adam.R). It then takes which.min, which keeps the
+    # earliest row on a tie -- so the visiting order is part of the answer
+    # whenever two candidates score alike. Walk it the same way round.
+    for constant in (False, True):
+        for combo in itertools.product(*[range(m + 1) for m in reversed(max_i)]):
+            i_orders = list(reversed(combo))
             # Skip (0,..,0) + const=False when an ETS baseline already covers it
             if (
                 all(d == 0 for d in i_orders)
@@ -179,10 +184,11 @@ def _select_i_orders(
     return best_i, best_constant, best_model, best_ic
 
 
-def _select_ma_orders(
+def _select_arma_orders(
     y,
     ets_model: str,
     best_i: List[int],
+    max_ar: List[int],
     max_ma: List[int],
     lags: List[int],
     constant: bool,
@@ -192,36 +198,43 @@ def _select_ma_orders(
     best_ic: float,
     X=None,
     **adam_kwargs,
-) -> Tuple[List[int], Any, float]:
-    """Phase 2: greedy MA selection using ACF of residuals (while loop).
+) -> Tuple[List[int], List[int], Any, float]:
+    """Phases 2 and 3: greedy MA then AR, interleaved lag by lag.
 
-    After accepting an MA order, residuals are recomputed and the search
-    continues until no further IC improvement is found.
+    R settles both orders for one lag before moving to the next, highest lag
+    first (utils-adam.R): the AR search at a lag sees the MA order just
+    accepted, and the MA search at the following lag sees the AR orders already
+    accepted. Running every MA phase and then every AR phase -- as this did --
+    hands different residuals and a different specification to each step after
+    the first lag, so the two searches part company as soon as there is more
+    than one lag.
     """
-    from statsmodels.tsa.stattools import acf
+    from statsmodels.tsa.stattools import acf, pacf
 
     n = len(lags)
+    best_ar = [0] * n
     best_ma = [0] * n
 
     try:
         resids = np.array(best_model.residuals, dtype=float)
     except Exception:
-        return best_ma, best_model, best_ic
+        return best_ar, best_ma, best_model, best_ic
 
     for idx in sorted(range(n), key=lambda i: lags[i], reverse=True):
-        lag, max_q = lags[idx], max_ma[idx]
-        if max_q == 0:
-            continue
+        lag = lags[idx]
 
-        while True:
+        # ---- MA at this lag, chosen off the ACF of the current residuals ----
+        while max_ma[idx] != 0:
             try:
-                n_lags_acf = max(max_q * lag * 2, len(resids) // 2) + 1
+                n_lags_acf = max(max_ma[idx] * lag * 2, len(resids) // 2) + 1
                 acf_vals = acf(resids, nlags=n_lags_acf, fft=True)[1:]
             except Exception:
                 break
 
             multiples = [
-                k * lag - 1 for k in range(1, max_q + 1) if k * lag - 1 < len(acf_vals)
+                k * lag - 1
+                for k in range(1, max_ma[idx] + 1)
+                if k * lag - 1 < len(acf_vals)
             ]
             if not multiples:
                 break
@@ -233,7 +246,7 @@ def _select_ma_orders(
             model, ic = _fit_arima_model(
                 y,
                 ets_model,
-                [0] * n,
+                best_ar,
                 best_i,
                 trial_ma,
                 lags,
@@ -249,53 +262,15 @@ def _select_ma_orders(
                     resids = np.array(model.residuals, dtype=float)
                 except Exception:
                     pass
-                # Loop again with updated residuals and accepted order
             else:
                 break
 
-    return best_ma, best_model, best_ic
-
-
-def _select_ar_orders(
-    y,
-    ets_model: str,
-    best_i: List[int],
-    best_ma: List[int],
-    max_ar: List[int],
-    lags: List[int],
-    constant: bool,
-    distribution: str,
-    ic_name: str,
-    best_model: Any,
-    best_ic: float,
-    X=None,
-    **adam_kwargs,
-) -> Tuple[List[int], Any, float]:
-    """Phase 3: greedy AR selection using PACF of residuals (while loop).
-
-    After accepting an AR order, residuals are recomputed and the search
-    continues until no further IC improvement is found.
-    """
-    from statsmodels.tsa.stattools import pacf
-
-    n = len(lags)
-    best_ar = [0] * n
-
-    try:
-        resids = np.array(best_model.residuals, dtype=float)
-    except Exception:
-        return best_ar, best_model, best_ic
-
-    for idx in sorted(range(n), key=lambda i: lags[i], reverse=True):
-        lag, max_p = lags[idx], max_ar[idx]
-        if max_p == 0:
-            continue
-
-        while True:
+        # ---- AR at this lag, chosen off the PACF of the current residuals ----
+        while max_ar[idx] != 0:
             try:
                 # statsmodels requires nlags < len(resids)//2
                 n_lags_pacf = min(
-                    max(max_p * lag * 2, len(resids) // 2),
+                    max(max_ar[idx] * lag * 2, len(resids) // 2),
                     len(resids) // 2 - 1,
                 )
                 pacf_vals = pacf(resids, nlags=n_lags_pacf)[1:]
@@ -303,7 +278,9 @@ def _select_ar_orders(
                 break
 
             multiples = [
-                k * lag - 1 for k in range(1, max_p + 1) if k * lag - 1 < len(pacf_vals)
+                k * lag - 1
+                for k in range(1, max_ar[idx] + 1)
+                if k * lag - 1 < len(pacf_vals)
             ]
             if not multiples:
                 break
@@ -331,11 +308,10 @@ def _select_ar_orders(
                     resids = np.array(model.residuals, dtype=float)
                 except Exception:
                     pass
-                # Loop again with updated residuals and accepted order
             else:
                 break
 
-    return best_ar, best_model, best_ic
+    return best_ar, best_ma, best_model, best_ic
 
 
 def _check_ima_models(
@@ -521,29 +497,13 @@ def arima_selector(
             "ic_value": np.inf,
         }
 
-    # Phase 2 — MA orders
-    best_ma, best_model, best_ic = _select_ma_orders(
+    # Phases 2 and 3 — MA and AR orders, interleaved per lag as R does
+    best_ar, best_ma, best_model, best_ic = _select_arma_orders(
         y,
         resolved_ets,
         best_i,
-        max_ma,
-        lags,
-        best_constant,
-        distribution,
-        ic,
-        best_model,
-        best_ic,
-        X,
-        **adam_kwargs,
-    )
-
-    # Phase 3 — AR orders
-    best_ar, best_model, best_ic = _select_ar_orders(
-        y,
-        resolved_ets,
-        best_i,
-        best_ma,
         max_ar,
+        max_ma,
         lags,
         best_constant,
         distribution,
@@ -573,6 +533,12 @@ def arima_selector(
         # ima_i / ima_ma are produced together with ima_model
         assert ima_i is not None and ima_ma is not None
         best_i, best_ma, best_model, best_ic = ima_i, ima_ma, ima_model, ima_ic
+        # The winner is a pure IMA(d,d): no AR terms and no constant. R resets
+        # both here (utils-adam.R:2450-2452). Leaving them at the values phase 3
+        # chose makes the reported orders describe a different model than the one
+        # actually fitted, and feeds the wrong specification to the final refit.
+        best_ar = [0] * len(lags)
+        best_constant = False
 
     # Final check: if ETS baseline is better or equal, return it
     # (autoadam.R lines 760-774)

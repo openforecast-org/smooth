@@ -1,0 +1,6 @@
+AutoMSARIMA Back	arima
+AutoMSARIMA Opt	arima
+statsforecast AutoARIMA	arima
+pmdarima auto_arima	arima
+skforecast Arima	arima
+aeon AutoARIMA	arima

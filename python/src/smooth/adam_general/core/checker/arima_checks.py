@@ -139,114 +139,82 @@ def _expand_orders(orders):
     return ar_orders, i_orders, ma_orders
 
 
-def _get_polynomial_indices_from_cpp(ar_orders, i_orders, ma_orders, lags):
-    """
-    Use C++ polynomialise to get correct polynomial indices matching R's algorithm.
+def _polynomial_positions(orders, i_orders, lags):
+    """Positions of the non-zero terms of a product of lag polynomials.
 
-    This function calls the C++ polynomialise with dummy parameters to extract
-    the correct polynomial structure (which indices are non-zero) matching exactly
-    what R's implementation produces.
+    Mirrors R's ``ariValues`` / ``maValues`` construction in
+    ``parametersChecker()``: for each seasonal lag the polynomial occupies
+    positions ``0, 1..order`` plus, for the ARI part, ``order+1..order+d`` from
+    the differences, all scaled by that lag. The positions of the product are
+    every sum of one position per lag.
+
+    The structure is derived from the *orders* alone, never from coefficient
+    values. Probing a numeric polynomial instead is unsound: distinct
+    parameters still cancel (phi = 0.1, 0.2, 0.3 with d=2 zeroes the B**3 term),
+    which silently drops a state and builds a different model from R's.
+
+    Parameters
+    ----------
+    orders : list of int
+        AR orders (for the ARI part) or MA orders, one per lag.
+    i_orders : list of int or None
+        Differencing orders, one per lag; ``None`` for the MA part.
+    lags : list of int
+        Seasonal lags.
+
+    Returns
+    -------
+    list of int
+        Sorted non-zero polynomial positions (position 0 excluded).
     """
-    try:
-        from smooth.adam_general._adamCore import adamCore
-    except ImportError:
+    positions = {0}
+    for k, lag in enumerate(lags):
+        order = int(orders[k])
+        values = {0} | set(range(min(1, order), order + 1))
+        if i_orders is not None and int(i_orders[k]) != 0:
+            values |= {order + d for d in range(1, int(i_orders[k]) + 1)}
+        values = {v * int(lag) for v in values}
+        positions = {p + v for p in positions for v in values}
+
+    return sorted(positions - {0})
+
+
+def _get_polynomial_indices(ar_orders, i_orders, ma_orders, lags):
+    """Build the ARIMA state structure the way R's ``parametersChecker()`` does.
+
+    Returns ``(non_zero_ari, non_zero_ma, lags_model_arima,
+    components_number_arima, initial_arima_number)``, or ``None`` when the
+    orders describe no ARIMA part at all.
+
+    Index convention follows the rest of the Python port: a polynomial position
+    ``k`` is stored as-is (R stores ``k + 1`` for its 1-based transition matrix)
+    and state indices are 0-based.
+    """
+    n = min(len(ar_orders), len(i_orders), len(ma_orders), len(lags))
+    ar_orders, i_orders = list(ar_orders[:n]), list(i_orders[:n])
+    ma_orders, lags = list(ma_orders[:n]), list(lags[:n])
+
+    ari_indices = _polynomial_positions(ar_orders, i_orders, lags)
+    ma_indices = _polynomial_positions(ma_orders, None, lags)
+
+    if not ari_indices and not ma_indices:
         return None
 
-    try:
-        ar_orders_arr = np.array(ar_orders, dtype=np.uint64)
-        i_orders_arr = np.array(i_orders, dtype=np.uint64)
-        ma_orders_arr = np.array(ma_orders, dtype=np.uint64)
-        lags_arr = np.array(lags, dtype=np.uint64)
+    lags_model_arima = sorted(set(ari_indices) | set(ma_indices))
+    state_map = {idx: i for i, idx in enumerate(lags_model_arima)}
 
-        n_ar = int(np.sum(ar_orders_arr))
-        n_ma = int(np.sum(ma_orders_arr))
-        n_arma = n_ar + n_ma
+    def _pairs(indices):
+        if not indices:
+            return np.zeros((0, 2), dtype=int)
+        return np.array([[idx, state_map[idx]] for idx in indices], dtype=int)
 
-        if n_arma == 0:
-            return None
-
-        # Use distinct values to prevent polynomial term cancellation
-        # (e.g. ARIMA(2,1,0) with equal phi1=phi2 makes the B² term vanish)
-        dummy_B = np.arange(1, n_arma + 1, dtype=np.float64) * 0.1
-
-        # Create minimal adamCore instance for polynomialise
-        # max_lag = max(lags_arr) if len(lags_arr) > 0 else 1
-        dummy_lags = np.array([1], dtype=np.uint64)
-        adam_cpp = adamCore(
-            dummy_lags,  # lags
-            "N",  # E
-            "N",  # T
-            "N",  # S
-            0,  # nNonSeasonal
-            0,  # nSeasonal
-            0,  # nETS
-            n_arma,  # nArima
-            0,  # nXreg
-            n_arma,  # nComponents
-            False,  # constant
-            False,  # adamETS
-        )
-
-        result = adam_cpp.polynomialise(
-            dummy_B,
-            ar_orders_arr,
-            i_orders_arr,
-            ma_orders_arr,
-            n_ar > 0,
-            n_ma > 0,
-            np.array([], dtype=np.float64),
-            lags_arr,
-        )
-
-        ari_poly = np.asarray(result.ariPolynomial).flatten()
-        ma_poly = np.asarray(result.maPolynomial).flatten()
-
-        # Use actual polynomial values (with non-zero params) to find structural indices
-        # This correctly captures cross-terms from polynomial multiplication
-        ari_indices = list(np.where(np.abs(ari_poly[1:]) > 1e-10)[0] + 1)
-        ma_indices = list(np.where(np.abs(ma_poly[1:]) > 1e-10)[0] + 1)
-
-        if len(ari_indices) == 0 and len(ma_indices) == 0:
-            return None
-
-        # Keep polynomial positions as direct numpy indices:
-        # coefficient for B^k is stored at index k.
-        all_lag_values = sorted(set(list(ari_indices) + list(ma_indices)))
-        lags_model_arima = all_lag_values
-
-        components_number_arima = len(lags_model_arima)
-        initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
-
-        # Map lag/polynomial position -> ARIMA state index.
-        ari_state_map = {idx: i for i, idx in enumerate(lags_model_arima)}
-        ma_state_map = {idx: i for i, idx in enumerate(lags_model_arima)}
-
-        # Handle empty indices case - must create 2D array with shape (0, 2)
-        if len(ari_indices) > 0:
-            non_zero_ari = np.array(
-                [[idx, ari_state_map[idx]] for idx in ari_indices], dtype=int
-            )
-        else:
-            non_zero_ari = np.zeros((0, 2), dtype=int)
-
-        if len(ma_indices) > 0:
-            non_zero_ma = np.array(
-                [[idx, ma_state_map[idx]] for idx in ma_indices], dtype=int
-            )
-        else:
-            non_zero_ma = np.zeros((0, 2), dtype=int)
-
-        return (
-            non_zero_ari,
-            non_zero_ma,
-            lags_model_arima,
-            components_number_arima,
-            initial_arima_number,
-        )
-
-    except Exception:
-        # Return None on any error to fall back to Python algorithm
-        return None
+    return (
+        _pairs(ari_indices),
+        _pairs(ma_indices),
+        lags_model_arima,
+        len(lags_model_arima),
+        max(lags_model_arima),
+    )
 
 
 def _check_arima(orders, validated_lags, silent=False, arma=None):
@@ -352,16 +320,16 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
     arima_result["i_orders"] = i_orders
     arima_result["ma_orders"] = ma_orders
 
-    cpp_result = _get_polynomial_indices_from_cpp(ar_orders, i_orders, ma_orders, lags)
+    poly_result = _get_polynomial_indices(ar_orders, i_orders, ma_orders, lags)
 
-    if cpp_result is not None:
+    if poly_result is not None:
         (
             non_zero_ari,
             non_zero_ma,
             lags_model_arima,
             components_number_arima,
             initial_arima_number,
-        ) = cpp_result
+        ) = poly_result
         # Component names - R lines 629-630
         if components_number_arima > 1:
             components_names_arima = [
@@ -372,7 +340,7 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
                 ["ARIMAState1"] if components_number_arima > 0 else []
             )
     else:
-        # Fall back to Python algorithm for simple cases or when C++ fails
+        # Fall back to the Python algorithm when there is no ARIMA part
         # Define the non-zero values via polynomial computation - R lines 580-616
         ari_values = []
         ma_values = []

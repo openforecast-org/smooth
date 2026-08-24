@@ -100,21 +100,29 @@ def _restrict_models_pool_for_sample_size(
         # Enough for trend model
         if obs_nonzero > (5 + n_param_exo):
             if trend_type in ["Z", "X", "A"]:
-                new_pool.extend(["AAN", "MAN"])
+                new_pool.append("AAN")
+                # MAN sits in this branch for its additive trend, but its error
+                # is multiplicative and must be allowed.
+                if allow_multiplicative:
+                    new_pool.append("MAN")
             if allow_multiplicative and trend_type in ["Z", "Y", "M"]:
                 new_pool.extend(["AMN", "MMN"])
 
         # Enough for damped trend model
         if obs_nonzero > (6 + n_param_exo):
             if trend_type in ["Z", "X", "A"]:
-                new_pool.extend(["AAdN", "MAdN"])
+                new_pool.append("AAdN")
+                if allow_multiplicative:
+                    new_pool.append("MAdN")
             if allow_multiplicative and trend_type in ["Z", "Y", "M"]:
                 new_pool.extend(["AMdN", "MMdN"])
 
         # Enough for seasonal model
         if obs_nonzero > lags_model_max and lags_model_max != 1:
             if season_type in ["Z", "X", "A"]:
-                new_pool.extend(["ANA", "MNA"])
+                new_pool.append("ANA")
+                if allow_multiplicative:
+                    new_pool.append("MNA")
             if allow_multiplicative and season_type in ["Z", "Y", "M"]:
                 new_pool.extend(["ANM", "MNM"])
 

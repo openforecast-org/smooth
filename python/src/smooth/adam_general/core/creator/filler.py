@@ -376,29 +376,36 @@ def filler(
                 - 1
             )
 
-            matrices_dict["mat_vt"][
-                arima_index, : initials_checked["initial_arima_number"]
-            ] = B[j : j + initials_checked["initial_arima_number"]]
+            n_init = initials_checked["initial_arima_number"]
+            init_vals = B[j : j + n_init]
+            non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
 
-            ari_indices = (
-                components_dict["components_number_ets"]
-                + arima_checked["non_zero_ari"][:, 1]
-            )
-            ari_poly_vals = arima_polynomials["ariPolynomial"][
-                arima_checked["non_zero_ari"][:, 0]
-            ].reshape(-1, 1)
-            init_vals = B[j : j + initials_checked["initial_arima_number"]]
+            # Spread the estimated initials across the ARI rows, exactly as R
+            # does (utils-adam.R:1017-1037). The last ARIMA row takes B raw
+            # *only* when there are no ARI terms at all -- a pure MA, whose ARI
+            # polynomial is just 1, so the general expression degenerates to B
+            # itself. Writing it unconditionally, as this did, overwrote the
+            # creator's seed whenever the last ARIMA state is reached only by
+            # the MA polynomial, which is a different model from R's.
+            if non_zero_ari.size > 0:
+                ari_indices = (
+                    components_dict["components_number_ets"] + non_zero_ari[:, 1]
+                )
+                ari_poly_vals = arima_polynomials["ariPolynomial"][
+                    non_zero_ari[:, 0]
+                ].reshape(-1, 1)
+                if model_type_dict["error_type"] == "A":
+                    matrices_dict["mat_vt"][ari_indices, :n_init] = (
+                        ari_poly_vals @ init_vals.reshape(1, -1)
+                    )
+                else:  # "M"
+                    matrices_dict["mat_vt"][ari_indices, :n_init] = np.exp(
+                        ari_poly_vals @ np.log(init_vals).reshape(1, -1)
+                    )
+            else:
+                matrices_dict["mat_vt"][arima_index, :n_init] = init_vals
 
-            if model_type_dict["error_type"] == "A":
-                matrices_dict["mat_vt"][
-                    ari_indices, : initials_checked["initial_arima_number"]
-                ] = ari_poly_vals @ init_vals.reshape(1, -1)
-            else:  # "M"
-                matrices_dict["mat_vt"][
-                    ari_indices, : initials_checked["initial_arima_number"]
-                ] = np.exp(ari_poly_vals @ np.log(init_vals).reshape(1, -1))
-
-            j += initials_checked["initial_arima_number"]
+            j += n_init
         elif any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]]):
             last_arima_row_idx = (
                 components_dict["components_number_ets"]

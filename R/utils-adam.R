@@ -2406,15 +2406,22 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
     additionalModels <- NULL;
     if(any(maMax!=0) && any(iMax!=0)){
         additionalModels <- iOrders[1:iCombinations,1:ordersLength,drop=FALSE];
+        # These are IMA(d,d) candidates: the MA order is set equal to the
+        # differencing one, so a row is only usable when d does not exceed maMax
+        # at EVERY lag. The conditions must accumulate -- assigning them in turn
+        # kept only the last lag's verdict and let through candidates asking for
+        # an MA order the user excluded.
         modelsLeft <- rep(TRUE,iCombinations);
         for(i in 1:ordersLength){
-            modelsLeft[] <- (additionalModels[,i] <= maMax[i]);
+            modelsLeft[] <- modelsLeft & (additionalModels[,i] <= maMax[i]);
         }
         additionalModels <- additionalModels[modelsLeft,,drop=FALSE];
     }
 
-    if(!is.null(additionalModels)){
-        imaOrdersICs <- vector("numeric",iCombinations);
+    # Row 1 is the all-zero differencing case and always survives the filter, so
+    # a single row means there is nothing left to test.
+    if(!is.null(additionalModels) && nrow(additionalModels)>1){
+        imaOrdersICs <- vector("numeric",nrow(additionalModels));
         imaOrdersICs[] <- Inf;
         for(d in 2:nrow(additionalModels)){
             testModel <- try(do.call(fitter,

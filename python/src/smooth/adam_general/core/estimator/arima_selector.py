@@ -377,7 +377,10 @@ def _check_ima_models(
         model, ic = _fit_arima_model(
             y,
             ets_model,
-            best_ar,
+            # A pure IMA(d,d): R hardcodes ar=0 here (utils-adam.R:2429), it does
+            # not carry over the AR orders chosen in the previous phase. Carrying
+            # them denies the search its one chance to drop those AR terms again.
+            [0] * len(lags),
             i_orders,
             ma_orders,
             lags,

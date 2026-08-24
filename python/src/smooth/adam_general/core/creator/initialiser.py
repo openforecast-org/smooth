@@ -588,7 +588,7 @@ def initialiser(
                             y_differenced, nlags=max(1, ar_total)
                         )
                         pacf_values[: min(ar_total, len(y_differenced) - 1)] = (
-                            pacf_vals[1 : min(ar_total + 1, len(pacf_vals))]
+                            pacf_vals[: min(ar_total, len(pacf_vals))]
                         )
 
             arma_start_index = j

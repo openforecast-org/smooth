@@ -209,7 +209,7 @@ def _select_arma_orders(
     the first lag, so the two searches part company as soon as there is more
     than one lag.
     """
-    from statsmodels.tsa.stattools import acf, pacf
+    from smooth.adam_general.core.utils.utils import calculate_acf, calculate_pacf
 
     n = len(lags)
     best_ar = [0] * n
@@ -227,7 +227,7 @@ def _select_arma_orders(
         while max_ma[idx] != 0:
             try:
                 n_lags_acf = max(max_ma[idx] * lag * 2, len(resids) // 2) + 1
-                acf_vals = acf(resids, nlags=n_lags_acf, fft=True)[1:]
+                acf_vals = calculate_acf(resids, nlags=n_lags_acf)[1:]
             except Exception:
                 break
 
@@ -268,20 +268,10 @@ def _select_arma_orders(
         # ---- AR at this lag, chosen off the PACF of the current residuals ----
         while max_ar[idx] != 0:
             try:
-                # statsmodels requires nlags < len(resids)//2
-                n_lags_pacf = min(
-                    max(max_ar[idx] * lag * 2, len(resids) // 2),
-                    len(resids) // 2 - 1,
-                )
-                # method="ywm" is Yule-Walker on the *biased* (n-divisor)
-                # autocovariances, which is what R's stats::pacf computes.
-                # statsmodels defaults to "ywadjusted" (n-k divisor); at the
-                # long seasonal lags this search probes, that divisor is a
-                # large fraction of the sample and inflates the estimate --
-                # on a 50-point series it reported |pacf| of 0.90 at lag 24
-                # against R's 0.09, so the seasonal AR order was picked off
-                # the wrong peak.
-                pacf_vals = pacf(resids, nlags=n_lags_pacf, method="ywm")[1:]
+                # Same lag.max R uses (utils-adam.R:2378). The former cap at
+                # len(resids)//2 - 1 was a statsmodels restriction, not R's.
+                n_lags_pacf = max(max_ar[idx] * lag * 2, len(resids) // 2) + 1
+                pacf_vals = calculate_pacf(resids, nlags=n_lags_pacf)
             except Exception:
                 break
 

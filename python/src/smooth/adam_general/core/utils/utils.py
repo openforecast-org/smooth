@@ -6,7 +6,6 @@ import pandas as pd
 from greybox import lowess as _greybox_lowess
 from scipy import stats
 from scipy.special import beta, digamma, gamma
-from statsmodels.tsa.stattools import acf, pacf
 
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
 
@@ -538,6 +537,76 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
     return result
 
 
+def _cumsum_r(first, terms):
+    """Sequential double-precision accumulation of ``first + sum(terms)``.
+
+    R's C loops accumulate one term at a time in a plain ``double``. ``np.sum``
+    is pairwise and ``_sum_r`` is long-double, so neither reproduces that;
+    ``np.cumsum`` is the one NumPy reduction that stays strictly sequential, so
+    its last element is the running total R would have computed.
+    """
+    if terms.size == 0:
+        return float(first)
+    return float(np.cumsum(np.concatenate(([first], terms)))[-1])
+
+
+def _acf_r(x, nlags):
+    """``stats::acf`` (type="correlation"), bit-for-bit.
+
+    R demeans with ``colMeans`` (a long-double accumulator), forms each
+    autocovariance as a sequential sum of lagged products over ``n``, and then
+    divides by ``sqrt(c0) * sqrt(c0)`` rather than by ``c0`` -- a different
+    rounding that shows up in the last bit. The result is clamped to [-1, 1] as
+    R does.
+
+    Bit-exactness matters because these values seed the ARIMA parameters in
+    ``initialiser()``: Nelder-Mead ranks its simplex by comparison, so a
+    one-ulp difference in the starting point flips a tie and sends the two
+    languages to different optima within the same evaluation budget.
+    """
+    x = np.asarray(x, dtype=np.float64).ravel()
+    n = x.size
+    nlags = min(int(nlags), n - 1)
+    xo = x - _sum_r(x) / n
+
+    c = np.empty(nlags + 1)
+    for lag in range(nlags + 1):
+        c[lag] = _cumsum_r(0.0, xo[lag:] * xo[: n - lag]) / n
+
+    se = np.sqrt(c[0])
+    return np.clip(c / (se * se), -1.0, 1.0)
+
+
+def _pacf_r(x, nlags):
+    """``stats::pacf``, bit-for-bit: Durbin-Levinson over R's own ACF.
+
+    Returns lags ``1..nlags`` -- R carries no lag-0 entry for a partial
+    autocorrelation, unlike ``statsmodels``. Note that R centres ``x`` with
+    ``scale()`` and then ``acf()`` centres the result a second time; that
+    second, near-zero shift is why ``pacf(x)[1]`` and ``acf(x)[2]`` can differ
+    in the last bit, and it has to be reproduced here.
+    """
+    x = np.asarray(x, dtype=np.float64).ravel()
+    nlags = min(int(nlags), x.size - 1)
+    cor = _acf_r(x - _sum_r(x) / x.size, nlags)[1:]
+
+    p = np.zeros(nlags)
+    v = np.zeros(nlags)
+    w = np.zeros(nlags)
+    w[0] = p[0] = cor[0]
+    for ll in range(1, nlags):
+        a = _cumsum_r(cor[ll], -w[:ll] * cor[ll - 1 :: -1])
+        b = _cumsum_r(1.0, -w[:ll] * cor[:ll])
+        p[ll] = c = a / b
+        if ll + 1 == nlags:
+            break
+        w[ll] = c
+        v[:ll] = w[ll - 1 :: -1]
+        w[:ll] -= c * v[:ll]
+
+    return p
+
+
 def calculate_acf(data, nlags=40):
     """
     Calculate Autocorrelation Function for numpy array or pandas Series.
@@ -552,7 +621,7 @@ def calculate_acf(data, nlags=40):
     if isinstance(data, pd.Series):
         data = data.values
 
-    return acf(data, nlags=nlags, fft=False)
+    return _acf_r(data, nlags)
 
 
 def calculate_pacf(data, nlags=40):
@@ -569,7 +638,7 @@ def calculate_pacf(data, nlags=40):
     if isinstance(data, pd.Series):
         data = data.values
 
-    return pacf(data, nlags=nlags, method="ywmle")
+    return _pacf_r(data, nlags)
 
 
 def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):

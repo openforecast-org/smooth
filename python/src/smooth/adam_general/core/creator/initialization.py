@@ -748,27 +748,29 @@ def _initialize_constant(
                 0,
             ]
 
-    # If ARIMA is done, debias states
+    # If ARIMA is done, debias states. Only the rows carrying the level the
+    # constant now accounts for -- the ARI rows -- as R does
+    # (utils-adam.R:858-878). An MA-only row holds no level, so debiasing it
+    # seeds it at -constant instead of 0. A pure MA has no ARI terms at all, and
+    # there R falls back to every ARIMA row (otherwise nothing would be
+    # debiased and the first fitted value would double count the level).
     if arima_checked["arima_model"] and initials_checked["initial_arima_estimate"]:
-        if e_type == "A":
-            mat_vt[
-                components_number_ets : components_number_ets + components_number_arima,
-                0 : initials_checked["initial_arima_number"],
-            ] -= mat_vt[
-                components_number_ets
-                + components_number_arima
-                + explanatory_checked["xreg_number"],
-                0,
-            ]
+        non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
+        if non_zero_ari.size > 0:
+            arima_rows = components_number_ets + non_zero_ari[:, 1].astype(int)
         else:
-            mat_vt[
-                components_number_ets : components_number_ets + components_number_arima,
-                0 : initials_checked["initial_arima_number"],
-            ] /= mat_vt[
-                components_number_ets
-                + components_number_arima
-                + explanatory_checked["xreg_number"],
-                0,
-            ]
+            arima_rows = components_number_ets + np.arange(components_number_arima)
+
+        constant_value = mat_vt[
+            components_number_ets
+            + components_number_arima
+            + explanatory_checked["xreg_number"],
+            0,
+        ]
+        cols = slice(0, initials_checked["initial_arima_number"])
+        if e_type == "A":
+            mat_vt[arima_rows, cols] -= constant_value
+        else:
+            mat_vt[arima_rows, cols] /= constant_value
 
     return mat_vt

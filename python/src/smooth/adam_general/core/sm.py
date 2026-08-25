@@ -451,9 +451,12 @@ def sm(
         args["orders"] = orders
     if distribution in ("dgnorm", "dlgnorm") and other is not None:
         args["gnorm_shape"] = other
-    occurrence = getattr(location, "_occurrence", {}).get("occurrence")
-    if info["occurrence_model"] and occurrence is not None:
-        args["occurrence"] = occurrence
+    # Reuse the location model's *fitted* occurrence model, as R does
+    # (newCall$occurrence <- object$occurrence): the scale model shares that
+    # occurrence rather than estimating a second one on the transformed
+    # residuals, which are a different series with different zeroes.
+    if info["occurrence_model"] and getattr(location, "om_model", None) is not None:
+        args["occurrence"] = location.om_model
     args.update(kwargs)
 
     scale_model = ADAM(**args)

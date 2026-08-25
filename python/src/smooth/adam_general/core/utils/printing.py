@@ -234,9 +234,18 @@ def _format_persistence_vector(model: Any, digits: int = 4) -> str:
 
     # Format header and values
     name_strs = [f"{n:>{max(len(n), digits + 2)}}" for n in names]
-    value_strs = [
-        f"{v:{max(len(names[i]), digits + 2)}.{digits}f}" for i, v in enumerate(values)
-    ]
+
+    def _fmt(value, width):
+        # Anything that is not a real scalar (a dict slipped in from a
+        # mis-parsed argument, say) is shown as-is rather than raising out of a
+        # printer -- an unreadable TypeError from __str__ hides whatever the
+        # actual problem was.
+        try:
+            return f"{value:{width}.{digits}f}"
+        except (TypeError, ValueError):
+            return f"{str(value):>{width}}"
+
+    value_strs = [_fmt(v, max(len(names[i]), digits + 2)) for i, v in enumerate(values)]
 
     header = " ".join(name_strs)
     vals = " ".join(value_strs)
@@ -723,7 +732,32 @@ def _build_model_name(model: Any) -> str:
         constant_name = "drift" if model_str != "NNN" else "constant"
         name += f" with {constant_name}"
 
-    return name or model_str or "Unknown"
+    # Occurrence models carry an "i" prefix and a bracketed letter for the
+    # occurrence type, as R's adam_model_name does (R/utils-adam.R:1688-1697).
+    occurrence = (getattr(model, "_occurrence", None) or {}).get("occurrence")
+    if not isinstance(occurrence, str):
+        # A provided (already fitted) occurrence model: take its own type.
+        occurrence = (
+            (getattr(occurrence, "_occurrence", None) or {}).get("occurrence")
+            if occurrence is not None
+            else None
+        )
+    suffix = {
+        "f": "[F]",
+        "fixed": "[F]",
+        "d": "[D]",
+        "direct": "[D]",
+        "o": "[O]",
+        "odds-ratio": "[O]",
+        "i": "[I]",
+        "inverse-odds-ratio": "[I]",
+        "g": "[G]",
+        "general": "[G]",
+    }
+    name = name or model_str or "Unknown"
+    if isinstance(occurrence, str) and occurrence not in ("n", "none"):
+        name = f"i{name}{suffix.get(occurrence, '')}"
+    return name
 
 
 def _get_model_name(model: Any) -> str:

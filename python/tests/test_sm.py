@@ -24,12 +24,8 @@ from smooth.adam_general.core.sm import (
 DATA = Path(__file__).parent / "data"
 REFERENCE = json.loads((DATA / "sm_reference.json").read_text())
 
-# R's sm() reuses the location model's fitted occurrence model. Python's
-# occurrence accessors do not yet match R -- residuals are y-fitted where R uses
-# y-fitted/p (and 0 at the zero observations), and nparam omits the occurrence
-# sub-model -- so these two cases cannot agree until that is fixed. The location
-# fit itself already matches R exactly, which is what `test_location_matches_r`
-# pins down.
+# R's sm() reuses the location model's already-fitted occurrence model rather
+# than estimating a second one on the transformed residuals.
 OCCURRENCE_CASES = {"occ_dnorm", "occ_MNN_dnorm"}
 
 
@@ -66,21 +62,7 @@ def test_location_matches_r(case_id):
     assert model.scale == pytest.approx(ref["loc_scale"], abs=1e-8)
 
 
-@pytest.mark.parametrize(
-    "case_id",
-    [
-        pytest.param(
-            c,
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="Python's occurrence residuals/nparam do not yet match R",
-            ),
-        )
-        if c in OCCURRENCE_CASES
-        else c
-        for c in sorted(REFERENCE)
-    ],
-)
+@pytest.mark.parametrize("case_id", sorted(REFERENCE))
 def test_scale_model_matches_r(case_id):
     ref = REFERENCE[case_id]
     scale_model = _scale_model(case_id, ref)

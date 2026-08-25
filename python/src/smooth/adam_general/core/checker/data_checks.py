@@ -45,6 +45,19 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
             "obs_all": obs_all,
         }
 
+    # A fitted occurrence model rather than a name: reuse it as it stands. R's
+    # sm() passes object$occurrence straight through so the scale model shares
+    # the location model's occurrence rather than refitting one on the
+    # transformed residuals.
+    if not isinstance(occurrence, str):
+        return {
+            "occurrence": occurrence,
+            "occurrence_model": True,
+            "obs_in_sample": obs_in_sample,
+            "obs_nonzero": obs_nonzero,
+            "obs_all": obs_all,
+        }
+
     # Validate the occurrence choice
     valid_occ = [
         "none",

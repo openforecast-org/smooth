@@ -352,6 +352,35 @@ _RATIO_RESIDUAL_DISTRIBUTIONS = (
 )
 
 
+_OCCURRENCE_NAME_SUFFIX = {
+    "f": "[F]",
+    "fixed": "[F]",
+    "d": "[D]",
+    "direct": "[D]",
+    "o": "[O]",
+    "odds-ratio": "[O]",
+    "i": "[I]",
+    "inverse-odds-ratio": "[I]",
+    "g": "[G]",
+    "general": "[G]",
+}
+
+
+def _decorate_occurrence_name(name, occurrence_dict):
+    """Prefix ``i`` and append the occurrence-type letter (R: adam_model_name)."""
+    occurrence = (occurrence_dict or {}).get("occurrence")
+    if not isinstance(occurrence, str):
+        # A provided (already fitted) occurrence model: read its own type.
+        occurrence = (
+            (getattr(occurrence, "_occurrence", None) or {}).get("occurrence")
+            if occurrence is not None
+            else None
+        )
+    if not isinstance(occurrence, str) or occurrence in ("n", "none"):
+        return name
+    return f"i{name}{_OCCURRENCE_NAME_SUFFIX.get(occurrence, '')}"
+
+
 class ADAM:
     """
     ADAM: Augmented Dynamic Adaptive Model for Time Series Forecasting.
@@ -1138,9 +1167,16 @@ class ADAM:
         if self._occurrence.get("occurrence_model"):
             ot_logical = self._observations["ot_logical"]
             self._observations["obs_zero"] = int(np.sum(~ot_logical))
-            self._om_model = self._fit_occurrence_model(y)
+            occurrence = self._occurrence["occurrence"]
+            # Already fitted: take it as it is, the way R reuses
+            # object$occurrence rather than estimating a second one.
+            self._om_model = (
+                occurrence
+                if not isinstance(occurrence, str)
+                else self._fit_occurrence_model(y)
+            )
             self._occurrence["p_fitted"] = self._om_model.fitted
-            self._occurrence["oes_model"] = self._occurrence["occurrence"]
+            self._occurrence["oes_model"] = occurrence
 
         # Execute model estimation or selection based on model_do
         if self._model_type["model_do"] == "estimate":
@@ -1184,11 +1220,30 @@ class ADAM:
             else:
                 yf = np.asarray(yf) * np.asarray(p)
             self._prepared["y_fitted"] = yf
-            self._prepared["residuals"] = np.asarray(
-                self._observations["y_in_sample"]
-            ) - np.asarray(yf)
-            # Include occurrence model params in the total count
-            self._adam_estimated["n_param_estimated"] += self._om_model.nparam
+            # The residuals stay as the fitter produced them. R does the same
+            # (R/adam.R:2005-2015): it scales `yFitted` by the probability and
+            # leaves `errors` alone, because those are the *demand-size*
+            # model's errors -- measured against the conditional mean mu_t, and
+            # already zero wherever nothing was demanded. Recomputing them as
+            # `y - p*mu` measured against the unconditional mean instead, which
+            # folds the occurrence probability into the demand-size error and
+            # manufactured an error of -fitted at every zero observation.
+
+            # Record the occurrence parameters in their own column, so nparam
+            # (and every information criterion) counts them as R's
+            # nParamOccurrence does. Adding them to `n_param_estimated` alone
+            # had no effect: the property reads the table whenever it exists.
+            # A *provided* occurrence model was estimated elsewhere, so its
+            # parameters go in the provided row and stay out of nparam --
+            # R writes parametersNumber[2,3] for that case (R/adam.R:2235).
+            row = (
+                self._n_param.provided
+                if not isinstance(occurrence, str)
+                else self._n_param.estimated
+            )
+            row["occurrence"] = int(self._om_model.nparam)
+            self._n_param.update_totals()
+            self._adam_estimated["n_param_estimated"] = self._n_param.estimated["all"]
 
         # Store fitted parameters with trailing underscores
         self._set_fitted_attributes()
@@ -1367,6 +1422,11 @@ class ADAM:
                 # so calling it "ANN with constant" both invents an ETS component
                 # that was never estimated and reads as a different model.
                 self.model = "Constant level"
+
+        # Occurrence models carry an "i" prefix and a bracketed letter naming
+        # the occurrence type, as R's adam_model_name does
+        # (R/utils-adam.R:1688-1697).
+        self.model = _decorate_occurrence_name(self.model, self._occurrence)
 
     # =========================================================================
     # Extraction properties — convenience accessors over the fitted state.
@@ -2603,6 +2663,34 @@ class ADAM:
         return base
 
     @property
+    def _nobs_nonzero(self) -> int:
+        """In-sample observations excluding zeroes (R: ``nobs(object, all=FALSE)``).
+
+        ``actuals.adam`` drops the zero observations for ``all=FALSE``
+        (R/adam.R:5368-5380), which is what an occurrence model's scale and
+        information criteria are measured over. Equals :attr:`nobs` when the
+        sample contains no zeroes.
+        """
+        y = np.asarray(self._observations["y_in_sample"], dtype=np.float64).ravel()
+        return int(np.count_nonzero(y))
+
+    def _ic_occurrence_terms(self):
+        """``(n_param_all, n_param_sizes, obs)`` for AICc/BICc.
+
+        Mirrors ``AICc.smooth``/``BICc.smooth`` (R/methods.R:81-115): an
+        occurrence model penalises the *total* parameter count but takes the
+        small-sample correction over the demand-sizes parameters alone, since
+        the correction is about the sizes model's sample. ``obs`` counts the
+        non-zero fitted values.
+        """
+        n_param_all = float(self.nparam)
+        if getattr(self, "_om_model", None) is None:
+            return n_param_all, n_param_all, int(self.nobs)
+        n_occurrence = float(self._n_param.estimated.get("occurrence", 0))
+        fitted = np.asarray(self.fitted, dtype=np.float64).ravel()
+        return n_param_all, n_param_all - n_occurrence, int(np.count_nonzero(fitted))
+
+    @property
     def scale_model(self):
         """The implanted scale model, or ``None`` (R: ``object$scale``).
 
@@ -2735,7 +2823,8 @@ class ADAM:
 
         residuals = np.asarray(self.residuals, dtype=float)
         residuals = residuals[np.isfinite(residuals)]
-        n_obs = int(self.nobs)
+        # R divides by nobs(object, all=FALSE) -- the non-zero sample.
+        n_obs = self._nobs_nonzero
         # R's ``sigma.adam`` (R/adam.R:4687) drops the scale from nparam for
         # likelihood loss, since sigma is that scale and must not unbias
         # itself; other losses use nparam as it stands.
@@ -2956,8 +3045,14 @@ class ADAM:
 
         if self._combined_has_no_likelihood("AICc"):
             return float("nan")
-        log_lik = self._adam_estimated["log_lik_adam_value"]
-        return AICc(log_lik["value"], log_lik["nobs"], log_lik["df"])
+        n_all, n_sizes, obs = self._ic_occurrence_terms()
+        if n_all == n_sizes:
+            return AICc(self.loglik, obs, n_all)
+        return (
+            2.0 * n_all
+            - 2.0 * self.loglik
+            + 2.0 * n_sizes * (n_sizes + 1.0) / (obs - n_sizes - 1.0)
+        )
 
     @property
     def bic(self) -> float:
@@ -3014,8 +3109,12 @@ class ADAM:
 
         if self._combined_has_no_likelihood("BICc"):
             return float("nan")
-        log_lik = self._adam_estimated["log_lik_adam_value"]
-        return BICc(log_lik["value"], log_lik["nobs"], log_lik["df"])
+        n_all, n_sizes, obs = self._ic_occurrence_terms()
+        if n_all == n_sizes:
+            return BICc(self.loglik, obs, n_all)
+        return -2.0 * self.loglik + (
+            n_sizes * np.log(obs) * obs / (obs - n_sizes - 1.0)
+        )
 
     @property
     def error_type(self) -> str:

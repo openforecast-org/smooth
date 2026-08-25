@@ -361,7 +361,9 @@ extractScale.smooth <- function(object, ...){
                       "dnorm"=,
                       "dlnorm"=sqrt(fitted(object$scale)),
                       "ds"=fitted(object$scale)^2,
-                      "dgnorm"=fitted(object$scale)^{1/object$scale$other},
+                      # $other is a list (list(shape=...)), so the shape has to
+                      # be named -- extractSigma.smooth below already does.
+                      "dgnorm"=fitted(object$scale)^{1/object$scale$other$shape},
                       fitted(object$scale)));
     }
     else{

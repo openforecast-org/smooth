@@ -187,3 +187,87 @@ def test_scale_model_can_be_detached():
     location.scale_model = None
     assert location.loglik == plain_loglik
     assert location.nparam == plain_nparam
+
+
+FORECAST_REFERENCE = json.loads((DATA / "sm_forecast_reference.json").read_text())
+SIMULATED_REFERENCE = json.loads((DATA / "sm_simulated_reference.json").read_text())
+
+
+def _with_scale_model(distribution):
+    location = ADAM(model="ANN", lags=[1], distribution=distribution)
+    location.fit(_series("positive"))
+    location.scale_model = location.sm()
+    return location
+
+
+@pytest.mark.parametrize("distribution", sorted(FORECAST_REFERENCE))
+def test_analytical_interval_uses_the_scale_model(distribution):
+    """A time-varying scale must reach the analytical prediction interval."""
+    ref = FORECAST_REFERENCE[distribution]
+    location = _with_scale_model(distribution)
+    forecast = location.predict(h=12, interval="prediction", level=0.95)
+
+    np.testing.assert_allclose(
+        np.asarray(location.scale_model.predict(h=12).mean, dtype=float).ravel(),
+        np.array(ref["scale_forecast"], dtype=float),
+        rtol=1e-9,
+    )
+    for name, got in (("lower", forecast.lower), ("upper", forecast.upper)):
+        np.testing.assert_allclose(
+            np.asarray(got, dtype=float).ravel(),
+            np.array(ref[name], dtype=float),
+            rtol=1e-8,
+            err_msg=f"{distribution}: {name} differs from R",
+        )
+
+
+@pytest.mark.parametrize("distribution", sorted(FORECAST_REFERENCE))
+def test_scale_model_widens_or_narrows_against_the_constant_scale(distribution):
+    """The interval must actually change once a scale model is attached.
+
+    Without this the previous two assertions would still pass if the scale
+    forecast were computed and then quietly dropped.
+    """
+    plain = ADAM(model="ANN", lags=[1], distribution=distribution)
+    plain.fit(_series("positive"))
+    flat = plain.predict(h=12, interval="prediction", level=0.95)
+    varying = _with_scale_model(distribution).predict(
+        h=12, interval="prediction", level=0.95
+    )
+    flat_width = np.asarray(flat.upper, float) - np.asarray(flat.lower, float)
+    varying_width = np.asarray(varying.upper, float) - np.asarray(varying.lower, float)
+    assert not np.allclose(flat_width, varying_width)
+
+
+@pytest.mark.parametrize("distribution", sorted(SIMULATED_REFERENCE))
+def test_simulated_interval_scale_matches_r(distribution):
+    """The simulator's per-horizon scale, which R de-biases and roots."""
+    import smooth.adam_general.core.forecaster.intervals as intervals_module
+
+    ref = SIMULATED_REFERENCE[distribution]
+    captured = {}
+    original = intervals_module.generate_errors
+
+    def _capture(distribution, n, scale, **kwargs):
+        captured["scale"] = np.asarray(scale, dtype=float).ravel()
+        return original(distribution, n, scale, **kwargs)
+
+    intervals_module.generate_errors = _capture
+    try:
+        _with_scale_model(distribution).predict(
+            h=12, interval="simulated", level=0.95, nsim=50
+        )
+    finally:
+        intervals_module.generate_errors = original
+
+    np.testing.assert_allclose(
+        captured["scale"][:12], np.array(ref["sim_scale"], dtype=float), rtol=1e-9
+    )
+
+
+def test_reforecast_accepts_a_per_horizon_sigma():
+    """``reforecast`` must take the scale model's forecast as its sigma."""
+    location = _with_scale_model("dnorm")
+    result = location.reforecast(h=12, nsim=20, interval="prediction", seed=7)
+    assert result.paths.shape == (12, 20, 20)
+    assert np.all(np.isfinite(np.asarray(result.mean, dtype=float)))

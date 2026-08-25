@@ -2796,6 +2796,22 @@ class ADAM:
             )
         return self.sigma
 
+    def _forecast_scale_model(self, h=None):
+        """The scale model's point forecast over ``self.h``, or ``None``.
+
+        The scale model was fitted in the scale's own space, so its mean is the
+        quantity R feeds into the interval variance. When ``sm()`` had to fit it
+        in logarithms the fitted values were already exponentiated back, so no
+        further transformation is needed here.
+        """
+        scale_model = self.scale_model
+        if scale_model is None:
+            return None
+        horizon = int(h if h is not None else (self.h or 0))
+        if horizon <= 0:
+            return None
+        return np.asarray(scale_model.predict(h=horizon).mean, dtype=np.float64).ravel()
+
     def sm(self, **kwargs):
         """Fit a scale model for this fit (R: ``sm.adam``). See :func:`sm`."""
         from smooth.adam_general.core.sm import sm as _sm
@@ -4614,6 +4630,17 @@ class ADAM:
                 side=side,
             )
 
+        # An implanted scale model makes the variance time-varying: forecast it
+        # over the same horizon and hand it to the interval code, which is what
+        # R does with forecast(object$scale, h)$mean (R/adam.R:6485-6530).
+        self._general["scale_forecast"] = self._forecast_scale_model()
+        # R de-biases the scale forecast with nparam(object) *after* implanting,
+        # which counts the scale model's parameters. `params_info` is a snapshot
+        # taken at estimation time and still holds the pre-implant count.
+        self._general["scale_nparam"] = (
+            float(self.nparam) if self.scale_model is not None else None
+        )
+
         # Standard single-model prediction
         self._forecast_results = forecaster(
             model_prepared=self._prepared,
@@ -6318,7 +6345,13 @@ class ADAM:
             distribution=distribution,
             h=h,
             nsim=nsim,
-            sigma=float(self.sigma),
+            # R substitutes the scale model's forecast for sigma(object) here
+            # (R/reapply.R:1281-1286), untransformed and un-de-biased.
+            sigma=(
+                self._forecast_scale_model(h)
+                if self.scale_model is not None
+                else float(self.sigma)
+            ),
             n_obs=n_obs,
             n_param=int(self.nparam),
             opt_scale=float(self.scale),

@@ -13,7 +13,7 @@ A :meth:`to_forecast_result` helper compresses it into the standard
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -100,7 +100,7 @@ def sample_reforecast_errors(
     distribution: str,
     h: int,
     nsim: int,
-    sigma: float,
+    sigma: Union[float, np.ndarray],
     *,
     n_obs: int,
     n_param: int,
@@ -156,21 +156,33 @@ def sample_reforecast_errors(
     rng = rng or np.random.default_rng()
     n = h * nsim * nsim
 
+    # An implanted scale model gives one sigma per horizon rather than a single
+    # number. R passes that vector straight to the r* draws and lets recycling
+    # spread it along the first (horizon) axis of the h x nsim x nsim cube
+    # (R/reapply.R:1281-1310); tiling reproduces that, since the cube is
+    # F-ordered and the horizon index varies fastest.
+    sigma_values = np.asarray(sigma, dtype=np.float64).ravel()
+    scale_draw: Any = (
+        np.tile(sigma_values, n // sigma_values.size)
+        if sigma_values.size > 1
+        else sigma
+    )
+
     if distribution == "dnorm":
-        e = rng.normal(0.0, sigma, n)
+        e = rng.normal(0.0, scale_draw, n)
     elif distribution == "dlaplace":
-        e = rng.laplace(0.0, sigma / 2.0, n)
+        e = rng.laplace(0.0, scale_draw / 2.0, n)
     elif distribution == "ds":
-        e = rs(n, 0.0, (sigma**2 / 120.0) ** 0.25, random_state=rng)
+        e = rs(n, 0.0, (scale_draw**2 / 120.0) ** 0.25, random_state=rng)
     elif distribution == "dgnorm":
         if shape is None:
             raise ValueError("'dgnorm' requires a shape parameter.")
         from math import gamma as _gamma
 
-        gnorm_scale = sigma * np.sqrt(_gamma(1.0 / shape) / _gamma(3.0 / shape))
+        gnorm_scale = scale_draw * np.sqrt(_gamma(1.0 / shape) / _gamma(3.0 / shape))
         e = rgnorm(n, 0.0, gnorm_scale, shape, random_state=rng)
     elif distribution == "dlogis":
-        e = rng.logistic(0.0, sigma * np.sqrt(3.0) / np.pi, n)
+        e = rng.logistic(0.0, scale_draw * np.sqrt(3.0) / np.pi, n)
     elif distribution == "dt":
         df = max(n_obs - n_param, 1)
         e = rng.standard_t(df, n)
@@ -179,33 +191,33 @@ def sample_reforecast_errors(
             raise ValueError("'dalaplace' requires an alpha parameter.")
         a2 = alpha**2
         oma2 = (1.0 - alpha) ** 2
-        scale = np.sqrt(sigma**2 * a2 * oma2 / (a2 + oma2))
+        scale = np.sqrt(scale_draw**2 * a2 * oma2 / (a2 + oma2))
         e = ralaplace(n, 0.0, scale, alpha, random_state=rng)
     elif distribution == "dlnorm":
         # R uses ``extractScale(object)`` (the optimisation scale) here,
-        # not ``sigma(object)``. Without subtracting 1 the multiplier
-        # would have mean ``exp(sigma^2/2 - sigma^2/2) = 1`` exactly.
+        # not ``scale_draw(object)``. Without subtracting 1 the multiplier
+        # would have mean ``exp(scale_draw^2/2 - scale_draw^2/2) = 1`` exactly.
         meanlog = -(opt_scale**2) / 2.0
         e = rng.lognormal(meanlog, opt_scale, n) - 1.0
     elif distribution == "dinvgauss":
-        # rinvgauss(n, mean=1, dispersion=sigma^2) - 1
+        # rinvgauss(n, mean=1, dispersion=scale_draw^2) - 1
         # scipy's invgauss is parametrised as ``mu`` (mean) with
         # ``scale=lambda`` where ``lambda = 1/dispersion``.
-        lam = 1.0 / (sigma**2)
+        lam = 1.0 / (scale_draw**2)
         e = _stats.invgauss.rvs(1.0 / lam, scale=lam, size=n, random_state=rng) - 1.0
     elif distribution == "dgamma":
-        # rgamma(n, shape=sigma^-2, scale=sigma^2) - 1
-        e = rng.gamma(1.0 / (sigma**2), sigma**2, n) - 1.0
+        # rgamma(n, shape=scale_draw^-2, scale=scale_draw^2) - 1
+        e = rng.gamma(1.0 / (scale_draw**2), scale_draw**2, n) - 1.0
     elif distribution == "dllaplace":
-        e = np.exp(rng.laplace(0.0, sigma / 2.0, n)) - 1.0
+        e = np.exp(rng.laplace(0.0, scale_draw / 2.0, n)) - 1.0
     elif distribution == "dls":
-        e = np.exp(rs(n, 0.0, (sigma**2 / 120.0) ** 0.25, random_state=rng)) - 1.0
+        e = np.exp(rs(n, 0.0, (scale_draw**2 / 120.0) ** 0.25, random_state=rng)) - 1.0
     elif distribution == "dlgnorm":
         if shape is None:
             raise ValueError("'dlgnorm' requires a shape parameter.")
         from math import gamma as _gamma
 
-        gnorm_scale = sigma * np.sqrt(_gamma(1.0 / shape) / _gamma(3.0 / shape))
+        gnorm_scale = scale_draw * np.sqrt(_gamma(1.0 / shape) / _gamma(3.0 / shape))
         e = np.exp(rgnorm(n, 0.0, gnorm_scale, shape, random_state=rng)) - 1.0
     else:
         raise ValueError(f"Unsupported distribution for reforecast: {distribution!r}")

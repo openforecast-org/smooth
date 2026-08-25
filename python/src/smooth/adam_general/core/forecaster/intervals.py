@@ -51,6 +51,48 @@ def ensure_level_format(level, side):
     return np.round(level_low, 5), np.round(level_up, 5)
 
 
+def _scale_model_variance(general, observations_dict, params_info):
+    """Per-horizon variance implied by an implanted scale model, or ``None``.
+
+    R replaces the constant ``s2`` with the scale model's forecast when one is
+    implanted (``R/adam.R:6485-6530``). The forecast is on that distribution's
+    *scale*, so it is first mapped onto a variance -- ``dnorm``, ``dlnorm``,
+    ``dgamma`` and ``dinvgauss`` already return one -- and then de-biased by
+    ``obsInSample / df``.
+    """
+    scale_forecast = general.get("scale_forecast")
+    if scale_forecast is None:
+        return None
+
+    sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
+    other = general.get("other") or {}
+    distribution = general["distribution"]
+
+    if distribution == "dlaplace":
+        variance = 2 * sf**2
+    elif distribution == "ds":
+        variance = 120 * sf**4
+    elif distribution == "dgnorm":
+        shape = other["shape"]
+        variance = sf**2 * gamma(3 / shape) / gamma(1 / shape)
+    elif distribution == "dalaplace":
+        alpha = other["alpha"]
+        variance = sf**2 / (alpha**2 * (1 - alpha) ** 2 / (alpha**2 + (1 - alpha) ** 2))
+    else:
+        variance = sf
+
+    obs = observations_dict["obs_in_sample"]
+    # R measures df over the non-zero sample, as nobs(object, all=FALSE) does.
+    obs_df = observations_dict.get("obs_nonzero", obs) or obs
+    n_param = general.get("scale_nparam")
+    if n_param is None:
+        n_param = params_info[0][-1]
+    df = obs_df - n_param
+    if df <= 0:
+        df = obs_df
+    return variance * obs / df
+
+
 def generate_prediction_interval(
     predictions,
     prepared_model,
@@ -72,6 +114,7 @@ def generate_prediction_interval(
     # reconstructed for the ratio-domain distributions.
     e_type = model_type_dict["error_type"]  # "A" or "M"
     s2 = sigma(observations_dict, params_info, general, prepared_model, e_type) ** 2
+    s2_forecast = _scale_model_variance(general, observations_dict, params_info)
 
     # lines 8015 to 8022
     # line 8404 -> I dont get the (is.scale(object$scale))
@@ -92,6 +135,11 @@ def generate_prediction_interval(
             lags_dict["lags_model_all"], general["h"], mat_wt[0], mat_f, vec_g, s2
         )
 
+        if s2_forecast is not None:
+            # R rescales the whole matrix by sqrt(s2F) outer sqrt(s2F); on the
+            # diagonal that is just v / s2 * s2F.
+            v_voc_multi = v_voc_multi / s2 * s2_forecast
+
         # For log-based distributions, transform the variance through log(1+v)
         if general["distribution"] in ["dlnorm", "dls", "dllaplace", "dlgnorm"]:
             v_voc_multi = np.log(1 + v_voc_multi)
@@ -104,6 +152,12 @@ def generate_prediction_interval(
         v_voc_multi = covar_anal(
             lags_dict["lags_model_all"], general["h"], mat_wt, mat_f, vec_g, s2
         )
+
+        if s2_forecast is not None:
+            # Time-varying variance: rescale the covariance matrix itself, so a
+            # cumulative forecast sums the rescaled off-diagonals too.
+            root = np.sqrt(s2_forecast)
+            v_voc_multi = v_voc_multi / s2 * np.outer(root, root)
 
         # Variance of the cumulative sum vs. per-horizon diagonal variances.
         if general.get("cumulative", False):
@@ -400,7 +454,29 @@ def generate_simulation_interval(
         df = observations_dict["obs_in_sample"]
 
     # 3. Get and de-bias scale
-    scale_value = prepared_model["scale"] * observations_dict["obs_in_sample"] / df
+    obs_in_sample = observations_dict["obs_in_sample"]
+    scale_forecast = general_dict.get("scale_forecast")
+    if scale_forecast is None:
+        scale_value = prepared_model["scale"] * obs_in_sample / df
+    else:
+        # An implanted scale model makes the scale time-varying. R de-biases it
+        # and maps it back out of the space sm() fitted it in
+        # (R/adam.R:6388-6400): sm() fits squared residuals for dnorm/dlnorm and
+        # the beta-th power for dgnorm, so those are rooted here. This is a
+        # *scale*, unlike the analytical path's variance, which is why the
+        # transformation differs from `_scale_model_variance`.
+        sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
+        distribution_sim = general_dict["distribution"]
+        shape_sim = (general_dict.get("other") or {}).get("shape")
+        if distribution_sim in ("dnorm", "dlnorm"):
+            scale_value = (sf * obs_in_sample / df) ** 0.5
+        elif distribution_sim == "dgnorm":
+            scale_value = ((sf**shape_sim) * obs_in_sample / df) ** (1 / shape_sim)
+        else:
+            scale_value = sf * obs_in_sample / df
+        # One draw per (horizon, replication); the h scales tile across nsim so
+        # that reshaping column-major puts the right scale on the right horizon.
+        scale_value = np.tile(scale_value, nsim)
 
     # 4. Generate random errors or use external errors
     if external_errors is not None:

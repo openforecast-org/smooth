@@ -21,11 +21,12 @@ on:
         required: true
         type: string
 
-# Opt every JavaScript action (including those bundled inside
-# ``pypa/cibuildwheel@v3.1``, e.g. ``actions/setup-python@v5``) into
-# the Node.js 24 runtime. GitHub deprecates Node.js 20 on 2026-06-02
-# and removes it on 2026-09-16; this env var is the documented opt-in
-# mechanism for the transition period.
+# Opt every JavaScript action into the Node.js 24 runtime. GitHub
+# deprecates Node.js 20 on 2026-06-02 and removes it on 2026-09-16;
+# this env var is the documented opt-in mechanism for the transition
+# period. Every action pinned below now targets Node 24 on its own, so
+# this is belt and braces -- it still covers anything an action pulls
+# in transitively.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -62,7 +63,7 @@ jobs:
           - { os: windows-2025,   cibw-build: 'cp313-win_amd64',  tag: 'cp313-win' }
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -76,7 +77,7 @@ jobs:
       # fails to build ``lapack-reference 3.12.1``).
       - name: Cache OpenBLAS (Windows)
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: C:\openblas
           key: openblas-windows-0.3.33
@@ -86,7 +87,7 @@ jobs:
       # correct) but skips the ~100 MB bottle download on cache hit.
       - name: Cache Homebrew downloads (macOS)
         if: runner.os == 'macOS'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: brew-openblas-${{ runner.os }}-${{ runner.arch }}
@@ -97,7 +98,7 @@ jobs:
       # the build environment. Scoped per (OS × Python build tag) so
       # cache entries don't shadow each other.
       - name: Cache cibuildwheel
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/cibuildwheel
@@ -105,7 +106,7 @@ jobs:
           key: cibuildwheel-${{ matrix.tag }}-v1
 
       - name: Build & test wheels
-        uses: pypa/cibuildwheel@v3.1
+        uses: pypa/cibuildwheel@v4.2.0
         with:
           package-dir: python
           output-dir: wheelhouse
@@ -132,7 +133,7 @@ jobs:
 
           # Windows: download the OpenMathLib pre-built OpenBLAS zip
           # (LAPACK is bundled in ``libopenblas.dll``, no Fortran
-          # compiler needed at build time). ``actions/cache@v4`` above
+          # compiler needed at build time). ``actions/cache@v6`` above
           # restores ``C:\openblas`` if a prior run wrote it, so the
           # ``BEFORE_ALL`` is idempotent: ``if exist ... else (download)``
           # — re-running ``mkdir C:\openblas`` on a restored cache
@@ -165,7 +166,7 @@ jobs:
           CIBW_TEST_COMMAND: pytest {project}/python/tests -v --tb=short
 
       - name: Upload wheels as artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           # Use the artifact-safe ``tag`` matrix field instead of
           # ``cibw-build`` directly — ``actions/upload-artifact``
@@ -179,12 +180,12 @@ jobs:
     name: Build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: 'pip'   # caches pip downloads keyed on requirements
@@ -196,7 +197,7 @@ jobs:
         run: python -m build --sdist python
 
       - name: Upload sdist artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: ./python/dist/*.tar.gz
@@ -211,14 +212,14 @@ jobs:
       contents: write   # creating / updating the draft release
     steps:
       - name: Download all wheel artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
           pattern: 'wheels-*'
 
       - name: Download sdist artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: sdist
           path: dist
@@ -227,7 +228,7 @@ jobs:
         run: ls -R dist/
 
       - name: Create or update draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # ``draft: true`` means no git tag is created yet —
           # GitHub creates it at ``target_commitish`` when the

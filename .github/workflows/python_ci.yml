@@ -7,11 +7,12 @@ on:
       - '.github/workflows/python_ci.yml'
   workflow_dispatch:
 
-# Opt every JavaScript action (including those bundled inside
-# ``pypa/cibuildwheel@v3.1``, e.g. ``actions/setup-python@v5``) into
-# the Node.js 24 runtime. GitHub deprecates Node.js 20 on 2026-06-02
-# and removes it on 2026-09-16; this env var is the documented opt-in
-# mechanism for the transition period.
+# Opt every JavaScript action into the Node.js 24 runtime. GitHub
+# deprecates Node.js 20 on 2026-06-02 and removes it on 2026-09-16;
+# this env var is the documented opt-in mechanism for the transition
+# period. Every action pinned below now targets Node 24 on its own, so
+# this is belt and braces -- it still covers anything an action pulls
+# in transitively.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -20,10 +21,10 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           # Cache pip's download tree so ``pip install ruff mypy`` hits
@@ -84,7 +85,7 @@ jobs:
             cibw-build: "cp311-win_amd64"
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -94,7 +95,7 @@ jobs:
       # release version so a bump invalidates the cache automatically.
       - name: Cache OpenBLAS (Windows)
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: C:\openblas
           key: openblas-windows-0.3.33
@@ -104,13 +105,13 @@ jobs:
       # correct) but skips the ~100 MB bottle download on cache hit.
       - name: Cache Homebrew downloads (macOS)
         if: runner.os == 'macOS'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: brew-openblas-${{ runner.os }}-${{ runner.arch }}
 
       - name: Build and test with cibuildwheel
-        uses: pypa/cibuildwheel@v3.1
+        uses: pypa/cibuildwheel@v4.2.0
         with:
           package-dir: python
           output-dir: wheelhouse
@@ -141,7 +142,7 @@ jobs:
           # OpenBLAS DLL and its MinGW runtime DLLs
           # (``libgfortran-5.dll``, ``libgcc_s_seh-1.dll``,
           # ``libwinpthread-1.dll``) into the wheel.
-          # ``actions/cache@v4`` (Windows step above) restores
+          # ``actions/cache@v6`` (Windows step above) restores
           # ``C:\openblas`` if a prior run wrote it. Skip the download
           # in that case — re-running ``mkdir C:\openblas`` would fail
           # and re-extracting would be wasted work. cmd.exe's

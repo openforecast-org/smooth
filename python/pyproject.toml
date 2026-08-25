@@ -53,7 +53,7 @@ dependencies = [
     "nlopt",
     "scipy>=1.11.0,<1.19.0",
     "statsmodels",
-    "greybox>=1.0.8",
+    "greybox>=1.0.7",
     "matplotlib",
 ]
 

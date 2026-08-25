@@ -153,25 +153,25 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                                               # "dfnorm" =,
                                               # "dbcnorm" =,
                                               # "dlogitnorm" =,
-                                              "dlnorm" = obsZero*(log(sqrt(2*pi)*fitted[!otLogical])+0.5),
+                                              "dlnorm" = (log(sqrt(2*pi)*fitted[!otLogical])+0.5),
                                               # "dlgnorm" =,
-                                              "dgnorm" =obsZero*(1/other-
+                                              "dgnorm" =(1/other-
                                                                       log(other /
                                                                               (2*fitted[!otLogical]*gamma(1/other)))),
-                                              "dinvgauss" = obsZero*(0.5*(log(pi/2)+1+suppressWarnings(log(fitted[!otLogical])))),
-                                              "dgamma" = obsZero*(1/fitted[!otLogical] + log(fitted[!otLogical]) +
+                                              "dinvgauss" = (0.5*(log(pi/2)+1+suppressWarnings(log(fitted[!otLogical])))),
+                                              "dgamma" = (1/fitted[!otLogical] + log(fitted[!otLogical]) +
                                                                       log(gamma(1/fitted[!otLogical])) +
                                                                       (1-1/fitted[!otLogical])*digamma(1/fitted[!otLogical])),
                                               # "dalaplace" =,
                                               # "dllaplace" =,
-                                              "dlaplace" = obsZero*(1 + log(2*fitted[!otLogical])),
+                                              "dlaplace" = (1 + log(2*fitted[!otLogical])),
                                               # "dls" =,
-                                              "ds" = obsZero*(2 + 2*log(2*fitted[!otLogical])),
+                                              "ds" = (2 + 2*log(2*fitted[!otLogical])),
                                               # "dlogis" = obsZero*2,
-                                              # "dt" = obsZero*((fitted[!otLogical]+1)/2 *
+                                              # "dt" = ((fitted[!otLogical]+1)/2 *
                                               #                     (digamma((fitted[!otLogical]+1)/2)-digamma(fitted[!otLogical]/2)) +
                                               #                     log(sqrt(fitted[!otLogical]) * beta(fitted[!otLogical]/2,0.5))),
-                                              # "dchisq" = obsZero*(log(2)*gamma(fitted[!otLogical]/2)-
+                                              # "dchisq" = (log(2)*gamma(fitted[!otLogical]/2)-
                                               #                         (1-fitted[!otLogical]/2)*digamma(fitted[!otLogical]/2)+
                                               #                         fitted[!otLogical]/2),
                                               0
@@ -186,7 +186,11 @@ sm.adam <- function(object, model="YYY", lags=NULL,
 
     # Transform residuals for the model fit
     # These should align with how the scale is calculated
-    et[] <- switch(distribution,
+    # Assign into the non-zero positions rather than over the whole vector: the
+    # right-hand side is only sum(otLogical) long for an occurrence model, so
+    # `et[] <- ...` recycled it across obsInSample slots and misaligned the
+    # scale response (and warned when the two are not multiples).
+    et[otLogical] <- switch(distribution,
                    "dnorm"=et[otLogical]^2,
                    "dlaplace"=,
                    "dalaplace"=abs(et[otLogical]),

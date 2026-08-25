@@ -51,6 +51,8 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.html#smooth.MSARIMA"><code class="docutils literal notranslate"><span class="pre">MSARIMA</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.coefbootstrap.html">smooth.MSARIMA.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.confint.html">smooth.MSARIMA.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.extract_scale.html">smooth.MSARIMA.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.extract_sigma.html">smooth.MSARIMA.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.multicov.html">smooth.MSARIMA.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.outlierdummy.html">smooth.MSARIMA.outlierdummy</a></li>
@@ -65,6 +67,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.rstudent.html">smooth.MSARIMA.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.select_best_model.html">smooth.MSARIMA.select_best_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.simulate.html">smooth.MSARIMA.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.sm.html">smooth.MSARIMA.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.summary.html">smooth.MSARIMA.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.vcov.html">smooth.MSARIMA.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.actuals.html">smooth.MSARIMA.actuals</a></li>
@@ -107,6 +110,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.profile.html">smooth.MSARIMA.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.residuals.html">smooth.MSARIMA.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.scale.html">smooth.MSARIMA.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.scale_model.html">smooth.MSARIMA.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.sigma.html">smooth.MSARIMA.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.states.html">smooth.MSARIMA.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.time_elapsed.html">smooth.MSARIMA.time_elapsed</a></li>
@@ -174,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -207,7 +212,7 @@
 <h1>smooth.MSARIMA.data<a class="headerlink" href="#smooth-msarima-data" title="Link to this heading"></a></h1>
 <dl class="py property">
 <dt class="sig sig-object py" id="smooth.MSARIMA.data">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">MSARIMA.</span></span><span class="sig-name descname"><span class="pre">data</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NDArray</span></span><a class="headerlink" href="#smooth.MSARIMA.data" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">MSARIMA.</span></span><span class="sig-name descname"><span class="pre">data</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarT</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#smooth.MSARIMA.data" title="Link to this definition"></a></dt>
 <dd><p>$data).</p>
 <p>Alias for <code class="docutils literal notranslate"><span class="pre">actuals</span></code> property. Returns the original time series
 data used for model fitting.</p>

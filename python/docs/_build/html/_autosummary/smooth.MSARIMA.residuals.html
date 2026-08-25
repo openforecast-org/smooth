@@ -51,6 +51,8 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.html#smooth.MSARIMA"><code class="docutils literal notranslate"><span class="pre">MSARIMA</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.coefbootstrap.html">smooth.MSARIMA.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.confint.html">smooth.MSARIMA.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.extract_scale.html">smooth.MSARIMA.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.extract_sigma.html">smooth.MSARIMA.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.multicov.html">smooth.MSARIMA.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.outlierdummy.html">smooth.MSARIMA.outlierdummy</a></li>
@@ -65,6 +67,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.rstudent.html">smooth.MSARIMA.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.select_best_model.html">smooth.MSARIMA.select_best_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.simulate.html">smooth.MSARIMA.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.sm.html">smooth.MSARIMA.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.summary.html">smooth.MSARIMA.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.vcov.html">smooth.MSARIMA.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.actuals.html">smooth.MSARIMA.actuals</a></li>
@@ -107,6 +110,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.scale.html">smooth.MSARIMA.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.scale_model.html">smooth.MSARIMA.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.sigma.html">smooth.MSARIMA.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.states.html">smooth.MSARIMA.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.time_elapsed.html">smooth.MSARIMA.time_elapsed</a></li>
@@ -174,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -207,12 +212,18 @@
 <h1>smooth.MSARIMA.residuals<a class="headerlink" href="#smooth-msarima-residuals" title="Link to this heading"></a></h1>
 <dl class="py property">
 <dt class="sig sig-object py" id="smooth.MSARIMA.residuals">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">MSARIMA.</span></span><span class="sig-name descname"><span class="pre">residuals</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NDArray</span></span><a class="headerlink" href="#smooth.MSARIMA.residuals" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">MSARIMA.</span></span><span class="sig-name descname"><span class="pre">residuals</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarT</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#smooth.MSARIMA.residuals" title="Link to this definition"></a></dt>
 <dd><p>Return model residuals (errors from fitting).</p>
 <p>For additive error models, residuals are y_t - fitted_t.
 For multiplicative error models, residuals are y_t / fitted_t - 1.
 For combined models, returns residuals computed from the IC-weighted
 combined fitted values: y_t - combined_fitted_t.</p>
+<p>The log-domain and multiplicative-domain distributions are the
+exception: <code class="docutils literal notranslate"><span class="pre">dlnorm</span></code>, <code class="docutils literal notranslate"><span class="pre">dllaplace</span></code>, <code class="docutils literal notranslate"><span class="pre">dls</span></code>, <code class="docutils literal notranslate"><span class="pre">dlgnorm</span></code>, <code class="docutils literal notranslate"><span class="pre">dgamma</span></code>
+and <code class="docutils literal notranslate"><span class="pre">dinvgauss</span></code> return the <em>ratio</em> <code class="docutils literal notranslate"><span class="pre">y_t</span> <span class="pre">/</span> <span class="pre">fitted_t</span></code> rather than an
+error, because that is the quantity their densities are written in.
+Mirrors R’s <code class="docutils literal notranslate"><span class="pre">residuals.adam</span></code> (R/adam.R:5383-5403): <code class="docutils literal notranslate"><span class="pre">abs(1</span> <span class="pre">+</span> <span class="pre">e/f)</span></code>
+for an additive error and <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">+</span> <span class="pre">e</span></code> for a multiplicative one.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Array of residuals from the fitted model.</p>

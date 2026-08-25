@@ -47,6 +47,8 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.html#smooth.ADAM"><code class="docutils literal notranslate"><span class="pre">ADAM</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.coefbootstrap.html">smooth.ADAM.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.confint.html">smooth.ADAM.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.extract_scale.html">smooth.ADAM.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.extract_sigma.html">smooth.ADAM.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.multicov.html">smooth.ADAM.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
@@ -61,6 +63,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.simulate.html">smooth.ADAM.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.sm.html">smooth.ADAM.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.vcov.html">smooth.ADAM.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.actuals.html">smooth.ADAM.actuals</a></li>
@@ -103,6 +106,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.profile.html">smooth.ADAM.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.residuals.html">smooth.ADAM.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.scale.html">smooth.ADAM.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.scale_model.html">smooth.ADAM.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.sigma.html">smooth.ADAM.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.states.html">smooth.ADAM.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.time_elapsed.html">smooth.ADAM.time_elapsed</a></li>
@@ -174,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -207,7 +212,7 @@
 <h1>smooth.ADAM.data<a class="headerlink" href="#smooth-adam-data" title="Link to this heading"></a></h1>
 <dl class="py property">
 <dt class="sig sig-object py" id="smooth.ADAM.data">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ADAM.</span></span><span class="sig-name descname"><span class="pre">data</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NDArray</span></span><a class="headerlink" href="#smooth.ADAM.data" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ADAM.</span></span><span class="sig-name descname"><span class="pre">data</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarT</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#smooth.ADAM.data" title="Link to this definition"></a></dt>
 <dd><p>$data).</p>
 <p>Alias for <code class="docutils literal notranslate"><span class="pre">actuals</span></code> property. Returns the original time series
 data used for model fitting.</p>

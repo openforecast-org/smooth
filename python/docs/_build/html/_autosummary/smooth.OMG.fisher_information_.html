@@ -151,6 +151,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -184,7 +185,7 @@
 <h1>smooth.OMG.fisher_information_<a class="headerlink" href="#smooth-omg-fisher-information" title="Link to this heading"></a></h1>
 <dl class="py property">
 <dt class="sig sig-object py" id="smooth.OMG.fisher_information_">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">OMG.</span></span><span class="sig-name descname"><span class="pre">fisher_information_</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NDArray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#smooth.OMG.fisher_information_" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">OMG.</span></span><span class="sig-name descname"><span class="pre">fisher_information_</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarT</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#smooth.OMG.fisher_information_" title="Link to this definition"></a></dt>
 <dd><p>Cached observed Fisher Information at the estimated joint B.</p>
 <p>Computed lazily on first access via <code class="xref py py-meth docutils literal notranslate"><span class="pre">_fisher_information_matrix()</span></code>;
 cleared whenever <a class="reference internal" href="smooth.OMG.fit.html#smooth.OMG.fit" title="smooth.OMG.fit"><code class="xref py py-meth docutils literal notranslate"><span class="pre">fit()</span></code></a> is called again.</p>

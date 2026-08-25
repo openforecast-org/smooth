@@ -1,0 +1,452 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scale Model (sm) &mdash; smooth  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="msdecompose" href="msdecompose.html" />
+    <link rel="prev" title="OM, OMG and AutoOM" href="om.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            smooth
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.html">smooth.ADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.html">smooth.AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.html">smooth.ES</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.html">smooth.SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.html">smooth.MSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.html">smooth.AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.html">smooth.OM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.html">smooth.OMG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.html">smooth.AutoOM</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.predict.html">smooth.ADAM.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.predict_intervals.html">smooth.ADAM.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.plot.html">smooth.ADAM.plot</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstandard.html">smooth.ADAM.rstandard</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoADAM.predict.html">smooth.AutoADAM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.fit.html">smooth.ES.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.predict.html">smooth.ES.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.predict_intervals.html">smooth.ES.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.ES.summary.html">smooth.ES.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.fit.html">smooth.SMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict.html">smooth.SMA.predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.predict_intervals.html">smooth.SMA.predict_intervals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.SMA.summary.html">smooth.SMA.summary</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.MSARIMA.predict.html">smooth.MSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.fit.html">smooth.AutoMSARIMA.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoMSARIMA.predict.html">smooth.AutoMSARIMA.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.fit.html">smooth.OM.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OM.predict.html">smooth.OM.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.fit.html">smooth.OMG.fit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.OMG.predict.html">smooth.OMG.predict</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/smooth.AutoOM.fit.html">smooth.AutoOM.fit</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autoadam.html">AutoADAM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sma.html">SMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="msarima.html">MSARIMA and AutoMSARIMA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Scale Model (sm)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#no-implant-in-python">No <code class="docutils literal notranslate"><span class="pre">implant()</span></code> in Python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-the-scale-model-is-fitted-to">What the scale model is fitted to</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reading-the-result">Reading the result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#choosing-a-scale-model">Choosing a scale model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#worked-example">Worked example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#api">API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="_autosummary/smooth.ADAM.sm.html">smooth.ADAM.sm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="_autosummary/smooth.ADAM.extract_scale.html">smooth.ADAM.extract_scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="_autosummary/smooth.ADAM.extract_sigma.html">smooth.ADAM.extract_sigma</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#differences-from-r">Differences from R</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="msdecompose.html">msdecompose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lowess.html">lowess</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">smooth</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Scale Model (sm)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/sm.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="scale-model-sm">
+<h1>Scale Model (sm)<a class="headerlink" href="#scale-model-sm" title="Link to this heading"></a></h1>
+<p>A scale model lets the error’s scale vary over time instead of being a single
+number. It is a second ADAM, fitted to a transform of a fitted model’s
+residuals, and scored by the <em>original</em> model’s log-likelihood — the
+state-space counterpart of a GARCH or GAMLSS scale equation.</p>
+<p>Where an ordinary ADAM assumes</p>
+<div class="math notranslate nohighlight">
+\[y_t = \mu_t + \sigma \varepsilon_t\]</div>
+<p>with a constant <span class="math notranslate nohighlight">\(\sigma\)</span>, a scale model estimates <span class="math notranslate nohighlight">\(\sigma_t\)</span>
+dynamically, using an ETS, ARIMA or regression structure of its own.</p>
+<section id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">ADAM</span>
+
+<span class="n">location</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;MNN&quot;</span><span class="p">,</span> <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span> <span class="n">distribution</span><span class="o">=</span><span class="s2">&quot;dnorm&quot;</span><span class="p">)</span>
+<span class="n">location</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+<span class="n">scale_model</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">sm</span><span class="p">()</span>        <span class="c1"># fit the scale model</span>
+<span class="n">location</span><span class="o">.</span><span class="n">scale_model</span> <span class="o">=</span> <span class="n">scale_model</span> <span class="c1"># adopt it (R&#39;s implant())</span>
+
+<span class="n">forecast</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="s2">&quot;prediction&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Once attached, the scale model changes the model’s log-likelihood, its
+parameter count, and the width of its prediction intervals at every horizon.</p>
+</section>
+<section id="no-implant-in-python">
+<h2>No <code class="docutils literal notranslate"><span class="pre">implant()</span></code> in Python<a class="headerlink" href="#no-implant-in-python" title="Link to this heading"></a></h2>
+<p>R needs two steps, because it cannot modify a fitted object in place:</p>
+<div class="highlight-r notranslate"><div class="highlight"><pre><span></span><span class="n">scaleModel</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">sm</span><span class="p">(</span><span class="n">locationModel</span><span class="p">)</span>
+<span class="n">mergedModel</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">implant</span><span class="p">(</span><span class="n">locationModel</span><span class="p">,</span><span class="w"> </span><span class="n">scaleModel</span><span class="p">)</span><span class="w">   </span><span class="c1"># returns a new object</span>
+</pre></div>
+</div>
+<p>Python assigns instead, and there is <strong>no</strong> <code class="docutils literal notranslate"><span class="pre">implant()</span></code> function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">location</span><span class="o">.</span><span class="n">scale_model</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">sm</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The assignment does everything R’s <code class="docutils literal notranslate"><span class="pre">implant()</span></code> does — it validates that what
+you are attaching really is a scale model, and switches the location model’s
+<code class="docutils literal notranslate"><span class="pre">loglik</span></code> and <code class="docutils literal notranslate"><span class="pre">nparam</span></code> over to it. Setting <code class="docutils literal notranslate"><span class="pre">scale_model</span> <span class="pre">=</span> <span class="pre">None</span></code> detaches
+it again, which R has no equivalent for.</p>
+<p>Because <code class="docutils literal notranslate"><span class="pre">sm()</span></code> returns the model rather than attaching it, you still get R’s
+two-step control: inspect the scale model first, adopt it only if you want it.</p>
+</section>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">sm()</span></code> raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> unless:</p>
+<ul class="simple">
+<li><p>the location model was estimated with <code class="docutils literal notranslate"><span class="pre">loss=&quot;likelihood&quot;</span></code>; and</p></li>
+<li><p>its distribution is one of <code class="docutils literal notranslate"><span class="pre">dnorm</span></code>, <code class="docutils literal notranslate"><span class="pre">dlaplace</span></code>, <code class="docutils literal notranslate"><span class="pre">ds</span></code>, <code class="docutils literal notranslate"><span class="pre">dgnorm</span></code>,
+<code class="docutils literal notranslate"><span class="pre">dlnorm</span></code>, <code class="docutils literal notranslate"><span class="pre">dgamma</span></code>, <code class="docutils literal notranslate"><span class="pre">dinvgauss</span></code>.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">dalaplace</span></code> and the log-variants are not supported — R’s own loss function
+has no branch for them either, so they are rejected rather than silently
+mis-scored.</p>
+</section>
+<section id="what-the-scale-model-is-fitted-to">
+<h2>What the scale model is fitted to<a class="headerlink" href="#what-the-scale-model-is-fitted-to" title="Link to this heading"></a></h2>
+<p>The response is a transform of the location model’s residuals, chosen so that
+its mean is the quantity that distribution calls a scale:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Distribution</p></th>
+<th class="head"><p>Scale response</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dnorm</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(e_t^2\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dlaplace</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(|e_t|\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ds</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(0.5\sqrt{|e_t|}\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dgnorm</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\((\beta|e_t|^\beta)^{1/\beta}\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dlnorm</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(\log(e_t)^2\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dgamma</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\((e_t-1)^2\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dinvgauss</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\((e_t-1)^2/e_t\)</span></p></td>
+</tr>
+</tbody>
+</table>
+<p>For <code class="docutils literal notranslate"><span class="pre">dgamma</span></code>, <code class="docutils literal notranslate"><span class="pre">dinvgauss</span></code> and the log-domain distributions <code class="docutils literal notranslate"><span class="pre">e_t</span></code> is the
+ratio <code class="docutils literal notranslate"><span class="pre">y_t</span> <span class="pre">/</span> <span class="pre">fitted_t</span></code>, which is what <code class="docutils literal notranslate"><span class="pre">residuals</span></code> returns for them.</p>
+</section>
+<section id="reading-the-result">
+<h2>Reading the result<a class="headerlink" href="#reading-the-result" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Accessor</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">model.scale_model</span></code></p></td>
+<td><p>The attached scale model, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">model.extract_scale()</span></code></p></td>
+<td><p>The fitted scale at each observation, mapped out of the space <code class="docutils literal notranslate"><span class="pre">sm()</span></code> fitted it in. A scalar when no scale model is attached.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">model.extract_sigma()</span></code></p></td>
+<td><p>The standard deviation that scale implies, which differs per distribution.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">model.loglik</span></code></p></td>
+<td><p>Switches to the scale model’s once attached.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">model.nparam</span></code></p></td>
+<td><p>Gains the scale model’s parameters, losing the one constant scale they replace.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">scale_model.fitted</span></code></p></td>
+<td><p>The fitted scale, in the space it was fitted in.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">scale_model.residuals</span></code></p></td>
+<td><p>Standardised residuals of the <em>location</em> model.</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">extract_scale()</span></code> is not the same as <code class="docutils literal notranslate"><span class="pre">scale_model.fitted</span></code>: <code class="docutils literal notranslate"><span class="pre">sm()</span></code> fits
+squared residuals for <code class="docutils literal notranslate"><span class="pre">dnorm</span></code>, so the scale is their square root.</p>
+</section>
+<section id="choosing-a-scale-model">
+<h2>Choosing a scale model<a class="headerlink" href="#choosing-a-scale-model" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Pattern in the residuals</p></th>
+<th class="head"><p>Try</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Constant variance</p></td>
+<td><p>No scale model needed</p></td>
+</tr>
+<tr class="row-odd"><td><p>Slowly changing variance</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.sm(model=&quot;MNN&quot;)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Seasonal variance</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.sm(model=&quot;MNM&quot;)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Unsure</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.sm()</span></code> — selects
+among multiplicative ETS</p></td>
+</tr>
+<tr class="row-even"><td><p>Variance driven by covariates</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.sm(model=&quot;NNN&quot;,</span> <span class="pre">X=X)</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>A scale model adds parameters, so compare information criteria before and
+after attaching one — <code class="docutils literal notranslate"><span class="pre">model.aicc</span></code> accounts for it automatically.</p>
+</section>
+<section id="worked-example">
+<h2>Worked example<a class="headerlink" href="#worked-example" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">smooth</span><span class="w"> </span><span class="kn">import</span> <span class="n">ADAM</span>
+
+<span class="n">location</span> <span class="o">=</span> <span class="n">ADAM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;ANN&quot;</span><span class="p">,</span> <span class="n">lags</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">distribution</span><span class="o">=</span><span class="s2">&quot;dnorm&quot;</span><span class="p">)</span>
+<span class="n">location</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+<span class="n">plain_aicc</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">aicc</span>
+<span class="n">plain</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="s2">&quot;prediction&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+
+<span class="n">location</span><span class="o">.</span><span class="n">scale_model</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">sm</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">location</span><span class="o">.</span><span class="n">aicc</span> <span class="o">-</span> <span class="n">plain_aicc</span><span class="p">)</span>          <span class="c1"># negative: the scale model helps</span>
+
+<span class="n">varying</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="s2">&quot;prediction&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">width_plain</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">plain</span><span class="o">.</span><span class="n">upper</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">plain</span><span class="o">.</span><span class="n">lower</span><span class="p">)</span>
+<span class="n">width_varying</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">varying</span><span class="o">.</span><span class="n">upper</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">varying</span><span class="o">.</span><span class="n">lower</span><span class="p">)</span>
+<span class="c1"># width_varying tracks the estimated scale instead of being flat</span>
+
+<span class="n">sigma_t</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">extract_sigma</span><span class="p">()</span>          <span class="c1"># one value per observation</span>
+</pre></div>
+</div>
+</section>
+<section id="api">
+<h2>API<a class="headerlink" href="#api" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.ADAM.sm.html#smooth.ADAM.sm" title="smooth.ADAM.sm"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM.sm</span></code></a>(**kwargs)</p></td>
+<td><p>Fit a scale model for this fit (R: <code class="docutils literal notranslate"><span class="pre">sm.adam</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/smooth.ADAM.extract_scale.html#smooth.ADAM.extract_scale" title="smooth.ADAM.extract_scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM.extract_scale</span></code></a>()</p></td>
+<td><p>The distribution's scale (R: <code class="docutils literal notranslate"><span class="pre">extractScale</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/smooth.ADAM.extract_sigma.html#smooth.ADAM.extract_sigma" title="smooth.ADAM.extract_sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ADAM.extract_sigma</span></code></a>()</p></td>
+<td><p>Standard deviation implied by the scale (R: <code class="docutils literal notranslate"><span class="pre">extractSigma</span></code>).</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="differences-from-r">
+<h2>Differences from R<a class="headerlink" href="#differences-from-r" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Behaviour</p></th>
+<th class="head"><p>R</p></th>
+<th class="head"><p>Python</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Fit a scale model</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sm(model)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.sm()</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Attach it</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">implant(location,</span> <span class="pre">scale)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">location.scale_model</span> <span class="pre">=</span> <span class="pre">scale</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Detach it</p></td>
+<td><p>—</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">location.scale_model</span> <span class="pre">=</span> <span class="pre">None</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Is a scale model attached?</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">is.scale(model$scale)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.scale_model</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">None</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>The scale</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">extractScale(model)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.extract_scale()</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>The implied sigma</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">extractSigma(model)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.extract_sigma()</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Where the scale lives</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model$scale</span></code> holds either a
+number or a model</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.scale</span></code> stays a float;
+the model lives in
+<code class="docutils literal notranslate"><span class="pre">model.scale_model</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Explanatory variables</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">formula=</span></code> / <code class="docutils literal notranslate"><span class="pre">data=</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">X=</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>R overloads a single <code class="docutils literal notranslate"><span class="pre">$scale</span></code> slot to hold either a number or a model, and
+tells them apart with <code class="docutils literal notranslate"><span class="pre">is.scale()</span></code>. Python keeps <code class="docutils literal notranslate"><span class="pre">scale</span></code> a float and gives
+the model its own attribute, so the return type never changes underfoot.</p>
+<p>Diagnostics on both sides use the same numbers: the fitted scale, the
+prediction-interval bounds and the standardised residuals all agree with R.</p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Svetunkov, I. (2023). <em>Forecasting and Analytics with the Augmented Dynamic
+Adaptive Model (ADAM)</em>. Chapman and Hall/CRC.
+<a class="reference external" href="https://openforecast.org/adam/ADAMscaleModel.html">Chapter 17: the scale model</a>.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="om.html" class="btn btn-neutral float-left" title="OM, OMG and AutoOM" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="msdecompose.html" class="btn btn-neutral float-right" title="msdecompose" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Filotas Theodosiou, Ivan Svetunkov, Leonidas Tsaprounis, Claude AI.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

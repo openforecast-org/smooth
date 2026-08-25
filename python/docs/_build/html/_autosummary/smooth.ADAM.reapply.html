@@ -47,6 +47,8 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.html#smooth.ADAM"><code class="docutils literal notranslate"><span class="pre">ADAM</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.coefbootstrap.html">smooth.ADAM.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.confint.html">smooth.ADAM.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.extract_scale.html">smooth.ADAM.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.extract_sigma.html">smooth.ADAM.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.fit.html">smooth.ADAM.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.multicov.html">smooth.ADAM.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.outlierdummy.html">smooth.ADAM.outlierdummy</a></li>
@@ -64,6 +66,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.rstudent.html">smooth.ADAM.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.select_best_model.html">smooth.ADAM.select_best_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.simulate.html">smooth.ADAM.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.sm.html">smooth.ADAM.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.summary.html">smooth.ADAM.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.vcov.html">smooth.ADAM.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.actuals.html">smooth.ADAM.actuals</a></li>
@@ -103,6 +106,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.profile.html">smooth.ADAM.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.residuals.html">smooth.ADAM.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.scale.html">smooth.ADAM.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.scale_model.html">smooth.ADAM.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.sigma.html">smooth.ADAM.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.states.html">smooth.ADAM.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ADAM.time_elapsed.html">smooth.ADAM.time_elapsed</a></li>
@@ -174,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -225,9 +230,9 @@ with array shapes matching R exactly.</p>
 <li><p><strong>bootstrap</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Forwarded to <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a>. <code class="docutils literal notranslate"><span class="pre">True</span></code> uses the empirical
 covariance from <a class="reference internal" href="smooth.ADAM.coefbootstrap.html#smooth.ADAM.coefbootstrap" title="smooth.ADAM.coefbootstrap"><code class="xref py py-meth docutils literal notranslate"><span class="pre">coefbootstrap()</span></code></a> instead of the analytical
 inverse-Fisher matrix.</p></li>
-<li><p><strong>heuristics</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]</span>) – Forwarded to <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a> — heuristic diagonal proportion
+<li><p><strong>heuristics</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Forwarded to <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a> — heuristic diagonal proportion
 (<code class="docutils literal notranslate"><span class="pre">vcov</span> <span class="pre">=</span> <span class="pre">diag(|coef|</span> <span class="pre">*</span> <span class="pre">heuristics)</span></code>) when set.</p></li>
-<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Seed for the MVN sampler. Makes the draw reproducible.</p></li>
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Seed for the MVN sampler. Makes the draw reproducible.</p></li>
 <li><p><strong>**vcov_kwargs</strong> – Forwarded to <a class="reference internal" href="smooth.ADAM.vcov.html#smooth.ADAM.vcov" title="smooth.ADAM.vcov"><code class="xref py py-meth docutils literal notranslate"><span class="pre">vcov()</span></code></a> (<code class="docutils literal notranslate"><span class="pre">step_size</span></code>, bootstrap kwargs).</p></li>
 </ul>
 </dd>

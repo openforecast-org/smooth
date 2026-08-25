@@ -16,6 +16,8 @@
 
    ~SMA.coefbootstrap
    ~SMA.confint
+   ~SMA.extract_scale
+   ~SMA.extract_sigma
    ~SMA.fit
    ~SMA.multicov
    ~SMA.outlierdummy
@@ -30,6 +32,7 @@
    ~SMA.rstudent
    ~SMA.select_best_model
    ~SMA.simulate
+   ~SMA.sm
    ~SMA.summary
    ~SMA.vcov
 
@@ -79,6 +82,7 @@
    ~SMA.profile
    ~SMA.residuals
    ~SMA.scale
+   ~SMA.scale_model
    ~SMA.sigma
    ~SMA.states
    ~SMA.time_elapsed

@@ -50,6 +50,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#smooth.ES"><code class="docutils literal notranslate"><span class="pre">ES</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.coefbootstrap.html">smooth.ES.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.confint.html">smooth.ES.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.extract_scale.html">smooth.ES.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.extract_sigma.html">smooth.ES.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.fit.html">smooth.ES.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.multicov.html">smooth.ES.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.outlierdummy.html">smooth.ES.outlierdummy</a></li>
@@ -64,6 +66,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.rstudent.html">smooth.ES.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.select_best_model.html">smooth.ES.select_best_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.simulate.html">smooth.ES.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.sm.html">smooth.ES.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.summary.html">smooth.ES.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.vcov.html">smooth.ES.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.actuals.html">smooth.ES.actuals</a></li>
@@ -103,6 +106,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.profile.html">smooth.ES.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.residuals.html">smooth.ES.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.scale.html">smooth.ES.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.ES.scale_model.html">smooth.ES.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.sigma.html">smooth.ES.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.states.html">smooth.ES.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.ES.time_elapsed.html">smooth.ES.time_elapsed</a></li>
@@ -172,6 +176,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -227,7 +232,7 @@ It uses normal distribution for errors and conventional ETS formulation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>]]</span>) – <p>The type of ETS model. The first letter stands for the type of error
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code> | <code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>]</span>) – <p>The type of ETS model. The first letter stands for the type of error
 (“A” or “M”), the second for trend (“N”, “A”, “Ad”, “M” or “Md”),
 and the third for seasonality (“N”, “A” or “M”).</p>
 <p>Examples: “ANN”, “AAN”, “AAdN”, “AAA”, “AAdA”, “MAdM”</p>
@@ -239,20 +244,20 @@ and the third for seasonality (“N”, “A” or “M”).</p>
 - “CCC”: Combination of all models using AIC weights</p>
 <p>Can also be a list of model names for custom model pool.</p>
 </p></li>
-<li><p><strong>lags</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]]</span>) – Seasonal period(s). Can be a single integer or a list of integers.
+<li><p><strong>lags</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Seasonal period(s). Can be a single integer or a list of integers.
 E.g., <code class="docutils literal notranslate"><span class="pre">lags=12</span></code> is equivalent to <code class="docutils literal notranslate"><span class="pre">lags=[12]</span></code>.
 For monthly data with annual seasonality: <code class="docutils literal notranslate"><span class="pre">lags=12</span></code> or <code class="docutils literal notranslate"><span class="pre">lags=[1,</span> <span class="pre">12]</span></code>.
 If None, defaults to [1] (no seasonality).</p></li>
-<li><p><strong>persistence</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]]</span>) – Fixed persistence (smoothing) parameters. If None, estimated.
+<li><p><strong>persistence</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Fixed persistence (smoothing) parameters. If None, estimated.
 Keys: “alpha” (level), “beta” (trend), “gamma” (seasonal).</p></li>
-<li><p><strong>phi</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]</span>) – Damping parameter for damped trend models. If None, estimated when applicable.</p></li>
-<li><p><strong>initial</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>], <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>]</span>) – Method for initializing states or dictionary of fixed initial values.
+<li><p><strong>phi</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Damping parameter for damped trend models. If None, estimated when applicable.</p></li>
+<li><p><strong>initial</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code> | <code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Method for initializing states or dictionary of fixed initial values.
 String options: “backcasting”, “optimal”, “complete”, “two-stage”</p></li>
-<li><p><strong>initial_season</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Initial values for seasonal components. If None, estimated.
+<li><p><strong>initial_season</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">...</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code>(<code class="docutils literal notranslate"><span class="pre">_ScalarT</span></code>, bound= <code class="xref py py-class docutils literal notranslate"><span class="pre">generic</span></code>)]] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Initial values for seasonal components. If None, estimated.
 Length should be (seasonal_period - 1) for each seasonal component.</p></li>
 <li><p><strong>ic</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'AIC'</span></code>, <code class="docutils literal notranslate"><span class="pre">'AICc'</span></code>, <code class="docutils literal notranslate"><span class="pre">'BIC'</span></code>, <code class="docutils literal notranslate"><span class="pre">'BICc'</span></code>]</span>) – Information criterion for model selection.</p></li>
 <li><p><strong>loss</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'likelihood'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GPL'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MSE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MAE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'HAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MSEh'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MAEh'</span></code>, <code class="docutils literal notranslate"><span class="pre">'HAMh'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MSCE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'MACE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'CHAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'TMSE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'TMAE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'THAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GTMSE'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GTAME'</span></code>, <code class="docutils literal notranslate"><span class="pre">'GTHAM'</span></code>, <code class="docutils literal notranslate"><span class="pre">'LASSO'</span></code>, <code class="docutils literal notranslate"><span class="pre">'RIDGE'</span></code>]</span>) – Loss function for parameter estimation.</p></li>
-<li><p><strong>h</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Forecast horizon. Can also be set in predict().</p></li>
+<li><p><strong>h</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Forecast horizon. Can also be set in predict().</p></li>
 <li><p><strong>holdout</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether to use holdout sample for validation.</p></li>
 <li><p><strong>bounds</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'usual'</span></code>, <code class="docutils literal notranslate"><span class="pre">'admissible'</span></code>, <code class="docutils literal notranslate"><span class="pre">'none'</span></code>]</span>) – Parameter bounds type:
 - “usual”: Standard smoothing parameter constraints
@@ -260,7 +265,7 @@ Length should be (seasonal_period - 1) for each seasonal component.</p></li>
 - “none”: No constraints</p></li>
 <li><p><strong>verbose</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Verbosity level. 0 = silent.</p></li>
 <li><p><strong>regressors</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'use'</span></code>, <code class="docutils literal notranslate"><span class="pre">'select'</span></code>]</span>) – How to handle external regressors.</p></li>
-<li><p><strong>initial_X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Initial values for regressor coefficients.</p></li>
+<li><p><strong>initial_X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">...</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code>(<code class="docutils literal notranslate"><span class="pre">_ScalarT</span></code>, bound= <code class="xref py py-class docutils literal notranslate"><span class="pre">generic</span></code>)]] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Initial values for regressor coefficients.</p></li>
 <li><p><strong>**kwargs</strong> – Additional arguments passed to ADAM.</p></li>
 </ul>
 </dd>
@@ -324,6 +329,12 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.confint.html#smooth.ES.confint" title="smooth.ES.confint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">confint</span></code></a>([parm, level, type, bootstrap, ...])</p></td>
 <td><p>Confidence intervals for the estimated parameters.</p></td>
 </tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.extract_scale.html#smooth.ES.extract_scale" title="smooth.ES.extract_scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_scale</span></code></a>()</p></td>
+<td><p>The distribution's scale (R: <code class="docutils literal notranslate"><span class="pre">extractScale</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.extract_sigma.html#smooth.ES.extract_sigma" title="smooth.ES.extract_sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_sigma</span></code></a>()</p></td>
+<td><p>Standard deviation implied by the scale (R: <code class="docutils literal notranslate"><span class="pre">extractSigma</span></code>).</p></td>
+</tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.fit.html#smooth.ES.fit" title="smooth.ES.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>(y[, X])</p></td>
 <td><p>Fit the ADAM model to time series data.</p></td>
 </tr>
@@ -366,10 +377,13 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
 <tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.simulate.html#smooth.ES.simulate" title="smooth.ES.simulate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulate</span></code></a>([nsim, seed, obs, randomizer])</p></td>
 <td><p>Re-simulate <code class="docutils literal notranslate"><span class="pre">obs</span></code> observations from the fitted model.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.summary.html#smooth.ES.summary" title="smooth.ES.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([level, digits, type])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.sm.html#smooth.ES.sm" title="smooth.ES.sm"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sm</span></code></a>(**kwargs)</p></td>
+<td><p>Fit a scale model for this fit (R: <code class="docutils literal notranslate"><span class="pre">sm.adam</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.summary.html#smooth.ES.summary" title="smooth.ES.summary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([level, digits, type])</p></td>
 <td><p>Generate a coefficient-table summary of the fitted model.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.vcov.html#smooth.ES.vcov" title="smooth.ES.vcov"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vcov</span></code></a>([type, bootstrap, heuristics, step_size])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.vcov.html#smooth.ES.vcov" title="smooth.ES.vcov"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vcov</span></code></a>([type, bootstrap, heuristics, step_size])</p></td>
 <td><p>Variance-covariance matrix of the estimated parameters.</p></td>
 </tr>
 </tbody>
@@ -488,16 +502,19 @@ Augmented Dynamic Adaptive Model. <a class="reference external" href="https://op
 <tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.scale.html#smooth.ES.scale" title="smooth.ES.scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale</span></code></a></p></td>
 <td><p>Internal optimisation scale of the error distribution (R: <code class="docutils literal notranslate"><span class="pre">adam_obj$scale</span></code>).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.sigma.html#smooth.ES.sigma" title="smooth.ES.sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.scale_model.html#smooth.ES.scale_model" title="smooth.ES.scale_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_model</span></code></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">object$scale</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.sigma.html#smooth.ES.sigma" title="smooth.ES.sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma</span></code></a></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">sigma(adam_obj)</span></code>).</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.states.html#smooth.ES.states" title="smooth.ES.states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">states</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.states.html#smooth.ES.states" title="smooth.ES.states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">states</span></code></a></p></td>
 <td><p>$states).</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.time_elapsed.html#smooth.ES.time_elapsed" title="smooth.ES.time_elapsed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_elapsed</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.time_elapsed.html#smooth.ES.time_elapsed" title="smooth.ES.time_elapsed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_elapsed</span></code></a></p></td>
 <td><p>Time taken to fit the model in seconds.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="smooth.ES.transition.html#smooth.ES.transition" title="smooth.ES.transition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">transition</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="smooth.ES.transition.html#smooth.ES.transition" title="smooth.ES.transition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">transition</span></code></a></p></td>
 <td><p>$transition).</p></td>
 </tr>
 </tbody>

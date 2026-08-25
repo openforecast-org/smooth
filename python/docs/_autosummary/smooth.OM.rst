@@ -16,6 +16,8 @@
 
    ~OM.coefbootstrap
    ~OM.confint
+   ~OM.extract_scale
+   ~OM.extract_sigma
    ~OM.fit
    ~OM.multicov
    ~OM.outlierdummy
@@ -30,6 +32,7 @@
    ~OM.rstudent
    ~OM.select_best_model
    ~OM.simulate
+   ~OM.sm
    ~OM.summary
    ~OM.vcov
 
@@ -81,6 +84,7 @@
    ~OM.profile
    ~OM.residuals
    ~OM.scale
+   ~OM.scale_model
    ~OM.sigma
    ~OM.states
    ~OM.time_elapsed

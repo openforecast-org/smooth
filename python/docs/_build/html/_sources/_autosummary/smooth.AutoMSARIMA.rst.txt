@@ -16,6 +16,8 @@
 
    ~AutoMSARIMA.coefbootstrap
    ~AutoMSARIMA.confint
+   ~AutoMSARIMA.extract_scale
+   ~AutoMSARIMA.extract_sigma
    ~AutoMSARIMA.fit
    ~AutoMSARIMA.multicov
    ~AutoMSARIMA.outlierdummy
@@ -30,6 +32,7 @@
    ~AutoMSARIMA.rstudent
    ~AutoMSARIMA.select_best_model
    ~AutoMSARIMA.simulate
+   ~AutoMSARIMA.sm
    ~AutoMSARIMA.summary
    ~AutoMSARIMA.vcov
 
@@ -79,6 +82,7 @@
    ~AutoMSARIMA.profile
    ~AutoMSARIMA.residuals
    ~AutoMSARIMA.scale
+   ~AutoMSARIMA.scale_model
    ~AutoMSARIMA.sigma
    ~AutoMSARIMA.states
    ~AutoMSARIMA.time_elapsed

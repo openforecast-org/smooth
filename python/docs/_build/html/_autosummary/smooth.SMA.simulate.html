@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="smooth.SMA.summary" href="smooth.SMA.summary.html" />
+    <link rel="next" title="smooth.SMA.sm" href="smooth.SMA.sm.html" />
     <link rel="prev" title="smooth.SMA.select_best_model" href="smooth.SMA.select_best_model.html" /> 
 </head>
 
@@ -50,6 +50,8 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.html#smooth.SMA"><code class="docutils literal notranslate"><span class="pre">SMA</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.coefbootstrap.html">smooth.SMA.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.confint.html">smooth.SMA.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.extract_scale.html">smooth.SMA.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.extract_sigma.html">smooth.SMA.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.fit.html">smooth.SMA.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.multicov.html">smooth.SMA.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.outlierdummy.html">smooth.SMA.outlierdummy</a></li>
@@ -67,6 +69,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#smooth.SMA.simulate"><code class="docutils literal notranslate"><span class="pre">SMA.simulate()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.sm.html">smooth.SMA.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.summary.html">smooth.SMA.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.vcov.html">smooth.SMA.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.actuals.html">smooth.SMA.actuals</a></li>
@@ -106,6 +109,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.profile.html">smooth.SMA.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.residuals.html">smooth.SMA.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.scale.html">smooth.SMA.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.SMA.scale_model.html">smooth.SMA.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.sigma.html">smooth.SMA.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.states.html">smooth.SMA.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.SMA.time_elapsed.html">smooth.SMA.time_elapsed</a></li>
@@ -174,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -218,11 +223,11 @@ the simulated series statistically resembles the in-sample fit.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of simulated series.</p></li>
-<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Seed for the RNG used by the error sampler. Set this to
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Seed for the RNG used by the error sampler. Set this to
 make the result deterministic across runs.</p></li>
-<li><p><strong>obs</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Number of observations per simulated series. Defaults to
+<li><p><strong>obs</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Number of observations per simulated series. Defaults to
 the in-sample length.</p></li>
-<li><p><strong>randomizer</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>]</span>) – Override the model’s fitted distribution. Accepts the same
+<li><p><strong>randomizer</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Override the model’s fitted distribution. Accepts the same
 R-style names / callables as <code class="xref py py-func docutils literal notranslate"><span class="pre">sim_es()</span></code>. When <code class="docutils literal notranslate"><span class="pre">None</span></code>
 (the default), R’s <code class="docutils literal notranslate"><span class="pre">simulate.adam</span></code> distribution dispatch
 is used: <code class="docutils literal notranslate"><span class="pre">self.distribution</span></code> selects the per-distribution
@@ -254,7 +259,7 @@ string is suffixed with <code class="docutils literal notranslate"><span class="
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="smooth.SMA.select_best_model.html" class="btn btn-neutral float-left" title="smooth.SMA.select_best_model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="smooth.SMA.summary.html" class="btn btn-neutral float-right" title="smooth.SMA.summary" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="smooth.SMA.sm.html" class="btn btn-neutral float-right" title="smooth.SMA.sm" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

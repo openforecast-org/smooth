@@ -54,6 +54,8 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.confint.html">smooth.MSARIMA.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.extract_scale.html">smooth.MSARIMA.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.extract_sigma.html">smooth.MSARIMA.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.fit.html">smooth.MSARIMA.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.multicov.html">smooth.MSARIMA.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.outlierdummy.html">smooth.MSARIMA.outlierdummy</a></li>
@@ -68,6 +70,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.rstudent.html">smooth.MSARIMA.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.select_best_model.html">smooth.MSARIMA.select_best_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.simulate.html">smooth.MSARIMA.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.sm.html">smooth.MSARIMA.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.summary.html">smooth.MSARIMA.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.vcov.html">smooth.MSARIMA.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.actuals.html">smooth.MSARIMA.actuals</a></li>
@@ -107,6 +110,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.profile.html">smooth.MSARIMA.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.residuals.html">smooth.MSARIMA.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.scale.html">smooth.MSARIMA.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.scale_model.html">smooth.MSARIMA.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.sigma.html">smooth.MSARIMA.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.states.html">smooth.MSARIMA.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.MSARIMA.time_elapsed.html">smooth.MSARIMA.time_elapsed</a></li>
@@ -174,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -217,11 +222,11 @@ in <a class="reference internal" href="smooth.MSARIMA.vcov.html#smooth.MSARIMA.v
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of bootstrap replicates.</p></li>
-<li><p><strong>size</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Subsample size per replicate. Defaults to <code class="docutils literal notranslate"><span class="pre">floor(0.75</span> <span class="pre">*</span> <span class="pre">nobs)</span></code>,
+<li><p><strong>size</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Subsample size per replicate. Defaults to <code class="docutils literal notranslate"><span class="pre">floor(0.75</span> <span class="pre">*</span> <span class="pre">nobs)</span></code>,
 matching R.</p></li>
 <li><p><strong>replace</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Resample with replacement.</p></li>
-<li><p><strong>prob</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – Sampling probabilities per observation (uniform if <code class="docutils literal notranslate"><span class="pre">None</span></code>).</p></li>
-<li><p><strong>parallel</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> runs replicates in parallel via <code class="docutils literal notranslate"><span class="pre">joblib.Parallel</span></code>
+<li><p><strong>prob</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">...</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code>(<code class="docutils literal notranslate"><span class="pre">_ScalarT</span></code>, bound= <code class="xref py py-class docutils literal notranslate"><span class="pre">generic</span></code>)]] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Sampling probabilities per observation (uniform if <code class="docutils literal notranslate"><span class="pre">None</span></code>).</p></li>
+<li><p><strong>parallel</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code> | <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> runs replicates in parallel via <code class="docutils literal notranslate"><span class="pre">joblib.Parallel</span></code>
 (<code class="docutils literal notranslate"><span class="pre">cpu_count</span> <span class="pre">-</span> <span class="pre">1</span></code> workers). An integer specifies the exact
 worker count. Requires the optional <code class="docutils literal notranslate"><span class="pre">joblib</span></code> dependency
 (<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">joblib</span></code> or <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;smooth[parallel]&quot;</span></code>);
@@ -230,7 +235,7 @@ and the call falls back to a serial loop.</p></li>
 <li><p><strong>method</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – <code class="docutils literal notranslate"><span class="pre">&quot;cr&quot;</span></code> is case resampling (the implemented path). <code class="docutils literal notranslate"><span class="pre">&quot;dsr&quot;</span></code>
 (data-shape replication, R’s <code class="docutils literal notranslate"><span class="pre">greybox::dsrboot</span></code>) raises
 <code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code>.</p></li>
-<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Seed for the <code class="xref py py-class docutils literal notranslate"><span class="pre">numpy.random.Generator</span></code> used to draw indices.
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Seed for the <code class="xref py py-class docutils literal notranslate"><span class="pre">numpy.random.Generator</span></code> used to draw indices.
 Makes the result reproducible (same indices in serial and
 parallel modes — the optimiser is deterministic given a fixed
 sample).</p></li>

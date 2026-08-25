@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="smooth.OM.summary" href="smooth.OM.summary.html" />
+    <link rel="next" title="smooth.OM.sm" href="smooth.OM.sm.html" />
     <link rel="prev" title="smooth.OM.select_best_model" href="smooth.OM.select_best_model.html" /> 
 </head>
 
@@ -53,6 +53,8 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.html#smooth.OM"><code class="docutils literal notranslate"><span class="pre">OM</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.coefbootstrap.html">smooth.OM.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.confint.html">smooth.OM.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.extract_scale.html">smooth.OM.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.extract_sigma.html">smooth.OM.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.fit.html">smooth.OM.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.multicov.html">smooth.OM.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.outlierdummy.html">smooth.OM.outlierdummy</a></li>
@@ -70,6 +72,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#smooth.OM.simulate"><code class="docutils literal notranslate"><span class="pre">OM.simulate()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.sm.html">smooth.OM.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.summary.html">smooth.OM.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.vcov.html">smooth.OM.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.actuals.html">smooth.OM.actuals</a></li>
@@ -111,6 +114,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.profile.html">smooth.OM.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.residuals.html">smooth.OM.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.scale.html">smooth.OM.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.OM.scale_model.html">smooth.OM.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.sigma.html">smooth.OM.sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.states.html">smooth.OM.states</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.OM.time_elapsed.html">smooth.OM.time_elapsed</a></li>
@@ -176,6 +180,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -220,11 +225,11 @@ via <code class="docutils literal notranslate"><span class="pre">rng.binomial(1,
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of simulated series.</p></li>
-<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – RNG seed. Pins both the latent-error draw and the
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – RNG seed. Pins both the latent-error draw and the
 binomial occurrence draw.</p></li>
-<li><p><strong>obs</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Observations per simulated series. Defaults to the
+<li><p><strong>obs</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Observations per simulated series. Defaults to the
 in-sample length.</p></li>
-<li><p><strong>randomizer</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>]</span>) – Forwarded to <a class="reference internal" href="smooth.ADAM.simulate.html#smooth.ADAM.simulate" title="smooth.ADAM.simulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ADAM.simulate()</span></code></a>. When <code class="docutils literal notranslate"><span class="pre">None</span></code> (the
+<li><p><strong>randomizer</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Forwarded to <a class="reference internal" href="smooth.ADAM.simulate.html#smooth.ADAM.simulate" title="smooth.ADAM.simulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ADAM.simulate()</span></code></a>. When <code class="docutils literal notranslate"><span class="pre">None</span></code> (the
 default), substitute a Gaussian-noise sampler with the
 empirical residual std as the scale — needed because OM
 stores <code class="docutils literal notranslate"><span class="pre">distribution=&quot;plogis&quot;</span></code> for which
@@ -254,7 +259,7 @@ by <a class="reference internal" href="smooth.OMG.simulate.html#smooth.OMG.simul
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="smooth.OM.select_best_model.html" class="btn btn-neutral float-left" title="smooth.OM.select_best_model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="smooth.OM.summary.html" class="btn btn-neutral float-right" title="smooth.OM.summary" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="smooth.OM.sm.html" class="btn btn-neutral float-right" title="smooth.OM.sm" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

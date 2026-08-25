@@ -20,7 +20,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="smooth.ES.multicov" href="smooth.ES.multicov.html" />
-    <link rel="prev" title="smooth.ES.confint" href="smooth.ES.confint.html" /> 
+    <link rel="prev" title="smooth.ES.extract_sigma" href="smooth.ES.extract_sigma.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -112,6 +112,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -173,7 +174,7 @@ via <code class="docutils literal notranslate"><span class="pre">preparator()</s
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>y</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code></span>) – <p>Time series data to fit. Can be:</p>
+<li><p><strong>y</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">...</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code>(<code class="docutils literal notranslate"><span class="pre">_ScalarT</span></code>, bound= <code class="xref py py-class docutils literal notranslate"><span class="pre">generic</span></code>)]]</span>) – <p>Time series data to fit. Can be:</p>
 <ul>
 <li><p><code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code>: Shape (T,) for univariate time series</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">pandas.Series</span></code>: Will use index for time information if DatetimeIndex</p></li>
@@ -187,7 +188,7 @@ T ≥ 3 × (number of parameters)</p></li>
 <li><p><strong>Frequency</strong>: Auto-detected from pandas Series with DatetimeIndex</p></li>
 </ul>
 </p></li>
-<li><p><strong>X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">NDArray</span></code>]</span>) – <p>External regressors (explanatory variables). If provided:</p>
+<li><p><strong>X</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">...</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code>(<code class="docutils literal notranslate"><span class="pre">_ScalarT</span></code>, bound= <code class="xref py py-class docutils literal notranslate"><span class="pre">generic</span></code>)]] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – <p>External regressors (explanatory variables). If provided:</p>
 <ul>
 <li><p>Must have same length as <code class="docutils literal notranslate"><span class="pre">y</span></code> (T observations)</p></li>
 <li><p>Each column is a separate regressor</p></li>
@@ -365,7 +366,7 @@ complex models.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="smooth.ES.confint.html" class="btn btn-neutral float-left" title="smooth.ES.confint" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="smooth.ES.extract_sigma.html" class="btn btn-neutral float-left" title="smooth.ES.extract_sigma" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="smooth.ES.multicov.html" class="btn btn-neutral float-right" title="smooth.ES.multicov" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

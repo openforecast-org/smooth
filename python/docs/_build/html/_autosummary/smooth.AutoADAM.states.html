@@ -48,6 +48,8 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.html#smooth.AutoADAM"><code class="docutils literal notranslate"><span class="pre">AutoADAM</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.coefbootstrap.html">smooth.AutoADAM.coefbootstrap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.confint.html">smooth.AutoADAM.confint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.extract_scale.html">smooth.AutoADAM.extract_scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.extract_sigma.html">smooth.AutoADAM.extract_sigma</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.fit.html">smooth.AutoADAM.fit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.multicov.html">smooth.AutoADAM.multicov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.outlierdummy.html">smooth.AutoADAM.outlierdummy</a></li>
@@ -62,6 +64,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.rstudent.html">smooth.AutoADAM.rstudent</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.select_best_model.html">smooth.AutoADAM.select_best_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.simulate.html">smooth.AutoADAM.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.sm.html">smooth.AutoADAM.sm</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.summary.html">smooth.AutoADAM.summary</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.vcov.html">smooth.AutoADAM.vcov</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.actuals.html">smooth.AutoADAM.actuals</a></li>
@@ -101,6 +104,7 @@
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.profile.html">smooth.AutoADAM.profile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.residuals.html">smooth.AutoADAM.residuals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.scale.html">smooth.AutoADAM.scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.scale_model.html">smooth.AutoADAM.scale_model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="smooth.AutoADAM.sigma.html">smooth.AutoADAM.sigma</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">smooth.AutoADAM.states</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#smooth.AutoADAM.states"><code class="docutils literal notranslate"><span class="pre">AutoADAM.states</span></code></a></li>
@@ -174,6 +178,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -207,7 +212,7 @@
 <h1>smooth.AutoADAM.states<a class="headerlink" href="#smooth-autoadam-states" title="Link to this heading"></a></h1>
 <dl class="py property">
 <dt class="sig sig-object py" id="smooth.AutoADAM.states">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">AutoADAM.</span></span><span class="sig-name descname"><span class="pre">states</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NDArray</span></span><a class="headerlink" href="#smooth.AutoADAM.states" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">AutoADAM.</span></span><span class="sig-name descname"><span class="pre">states</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">_ScalarT</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#smooth.AutoADAM.states" title="Link to this definition"></a></dt>
 <dd><p>$states).</p>
 <p>The state matrix stores the evolution of all model components including
 level, trend (if present), seasonal components (if present), and ARIMA

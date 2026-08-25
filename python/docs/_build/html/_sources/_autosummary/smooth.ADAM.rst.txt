@@ -16,6 +16,8 @@
 
    ~ADAM.coefbootstrap
    ~ADAM.confint
+   ~ADAM.extract_scale
+   ~ADAM.extract_sigma
    ~ADAM.fit
    ~ADAM.multicov
    ~ADAM.outlierdummy
@@ -30,6 +32,7 @@
    ~ADAM.rstudent
    ~ADAM.select_best_model
    ~ADAM.simulate
+   ~ADAM.sm
    ~ADAM.summary
    ~ADAM.vcov
 
@@ -79,6 +82,7 @@
    ~ADAM.profile
    ~ADAM.residuals
    ~ADAM.scale
+   ~ADAM.scale_model
    ~ADAM.sigma
    ~ADAM.states
    ~ADAM.time_elapsed

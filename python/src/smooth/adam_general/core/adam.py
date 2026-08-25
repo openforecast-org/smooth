@@ -2813,7 +2813,62 @@ class ADAM:
         return np.asarray(scale_model.predict(h=horizon).mean, dtype=np.float64).ravel()
 
     def sm(self, **kwargs):
-        """Fit a scale model for this fit (R: ``sm.adam``). See :func:`sm`."""
+        """Fit a scale model for this fit (R: ``sm.adam``).
+
+        A scale model is a second ADAM fitted to a transform of this model's
+        residuals, so the error's scale varies over time instead of being a
+        single number. It is scored by *this* model's log-likelihood, with the
+        scale model's fitted values supplying the distribution's scale at each
+        observation -- the state-space counterpart of a GARCH or GAMLSS scale
+        equation.
+
+        The fitted scale model is returned, not attached. Assign it to
+        :attr:`scale_model` to put it to work: that is R's ``implant()``, which
+        Python does not need as a separate function.
+
+        Parameters
+        ----------
+        model : str, optional
+            Scale model specification, ``"YYY"`` by default (select among
+            multiplicative ETS), exactly as in R.
+        lags, orders, constant, regressors, X
+            Passed to :class:`ADAM`. ``lags`` defaults to this model's and
+            ``constant`` to ``False``.
+        **kwargs
+            Any other :class:`ADAM` argument (``initial``, ``ic``, ``bounds``).
+
+        Returns
+        -------
+        ADAM
+            The fitted scale model, with ``is_scale_`` set.
+
+        Raises
+        ------
+        ValueError
+            If this model was not estimated with ``loss="likelihood"``, or if
+            its distribution is one ``sm()`` cannot score.
+
+        Notes
+        -----
+        Only arguments passed explicitly are forwarded, mirroring R, where the
+        matched call means ``sm()``'s own defaults never reach ``adam()`` and
+        ``adam()``'s apply instead -- so the scale model uses
+        ``initial="backcasting"`` unless told otherwise.
+
+        Examples
+        --------
+        >>> model = ADAM(model="MNN", lags=[1, 12], distribution="dnorm")
+        >>> model.fit(y)
+        >>> scale_model = model.sm()
+        >>> model.scale_model = scale_model      # R's implant()
+        >>> forecast = model.predict(h=12, interval="prediction")
+
+        See Also
+        --------
+        scale_model : Attach a scale model to this fit.
+        extract_scale : The fitted scale, per observation.
+        extract_sigma : The standard deviation that scale implies.
+        """
         from smooth.adam_general.core.sm import sm as _sm
 
         return _sm(self, **kwargs)

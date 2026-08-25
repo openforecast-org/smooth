@@ -16,6 +16,8 @@
 
    ~AutoADAM.coefbootstrap
    ~AutoADAM.confint
+   ~AutoADAM.extract_scale
+   ~AutoADAM.extract_sigma
    ~AutoADAM.fit
    ~AutoADAM.multicov
    ~AutoADAM.outlierdummy
@@ -30,6 +32,7 @@
    ~AutoADAM.rstudent
    ~AutoADAM.select_best_model
    ~AutoADAM.simulate
+   ~AutoADAM.sm
    ~AutoADAM.summary
    ~AutoADAM.vcov
 
@@ -79,6 +82,7 @@
    ~AutoADAM.profile
    ~AutoADAM.residuals
    ~AutoADAM.scale
+   ~AutoADAM.scale_model
    ~AutoADAM.sigma
    ~AutoADAM.states
    ~AutoADAM.time_elapsed

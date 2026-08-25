@@ -16,6 +16,8 @@
 
    ~MSARIMA.coefbootstrap
    ~MSARIMA.confint
+   ~MSARIMA.extract_scale
+   ~MSARIMA.extract_sigma
    ~MSARIMA.fit
    ~MSARIMA.multicov
    ~MSARIMA.outlierdummy
@@ -30,6 +32,7 @@
    ~MSARIMA.rstudent
    ~MSARIMA.select_best_model
    ~MSARIMA.simulate
+   ~MSARIMA.sm
    ~MSARIMA.summary
    ~MSARIMA.vcov
 
@@ -79,6 +82,7 @@
    ~MSARIMA.profile
    ~MSARIMA.residuals
    ~MSARIMA.scale
+   ~MSARIMA.scale_model
    ~MSARIMA.sigma
    ~MSARIMA.states
    ~MSARIMA.time_elapsed

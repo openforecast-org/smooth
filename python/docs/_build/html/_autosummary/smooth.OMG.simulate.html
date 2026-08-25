@@ -151,6 +151,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../sma.html">SMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msarima.html">MSARIMA and AutoMSARIMA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../om.html">OM, OMG and AutoOM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sm.html">Scale Model (sm)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../msdecompose.html">msdecompose</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../lowess.html">lowess</a></li>
 </ul>
@@ -195,9 +196,9 @@ indicators with the resulting probability.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>nsim</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Forwarded to each sub-model’s <a class="reference internal" href="smooth.OM.simulate.html#smooth.OM.simulate" title="smooth.OM.simulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">OM.simulate()</span></code></a>.</p></li>
-<li><p><strong>obs</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Forwarded to each sub-model’s <a class="reference internal" href="smooth.OM.simulate.html#smooth.OM.simulate" title="smooth.OM.simulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">OM.simulate()</span></code></a>.</p></li>
+<li><p><strong>obs</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Forwarded to each sub-model’s <a class="reference internal" href="smooth.OM.simulate.html#smooth.OM.simulate" title="smooth.OM.simulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">OM.simulate()</span></code></a>.</p></li>
 <li><p><strong>**kwargs</strong> – Forwarded to each sub-model’s <a class="reference internal" href="smooth.OM.simulate.html#smooth.OM.simulate" title="smooth.OM.simulate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">OM.simulate()</span></code></a>.</p></li>
-<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Master seed. Derived seeds <code class="docutils literal notranslate"><span class="pre">seed</span></code> and <code class="docutils literal notranslate"><span class="pre">seed</span> <span class="pre">+</span> <span class="pre">1</span></code> are
+<li><p><strong>seed</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span>) – Master seed. Derived seeds <code class="docutils literal notranslate"><span class="pre">seed</span></code> and <code class="docutils literal notranslate"><span class="pre">seed</span> <span class="pre">+</span> <span class="pre">1</span></code> are
 passed to the two sub-model calls so the joint result is
 reproducible from a single integer.</p></li>
 </ul>

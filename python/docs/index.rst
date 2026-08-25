@@ -39,6 +39,12 @@ ADAM Methods
    ADAM.summary
    ADAM.plot
 
+ADAM Scale Model
+----------------
+
+``ADAM.sm()``, ``ADAM.scale_model``, ``ADAM.extract_scale()`` and
+``ADAM.extract_sigma()`` let the error's scale vary over time. See :doc:`sm`.
+
 ADAM Diagnostics
 ----------------
 
@@ -137,6 +143,7 @@ AutoOM Methods
 Utility Functions
 -----------------
 
+- :doc:`sm` - Scale model: a time-varying error scale for a fitted ADAM
 - :doc:`msdecompose` - Multiple seasonal decomposition for time series
 - :doc:`lowess` - LOWESS (Locally Weighted Scatterplot Smoothing)
 
@@ -195,5 +202,6 @@ customize the optimization behavior via the ``nlopt_kwargs`` parameter:
    sma
    msarima
    om
+   sm
    msdecompose
    lowess

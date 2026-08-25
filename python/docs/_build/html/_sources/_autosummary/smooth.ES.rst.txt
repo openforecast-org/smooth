@@ -16,6 +16,8 @@
 
    ~ES.coefbootstrap
    ~ES.confint
+   ~ES.extract_scale
+   ~ES.extract_sigma
    ~ES.fit
    ~ES.multicov
    ~ES.outlierdummy
@@ -30,6 +32,7 @@
    ~ES.rstudent
    ~ES.select_best_model
    ~ES.simulate
+   ~ES.sm
    ~ES.summary
    ~ES.vcov
 
@@ -79,6 +82,7 @@
    ~ES.profile
    ~ES.residuals
    ~ES.scale
+   ~ES.scale_model
    ~ES.sigma
    ~ES.states
    ~ES.time_elapsed

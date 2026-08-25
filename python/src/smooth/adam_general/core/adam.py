@@ -2335,7 +2335,14 @@ class ADAM:
         dist = self.distribution_
         # R's rstandard.adam standardises by extractScale(), the estimated
         # distribution scale -- not by the df-unbiased sigma() (R/adam.R:5406).
-        scale = self.scale
+        # extract_scale() is *not* self.scale for a scale model: it returns 1,
+        # because such a model is the scale, and its residuals are already the
+        # location model's standardised ones. Dividing by self.scale instead
+        # shrank them by that factor, so none of them reached +-1.96 and the
+        # residual panels looked far tighter than they are. When a scale model
+        # is attached to a location model it returns a vector, which is the
+        # point: each residual is standardised by its own scale.
+        scale = self.extract_scale()
 
         if dist in ("dnorm", "dt"):
             mean_e = np.mean(errors)
@@ -2440,7 +2447,7 @@ class ADAM:
             return errors / mean_loo
 
         elif dist == "dlnorm":
-            scale = self.scale
+            scale = self.extract_scale()
             log_e = np.log(errors) - np.mean(np.log(errors)) - scale**2 / 2
             total_sq = np.sum(log_e**2)
             denom = np.sqrt((total_sq - log_e**2) / df)

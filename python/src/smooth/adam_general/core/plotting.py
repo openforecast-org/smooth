@@ -3,10 +3,11 @@
 import math
 import warnings
 
+import greybox as gb
 import numpy as np
 import scipy.stats as sp_stats
-from statsmodels.tsa.stattools import acf as _acf
-from statsmodels.tsa.stattools import pacf as _pacf
+
+from smooth.adam_general.core.utils.utils import calculate_acf, calculate_pacf
 
 _LOG_DISTS = {"dinvgauss", "dgamma", "dlnorm", "dllaplace", "dls", "dlgnorm"}
 
@@ -260,60 +261,91 @@ def _plot3(model, ax, type_, lowess, **kw):
 # ---------------------------------------------------------------------------
 
 
-def _qqplot_dist(model):
-    """Return (scipy_dist_frozen, title) for the model's distribution."""
+def _qqplot_quantiles(model):
+    """Return (theoretical-quantile function, title) for the distribution.
+
+    The quantile functions are greybox's, so the theoretical axis is the same
+    one R draws against. The scale is ``extract_scale()``, not ``scale``: for a
+    scale model those differ (``extract_scale()`` is 1, since such a model *is*
+    the scale), and R uses ``extractScale()`` throughout ``plot.adam``.
+    """
     dist = model.distribution_
-    scale = model.scale
+    scale = model.extract_scale()
+    if not np.isscalar(scale):
+        # A time-varying scale has no single theoretical distribution; R uses
+        # extractScale() the same way and ends up with the first value.
+        scale = float(np.asarray(scale, dtype=float).ravel()[0])
+    other = getattr(model, "other", None) or {}
 
     if dist == "dnorm":
-        return sp_stats.norm(), "QQ plot of Normal distribution"
-
+        return (lambda p: gb.qnorm(p, 0.0, 1.0)), "QQ plot of Normal distribution"
     if dist == "dlnorm":
-        s = scale
         return (
-            sp_stats.lognorm(s=s, scale=math.exp(-(s**2) / 2)),
+            lambda p: gb.qlnorm(p, -(scale**2) / 2, scale),
             "QQ plot of Log-Normal distribution",
         )
-
     if dist == "dlaplace":
-        return sp_stats.laplace(scale=scale), "QQ-plot of Laplace distribution"
-
-    if dist == "ds":
-        # S distribution not in scipy; fall back to normal
-        return sp_stats.norm(), "QQ-plot of S distribution (Normal approx.)"
-
-    if dist == "dgnorm":
-        shape = model._config.get("gnorm_shape", 2.0)
         return (
-            sp_stats.gennorm(beta=shape, scale=scale),
+            lambda p: gb.qlaplace(p, 0.0, scale),
+            "QQ-plot of Laplace distribution",
+        )
+    if dist == "ds":
+        # greybox supplies qs; scipy has no S distribution, and the old
+        # Normal stand-in drew the wrong theoretical axis entirely.
+        return (lambda p: gb.qs(p, 0.0, scale)), "QQ-plot of S distribution"
+    if dist == "dgnorm":
+        shape = other.get("shape", 2.0)
+        return (
+            lambda p: gb.qgnorm(p, 0.0, scale, shape),
             f"QQ-plot of Generalised Normal (shape={shape:.3f})",
         )
-
-    if dist == "dinvgauss":
-        # scipy's invgauss(mu, scale=s) is IG(mean=mu*s, lambda=s); R uses
-        # qinvgauss(mean=1, dispersion=scale), i.e. mu=scale, s=1/scale
+    if dist == "dalaplace":
+        alpha = other.get("alpha", 0.5)
         return (
-            sp_stats.invgauss(mu=scale, scale=1 / scale),
+            lambda p: gb.qalaplace(p, 0.0, scale, alpha),
+            "QQ-plot of Asymmetric Laplace distribution",
+        )
+    if dist == "dlogis":
+        return (lambda p: gb.qlogis(p, 0.0, scale)), "QQ-plot of Logistic distribution"
+    if dist == "dinvgauss":
+        return (
+            lambda p: gb.qinvgauss(p, 1.0, scale),
             "QQ-plot of Inverse Gaussian distribution",
         )
-
     if dist == "dgamma":
-        a = 1.0 / scale if scale > 0 else 1.0
-        return sp_stats.gamma(a=a, scale=scale), "QQ-plot of Gamma distribution"
+        return (
+            lambda p: gb.qgamma(p, shape=1.0 / scale, scale=scale),
+            "QQ-plot of Gamma distribution",
+        )
+    return (lambda p: gb.qnorm(p, 0.0, 1.0)), f"QQ plot ({dist})"
 
-    # Fallback
-    return sp_stats.norm(), f"QQ plot ({dist})"
+
+def _ppoints(n):
+    """R's ``stats::ppoints``: (i - a) / (n + 1 - 2a), a = 3/8 for n <= 10."""
+    a = 3.0 / 8.0 if n <= 10 else 0.5
+    return (np.arange(1, n + 1) - a) / (n + 1 - 2 * a)
 
 
 def _plot4(model, ax, **kw):
     resid = np.asarray(model.residuals, dtype=float)
     resid = resid[~np.isnan(resid)]
 
-    dist_frozen, default_title = _qqplot_dist(model)
-    (osm, osr), (slope, intercept, _) = sp_stats.probplot(resid, dist=dist_frozen)
+    quantile_fn, default_title = _qqplot_quantiles(model)
 
-    ax.scatter(osm, osr, s=8, color="black")
-    line_x = np.array([osm[0], osm[-1]])
+    sample = np.sort(resid)
+    theoretical = np.asarray(quantile_fn(_ppoints(len(sample))), dtype=float)
+
+    # R's qqline draws through the first and third quartiles, not a
+    # least-squares fit: a regression line is tilted by exactly the outliers a
+    # Q-Q plot exists to show. `type=7` is R's default quantile definition.
+    probs = np.array([0.25, 0.75])
+    y_q = np.quantile(sample, probs, method="linear")
+    x_q = np.asarray(quantile_fn(probs), dtype=float)
+    slope = (y_q[1] - y_q[0]) / (x_q[1] - x_q[0])
+    intercept = y_q[0] - slope * x_q[0]
+
+    ax.scatter(theoretical, sample, s=8, color="black")
+    line_x = np.array([theoretical[0], theoretical[-1]])
     ax.plot(line_x, slope * line_x + intercept, color="red", lw=1.5)
     ax.set_title(kw.get("main", default_title))
     ax.set_xlabel(kw.get("xlab", "Theoretical Quantiles"))
@@ -345,14 +377,23 @@ def _plot5(model, ax, legend, **kw):
     # Fitted values — dashed purple on top
     ax.plot(t_in, fitted, color="#A020F0", lw=1.5, linestyle="--", label="Fitted")
 
-    # Horizontal line at the last in-sample observation
-    ax.axvline(n - 1, color="#FF0000", lw=0.8)
-
     # Forecast mean: prefer manual predict() result, fall back to auto-forecast
     fc = getattr(model, "_forecast_results", None) or getattr(
         model, "_auto_forecast", None
     )
-    if fc is not None and hasattr(fc, "mean") and fc.mean is not None:
+    has_forecast = (
+        fc is not None
+        and getattr(fc, "mean", None) is not None
+        and len(np.asarray(fc.mean, dtype=float).ravel()) > 0
+    )
+
+    # The divider marks where the in-sample ends and the forecast begins, so it
+    # only means something when there is a forecast. R suppresses it the same
+    # way: greybox::graphmaker sets `vline <- FALSE` when the forecast is all NA.
+    if has_forecast or holdout is not None:
+        ax.axvline(n - 1, color="#FF0000", lw=0.8)
+
+    if has_forecast:
         fc_mean = np.asarray(fc.mean, dtype=float).ravel()
         t_f = np.arange(n, n + len(fc_mean))
         ax.plot(t_f, fc_mean, color="#0000FF", lw=1.5, label="Forecast")
@@ -466,14 +507,23 @@ def _plot7(model, ax, type_, squared, level, **kw):
         resid = resid**2
 
     nobs = len(resid)
-    nlags = min(40, nobs // 2)
+    # R's acf()/pacf() default: lag.max = floor(10 * log10(n)), capped at n-1.
+    # The previous min(40, n//2) drew far more lags than R for any sample of a
+    # few hundred points, so the two plots could not be compared side by side.
+    nlags = min(int(np.floor(10 * np.log10(nobs))), nobs - 1)
 
+    # Use the package's own ACF/PACF rather than statsmodels': these reproduce
+    # R's stats::acf/pacf bit-for-bit (biased n-divisor, Durbin-Levinson over
+    # the same autocorrelations), so the two languages draw the same stems.
+    # calculate_pacf already returns lags 1..nlags with no lag-0 entry, as R
+    # does -- statsmodels prepends one, which was drawing a spurious stem of
+    # height 1 at lag 0 and shifting every label by one.
     if type_ == "acf":
-        values = _acf(resid, nlags=nlags, fft=True)[1:]  # skip lag 0
+        values = calculate_acf(resid, nlags=nlags)[1:]  # skip lag 0
         default_title = "ACF of Squared Residuals" if squared else "ACF of Residuals"
         default_ylab = "ACF"
     else:
-        values = _pacf(resid, nlags=nlags)
+        values = calculate_pacf(resid, nlags=nlags)
         default_title = "PACF of Squared Residuals" if squared else "PACF of Residuals"
         default_ylab = "PACF"
 

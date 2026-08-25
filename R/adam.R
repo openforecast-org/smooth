@@ -3979,6 +3979,16 @@ plot.adam <- function(x, which=c(1,2,4,6), level=0.95, legend=FALSE,
         parDefault <- par(no.readonly=TRUE);
         on.exit(par(parDefault), add=TRUE);
         if(smoothType(x)=="CES" || any(unlist(gregexpr("C",x$model))==-1)){
+            # Drop the initial-state rows so the states line up with the
+            # actuals. They carry no matching observation, and their values are
+            # the initialiser's seed rather than anything the fitter used -- for
+            # a backcast ETS(ANN) the level row holds mean(y), while the level
+            # the first fitted value came from is elsewhere. Plotting them put a
+            # spurious spike at the left edge of every states panel.
+            statesHead <- nrow(x$states) - nobs(x);
+            if(statesHead>0){
+                x$states <- x$states[-c(1:statesHead),,drop=FALSE];
+            }
             statesNames <- c("actuals",colnames(x$states),"residuals");
             x$states <- cbind(actuals(x),x$states,residuals(x));
             colnames(x$states) <- statesNames;

@@ -93,7 +93,8 @@ def _acf_stems(fig, n=4):
         if isinstance(collection, LineCollection):
             segments = collection.get_segments()
             if len(segments) > 5:
-                return np.array([s[1][1] for s in segments])[:n]
+                heights = np.array([s[1][1] for s in segments])
+                return heights if n is None else heights[:n]
     raise AssertionError("no ACF stems found on the figure")
 
 
@@ -168,3 +169,93 @@ def test_no_note_without_a_scale_model():
     with _warnings.catch_warnings():
         _warnings.simplefilter("error")
         assert model.plot(which=2) is not None
+
+
+def test_standardised_residuals_are_actually_standardised():
+    """rstandard() divides by extract_scale(), which is 1 for a scale model.
+
+    Dividing by ``scale`` instead shrank them by that factor, so nothing ever
+    reached +-1.96 and panels 2, 8 and 14 looked far tighter than the data.
+    """
+    model = _heteroscedastic_fit()
+    scale_model = model.sm()
+    standardised = np.asarray(scale_model.rstandard(), dtype=float)
+
+    assert scale_model.extract_scale() == pytest.approx(1.0)
+    # R: sd 1.0711, 8.0% outside +-1.96, range [-4.49, 3.20]
+    assert standardised.std(ddof=1) == pytest.approx(1.0711, abs=1e-3)
+    assert np.mean(np.abs(standardised) > 1.96) == pytest.approx(0.08, abs=0.005)
+    assert standardised.min() == pytest.approx(-4.49, abs=0.01)
+
+
+def test_qqline_uses_quartiles_not_least_squares():
+    """R's qqline goes through Q1 and Q3; a regression line is tilted by the
+    very outliers the plot exists to reveal."""
+    model = _heteroscedastic_fit()
+    model.scale_model = model.sm()
+    with pytest.warns(UserWarning, match="scale model"):
+        fig = model.plot(which=6)
+
+    line = fig.axes[0].lines[0]
+    x, y = line.get_xdata(), line.get_ydata()
+    slope = (y[1] - y[0]) / (x[1] - x[0])
+    intercept = y[0] - slope * x[0]
+    # R: slope 0.821242, intercept 0.337407
+    assert slope == pytest.approx(0.821242, abs=1e-6)
+    assert intercept == pytest.approx(0.337407, abs=1e-6)
+
+
+def test_acf_lag_count_matches_r():
+    """R's acf()/pacf() default to floor(10 * log10(n)) lags."""
+    model = _heteroscedastic_fit()
+    expected = int(np.floor(10 * np.log10(model.nobs)))
+    for which in (10, 11, 15, 16):
+        stems = _acf_stems(model.plot(which=which), n=None)
+        assert len(stems) == expected, f"which={which}"
+
+
+def test_no_divider_line_without_a_forecast():
+    """The red divider marks where the forecast starts, so h=0 has none."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    y = pd.read_csv(Path(__file__).parent / "data" / "sm_heteroscedastic.csv")
+    y = y["y"].to_numpy(float)
+
+    def _has_vline(fig):
+        return any(
+            len(set(line.get_xdata())) == 1 and line.get_color() == "#FF0000"
+            for line in fig.axes[0].lines
+        )
+
+    no_forecast = ADAM(model="ANN", lags=[1], distribution="dnorm")
+    no_forecast.fit(y)
+    assert not _has_vline(no_forecast.plot(which=7))
+
+    with_forecast = ADAM(
+        model="ANN", lags=[1], distribution="dnorm", h=12, holdout=True
+    )
+    with_forecast.fit(y)
+    assert _has_vline(with_forecast.plot(which=7))
+
+
+def test_states_plot_drops_the_initial_state():
+    """The states matrix carries lags_model_max leading columns that hold the
+    initialiser's seed, not anything the fitter used. They must not be drawn."""
+    model = _heteroscedastic_fit()
+    states = np.asarray(model.states, dtype=float)
+    assert states.shape[1] == model.nobs + 1
+
+    figs = model.plot(which=12)
+    figs = figs if isinstance(figs, list) else getattr(figs, "figures", [figs])
+    drawn = [
+        line.get_ydata()
+        for fig in figs
+        for ax in fig.axes
+        for line in ax.get_lines()
+        if len(line.get_ydata()) == model.nobs
+    ]
+    assert drawn, "no series of length nobs was drawn"
+    # the stale seed must not appear anywhere
+    assert not any(np.isclose(series[0], states[0, 0]) for series in drawn)

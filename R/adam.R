@@ -3345,7 +3345,7 @@ plot.adam <- function(x, which=c(1,2,4,6), level=0.95, legend=FALSE,
     }
 
     # Warn if the diagnostis will be done for scale
-    if(is.scale(x$scale) && any(which %in% c(2:6,8,9,13,14))){
+    if(is.scale(x$scale) && any(which %in% c(2:6,8,9,13:16))){
         message("Note that residuals diagnostics plots are produced for scale model");
     }
 
@@ -3897,6 +3897,14 @@ plot.adam <- function(x, which=c(1,2,4,6), level=0.95, legend=FALSE,
     # 10 and 11. ACF and PACF
     plot7 <- function(x, type="acf", squared=FALSE, ...){
         ellipsis <- list(...);
+
+        # The squared-residual ACF/PACF exist to check for heteroscedasticity that
+        # is still unexplained, which is the question the scale model answers, so
+        # they belong on its standardised residuals. The plain ACF/PACF (which=10,
+        # 11) stay on the location model: scaling barely affects autocorrelation.
+        if(squared && is.scale(x$scale)){
+            x <- x$scale;
+        }
 
         if(!any(names(ellipsis)=="main")){
             if(type=="acf"){

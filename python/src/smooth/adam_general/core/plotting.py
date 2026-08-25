@@ -1,6 +1,7 @@
 """Diagnostic plots for fitted ADAM models (residuals, ACF/PACF, Q-Q, fit)."""
 
 import math
+import warnings
 
 import numpy as np
 import scipy.stats as sp_stats
@@ -634,6 +635,19 @@ _WHICH_MAP: dict = {
 }
 
 
+# Panels whose diagnostics belong to the scale model when one is attached.
+# Mirrors R's ``if(is.scale(x$scale)){ x <- x$scale }`` at the top of plot2,
+# plot3, plot4, plot6 and plot9 (R/adam.R), plus the squared-residual ACF/PACF:
+# those exist to check for heteroscedasticity that is still unexplained, which
+# is exactly what the scale model answers, so they belong on its standardised
+# residuals. The plain ACF/PACF (10, 11) stay with the location model --
+# rescaling barely moves autocorrelation -- and so do the structural panels
+# (1 actuals-vs-fitted, 7 series over time, 12 states), which describe the
+# location model itself. Plot the scale model directly for its own versions:
+# ``model.scale_model.plot(which=1)``.
+_SCALE_MODEL_PANELS = frozenset({2, 3, 4, 5, 6, 8, 9, 13, 14, 15, 16})
+
+
 def plot_adam(model, which, level, legend, lowess, **kwargs):
     """Create diagnostic plots for a fitted ADAM model.
 
@@ -667,6 +681,13 @@ def plot_adam(model, which, level, legend, lowess, **kwargs):
     else:
         which = [int(w) for w in which]
 
+    scale_model = getattr(model, "scale_model", None)
+    if scale_model is not None and any(w in _SCALE_MODEL_PANELS for w in which):
+        warnings.warn(
+            "Note that residuals diagnostics plots are produced for scale model",
+            stacklevel=2,
+        )
+
     figs = []
     for w in which:
         if w not in _WHICH_MAP:
@@ -675,6 +696,14 @@ def plot_adam(model, which, level, legend, lowess, **kwargs):
         if w == 12:
             figs.extend(_plot8(model, mpl_figure, **kwargs))
             continue
+
+        # Swap in the scale model for the panels that diagnose it, exactly as R
+        # replaces the whole object rather than only its residuals.
+        panel_model = (
+            scale_model
+            if scale_model is not None and w in _SCALE_MODEL_PANELS
+            else model
+        )
 
         fn, extra = _WHICH_MAP[w]
         fig, kw = _make_fig(mpl_figure, **kwargs)
@@ -689,7 +718,7 @@ def plot_adam(model, which, level, legend, lowess, **kwargs):
         if "lowess" in fn.__code__.co_varnames:
             call_kw["lowess"] = lowess
 
-        fn(model, ax, **call_kw, **kw)
+        fn(panel_model, ax, **call_kw, **kw)
         fig.tight_layout()
         figs.append(fig)
 

@@ -302,9 +302,12 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     adamModel <- do.call(adam, as.list(newCall));
 
     nVariables <- nparam(adamModel);
+    # Replace the logLik first: assigning the attribute before this line set it
+    # on the object that the next statement then discarded, so the df never
+    # reached the output and the ICs used nparam(scale) alone.
+    adamModel$logLik <- -adamModel$lossValue;
     # -1 is needed to remove the scale from the number of parameters
     attr(adamModel$logLik,"df") <- nVariables + nparam(object)-1;
-    adamModel$logLik <- -adamModel$lossValue
     # object$nParam[1,5] <- object$nParam[1,5]-1;
     # object$nParam[1,1] <- object$nParam[1,1]-1;
     # # Redo nParam table. Record scale parameters in the respective column

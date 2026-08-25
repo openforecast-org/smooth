@@ -259,3 +259,29 @@ def test_states_plot_drops_the_initial_state():
     assert drawn, "no series of length nobs was drawn"
     # the stale seed must not appear anywhere
     assert not any(np.isclose(series[0], states[0, 0]) for series in drawn)
+
+
+@pytest.mark.parametrize("which", [2, 3, 8, 9])
+def test_outlier_labels_sit_clear_of_their_points(which):
+    """Labels go above the point in the upper half of the panel, below in the
+    lower half, so the text never lands on the marker.
+
+    R does the same with ``pos=(y>0)*2+1``: 3 (above) when positive, 1 (below)
+    otherwise.
+    """
+    model = _heteroscedastic_fit()
+    model.scale_model = model.sm()
+    with pytest.warns(UserWarning, match="scale model"):
+        ax = model.plot(which=which).axes[0]
+
+    low, high = ax.get_ylim()
+    midpoint = (low + high) / 2
+    labels = [(annotation.xy[1], annotation.get_va()) for annotation in ax.texts]
+    assert labels, f"which={which} drew no outlier labels"
+
+    for value, alignment in labels:
+        expected = "bottom" if value > midpoint else "top"
+        assert alignment == expected, (
+            f"which={which}: label at y={value:.3f} is on the wrong side "
+            f"of the midpoint {midpoint:.3f}"
+        )

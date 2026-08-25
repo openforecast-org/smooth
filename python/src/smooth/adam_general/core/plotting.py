@@ -147,6 +147,24 @@ def _state_labels(model):
 # ---------------------------------------------------------------------------
 
 
+def _label_offset(ax, y_value):
+    """Keep an outlier's label clear of its point.
+
+    A label drawn on top of its point is unreadable, so it is pushed away from
+    the middle of the panel: above the point in the upper half, below it in the
+    lower half. R does this with ``pos=(y>0)*2+1`` -- 3 (above) when positive,
+    1 (below) otherwise -- which is the same rule for a panel centred on zero.
+    Comparing against the axis midpoint generalises it to panels whose data is
+    not centred, and agrees with R wherever R's version applies.
+
+    Returns the matplotlib vertical alignment: ``"bottom"`` puts the text's
+    bottom edge on the point, so the label sits above it; ``"top"`` puts its
+    top edge there, so it hangs below.
+    """
+    low, high = ax.get_ylim()
+    return "bottom" if y_value > (low + high) / 2 else "top"
+
+
 def _plot1(model, ax, lowess, **kw):
     fitted = np.asarray(model.fitted, dtype=float)
     actuals = np.asarray(model.actuals, dtype=float)
@@ -198,8 +216,9 @@ def _plot2(model, ax, resid_type, level, lowess, legend, **kw):
     if len(outlier_idx):
         ax.scatter(x[outlier_idx], y[outlier_idx], s=20, color="black", zorder=5)
         for i in outlier_idx:
-            va = "bottom" if y[i] > 0 else "top"
-            ax.annotate(str(i + 1), (x[i], y[i]), fontsize=7, va=va)
+            ax.annotate(
+                str(i + 1), (x[i], y[i]), fontsize=7, va=_label_offset(ax, y[i])
+            )
     if lowess:
         _lowess_line(ax, x, y)
 
@@ -466,8 +485,12 @@ def _plot6(model, ax, resid_type, level, lowess, legend, **kw):
     if len(outlier_idx):
         ax.scatter(t[outlier_idx], resid[outlier_idx], s=20, color="black", zorder=5)
         for i in outlier_idx:
-            va = "bottom" if resid[i] > 0 else "top"
-            ax.annotate(str(i + 1), (t[i], resid[i]), fontsize=7, va=va)
+            ax.annotate(
+                str(i + 1),
+                (t[i], resid[i]),
+                fontsize=7,
+                va=_label_offset(ax, resid[i]),
+            )
 
     if lowess:
         y_fill = resid.copy()
@@ -540,8 +563,12 @@ def _plot7(model, ax, type_, squared, level, **kw):
     if len(sig_idx):
         ax.scatter(lags[sig_idx], values[sig_idx], s=20, color="black", zorder=5)
         for i in sig_idx:
-            va = "bottom" if values[i] > 0 else "top"
-            ax.annotate(str(lags[i]), (lags[i], values[i]), fontsize=7, va=va)
+            ax.annotate(
+                str(lags[i]),
+                (lags[i], values[i]),
+                fontsize=7,
+                va=_label_offset(ax, values[i]),
+            )
 
     ax.set_title(kw.get("main", default_title))
     ax.set_xlabel(kw.get("xlab", "Lags"))

@@ -339,6 +339,18 @@ def _build_profiles_array(arr_vt_seed: NDArray, L: int, nsim: int) -> NDArray:
     return profile
 
 
+# Distributions written in terms of the ratio y/fitted rather than an error.
+# ``residuals`` returns that ratio for them, as R's residuals.adam does.
+_RATIO_RESIDUAL_DISTRIBUTIONS = (
+    "dlnorm",
+    "dllaplace",
+    "dls",
+    "dlgnorm",
+    "dgamma",
+    "dinvgauss",
+)
+
+
 class ADAM:
     """
     ADAM: Augmented Dynamic Adaptive Model for Time Series Forecasting.
@@ -2172,6 +2184,13 @@ class ADAM:
         For combined models, returns residuals computed from the IC-weighted
         combined fitted values: y_t - combined_fitted_t.
 
+        The log-domain and multiplicative-domain distributions are the
+        exception: ``dlnorm``, ``dllaplace``, ``dls``, ``dlgnorm``, ``dgamma``
+        and ``dinvgauss`` return the *ratio* ``y_t / fitted_t`` rather than an
+        error, because that is the quantity their densities are written in.
+        Mirrors R's ``residuals.adam`` (R/adam.R:5383-5403): ``abs(1 + e/f)``
+        for an additive error and ``1 + e`` for a multiplicative one.
+
         Returns
         -------
         NDArray
@@ -2192,7 +2211,14 @@ class ADAM:
         self._check_is_fitted()
         if getattr(self, "_is_combined", False):
             return self._combined_residuals
-        return self._prepared["residuals"]
+
+        e = self._prepared["residuals"]
+        if self.distribution_ in _RATIO_RESIDUAL_DISTRIBUTIONS:
+            e = np.asarray(e, dtype=np.float64)
+            if self.error_type == "A":
+                return np.abs(1.0 + e / np.asarray(self.fitted, dtype=np.float64))
+            return 1.0 + e
+        return e
 
     def rstandard(self) -> NDArray:
         """
@@ -2613,24 +2639,21 @@ class ADAM:
             else "dnorm"
         )
 
-        # Log-domain distributions: R's residuals.adam returns 1+epsilon
-        # for these; the log of that recovers epsilon-on-log-scale. Use
-        # complex arithmetic so log(non-positive) doesn't NaN out — same
-        # pattern as ``adam_scaler``'s inline ``complex_log``.
+        # ``residuals`` already carries what R's residuals.adam returns -- the
+        # ratio y/fitted for the log- and multiplicative-domain distributions --
+        # so these mirror sigma.adam (R/adam.R:4642-4662) term for term rather
+        # than reconstructing the ratio here. Complex arithmetic keeps
+        # log(non-positive) finite, the same pattern as ``adam_scaler``.
         def _complex_log_abs(x):
             return np.abs(np.log(np.asarray(x, dtype=np.complex128)))
 
         if distribution in ("dlnorm", "dllaplace", "dls"):
-            ss = float(np.sum(_complex_log_abs(1.0 + residuals) ** 2))
+            ss = float(np.sum(_complex_log_abs(residuals) ** 2))
         elif distribution == "dlgnorm":
             opt_scale = float(self._prepared.get("scale", 0.0))
-            ss = float(
-                np.sum(_complex_log_abs(1.0 + residuals - opt_scale**2 / 2.0) ** 2)
-            )
+            ss = float(np.sum(_complex_log_abs(residuals - opt_scale**2 / 2.0) ** 2))
         elif distribution in ("dinvgauss", "dgamma"):
-            # R: sum((residuals − 1)²) where residuals is 1+epsilon — i.e.
-            # sum(epsilon²) in Python's additive convention.
-            ss = float(np.sum(residuals**2))
+            ss = float(np.sum((residuals - 1.0) ** 2))
         else:
             # dnorm, dlaplace, ds, dgnorm, dt, dlogis, dalaplace — plain
             # sum of squared residuals.

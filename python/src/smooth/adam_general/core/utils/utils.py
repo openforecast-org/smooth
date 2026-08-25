@@ -16,11 +16,32 @@ def _fsum_mean(x):
     return math.fsum(x) / n if n else float("nan")
 
 
-def _fsum_nanmean(x):
+def _mean_r(x):
+    """``mean()`` with R's accumulator.
+
+    R's ``mean.default`` drops the NAs, sums into a long double register,
+    divides by n, then makes a second long double pass over ``x[i] - s`` to
+    correct the rounding, and only rounds to double at the very end.
+    ``math.fsum(...) / n`` rounds twice -- once for the sum, once for the
+    divide -- and lands a ULP away wherever the correction pass bites. That
+    ULP reaches the ADAM initials: msdecompose's trend seed is the mean of the
+    smoothed first differences, so it moves the whole backcast.
+
+    ``np.longdouble`` is 80-bit on x86-64 Linux; where the platform aliases it
+    to double this degrades to the plain two-pass mean, which is exactly what
+    R does when built without long double support.
+    """
     arr = np.asarray(x, dtype=np.float64).ravel()
-    mask = ~np.isnan(arr)
-    n = int(mask.sum())
-    return math.fsum(arr[mask]) / n if n else float("nan")
+    arr = arr[~np.isnan(arr)]
+    n = arr.size
+    if not n:
+        return float("nan")
+
+    wide = arr.astype(np.longdouble)
+    s = wide.sum() / n
+    if not np.isfinite(np.float64(s)):
+        return float(s)
+    return float(s + (wide - s).sum() / n)
 
 
 def _r_filter_mean(x):
@@ -454,7 +475,7 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
             # Use only complete seasonal cycles for mean calculation
             obs_in_sample_lags = int(np.floor(obs_in_sample / lags[i]) * lags[i])
             if obs_in_sample_lags > 0:
-                pattern_i -= _fsum_nanmean(pattern_i[:obs_in_sample_lags])
+                pattern_i -= _mean_r(pattern_i[:obs_in_sample_lags])
             patterns.append(pattern_i)
     else:
         patterns = None
@@ -475,7 +496,7 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
         init_level = valid_data_for_initial[0]
         # Trend: NaN-skipping mean of first differences of the full series.
         diffs = np.diff(data_for_initial)
-        init_trend = _fsum_nanmean(diffs) if len(diffs) > 0 else 0.0
+        init_trend = _mean_r(diffs) if len(diffs) > 0 else 0.0
 
     lags_max = max(lags)
 

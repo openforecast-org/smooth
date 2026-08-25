@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy import special
 from scipy import stats as scipy_stats
 
 from smooth.adam_general._adam_general import adam_simulator
@@ -2586,11 +2587,127 @@ class ADAM:
         """
         self._check_is_fitted()
         n_param = getattr(self, "_n_param", None)
-        if n_param is not None:
-            return n_param.estimated["all"]
-        # Occurrence models keep no parameters table; they are Bernoulli, so
-        # there is no scale to add (R/om.R: parNum[1,4] stays 0).
-        return self._adam_estimated["n_param_estimated"]
+        base = (
+            n_param.estimated["all"]
+            if n_param is not None
+            # Occurrence models keep no parameters table; they are Bernoulli, so
+            # there is no scale to add (R/om.R: parNum[1,4] stays 0).
+            else self._adam_estimated["n_param_estimated"]
+        )
+        scale_model = getattr(self, "_scale_model", None)
+        if scale_model is not None:
+            # implant() moves the scale model's parameters into the location
+            # model's scale column, so the total gains them and drops the
+            # single scale parameter they replace.
+            return float(base) - 1.0 + float(scale_model.nparam)
+        return base
+
+    @property
+    def scale_model(self):
+        """The implanted scale model, or ``None`` (R: ``object$scale``).
+
+        R stores either a number or a scale model in the same ``$scale`` slot
+        and disambiguates with ``is.scale()``. Python keeps :attr:`scale` a
+        float and puts the model here, so the two never have to be told apart
+        by type.
+        """
+        return getattr(self, "_scale_model", None)
+
+    @scale_model.setter
+    def scale_model(self, value) -> None:
+        """Attach a scale model -- R's ``implant()`` (greybox).
+
+        R needs a separate verb because it cannot mutate a fitted object in
+        place. Assigning here does the same job: the location model's
+        likelihood and parameter count switch to the scale model's, so its
+        information criteria account for the time-varying scale.
+        """
+        if value is None:
+            self._scale_model = None
+            return
+        if not getattr(value, "is_scale_", False):
+            raise ValueError(
+                "Not a scale model. Build one with sm() before attaching it."
+            )
+        self._scale_model = value
+
+    def extract_scale(self):
+        """The distribution's scale (R: ``extractScale``).
+
+        A vector when a scale model is attached -- the fitted scale at each
+        observation, mapped out of the space ``sm()`` fitted it in -- and the
+        scalar :attr:`scale` otherwise. A scale model asked for its own scale
+        returns 1, as R does: it *is* the scale.
+        """
+        self._check_is_fitted()
+        scale_model = self.scale_model
+        if scale_model is None:
+            return 1.0 if getattr(self, "is_scale_", False) else self.scale
+
+        fitted = np.asarray(scale_model.fitted, dtype=np.float64).ravel()
+        dist = self.distribution_
+        if dist in ("dnorm", "dlnorm"):
+            return np.sqrt(fitted)
+        if dist == "ds":
+            return fitted**2
+        if dist == "dgnorm":
+            other = (getattr(scale_model, "other", None) or {}).get("shape")
+            if other is None:
+                raise ValueError("dgnorm scale model carries no shape.")
+            return fitted ** (1.0 / other)
+        return fitted
+
+    def extract_sigma(self):
+        """Standard deviation implied by the scale (R: ``extractSigma``).
+
+        Each distribution's scale maps to its standard deviation differently;
+        without a scale model this is just :attr:`sigma`.
+        """
+        self._check_is_fitted()
+        if self.scale_model is None:
+            return self.sigma
+
+        scale = self.extract_scale()
+        dist = self.distribution_
+        if dist in (
+            "dnorm",
+            "dlnorm",
+            "dlogitnorm",
+            "dbcnorm",
+            "dfnorm",
+            "dinvgauss",
+            "dgamma",
+        ):
+            return scale
+        if dist in ("dlaplace", "dllaplace"):
+            return np.sqrt(2.0 * scale)
+        if dist in ("ds", "dls"):
+            return np.sqrt(120.0 * scale**4)
+        if dist in ("dgnorm", "dlgnorm"):
+            shape = (getattr(self, "other", None) or {}).get("shape")
+            if shape is None:
+                raise ValueError("dgnorm model carries no shape.")
+            return np.sqrt(
+                scale**2 * special.gamma(3.0 / shape) / special.gamma(1.0 / shape)
+            )
+        if dist == "dlogis":
+            return scale * np.pi / np.sqrt(3.0)
+        if dist == "dt":
+            return 1.0 / np.sqrt(1.0 - 2.0 / scale)
+        if dist == "dalaplace":
+            alpha = (getattr(self, "other", None) or {}).get("alpha")
+            if alpha is None:
+                raise ValueError("dalaplace model carries no alpha.")
+            return scale / np.sqrt(
+                (alpha**2 * (1.0 - alpha) ** 2) * (alpha**2 + (1.0 - alpha) ** 2)
+            )
+        return self.sigma
+
+    def sm(self, **kwargs):
+        """Fit a scale model for this fit (R: ``sm.adam``). See :func:`sm`."""
+        from smooth.adam_general.core.sm import sm as _sm
+
+        return _sm(self, **kwargs)
 
     @property
     def sigma(self) -> float:
@@ -2702,6 +2819,11 @@ class ADAM:
         self._check_is_fitted()
         if self._combined_has_no_likelihood("likelihood"):
             return float("nan")
+        scale_model = getattr(self, "_scale_model", None)
+        if scale_model is not None:
+            # R's implant() replaces the location model's likelihood with the
+            # scale model's: the scale is no longer a single parameter.
+            return float(scale_model.loglik_sm_)
         return self._adam_estimated["log_lik_adam_value"]["value"]
 
     def point_lik(self, log: bool = True) -> NDArray:

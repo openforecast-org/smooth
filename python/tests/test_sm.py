@@ -146,3 +146,62 @@ def test_log_density_is_finite_and_shaped(distribution):
 def test_entropy_is_zero_without_zero_observations(distribution):
     """No zero observations means no entropy contribution."""
     assert _differential_entropy(distribution, np.array([]), 1.7) == 0.0
+
+
+IMPLANT_REFERENCE = json.loads((DATA / "sm_implant_reference.json").read_text())
+
+
+@pytest.mark.parametrize("distribution", sorted(IMPLANT_REFERENCE))
+def test_implant_matches_r(distribution):
+    """Attaching a scale model reproduces R's implant() + extractScale/Sigma."""
+    ref = IMPLANT_REFERENCE[distribution]
+    location = ADAM(model="ANN", lags=[1], distribution=distribution)
+    location.fit(_series("positive"))
+    scale_model = location.sm()
+
+    assert location.scale_model is None
+    location.scale_model = scale_model
+    assert location.scale_model is scale_model
+
+    np.testing.assert_allclose(
+        np.asarray(location.extract_scale(), float).ravel()[:5],
+        np.array(ref["scale_head"], float),
+        atol=1e-8,
+    )
+    np.testing.assert_allclose(
+        np.asarray(location.extract_sigma(), float).ravel()[:5],
+        np.array(ref["sigma_head"], float),
+        atol=1e-8,
+    )
+    assert location.loglik == pytest.approx(ref["logLik"], abs=1e-8)
+    assert location.nparam == ref["nparam"]
+    # A scale model asked for its own scale returns 1: it is the scale.
+    assert scale_model.extract_scale() == pytest.approx(ref["sm_scale_own"])
+
+
+def test_extract_scale_without_scale_model_is_the_scalar():
+    location = ADAM(model="ANN", lags=[1], distribution="dnorm")
+    location.fit(_series("positive"))
+    assert location.extract_scale() == location.scale
+    assert location.extract_sigma() == location.sigma
+
+
+def test_scale_model_setter_rejects_a_plain_model():
+    y = _series("positive")
+    location = ADAM(model="ANN", lags=[1], distribution="dnorm")
+    location.fit(y)
+    other = ADAM(model="ANN", lags=[1], distribution="dnorm")
+    other.fit(y)
+    with pytest.raises(ValueError, match="Not a scale model"):
+        location.scale_model = other
+
+
+def test_scale_model_can_be_detached():
+    location = ADAM(model="ANN", lags=[1], distribution="dnorm")
+    location.fit(_series("positive"))
+    plain_loglik, plain_nparam = location.loglik, location.nparam
+    location.scale_model = location.sm()
+    assert location.nparam != plain_nparam
+    location.scale_model = None
+    assert location.loglik == plain_loglik
+    assert location.nparam == plain_nparam

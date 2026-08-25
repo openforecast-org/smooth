@@ -245,6 +245,30 @@ Follow existing pattern (e.g., `R/adam-es.R`):
 3. Add tests in `tests/testthat/`
 4. Document with roxygen2 comments
 
+## R / Python parity discipline
+
+The Python port is a *numerical* port, not merely a functional one. Two rules follow.
+
+**A difference in results is never "optimiser noise".** Both languages run the same
+optimiser (NLopt), the same loss and the same initialisation, so a materially different
+optimum is impossible as an optimiser artefact. Explanations of the form "the optimiser
+wandered", "the maxeval budget differed" or "it is a flat surface" are ruled out by
+construction. A real gap means either the initialisation differs (seed, `B0`, bounds,
+profile tables) or the model being fitted differs (state structure, lags, matrices).
+
+The diagnostic that settles it in one step: evaluate the likelihood in *both* languages
+at *identical* parameter values. Equal there means the seed differs; different there
+means the two are not fitting the same model, and the next move is to print
+`lagsModelAll` / `persistence` / component counts side by side.
+
+**Distributions come from greybox, never re-derived.** `greybox` (Python) supplies
+`dnorm`/`dlaplace`/`ds`/`dgnorm`/`dalaplace`/`dlnorm`/`dllaplace`/`dls`/`dlgnorm`/
+`dinvgauss`/`dgamma` and their `p`/`q`/`r` counterparts — the same functions R's `smooth`
+calls. Do not re-implement a density or quantile against `scipy`: only the
+*parameterisation* should be spelled out on either side. The one exception is the `r*`
+draws, which keep `scipy` because greybox's take no `random_state` and seeded
+reproducibility matters.
+
 ## Dependencies
 
 Key R packages:
@@ -274,11 +298,10 @@ A Python implementation is under development in `python/` subdirectory. The Pyth
 - Reimplements core logic in Python with C++ extensions via pybind11
 - See `python/CLAUDE.md` for Python-specific development guidelines
 
-When modifying R code that affects algorithms, check if corresponding Python code in `python/smooth/adam_general/core/` needs updates to maintain equivalence.
+When modifying R code that affects algorithms, check if corresponding Python code in `python/src/smooth/adam_general/core/` needs updates to maintain equivalence.
 
 ## Git Workflow
 
-- **Main branch**: `master` (stable, CRAN-ready)
-- **Development branch**: `Python` (active Python development)
-- Python changes should be made on Python branch
-- R changes on master or feature branches
+- **Main branch**: `master` — both the R package and the Python port are developed here.
+- The `Python` branch is historical; it is no longer the target for new work.
+- R and Python changes that mirror each other belong in the same commit where practical, so the two stay in step.

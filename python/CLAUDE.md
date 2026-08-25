@@ -72,6 +72,18 @@ When you are about to write `pmax(x, 1e-15)`, `np.clip(...)`, `if x < 0
 return 1e+300`, `if cf is Inf return 1e10`, or anything in that family:
 **stop and find the actual root cause first.**
 
+## Distributions come from greybox
+
+`greybox` supplies `dnorm`, `dlaplace`, `ds`, `dgnorm`, `dalaplace`, `dlnorm`,
+`dllaplace`, `dls`, `dlgnorm`, `dinvgauss` and `dgamma`, plus their `p`/`q`/`r`
+counterparts. These are the same functions R's `smooth` calls, so **do not
+re-implement a density or quantile against `scipy`** — import from `greybox` and spell
+out only the parameterisation. Re-derivation is how the port ended up with five
+distributions whose prediction intervals were wrong.
+
+The `r*` random draws are the one exception: they keep `scipy`, because greybox's take
+no `random_state` and seeded reproducibility matters.
+
 ## Important Testing Note
 
 **RNG Differences**: R and Python use different random number generation algorithms. Even with the same seed (e.g., `set.seed(33)` in R and `np.random.seed(33)` in Python), they will produce completely different random data.
@@ -123,16 +135,27 @@ Update only if you do C++ code changes not python code changes.
 ### Testing
 
 ```bash
-# Run pytest
-pytest smooth/
+# Run pytest (from python/)
+.venv/bin/python -m pytest tests/ -q
 
-# Or use Makefile
+# Or use the Makefile
 make test
 ```
 
-**Test Location**: `python/smooth/adam_general/tests/`
-- Primary tests are in Jupyter notebooks (`test_adam_ets_python.ipynb`)
-- Speed tests: `speed_test.py`
+**Test location**: `python/tests/` — a pytest suite of ~885 tests (a further ~460 are
+deselected by default; see below).
+
+- `tests/data/` holds the R-generated reference fixtures.
+- `tests/R scripts/` holds the generators that produce them. Regenerate with
+  `Rscript "python/tests/R scripts/<name>.R"` **from the repository root**.
+- `tests/notebooks/` holds benchmark runners and notebooks. These are *not* part of the
+  suite and are not linted — `ruff check tests/` will report a wall of pre-existing
+  errors from them, which is why the linting commands target `src/` only.
+
+**Deselected markers**: `pyproject.toml` deselects `r_comparison` and `r_parity` by
+default. Those tests shell out to an R runner that is not present in every environment,
+so a bare run of them can fail with `FileNotFoundError` for reasons unrelated to the
+code. Baseline them before attributing a failure to a change.
 
 ### Linting and Code Quality
 
@@ -168,9 +191,9 @@ make environment
 
 ### CI/CD
 
-Python CI runs on the `Python` branch (see `.github/workflows/python_ci.yml`):
-- Linting with ruff
-- Currently only linting is configured in CI
+Python CI (`.github/workflows/python_ci.yml`) runs on pull requests touching
+`python/**`. It lints with ruff; the test suite is not yet wired into CI, so run it
+locally before considering a change complete.
 
 ## Python Package Architecture
 
@@ -178,21 +201,31 @@ The Python ADAM implementation follows a modular, scikit-learn-style design:
 
 ### Core Module Structure
 ```
-python/smooth/adam_general/
-├── _adam_general.py          # C++ bindings (adam_fitter, adam_forecaster)
+python/src/smooth/adam_general/
+├── _adamCore, _eigenCalc, _ols, ...   # compiled C++ extensions (pybind11)
 └── core/
     ├── adam.py               # Main ADAM class (user interface)
-    ├── checker.py            # Parameter validation
-    ├── creator.py            # Model structure creation (matrices)
-    ├── estimator.py          # Parameter estimation & model selection
-    ├── forecaster.py         # Forecast generation
+    ├── es.py, sma.py, msarima.py, auto_msarima.py, auto_adam.py
+    ├── om.py, omg.py, auto_om.py      # occurrence models
+    ├── ces/, ces_model.py             # complex exponential smoothing
+    ├── sm.py                          # scale model (R's sm(); see docs/sm.rst)
+    ├── plotting.py
+    ├── checker/              # parameter validation (split by concern)
+    ├── creator/              # architector, creator, filler, initialiser
+    ├── estimator/            # estimation, optimisation, model/ARIMA selection
+    ├── forecaster/           # preparator, forecaster, intervals
+    ├── simulate/
     └── utils/
-        ├── cost_functions.py # Optimization cost functions (CF, log_Lik_ADAM)
+        ├── cost_functions.py # Optimisation cost functions (CF, log_Lik_ADAM)
         ├── ic.py             # Information criteria (AIC, BIC, etc.)
         ├── polynomials.py    # ARIMA polynomial utilities
-        ├── utils.py          # General utilities (decomposition, likelihood)
-        └── var_covar.py      # Variance-covariance calculations
+        ├── utils.py          # msdecompose, ACF/PACF, likelihoods
+        ├── var_covar.py      # sigma, covariance matrices
+        └── reforecast.py     # reforecast/reapply helpers
 ```
+
+The `checker`/`creator`/`estimator`/`forecaster` names are packages now, not single
+modules — the flow below still holds, but each step lives in its own subpackage.
 
 ### Critical Function Flow
 
@@ -323,6 +356,9 @@ fc.to_dataframe()    # flat pd.DataFrame with prefixed column names
 
 ## Reference Documentation
 
+- `docs/` - Sphinx documentation. `docs/sm.rst` is the scale model (R's `sm()`); build
+  with `.venv/bin/python -m sphinx -b html docs docs/_build/html` after
+  `pip install -e ".[docs]"`.
 - `python/smooth_package_structure.md` - Comprehensive architecture and function flow documentation
 - `.cursor/rules/` - Three detailed context files:
   - `python-adam-structure.mdc` - Package structure and R-to-Python mapping
@@ -332,8 +368,8 @@ fc.to_dataframe()    # flat pd.DataFrame with prefixed column names
 
 ## Git Workflow
 
-**Current Branch**: `Python` (active development)
-**Main Branch**: `master`
+**Working branch**: `master` — both the R package and the Python port are developed
+here. The `Python` branch is historical.
 
 ## R / Python API Parity
 

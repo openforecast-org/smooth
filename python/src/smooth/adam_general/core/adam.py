@@ -1333,6 +1333,11 @@ class ADAM:
         gnorm_shape = getattr(self, "gnorm_shape", None)
         if dist in ("dgnorm", "dlgnorm") and gnorm_shape is not None:
             self.other = {"shape": float(gnorm_shape)}
+            # The forecaster reads the shape off `_general["other"]`, so keep
+            # the two in step: without this the prediction-interval code found
+            # no shape and returned NaN for every dgnorm/dlgnorm horizon.
+            if self._general is not None:
+                self._general["other"] = self.other
 
         # Set persistence parameters (pre-estimation values for provided params)
         if self._persistence:

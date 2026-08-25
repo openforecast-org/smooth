@@ -1,10 +1,10 @@
 import math
 from typing import Literal
 
+import greybox as gb
 import numpy as np
 import pandas as pd
 from greybox import lowess as _greybox_lowess
-from scipy import stats
 from scipy.special import beta, digamma, gamma
 
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
@@ -653,70 +653,67 @@ def calculate_pacf(data, nlags=40):
     return _pacf_r(data, nlags)
 
 
+def _real_log(x):
+    """``Re(log(as.complex(x)))`` -- log|x|, finite for a negative fitted value.
+
+    R takes the real part of the complex logarithm so that a negative fitted
+    value produced mid-optimisation gives a finite number rather than NaN.
+    """
+    return np.log(np.abs(np.asarray(x, dtype=np.float64)))
+
+
 def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
-    # Fixes the output dimension
-    y = y.reshape(-1, 1)
+    """Log-density of one observation, mirroring R's cost function.
+
+    The densities come from greybox, so both languages evaluate the same code;
+    only the parameterisation is spelled out here, following the switch in
+    ``R/adam.R:790-862``. A multiplicative error scales the density's scale by
+    the fitted value.
+    """
+    y = np.asarray(y, dtype=np.float64).reshape(-1, 1)
+    mult = y_fitted if Etype == "M" else 1.0
 
     if distribution == "dnorm":
-        if Etype == "A":
-            return stats.norm.logpdf(y, loc=y_fitted, scale=scale)
-        else:  # "M"
-            return stats.norm.logpdf(y, loc=y_fitted, scale=scale * y_fitted)
-    elif distribution == "dlaplace":
-        if Etype == "A":
-            return stats.laplace.logpdf(y, loc=y_fitted, scale=scale)
-        else:  # "M"
-            return stats.laplace.logpdf(y, loc=y_fitted, scale=scale * y_fitted)
-    elif distribution == "ds":
-        # The S distribution (greybox::ds), NOT Student's t: its log-density is
-        # -log(4 s^2) - sqrt(|x - mu|) / s. scipy has no S distribution.
-        if Etype == "A":
-            s = scale
-            return -np.log(4 * s**2) - np.sqrt(np.abs(y - y_fitted)) / s
-        else:  # "M"
-            s = scale * np.sqrt(y_fitted)
-            return -np.log(4 * s**2) - np.sqrt(np.abs(y - y_fitted)) / s
-    elif distribution == "dgnorm":
+        return gb.dnorm(y, y_fitted, scale * mult, log=True)
+    if distribution == "dlaplace":
+        return gb.dlaplace(y, y_fitted, scale * mult, log=True)
+    if distribution == "ds":
+        # R scales by sqrt(fitted) here, not by fitted.
+        return gb.ds(
+            y,
+            y_fitted,
+            scale * (np.sqrt(np.abs(y_fitted)) if Etype == "M" else 1.0),
+            log=True,
+        )
+    if distribution == "dgnorm":
         beta = other if other is not None else 2.0
-        if Etype == "A":
-            return stats.gennorm.logpdf(y, beta, loc=y_fitted, scale=scale)
-        else:  # "M"
-            return stats.gennorm.logpdf(y, beta, loc=y_fitted, scale=scale * y_fitted)
-    elif distribution == "dalaplace":
-        # Implement asymmetric Laplace distribution
-        pass
-    elif distribution == "dlnorm":
-        # Use the real part of the complex logarithm so that negative
-        # y_fitted values during optimisation produce a finite log instead
-        # of NaN (the imaginary part is discarded).
-        meanlog = np.real(np.log(y_fitted.astype(complex))) - scale**2 / 2
-        return stats.lognorm.logpdf(y, s=scale, scale=np.exp(meanlog))
-    elif distribution == "dllaplace":
-        return stats.laplace.logpdf(
-            np.log(y), loc=np.log(y_fitted), scale=scale
+        return gb.dgnorm(y, y_fitted, scale * mult, beta, log=True)
+    if distribution == "dalaplace":
+        return gb.dalaplace(y, y_fitted, scale * mult, other, log=True)
+    if distribution == "dlogis":
+        return gb.dlogis(y, y_fitted, scale * mult, log=True)
+    if distribution == "dt":
+        errors = (y - y_fitted) * (y_fitted if Etype == "M" else 1.0)
+        return gb.dt(errors, abs(other), log=True)
+
+    # Log-domain: the density on the log scale plus the Jacobian -log(y).
+    if distribution == "dlnorm":
+        return gb.dlnorm(y, _real_log(y_fitted) - scale**2 / 2, scale, log=True)
+    if distribution == "dllaplace":
+        return gb.dlaplace(np.log(y), _real_log(y_fitted), scale, log=True) - np.log(y)
+    if distribution == "dls":
+        return gb.ds(np.log(y), _real_log(y_fitted), scale, log=True) - np.log(y)
+    if distribution == "dlgnorm":
+        return gb.dgnorm(
+            np.log(y), _real_log(y_fitted), scale, other, log=True
         ) - np.log(y)
-    elif distribution == "dls":
-        # Log-S: the S log-density on the log scale, minus log(y) for the
-        # Jacobian. Mirrors R: ds(log(y), log(fitted), scale) - log(y).
-        return (
-            -np.log(4 * scale**2)
-            - np.sqrt(np.abs(np.log(y) - np.log(y_fitted))) / scale
-            - np.log(y)
-        )
-    elif distribution == "dlgnorm":
-        # Implement log-generalized normal distribution
-        pass
-    elif distribution == "dinvgauss":
-        # scipy's invgauss(mu, scale=s) is IG(mean=mu*s, lambda=s); statmod's
-        # (mean, dispersion) parameterisation maps to mu = mean*dispersion,
-        # s = 1/dispersion. Mirrors R: dinvgauss(y, mean=|fitted|,
-        # dispersion=|scale/fitted|).
-        dispersion = np.abs(scale / y_fitted)
-        return stats.invgauss.logpdf(
-            y, mu=np.abs(y_fitted) * dispersion, scale=1 / dispersion
-        )
-    elif distribution == "dgamma":
-        return stats.gamma.logpdf(y, a=1 / scale, scale=scale * np.abs(y_fitted))
+
+    if distribution == "dinvgauss":
+        return gb.dinvgauss(y, np.abs(y_fitted), np.abs(scale / y_fitted), log=True)
+    if distribution == "dgamma":
+        return gb.dgamma(y, shape=1 / scale, scale=scale * np.abs(y_fitted), log=True)
+
+    raise ValueError(f"Unsupported distribution {distribution!r}.")
 
 
 def calculate_entropy(distribution, scale, other, obsZero, y_fitted):

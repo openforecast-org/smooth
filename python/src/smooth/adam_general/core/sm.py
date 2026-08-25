@@ -14,6 +14,7 @@ object in place; the property setter does the same job here.
 import warnings
 from typing import Any, Callable, Dict, Optional
 
+import greybox as gb
 import numpy as np
 from numpy.typing import NDArray
 from scipy import special
@@ -144,59 +145,41 @@ def _log_density(
 ) -> NDArray:
     """Log-density of the *location* model at a per-observation scale.
 
-    ``scale`` is the scale model's fitted vector. The ``error_type`` branches
-    reproduce how R scales a multiplicative-error model's density by the fitted
-    value (``R/sm.R``, the ``lossFunction`` switch).
+    ``scale`` is the scale model's fitted vector. The densities are greybox's,
+    so they are the same code R calls; the ``error_type`` branches reproduce
+    how R rescales a multiplicative-error model's density by the fitted value
+    (``R/sm.R``, the ``lossFunction`` switch).
     """
     if distribution == "dnorm":
         sd = np.sqrt(scale) * (mu if error_type == "M" else 1.0)
-        return -0.5 * np.log(2.0 * np.pi) - np.log(sd) - 0.5 * ((y - mu) / sd) ** 2
+        return gb.dnorm(y, mu, sd, log=True)
 
     if distribution == "dlaplace":
         b = scale * (mu if error_type == "M" else 1.0)
-        return -np.log(2.0 * b) - np.abs(y - mu) / b
+        return gb.dlaplace(y, mu, b, log=True)
 
     if distribution == "ds":
         b = scale * (np.sqrt(mu) if error_type == "M" else 1.0)
-        return -np.log(4.0 * b**2) - np.sqrt(np.abs(y - mu)) / b
+        return gb.ds(y, mu, b, log=True)
 
     if distribution == "dgnorm":
         if other is None:
             raise ValueError("dgnorm needs a shape; the model carries none.")
         b = scale * (mu**other if error_type == "M" else 1.0)
-        return (
-            np.log(other)
-            - np.log(2.0 * b)
-            - special.gammaln(1.0 / other)
-            - (np.abs(y - mu) / b) ** other
-        )
+        return gb.dgnorm(y, mu, b, other, log=True)
 
     if distribution == "dlnorm":
         # R uses sdlog=sqrt(f) but meanlog=log(mu)-f^2/2 -- f plays the role of
         # a variance in one and a standard deviation in the other. Reproduced as
         # written; changing it would move every dlnorm scale model off R.
-        sdlog = np.sqrt(scale)
         meanlog = np.log(np.abs(mu)) - scale**2 / 2.0
-        return -np.log(y * sdlog * np.sqrt(2.0 * np.pi)) - (
-            np.log(y) - meanlog
-        ) ** 2 / (2.0 * sdlog**2)
+        return gb.dlnorm(y, meanlog, np.sqrt(scale), log=True)
 
     if distribution == "dinvgauss":
-        mean = np.abs(mu)
-        disp = np.abs(scale / mu)
-        return -0.5 * (np.log(np.pi * 2.0 * disp) + 3.0 * np.log(y)) - (
-            y - mean
-        ) ** 2 / (2.0 * disp * y * mean**2)
+        return gb.dinvgauss(y, np.abs(mu), np.abs(scale / mu), log=True)
 
     if distribution == "dgamma":
-        shape = 1.0 / scale
-        scl = scale * mu
-        return (
-            (shape - 1.0) * np.log(y)
-            - y / scl
-            - special.gammaln(shape)
-            - shape * np.log(scl)
-        )
+        return gb.dgamma(y, shape=1.0 / scale, scale=scale * mu, log=True)
 
     raise ValueError(f"sm() does not support distribution {distribution!r}.")
 

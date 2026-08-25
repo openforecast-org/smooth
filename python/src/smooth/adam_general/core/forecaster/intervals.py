@@ -1,5 +1,5 @@
+import greybox as gb
 import numpy as np
-from scipy import stats
 from scipy.optimize import minimize
 from scipy.special import gamma
 
@@ -68,8 +68,10 @@ def generate_prediction_interval(
         prepared_model, observations_dict, lags_dict, general
     )
 
-    # stimate sigma
-    s2 = sigma(observations_dict, params_info, general, prepared_model) ** 2
+    # Estimate sigma. The error type decides how residuals(object) is
+    # reconstructed for the ratio-domain distributions.
+    e_type = model_type_dict["error_type"]  # "A" or "M"
+    s2 = sigma(observations_dict, params_info, general, prepared_model, e_type) ** 2
 
     # lines 8015 to 8022
     # line 8404 -> I dont get the (is.scale(object$scale))
@@ -117,8 +119,6 @@ def generate_prediction_interval(
     y_lower = np.zeros((h, n_levels))
     y_upper = np.zeros((h, n_levels))
 
-    e_type = model_type_dict["error_type"]  # "A" or "M"
-
     distribution = general["distribution"]
     other_params = general.get(
         "other", {}
@@ -154,202 +154,85 @@ def generate_prediction_interval(
             np.where(is_lower_side, 1.0, (1.0 + conf_levels_adj) / 2),
         )
 
+    # Quantiles of the *error* distribution, parameterised exactly as R does
+    # (R/adam.R:6600-6725), and taken from greybox so both languages call the
+    # same functions with the same arguments. `scale_2d` is R's `vcovMulti`.
+    shape = other_params.get("shape")
+    alpha = other_params.get("alpha")
+    loc = 1.0 if e_type == "M" else 0.0
+    y_lower_mult = None
+    y_upper_mult = None
+
     if distribution == "dnorm":
-        scale = np.sqrt(scale_2d)
-        loc = 1 if e_type == "M" else 0
-        y_lower[:] = stats.norm.ppf(ll, loc=loc, scale=scale)
-        y_upper[:] = stats.norm.ppf(lu, loc=loc, scale=scale)
+        sd = np.sqrt(scale_2d)
+        y_lower[:] = gb.qnorm(ll, loc, sd)
+        y_upper[:] = gb.qnorm(lu, loc, sd)
 
     elif distribution == "dlaplace":
-        scale = np.sqrt(scale_2d / 2)
-        loc = 1 if e_type == "M" else 0
-        y_lower[:] = stats.laplace.ppf(ll, loc=loc, scale=scale)
-        y_upper[:] = stats.laplace.ppf(lu, loc=loc, scale=scale)
+        sd = np.sqrt(scale_2d / 2)
+        y_lower[:] = gb.qlaplace(ll, loc, sd)
+        y_upper[:] = gb.qlaplace(lu, loc, sd)
 
     elif distribution == "ds":
-        scale = (scale_2d / 120) ** 0.25
-        loc = 1 if e_type == "M" else 0
-        try:
-            if hasattr(stats, "s_dist") and hasattr(stats.s_dist, "ppf"):
-                y_lower[:] = stats.s_dist.ppf(ll, loc=loc, scale=scale)
-                y_upper[:] = stats.s_dist.ppf(lu, loc=loc, scale=scale)
-            else:
-                print(
-                    "Warning: stats.s_dist not found. "
-                    "Cannot calculate intervals for 'ds'."
-                )
-                y_lower[:], y_upper[:] = np.nan, np.nan
-        except Exception as e:
-            print(f"Error calculating 'ds' interval: {e}")
-            y_lower[:], y_upper[:] = np.nan, np.nan
+        sd = (scale_2d / 120) ** 0.25
+        y_lower[:] = gb.qs(ll, loc, sd)
+        y_upper[:] = gb.qs(lu, loc, sd)
 
     elif distribution == "dgnorm":
-        shape_beta = other_params.get("shape")
-        if shape_beta is not None:
-            try:
-                scale = np.sqrt(
-                    scale_2d * (gamma(1 / shape_beta) / gamma(3 / shape_beta))
-                )
-                loc = 1 if e_type == "M" else 0
-                y_lower[:] = stats.gennorm.ppf(
-                    ll, beta=shape_beta, loc=loc, scale=scale
-                )
-                y_upper[:] = stats.gennorm.ppf(
-                    lu, beta=shape_beta, loc=loc, scale=scale
-                )
-            except (ValueError, ZeroDivisionError) as e:
-                print(
-                    f"Warning: Could not calculate scale for dgnorm "
-                    f"(shape={shape_beta}). Error: {e}"
-                )
-                y_lower[:], y_upper[:] = np.nan, np.nan
-        else:
-            print("Warning: Shape parameter 'beta' not found for dgnorm.")
-            y_lower[:], y_upper[:] = np.nan, np.nan
+        sd = np.sqrt(scale_2d * gamma(1 / shape) / gamma(3 / shape))
+        y_lower[:] = gb.qgnorm(ll, loc, sd, shape)
+        y_upper[:] = gb.qgnorm(lu, loc, sd, shape)
 
     elif distribution == "dlogis":
-        scale = np.sqrt(scale_2d * 3) / np.pi
-        loc = 1 if e_type == "M" else 0
-        y_lower[:] = stats.logistic.ppf(ll, loc=loc, scale=scale)
-        y_upper[:] = stats.logistic.ppf(lu, loc=loc, scale=scale)
+        sd = np.sqrt(scale_2d * 3) / np.pi
+        y_lower[:] = gb.qlogis(ll, loc, sd)
+        y_upper[:] = gb.qlogis(lu, loc, sd)
 
     elif distribution == "dt":
-        df = observations_dict["obs_in_sample"] - params_info["n_param"]
-        if df <= 0:
-            print(
-                f"Warning: Degrees of freedom ({df}) non-positive for dt "
-                f"distribution. Setting intervals to NaN."
-            )
-            y_lower[:], y_upper[:] = np.nan, np.nan
-        else:
-            scale = np.sqrt(scale_2d)
-            if e_type == "A":
-                y_lower[:] = scale * stats.t.ppf(ll, df)
-                y_upper[:] = scale * stats.t.ppf(lu, df)
-            else:  # Etype == "M"
-                y_lower[:] = 1 + scale * stats.t.ppf(ll, df)
-                y_upper[:] = 1 + scale * stats.t.ppf(lu, df)
+        # R scales the standard t rather than passing a scale argument.
+        df = general.get("df_t", other_params.get("nu"))
+        y_lower[:] = loc + np.sqrt(scale_2d) * gb.qt(ll, df)
+        y_upper[:] = loc + np.sqrt(scale_2d) * gb.qt(lu, df)
 
     elif distribution == "dalaplace":
-        alpha = other_params.get("alpha")
-        if alpha is not None and 0 < alpha < 1:
-            try:
-                scale = np.sqrt(
-                    scale_2d
-                    * alpha**2
-                    * (1 - alpha) ** 2
-                    / (alpha**2 + (1 - alpha) ** 2)
-                )
-                loc = 1 if e_type == "M" else 0
-                if hasattr(stats, "alaplace") and hasattr(stats.alaplace, "ppf"):
-                    try:
-                        y_lower[:] = stats.alaplace.ppf(
-                            ll, loc=loc, scale=scale, alpha=alpha
-                        )
-                        y_upper[:] = stats.alaplace.ppf(
-                            lu, loc=loc, scale=scale, alpha=alpha
-                        )
-                    except TypeError:
-                        y_lower[:] = stats.alaplace.ppf(
-                            ll, loc=loc, scale=scale, kappa=alpha
-                        )
-                        y_upper[:] = stats.alaplace.ppf(
-                            lu, loc=loc, scale=scale, kappa=alpha
-                        )
-                else:
-                    print(
-                        "Warning: stats.alaplace not found. "
-                        "Cannot calculate intervals for 'dalaplace'."
-                    )
-                    y_lower[:], y_upper[:] = np.nan, np.nan
-            except (ValueError, ZeroDivisionError) as e:
-                print(
-                    f"Warning: Could not calculate scale for dalaplace "
-                    f"(alpha={alpha}). Error: {e}"
-                )
-                y_lower[:], y_upper[:] = np.nan, np.nan
-        else:
-            print(
-                f"Warning: Alpha parameter ({alpha}) invalid or not found "
-                f"for dalaplace."
-            )
-            y_lower[:], y_upper[:] = np.nan, np.nan
+        sd = np.sqrt(
+            scale_2d * alpha**2 * (1 - alpha) ** 2 / (alpha**2 + (1 - alpha) ** 2)
+        )
+        y_lower[:] = gb.qalaplace(ll, loc, sd, alpha)
+        y_upper[:] = gb.qalaplace(lu, loc, sd, alpha)
 
-    # Log-Distributions
     elif distribution == "dlnorm":
+        # R's meanlog is sqrt(|1 - v|) - 1, not -v/2: the quantile is of the
+        # multiplicative error, whose median is pulled below 1 as v grows.
+        meanlog = np.sqrt(np.abs(1 - scale_2d)) - 1
         sdlog = np.sqrt(scale_2d)
-        meanlog = -scale_2d / 2
-        scipy_scale = np.exp(meanlog)
-        y_lower_mult = stats.lognorm.ppf(ll, s=sdlog, loc=0, scale=scipy_scale)
-        y_upper_mult = stats.lognorm.ppf(lu, s=sdlog, loc=0, scale=scipy_scale)
+        y_lower_mult = gb.qlnorm(ll, meanlog, sdlog)
+        y_upper_mult = gb.qlnorm(lu, meanlog, sdlog)
 
     elif distribution == "dllaplace":
-        scale_log = np.sqrt(scale_2d / 2)
-        y_lower_mult = np.exp(stats.laplace.ppf(ll, loc=0, scale=scale_log))
-        y_upper_mult = np.exp(stats.laplace.ppf(lu, loc=0, scale=scale_log))
+        sd = np.sqrt(scale_2d / 2)
+        y_lower_mult = np.exp(gb.qlaplace(ll, 0.0, sd))
+        y_upper_mult = np.exp(gb.qlaplace(lu, 0.0, sd))
 
     elif distribution == "dls":
-        scale_log = (scale_2d / 120) ** 0.25
-        try:
-            if hasattr(stats, "s_dist") and hasattr(stats.s_dist, "ppf"):
-                y_lower_mult = np.exp(stats.s_dist.ppf(ll, loc=0, scale=scale_log))
-                y_upper_mult = np.exp(stats.s_dist.ppf(lu, loc=0, scale=scale_log))
-            else:
-                print(
-                    "Warning: stats.s_dist not found. "
-                    "Cannot calculate intervals for 'dls'."
-                )
-                y_lower_mult, y_upper_mult = np.nan, np.nan
-        except Exception as e:
-            print(f"Error calculating 'dls' interval: {e}")
-            y_lower_mult, y_upper_mult = np.nan, np.nan
+        sd = (scale_2d / 120) ** 0.25
+        y_lower_mult = np.exp(gb.qs(ll, 0.0, sd))
+        y_upper_mult = np.exp(gb.qs(lu, 0.0, sd))
 
     elif distribution == "dlgnorm":
-        shape_beta = other_params.get("shape")
-        if shape_beta is not None:
-            try:
-                scale_log = np.sqrt(
-                    scale_2d * (gamma(1 / shape_beta) / gamma(3 / shape_beta))
-                )
-                y_lower_mult = np.exp(
-                    stats.gennorm.ppf(ll, beta=shape_beta, loc=0, scale=scale_log)
-                )
-                y_upper_mult = np.exp(
-                    stats.gennorm.ppf(lu, beta=shape_beta, loc=0, scale=scale_log)
-                )
-            except (ValueError, ZeroDivisionError) as e:
-                print(
-                    f"Warning: Could not calculate scale for dlgnorm "
-                    f"(shape={shape_beta}). Error: {e}"
-                )
-                y_lower_mult, y_upper_mult = np.nan, np.nan
-        else:
-            print("Warning: Shape parameter 'beta' not found for dlgnorm.")
-            y_lower_mult, y_upper_mult = np.nan, np.nan
+        sd = np.sqrt(scale_2d * gamma(1 / shape) / gamma(3 / shape))
+        y_lower_mult = np.exp(gb.qgnorm(ll, 0.0, sd, shape))
+        y_upper_mult = np.exp(gb.qgnorm(lu, 0.0, sd, shape))
 
     elif distribution == "dinvgauss":
-        if np.any(v_voc_multi <= 0):
-            print(
-                "Warning: Non-positive variance for dinvgauss. "
-                "Setting intervals to NaN."
-            )
-            y_lower[:], y_upper[:] = np.nan, np.nan
-        else:
-            mu_shape = 1.0 / scale_2d
-            y_lower_mult = stats.invgauss.ppf(ll, mu=mu_shape, loc=0, scale=1)
-            y_upper_mult = stats.invgauss.ppf(lu, mu=mu_shape, loc=0, scale=1)
+        # mean 1, dispersion vcovMulti -- greybox's (loc, scale) are exactly
+        # statmod's (mean, dispersion).
+        y_lower_mult = gb.qinvgauss(ll, 1.0, scale_2d)
+        y_upper_mult = gb.qinvgauss(lu, 1.0, scale_2d)
 
     elif distribution == "dgamma":
-        if np.any(v_voc_multi <= 0):
-            print(
-                "Warning: Non-positive variance for dgamma. Setting intervals to NaN."
-            )
-            y_lower[:], y_upper[:] = np.nan, np.nan
-        else:
-            shape_a = 1.0 / scale_2d
-            scale_param = scale_2d
-            y_lower_mult = stats.gamma.ppf(ll, a=shape_a, loc=0, scale=scale_param)
-            y_upper_mult = stats.gamma.ppf(lu, a=shape_a, loc=0, scale=scale_param)
+        y_lower_mult = gb.qgamma(ll, shape=1 / scale_2d, scale=scale_2d)
+        y_upper_mult = gb.qgamma(lu, shape=1 / scale_2d, scale=scale_2d)
 
     else:
         print(
@@ -359,14 +242,7 @@ def generate_prediction_interval(
         y_lower[:], y_upper[:] = np.nan, np.nan
 
     # Final adjustments based on Etype (as done in R lines 8632-8640)
-    needs_etype_A_adjustment = distribution in [
-        "dlnorm",
-        "dllaplace",
-        "dls",
-        "dlgnorm",
-        "dinvgauss",
-        "dgamma",
-    ]
+    needs_etype_A_adjustment = y_lower_mult is not None
 
     yf = y_forecast.reshape(-1, 1)  # (h, 1) for broadcasting
     if needs_etype_A_adjustment and e_type == "A":

@@ -1,7 +1,9 @@
 import numpy as np
 
+from smooth.adam_general.core.utils.cost_functions import _sum_r
 
-def sigma(observations_dict, params_info, general, prepared_model):
+
+def sigma(observations_dict, params_info, general, prepared_model, error_type=None):
     """
     Calculate error scale parameter (standard deviation) for ADAM model.
 
@@ -182,26 +184,33 @@ def sigma(observations_dict, params_info, general, prepared_model):
 
     residuals = prepared_model["residuals"]
     non_nan_mask = ~residuals.isna()
+    r = np.asarray(residuals[non_nan_mask], dtype=np.float64)
 
-    # Calculate sigma based on distribution type
-    r = residuals[non_nan_mask]
-    if general["distribution"] in [
-        "dnorm",
-        "dlaplace",
-        "ds",
-        "dgnorm",
-        "dt",
-        "dlogis",
-        "dalaplace",
-        "dinvgauss",
-        "dgamma",
-    ]:
-        return np.linalg.norm(r) / np.sqrt(vals)
-    elif general["distribution"] in ["dlnorm", "dllaplace", "dls"]:
-        # elif general['distribution'] == 'dlgnorm':
-        # we need the extract_scale() function here
-        #    sigma = (np.log(r - extract_scale()**2/2)**2).sum()
-        return np.linalg.norm(np.log(r)) / np.sqrt(vals)
+    distribution = general["distribution"]
+
+    # R's sigma.adam works on residuals(object), which for the log- and
+    # multiplicative-domain distributions is the *ratio* y/fitted rather than
+    # the raw error (R/adam.R:5383-5403). Reconstruct it here: `prepared_model`
+    # carries the raw errors, so squaring them directly measured the variance
+    # on the original scale instead of the relative one, and the interval code
+    # then fed a scale hundreds of times too large to the quantile functions.
+    if distribution in ("dlnorm", "dllaplace", "dls", "dlgnorm", "dinvgauss", "dgamma"):
+        fitted = np.asarray(prepared_model["y_fitted"], dtype=np.float64)[non_nan_mask]
+        e_type = error_type or (prepared_model.get("model") or "A")[0]
+        r = np.abs(1.0 + r / fitted) if e_type == "A" else 1.0 + r
+
+    # sigma.adam (R/adam.R:4642-4662), term for term.
+    if distribution in ("dlnorm", "dllaplace", "dls"):
+        ss = _sum_r(np.log(r) ** 2)
+    elif distribution == "dlgnorm":
+        opt_scale = float(prepared_model.get("scale", 0.0))
+        ss = _sum_r(np.log(r - opt_scale**2 / 2.0) ** 2)
+    elif distribution in ("dinvgauss", "dgamma"):
+        ss = _sum_r((r - 1.0) ** 2)
+    else:
+        # dnorm, dlaplace, ds, dgnorm, dt, dlogis, dalaplace
+        ss = _sum_r(r**2)
+    return float(np.sqrt(ss / vals))
 
 
 def covar_anal(lags_model, h, measurement, transition, persistence, s2):

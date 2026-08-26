@@ -1,2 +1,0 @@
-AutoMSARIMA Back	arima
-AutoMSARIMA Opt	arima

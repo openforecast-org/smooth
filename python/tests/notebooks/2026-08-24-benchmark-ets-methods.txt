@@ -1,7 +1,0 @@
-ADAM ETS Back	ets
-ES Back	ets
-ES Opt	ets
-statsforecast AutoETS	ets
-sktime AutoETS	ets
-skforecast AutoETS	ets
-aeon AutoETS	ets

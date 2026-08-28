@@ -6,13 +6,12 @@ Skipped in CI by default (requires R + smooth + devtools).
 
 from __future__ import annotations
 
-import json
-import subprocess
-
 import numpy as np
 import pytest
 
 from smooth import SMA
+
+from ._r_bridge import r_array
 
 pytestmark = pytest.mark.r_parity
 
@@ -32,23 +31,10 @@ Y = np.array(
 _R_Y = "c(" + ",".join(str(v) for v in Y) + ")"
 
 
-def _r_eval(expr: str) -> np.ndarray:
-    script = (
-        "suppressMessages(devtools::load_all('.', quiet=TRUE));"
-        f"cat(jsonlite::toJSON({expr}, digits=15))"
-    )
-    out = subprocess.check_output(
-        ["Rscript", "--vanilla", "-e", script],
-        text=True,
-        cwd="/home/config/Misc/Python/Libraries/smooth",
-    )
-    return np.array(json.loads(out))
-
-
 def test_sma_fixed_order3_fitted():
     """Fitted values from SMA(3) match R's sma(order=3)."""
     py = np.asarray(SMA(order=3, h=0).fit(Y).fitted, dtype=float)
-    r = _r_eval(
+    r = r_array(
         f"as.numeric(sma({_R_Y}, order=3, h=0, holdout=FALSE, silent=TRUE)$fitted)"
     )
     np.testing.assert_allclose(py, r, rtol=1e-5, atol=1e-6)
@@ -57,7 +43,7 @@ def test_sma_fixed_order3_fitted():
 def test_sma_fixed_order5_fitted():
     """Fitted values from SMA(5) match R's sma(order=5)."""
     py = np.asarray(SMA(order=5, h=0).fit(Y).fitted, dtype=float)
-    r = _r_eval(
+    r = r_array(
         f"as.numeric(sma({_R_Y}, order=5, h=0, holdout=FALSE, silent=TRUE)$fitted)"
     )
     np.testing.assert_allclose(py, r, rtol=1e-5, atol=1e-6)
@@ -66,7 +52,7 @@ def test_sma_fixed_order5_fitted():
 def test_sma_fixed_order4_forecast():
     """h-step-ahead point forecasts from SMA(4) match R."""
     py_fc = SMA(order=4, h=5).fit(Y).predict(h=5).mean.values
-    r = _r_eval(
+    r = r_array(
         f"as.numeric(sma({_R_Y}, order=4, h=5, holdout=FALSE, silent=TRUE)$forecast)"
     )
     np.testing.assert_allclose(py_fc, r, rtol=1e-5, atol=1e-6)

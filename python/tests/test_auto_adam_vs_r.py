@@ -193,11 +193,22 @@ def r_outputs():
 
 
 def _normalise_orders(val):
+    """Canonical order vector: per-lag orders with trailing zeros dropped.
+
+    R collapses ``m$orders`` to a plain vector when no ARIMA is selected, so
+    it reports ``0`` where Python reports one zero per lag. A zero order at a
+    lag is the absence of that term, so trimming trailing zeros makes the two
+    representations comparable without weakening the check on real orders.
+    """
     if isinstance(val, int):
-        return [val]
-    if isinstance(val, list):
-        return list(val)
-    return [int(val)]
+        orders = [val]
+    elif isinstance(val, list):
+        orders = list(val)
+    else:
+        orders = [int(val)]
+    while orders and orders[-1] == 0:
+        orders.pop()
+    return orders
 
 
 def _series_for(case_name, r_outputs):

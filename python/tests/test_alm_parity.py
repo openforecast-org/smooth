@@ -13,13 +13,12 @@ Skip them (Python-only CI) with:  pytest -m "not r_parity"
 
 from __future__ import annotations
 
-import json
-import subprocess
-
 import numpy as np
 import pytest
 
 from smooth import ADAM, OM
+
+from ._r_bridge import r_array
 
 pytestmark = pytest.mark.r_parity
 
@@ -31,23 +30,9 @@ _R_Y = "(1,0,1,1,0,1,0,1,1,0,1,0,1,1,0,1,0,1,1,0)"
 _R_X = "0:19"
 
 
-def _r_eval(expr: str) -> np.ndarray:
-    """Run a one-liner R expression that prints a JSON array; return as ndarray."""
-    script = (
-        "suppressMessages(devtools::load_all('.', quiet=TRUE));"
-        f"cat(jsonlite::toJSON({expr}, digits=15))"
-    )
-    out = subprocess.check_output(
-        ["Rscript", "--vanilla", "-e", script],
-        text=True,
-        cwd="/home/config/Misc/Python/Libraries/smooth",
-    )
-    return np.array(json.loads(out))
-
-
 def test_adam_pure_regression_coef():
     py = ADAM(model="NNN").fit(Y, X).coef
-    r = _r_eval(
+    r = r_array(
         f"adam(cbind(y=c{_R_Y},x={_R_X}),model='NNN',regressors='use',"
         "distribution='dnorm',silent=TRUE)$B"
     )
@@ -56,7 +41,7 @@ def test_adam_pure_regression_coef():
 
 def test_adam_pure_regression_fitted():
     py = ADAM(model="NNN").fit(Y, X).fitted
-    r = _r_eval(
+    r = r_array(
         f"as.numeric(adam(cbind(y=c{_R_Y},x={_R_X}),model='NNN',regressors='use',"
         "distribution='dnorm',silent=TRUE)$fitted)"
     )
@@ -65,7 +50,7 @@ def test_adam_pure_regression_fitted():
 
 def test_om_pure_regression_coef():
     py = OM(model="NNN", occurrence="odds-ratio").fit(Y, X).coef
-    r = _r_eval(
+    r = r_array(
         f"om(cbind(y=c{_R_Y},x={_R_X}),model='NNN',occurrence='odds-ratio',"
         "regressors='use',silent=TRUE)$B"
     )
@@ -74,7 +59,7 @@ def test_om_pure_regression_coef():
 
 def test_om_pure_regression_fitted():
     py = OM(model="NNN", occurrence="odds-ratio").fit(Y, X).fitted
-    r = _r_eval(
+    r = r_array(
         f"as.numeric(om(cbind(y=c{_R_Y},x={_R_X}),model='NNN',occurrence='odds-ratio',"
         "regressors='use',silent=TRUE)$fitted)"
     )

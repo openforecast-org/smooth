@@ -11,8 +11,11 @@ at Python's own optimum.
 
 Both models are fitted with ``initial="optimal"`` so the parameter vector
 contains the initial states too, matching R's default initialisation. R's
-``vcov(m)`` is the inverse of the observed FI, so the FI is recovered as
-``solve(vcov(m))`` at the fitted optimum.
+R's ``vcov(m, type="hessian")`` is the inverse of the observed FI, so the FI
+is recovered as ``solve(vcov(m, type="hessian"))`` at the fitted optimum. The
+default ``type="opg"`` is a *different* estimator (outer product of gradients)
+and must not be used here -- it agrees with the observed FI only
+asymptotically.
 
 Skipped in CI by default (``r_parity`` marker — opt in with
 ``pytest -m r_parity``).
@@ -52,7 +55,7 @@ def _r_fit_outputs(scenario, model):
         "   list(series=as.numeric(y),"
         "        coef=as.numeric(coef(m)),"
         "        coef_names=names(coef(m)),"
-        "        FI=as.matrix(solve(vcov(m)))) }"
+        "        FI=as.matrix(solve(vcov(m, type='hessian')))) }"
     )
     return r_dict(expr)
 

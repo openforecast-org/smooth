@@ -13,6 +13,7 @@ Each test file that imports from here must also carry
 from __future__ import annotations
 
 import json
+import pathlib
 import subprocess
 from typing import Any, Optional
 
@@ -20,7 +21,9 @@ import numpy as np
 
 # Repo root (the directory containing the R package source). load_all() is
 # called against this path so the R-side resolution matches the dev install.
-REPO_ROOT = "/home/config/Misc/Python/Libraries/smooth"
+# Derived from this file's location (python/tests/_r_bridge.py) so the bridge
+# keeps working wherever the checkout lives.
+REPO_ROOT = str(pathlib.Path(__file__).resolve().parents[2])
 
 _PRELUDE = (
     "suppressMessages(suppressWarnings({"

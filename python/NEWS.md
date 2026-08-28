@@ -6,6 +6,8 @@ Release history of the Python implementation of the **smooth** forecasting packa
 ## v1.0.8 (unreleased)
 
 Changes:
+* `sm` is exported from the package: `from smooth import sm`, then `sm(model, ...)`, mirroring R's call form. It was reachable only as `model.sm(...)` or through the full module path, which left the documented `sm(location, ...)` signature with no importable name behind it. The method and the function are the same object.
+* The Python README documents the scale model: what `sm()` fits, a runnable example that attaches one with `model.scale_model = scale` and shows the AICc and the prediction intervals responding, the seven distributions it supports, and why there is no `implant()`.
 * The R-parity test harness runs again. `tests/_r_bridge.py` derived its repo root from a hard-coded path that no longer exists, so every test using it failed with `FileNotFoundError`; it is now taken from the module's own location. `test_alm_parity.py` and `test_sma_r_parity.py` each carried a private copy of the same bridge with the same stale path and now import the shared one.
 * `test_fi_r_comparison.py` recovers R's observed Fisher information from `vcov(m, type="hessian")` rather than from `vcov(m)`. R's default is `type="opg"`, a different estimator that agrees with the observed FI only asymptotically, so the test had been comparing two different quantities and failing by up to 80x. Against the Hessian-based vcov, Python's FI at R's coefficients matches to 2.7e-11.
 * `test_auto_adam_vs_r.py` compares ARIMA orders with trailing zeros trimmed. R collapses `m$orders` to a plain vector when no ARIMA is selected, reporting `0` where Python reports one zero per lag; both mean "no ARIMA", but the comparison was length-sensitive.

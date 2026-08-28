@@ -19,6 +19,7 @@ from smooth.adam_general.core.simulate import (
     sim_sma,
     sim_ssarima,
 )
+from smooth.adam_general.core.sm import sm
 from smooth.adam_general.core.sma import SMA
 from smooth.adam_general.core.utils.utils import msdecompose
 from smooth.utils import show_versions
@@ -50,4 +51,5 @@ __all__ = [
     "sim_oes",
     "sim_sma",
     "sim_ssarima",
+    "sm",
 ]

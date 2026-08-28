@@ -26,6 +26,7 @@ The package includes the following models:
 - [MSARIMA](https://github.com/openforecast-org/smooth/wiki/MSARIMA) - Multiple seasonal ARIMA in state space form, implemented in the `MSARIMA` class (fixed orders) and `AutoMSARIMA` class (automatic order selection).
 - [OM](https://github.com/openforecast-org/smooth/wiki/OM) - Occurrence Model for intermittent demand, implemented in the `OM` class (plus `OMG` for the general two-component model and `AutoOM` for automatic type selection).
 - [SMA](https://github.com/openforecast-org/smooth/wiki/SMA) - Simple Moving Average in state-space form (an AR(m) model with fixed coefficients), implemented in the `SMA` class with automatic order selection.
+- [SM](https://github.com/openforecast-org/smooth/wiki/Scale-Model) - Scale Model, a second ADAM fitted to the scale of the error term so the variance evolves over time, available as the `.sm()` method on a fitted model.
 
 The package also provides standalone data generators that mirror R's `sim.*` family — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, and `sim_oes` — plus a `.simulate()` method on fitted `ADAM`, `OM`, and `OMG` objects. See [Simulation Functions](https://github.com/openforecast-org/smooth/wiki/Simulation-Functions).
 
@@ -187,6 +188,52 @@ print(auto.best_model_.model_name)
 > `nlopt>=2.10.0`; older versions still fit, but the BOBYQA stage-1 trajectory
 > may differ slightly from R.
 
+## SM — Scale Model
+
+A scale model is a second ADAM fitted to a transform of the location model's
+residuals, so the error's scale varies over time instead of being one number —
+the state-space counterpart of a GARCH or GAMLSS scale equation. It mirrors R's
+`sm()`, and is scored by the *location* model's likelihood, so the information
+criteria of the two are directly comparable.
+
+```python
+import numpy as np
+from smooth import ADAM
+
+# Monthly series whose noise grows with the level
+rng = np.random.default_rng(42)
+t = np.arange(120)
+level = 100 + 0.8 * t + 10 * np.sin(2 * np.pi * t / 12)
+y = level * (1 + rng.normal(0, 0.02 + 0.0004 * t))
+
+# Location model: the mean. Requires loss="likelihood" (the default).
+model = ADAM(model="AAA", lags=[1, 12], distribution="dnorm")
+model.fit(y)
+print(model.aicc)                     # 801.9385 — one constant scale
+
+# Scale model: the variance. "YYY" (the default) selects among multiplicative ETS.
+scale = model.sm(model="MNN")
+model.scale_model = scale             # this assignment is R's implant()
+print(model.aicc)                     # 775.9587 — now a time-varying scale
+
+print(scale.model_name)               # ETS(MNN)
+print(model.extract_scale()[:3])      # [2.930 2.853 2.766] — scale per observation
+
+# Prediction intervals now widen and narrow with the fitted scale
+fc = model.predict(h=12, interval="prediction", level=0.95)
+print(fc.upper[:3])
+```
+
+`sm` is also importable directly — `from smooth import sm`, then `sm(model, ...)`,
+which mirrors R's call form; it is the same function the method wraps.
+
+`sm()` supports seven distributions — `dnorm`, `dlaplace`, `ds`, `dgnorm`,
+`dlnorm`, `dgamma`, `dinvgauss` — and takes the usual `ADAM` arguments
+(`lags`, `orders`, `regressors`, `X`, `initial`, `ic`, `bounds`), so the scale
+can carry its own ETS structure, ARIMA orders or explanatory variables.
+Set `model.scale_model = None` to detach it. There is no `implant()` function:
+Python can modify a fitted object in place, so assignment does the job.
+
 ## Documentation
 
 - [GitHub Wiki](https://github.com/openforecast-org/smooth/wiki) - Full documentation
@@ -202,6 +249,7 @@ The pages below document the models and their Python classes:
 - [MSARIMA](https://github.com/openforecast-org/smooth/wiki/MSARIMA) — Multiple Seasonal ARIMA (fixed orders) and automatic selection (`AutoMSARIMA`)
 - [OM](https://github.com/openforecast-org/smooth/wiki/OM) — Occurrence Model for intermittent demand (`OM`, `OMG`, `AutoOM`)
 - [SMA](https://github.com/openforecast-org/smooth/wiki/SMA) — Simple Moving Average in state-space form with automatic order selection
+- [Scale Model](https://github.com/openforecast-org/smooth/wiki/Scale-Model) — `model.sm()`, a dynamic model for the scale of the error term
 - [Simulation Functions](https://github.com/openforecast-org/smooth/wiki/Simulation-Functions) — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, `sim_oes`, and the `.simulate()` method on fitted models
 
 **Book:** Svetunkov, I. (2023). *Forecasting and Analytics with the Augmented Dynamic Adaptive Model (ADAM)*. Chapman and Hall/CRC. Online: https://openforecast.org/adam/

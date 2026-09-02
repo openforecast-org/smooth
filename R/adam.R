@@ -4618,17 +4618,19 @@ confint.adam <- function(object, parm, level=0.95,
             #     adamCoefBounds["level",2] <- max(-parameters["level"],adamCoefBounds["level",2]);
             # }
             adamModelType <- modelType(object);
+            # Only the lower bound needs the restriction: the upper one is above
+            # the lower, so it clears -parameters automatically once the lower does.
             # Trend
             if(substr(adamModelType,2,2)=="M" && any(parametersNames=="trend")){
                 adamCoefBounds["trend",1] <- max(-parameters["trend"],adamCoefBounds["trend",1]);
-                adamCoefBounds["trend",2] <- max(-parameters["trend"],adamCoefBounds["trend",2]);
             }
-            # Seasonality
+            # Seasonality. pmax(), not max(): these are vectors, one element per
+            # seasonal initial, and max() would collapse them to a single number
+            # that then gets recycled across every seasonal row.
             if(substr(adamModelType,nchar(adamModelType),nchar(adamModelType))=="M" &&
                any(substr(parametersNames,1,8)=="seasonal")){
                 seasonals <- which(substr(parametersNames,1,8)=="seasonal");
-                adamCoefBounds[seasonals,1] <- max(-parameters[seasonals],adamCoefBounds[seasonals,1]);
-                adamCoefBounds[seasonals,2] <- max(-parameters[seasonals],adamCoefBounds[seasonals,2]);
+                adamCoefBounds[seasonals,1] <- pmax(-parameters[seasonals],adamCoefBounds[seasonals,1]);
             }
         }
 

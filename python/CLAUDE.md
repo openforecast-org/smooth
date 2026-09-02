@@ -95,7 +95,7 @@ When comparing Python implementations against R:
 
 ## Repository Overview
 
-The **smooth** repository contains time series forecasting implementations in both R and Python. The R package is the mature, production version available on CRAN. The Python implementation (currently in development on the `Python` branch) is a direct translation focusing on the ADAM (Augmented Dynamic Adaptive Model) forecasting framework.
+The **smooth** repository contains time series forecasting implementations in both R and Python. The R package is the mature, production version available on CRAN. The Python implementation is a direct translation focusing on the ADAM (Augmented Dynamic Adaptive Model) forecasting framework. Both are developed on `master`; the `Python` branch is historical.
 
 **Primary Languages**: R (production), Python (in development)
 
@@ -142,7 +142,7 @@ Update only if you do C++ code changes not python code changes.
 make test
 ```
 
-**Test location**: `python/tests/` — a pytest suite of ~885 tests (a further ~460 are
+**Test location**: `python/tests/` — a pytest suite of 914 tests (a further 460 are
 deselected by default; see below).
 
 - `tests/data/` holds the R-generated reference fixtures.
@@ -153,9 +153,19 @@ deselected by default; see below).
   errors from them, which is why the linting commands target `src/` only.
 
 **Deselected markers**: `pyproject.toml` deselects `r_comparison` and `r_parity` by
-default. Those tests shell out to an R runner that is not present in every environment,
-so a bare run of them can fail with `FileNotFoundError` for reasons unrelated to the
-code. Baseline them before attributing a failure to a change.
+default, because they need R with `smooth`'s dependencies, `devtools` and `jsonlite`
+installed. Where that is available they run as-is:
+
+```bash
+.venv/bin/python -m pytest tests/ -m "r_parity or r_comparison"
+```
+
+They shell out to R through `tests/_r_bridge.py`, which loads the *local* R source
+with `devtools::load_all()` — so they always compare against the working tree, and an
+R-side edit is picked up without reinstalling. The repo root is derived from the
+module's own location, so the bridge follows the checkout. Current baseline: **457
+passed, 3 xfailed** (the three xfails are all `simulate.om`, reasons recorded in
+`tests/test_om_simulate_r_parity.py`). Any other failure is yours.
 
 ### Linting and Code Quality
 
@@ -192,8 +202,11 @@ make environment
 ### CI/CD
 
 Python CI (`.github/workflows/python_ci.yml`) runs on pull requests touching
-`python/**`. It lints with ruff; the test suite is not yet wired into CI, so run it
-locally before considering a change complete.
+`python/**` and on workflow_dispatch. The `lint` job runs `ruff check`, `ruff format
+--check` and `mypy`; `build-and-test` then uses cibuildwheel to build a wheel and run
+the pytest suite against it on Linux (3.11-3.14), macOS and Windows
+(`CIBW_TEST_COMMAND: pytest {project}/python/tests`). The `r_parity` /
+`r_comparison` markers stay deselected there — CI has no R — so run those locally.
 
 ## Python Package Architecture
 
@@ -209,6 +222,7 @@ python/src/smooth/adam_general/
     ├── om.py, omg.py, auto_om.py      # occurrence models
     ├── ces/, ces_model.py             # complex exponential smoothing
     ├── sm.py                          # scale model (R's sm(); see docs/sm.rst)
+    │                                  # exported as smooth.sm; also ADAM.sm()
     ├── plotting.py
     ├── checker/              # parameter validation (split by concern)
     ├── creator/              # architector, creator, filler, initialiser
@@ -244,6 +258,14 @@ modules — the flow below still holds, but each step lives in its own subpackag
    - `preparator()` (forecaster.py) - Prepare model for forecasting
    - `forecaster()` (forecaster.py) - Generate point forecasts and intervals, returns `ForecastResult`
      - `adam_forecaster()` (_adam_general.py) - C++ forecasting routine
+
+```
+┌───────────┐    ┌─────────┐    ┌─────────┐    ┌───────────┐    ┌────────────┐
+│ User input│───►│ checker │───►│ creator │───►│ estimator │───►│ forecaster │
+└───────────┘    └─────────┘    └─────────┘    └───────────┘    └────────────┘
+      │                                                                │
+      └──────────────────────  ADAM (public API)  ─────────────────────┘
+```
 
 **Key Functions**:
 - `filler()` in creator.py: Central function that populates state-space matrices with parameter values (called repeatedly during optimization and before forecasting)
@@ -294,7 +316,7 @@ The Python implementation is a **direct translation** of the R version:
 - Maintains same algorithms and mathematical formulations
 - Uses object-oriented design (scikit-learn style) vs R's functional approach
 - Function names and logic mirror R counterparts
-- See `python/smooth_package_structure.md` for detailed function flow and architecture
+- See the `smooth-translation` skill for the R↔Python map and the parity rules
 
 **When modifying Python code**: Compare with corresponding R implementation in `R/adam.R` to maintain equivalence
 
@@ -330,8 +352,8 @@ Default distribution selection:
 ## Usage Example
 
 ```python
-from smooth.adam_general.core.adam import ADAM
 import numpy as np
+from smooth import ADAM
 
 # Sample data
 y_data = np.array([10, 12, 15, 13, 16, 18, 20, 19, 22, 25, 28, 30,
@@ -356,14 +378,22 @@ fc.to_dataframe()    # flat pd.DataFrame with prefixed column names
 
 ## Reference Documentation
 
+- **Skills** (`.claude/skills/`, invocable by name):
+  - `smooth-translation` - the R↔Python name map (arguments, fitted attributes,
+    matrices, internal dicts), both call flows side by side, the parity rules,
+    and the checklist for landing a translation.
+  - `smooth-cpp-shared` - the shared `src/headers/` layer, the Rcpp and pybind11
+    bindings, both build systems, and the floating-point rules.
+  - `explain-smooth` - explaining fitted models and choosing a function, for
+    both languages.
 - `docs/` - Sphinx documentation. `docs/sm.rst` is the scale model (R's `sm()`); build
   with `.venv/bin/python -m sphinx -b html docs docs/_build/html` after
   `pip install -e ".[docs]"`.
-- `python/smooth_package_structure.md` - Comprehensive architecture and function flow documentation
-- `.cursor/rules/` - Three detailed context files:
-  - `python-adam-structure.mdc` - Package structure and R-to-Python mapping
-  - `python-adam-workflow.mdc` - Function flow and relationships
-  - `python-adam-technical.mdc` - Technical implementation details (parameter mapping, matrix structure, optimization)
+- `python/ADAM_API_REFERENCE.md` - every `ADAM` constructor argument, property and
+  public method, with signatures.
+- [Wiki](https://github.com/openforecast-org/smooth/wiki) - user-facing reference for
+  both languages. `Roadmap` and `R-Python-differences` are the maintained answers
+  on port coverage and numerical parity; do not duplicate them in the repo.
 - `README.md` - High-level package overview (R-focused)
 
 ## Git Workflow

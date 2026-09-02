@@ -72,14 +72,11 @@ R -e "testthat::test_file('tests/testthat/test_adam.R')"
 
 ### Testing
 
-Test files are in `tests/testthat/`:
-- `test_adam.R` - ADAM model tests
-- `test_es.R` - Exponential Smoothing tests
-- `test_ssarima.R` - State-Space ARIMA tests
-- `test_ces.R` - Complex Exponential Smoothing tests
-- `test_gum.R` - Generalised Uniform Model tests
-- `test_oes.R` - Occurrence model tests
-- `test_simulate.R` - Simulation function tests
+Test files are in `tests/testthat/`: `test_adam.R`, `test_autoadam.R`,
+`test_es.R`, `test_ces.R`, `test_ssarima.R`, `test_sparma.R`, `test_gum.R`,
+`test_sma.R`, `test_om.R`, `test_omg.R`, `test_oes.R`, `test_simulate.R`,
+`test_df.R` (degrees of freedom), `test_gradient.R` (`initial="gradient"`),
+`test_vcov_opg.R` (OPG covariance).
 
 Run all tests with: `R -e "devtools::test()"`
 
@@ -88,18 +85,24 @@ Run all tests with: `R -e "devtools::test()"`
 GitHub Actions workflows:
 - `.github/workflows/test.yml` - R-CMD-check on macOS, Windows, Ubuntu
 - `.github/workflows/rhub.yaml` - R-hub checks for CRAN submission
-- `.github/workflows/python_ci.yml` - Python linting (Python branch only)
+- `.github/workflows/revdep.yaml` - reverse-dependency checks
+- `.github/workflows/python_ci.yml` - ruff + mypy, then cibuildwheel builds
+  **and runs the pytest suite** on Linux (3.11-3.14), macOS and Windows.
+  Triggered by pull requests touching `python/**`, and by workflow_dispatch.
+- `.github/workflows/build-release-wheels.yml`, `release.yml`,
+  `publish-testpypi.yml` - wheel building and publishing
 
 ### Documentation
 
 Build documentation: `R -e "devtools::document()"`
 
 Vignettes (in `vignettes/`):
+- `smooth.Rmd` - package overview
 - `adam.Rmd` - ADAM model guide
 - `es.Rmd`, `ces.Rmd`, `gum.Rmd` - Specific model guides
 - `ssarima.Rmd`, `sma.Rmd` - ARIMA and moving average guides
 - `simulate.Rmd` - Simulation functions
-- `oes.Rmd` - Occurrence models for intermittent demand
+- `oes.Rmd`, `om.Rmd` - Occurrence models for intermittent demand
 
 Build vignettes: `R -e "devtools::build_vignettes()"`
 
@@ -130,24 +133,27 @@ Where:
    - Regression with exogenous variables
    - Multiple seasonal patterns
 
-2. **ETS models** (`R/es.R`, `R/adam-es.R`) - Exponential Smoothing variants
+2. **ETS models** (`R/adam-es.R`) - Exponential Smoothing variants
 
-3. **ARIMA models** (`R/ssarima.R`, `R/adam-ssarima.R`) - State-Space ARIMA
+3. **ARIMA models** (`R/adam-ssarima.R`, `R/adam-msarima.R`, `R/automsarima.R`) - State-Space and Multiple Seasonal ARIMA
 
-4. **CES** (`R/ces.R`, `R/adam-ces.R`) - Complex Exponential Smoothing
+4. **CES** (`R/adam-ces.R`) - Complex Exponential Smoothing
 
-5. **GUM** (`R/gum.R`, `R/adam-gum.R`) - Generalised Uniform Model
+5. **GUM** (`R/adam-gum.R`) - Generalised Uniform Model
 
-6. **Occurrence models** (`R/oes.R`) - For intermittent demand
+6. **Occurrence models** (`R/om.R`, `R/omg.R`, `R/om-oes.R`) - For intermittent demand
+
+7. **Scale model** (`R/sm.R`) - Dynamic model for the scale of the error term
 
 ### R and C++ Integration
 
 Critical performance functions are implemented in C++ (in `src/`):
 
-- `adamGeneral.cpp` - Core ADAM fitting/forecasting (uses `adamCore.h`)
-- `ssGeneral.cpp` - General state space operations
-- `ssOccurrence.cpp` - Occurrence model operations
-- `ssSimulator.cpp` - Simulation functions
+- `adamGeneral.cpp` - Core ADAM fitting/forecasting/simulation (uses `headers/adamCore.h`)
+- `ssGeneral.cpp` - General state space operations (uses `headers/ssGeneral.h`, `headers/ssOccurrence.h`)
+- `hessianCpp.cpp` - Finite-difference Hessian (`headers/hessianCore.h`), shared with the Python build
+- `olsWrap.cpp` - Pivoted-QR least squares (`headers/olsCore.h`), shared with the Python build
+- `eigenCalc.cpp` - Eigenvalue bounds for the admissible-bounds checks
 - `matrixPowerWrap.cpp` - Matrix power operations for variance calculations
 
 The R code (in `R/`) provides:
@@ -183,9 +189,14 @@ Error distributions (via `distribution` parameter):
 - `dlaplace` - Laplace
 - `ds` - S distribution
 - `dgnorm` - Generalised Normal
+- `dalaplace` - Asymmetric Laplace (R only)
 - `dlnorm` - Log-Normal
+- `dllaplace`, `dls`, `dlgnorm` - log-variants (R only)
 - `dgamma` - Gamma (default for multiplicative)
 - `dinvgauss` - Inverse Gaussian
+
+The Python `ADAM` accepts the seven that are not marked R-only, and raises on
+anything else.
 
 Distribution selection affects likelihood calculation and prediction intervals.
 

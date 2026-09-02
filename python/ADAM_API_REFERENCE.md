@@ -78,7 +78,7 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 | `frequency` | `str \| None` | `None` | Time series frequency (e.g. `"D"`, `"M"`); auto-detected from pandas DatetimeIndex |
 | `profiles_recent_provided` | `bool` | `False` | Whether recent seasonal profiles are provided |
 | `profiles_recent_table` | `Any \| None` | `None` | Table of recent profile data |
-| `reg_lambda` | `float \| None` | `None` | Regularization parameter for LASSO/RIDGE losses |
+| `reg_lambda` | `float \| None` | `None` | Accepted but **not read** by the cost function — use `lambda_param` (or `**{"lambda": …}`) for LASSO/RIDGE. `reg_lambda` is `OM` / `OMG`'s name for it |
 | `gnorm_shape` | `float \| None` | `None` | Shape parameter for generalized normal distribution |
 | `smoother` | `"lowess" \| "ma" \| "global"` | `"lowess"` | Smoother for decomposition in initial state estimation |
 
@@ -124,6 +124,33 @@ Return formatted model summary string.
 ### `select_best_model()`
 
 Select best model from selection results based on IC. Updates `_model_type`, `_phi_internal`, `_adam_estimated`, and `_adam_cpp` with best model's values.
+
+### Other public methods
+
+Each mirrors the R method of the same name; see the wiki page named in the last
+column for the R/Python treatment.
+
+| Method | Signature | Purpose | Wiki |
+|---|---|---|---|
+| `vcov` | `(type=None, bootstrap=False, heuristics=None, step_size=None)` | Parameter covariance. `type` defaults to `"opg"`; `"hessian"` inverts the observed FI | [Coefficients and Parameters](https://github.com/openforecast-org/smooth/wiki/Coefficients-and-Parameters) |
+| `confint` | `(parm=None, level=0.95, type=None, bootstrap=False, step_size=None)` | Confidence intervals; returns a `DataFrame` of S.E. / lower / upper | [Coefficients and Parameters](https://github.com/openforecast-org/smooth/wiki/Coefficients-and-Parameters) |
+| `coefbootstrap` | `(nsim=1000, size=None, replace=False, prob=None, ...)` | Bootstrap distribution of the coefficients | [Coefficients and Parameters](https://github.com/openforecast-org/smooth/wiki/Coefficients-and-Parameters) |
+| `multicov` | `(type="analytical", h=10, nsim=1000)` | Covariance of multi-step forecast errors | [Residuals and Errors](https://github.com/openforecast-org/smooth/wiki/Residuals-and-Errors) |
+| `point_lik` | `(log=True)` | Per-observation log-likelihood; sums to `loglik` | [Likelihood and Information Criteria](https://github.com/openforecast-org/smooth/wiki/Likelihood-and-Information-Criteria) |
+| `rstandard` | `()` | Standardised residuals | [Residuals and Errors](https://github.com/openforecast-org/smooth/wiki/Residuals-and-Errors) |
+| `rstudent` | `()` | Studentised residuals | [Residuals and Errors](https://github.com/openforecast-org/smooth/wiki/Residuals-and-Errors) |
+| `rmultistep` | `(h=10)` | Matrix of multi-step forecast errors | [Residuals and Errors](https://github.com/openforecast-org/smooth/wiki/Residuals-and-Errors) |
+| `outlierdummy` | `(level=0.999, type="rstandard")` | Outlier indicator matrix | [Residuals and Errors](https://github.com/openforecast-org/smooth/wiki/Residuals-and-Errors) |
+| `extract_scale` | `()` | Fitted scale — a vector when a scale model is attached, else the scalar | [Scale Model](https://github.com/openforecast-org/smooth/wiki/Scale-Model) |
+| `extract_sigma` | `()` | Standard deviation implied by the scale | [Scale Model](https://github.com/openforecast-org/smooth/wiki/Scale-Model) |
+| `sm` | `(**kwargs)` | Fit a scale model for this fit; also `smooth.sm(model, ...)` | [Scale Model](https://github.com/openforecast-org/smooth/wiki/Scale-Model) |
+| `reapply` | `(nsim=1000, type=None, bootstrap=False, heuristics=None, seed=None)` | Refit over sampled parameter draws | [Refitting and Reforecasting](https://github.com/openforecast-org/smooth/wiki/Refitting-and-Reforecasting) |
+| `reforecast` | `(h=10, X=None, occurrence=None, ...)` | Forecast accounting for parameter uncertainty | [Refitting and Reforecasting](https://github.com/openforecast-org/smooth/wiki/Refitting-and-Reforecasting) |
+| `simulate` | `(nsim=1, seed=None, obs=None, randomizer=None, ...)` | Simulate paths from the fitted model | [Simulation Functions](https://github.com/openforecast-org/smooth/wiki/Simulation-Functions) |
+| `plot` | `(which=[1, 2, 4, 6], level=0.95, legend=False, lowess=True)` | Diagnostic panels; scale-model aware | [Visualisation and Output](https://github.com/openforecast-org/smooth/wiki/Visualisation-and-Output) |
+
+Attaching a scale model is an assignment, not a method: `model.scale_model = model.sm()`
+(R's `implant()`). `model.scale_model = None` detaches it.
 
 ---
 

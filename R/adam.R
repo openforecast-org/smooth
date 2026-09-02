@@ -7653,6 +7653,22 @@ simulateADAMCore <- function(object, nsim=1, obs=nobs(object), ...){
         EtypeModified[] <- "M";
     }
 
+    # A multiplicative error enters the model as (1 + e), so its support is
+    # e > -1: none of the distributions adam() samples from can produce anything
+    # below that. A supplied randomizer can, and the state recursion then takes
+    # a log of a negative number and returns NaN from that point on, which is
+    # easy to mistake for a defect in the kernel.
+    if(!is.null(ellipsis$randomizer) && EtypeModified=="M" &&
+       any(matErrors <= -1, na.rm=TRUE)){
+        warning(paste0("The supplied randomizer returned ",
+                       sum(matErrors <= -1, na.rm=TRUE),
+                       " error(s) of -1 or lower. A multiplicative error enters ",
+                       "the model as (1 + e), so it must stay above -1. The ",
+                       "simulated states will contain NaN. Rescale the errors, ",
+                       "or use a model with an additive error."),
+                call.=FALSE);
+    }
+
     matOt <- matrix(rbinom(obsInSample*nsim, 1, pt), obsInSample, nsim);
 
     ySimulated <- adamCpp$simulate(matErrors, matOt,

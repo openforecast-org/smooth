@@ -6582,6 +6582,16 @@ class ADAM:
             model=model_name,
         )
 
+    def _simulate_state_head(self, lags_model_max):
+        """Initial state head the simulator seeds from (R: ``$profileInitial``).
+
+        ``None`` means "keep the head already copied out of ``states``", which
+        is right for ADAM: there the first ``lags_model_max`` columns of the
+        fitted states *are* the head the recursion ran from. Subclasses whose
+        ``states`` carry a head on a different scale override this.
+        """
+        return None
+
     def simulate(
         self,
         nsim: int = 1,
@@ -6695,6 +6705,16 @@ class ADAM:
                     n_state_cols - cols_to_copy, axis=1
                 )
 
+        # R's simulateADAMCore does not trust the head of ``$states``; it
+        # overwrites it with the object's initial profile before handing the
+        # cube to the kernel. Mirror that, so the recursion starts from the
+        # state the fit ran from.
+        head = self._simulate_state_head(lags_model_max)
+        if head is not None:
+            arr_vt[:, :lags_model_max, :] = np.asarray(head, dtype=np.float64)[
+                :, :lags_model_max, None
+            ]
+
         # Build the per-step measurement matrix (R/adam.R:7515-7519).
         if measurement.shape[0] < obs:
             pad_rows = obs - measurement.shape[0]
@@ -6775,6 +6795,23 @@ class ADAM:
             in {"dlnorm", "dinvgauss", "dgamma", "dls", "dllaplace"}
         ):
             e_type_modified = "M"
+
+        # A multiplicative error enters the model as (1 + e), so its support is
+        # e > -1: none of the distributions ADAM samples from can produce
+        # anything below that. A supplied randomizer can, and the state
+        # recursion then takes a log of a negative number and returns NaN from
+        # that point on, which is easy to mistake for a defect in the kernel.
+        if randomizer is not None and e_type_modified == "M":
+            n_bad = int(np.sum(mat_errors <= -1))
+            if n_bad:
+                warnings.warn(
+                    f"The supplied randomizer returned {n_bad} error(s) of -1 or "
+                    "lower. A multiplicative error enters the model as (1 + e), "
+                    "so it must stay above -1. The simulated states will contain "
+                    "NaN. Rescale the errors, or use a model with an additive "
+                    "error.",
+                    stacklevel=2,
+                )
 
         # ---------- drive the C++ kernel ----------------------------------
         result = adam_simulator(

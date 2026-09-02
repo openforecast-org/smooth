@@ -1783,6 +1783,21 @@ class OM(ADAM):
         self._check_is_fitted()
         return OMSummary(self, level=level, digits=digits, type=type)
 
+    def _simulate_state_head(self, lags_model_max):
+        """Seed the simulator from the profile, not from ``states``.
+
+        An occurrence model's ``states`` head is the raw initial level, on the
+        probability scale, while the recursion runs on the link scale -- for an
+        odds-ratio ETS(MNM) fit those are 0.616502 and 3.004092, and seeding
+        from the former scales every simulated latent value by their ratio.
+        ``profile`` holds the head the fit actually ran from, which is what R's
+        ``$profileInitial`` carries for an ``om`` object.
+        """
+        profile = getattr(self, "profile", None)
+        if profile is None:
+            return None
+        return np.asarray(profile, dtype=np.float64)
+
     def simulate(
         self,
         nsim: int = 1,

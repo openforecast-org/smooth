@@ -23,6 +23,11 @@ from ._r_bridge import r_dict, r_to_literal
 pytestmark = pytest.mark.r_parity
 
 
+# Every model here has a multiplicative error, whose support is 1 + e > 0: the
+# distributions ADAM draws from (dgamma, dlnorm, dinvgauss) cannot produce
+# e <= -1. Hand-fed error vectors have to respect that, otherwise the test
+# drives the kernel outside the model rather than exercising it.
+
 def _baseline():
     rng = np.random.default_rng(42)
     n = 60
@@ -74,7 +79,7 @@ def _r_om_simulate(model, occurrence, y, errors, *, lags=None, orders=None):
 def test_om_simulate_latent_matches_r():
     """OM(MNN, odds-ratio): latent series under matched errors."""
     y, n = _baseline()
-    errors = np.linspace(-1.5, 1.5, n)
+    errors = np.linspace(-0.9, 0.9, n)
 
     def feed(k):
         return errors[:k]
@@ -96,18 +101,6 @@ def test_om_simulate_latent_matches_r():
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Seasonal OM (MNM): the fit itself is now identical — same profile, "
-        "same coefficients, same log-likelihood to all digits — but the "
-        "simulated latent series differ by a constant factor (4.87 on this "
-        "case), which is the ratio between the profile head R seeds from and "
-        "the initial level Python seeds from. Same class of defect as the "
-        "R-side seed fixed for the non-seasonal case, this time on the "
-        "Python side and only for the seasonal path. Tracked as a follow-up."
-    ),
-    strict=False,
-)
 def test_om_simulate_seasonal_matches_r():
     """Seasonal OM (lags=[1, 12]) — confirms the matrix prep
     inherited from ``ADAM.simulate`` produces the same state cube
@@ -116,7 +109,7 @@ def test_om_simulate_seasonal_matches_r():
     n = 72
     season = 0.2 * np.sin(2 * np.pi * np.arange(n) / 12)
     y = rng.binomial(1, np.clip(0.3 + season, 0.05, 0.95)).astype(float)
-    errors = rng.standard_normal(n)
+    errors = 0.25 * rng.standard_normal(n)
 
     def feed(k):
         return errors[:k]
@@ -133,25 +126,12 @@ def test_om_simulate_seasonal_matches_r():
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "OM + ARIMA. R no longer aborts here — om() was truncating the "
-        "persistence vector to the ETS components, so the kernel got a "
-        "length-1 g against a 2-row state; that is fixed. What remains is "
-        "shared by both languages: the ETS level updates correctly but the "
-        "ARIMA state goes NaN on the first simulated step, so both sides "
-        "return one finite value and NaN thereafter. A defect in the "
-        "simulator's multiplicative-error ARIMA update, not a parity gap. "
-        "Tracked as a follow-up."
-    ),
-    strict=False,
-)
 def test_om_simulate_arima_matches_r():
     """OM with ARMA(1, 0, 1) in the latent — the ARIMA path through
     ``ADAM.simulate`` must agree with ``simulateADAMCore`` on R."""
     y, n = _baseline()
     rng = np.random.default_rng(1)
-    errors = rng.standard_normal(n)
+    errors = 0.25 * rng.standard_normal(n)
 
     def feed(k):
         return errors[:k]
@@ -181,7 +161,7 @@ def test_omg_simulate_combined_probability_matches_r():
     ``test_sim_oes_r_parity.py``)."""
     y, n = _baseline()
     rng = np.random.default_rng(2)
-    errors = rng.standard_normal(2 * n)   # one block per sub-model
+    errors = 0.25 * rng.standard_normal(2 * n)   # one block per sub-model
 
     cursor = [0]
 

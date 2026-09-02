@@ -7228,7 +7228,25 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
     matF <- object$transition;
 
     if(type=="analytical"){
-        covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, s2);
+        # A multiplicative-error ETS on a log / positive distribution has no
+        # usable closed form for the off-diagonal, so forecast.adam() takes the
+        # per-horizon variances from adamVarAnal() for those (R/adam.R, the
+        # "IG and Lnorm can use approximations" branch). Do the same here:
+        # multicov() and the prediction intervals should not disagree about
+        # what the model implies.
+        if(etsChecker(object) && errorType(object)=="M" &&
+           any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm"))){
+            varVector <- adamVarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, s2);
+            if(any(object$distribution==c("dlnorm","dls","dllaplace","dlgnorm"))){
+                varVector[] <- log(1+varVector);
+            }
+            # nrow= is needed: diag() of a length-one vector returns an
+            # identity matrix of that size instead of a 1x1 matrix.
+            covarMat <- diag(varVector, nrow=h);
+        }
+        else{
+            covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, s2);
+        }
     }
     else if(type=="empirical"){
         adamErrors <- rmultistep(object, h=h);

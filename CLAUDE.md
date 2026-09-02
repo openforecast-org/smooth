@@ -191,12 +191,13 @@ Error distributions (via `distribution` parameter):
 - `dgnorm` - Generalised Normal
 - `dalaplace` - Asymmetric Laplace (R only)
 - `dlnorm` - Log-Normal
-- `dllaplace`, `dls`, `dlgnorm` - log-variants (R only)
 - `dgamma` - Gamma (default for multiplicative)
 - `dinvgauss` - Inverse Gaussian
 
-The Python `ADAM` accepts the seven that are not marked R-only, and raises on
-anything else.
+The Python `ADAM` accepts the seven that are not marked R-only. `dllaplace`,
+`dls` and `dlgnorm` appear in some internal switches as placeholders but are
+rejected by `adam()`'s own `match.arg` in R and are not implemented in either
+language, so they are not options.
 
 Distribution selection affects likelihood calculation and prediction intervals.
 

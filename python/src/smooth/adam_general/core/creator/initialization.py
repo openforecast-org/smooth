@@ -422,15 +422,15 @@ def _initialize_ets_seasonal_states_small_sample(
     if s_type == "A":
         for i in range(components_number_ets_seasonal):
             if initials_checked["initial_seasonal_estimate"]:
-                mat_vt[i + j - 1, 0 : lags_model[i + j - 1]] = (
-                    y_in_sample[0 : lags_model[i + j - 1]] - mat_vt[0, 0]
+                mat_vt[i + j, 0 : lags_model[i + j]] = (
+                    y_in_sample[0 : lags_model[i + j]] - mat_vt[0, 0]
                 )
                 # Renormalise the initial seasons
-                mat_vt[i + j - 1, 0 : lags_model[i + j - 1]] -= np.mean(
-                    mat_vt[i + j - 1, 0 : lags_model[i + j - 1]]
+                mat_vt[i + j, 0 : lags_model[i + j]] -= np.mean(
+                    mat_vt[i + j, 0 : lags_model[i + j]]
                 )
             else:
-                mat_vt[i + j - 1, 0 : lags_model[i + j - 1]] = initials_checked[
+                mat_vt[i + j, 0 : lags_model[i + j]] = initials_checked[
                     "initial_seasonal"
                 ][i]
     # For mixed models use a different set of initials
@@ -438,15 +438,15 @@ def _initialize_ets_seasonal_states_small_sample(
         for i in range(components_number_ets_seasonal):
             if initials_checked["initial_seasonal_estimate"]:
                 # abs() is needed for mixed ETS+ARIMA
-                mat_vt[i + j - 1, 0 : lags_model[i + j - 1]] = y_in_sample[
-                    0 : lags_model[i + j - 1]
+                mat_vt[i + j, 0 : lags_model[i + j]] = y_in_sample[
+                    0 : lags_model[i + j]
                 ] / abs(mat_vt[0, 0])
                 # Renormalise the initial seasons
-                mat_vt[i + j - 1, 0 : lags_model[i + j - 1]] /= np.exp(
-                    np.mean(np.log(mat_vt[i + j - 1, 0 : lags_model[i + j - 1]]))
+                mat_vt[i + j, 0 : lags_model[i + j]] /= np.exp(
+                    np.mean(np.log(mat_vt[i + j, 0 : lags_model[i + j]]))
                 )
             else:
-                mat_vt[i + j - 1, 0 : lags_model[i + j - 1]] = initials_checked[
+                mat_vt[i + j, 0 : lags_model[i + j]] = initials_checked[
                     "initial_seasonal"
                 ][i]
 

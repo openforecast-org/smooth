@@ -884,6 +884,14 @@ class OM(ADAM):
         observations_dict_for_creator["ot_logical"] = np.ones_like(
             original_ot_logical, dtype=bool
         )
+        # ``obs_nonzero`` has to follow ``ot_logical``. On a binary occurrence
+        # series it counts the ones, not the observations, so the creator's
+        # ``obs_nonzero >= 2 * lags_model_max`` guard sends any seasonal
+        # occurrence model with a low rate down the small-sample path -- R's
+        # adam_creator() has no such guard and always decomposes.
+        observations_dict_for_creator["obs_nonzero"] = int(
+            observations_dict["obs_in_sample"]
+        )
 
         adam_created = creator(
             creator_model_type,

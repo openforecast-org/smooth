@@ -1025,14 +1025,15 @@ om <- function(data,
                                      occurrenceType, adamArchitect$componentsNumberETSSeasonal,
                                      prefix = "o");
 
-        # Persistence vector
+        # Persistence vector. Keep every row of vecG, not just the ETS ones:
+        # adam() reports alpha together with the ARIMA psi and the xreg deltas,
+        # and simulate()/reapply() size their g vector against the full state
+        # vector. Truncating to the ETS components left a length-1 g against a
+        # 2-row state for an om with ARIMA, which aborted inside the C++ kernel
+        # with "incompatible matrix dimensions: 2x1 and 1x1".
         vecGFinal <- adamFilled$vecG;
-        if(adamArchitect$componentsNumberETS > 0){
-            persistenceVec <- as.vector(vecGFinal)[1:adamArchitect$componentsNumberETS];
-            names(persistenceVec) <- rownames(vecGFinal)[1:adamArchitect$componentsNumberETS];
-        } else {
-            persistenceVec <- numeric(0);
-        }
+        persistenceVec <- as.vector(vecGFinal);
+        names(persistenceVec) <- rownames(vecGFinal);
 
         # Initial values
         initialCollected <- adam_initial_collector(
@@ -1092,7 +1093,13 @@ om <- function(data,
             forecast = yForecast,
             states = matVt,
             profile = adamFitted$profile,
-            profileInitial = prof,
+            # The head the fitted recursion actually starts from, matching what
+            # adam() stores: `prof` is the pre-fit seed, which for an occurrence
+            # model is still on the raw probability scale (om_initial_transform
+            # and the backcasting pass both run after it), so seeding
+            # simulate()/rmultistep() from it starts the state recursion in the
+            # wrong space.
+            profileInitial = adamFitted$profile,
             persistence = persistenceVec,
             phi = if(nla$phiEstimate) res$B["phi"] else phi,
             transition = adamFilled$matF,

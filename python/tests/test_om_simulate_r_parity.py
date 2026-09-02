@@ -71,18 +71,6 @@ def _r_om_simulate(model, occurrence, y, errors, *, lags=None, orders=None):
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "OM fit converges to subtly different smoothing parameters "
-        "between Python (NLopt) and R for the same y — latents differ "
-        "by a consistent ratio that tracks alpha_python / alpha_R. "
-        "Not a simulate-path divergence; the randomizer plumbing is "
-        "verified by the OMG parity test which now passes via the "
-        "R-side simulateADAMCore randomizer-override added in this "
-        "commit. Tracked as an OM-fit-parity issue."
-    ),
-    strict=False,
-)
 def test_om_simulate_latent_matches_r():
     """OM(MNN, odds-ratio): latent series under matched errors."""
     y, n = _baseline()
@@ -110,13 +98,13 @@ def test_om_simulate_latent_matches_r():
 
 @pytest.mark.xfail(
     reason=(
-        "Multiplicative-seasonal OM (MNM) latent path produces all-NaN on "
-        "the Python side under matched errors (the multiplicative seasonal "
-        "component collapses to zero, propagating NaN through the link). "
-        "R's simulateADAMCore handles the same matrices without NaN — the "
-        "divergence is in the Python-side ADAM.simulate multiplicative-"
-        "seasonal numerics, not in OM.simulate itself. Tracked as a "
-        "follow-up."
+        "Seasonal OM (MNM): the fit itself is now identical — same profile, "
+        "same coefficients, same log-likelihood to all digits — but the "
+        "simulated latent series differ by a constant factor (4.87 on this "
+        "case), which is the ratio between the profile head R seeds from and "
+        "the initial level Python seeds from. Same class of defect as the "
+        "R-side seed fixed for the non-seasonal case, this time on the "
+        "Python side and only for the seasonal path. Tracked as a follow-up."
     ),
     strict=False,
 )
@@ -147,12 +135,14 @@ def test_om_simulate_seasonal_matches_r():
 
 @pytest.mark.xfail(
     reason=(
-        "R-side ``simulate.om`` on an OM with ARMA orders crashes inside "
-        "the C++ kernel ('element-wise multiplication: incompatible matrix "
-        "dimensions: 2x1 and 1x1') — an upstream R bug in "
-        "simulateADAMCore's matrix prep for OM+ARIMA. Python's "
-        "OM.simulate handles the same case cleanly (smoke test passes); "
-        "byte-equivalence is impossible until R is fixed."
+        "OM + ARIMA. R no longer aborts here — om() was truncating the "
+        "persistence vector to the ETS components, so the kernel got a "
+        "length-1 g against a 2-row state; that is fixed. What remains is "
+        "shared by both languages: the ETS level updates correctly but the "
+        "ARIMA state goes NaN on the first simulated step, so both sides "
+        "return one finite value and NaN thereafter. A defect in the "
+        "simulator's multiplicative-error ARIMA update, not a parity gap. "
+        "Tracked as a follow-up."
     ),
     strict=False,
 )

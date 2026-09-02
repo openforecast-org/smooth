@@ -28,7 +28,34 @@ SEASONALITY_OPTIONS = Literal["none", "simple", "partial", "full"]
 LOSS_OPTIONS = Literal[
     "likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"
 ]
+_VALID_LOSSES = (
+    "likelihood",
+    "MSE",
+    "MAE",
+    "HAM",
+    "MSEh",
+    "TMSE",
+    "GTMSE",
+    "MSCE",
+    "GPL",
+)
 _CES_NLOPT_WARNING_SHOWN = False
+
+
+def _check_loss(loss):
+    """Reject a loss ces() would not accept.
+
+    R's ces() runs match.arg() over exactly this set, so a callable or one of
+    ADAM's absolute / half-moment multistep losses is an error there. Without
+    this check the cost function falls through to its MSE branch and returns a
+    fit under a loss that was never requested.
+    """
+    if loss not in _VALID_LOSSES:
+        raise ValueError(
+            f"Unknown loss function: {loss!r}. CES accepts one of "
+            f"{', '.join(repr(v) for v in _VALID_LOSSES)}."
+        )
+    return
 
 
 def _pristine(kwargs):
@@ -252,6 +279,7 @@ class CES:
         -------
         self
         """
+        _check_loss(self.loss)
         y = np.asarray(y, dtype=np.float64).ravel()
 
         # CES parity with R depends on the stage-1 BOBYQA trajectory.
@@ -1009,6 +1037,7 @@ class AutoCES:
         -------
         self
         """
+        _check_loss(self.loss)
         y = np.asarray(y, dtype=np.float64).ravel()
 
         # Determine lags and frequency

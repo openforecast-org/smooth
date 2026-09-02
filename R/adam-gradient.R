@@ -18,8 +18,8 @@ adam_gradientLossCode <- function(loss, distribution, Etype, other, horizon,
     if(distribution == "default"){
         distribution <- switch(loss,
                                "likelihood"=switch(Etype, "A"="dnorm", "M"="dgamma"),
-                               "MAEh"=, "MACE"=, "MAE"="dlaplace",
-                               "HAMh"=, "CHAM"=, "HAM"="ds",
+                               "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"="dlaplace",
+                               "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"="ds",
                                "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
     }
     if(multisteps){

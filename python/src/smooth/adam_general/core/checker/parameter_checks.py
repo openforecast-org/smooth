@@ -56,10 +56,14 @@ def _check_distribution_loss(distribution, loss, silent=False):
         "TMAE",
         "THAM",
         "GTMSE",
-        "GTAME",
+        "GTMAE",
         "GTHAM",
         "LASSO",
         "RIDGE",
+        # Set upstream by om() / omg() when the user passes a callable, so it
+        # has to be accepted as a string by the time it reaches here. Mirrors
+        # the same entry in R's match.arg list (R/adamGeneral.R).
+        "custom",
     ]
 
     # Check distribution. ``None`` is the ADAM constructor's default and
@@ -77,8 +81,13 @@ def _check_distribution_loss(distribution, loss, silent=False):
         loss_function = loss
         loss = "custom"
     elif loss not in valid_losses:
-        _warn(f"Unknown loss function: {loss}. Switching to 'likelihood'.", silent)
-        loss = "likelihood"
+        # R stops here via match.arg(); silently falling back to "likelihood"
+        # would return a fit that is not the one that was asked for.
+        raise ValueError(
+            f"Unknown loss function: {loss!r}. It should be one of "
+            f"{', '.join(repr(v) for v in valid_losses if v != 'custom')}, "
+            "or a callable (actual, fitted, B) -> scalar."
+        )
 
     result = {"distribution": distribution, "loss": loss}
     if loss_function is not None:

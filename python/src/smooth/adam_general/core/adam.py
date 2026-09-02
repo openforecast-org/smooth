@@ -49,7 +49,7 @@ LOSS_OPTIONS = Literal[
     "TMAE",
     "THAM",
     "GTMSE",
-    "GTAME",
+    "GTMAE",
     "GTHAM",
     "LASSO",
     "RIDGE",

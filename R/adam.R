@@ -1408,8 +1408,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         if(distribution=="default"){
             distributionNew <- switch(loss,
                                       "likelihood"= switch(Etype, "A"= "dnorm", "M"= "dgamma"),
-                                      "MAEh"=, "MACE"=, "MAE"= "dlaplace",
-                                      "HAMh"=, "CHAM"=, "HAM"= "ds",
+                                      "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"= "dlaplace",
+                                      "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"= "ds",
                                       "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
         }
         else{
@@ -2059,8 +2059,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         if(distribution=="default"){
             distribution[] <- switch(loss,
                                      "likelihood"= switch(Etype, "A"= "dnorm", "M"= "dgamma"),
-                                     "MAEh"=, "MACE"=, "MAE"= "dlaplace",
-                                     "HAMh"=, "CHAM"=, "HAM"= "ds",
+                                     "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"= "dlaplace",
+                                     "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"= "ds",
                                      "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
         }
 
@@ -2614,8 +2614,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         if(distribution=="default"){
             distributionNew <- switch(loss,
                                       "likelihood"= switch(Etype, "A"= "dnorm", "M"= "dgamma"),
-                                      "MAEh"=, "MACE"=, "MAE"= "dlaplace",
-                                      "HAMh"=, "CHAM"=, "HAM"= "ds",
+                                      "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"= "dlaplace",
+                                      "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"= "ds",
                                       "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
         }
         else{

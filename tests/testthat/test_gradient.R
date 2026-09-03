@@ -274,8 +274,16 @@ test_that("gradient solves additive SSOE initials for CES/GUM/SSARIMA/SPARMA", {
     # These are additive SSOE models, so the affine least-squares gradient solve
     # applies: it must run (not fall back), differ from backcasting, and not lose
     # to backcasting on the in-sample SSE.
+    #
+    # The series carries a trend on purpose. On a pure random walk these models
+    # are over-parameterised, the two initialisations become near-degenerate,
+    # and the SSE comparison measures platform noise rather than the solve: with
+    # `y <- ts(100 + cumsum(rnorm(120, 0, 2)))` the GUM ratio is 1.000255 here
+    # and 1.0016 on CRAN's r-devel-fedora-gcc, which tipped the 1.001 allowance
+    # into an ERROR. With a trend every engine wins by 0.6-8%, so the assertion
+    # tests the solve again instead of the last few bits of a tie.
     set.seed(1)
-    y <- ts(100 + cumsum(rnorm(120, 0, 2)))
+    y <- ts(100 + 0.5 * (1:120) + rnorm(120, 0, 2))
     engines <- list(
         SSARIMA = function(i) ssarima(y, orders = list(ar = 1, i = 1, ma = 1), lags = 1,
                                       initial = i, loss = "MSE", silent = TRUE),

@@ -356,7 +356,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
             matricesCreated$vecG[nonZeroMA[,1],] <- matricesCreated$vecG[nonZeroMA[,1],] + maValue;
         }
 
-        if(initialType=="optimal"){
+        if(any(initialType==c("optimal","two-stage"))){
             # Fill in the AR components
             matricesCreated$matVt[nonZeroARI[,1], 1:componentsNumberARIMA] <- B[idx+c(1:componentsNumberARIMA)];
             # MA components are zero, so don't bother
@@ -498,12 +498,12 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     if(is.null(B)){
         # Build initial parameter vector
         B <- vector("numeric", arEstimate*pLength + maEstimate*qLength +
-                        (initialType=="optimal")*componentsNumberARIMA +
+                        any(initialType==c("optimal","two-stage"))*componentsNumberARIMA +
                         constantEstimate);
         names(B) <- c(paste0("phi",p), paste0("theta",q),
                       paste0("initial",c(1:componentsNumberARIMA)),
                       constantName)[c(rep(arEstimate, pLength), rep(maEstimate, qLength),
-                                      rep((initialType=="optimal"),componentsNumberARIMA),
+                                      rep(any(initialType==c("optimal","two-stage")),componentsNumberARIMA),
                                       constantEstimate)];
 
         idx <- 0
@@ -519,7 +519,13 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
             B[idx+1:qLength] <- acfValues;
             idx[] <- idx + qLength;
         }
-        if(initialType == "optimal") {
+        # "two-stage" shares this layout with "optimal". It gets no separate
+        # backcasting warm start, unlike adam()/ces()/ssarima()/gum(): a
+        # complete-backcast SPARMA leaves its ARIMA states at 0 ($initial and
+        # $profileInitial are both 0), so there is nothing for the first stage
+        # to hand over, and seeding from it would replace yInSample[1] with 0.
+        # The AR/MA parameters already start from pacf/acf estimates.
+        if(any(initialType==c("optimal","two-stage"))) {
             B[idx + c(1:componentsNumberARIMA)] <- yInSample[c(1:componentsNumberARIMA)];
             idx[] <- idx + componentsNumberARIMA;
         }

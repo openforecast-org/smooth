@@ -342,7 +342,14 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
             }
         }
         else if(bounds=="usual"){
-            if(any(B>1) || any(B<0)){
+            # Only the persistence / transition / measurement parameters belong
+            # in [0,1]. The initial states that follow them in B are levels of
+            # the series, so including them here made the whole of B infeasible
+            # for any series away from [0,1]: the optimiser was pinned against
+            # the box and returned initials of ~1 for a series around 100, with
+            # an in-sample SSE an order of magnitude worse than backcasting's.
+            if(nBoundedParameters>0 &&
+               (any(B[1:nBoundedParameters]>1) || any(B[1:nBoundedParameters]<0))){
                 return(1E+100);
             }
         }
@@ -485,6 +492,14 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     persistenceEstimate <- is.null(persistence);
     transitionEstimate <- is.null(transition);
     measurementEstimate <- is.null(measurement);
+
+    # Number of leading elements of B that the "usual" bounds apply to: the
+    # persistence, the transition and the measurement. Everything after them in
+    # B is initial states, which live on the scale of the data. CF() closes over
+    # this, so it has to be defined before the optimiser runs, not before CF().
+    nBoundedParameters <- persistenceEstimate*componentsNumberAll +
+        transitionEstimate*componentsNumberAll^2 +
+        measurementEstimate*componentsNumber;
     initialEstimate <- is.null(initialValue);
 
     # Provided measurement should be just a vector for the dynamic elements
@@ -607,30 +622,48 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                 nCoefficients[] <- nCoefficients + componentsNumber;
             }
 
-            # In case of optimal, get some initials from backcasting
-            if(initialType=="two-stage" && is.null(B)){
-                clNew <- cl;
-                # If environment is provided, use it
-                if(!is.null(ellipsis$environment)){
-                    env <- ellipsis$environment;
+            # The initial states need a seed. B was created by
+            # vector("numeric"), so without this they enter the optimiser at 0
+            # while the series sits at its own level -- for a series around 100
+            # the optimiser starts every state 100 units away and does not
+            # recover, ending with initials pinned near 1 and an in-sample SSE
+            # an order of magnitude worse than backcasting's.
+            #
+            # Note this block used to be guarded by `is.null(B)`, which is
+            # always FALSE here: B has just been assigned a few lines above.
+            # So neither "optimal" nor "two-stage" was seeded at all, and
+            # nCoefficients was left pointing at the initials, which the xreg
+            # block below then overwrote.
+            if(initialEstimate && any(initialType==c("optimal","two-stage"))){
+                if(initialType=="two-stage"){
+                    clNew <- cl;
+                    # If environment is provided, use it
+                    if(!is.null(ellipsis$environment)){
+                        env <- ellipsis$environment;
+                    }
+                    # Use complete backcasting
+                    clNew$initial <- "complete";
+                    # Shut things up
+                    clNew$silent <- TRUE;
+                    # Switch off regressors selection
+                    if(!is.null(clNew$regressors) && clNew$regressors=="select"){
+                        clNew$regressors <- "use";
+                    }
+
+                    # Call for GUM with backcasting
+                    gumBack <- suppressWarnings(eval(clNew, envir=env));
+                    B[1:nCoefficients] <- gumBack$B;
+                    initialSeed <- gumBack$initial$endogenous;
                 }
-                # Use complete backcasting
-                clNew$initial <- "complete";
-                # Shut things up
-                clNew$silent <- TRUE;
-                # Switch off regressors selection
-                if(!is.null(clNew$regressors) && clNew$regressors=="select"){
-                    clNew$regressors <- "use";
+                else{
+                    # "optimal": the creator has already derived the states from
+                    # the data (the intercept / slope block above), so start
+                    # from those.
+                    initialSeed <- matVt[1:componentsNumber,,drop=FALSE];
                 }
 
-                # Call for GUM with backcasting
-                gumBack <- suppressWarnings(eval(clNew, envir=env));
-                B[1:nCoefficients] <- gumBack$B;
-
-                # B <- c(B, gumBack$initial$endogenous);
                 for(i in 1:componentsNumber){
-                    # B[nCoefficients+(1:lagsModel[i])] <- matVt[i,lagsModelRev[i]:lagsModelMax];
-                    B[nCoefficients+(1:lagsModel[i])] <- gumBack$initial$endogenous[i,1:lagsModel[i]];
+                    B[nCoefficients+(1:lagsModel[i])] <- initialSeed[i,1:lagsModel[i]];
                     nCoefficients[] <- nCoefficients + lagsModel[i];
                 }
             }

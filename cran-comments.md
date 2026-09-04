@@ -1,17 +1,17 @@
 ---
 title: "Cran Comments"
 author: "Ivan Svetunkov"
-date: "03 September 2026"
+date: "04 September 2026"
 output: html_document
 ---
 
 ## Update
 
-This submission fixes the issues with the tests identified on CRAN.
+This submission fixes the issues with the tests in v4.5.1 identified on CRAN.
 
 
 ## Version
-This is ``smooth`` package, v4.5.1
+This is ``smooth`` package, v4.5.2
 
 
 ## Test environments

@@ -830,6 +830,15 @@ def _sum_r(values, axis=None):
     return np.asarray(total, dtype=float)
 
 
+# Overflow here is the infeasibility signal, not a defect. During optimisation
+# NLopt probes parameter vectors that make the state recursion diverge -- on a
+# 336-lag MSARIMA one probe reached |e| ~ 2e165 -- and squaring those errors
+# overflows to inf. That inf flows into the likelihood, CF() turns a non-finite
+# cost into the 1e300 penalty, and the optimiser steers away, which is exactly
+# what should happen. R computes the same thing and reports nothing, because R
+# does not warn on double overflow. Suppress the warning, not the value: the
+# result is unchanged, so the fit stays bit-comparable with R.
+@np.errstate(over="ignore")
 def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
     """
     Calculate scale parameter for the provided parameters.

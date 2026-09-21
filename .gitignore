@@ -179,3 +179,6 @@ dmypy.json
 python/tests/speed_tests/benchmark_data/
 # Large benchmark predictive-distribution result arrays (regenerate via the runners)
 python/tests/notebooks/*-dist.npy
+# Rscript's default graphics device: any plotting call (silent=FALSE, for one)
+# drops this in the working directory, and the package root must stay clean
+Rplots.pdf

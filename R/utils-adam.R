@@ -102,7 +102,17 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
         }
     }
 
+    # deparse(substitute(data)) in the caller returns the whole series whenever
+    # the data arrives by value -- do.call(adam, list(y)), for instance. The
+    # resulting "name" is useless and, past R's 10000-byte limit on names, makes
+    # the default formula unbuildable, so fall back to a plain name.
     responseName <- make.names(responseName)
+    if(nchar(responseName)>100){
+        responseName <- "y"
+    }
+    if(nchar(yName)>100){
+        yName <- "data"
+    }
 
     obsAll <- length(y) + (1 - holdout)*h
     obsInSample <- length(y) - holdout*h
@@ -210,6 +220,7 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
         obsAll = obsAll,
         xregData = xregData,
         responseName = responseName,
+        yName = yName,
         parametersNumber = parametersNumber,
         lags = lags,
         h = h,

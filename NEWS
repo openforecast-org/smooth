@@ -3,6 +3,8 @@ smooth v4.5.3 (Release date: 2026-09-21)
 
 Bugfixes:
 * `auto.msarima()` and `auto.adam()` failed on any series longer than roughly a thousand observations with "variable names are limited to 10000 bytes". The ARIMA order selector passed the data to the fitter by value, and the fitter takes the response name from `deparse(substitute(data))`, so the whole series was deparsed into the name. On `forecast::taylor` that name ran past R's 10000-byte limit and building the default formula from it aborted the selection. The data is now passed as a symbol, which also drops a deparse of the full series from every trial fit.
+* The same 10000-byte name error hit `adam()`, `ces()`, `ssarima()` and `auto.ces()` whenever the data arrived by value, as in `do.call(adam, list(y))`, since the response name again came from deparsing the series. The data checker now falls back to a plain name when the deparsed one runs past 100 characters. `auto.gum()` and `auto.ssarima()` were never affected: they pass the data to their fitters as a symbol.
+* Two tests called functions that are not exported -- `smoothType()` in `test_ces.R` and `forecast.adam()` in `test_omg.R` -- and errored out. They now qualify them with `smooth:::`.
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

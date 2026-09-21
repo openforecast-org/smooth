@@ -118,8 +118,8 @@ test_that("forecast(omg_obj) returns adam.forecast with expected fields", {
 test_that("forecast.omg values equal omgLinkFunction of forecast.adam sub-model outputs", {
     m   <- omg(y, h=10)
     fc  <- forecast(m, h=10)
-    fcA <- forecast.adam(m$modelA, h=10, interval="none", level=0.95, side="both", cumulative=FALSE)
-    fcB <- forecast.adam(m$modelB, h=10, interval="none", level=0.95, side="both", cumulative=FALSE)
+    fcA <- smooth:::forecast.adam(m$modelA, h=10, interval="none", level=0.95, side="both", cumulative=FALSE)
+    fcB <- smooth:::forecast.adam(m$modelB, h=10, interval="none", level=0.95, side="both", cumulative=FALSE)
     fA  <- as.vector(fcA$mean)
     fB  <- as.vector(fcB$mean)
     expected <- fA / (fA + fB)

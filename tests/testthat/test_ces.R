@@ -3,7 +3,7 @@ context("Tests for ces() function");
 # Basic CES selection
 testModel <- auto.ces(AirPassengers, silent=TRUE);
 test_that("Test CES selection on BJsales", {
-    expect_match(smoothType(testModel), "CES");
+    expect_match(smooth:::smoothType(testModel), "CES");
 })
 
 # Reuse previous CES

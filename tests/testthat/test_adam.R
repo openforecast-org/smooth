@@ -486,3 +486,15 @@ test_that("Best auto.adam ETS+ARIMA+Regression+outliers on AirPassengers", {
                            outliers="use", regressors="use", initial="back")
     expect_match(testModel$loss, "likelihood")
 })
+
+# Data passed by value, e.g. do.call(adam, list(y))
+test_that("The response name survives data passed by value", {
+    skip_on_cran()
+    set.seed(42)
+    y <- ts(100 + cumsum(rnorm(1500)))
+    # deparse(substitute(data)) returns the whole series here, which is past R's
+    # 10000-byte limit on names, so the checker must fall back to a plain one.
+    expect_lt(nchar(colnames(do.call(adam, list(y, model="ANN", silent=TRUE))$data)[1]), 100)
+    expect_lt(nchar(colnames(do.call(ces, list(y, silent=TRUE))$data)[1]), 100)
+    expect_lt(nchar(colnames(do.call(ssarima, list(y, silent=TRUE))$data)[1]), 100)
+})

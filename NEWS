@@ -1,3 +1,10 @@
+smooth v4.5.3 (Release date: 2026-09-21)
+=======
+
+Bugfixes:
+* `auto.msarima()` and `auto.adam()` failed on any series longer than roughly a thousand observations with "variable names are limited to 10000 bytes". The ARIMA order selector passed the data to the fitter by value, and the fitter takes the response name from `deparse(substitute(data))`, so the whole series was deparsed into the name. On `forecast::taylor` that name ran past R's 10000-byte limit and building the default formula from it aborted the selection. The data is now passed as a symbol, which also drops a deparse of the full series from every trial fit.
+
+
 smooth v4.5.2 (Release date: 2026-09-04)
 =======
 

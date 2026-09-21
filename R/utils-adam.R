@@ -2278,8 +2278,14 @@ adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
         cat("\nSelecting differences... ");
     }
 
-    # Base call arguments shared by every fitter call
-    base_call <- c(list(data=data, model=model, lags=lags,
+    # Base call arguments shared by every fitter call.
+    # The data is passed as the symbol `data`, not by value: the fitter takes the
+    # response name from deparse(substitute(data)), so a by-value call deparsed
+    # the whole series into that name. Beyond roughly a thousand observations
+    # this exceeds R's 10000-byte limit on names, and building the default
+    # formula from it aborted the selection with "variable names are limited to
+    # 10000 bytes". do.call() below evaluates the symbol in this frame.
+    base_call <- c(list(data=quote(data), model=model, lags=lags,
                         formula=formula, h=h, holdout=holdout,
                         persistence=persistence, phi=phi, initial=initial,
                         ic=ic, bounds=bounds, regressors=regressors,

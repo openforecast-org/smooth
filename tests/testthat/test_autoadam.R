@@ -101,3 +101,16 @@ test_that("auto.adam() with outliers='select' on BJsales", {
     expect_equal(modelType(m), "AMdN")
     expect_equal(AICc(m), 525.592, tolerance=0.01)
 })
+
+# 9. Long series: the ARIMA selector must not deparse the data into a name
+test_that("auto.msarima() selects orders on a series longer than R's name limit", {
+    skip_on_cran()
+    set.seed(42)
+    y <- ts(100 + cumsum(rnorm(1500)))
+    m <- auto.msarima(y, orders=list(ar=1, i=1, ma=1), lags=1,
+                      h=10, holdout=TRUE, silent=TRUE)
+    # The response name comes from deparse(substitute(data)) inside the fitter;
+    # deparsing 1500 observations into it breaks R's 10000-byte limit on names.
+    expect_lt(nchar(colnames(m$data)[1]), 100)
+    expect_true(grepl("ARIMA", m$model))
+})

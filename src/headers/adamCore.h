@@ -86,6 +86,10 @@ public:
     // construction; defaults to false (no ARIMA differencing).
     bool flipConstant = false;
 
+    // Length of the zero-error head that headFillBwd() produces and that the final forward pass
+    // filters over. 0 means "use lagsModelMax", i.e. the behaviour before this change.
+    unsigned int headLength = 0;
+
 private:
     arma::uvec lags;
     char E;
@@ -410,31 +414,36 @@ private:
     // Private helper: shared loop control for fit(), omfit(), omfitGeneral()
     template<typename ForwardFn, typename BackwardFn,
              typename HeadFillFwdFn, typename HeadFillBwdFn,
-             typename TrendReversalFn>
-    void fitLoopImpl(int obs, int lagsModelMax,
+             typename TrendReversalFn, typename HeadForwardFn>
+    void fitLoopImpl(int obs, int H,
                      bool backcast, unsigned int nIterations,
                      ForwardFn forwardStep,
                      BackwardFn backwardStep,
                      HeadFillFwdFn headFillFwd,
                      HeadFillBwdFn headFillBwd,
-                     TrendReversalFn trendReversal) {
+                     TrendReversalFn trendReversal,
+                     HeadForwardFn headForwardStep) {
         // Loop for the backcast
         for (unsigned int j=1; j<=nIterations; j=j+1) {
-            // Refine the head so the initial level/trend land at position -lagsModelMax+1
-            // and walk forward across the head cycle. Skip when lagsModelMax=1 (nothing to fill).
-            if(lagsModelMax > 1) {
-                headFillFwd();
+            if(j == 1) {
+                // Refine the head so the initial level/trend land at position -H+1
+                // and walk forward across the head cycle. Skip when H=1 (nothing to fill).
+                if(H > 1) {
+                    headFillFwd();
+                }
+            } else {
+                headForwardStep();
             }
             ////// Run forward
             // Loop for the model construction
-            for (int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
+            for (int i=H; i<obs+H; i=i+1) {
                 forwardStep(i);
             }
             ////// Backwards run
             if(backcast && j<nIterations) {
                 // Change the specific element in the state vector to negative/inverse
                 trendReversal();
-                for (int i=obs+lagsModelMax-1; i>=lagsModelMax; i=i-1) {
+                for (int i=obs+H-1; i>=H; i=i-1) {
                     backwardStep(i);
                 }
                 // Fill in the head of the series.
@@ -445,19 +454,40 @@ private:
         }
     }
 
+    // Overload for omfitGeneral (preserves existing behavior)
+    template<typename ForwardFn, typename BackwardFn,
+             typename HeadFillFwdFn, typename HeadFillBwdFn,
+             typename TrendReversalFn>
+    void fitLoopImpl(int obs, int lagsModelMax,
+                     bool backcast, unsigned int nIterations,
+                     ForwardFn forwardStep,
+                     BackwardFn backwardStep,
+                     HeadFillFwdFn headFillFwd,
+                     HeadFillBwdFn headFillBwd,
+                     TrendReversalFn trendReversal) {
+        auto noopHeadForward = [&]() {
+            if(lagsModelMax > 1) {
+                headFillFwd();
+            }
+        };
+        fitLoopImpl(obs, lagsModelMax, backcast, nIterations,
+                    forwardStep, backwardStep, headFillFwd, headFillBwd,
+                    trendReversal, noopHeadForward);
+    }
+
     // Private helper: refine the head of a state matrix so that the initial
-    // level/trend are placed at column 0 (observation -lagsModelMax+1) and the
+    // level/trend are placed at column 0 (observation -headLength+1) and the
     // trend rows are walked forward one step per column across the head cycle.
     // Uses this instance's T/E/S/nETS/... members. For the T=='N' case it just
     // copies the profile into the head columns (no trend to walk).
     void refineHeadFwd(arma::mat &matVt, arma::mat &profile,
                        arma::mat const &matF,
-                       arma::umat const &lookup, int lagsModelMax) {
+                       arma::umat const &lookup, int headLength) {
         if(T != 'N') {
             // Record the initial profile to the first column
             matVt.col(0) = profile(lookup.col(0));
             // Update the head, but only for the trend component
-            for (int i=1; i<lagsModelMax; i=i+1) {
+            for (int i=1; i<headLength; i=i+1) {
                 profile(lookup.col(i).rows(0,1)) =
                     adamFvalue(profile(lookup.col(i)),
                                matF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
@@ -466,7 +496,7 @@ private:
             }
         } else {
             // No trend to walk; just seed the head columns from the profile
-            for (int i=0; i<lagsModelMax; i=i+1) {
+            for (int i=0; i<headLength; i=i+1) {
                 matVt.col(i) = profile(lookup.col(i));
             }
         }
@@ -614,14 +644,19 @@ public:
 
         int obs = vectorYt.n_rows;
         int lagsModelMax = max(lags);
+        unsigned int H = (headLength == 0 ? lagsModelMax : headLength);
+        if(H < (unsigned int)lagsModelMax) {
+            H = lagsModelMax;
+        }
 
         // Fitted values and the residuals
         arma::vec vecYfit(obs, arma::fill::zeros);
         arma::vec vecErrors(obs, arma::fill::zeros);
+        arma::vec backcasts(H, arma::fill::zeros);
 
         // What to do in the forward pass
         auto forwardStep = [&](int i) {
-            int idx = i - lagsModelMax;
+            int idx = i - H;
             /* # Measurement equation and the error term */
             vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                     matrixWt.row(idx), E, T, S,
@@ -644,7 +679,7 @@ public:
 
         // What to do in the backward pass
         auto backwardStep = [&](int i) {
-            int idx = i - lagsModelMax;
+            int idx = i - H;
             /* # Measurement equation and the error term */
             vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                     matrixWt.row(idx), E, T, S,
@@ -665,15 +700,42 @@ public:
         // How to fill in the head before the forward pass
         auto headFillFwd = [&]() {
             refineHeadFwd(matrixVt, profilesRecent, matrixF,
-                          indexLookupTable, lagsModelMax);
+                          indexLookupTable, H);
         };
 
-        // How to fix the head after the bakwards pass
+        // How to fix the head after the bakwards pass and record predicted backcasts
         auto headFillBwd = [&]() {
-            for (int i=lagsModelMax-1; i>=0; i=i-1) {
+            for (int i=H-1; i>=0; i=i-1) {
                 profilesRecent(indexLookupTable.col(i)) =
                     adamFvalue(profilesRecent(indexLookupTable.col(i)),
                                matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
+                double yHat = adamWvalue(profilesRecent(indexLookupTable.col(i)),
+                        matrixWt.row(0), E, T, S,
+                        nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
+                    yHat = 1;
+                }
+                backcasts(i) = yHat;
+            }
+        };
+
+        // How to filter over the backcast head on subsequent forward passes
+        auto headForwardStep = [&]() {
+            for (unsigned int i=0; i<H; i=i+1) {
+                double yFitHead = adamWvalue(profilesRecent(indexLookupTable.col(i)),
+                        matrixWt.row(0), E, T, S,
+                        nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                if((E=='M' || T=='M' || S=='M') && (yFitHead<=0)){
+                    yFitHead = 1;
+                }
+                double errHead = errorf(backcasts(i), yFitHead, E, 1.0, O);
+                profilesRecent(indexLookupTable.col(i)) =
+                    adamFvalue(profilesRecent(indexLookupTable.col(i)),
+                               matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                    adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(0), E, T, S,
+                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                               vectorG, errHead, yFitHead, adamETS);
+                matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
             }
         };
 
@@ -689,8 +751,8 @@ public:
         };
 
         // Do the fit!
-        fitLoopImpl(obs, lagsModelMax, backcast, nIterations,
-                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal);
+        fitLoopImpl(obs, H, backcast, nIterations,
+                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal, headForwardStep);
 
         FitResult result;
         result.states = matrixVt;
@@ -1304,57 +1366,82 @@ public:
         }
 
         int lagsModelMax = max(lags);
+        unsigned int H = (headLength == 0 ? lagsModelMax : headLength);
+        if(H < (unsigned int)lagsModelMax) {
+            H = lagsModelMax;
+        }
 
         arma::mat matYfit(obs, nSeries, arma::fill::zeros);
         arma::vec vecErrors(obs, arma::fill::zeros);
 
         for(unsigned int k=0; k<nSeries; k=k+1){
             // Loop for the backcasting
+            arma::vec backcasts(H, arma::fill::zeros);
             for (unsigned int j=1; j<=nIterations; j=j+1) {
-                // Refine the head via the shared helper so it is walked one step
-                // per column across the head cycle (or copied verbatim when T=='N').
-                if(lagsModelMax > 1) {
-                    // Bind slice views so refineHeadFwd can mutate them via references.
-                    arma::mat sliceVt = arrayVt.slice(k);
-                    arma::mat sliceProfile = arrayProfilesRecent.slice(k);
-                    arma::mat sliceF = arrayF.slice(k);
-                    // Note: reapply's original branch used the full profile column,
-                    // not just the trend rows, so we call refineHeadFwd once here to
-                    // match — the helper writes the trend-walked value into the
-                    // level+trend rows and preserves the seasonal via the profile.
-                    refineHeadFwd(sliceVt, sliceProfile, sliceF,
-                                  indexLookupTable, lagsModelMax);
-                    arrayVt.slice(k) = sliceVt;
-                    arrayProfilesRecent.slice(k) = sliceProfile;
+                if(j == 1) {
+                    // Refine the head via the shared helper so it is walked one step
+                    // per column across the head cycle (or copied verbatim when T=='N').
+                    if(H > 1) {
+                        // Bind slice views so refineHeadFwd can mutate them via references.
+                        arma::mat sliceVt = arrayVt.slice(k);
+                        arma::mat sliceProfile = arrayProfilesRecent.slice(k);
+                        arma::mat sliceF = arrayF.slice(k);
+                        // Note: reapply's original branch used the full profile column,
+                        // not just the trend rows, so we call refineHeadFwd once here to
+                        // match — the helper writes the trend-walked value into the
+                        // level+trend rows and preserves the seasonal via the profile.
+                        refineHeadFwd(sliceVt, sliceProfile, sliceF,
+                                      indexLookupTable, H);
+                        arrayVt.slice(k) = sliceVt;
+                        arrayProfilesRecent.slice(k) = sliceProfile;
+                    }
+                } else {
+                    for(unsigned int i=0; i<H; i=i+1) {
+                        double yFitHead = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                                arrayWt.slice(k).row(0), E, T, S,
+                                nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                        if((E=='M' || T=='M' || S=='M') && (yFitHead<=0)){
+                            yFitHead = 1;
+                        }
+                        double errHead = errorf(backcasts(i), yFitHead, E, 1.0);
+                        arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
+                            adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
+                                       arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                            adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                                       arrayF.slice(k), arrayWt.slice(k).row(0), E, T, S,
+                                       nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                                       matrixG.col(k), errHead, yFitHead, adamETS);
+                        arrayVt.slice(k).col(i) = arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i));
+                    }
                 }
                 // Loop for the model construction
-                for(int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
+                for(int i=H; i<obs+H; i=i+1) {
                     /* # Measurement equation and the error term */
-                    matYfit(i-lagsModelMax,k) = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                            arrayWt.slice(k).row(i-lagsModelMax), E, T, S,
+                    matYfit(i-H,k) = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                            arrayWt.slice(k).row(i-H), E, T, S,
                             nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
 
                     // Fix potential issue with negatives in mixed models
-                    if((E=='M' || T=='M' || S=='M') && (matYfit(i-lagsModelMax,k)<=0)){
-                        matYfit(i-lagsModelMax,k) = 1;
+                    if((E=='M' || T=='M' || S=='M') && (matYfit(i-H,k)<=0)){
+                        matYfit(i-H,k) = 1;
                     }
 
                     // We need this multiplication for cases, when occurrence is fractional
-                    if(matrixOt(i-lagsModelMax)!=0){
-                        matYfit(i-lagsModelMax,k) = matrixOt(i-lagsModelMax) * matYfit(i-lagsModelMax,k);
+                    if(matrixOt(i-H)!=0){
+                        matYfit(i-H,k) = matrixOt(i-H) * matYfit(i-H,k);
                     }
                     // errorf() returns 0 immediately when ot==0
-                    vecErrors(i-lagsModelMax) = errorf(matrixYt(i-lagsModelMax), matYfit(i-lagsModelMax,k), E,
-                                                       matrixOt(i-lagsModelMax));
+                    vecErrors(i-H) = errorf(matrixYt(i-H), matYfit(i-H,k), E,
+                                                       matrixOt(i-H));
 
                     /* # Transition equation */
                     arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
                     adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
                                arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
                                    adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                              arrayF.slice(k), arrayWt.slice(k).row(i-lagsModelMax), E, T, S,
+                                              arrayF.slice(k), arrayWt.slice(k).row(i-H), E, T, S,
                                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
-                                              matrixG.col(k), vecErrors(i-lagsModelMax), matYfit(i-lagsModelMax,k), adamETS);
+                                              matrixG.col(k), vecErrors(i-H), matYfit(i-H,k), adamETS);
 
                     arrayVt.slice(k).col(i) = arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i));
                 }
@@ -1375,38 +1462,45 @@ public:
                             -arrayProfilesRecent.slice(k)(nComponents-1);
                     }
 
-                    for(int i=obs+lagsModelMax-1; i>=lagsModelMax; i=i-1) {
+                    for(int i=obs+H-1; i>=H; i=i-1) {
                         /* # Measurement equation and the error term */
-                        matYfit(i-lagsModelMax,k) = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                arrayWt.slice(k).row(i-lagsModelMax), E, T, S,
+                        matYfit(i-H,k) = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                                arrayWt.slice(k).row(i-H), E, T, S,
                                 nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
 
                         // Fix potential issue with negatives in mixed models
-                        if((E=='M' || T=='M' || S=='M') && (matYfit(i-lagsModelMax,k)<=0)){
-                            matYfit(i-lagsModelMax,k) = 1;
+                        if((E=='M' || T=='M' || S=='M') && (matYfit(i-H,k)<=0)){
+                            matYfit(i-H,k) = 1;
                         }
 
-                        if(matrixOt(i-lagsModelMax)!=0){
-                            matYfit(i-lagsModelMax,k) = matrixOt(i-lagsModelMax) * matYfit(i-lagsModelMax,k);
+                        if(matrixOt(i-H)!=0){
+                            matYfit(i-H,k) = matrixOt(i-H) * matYfit(i-H,k);
                         }
-                        vecErrors(i-lagsModelMax) = errorf(matrixYt(i-lagsModelMax), matYfit(i-lagsModelMax,k), E,
-                                                           matrixOt(i-lagsModelMax));
+                        vecErrors(i-H) = errorf(matrixYt(i-H), matYfit(i-H,k), E,
+                                                           matrixOt(i-H));
 
                         /* # Transition equation */
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
                         adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
                                    arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
                                        adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                                  arrayF.slice(k), arrayWt.slice(k).row(i-lagsModelMax), E, T, S,
+                                                  arrayF.slice(k), arrayWt.slice(k).row(i-H), E, T, S,
                                                   nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
-                                                  matrixG.col(k), vecErrors(i-lagsModelMax), matYfit(i-lagsModelMax,k), adamETS);
+                                                  matrixG.col(k), vecErrors(i-H), matYfit(i-H,k), adamETS);
                     }
 
-                    // Fill in the head of the series (backward pass).
-                    for(int i=lagsModelMax-1; i>=0; i=i-1) {
+                    // Fill in the head of the series (backward pass) and record backcasts
+                    for(int i=H-1; i>=0; i=i-1) {
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                            adamFvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                            adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
                                        arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
+                        double yHat = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                                arrayWt.slice(k).row(0), E, T, S,
+                                nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                        if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
+                            yHat = 1;
+                        }
+                        backcasts(i) = yHat;
                     }
 
                     // Change the specific element in the state vector to negative

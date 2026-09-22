@@ -222,6 +222,7 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
                        componentsNumberETS, order,
                        xregNumber, length(lagsModelAll),
                        constantRequired, FALSE);
+        adamCpp$headLength <- lagsModelMax;
 
         #### Fitter and the losses calculation ####
         adamFitted <- adamCpp$fit(matVt, matWt,

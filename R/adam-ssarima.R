@@ -586,6 +586,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     # Drift flips sign in the backcasting backward pass when the total order
     # of differencing is odd — the ARIMA analog of the ETS trend reversal
     adamCpp$flipConstant <- constantRequired && (sum(iOrders) %% 2 == 1);
+    adamCpp$headLength <- headLength;
 
     if(!is.null(initialValueProvided)){
         initialType <- "provided";
@@ -709,7 +710,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     if(modelDo=="estimate"){
         # Create ADAM profiles for correct treatment of seasonality
         adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses);
+                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                           headLength=headLength);
         profilesRecentTable <- adamProfiles$recent;
         if(initialType=="provided"){
             profilesRecentTable[1:componentsNumberARIMA,1] <- matVt[1:componentsNumberARIMA,1];
@@ -1020,7 +1022,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
 
         # Create index lookup table
         adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                       lags=lags, yIndex=yIndexAll, yClasses=yClasses);
+                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                           headLength=headLength);
         indexLookupTable <- adamProfiles$lookup;
         if(is.null(profilesRecentTable)){
             profilesRecentInitial <- profilesRecentTable <- adamProfiles$recent;
@@ -1148,6 +1151,9 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     # Write down the recent profile for future use
     profilesRecentTable <- adamFitted$profile;
     matVt[] <- adamFitted$states;
+    if(headLength > lagsModelMax){
+        matVt <- matVt[, c((headLength - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
+    }
 
     # Write down the initials in the recent profile
     if(!any(initialType==c("complete","backcasting","gradient"))){
@@ -1164,7 +1170,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     }
     if(h>0){
         yForecast[] <- adamCpp$forecast(tail(matWt,h), matF,
-                                        indexLookupTable[,lagsModelMax+obsInSample+c(1:h),drop=FALSE],
+                                        indexLookupTable[,headLength+obsInSample+c(1:h),drop=FALSE],
                                         profilesRecentTable,
                                         h)$forecast;
     }

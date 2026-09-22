@@ -266,7 +266,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
         xregParametersEstimated <- 0;
         xregParametersPersistence <- 0;
     }
-    indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample)$lookup;
+    headLength <- if(!is.null(object$adamCpp$headLength) && object$adamCpp$headLength > 0) object$adamCpp$headLength else lagsModelMax;
+    indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample,
+                                           headLength=headLength)$lookup;
 
     # Create C++ adam class
     adamCpp <- new(adamCore,
@@ -280,6 +282,7 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     # of differencing is odd — the ARIMA analog of the ETS trend reversal
     adamCpp$flipConstant <- constantRequired && !is.null(object$orders) &&
         (sum(object$orders$i) %% 2 == 1);
+    adamCpp$headLength <- headLength;
 
     # Generate the data from the multivariate normal
     randomParameters <- mvrnorm(nsim, coef(object), vcovAdam);
@@ -479,8 +482,15 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     #### Prepare the necessary matrices ####
     # States are defined similar to how it is done in adam.
     # Inserting the existing one is needed in order to deal with the case, when one of the initials was provided
-    arrVt <- array(t(object$states),c(ncol(object$states),nrow(object$states),nsim),
-                   dimnames=list(colnames(object$states),NULL,paste0("nsim",c(1:nsim))));
+    arrVt <- array(0, c(ncol(object$states), obsInSample + headLength, nsim),
+                   dimnames=list(colnames(object$states), NULL, paste0("nsim", c(1:nsim))));
+    if(headLength == lagsModelMax){
+        arrVt[] <- array(t(object$states), c(ncol(object$states), nrow(object$states), nsim));
+    }
+    else{
+        arrVt[, headLength + c(1:obsInSample), ] <- array(t(tail(object$states, obsInSample)),
+                                                          c(ncol(object$states), obsInSample, nsim));
+    }
     # Set the proper time stamps for the fitted
     if(any(yClasses=="zoo")){
         fittedMatrix <- zoo(array(NA,c(obsInSample,nsim),
@@ -794,7 +804,11 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                                     indexLookupTable, profilesRecentArray,
                                     any(object$initialType==c("backcasting","complete")))
 
-    arrVt[] <- adamRefitted$states;
+    arrVt <- adamRefitted$states;
+    if(headLength > lagsModelMax){
+        arrVt <- arrVt[, c((headLength - lagsModelMax + 1):dim(arrVt)[2]), , drop=FALSE];
+    }
+    dimnames(arrVt) <- list(colnames(object$states), NULL, paste0("nsim", c(1:nsim)));
     fittedMatrix[] <- adamRefitted$fitted * as.vector(pt);
     profilesRecentArray[] <- adamRefitted$profile;
 

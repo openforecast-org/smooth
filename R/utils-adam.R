@@ -389,7 +389,7 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
                              componentsNumberARIMA,
                              obsAll, yIndexAll, yClasses, adamETS,
                              profilesRecentTable=NULL, profilesRecentProvided=FALSE,
-                             flipConstant=FALSE){
+                             flipConstant=FALSE, headLength=NULL){
     if(etsModel){
         modelIsTrendy <- Ttype != "N"
         if(modelIsTrendy){
@@ -438,10 +438,14 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
     }
 
     lagsModelMax <- max(lagsModelAll)
-    obsStates <- obsInSample + lagsModelMax
+    if(is.null(headLength)){
+        headLength <- lagsModelMax
+    }
+    obsStates <- obsInSample + headLength
 
     adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                       lags=lags, yIndex=yIndexAll, yClasses=yClasses)
+                                       lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                       headLength=headLength)
     if(profilesRecentProvided){
         profilesRecentTable <- profilesRecentTable[, 1:lagsModelMax, drop=FALSE]
     }
@@ -462,11 +466,13 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
     # order of ARIMA differencing is odd (time reversal changes the drift by
     # (-1)^(d+D)) — the ARIMA analog of the ETS trend reversal
     adamCpp$flipConstant <- flipConstant
+    adamCpp$headLength <- headLength
 
     return(list(
         lagsModel = lagsModel,
         lagsModelAll = lagsModelAll,
         lagsModelMax = lagsModelMax,
+        headLength = headLength,
         componentsNumberETS = componentsNumberETS,
         componentsNumberETSSeasonal = componentsNumberETSSeasonal,
         componentsNumberETSNonSeasonal = componentsNumberETSNonSeasonal,

@@ -482,12 +482,17 @@ private:
     // copies the profile into the head columns (no trend to walk).
     void refineHeadFwd(arma::mat &matVt, arma::mat &profile,
                        arma::mat const &matF,
-                       arma::umat const &lookup, int headLength) {
+                       arma::umat const &lookup, int lagsModelMax, int H) {
+        int headOffset = H - lagsModelMax;
         if(T != 'N') {
-            // Record the initial profile to the first column
-            matVt.col(0) = profile(lookup.col(0));
+            for (int i=0; i<headOffset; i=i+1) {
+                matVt.col(i) = profile(lookup.col(i));
+            }
+            // Record the initial profile to the start of the seasonal cycle
+            profile(lookup.col(headOffset).rows(0,1)) = profile(lookup.col(0).rows(0,1));
+            matVt.col(headOffset) = profile(lookup.col(headOffset));
             // Update the head, but only for the trend component
-            for (int i=1; i<headLength; i=i+1) {
+            for (int i=headOffset+1; i<H; i=i+1) {
                 profile(lookup.col(i).rows(0,1)) =
                     adamFvalue(profile(lookup.col(i)),
                                matF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
@@ -496,10 +501,16 @@ private:
             }
         } else {
             // No trend to walk; just seed the head columns from the profile
-            for (int i=0; i<headLength; i=i+1) {
+            for (int i=0; i<H; i=i+1) {
                 matVt.col(i) = profile(lookup.col(i));
             }
         }
+    }
+
+    void refineHeadFwd(arma::mat &matVt, arma::mat &profile,
+                       arma::mat const &matF,
+                       arma::umat const &lookup, int lagsModelMax) {
+        refineHeadFwd(matVt, profile, matF, lookup, lagsModelMax, lagsModelMax);
     }
 
 public:
@@ -700,15 +711,27 @@ public:
         // How to fill in the head before the forward pass
         auto headFillFwd = [&]() {
             refineHeadFwd(matrixVt, profilesRecent, matrixF,
-                          indexLookupTable, H);
+                          indexLookupTable, lagsModelMax, H);
         };
 
-        // How to fix the head after the bakwards pass and record predicted backcasts
+        // How to revert the trend component for backcasting.
+        // The constant (drift) flips sign when the total order of differencing
+        // is odd — the direct ARIMA analog of the ETS trend reversal.
+        auto trendReversal = [&]() {
+            if(T == 'A')      { profilesRecent(1) = -profilesRecent(1); }
+            else if(T == 'M') { profilesRecent(1) = 1/profilesRecent(1); }
+            if(constant && flipConstant) {
+                profilesRecent(nComponents-1) = -profilesRecent(nComponents-1);
+            }
+        };
+
+        // How to fix the head after the backwards pass and record predicted backcasts
         auto headFillBwd = [&]() {
             for (int i=H-1; i>=0; i=i-1) {
                 profilesRecent(indexLookupTable.col(i)) =
                     adamFvalue(profilesRecent(indexLookupTable.col(i)),
                                matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
+                trendReversal();
                 double yHat = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                         matrixWt.row(0), E, T, S,
                         nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
@@ -716,6 +739,7 @@ public:
                     yHat = 1;
                 }
                 backcasts(i) = yHat;
+                trendReversal();
             }
         };
 
@@ -728,7 +752,7 @@ public:
                 if((E=='M' || T=='M' || S=='M') && (yFitHead<=0)){
                     yFitHead = 1;
                 }
-                double errHead = errorf(backcasts(i), yFitHead, E, 1.0, O);
+                double errHead = errorf(backcasts(i), yFitHead, E, 1.0);
                 profilesRecent(indexLookupTable.col(i)) =
                     adamFvalue(profilesRecent(indexLookupTable.col(i)),
                                matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
@@ -736,17 +760,6 @@ public:
                                nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                                vectorG, errHead, yFitHead, adamETS);
                 matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
-            }
-        };
-
-        // How to revert the trend component for backcasting.
-        // The constant (drift) flips sign when the total order of differencing
-        // is odd — the direct ARIMA analog of the ETS trend reversal.
-        auto trendReversal = [&]() {
-            if(T == 'A')      { profilesRecent(1) = -profilesRecent(1); }
-            else if(T == 'M') { profilesRecent(1) = 1/profilesRecent(1); }
-            if(constant && flipConstant) {
-                profilesRecent(nComponents-1) = -profilesRecent(nComponents-1);
             }
         };
 
@@ -1391,7 +1404,7 @@ public:
                         // match — the helper writes the trend-walked value into the
                         // level+trend rows and preserves the seasonal via the profile.
                         refineHeadFwd(sliceVt, sliceProfile, sliceF,
-                                      indexLookupTable, H);
+                                      indexLookupTable, lagsModelMax, H);
                         arrayVt.slice(k) = sliceVt;
                         arrayProfilesRecent.slice(k) = sliceProfile;
                     }
@@ -1494,6 +1507,16 @@ public:
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
                             adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
                                        arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
+                        if(T=='A'){
+                            arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
+                        }
+                        else if(T=='M'){
+                            arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
+                        }
+                        if(constant && flipConstant){
+                            arrayProfilesRecent.slice(k)(nComponents-1) =
+                                -arrayProfilesRecent.slice(k)(nComponents-1);
+                        }
                         double yHat = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                                 arrayWt.slice(k).row(0), E, T, S,
                                 nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
@@ -1501,6 +1524,16 @@ public:
                             yHat = 1;
                         }
                         backcasts(i) = yHat;
+                        if(T=='A'){
+                            arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
+                        }
+                        else if(T=='M'){
+                            arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
+                        }
+                        if(constant && flipConstant){
+                            arrayProfilesRecent.slice(k)(nComponents-1) =
+                                -arrayProfilesRecent.slice(k)(nComponents-1);
+                        }
                     }
 
                     // Change the specific element in the state vector to negative

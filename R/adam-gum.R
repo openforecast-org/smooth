@@ -451,7 +451,8 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         lagsModelAll <- lagsModel;
     }
     lagsModelMax <- max(lagsModelAll);
-    obsStates[] <- obsInSample + lagsModelMax;
+    headLength <- if(is.null(ellipsis$headLength)) lagsModelMax else if(is.numeric(ellipsis$headLength)) max(lagsModelMax, min(round(ellipsis$headLength), obsInSample)) else lagsModelMax;
+    obsStates[] <- obsInSample + headLength;
 
     # The reversed lags to fill in values in the state vector
     # lagsModelRev <- lagsModelMax - lagsModel + 1;

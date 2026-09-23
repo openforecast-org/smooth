@@ -288,19 +288,30 @@ def _check_persistence(
 
     # Handle dictionary of named parameters
     if isinstance(persistence, dict):
+        # R accepts the Greek names as aliases of the component names, with the
+        # component name winning when both are given (R/adamGeneral.R).
+        def _named(name, alias):
+            if persistence.get(name) is not None:
+                return persistence[name]
+            return persistence.get(alias)
+
+        level_val = _named("level", "alpha")
+        trend_val = _named("trend", "beta")
+        seasonal_val = _named("seasonal", "gamma")
+        xreg_val = _named("xreg", "delta")
+
         # Process level persistence
-        if "level" in persistence:
-            result["persistence_level"] = persistence["level"]
+        if level_val is not None:
+            result["persistence_level"] = level_val
             result["persistence_level_estimate"] = False
 
         # Process trend persistence
-        if "trend" in persistence and trend_type != "N":
-            result["persistence_trend"] = persistence["trend"]
+        if trend_val is not None and trend_type != "N":
+            result["persistence_trend"] = trend_val
             result["persistence_trend_estimate"] = False
 
         # Process seasonal persistence
-        if "seasonal" in persistence and len(lags_model_seasonal) > 0:
-            seasonal_val = persistence["seasonal"]
+        if seasonal_val is not None and len(lags_model_seasonal) > 0:
             if isinstance(seasonal_val, (int, float)):
                 # Single value applies to all seasonal components
                 result["persistence_seasonal"] = [seasonal_val] * n_seasonal
@@ -322,8 +333,8 @@ def _check_persistence(
                 result["persistence_seasonal_estimate"] = [False] * n_seasonal
 
         # Process xreg persistence
-        if "xreg" in persistence and xreg_model:
-            result["persistence_xreg"] = persistence["xreg"]
+        if xreg_val is not None and xreg_model:
+            result["persistence_xreg"] = xreg_val
             result["persistence_xreg_estimate"] = False
             result["persistence_xreg_provided"] = True
 

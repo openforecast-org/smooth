@@ -8,7 +8,7 @@ Builds matF, vecG, matWt, matVt for CES with four seasonality types.
 import numpy as np
 
 from smooth.adam_general.core.creator.architector import adam_profile_creator
-from smooth.adam_general.core.utils.utils import msdecompose
+from smooth.adam_general.core.utils.utils import _mean_r, msdecompose
 
 
 def ces_creator(
@@ -125,7 +125,7 @@ def ces_creator(
                 row_names[2 + 2 * i] = f"seasonal 1[{lags_model_seasonal[i]}]"
                 row_names[2 + 2 * i + 1] = f"seasonal 2[{lags_model_seasonal[i]}]"
             # R: matVt[1,1:lagsModelMax] <- mean(yInSample[1:lagsModelMax])
-            level_init = np.mean(y_in_sample[:lags_model_max])
+            level_init = _mean_r(y_in_sample[:lags_model_max])
             mat_vt[0, :lags_model_max] = level_init
             mat_vt[1, :lags_model_max] = level_init / 1.1
             for i in range(n_seasonal):
@@ -142,7 +142,7 @@ def ces_creator(
             mat_f[3, 2] = 1  # R: matF[4,3] <- 1
             mat_wt[:, 3] = 0  # R: matWt[,4] <- 0
             row_names = ["level", "potential", "seasonal 1", "seasonal 2"]
-            level_init = np.mean(y_in_sample[:lags_model_max])
+            level_init = _mean_r(y_in_sample[:lags_model_max])
             mat_vt[0, :lags_model_max] = level_init
             mat_vt[1, :lags_model_max] = level_init / 1.1
             mat_vt[2, :lags_model_max] = y_decomposed_seasonal[0][:lags_model_max]
@@ -154,7 +154,7 @@ def ces_creator(
         if n_seasonal > 1:
             for i in range(n_seasonal):
                 row_names[2 + i] = f"seasonal[{lags_model_seasonal[i]}]"
-            level_init = np.mean(y_in_sample[:lags_model_max])
+            level_init = _mean_r(y_in_sample[:lags_model_max])
             mat_vt[0, :lags_model_max] = level_init
             mat_vt[1, :lags_model_max] = level_init / 1.1
             for i in range(n_seasonal):
@@ -163,7 +163,7 @@ def ces_creator(
                 ]
         else:
             row_names = ["level", "potential", "seasonal"]
-            level_init = np.mean(y_in_sample[:lags_model_max])
+            level_init = _mean_r(y_in_sample[:lags_model_max])
             mat_vt[0, :lags_model_max] = level_init
             mat_vt[1, :lags_model_max] = level_init / 1.1
             mat_vt[2, :lags_model_max] = y_decomposed_seasonal[0][:lags_model_max]
@@ -193,7 +193,7 @@ def ces_creator(
         # seasonality == "none" — R lines 463-467
         row_names = ["level", "potential"]
         init_len = min(max(10, y_frequency), obs_in_sample)
-        level_init = np.mean(y_in_sample[:init_len])
+        level_init = _mean_r(y_in_sample[:init_len])
         mat_vt[0, 0] = level_init
         mat_vt[1, 0] = level_init / 1.1
 

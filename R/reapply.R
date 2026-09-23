@@ -266,7 +266,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
         xregParametersEstimated <- 0;
         xregParametersPersistence <- 0;
     }
-    headLength <- if(!is.null(object$adamCpp$headLength) && object$adamCpp$headLength > 0) object$adamCpp$headLength else lagsModelMax;
+    # Take the head length from the plain R object: the external pointer in
+    # object$adamCpp is stale after a save/reload cycle.
+    headLength <- adam_headLength(object$headLength, lagsModelMax, obsInSample)$geometry;
     indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample,
                                            headLength=headLength)$lookup;
 

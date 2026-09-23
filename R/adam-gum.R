@@ -451,8 +451,8 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         lagsModelAll <- lagsModel;
     }
     lagsModelMax <- max(lagsModelAll);
-    headLengthProvided <- !is.null(ellipsis$headLength);
-    headLength <- if(!headLengthProvided) lagsModelMax else if(is.numeric(ellipsis$headLength)) max(lagsModelMax, min(round(ellipsis$headLength), obsInSample)) else lagsModelMax;
+    headLengthResolved <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample);
+    headLength <- headLengthResolved$geometry;
     obsStates[] <- obsInSample + headLength;
 
     # The reversed lags to fill in values in the state vector
@@ -476,7 +476,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, FALSE);
-    adamCpp$headLength <- if(headLengthProvided) headLength else 0L;
+    adamCpp$headLength <- headLengthResolved$flag;
 
     matF <- diag(componentsNumber+xregNumber);
     vecG <- matrix(0,componentsNumber+xregNumber,1);

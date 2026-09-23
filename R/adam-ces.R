@@ -654,8 +654,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                           rep(1, xregNumber)),
                                         ncol=1);
 
-    headLengthProvided <- !is.null(ellipsis$headLength);
-    headLength <- if(!headLengthProvided) lagsModelMax else if(is.numeric(ellipsis$headLength)) max(lagsModelMax, min(round(ellipsis$headLength), obsInSample)) else lagsModelMax;
+    headLengthResolved <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample);
+    headLength <- headLengthResolved$geometry;
     obsStates[] <- obsInSample + headLength;
 
     Stype <- Ttype <- "N";
@@ -669,7 +669,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, FALSE);
-    adamCpp$headLength <- if(headLengthProvided) headLength else 0L;
+    adamCpp$headLength <- headLengthResolved$flag;
 
     ##### Pre-set yFitted, yForecast, errors and basic parameters #####
     # Prepare fitted and error with ts / zoo

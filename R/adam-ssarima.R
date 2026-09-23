@@ -574,8 +574,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
 
     lagsModelAll <- matrix(rep(1,componentsNumberAll+xregNumber),ncol=1);
     lagsModelMax <- 1;
-    headLengthProvided <- !is.null(ellipsis$headLength);
-    headLength <- if(!headLengthProvided) lagsModelMax else if(is.numeric(ellipsis$headLength)) max(lagsModelMax, min(round(ellipsis$headLength), obsInSample)) else lagsModelMax;
+    headLengthResolved <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample);
+    headLength <- headLengthResolved$geometry;
     obsStates <- obsInSample + headLength;
 
     # Create C++ adam class, which will then use fit, forecast etc methods
@@ -589,7 +589,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     # Drift flips sign in the backcasting backward pass when the total order
     # of differencing is odd — the ARIMA analog of the ETS trend reversal
     adamCpp$flipConstant <- constantRequired && (sum(iOrders) %% 2 == 1);
-    adamCpp$headLength <- if(headLengthProvided) headLength else 0L;
+    adamCpp$headLength <- headLengthResolved$flag;
 
     if(!is.null(initialValueProvided)){
         initialType <- "provided";

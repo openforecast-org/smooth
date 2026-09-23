@@ -381,6 +381,21 @@ dfInitialsBackcast <- function(etsModel, modelIsSeasonal, modelIsTrendy,
     return(dfInitials);
 }
 
+# Resolves the user's headLength argument (may be NULL) into:
+# - geometry: the head length used for adamProfileCreator() / obsStates (always
+#   at least lagsModelMax, clamped to obsInSample);
+# - flag: what is assigned to adamCpp$headLength (0L switches head filtering off).
+# NULL (absent): geometry=lagsModelMax, flag=lagsModelMax (filtering on, one cycle).
+# hl==0: geometry=lagsModelMax, flag=0L (filtering off, legacy behaviour).
+# hl>0: geometry=flag=max(lagsModelMax, min(round(hl), obsInSample)).
+#' @keywords internal
+adam_headLength <- function(hl, lagsModelMax, obsInSample){
+    hlRequested <- if(is.null(hl)) lagsModelMax else max(0, round(hl))
+    geometry <- max(lagsModelMax, min(hlRequested, obsInSample))
+    flag <- if(hlRequested==0) 0L else as.integer(geometry)
+    return(list(geometry=geometry, flag=flag))
+}
+
 #### Model architecture and initial matrix creation ####
 #' @keywords internal
 adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeasonal,
@@ -438,13 +453,8 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
     }
 
     lagsModelMax <- max(lagsModelAll)
-    headLengthProvided <- !is.null(headLength)
-    if(!headLengthProvided){
-        headLength <- lagsModelMax
-    }
-    else{
-        headLength <- max(lagsModelMax, min(round(headLength), obsInSample))
-    }
+    headLengthResolved <- adam_headLength(headLength, lagsModelMax, obsInSample)
+    headLength <- headLengthResolved$geometry
     obsStates <- obsInSample + headLength
 
     adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
@@ -470,7 +480,9 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
     # order of ARIMA differencing is odd (time reversal changes the drift by
     # (-1)^(d+D)) — the ARIMA analog of the ETS trend reversal
     adamCpp$flipConstant <- flipConstant
-    adamCpp$headLength <- if(headLengthProvided) headLength else 0L
+    # Head length for backcasting: one full lag cycle by default, so the head is
+    # filtered against the model's own backcasts. 0 switches the filtering off.
+    adamCpp$headLength <- headLengthResolved$flag
 
     return(list(
         lagsModel = lagsModel,

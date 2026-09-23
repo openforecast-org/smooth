@@ -727,6 +727,12 @@ public:
 
         // How to fix the head after the backwards pass and record predicted backcasts
         auto headFillBwd = [&]() {
+            if(headLength > 0 && T != 'N') {
+                profilesRecent(indexLookupTable.col(H-1).rows(0,1)) =
+                    adamFvalue(profilesRecent(indexLookupTable.col(H-1)),
+                               matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                               nComponents, constant).rows(0,1);
+            }
             for (int i=H-1; i>=0; i=i-1) {
                 profilesRecent(indexLookupTable.col(i)) =
                     adamFvalue(profilesRecent(indexLookupTable.col(i)),
@@ -1505,6 +1511,12 @@ public:
                     }
 
                     // Fill in the head of the series (backward pass) and record backcasts
+                    if(headLength > 0 && T != 'N') {
+                        arrayProfilesRecent.slice(k).elem(indexLookupTable.col(H-1).rows(0,1)) =
+                            adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(H-1)),
+                                       arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                                       nComponents, constant).rows(0,1);
+                    }
                     for(int i=H-1; i>=0; i=i-1) {
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
                             adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),

@@ -97,7 +97,7 @@ auto.ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(
         if(any(initial==c("optimal","two-stage"))){
             nParamMax <- nParamMax + 2 + yFrequency;
         }
-        if(obsInSample <= nParamMax){
+        if(obsInSample <= nParamMax || obsInSample < yFrequency){
             warning("The sample is too small. We cannot use partial seasonal model.",call.=FALSE);
             seasonality <- seasonality[seasonality!="p"];
         }
@@ -107,7 +107,7 @@ auto.ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(
         if(any(initial==c("optimal","two-stage"))){
             nParamMax <- nParamMax + 2*yFrequency;
         }
-        if(obsInSample <= nParamMax){
+        if(obsInSample <= nParamMax || obsInSample < yFrequency){
             warning("The sample is too small. We cannot use simple seasonal model.",call.=FALSE);
             seasonality <- seasonality[seasonality!="s"];
         }
@@ -117,7 +117,7 @@ auto.ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(
         if(any(initial==c("optimal","two-stage"))){
             nParamMax <- nParamMax + 2 + 2*yFrequency;
         }
-        if(obsInSample <= nParamMax){
+        if(obsInSample <= nParamMax || obsInSample < yFrequency){
             warning("The sample is too small. We cannot use full seasonal model.",call.=FALSE);
             seasonality <- seasonality[seasonality!="f"];
         }

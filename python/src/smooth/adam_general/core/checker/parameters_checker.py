@@ -43,6 +43,7 @@ def parameters_checker(
     phi=None,
     initial=None,
     n_iterations=None,
+    head_length=None,
     distribution="default",
     loss="likelihood",
     h=0,
@@ -260,6 +261,14 @@ def parameters_checker(
         - **int**: Custom iteration count (typically 2-5)
 
         More iterations improve initial state estimates but increase computation time.
+
+    head_length : int or None, default=None
+        Length of the zero-error head that backcasting produces before the sample.
+
+        - **None**: one full lag cycle, so the final forward pass filters over the
+          model's own backcasts
+        - **0**: switches the filtering off (zero-error head)
+        - **int > 0**: that head length (experimental above the maximum lag)
 
     distribution : str, default="default"
         Error term probability distribution.
@@ -887,6 +896,8 @@ def parameters_checker(
     )
     observations_dict = {
         "obs_in_sample": actual_obs_in_sample,
+        # Raw user value for the backcasting head; resolved in architector()
+        "head_length_user": head_length,
         "obs_nonzero": obs_nonzero,
         "obs_all": occ_info["obs_all"],
         # "obs_states": obs_states,

@@ -423,13 +423,7 @@ def generate_simulation_interval(
     arr_vt = np.zeros((n_components, h + lags_model_max, nsim), order="F")
 
     # Initialize with current states (replicated across nsim)
-    mat_vt = prepared_model["states"][
-        :,
-        observations_dict["obs_states"] - lags_model_max : observations_dict[
-            "obs_states"
-        ]
-        + 1,
-    ]
+    mat_vt = prepared_model["states"][:, -lags_model_max:]
     for i in range(nsim):
         arr_vt[:, :lags_model_max, i] = mat_vt[:, :lags_model_max]
 

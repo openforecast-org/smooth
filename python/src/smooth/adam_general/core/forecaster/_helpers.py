@@ -151,11 +151,9 @@ def _prepare_matrices_for_forecast(
         Tuple containing (mat_vt, mat_wt, vec_g, mat_f)
     """
     # Get state matrix
-    mat_vt = model_prepared["states"][
-        :,
-        observations_dict["obs_states"]
-        - lags_dict["lags_model_max"] : observations_dict["obs_states"] + 1,
-    ]
+    # The last lag cycle of states. Taken from the state matrix's own width, which
+    # is what R does too (nrow(object$states)) — the head may have been trimmed.
+    mat_vt = model_prepared["states"][:, -lags_dict["lags_model_max"] :]
 
     # Get measurement matrix
     if model_prepared["measurement"].shape[0] < general_dict["h"]:

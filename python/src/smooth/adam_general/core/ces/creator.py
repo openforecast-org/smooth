@@ -28,6 +28,7 @@ def ces_creator(
     xreg_data=None,
     xreg_model_initials=None,
     xreg_names=None,
+    head_length=None,
 ):
     """
     Create CES state-space matrices.
@@ -81,6 +82,7 @@ def ces_creator(
         lags_model_max=lags_model_max,
         obs_all=obs_all,
         lags=lags,
+        head_length=head_length,
     )
     profiles_recent_table = adam_profiles["profiles_recent_table"]
     index_lookup_table = adam_profiles["index_lookup_table"]

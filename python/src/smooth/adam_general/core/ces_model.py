@@ -21,6 +21,7 @@ from smooth.adam_general.core.ces.cost_function import ces_cf
 from smooth.adam_general.core.ces.creator import ces_creator
 from smooth.adam_general.core.ces.filler import ces_filler
 from smooth.adam_general.core.ces.initialiser import ces_initialiser
+from smooth.adam_general.core.creator.architector import adam_head_length
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 
@@ -227,6 +228,7 @@ class CES:
         xtol_abs: float = 1e-8,
         ftol_rel: float = 1e-8,
         ftol_abs: float = 0,
+        head_length: Optional[int] = None,
     ) -> None:
         # Validate seasonality
         valid = {"none", "simple", "partial", "full"}
@@ -240,6 +242,7 @@ class CES:
         self.seasonality = cast(SEASONALITY_OPTIONS, seasonality_resolved)
         self.lags = lags
         self.initial = initial
+        self.head_length = head_length
         self._a_provided = a
         self._b_provided = _validate_b(b, seasonality)
         self.loss = loss
@@ -380,7 +383,13 @@ class CES:
         # The profile lookup table has to span the forecast horizon too, otherwise
         # the multistep losses walk off the end of it (R/utils-adam.R:107).
         obs_all = len(y) + (0 if self.holdout else h)
-        obs_states = obs_in_sample + lags_model_max
+        # Backcasting head: one full lag cycle by default (filtering on), 0 switches
+        # it off, larger values give that head length (R/adam-ces.R).
+        head_resolved = adam_head_length(
+            self.head_length, lags_model_max, obs_in_sample
+        )
+        head_length = head_resolved["geometry"]
+        obs_states = obs_in_sample + head_length
 
         # Occurrence (CES doesn't support occurrence — R line 618)
         ot = np.ones(obs_in_sample, dtype=np.float64)
@@ -413,6 +422,7 @@ class CES:
             constant=False,
             adamETS=False,
         )
+        adam_cpp.headLength = head_resolved["flag"]
 
         # Create matrices — R line creator() call
         created = ces_creator(
@@ -431,6 +441,7 @@ class CES:
             lags=lags,
             xreg_data=xreg_data,
             xreg_names=xreg_names,
+            head_length=head_length,
         )
 
         mat_vt = created["mat_vt"]
@@ -758,7 +769,7 @@ class CES:
                 mat_wt_forecast = np.tile(mat_wt[-1:], (h, 1))
 
             # Build forecast index lookup
-            idx_start = lags_model_max + obs_in_sample
+            idx_start = head_length + obs_in_sample
             idx_end = idx_start + h
             ilt_forecast = index_lookup_table[:, idx_start:idx_end]
 
@@ -1087,7 +1098,10 @@ class AutoCES:
                 n_param_max = 4
                 if initial in ("optimal", "two-stage"):
                     n_param_max += 2 + y_frequency
-                if obs_in_sample <= n_param_max:
+                # A seasonal candidate needs at least one full cycle of
+                # observations, otherwise the head of the lookup table cannot
+                # carry a full set of profile cells (R/autoces.R).
+                if obs_in_sample <= n_param_max or obs_in_sample < y_frequency:
                     warnings.warn(
                         "The sample is too small. Cannot use partial seasonal model."
                     )
@@ -1099,7 +1113,10 @@ class AutoCES:
                 n_param_max = 3
                 if initial in ("optimal", "two-stage"):
                     n_param_max += 2 * y_frequency
-                if obs_in_sample <= n_param_max:
+                # A seasonal candidate needs at least one full cycle of
+                # observations, otherwise the head of the lookup table cannot
+                # carry a full set of profile cells (R/autoces.R).
+                if obs_in_sample <= n_param_max or obs_in_sample < y_frequency:
                     warnings.warn(
                         "The sample is too small. Cannot use simple seasonal model."
                     )
@@ -1111,7 +1128,10 @@ class AutoCES:
                 n_param_max = 5
                 if initial in ("optimal", "two-stage"):
                     n_param_max += 2 + 2 * y_frequency
-                if obs_in_sample <= n_param_max:
+                # A seasonal candidate needs at least one full cycle of
+                # observations, otherwise the head of the lookup table cannot
+                # carry a full set of profile cells (R/autoces.R).
+                if obs_in_sample <= n_param_max or obs_in_sample < y_frequency:
                     warnings.warn(
                         "The sample is too small. Cannot use full seasonal model."
                     )

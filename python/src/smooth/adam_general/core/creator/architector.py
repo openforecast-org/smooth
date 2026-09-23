@@ -5,6 +5,28 @@ import numpy as np
 from smooth.adam_general._adamCore import adamCore
 
 
+def adam_head_length(
+    head_length: Optional[int], lags_model_max: int, obs_in_sample: int
+) -> Dict[str, int]:
+    """
+    Resolve the user's ``head_length`` argument (R's ``adam_headLength()``).
+
+    Returns a dict with:
+
+    - ``geometry``: the head length used for :func:`adam_profile_creator` and for
+      ``obs_states`` (always at least ``lags_model_max``, clamped to
+      ``obs_in_sample``);
+    - ``flag``: what is assigned to ``adamCpp.headLength``; ``0`` switches the
+      head filtering off.
+
+    ``None`` (absent) means one full lag cycle with filtering on, ``0`` switches
+    the filtering off, larger values give that head length.
+    """
+    requested = lags_model_max if head_length is None else max(0, round(head_length))
+    geometry = int(max(lags_model_max, min(requested, obs_in_sample)))
+    return {"geometry": geometry, "flag": 0 if requested == 0 else geometry}
+
+
 def architector(
     # Model type info
     model_type_dict: Dict[str, Any],
@@ -20,6 +42,7 @@ def architector(
     profiles_recent_table: Union[np.ndarray, None] = None,
     profiles_recent_provided: bool = False,
     adam_ets: bool = False,
+    head_length: Optional[int] = None,
 ) -> Tuple[Dict[str, Any], Any, Dict[str, Any], Dict[str, Any], Any, Any]:
     """
     Determine and set up ADAM model architecture before matrix creation.
@@ -252,14 +275,29 @@ def architector(
     # Store in components_dict
     components_dict["components_number_all"] = components_number_all
 
+    # Resolve the backcasting head: one full lag cycle by default (filtering on),
+    # 0 switches the filtering off, larger values give that head length.
+    head_resolved = adam_head_length(
+        observations_dict.get("head_length_user")
+        if head_length is None
+        else head_length,
+        lags_dict["lags_model_max"],
+        observations_dict["obs_in_sample"],
+    )
+    observations_dict["head_length"] = head_resolved["geometry"]
+
     # Set up profiles
     profiles_dict = _create_profiles(
-        profiles_recent_provided, profiles_recent_table, lags_dict, observations_dict
+        profiles_recent_provided,
+        profiles_recent_table,
+        lags_dict,
+        observations_dict,
+        head_resolved["geometry"],
     )
 
     # Update obs states
     observations_dict["obs_states"] = (
-        observations_dict["obs_in_sample"] + lags_dict["lags_model_max"]
+        observations_dict["obs_in_sample"] + head_resolved["geometry"]
     )
 
     # Create C++ adam class, which will then use fit, forecast etc methods
@@ -279,16 +317,13 @@ def architector(
         else False,
         adamETS=adam_ets,
     )
-    # Drift flips sign in the backcasting backward pass when the total order
-    # of ARIMA differencing is odd (time reversal changes the drift by
-    # (-1)^(d+D)) — the ARIMA analog of the ETS trend reversal.
-    adam_cpp.flipConstant = bool(
-        constants_checked
-        and constants_checked.get("constant_required", False)
-        and arima_checked
-        and arima_checked.get("arima_model", False)
-        and sum(arima_checked.get("i_orders") or []) % 2 == 1
-    )
+    # ADAM's ARIMA carries the constant in the measurement vector with an identity
+    # transition, so the drift must NOT be flipped in the backward pass (unlike
+    # ssarima's companion form, where the flip is exactly right).
+    adam_cpp.flipConstant = False
+    # Head length for backcasting: one full lag cycle by default, so the head is
+    # filtered against the model's own backcasts. 0 switches the filtering off.
+    adam_cpp.headLength = head_resolved["flag"]
 
     return (
         model_type_dict,
@@ -420,7 +455,11 @@ def _setup_lags(lags_dict, model_type_dict, components_dict):
 
 
 def _create_profiles(
-    profiles_recent_provided, profiles_recent_table, lags_dict, observations_dict
+    profiles_recent_provided,
+    profiles_recent_table,
+    lags_dict,
+    observations_dict,
+    head_length=None,
 ):
     """
     Create profiles for the model architecture.
@@ -450,6 +489,7 @@ def _create_profiles(
             lags=lags_dict["lags"],
             y_index=observations_dict.get("y_index", None),
             y_classes=observations_dict.get("y_classes", None),
+            head_length=head_length,
         )
 
         # Store profiles in dictionary
@@ -465,6 +505,7 @@ def adam_profile_creator(
     lags: Union[List[int], None] = None,
     y_index: Union[List, None] = None,
     y_classes: Union[List, None] = None,
+    head_length: Optional[int] = None,
 ) -> Dict[str, np.ndarray]:
     """
     Creates recent profile and the lookup table for ADAM.
@@ -476,11 +517,14 @@ def adam_profile_creator(
         lags: The original lags provided by user (optional).
         y_index: The indices needed to get the specific dates (optional).
         y_classes: The class used for the actual data (optional).
+        head_length: Length of the zero-error head in the lookup table
+            (defaults to lags_model_max).
 
     Returns:
         A dictionary with 'recent' (profiles_recent_table) and 'lookup'
         (index_lookup_table) as keys.
     """
+    head = lags_model_max if head_length is None else int(head_length)
     # Initialize matrices
     # Flatten lags_model_all to handle it properly
     #  This is needed because in R, the lagsModelAll is a flat vector, but in Python
@@ -490,7 +534,7 @@ def adam_profile_creator(
     # The extra lags_model_max columns at the end form the "tail" — the cyclic
     # continuation past the last observation used by the backcasting tail
     # mirror in the C++ code.
-    index_lookup_table = np.ones((len(lags_model_all), obs_all + 2 * lags_model_max))
+    index_lookup_table = np.ones((len(lags_model_all), obs_all + head + lags_model_max))
     profile_indices = (
         np.arange(1, lags_model_max * len(lags_model_all) + 1)
         .reshape(-1, len(lags_model_all))
@@ -509,7 +553,7 @@ def adam_profile_creator(
         # The repeated sequence is the i-th row of profileIndices, repeated enough times
         # to cover 'obsAll' observations plus the tail.
         # '- 1' at the end adjusts these values to Python's zero-based indexing.
-        index_lookup_table[i, lags_model_max : (lags_model_max + obs_all_tail)] = (
+        index_lookup_table[i, head : (head + obs_all_tail)] = (
             np.tile(
                 profile_indices[i, : lags_model_all[i]],
                 int(np.ceil(obs_all_tail / lags_model_all[i])),
@@ -519,14 +563,14 @@ def adam_profile_creator(
 
         # Fix the head: use order-preserving unique (like R's unique()),
         # based on the in-sample columns only (tail excluded)
-        vals = index_lookup_table[i, lags_model_max : (lags_model_max + obs_all)]
+        vals = index_lookup_table[i, head : (head + obs_all)]
         unique_indices = np.array(list(dict.fromkeys(vals.tolist())))
 
-        # Use [-lags_model_max:] to replicate R's tail() — take from the END
+        # Use [-head:] to replicate R's tail() — take from the END
         # not the beginning (Bug 3 fix).
-        index_lookup_table[i, :lags_model_max] = np.tile(
-            unique_indices, lags_model_max
-        )[-lags_model_max:]
+        index_lookup_table[i, :head] = np.tile(
+            unique_indices, int(np.ceil(head / len(unique_indices)))
+        )[-head:]
 
     # Convert to int!
     index_lookup_table = index_lookup_table.astype(int)

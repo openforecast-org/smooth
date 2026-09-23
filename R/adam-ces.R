@@ -658,6 +658,9 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
     headLength <- if(!headLengthProvided) lagsModelMax else if(is.numeric(ellipsis$headLength)) max(lagsModelMax, min(round(ellipsis$headLength), obsInSample)) else lagsModelMax;
     obsStates[] <- obsInSample + headLength;
 
+    Stype <- Ttype <- "N";
+    model <- "ANN";
+
     # Create C++ adam class, which will then use fit, forecast etc methods
     adamCpp <- new(adamCore,
                    lagsModelAll, Etype, Ttype, Stype,

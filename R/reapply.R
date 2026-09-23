@@ -278,10 +278,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, adamETS);
-    # Drift flips sign in the backcasting backward pass when the total order
-    # of differencing is odd — the ARIMA analog of the ETS trend reversal
-    adamCpp$flipConstant <- constantRequired && !is.null(object$orders) &&
-        (sum(object$orders$i) %% 2 == 1);
+    # ADAM's ARIMA keeps the constant in the measurement vector, so the drift is not
+    # flipped in the backward pass (see the note in adam())
+    adamCpp$flipConstant <- FALSE;
     adamCpp$headLength <- headLength;
 
     # Generate the data from the multivariate normal

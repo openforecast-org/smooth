@@ -422,10 +422,13 @@ private:
                      HeadFillFwdFn headFillFwd,
                      HeadFillBwdFn headFillBwd,
                      TrendReversalFn trendReversal,
-                     HeadForwardFn headForwardStep) {
+                     HeadForwardFn headForwardStep,
+                     bool useHeadFilter) {
+        // Without backcasting there is nothing to iterate: one forward pass, no backward run.
+        if(!backcast) { nIterations = 1; }
         // Loop for the backcast
         for (unsigned int j=1; j<=nIterations; j=j+1) {
-            if(j == 1 || headLength == 0) {
+            if(j == 1 || !useHeadFilter) {
                 // Refine the head so the initial level/trend land at position -H+1
                 // and walk forward across the head cycle. Skip when H=1 (nothing to fill).
                 if(H > 1) {
@@ -472,7 +475,18 @@ private:
         };
         fitLoopImpl(obs, lagsModelMax, backcast, nIterations,
                     forwardStep, backwardStep, headFillFwd, headFillBwd,
-                    trendReversal, noopHeadForward);
+                    trendReversal, noopHeadForward, false);
+    }
+
+    // Private helper: is the existing trend/drift flip already the exact time reversal?
+    // It is for a pure ETS model without a damped trend (the flip plus the phase
+    // alignment of the lookup table reproduce the exact junction map), so filtering the
+    // head there cannot change the result and is pure cost. ARIMA states, regressors and
+    // a damped trend all break that exactness, so the head is filtered for them.
+    bool headFlipIsExact(arma::mat const &matrixF) const {
+        if(nArima != 0 || nXreg != 0) { return false; }
+        if(T == 'N') { return true; }
+        return (matrixF.n_rows > 1) && (matrixF(1,1) == 1.0);
     }
 
     // Private helper: refine the head of a state matrix so that the initial
@@ -659,11 +673,17 @@ public:
         if(H < (unsigned int)lagsModelMax) {
             H = lagsModelMax;
         }
+        // Skip the head filtering where the flip is already exact and the head has the
+        // legacy length, so those models keep the legacy path bit-for-bit.
+        bool useHeadFilter = (headLength > 0) &&
+            !(headFlipIsExact(matrixF) && H == (unsigned int)lagsModelMax);
 
         // Fitted values and the residuals
         arma::vec vecYfit(obs, arma::fill::zeros);
         arma::vec vecErrors(obs, arma::fill::zeros);
         arma::vec backcasts(H, arma::fill::zeros);
+        // The head steps all measure with the same regressor row; hoist it out of the loops
+        const arma::rowvec wHead = matrixWt.row(0);
 
         // What to do in the forward pass
         auto forwardStep = [&](int i) {
@@ -727,24 +747,21 @@ public:
 
         // How to fix the head after the backwards pass and record predicted backcasts
         auto headFillBwd = [&]() {
-            if(headLength > 0 && T != 'N') {
+            if(useHeadFilter && T != 'N') {
                 profilesRecent(indexLookupTable.col(H-1).rows(0,1)) =
                     adamFvalue(profilesRecent(indexLookupTable.col(H-1)),
                                matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
                                nComponents, constant).rows(0,1);
             }
             for (int i=H-1; i>=0; i=i-1) {
-                profilesRecent(indexLookupTable.col(i)) =
-                    adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                               matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                if(headLength > 0) {
+                arma::vec vHead = adamFvalue(profilesRecent(indexLookupTable.col(i)),
+                                             matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal,
+                                             nArima, nComponents, constant);
+                profilesRecent(indexLookupTable.col(i)) = vHead;
+                if(useHeadFilter) {
                     trendReversal();
-                    double yHat = adamWvalue(profilesRecent(indexLookupTable.col(i)),
-                            matrixWt.row(0), E, T, S,
+                    double yHat = adamWvalue(profilesRecent(indexLookupTable.col(i)), wHead, E, T, S,
                             nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                    if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
-                        yHat = 1;
-                    }
                     backcasts(i) = yHat;
                     trendReversal();
                 }
@@ -754,26 +771,28 @@ public:
         // How to filter over the backcast head on subsequent forward passes
         auto headForwardStep = [&]() {
             for (unsigned int i=0; i<H; i=i+1) {
-                double yFitHead = adamWvalue(profilesRecent(indexLookupTable.col(i)),
-                        matrixWt.row(0), E, T, S,
+                // Gather the profile cells for this head step once and reuse them
+                arma::vec vCur = profilesRecent(indexLookupTable.col(i));
+                double yFitHead = adamWvalue(vCur, wHead, E, T, S,
                         nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                if((E=='M' || T=='M' || S=='M') && (yFitHead<=0)){
-                    yFitHead = 1;
-                }
+                // The head's pseudo-observation is the model's own predicted value, not an
+                // occurrence indicator, so the occurrence dispatch does not apply here.
                 double errHead = errorf(backcasts(i), yFitHead, E, 1.0);
-                profilesRecent(indexLookupTable.col(i)) =
-                    adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                               matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
-                    adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(0), E, T, S,
+                arma::vec vNew =
+                    adamFvalue(vCur, matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal,
+                               nArima, nComponents, constant) +
+                    adamGvalue(vCur, matrixF, wHead, E, T, S,
                                nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                                vectorG, errHead, yFitHead, adamETS);
-                matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
+                profilesRecent(indexLookupTable.col(i)) = vNew;
+                matrixVt.col(i) = vNew;
             }
         };
 
         // Do the fit!
         fitLoopImpl(obs, H, backcast, nIterations,
-                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal, headForwardStep);
+                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal,
+                    headForwardStep, useHeadFilter);
 
         FitResult result;
         result.states = matrixVt;
@@ -1398,8 +1417,12 @@ public:
         for(unsigned int k=0; k<nSeries; k=k+1){
             // Loop for the backcasting
             arma::vec backcasts(H, arma::fill::zeros);
+            // Same gate as in fit(): no filtering where the flip is already exact
+            bool useHeadFilter = (headLength > 0) &&
+                !(headFlipIsExact(arrayF.slice(k)) && H == (unsigned int)lagsModelMax);
+            const arma::rowvec wHead = arrayWt.slice(k).row(0);
             for (unsigned int j=1; j<=nIterations; j=j+1) {
-                if(j == 1 || headLength == 0) {
+                if(j == 1 || !useHeadFilter) {
                     // Refine the head via the shared helper so it is walked one step
                     // per column across the head cycle (or copied verbatim when T=='N').
                     if(H > 1) {
@@ -1418,21 +1441,19 @@ public:
                     }
                 } else {
                     for(unsigned int i=0; i<H; i=i+1) {
-                        double yFitHead = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                arrayWt.slice(k).row(0), E, T, S,
+                        // Gather the profile cells for this head step once and reuse them
+                        arma::vec vCur = arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i));
+                        double yFitHead = adamWvalue(vCur, wHead, E, T, S,
                                 nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                        if((E=='M' || T=='M' || S=='M') && (yFitHead<=0)){
-                            yFitHead = 1;
-                        }
                         double errHead = errorf(backcasts(i), yFitHead, E, 1.0);
-                        arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                            adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
-                                       arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
-                            adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                       arrayF.slice(k), arrayWt.slice(k).row(0), E, T, S,
+                        arma::vec vNew =
+                            adamFvalue(vCur, arrayF.slice(k), E, T, S, nETS, nNonSeasonal,
+                                       nSeasonal, nArima, nComponents, constant) +
+                            adamGvalue(vCur, arrayF.slice(k), wHead, E, T, S,
                                        nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                                        matrixG.col(k), errHead, yFitHead, adamETS);
-                        arrayVt.slice(k).col(i) = arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i));
+                        arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) = vNew;
+                        arrayVt.slice(k).col(i) = vNew;
                     }
                 }
                 // Loop for the model construction
@@ -1511,7 +1532,7 @@ public:
                     }
 
                     // Fill in the head of the series (backward pass) and record backcasts
-                    if(headLength > 0 && T != 'N') {
+                    if(useHeadFilter && T != 'N') {
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(H-1).rows(0,1)) =
                             adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(H-1)),
                                        arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
@@ -1521,7 +1542,7 @@ public:
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
                             adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
                                        arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                        if(headLength > 0) {
+                        if(useHeadFilter) {
                             if(T=='A'){
                                 arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
                             }
@@ -1535,9 +1556,6 @@ public:
                             double yHat = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                                     arrayWt.slice(k).row(0), E, T, S,
                                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                            if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
-                                yHat = 1;
-                            }
                             backcasts(i) = yHat;
                             if(T=='A'){
                                 arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);

@@ -621,8 +621,11 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
 
     if(componentsNumberARIMA > 0){
         # Transition matrix, measurement vector and persistence vector + state vector
+        # The first column carries the ARI feedback and is filled by the filler when
+        # there are AR or I terms. Without them (pure MA) it must be zero, not the
+        # identity left by diag() above.
+        matF[1,1] <- 0;
         if(componentsNumberARIMA>1){
-            matF[1,1] <- 0;
             matF[componentsNumberARIMA,componentsNumberARIMA] <- 0;
             matF[1:(componentsNumberARIMA-1),2:componentsNumberARIMA] <- diag(componentsNumberARIMA-1);
             matWt[,2:componentsNumberARIMA] <- 0;

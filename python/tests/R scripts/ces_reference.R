@@ -8,7 +8,10 @@
 ## Outputs written to:  python/tests/data/ces_reference.json
 ##                      python/tests/data/ces_*.csv
 
-library(smooth)
+## Load the *local* R source, exactly as python/tests/_r_bridge.py does, so the
+## fixtures always track the working tree rather than whatever version happens to
+## be installed in the user's R library.
+suppressMessages(suppressWarnings(devtools::load_all(".", quiet = TRUE)))
 library(jsonlite)
 
 OUT_DIR <- "python/tests/data"

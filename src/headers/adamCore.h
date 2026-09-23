@@ -425,7 +425,7 @@ private:
                      HeadForwardFn headForwardStep) {
         // Loop for the backcast
         for (unsigned int j=1; j<=nIterations; j=j+1) {
-            if(j == 1) {
+            if(j == 1 || headLength == 0) {
                 // Refine the head so the initial level/trend land at position -H+1
                 // and walk forward across the head cycle. Skip when H=1 (nothing to fill).
                 if(H > 1) {
@@ -731,15 +731,17 @@ public:
                 profilesRecent(indexLookupTable.col(i)) =
                     adamFvalue(profilesRecent(indexLookupTable.col(i)),
                                matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                trendReversal();
-                double yHat = adamWvalue(profilesRecent(indexLookupTable.col(i)),
-                        matrixWt.row(0), E, T, S,
-                        nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
-                    yHat = 1;
+                if(headLength > 0) {
+                    trendReversal();
+                    double yHat = adamWvalue(profilesRecent(indexLookupTable.col(i)),
+                            matrixWt.row(0), E, T, S,
+                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                    if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
+                        yHat = 1;
+                    }
+                    backcasts(i) = yHat;
+                    trendReversal();
                 }
-                backcasts(i) = yHat;
-                trendReversal();
             }
         };
 
@@ -1391,7 +1393,7 @@ public:
             // Loop for the backcasting
             arma::vec backcasts(H, arma::fill::zeros);
             for (unsigned int j=1; j<=nIterations; j=j+1) {
-                if(j == 1) {
+                if(j == 1 || headLength == 0) {
                     // Refine the head via the shared helper so it is walked one step
                     // per column across the head cycle (or copied verbatim when T=='N').
                     if(H > 1) {
@@ -1507,32 +1509,34 @@ public:
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
                             adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
                                        arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                        if(T=='A'){
-                            arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
-                        }
-                        else if(T=='M'){
-                            arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
-                        }
-                        if(constant && flipConstant){
-                            arrayProfilesRecent.slice(k)(nComponents-1) =
-                                -arrayProfilesRecent.slice(k)(nComponents-1);
-                        }
-                        double yHat = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                arrayWt.slice(k).row(0), E, T, S,
-                                nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                        if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
-                            yHat = 1;
-                        }
-                        backcasts(i) = yHat;
-                        if(T=='A'){
-                            arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
-                        }
-                        else if(T=='M'){
-                            arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
-                        }
-                        if(constant && flipConstant){
-                            arrayProfilesRecent.slice(k)(nComponents-1) =
-                                -arrayProfilesRecent.slice(k)(nComponents-1);
+                        if(headLength > 0) {
+                            if(T=='A'){
+                                arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
+                            }
+                            else if(T=='M'){
+                                arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
+                            }
+                            if(constant && flipConstant){
+                                arrayProfilesRecent.slice(k)(nComponents-1) =
+                                    -arrayProfilesRecent.slice(k)(nComponents-1);
+                            }
+                            double yHat = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
+                                    arrayWt.slice(k).row(0), E, T, S,
+                                    nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                            if((E=='M' || T=='M' || S=='M') && (yHat<=0)){
+                                yHat = 1;
+                            }
+                            backcasts(i) = yHat;
+                            if(T=='A'){
+                                arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
+                            }
+                            else if(T=='M'){
+                                arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
+                            }
+                            if(constant && flipConstant){
+                                arrayProfilesRecent.slice(k)(nComponents-1) =
+                                    -arrayProfilesRecent.slice(k)(nComponents-1);
+                            }
                         }
                     }
 

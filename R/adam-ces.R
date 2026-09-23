@@ -654,9 +654,9 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                           rep(1, xregNumber)),
                                         ncol=1);
 
-    Stype <- Ttype <- "N";
-    model <- "ANN";
-
+    headLengthProvided <- !is.null(ellipsis$headLength);
+    headLength <- if(!headLengthProvided) lagsModelMax else if(is.numeric(ellipsis$headLength)) max(lagsModelMax, min(round(ellipsis$headLength), obsInSample)) else lagsModelMax;
+    obsStates[] <- obsInSample + headLength;
 
     # Create C++ adam class, which will then use fit, forecast etc methods
     adamCpp <- new(adamCore,
@@ -666,7 +666,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, FALSE);
-    adamCpp$headLength <- headLength;
+    adamCpp$headLength <- if(headLengthProvided) headLength else 0L;
 
     ##### Pre-set yFitted, yForecast, errors and basic parameters #####
     # Prepare fitted and error with ts / zoo

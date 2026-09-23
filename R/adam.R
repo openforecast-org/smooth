@@ -665,6 +665,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         ic=ic, bounds=bounds, silent=silent, ...)));
     }
 
+    headLengthUser <- if(exists("headLength", inherits=FALSE)) headLength else NULL;
+
     #### Thin wrappers: top-level adam_* functions + adam() closure variables ####
     architector <- function(...){
         return(adam_architector(...,
@@ -673,7 +675,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                 adamETS=adamETS,
                                 flipConstant=arimaModel && constantRequired &&
                                     (sum(iOrders) %% 2 == 1),
-                                headLength=headLength));
+                                headLength=headLengthUser));
     }
     creator <- function(...){
         return(adam_creator(...,
@@ -1976,8 +1978,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
         # If headLength > lagsModelMax, keep only the last lagsModelMax head states
         # so returned states and extracted initials keep exactly today's dimensions and meaning.
-        if(headLength > lagsModelMax){
-            matVt <- matVt[, c((headLength - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
+        headOffset <- if(!is.null(headLength)) headLength else lagsModelMax;
+        if(headOffset > lagsModelMax){
+            matVt <- matVt[, c((headOffset - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
         }
 
         # Write down the recent profile for future use
@@ -2036,7 +2039,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
 
             yForecast[] <- adamCpp$forecast(tail(matWt,horizon), matF,
-                                            indexLookupTable[,headLength+obsInSample+c(1:horizon),drop=FALSE],
+                                            indexLookupTable[,headOffset+obsInSample+c(1:horizon),drop=FALSE],
                                             profilesRecentTable,
                                             horizon)$forecast;
             #### Make safety checks
@@ -2569,6 +2572,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             adamSelected$results[[i]]$componentsNumberETSNonSeasonal <- adamArchitect$componentsNumberETSNonSeasonal;
             adamSelected$results[[i]]$componentsNamesETS <- adamArchitect$componentsNamesETS;
             adamSelected$results[[i]]$adamCpp <- adamArchitect$adamCpp;
+            adamSelected$results[[i]]$headLength <- adamArchitect$headLength;
+            adamSelected$results[[i]]$obsStates <- adamArchitect$obsStates;
 
             # Create the matrices for the specific ETS model
             adamCreated <- creator(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,

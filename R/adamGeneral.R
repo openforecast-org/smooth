@@ -2771,15 +2771,17 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
              envir=environment());
 
     if(is.null(ellipsis$headLength)){
-        headLength <- lagsModelMax;
+        headLength <- NULL;
+        obsStates <- obsInSample + lagsModelMax;
     }
     else if(is.numeric(ellipsis$headLength)){
         headLength <- max(lagsModelMax, min(round(ellipsis$headLength), obsInSample));
+        obsStates <- obsInSample + headLength;
     }
     else{
-        headLength <- lagsModelMax;
+        headLength <- NULL;
+        obsStates <- obsInSample + lagsModelMax;
     }
-    obsStates <- obsInSample + headLength;
 
     # Add constant in the model
     if(is.numeric(constant)){

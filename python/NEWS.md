@@ -3,7 +3,7 @@
 Release history of the Python implementation of the **smooth** forecasting package.
 
 
-## v1.0.8 (unreleased)
+## v1.0.9 (unreleased)
 
 Changes:
 * Backcasting now filters its head, matching the R side. The zero-error stretch that backcasting produces before the sample is regulated by a new `head_length` argument on `ADAM` (and so on `ES`, `MSARIMA`, `SMA`, `AutoADAM`, `AutoMSARIMA`) and on `CES`. By default it is one full lag cycle, so the final forward pass filters over the model's own backcasts, which makes the junction between the backward and forward passes accurate for the models where the state reversal is not exact -- a damped trend, ARIMA states, regressors, CES. `head_length=0` reverts to the zero-error head; larger values are experimental. Pure ETS without a damped trend keeps the legacy path bit for bit. The kernel already implemented this (`src/headers/adamCore.h` is shared with R), but `headLength` was exposed only to Rcpp, so the Python build had silently been running with the filtering off.
@@ -26,6 +26,10 @@ Changes:
 * The R-parity test harness runs again. `tests/_r_bridge.py` derived its repo root from a hard-coded path that no longer exists, so every test using it failed with `FileNotFoundError`; it is now taken from the module's own location. `test_alm_parity.py` and `test_sma_r_parity.py` each carried a private copy of the same bridge with the same stale path and now import the shared one.
 * `test_fi_r_comparison.py` recovers R's observed Fisher information from `vcov(m, type="hessian")` rather than from `vcov(m)`. R's default is `type="opg"`, a different estimator that agrees with the observed FI only asymptotically, so the test had been comparing two different quantities and failing by up to 80x. Against the Hessian-based vcov, Python's FI at R's coefficients matches to 2.7e-11.
 * `test_auto_adam_vs_r.py` compares ARIMA orders with trailing zeros trimmed. R collapses `m$orders` to a plain vector when no ARIMA is selected, reporting `0` where Python reports one zero per lag; both mean "no ARIMA", but the comparison was length-sensitive.
+
+## v1.0.8 (Release date: 2026-08-27)
+
+Changes:
 * Full R/Python parity sweep over the M1 + M3 + Tourism competition data (5315 series), fitting `ADAM` ETS and `AutoMSARIMA` in both languages and comparing the selected model, the log-likelihood, the parameter count and AICc. **AutoMSARIMA agrees on 5315/5315 series with a maximum log-likelihood difference of exactly zero**; ETS agrees on 5315/5315 with 98.83% bit-exact and a worst difference of 2.0e-10. The runners (`run_parity_sweep.py`, `run_parity_sweep.R`) and the comparison script (`compare_parity_sweep.py`) live in `tests/notebooks/`. Unlike `run_full_benchmark.py`, which measures forecast accuracy against other packages, these compare the *fitted model* between languages, which fails on any structural divergence rather than only on one large enough to move an error measure.
 * Requires greybox >= 1.0.7, whose `dgamma` computes its log-density with R's saddle-point algorithm. Before that, one series in the sweep (M3 N0737) differed: SciPy's direct expression loses about 1.4e-13 at the shapes an ADAM fit uses, which was enough to stop the optimiser short of the boundary `beta = 0` that R reached, costing 0.024 of log-likelihood. With greybox 1.0.7 that series matches R exactly, and ETS bit-exact agreement across the sweep rises from 88.00% to 98.83%.
 * greybox 1.0.7 also makes `dnorm` and `dlnorm` bit-identical to R's nmath, which closes the last additive-error disagreement in the sweep (M1 series M230, whose log-likelihood differed in the 13th digit). SciPy computes its `log(sqrt(2*pi))` constant at import and lands one ULP below the correctly-rounded literal R hard-codes; it also groups R's large-`|z|` branch differently, and `scipy.stats.lognorm` routes `meanlog` through `exp()` and back instead of working from `log(q)`.

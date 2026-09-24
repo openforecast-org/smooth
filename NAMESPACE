@@ -201,146 +201,160 @@ export(xtable)
 import(Rcpp)
 import(zoo)
 importFrom(MASS,mvrnorm)
-importFrom(generics,accuracy)
-importFrom(generics,forecast)
-importFrom(grDevices,colorRampPalette)
-importFrom(grDevices,dev.interactive)
-importFrom(grDevices,devAskNewPage)
-importFrom(grDevices,palette)
-importFrom(grDevices,rgb)
-importFrom(graphics,abline)
-importFrom(graphics,layout)
-importFrom(graphics,legend)
-importFrom(graphics,lines)
-importFrom(graphics,par)
-importFrom(graphics,plot)
-importFrom(graphics,points)
-importFrom(graphics,polygon)
-importFrom(graphics,text)
-importFrom(greybox,AICc)
-importFrom(greybox,BICc)
-importFrom(greybox,actuals)
-importFrom(greybox,alm)
-importFrom(greybox,coefbootstrap)
-importFrom(greybox,dalaplace)
-importFrom(greybox,detectdst)
-importFrom(greybox,dgnorm)
-importFrom(greybox,dlaplace)
-importFrom(greybox,ds)
-importFrom(greybox,dsrboot)
-importFrom(greybox,errorType)
-importFrom(greybox,extractScale)
-importFrom(greybox,extractSigma)
-importFrom(greybox,graphmaker)
-importFrom(greybox,hm)
-importFrom(greybox,implant)
-importFrom(greybox,is.alm)
-importFrom(greybox,is.occurrence)
-importFrom(greybox,is.scale)
-importFrom(greybox,measures)
-importFrom(greybox,nparam)
-importFrom(greybox,outlierdummy)
-importFrom(greybox,plaplace)
-importFrom(greybox,pointLik)
-importFrom(greybox,polyprod)
-importFrom(greybox,ps)
-importFrom(greybox,qalaplace)
-importFrom(greybox,qgnorm)
-importFrom(greybox,qlaplace)
-importFrom(greybox,qs)
-importFrom(greybox,ralaplace)
-importFrom(greybox,rgnorm)
-importFrom(greybox,rlaplace)
-importFrom(greybox,rs)
-importFrom(greybox,sm)
-importFrom(greybox,stepwise)
-importFrom(greybox,xregExpander)
+importFrom(generics,
+  accuracy,
+  forecast
+)
+importFrom(grDevices,
+  colorRampPalette,
+  dev.interactive,
+  devAskNewPage,
+  palette,
+  rgb
+)
+importFrom(graphics,
+  abline,
+  layout,
+  legend,
+  lines,
+  par,
+  plot,
+  points,
+  polygon,
+  text
+)
+importFrom(greybox,
+  AICc,
+  BICc,
+  actuals,
+  alm,
+  coefbootstrap,
+  dalaplace,
+  detectdst,
+  dgnorm,
+  dlaplace,
+  ds,
+  dsrboot,
+  errorType,
+  extractScale,
+  extractSigma,
+  graphmaker,
+  hm,
+  implant,
+  is.alm,
+  is.occurrence,
+  is.scale,
+  measures,
+  nparam,
+  outlierdummy,
+  plaplace,
+  pointLik,
+  polyprod,
+  ps,
+  qalaplace,
+  qgnorm,
+  qlaplace,
+  qs,
+  ralaplace,
+  rgnorm,
+  rlaplace,
+  rs,
+  sm,
+  stepwise,
+  xregExpander
+)
 importFrom(methods,new)
 importFrom(nloptr,nloptr)
-importFrom(statmod,dinvgauss)
-importFrom(statmod,qinvgauss)
-importFrom(statmod,rinvgauss)
-importFrom(stats,.lm.fit)
-importFrom(stats,AIC)
-importFrom(stats,BIC)
-importFrom(stats,acf)
-importFrom(stats,as.formula)
-importFrom(stats,coef)
-importFrom(stats,confint)
-importFrom(stats,contrasts)
-importFrom(stats,cor)
-importFrom(stats,cov)
-importFrom(stats,dbeta)
-importFrom(stats,decompose)
-importFrom(stats,deltat)
-importFrom(stats,dgamma)
-importFrom(stats,dlnorm)
-importFrom(stats,dlogis)
-importFrom(stats,dnorm)
-importFrom(stats,dt)
-importFrom(stats,end)
-importFrom(stats,filter)
-importFrom(stats,fitted)
-importFrom(stats,formula)
-importFrom(stats,frequency)
-importFrom(stats,is.ts)
-importFrom(stats,lm)
-importFrom(stats,logLik)
-importFrom(stats,lowess)
-importFrom(stats,median)
-importFrom(stats,model.frame)
-importFrom(stats,model.matrix)
-importFrom(stats,na.pass)
-importFrom(stats,nlminb)
-importFrom(stats,nobs)
-importFrom(stats,optim)
-importFrom(stats,optimize)
-importFrom(stats,pacf)
-importFrom(stats,plnorm)
-importFrom(stats,pnorm)
-importFrom(stats,poly)
-importFrom(stats,ppoints)
-importFrom(stats,predict)
-importFrom(stats,qchisq)
-importFrom(stats,qgamma)
-importFrom(stats,qlnorm)
-importFrom(stats,qlogis)
-importFrom(stats,qnorm)
-importFrom(stats,qqline)
-importFrom(stats,qqnorm)
-importFrom(stats,qqplot)
-importFrom(stats,qt)
-importFrom(stats,quantile)
-importFrom(stats,rbinom)
-importFrom(stats,reformulate)
-importFrom(stats,residuals)
-importFrom(stats,rgamma)
-importFrom(stats,rlnorm)
-importFrom(stats,rlogis)
-importFrom(stats,rnorm)
-importFrom(stats,rstandard)
-importFrom(stats,rstudent)
-importFrom(stats,rt)
-importFrom(stats,runif)
-importFrom(stats,sd)
-importFrom(stats,setNames)
-importFrom(stats,sigma)
-importFrom(stats,simulate)
-importFrom(stats,start)
-importFrom(stats,supsmu)
-importFrom(stats,terms)
-importFrom(stats,time)
-importFrom(stats,ts)
-importFrom(stats,update)
-importFrom(stats,update.formula)
-importFrom(stats,var)
-importFrom(stats,vcov)
-importFrom(stats,window)
-importFrom(utils,combn)
-importFrom(utils,head)
-importFrom(utils,modifyList)
-importFrom(utils,packageVersion)
-importFrom(utils,tail)
+importFrom(statmod,
+  dinvgauss,
+  qinvgauss,
+  rinvgauss
+)
+importFrom(stats,
+  .lm.fit,
+  AIC,
+  BIC,
+  acf,
+  as.formula,
+  coef,
+  confint,
+  contrasts,
+  cor,
+  cov,
+  dbeta,
+  decompose,
+  deltat,
+  dgamma,
+  dlnorm,
+  dlogis,
+  dnorm,
+  dt,
+  end,
+  filter,
+  fitted,
+  formula,
+  frequency,
+  is.ts,
+  lm,
+  logLik,
+  lowess,
+  median,
+  model.frame,
+  model.matrix,
+  na.pass,
+  nlminb,
+  nobs,
+  optim,
+  optimize,
+  pacf,
+  plnorm,
+  pnorm,
+  poly,
+  ppoints,
+  predict,
+  qchisq,
+  qgamma,
+  qlnorm,
+  qlogis,
+  qnorm,
+  qqline,
+  qqnorm,
+  qqplot,
+  qt,
+  quantile,
+  rbinom,
+  reformulate,
+  residuals,
+  rgamma,
+  rlnorm,
+  rlogis,
+  rnorm,
+  rstandard,
+  rstudent,
+  rt,
+  runif,
+  sd,
+  setNames,
+  sigma,
+  simulate,
+  start,
+  supsmu,
+  terms,
+  time,
+  ts,
+  update,
+  update.formula,
+  var,
+  vcov,
+  window
+)
+importFrom(utils,
+  combn,
+  head,
+  modifyList,
+  packageVersion,
+  tail
+)
 importFrom(xtable,xtable)
 importFrom(zoo,zoo)
 useDynLib(smooth)

@@ -48,5 +48,4 @@ VignetteBuilder: knitr
 Encoding: UTF-8
 Roxygen: list(old_usage = TRUE)
 ByteCompile: true
-Config/roxygen2/version: 8.0.0
-RoxygenNote: 8.0.0
+Config/roxygen2/version: 8.1.0

@@ -277,7 +277,13 @@ the model. This is calculated based on the hessian of log-likelihood function an
 accepts \code{stepSize} parameter, determining how it is calculated. The default value
 is \code{stepSize=.Machine$double.eps^(1/4)}. This is used in the \link[stats]{vcov} method.
 Number of iterations inside the backcasting loop to do is regulated with \code{nIterations}
-parameter. By default it is set to 2. Furthermore, starting values of parameters can be
+parameter. By default it is set to 2. The length of the zero-error head that backcasting
+produces before the sample is regulated with \code{headLength}. By default it is set to the
+maximum lag of the model, so that the final forward pass filters over one full cycle of the
+model's own backcasts, which makes the transition between the backward and forward passes
+more accurate for the models where the state reversal is not exact (damped trend, ARIMA, CES
+and GUM). Setting \code{headLength=0} switches this filtering off and reverts to the
+zero-error head. Values above the maximum lag are experimental. Furthermore, starting values of parameters can be
 passed via \code{B}, while the upper and lower bounds should be passed in \code{ub}
 and \code{lb} respectively. In this case they will be used for optimisation. These
 values should have the length equal to the number of parameters to estimate in

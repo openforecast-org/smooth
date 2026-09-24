@@ -132,17 +132,27 @@ def main():
     if limit:
         datasets = datasets[:limit] + datasets[1001 : 1001 + limit] + datasets[-limit:]
 
-    n_series, n_methods = len(datasets), len(METHODS)
+    # BENCH_ONLY restricts the run to the methods whose name contains one of the
+    # given substrings, so the smooth rows can be recomputed on their own while
+    # the competitor rows are read from an earlier saved array.
+    only = [
+        t.strip().lower()
+        for t in os.environ.get("BENCH_ONLY", "").split(",")
+        if t.strip()
+    ]
+    methods = [m for m in METHODS if not only or any(t in m[0].lower() for t in only)]
+
+    n_series, n_methods = len(datasets), len(methods)
     out = np.full((n_methods, n_series, 3), np.nan)
     tasks = [
         (j, i, s, pkg, cfg)
-        for j, (_, pkg, cfg) in enumerate(METHODS)
+        for j, (_, pkg, cfg) in enumerate(methods)
         for i, s in enumerate(datasets)
     ]
     ncap = int(os.environ.get("BENCH_WORKERS", min(30, multiprocessing.cpu_count())))
     print(
         f"CES benchmark: {n_methods} methods x {n_series} series = "
-        f"{len(tasks)} tasks, {ncap} workers",
+        f"{len(tasks)} tasks, {ncap} workers\n  " + ", ".join(m[0] for m in methods),
         flush=True,
     )
 
@@ -162,12 +172,21 @@ def main():
                     flush=True,
                 )
 
+    # Tag a filtered run so it cannot overwrite the full-roster array.
     date = datetime.datetime.now().strftime("%Y-%m-%d")
-    path = os.path.join(os.path.dirname(__file__), f"{date}-benchmark-ces.npy")
+    tag = os.environ.get("BENCH_TAG", "").strip() or (
+        "-".join(sorted(only)) if only else ""
+    )
+    tag = "".join(c if c.isalnum() or c in "-_" else "_" for c in tag)
+    stem = f"{date}-benchmark-ces" + (f"-{tag}" if tag else "")
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, f"{stem}.npy")
     np.save(path, out)
+    with open(os.path.join(here, f"{stem}-methods.txt"), "w") as f:
+        f.write("\n".join(m[0] for m in methods) + "\n")
     print(f"saved {path} in {(time.time() - t0) / 60:.1f} min", flush=True)
 
-    for j, (name, _, _) in enumerate(METHODS):
+    for j, (name, _, _) in enumerate(methods):
         print(
             f"  {name:24s} RMSSE={np.nanmean(out[j, :, 0]):.4f} "
             f"SAME={np.nanmean(out[j, :, 1]):.4f} "

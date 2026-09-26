@@ -160,7 +160,8 @@ auto.gum <- function(y, orders=3, lags=frequency(y), type=c("additive","multipli
                 # nParamMax <- (1 + nComponents + nComponents + (nComponents^2)
                 nParamMax <- (1 + nComponents + (nComponents^2)
                               + (ordersTest %*% lagsTest)*(initial=="optimal"));
-                if(obsInSample<=nParamMax){
+                # A seasonal candidate needs at least one full cycle of observations
+                if(obsInSample<=nParamMax || obsInSample < max(lagsTest)){
                     ICs[i] <- 1E100;
                     next;
                 }

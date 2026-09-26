@@ -633,8 +633,10 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
 
     # Forecasting if h > 0
     if(h>0){
+        # sparma builds its lookup table with the default head of lagsModelMax
+        headOffset <- lagsModelMax;
         yForecast[] <- adamCpp$forecast(tail(matricesFinal$matWt,h), matricesFinal$matF,
-                                        indexLookupTable[,lagsModelMax+obsInSample+c(1:h),drop=FALSE],
+                                        indexLookupTable[,headOffset+obsInSample+c(1:h),drop=FALSE],
                                         profilesRecentTable,
                                         h)$forecast;
     }

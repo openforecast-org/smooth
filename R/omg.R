@@ -1016,8 +1016,10 @@ omg <- function(data,
             } else {
                 zoo(vector("numeric", hLocal), order.by=yForecastIndex[1])
             }
+            # The head of the lookup table may be longer than lagsModelMax
+            headOffsetLocal <- if(!is.null(adamArchitect$headLength)) adamArchitect$headLength else adamArchitect$lagsModelMax
             forecastIndexLookup <- adamArchitect$indexLookupTable[,
-                                   adamArchitect$lagsModelMax + obsInSample + seq_len(hLocal), drop=FALSE]
+                                   headOffsetLocal + obsInSample + seq_len(hLocal), drop=FALSE]
             yForecast[] <- adamArchitect$adamCpp$forecast(
                 tail(adamFilled$matWt, hLocal), adamFilled$matF,
                 forecastIndexLookup, adamFitted$profile, hLocal)$forecast

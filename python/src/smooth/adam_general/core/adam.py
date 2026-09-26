@@ -687,6 +687,9 @@ class ADAM:
         initial: INITIAL_OPTIONS = "backcasting",
         # Number of iterations for backcasting (default 2 for backcasting, 1 otherwise)
         n_iterations: Optional[int] = None,
+        # Length of the zero-error head produced by backcasting. None means one full
+        # lag cycle (head filtering on); 0 switches the filtering off.
+        head_length: Optional[int] = None,
         # TODO: enforce the structure of this
         arma: Optional[Dict[str, Any]] = None,
         # ----- End of parameters----
@@ -887,6 +890,7 @@ class ADAM:
         self.phi = phi
         self.initial = initial
         self.n_iterations = n_iterations
+        self.head_length = head_length
         self.arma = arma
         self.verbose = verbose
         self.nlopt_initial = nlopt_initial
@@ -1301,6 +1305,7 @@ class ADAM:
             "phi": self.phi,
             "initial": self.initial,
             "n_iterations": self.n_iterations,
+            "head_length": self.head_length,
             "arma": self.arma,
             "reg_lambda": self.reg_lambda,
             "gnorm_shape": self.gnorm_shape,
@@ -3680,6 +3685,7 @@ class ADAM:
             phi=self.phi,
             initial=self.initial,
             n_iterations=self.n_iterations,
+            head_length=self.head_length,
             distribution=self.distribution,
             loss=self.loss,
             h=self.h,
@@ -6085,11 +6091,14 @@ class ADAM:
         # 8. Build the index lookup table and call C++ (R/reapply.R:239, 757-761)
         from smooth.adam_general.core.creator import adam_profile_creator
 
+        # The head of the lookup table may be longer than lagsModelMax; take it
+        # from the fitted object, not from the C++ pointer (R/reapply.R).
         profiles = adam_profile_creator(
             lags_model_all=self._lags_model["lags_model_all"],
             lags_model_max=L,
             obs_all=n,
             lags=self._lags_model.get("lags"),
+            head_length=self._observations.get("head_length", L),
         )
         index_lookup_table = np.asfortranarray(
             profiles["index_lookup_table"], dtype=np.uint64

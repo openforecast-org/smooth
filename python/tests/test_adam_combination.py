@@ -194,12 +194,17 @@ class TestADAMCombinationProperties:
             _ = model.models
 
     def test_model_name_for_combined(self, simple_series):
-        """Test model name for combined model has ETS prefix."""
+        """Test model name for combined model has ETS prefix.
+
+        With unit lags there is no seasonal component to combine over, so the
+        seasonal letter is dropped, exactly as R does: ``adam(y, model="CCC",
+        lags=1)`` reports ``ETS(CCN)`` (R/adamGeneral.R, "unity lags").
+        """
         model = ADAM(model="CCC", lags=[1])
         model.fit(simple_series)
 
-        # Model name should have ETS prefix with original spec
-        assert model.model == "ETS(CCC)"
+        # Model name should have ETS prefix with the resolved spec
+        assert model.model == "ETS(CCN)"
         assert model.model_name is not None
 
 

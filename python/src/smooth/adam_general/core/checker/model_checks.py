@@ -427,6 +427,20 @@ def _check_model_composition(
                 silent,
             )
 
+    # A seasonal model needs a seasonal lag. R warns and drops the seasonal
+    # component when the maximum lag is 1 (R/adamGeneral.R, "unity lags").
+    if season_type not in ("N", None) and max_lag <= 1:
+        if season_type not in ("Z", "X", "Y"):
+            _warn(
+                "Cannot build the seasonal model on data with the unity lags.\n"
+                f"Switching to non-seasonal model: ETS({model_str[:-1]}N)",
+                silent,
+            )
+        season_type = "N"
+        model_str = model_str[:-1] + "N"
+        if models_pool is not None:
+            models_pool = [m for m in models_pool if m[-1] == "N"]
+
     # Generate models pool if needed
     # Only pre-generate pool when components are specific (not Z, X, Y)
     # When Z, X, or Y is present, leave models_pool as None for branch-and-bound

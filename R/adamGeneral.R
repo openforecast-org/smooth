@@ -2770,6 +2770,9 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     list2env(adam_checkOptimizer(ellipsis, loss, distribution, initialType, lags, arimaModel),
              envir=environment());
 
+    headLength <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample)$geometry;
+    obsStates <- obsInSample + headLength;
+
     # Add constant in the model
     if(is.numeric(constant)){
         constantRequired <- TRUE;
@@ -2915,6 +2918,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         lagsModelARIMA = lagsModelARIMA,
         lagsModelAll = lagsModelAll,
         lagsModelMax = lagsModelMax,
+        headLength = headLength,
         # Persistence
         persistence = persistence,
         persistenceEstimate = persistenceEstimate,

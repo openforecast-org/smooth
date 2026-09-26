@@ -23,12 +23,15 @@ test_that("auto.adam() ARIMA selection (NNN) on BJsales", {
                    orders=list(ar=c(2,0), i=c(2,0), ma=c(2,0), select=TRUE),
                    distribution="dnorm", silent=TRUE)
     expect_equal(modelType(m), "NNN")
-    # Re-pinned after the structural-df change: ARIMA(0,2,2) is now selected
-    # (initials count towards df, penalising larger AR/MA orders).
-    expect_equal(AICc(m), 527.457, tolerance=0.01)
+    # Re-pinned after the backcasting head change: with the head filtered over the
+    # model's own backcasts (headLength defaults to the maximum lag), the likelihood
+    # shifts slightly and ARIMA(2,1,2) with a constant now wins by 0.2 AICc.
+    # The previous pin (AICc 527.457, arma -0.73604, -0.03876) is reproduced exactly
+    # with headLength=0, i.e. by the zero-error head of earlier versions.
+    expect_equal(AICc(m), 527.259, tolerance=0.01)
     expect_equal(m$distribution, "dnorm")
     expect_equal(as.numeric(m$arma[[1]]),
-                 c(-0.73604, -0.03876), tolerance=1e-3)
+                 c(-0.040224, 0.72703), tolerance=1e-3)
 })
 
 # 3. ETS + ARIMA selection on AirPassengers

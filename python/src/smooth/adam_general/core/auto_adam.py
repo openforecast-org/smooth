@@ -417,6 +417,7 @@ class AutoADAM(ADAM):
             "persistence",
             "phi",
             "n_iterations",
+            "head_length",
             "fast",
             "smoother",
             "ets",

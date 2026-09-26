@@ -400,7 +400,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                         yFrequency, xregModelInitials){
         # Create ADAM profiles for correct treatment of seasonality
         adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses);
+                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                           headLength=headLength);
         profilesRecentTable <- adamProfiles$recent;
         indexLookupTable <- adamProfiles$lookup;
 
@@ -653,9 +654,12 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                           rep(1, xregNumber)),
                                         ncol=1);
 
+    headLengthResolved <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample);
+    headLength <- headLengthResolved$geometry;
+    obsStates[] <- obsInSample + headLength;
+
     Stype <- Ttype <- "N";
     model <- "ANN";
-
 
     # Create C++ adam class, which will then use fit, forecast etc methods
     adamCpp <- new(adamCore,
@@ -665,6 +669,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, FALSE);
+    adamCpp$headLength <- headLengthResolved$flag;
 
     ##### Pre-set yFitted, yForecast, errors and basic parameters #####
     # Prepare fitted and error with ts / zoo
@@ -963,7 +968,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
     else{
         # Create index lookup table
         indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses)$lookup;
+                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                           headLength=headLength)$lookup;
         if(any(initialType==c("optimal","two-stage","provided"))){
             initialType <- "provided";
         }
@@ -996,12 +1002,12 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         # CES. "none" was unaffected: with lagsModelMax==1 there is no head to
         # refine, so its states head already was the seed.
         if(any(initialType==c("backcasting","complete","gradient"))){
-            matVt[,1:lagsModelMax] <-
+            matVt[,1:headLength] <-
                 creator(seasonality, xregModel,
                         lagsModelAll, lagsModelMax, obsAll, lags, yIndexAll, yClasses,
                         lagsModelSeasonal, nSeasonal,
                         componentsNumber, xregNumber, obsInSample, obsStates, xregNames,
-                        yFrequency, xregModelInitials)$matVt[,1:lagsModelMax];
+                        yFrequency, xregModelInitials)$matVt[,1:headLength];
         }
 
         CFValue <- CF(B, matVt, matF, vecG, a, b);
@@ -1091,6 +1097,9 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
     # Write down the recent profile for future use
     profilesRecentTable <- adamFitted$profile;
     matVt[] <- adamFitted$states;
+    if(headLength > lagsModelMax){
+        matVt <- matVt[, c((headLength - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
+    }
     if(!any(initialType==c("complete","backcasting","gradient"))){
         profilesRecentInitial <- matVt[,1:lagsModelMax,drop=FALSE];
     }
@@ -1105,7 +1114,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
     }
     if(h>0){
         yForecast[] <- adamCpp$forecast(tail(matWt,h), matF,
-                                        indexLookupTable[,lagsModelMax+obsInSample+c(1:h),drop=FALSE],
+                                        indexLookupTable[,headLength+obsInSample+c(1:h),drop=FALSE],
                                         profilesRecentTable,
                                         h)$forecast;
     }

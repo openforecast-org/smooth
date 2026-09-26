@@ -316,7 +316,7 @@ auto.ssarima <- function(y, orders=list(ar=c(3,3),i=c(2,1),ma=c(3,3)), lags=c(1,
                              constant=constantValue, regressors=regressors,
                              initial=initial, loss=loss,
                              h=h, holdout=holdout, bounds=bounds, silent=TRUE,
-                             xreg=xreg);
+                             xreg=xreg, ...);
         return(bestModel);
     }
 
@@ -348,7 +348,7 @@ auto.ssarima <- function(y, orders=list(ar=c(3,3),i=c(2,1),ma=c(3,3)), lags=c(1,
                              constant=constantValue, regressors=regressors,
                              initial=initial, loss=loss,
                              h=h, holdout=holdout, bounds=bounds, silent=TRUE,
-                             xreg=xreg);
+                             xreg=xreg, ...);
         ICValue <- IC(testModel);
         if(combine){
             testForecasts[[m]] <- matrix(NA,h,3);
@@ -410,7 +410,7 @@ auto.ssarima <- function(y, orders=list(ar=c(3,3),i=c(2,1),ma=c(3,3)), lags=c(1,
                         }
                         testModel <- ssarima(dataI, orders=list(ar=0,i=0,ma=maTest), lags=lags,
                                              constant=FALSE, initial=initial, loss=loss,
-                                             h=h, holdout=FALSE, bounds=bounds, silent=TRUE);
+                                             h=h, holdout=FALSE, bounds=bounds, silent=TRUE, ...);
                         ICValue <- icCorrector(IC(testModel), nParamMA, obsInSample, nParamNew);
                         if(combine){
                             testForecasts[[m]] <- matrix(NA,h,3);
@@ -471,7 +471,7 @@ auto.ssarima <- function(y, orders=list(ar=c(3,3),i=c(2,1),ma=c(3,3)), lags=c(1,
                                         }
                                         testModel <- ssarima(dataMA, orders=list(ar=arTest,i=0,ma=0), lags=lags,
                                                              constant=FALSE, initial=initial, loss=loss,
-                                                             h=h, holdout=FALSE, bounds=bounds, silent=TRUE);
+                                                             h=h, holdout=FALSE, bounds=bounds, silent=TRUE, ...);
                                         ICValue <- icCorrector(IC(testModel), nParamAR, obsInSample, nParamNew);
                                         if(combine){
                                             testForecasts[[m]] <- matrix(NA,h,3);
@@ -539,7 +539,7 @@ auto.ssarima <- function(y, orders=list(ar=c(3,3),i=c(2,1),ma=c(3,3)), lags=c(1,
                             }
                             testModel <- ssarima(dataMA, orders=list(ar=arTest,i=0,ma=0), lags=lags,
                                                  constant=FALSE, initial=initial, loss=loss,
-                                                 h=h, holdout=FALSE, bounds=bounds, silent=TRUE);
+                                                 h=h, holdout=FALSE, bounds=bounds, silent=TRUE, ...);
                             ICValue <- icCorrector(IC(testModel), nParamAR, obsInSample, nParamNew);
                             if(combine){
                                 testForecasts[[m]] <- matrix(NA,h,3);
@@ -596,7 +596,7 @@ auto.ssarima <- function(y, orders=list(ar=c(3,3),i=c(2,1),ma=c(3,3)), lags=c(1,
                                  constant=FALSE, regressors=regressors,
                                  initial=initial, loss=loss,
                                  h=h, holdout=holdout, bounds=bounds, silent=TRUE,
-                                 xreg=xreg);
+                                 xreg=xreg, ...);
             ICValue <- IC(testModel);
             if(combine){
                 testForecasts[[m]] <- matrix(NA,h,3);
@@ -675,7 +675,7 @@ auto.ssarima <- function(y, orders=list(ar=c(3,3),i=c(2,1),ma=c(3,3)), lags=c(1,
                              constant=constantValue, regressors=regressors,
                              initial=initial, loss=loss,
                              h=h, holdout=holdout, bounds=bounds, silent=TRUE,
-                             xreg=xreg);
+                             xreg=xreg, ...);
 
         bestModel$timeElapsed <- Sys.time()-startTime;
     }

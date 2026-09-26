@@ -574,6 +574,9 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
 
     lagsModelAll <- matrix(rep(1,componentsNumberAll+xregNumber),ncol=1);
     lagsModelMax <- 1;
+    headLengthResolved <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample);
+    headLength <- headLengthResolved$geometry;
+    obsStates <- obsInSample + headLength;
 
     # Create C++ adam class, which will then use fit, forecast etc methods
     adamCpp <- new(adamCore,
@@ -586,6 +589,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     # Drift flips sign in the backcasting backward pass when the total order
     # of differencing is odd — the ARIMA analog of the ETS trend reversal
     adamCpp$flipConstant <- constantRequired && (sum(iOrders) %% 2 == 1);
+    adamCpp$headLength <- headLengthResolved$flag;
 
     if(!is.null(initialValueProvided)){
         initialType <- "provided";
@@ -617,8 +621,11 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
 
     if(componentsNumberARIMA > 0){
         # Transition matrix, measurement vector and persistence vector + state vector
+        # The first column carries the ARI feedback and is filled by the filler when
+        # there are AR or I terms. Without them (pure MA) it must be zero, not the
+        # identity left by diag() above.
+        matF[1,1] <- 0;
         if(componentsNumberARIMA>1){
-            matF[1,1] <- 0;
             matF[componentsNumberARIMA,componentsNumberARIMA] <- 0;
             matF[1:(componentsNumberARIMA-1),2:componentsNumberARIMA] <- diag(componentsNumberARIMA-1);
             matWt[,2:componentsNumberARIMA] <- 0;
@@ -709,7 +716,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     if(modelDo=="estimate"){
         # Create ADAM profiles for correct treatment of seasonality
         adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses);
+                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                           headLength=headLength);
         profilesRecentTable <- adamProfiles$recent;
         if(initialType=="provided"){
             profilesRecentTable[1:componentsNumberARIMA,1] <- matVt[1:componentsNumberARIMA,1];
@@ -1020,7 +1028,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
 
         # Create index lookup table
         adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                       lags=lags, yIndex=yIndexAll, yClasses=yClasses);
+                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                           headLength=headLength);
         indexLookupTable <- adamProfiles$lookup;
         if(is.null(profilesRecentTable)){
             profilesRecentInitial <- profilesRecentTable <- adamProfiles$recent;
@@ -1148,6 +1157,9 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     # Write down the recent profile for future use
     profilesRecentTable <- adamFitted$profile;
     matVt[] <- adamFitted$states;
+    if(headLength > lagsModelMax){
+        matVt <- matVt[, c((headLength - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
+    }
 
     # Write down the initials in the recent profile
     if(!any(initialType==c("complete","backcasting","gradient"))){
@@ -1164,7 +1176,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     }
     if(h>0){
         yForecast[] <- adamCpp$forecast(tail(matWt,h), matF,
-                                        indexLookupTable[,lagsModelMax+obsInSample+c(1:h),drop=FALSE],
+                                        indexLookupTable[,headLength+obsInSample+c(1:h),drop=FALSE],
                                         profilesRecentTable,
                                         h)$forecast;
     }

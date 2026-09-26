@@ -218,7 +218,13 @@
 #' accepts \code{stepSize} parameter, determining how it is calculated. The default value
 #' is \code{stepSize=.Machine$double.eps^(1/4)}. This is used in the \link[stats]{vcov} method.
 #' Number of iterations inside the backcasting loop to do is regulated with \code{nIterations}
-#' parameter. By default it is set to 2. Furthermore, starting values of parameters can be
+#' parameter. By default it is set to 2. The length of the zero-error head that backcasting
+#' produces before the sample is regulated with \code{headLength}. By default it is set to the
+#' maximum lag of the model, so that the final forward pass filters over one full cycle of the
+#' model's own backcasts, which makes the transition between the backward and forward passes
+#' more accurate for the models where the state reversal is not exact (damped trend, ARIMA, CES
+#' and GUM). Setting \code{headLength=0} switches this filtering off and reverts to the
+#' zero-error head. Values above the maximum lag are experimental. Furthermore, starting values of parameters can be
 #' passed via \code{B}, while the upper and lower bounds should be passed in \code{ub}
 #' and \code{lb} respectively. In this case they will be used for optimisation. These
 #' values should have the length equal to the number of parameters to estimate in
@@ -665,14 +671,20 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         ic=ic, bounds=bounds, silent=silent, ...)));
     }
 
+    headLengthUser <- ellipsis$headLength;
+
     #### Thin wrappers: top-level adam_* functions + adam() closure variables ####
     architector <- function(...){
         return(adam_architector(...,
                                 componentsNumberARIMA=componentsNumberARIMA,
                                 obsAll=obsAll, yIndexAll=yIndexAll, yClasses=yClasses,
                                 adamETS=adamETS,
-                                flipConstant=arimaModel && constantRequired &&
-                                    (sum(iOrders) %% 2 == 1)));
+                                # ADAM's ARIMA carries the constant in the measurement
+                                # vector with an identity transition, so the drift must NOT
+                                # be flipped in the backward pass (unlike ssarima's
+                                # companion form, where the flip is exactly right)
+                                flipConstant=FALSE,
+                                headLength=headLengthUser));
     }
     creator <- function(...){
         return(adam_creator(...,
@@ -1973,6 +1985,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
         matVt[] <- adamFitted$states;
 
+        # If headLength > lagsModelMax, keep only the last lagsModelMax head states
+        # so returned states and extracted initials keep exactly today's dimensions and meaning.
+        headOffset <- if(!is.null(headLength)) headLength else lagsModelMax;
+        if(headOffset > lagsModelMax){
+            matVt <- matVt[, c((headOffset - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
+        }
+
         # Write down the recent profile for future use
         profilesRecentTable <- adamFitted$profile;
 
@@ -2029,7 +2048,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
 
             yForecast[] <- adamCpp$forecast(tail(matWt,horizon), matF,
-                                            indexLookupTable[,lagsModelMax+obsInSample+c(1:horizon),drop=FALSE],
+                                            indexLookupTable[,headOffset+obsInSample+c(1:horizon),drop=FALSE],
                                             profilesRecentTable,
                                             horizon)$forecast;
             #### Make safety checks
@@ -2194,7 +2213,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                     occurrence=omModel, formula=formula, regressors=regressors,
                     loss=loss, lossValue=CFValue, logLik=logLikADAMValue, distribution=distribution,
                     scale=scale, other=otherReturned, B=B, lags=lags, lagsAll=lagsModelAll, ets=ets,
-                    res=res, FI=FI, adamCpp=adamCpp));
+                    res=res, FI=FI, adamCpp=adamCpp, headLength=headOffset));
     }
 
     #### Deal with occurrence model ####
@@ -2562,6 +2581,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             adamSelected$results[[i]]$componentsNumberETSNonSeasonal <- adamArchitect$componentsNumberETSNonSeasonal;
             adamSelected$results[[i]]$componentsNamesETS <- adamArchitect$componentsNamesETS;
             adamSelected$results[[i]]$adamCpp <- adamArchitect$adamCpp;
+            adamSelected$results[[i]]$headLength <- adamArchitect$headLength;
+            adamSelected$results[[i]]$obsStates <- adamArchitect$obsStates;
 
             # Create the matrices for the specific ETS model
             adamCreated <- creator(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
@@ -3171,7 +3192,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 # This function creates recent profile and the lookup table for adam
 #' @importFrom greybox detectdst
 adamProfileCreator <- function(lagsModelAll, lagsModelMax, obsAll,
-                               lags=NULL, yIndex=NULL, yClasses=NULL){
+                               lags=NULL, yIndex=NULL, yClasses=NULL,
+                               headLength=lagsModelMax){
     # lagsModelAll - all lags used in the model for ETS + ARIMA + xreg
     # lagsModelMax - the maximum lag used in the model
     # obsAll - number of observations to create
@@ -3179,13 +3201,14 @@ adamProfileCreator <- function(lagsModelAll, lagsModelMax, obsAll,
     #        if weird frequencies are used.
     # yIndex - the indices needed in order to get the weird dates.
     # yClass - the class used for the actuals. If zoo, magic will happen here.
+    # headLength - length of the zero-error head in lookup table (defaults to lagsModelMax)
     # Create the matrix with profiles, based on provided lags
     profilesRecentTable <- matrix(0,length(lagsModelAll),lagsModelMax,
                                   dimnames=list(lagsModelAll,NULL));
     # Create the lookup table. The extra lagsModelMax columns at the end form
     # the "tail" — the cyclic continuation past the last observation used by
     # the backcasting tail mirror in the C++ code.
-    indexLookupTable <- matrix(1,length(lagsModelAll),obsAll+2*lagsModelMax,
+    indexLookupTable <- matrix(1,length(lagsModelAll),obsAll+headLength+lagsModelMax,
                                dimnames=list(lagsModelAll,NULL));
     # Modify the lookup table in order to get proper indices in C++
     profileIndices <- matrix(c(1:(lagsModelMax*length(lagsModelAll))),length(lagsModelAll));
@@ -3194,11 +3217,12 @@ adamProfileCreator <- function(lagsModelAll, lagsModelMax, obsAll,
     for(i in 1:length(lagsModelAll)){
         profilesRecentTable[i,1:lagsModelAll[i]] <- 1:lagsModelAll[i];
         # -1 is needed to align this with C++ code
-        indexLookupTable[i,lagsModelMax+c(1:obsAllTail)] <- rep(profileIndices[i,1:lagsModelAll[i]],
-                                                                ceiling(obsAllTail/lagsModelAll[i]))[1:obsAllTail] -1;
+        indexLookupTable[i,headLength+c(1:obsAllTail)] <- rep(profileIndices[i,1:lagsModelAll[i]],
+                                                              ceiling(obsAllTail/lagsModelAll[i]))[1:obsAllTail] -1;
         # Fix the head of the data, before the sample starts
-        indexLookupTable[i,1:lagsModelMax] <- tail(rep(unique(indexLookupTable[i,lagsModelMax+c(1:obsAll)]),lagsModelMax),
-                                                   lagsModelMax);
+        uIndices <- unique(indexLookupTable[i,headLength+c(1:obsAll)]);
+        indexLookupTable[i,1:headLength] <- tail(rep(uIndices, ceiling(headLength/length(uIndices))),
+                                                 headLength);
     }
 
     # Do shifts for proper lags only:

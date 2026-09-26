@@ -622,3 +622,46 @@ class TestADAMvcovType:
         m = ADAM(model="ANN", lags=[1], initial="optimal").fit(self._series())
         with pytest.raises(ValueError, match="type must be one of"):
             m.vcov(type="nonsense")
+
+
+class TestADAMPersistenceNames:
+    """R accepts the Greek names as aliases of the component names."""
+
+    @staticmethod
+    def _series():
+        rng = np.random.default_rng(5)
+        t = np.arange(96)
+        return (
+            100 + 0.5 * t + 8 * np.sin(2 * np.pi * t / 12) + rng.normal(0, 1.5, t.size)
+        )
+
+    def test_greek_names_match_component_names(self):
+        y = self._series()
+        greek = ADAM(
+            model="AAdA",
+            lags=[1, 12],
+            persistence={"alpha": 0.3, "beta": 0.1, "gamma": 0.2},
+            phi=0.9,
+            initial="backcasting",
+        ).fit(y)
+        named = ADAM(
+            model="AAdA",
+            lags=[1, 12],
+            persistence={"level": 0.3, "trend": 0.1, "seasonal": 0.2},
+            phi=0.9,
+            initial="backcasting",
+        ).fit(y)
+        assert greek.loglik == named.loglik
+
+    def test_component_name_wins_over_the_alias(self):
+        y = self._series()
+        both = ADAM(
+            model="ANN",
+            lags=[1],
+            persistence={"level": 0.3, "alpha": 0.9},
+            initial="backcasting",
+        ).fit(y)
+        only = ADAM(
+            model="ANN", lags=[1], persistence={"level": 0.3}, initial="backcasting"
+        ).fit(y)
+        assert both.loglik == only.loglik

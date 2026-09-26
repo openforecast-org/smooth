@@ -140,6 +140,8 @@ def _ces_cf_from_reference(case_name):
         constant=False,
         adamETS=False,
     )
+    # One full lag cycle of head filtering, as CES.fit() resolves it
+    adam_cpp.headLength = lags_model_max
 
     b_estimate = seasonality in ("partial", "full")
     return ces_cf(

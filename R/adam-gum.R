@@ -451,7 +451,9 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         lagsModelAll <- lagsModel;
     }
     lagsModelMax <- max(lagsModelAll);
-    obsStates[] <- obsInSample + lagsModelMax;
+    headLengthResolved <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample);
+    headLength <- headLengthResolved$geometry;
+    obsStates[] <- obsInSample + headLength;
 
     # The reversed lags to fill in values in the state vector
     # lagsModelRev <- lagsModelMax - lagsModel + 1;
@@ -474,6 +476,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, FALSE);
+    adamCpp$headLength <- headLengthResolved$flag;
 
     matF <- diag(componentsNumber+xregNumber);
     vecG <- matrix(0,componentsNumber+xregNumber,1);
@@ -588,7 +591,8 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     if(modelDo=="estimate"){
         # Create ADAM profiles for correct treatment of seasonality
         adamProfiles <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses);
+                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                           headLength=headLength);
         profilesRecentTable <- adamProfiles$recent;
         indexLookupTable <- adamProfiles$lookup;
 
@@ -802,7 +806,8 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     else{
         # Create index lookup table
         indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsAll,
-                                           lags=lags, yIndex=yIndexAll, yClasses=yClasses)$lookup;
+                                               lags=lags, yIndex=yIndexAll, yClasses=yClasses,
+                                               headLength=headLength)$lookup;
         if(any(initialType==c("optimal","two-stage","provided"))){
             initialType <- "provided";
         }
@@ -891,6 +896,9 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     # Write down the recent profile for future use
     profilesRecentTable <- adamFitted$profile;
     matVt[] <- adamFitted$states;
+    if(headLength > lagsModelMax){
+        matVt <- matVt[, c((headLength - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
+    }
     if(!any(initialType==c("complete","backcasting"))){
         profilesRecentInitial <- matVt[,1:lagsModelMax,drop=FALSE];
     }
@@ -905,7 +913,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     }
     if(h>0){
         yForecast[] <- adamCpp$forecast(tail(matWt,h), matF,
-                                        indexLookupTable[,lagsModelMax+obsInSample+c(1:h),drop=FALSE],
+                                        indexLookupTable[,headLength+obsInSample+c(1:h),drop=FALSE],
                                         profilesRecentTable,
                                         h)$forecast;
     }

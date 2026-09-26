@@ -103,11 +103,19 @@ def main():
     datasets = [M1[k] for k in M1.keys()] + [M3[k] for k in M3.keys()] + [Tourism[k] for k in Tourism.keys()]
     _lim = int(os.environ.get('BENCH_LIMIT', '0'))
     if _lim: datasets = datasets[:_lim] + datasets[1001:1001+_lim] + datasets[-_lim:]
-    nS = len(datasets); nM = len(METHODS)
+    # BENCH_ONLY keeps only the methods whose name contains one of the given
+    # substrings, so the smooth rows can be recomputed on their own while the
+    # competitor rows are read from an earlier saved array. BENCH_TAG names the
+    # output, which keeps a partial run from overwriting the full-roster one.
+    _only_env = os.environ.get("BENCH_ONLY", "").split(",")
+    only = [t.strip().lower() for t in _only_env if t.strip()]
+    methods = [m for m in METHODS if not only or any(t in m[0].lower() for t in only)]
+    nS = len(datasets); nM = len(methods)
     out = np.full((nM, nS, 99, 2), np.nan)
-    tasks = [(j, i, s, pkg, cfg) for j, (_, pkg, cfg) in enumerate(METHODS) for i, s in enumerate(datasets)]
+    tasks = [(j, i, s, pkg, cfg) for j, (_, pkg, cfg) in enumerate(methods) for i, s in enumerate(datasets)]
     ncap = int(os.environ.get("BENCH_WORKERS", min(30, multiprocessing.cpu_count())))
-    print(f"dist benchmark: {nM} methods x {nS} series = {len(tasks)} tasks, {ncap} workers", flush=True)
+    print(f"dist benchmark: {nM} methods x {nS} series = {len(tasks)} tasks, {ncap} workers"
+          f"\n  " + ", ".join(m[0] for m in methods), flush=True)
     t0 = time.time(); done = 0
     ctx = multiprocessing.get_context("fork")
     with ProcessPoolExecutor(max_workers=ncap, mp_context=ctx) as ex:
@@ -121,11 +129,18 @@ def main():
                 el = time.time() - t0
                 print(f"  {done}/{len(tasks)} ({100*done/len(tasks):.1f}%) {el/60:.1f}min", flush=True)
     date = datetime.datetime.now().strftime("%Y-%m-%d")
-    path = os.path.join(os.path.dirname(__file__), f"{date}-benchmark-dist.npy")
+    tag = os.environ.get("BENCH_TAG", "").strip()
+    tag = tag or ("-".join(sorted(only)) if only else "")
+    tag = "".join(c if c.isalnum() or c in "-_" else "_" for c in tag)
+    here = os.path.dirname(os.path.abspath(__file__))
+    stem = f"{date}-benchmark-dist" + (f"-{tag}" if tag else "")
+    path = os.path.join(here, f"{stem}.npy")
     np.save(path, out)
+    with open(os.path.join(here, f"{stem}-methods.txt"), "w") as f:
+        f.write("\n".join(m[0] for m in methods) + "\n")
     print(f"saved {path} in {(time.time()-t0)/60:.1f} min", flush=True)
     # quick summary
-    names = [m[0] for m in METHODS]
+    names = [m[0] for m in methods]
     for j, nm in enumerate(names):
         pb = np.nanmean(out[j, :, :, 0]); cov = np.nanmean(out[j, :, :, 1], axis=0)
         mce = np.nanmean(np.abs(cov - LEVELS)) if np.isfinite(pb) else np.nan

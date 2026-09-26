@@ -28,6 +28,33 @@ infer seasonality from, so the parameter is load-bearing. This exception does
 **not** extend to `ADAM.simulate()` / `ES.simulate()` / etc., which read `lags`
 straight off the fitted model.
 
+## Export every new `adamCore` field to Python
+
+R and Python share the C++ kernel in `src/headers/adamCore.h`, but a field only
+reaches Python if it is exported in `src/python/adamPython.cpp`. A missing export
+does not fail — Python silently runs the kernel with that field at its default while
+R runs it with another value, and every number quietly diverges. This happened with
+`headLength`: the head filtering was on in R and off in Python for three weeks.
+
+After touching `adamCore`'s public fields, export them and re-run the parity tests.
+
+## Rebuild from scratch after editing a header
+
+`R CMD INSTALL` and the Python build both track `.cpp` files, not headers. Editing
+`src/headers/*.h` alone leaves the old object files in place, so both sides keep
+running the previous logic and report it convincingly. Use `R CMD INSTALL --preclean`
+on the R side and force a clean rebuild of the extension on the Python side whenever
+a header changed.
+
+## Match R's accumulators, not just its formulas
+
+Seeds and summary statistics must reproduce R bit-for-bit, because the loss surfaces
+here are flat enough for a last-bit difference to change the answer. `np.mean` and
+R's two-pass long-double `mean()` differ by one ULP, which was enough to send CES
+into a different optimiser basin (logLik -132.24 against R's -120.96) while the cost
+surfaces themselves agreed to 3.2e-16. Use the `_mean_r` helper and its relatives
+rather than the NumPy defaults.
+
 ## Never clip, clamp, or patch around bad numerics
 
 This rule applies across the whole project — `adam`, `OM`, `OMG`, `ES`,
@@ -142,7 +169,7 @@ Update only if you do C++ code changes not python code changes.
 make test
 ```
 
-**Test location**: `python/tests/` — a pytest suite of 914 tests (a further 460 are
+**Test location**: `python/tests/` — a pytest suite of 926 tests (a further 460 are
 deselected by default; see below).
 
 - `tests/data/` holds the R-generated reference fixtures.
@@ -163,9 +190,8 @@ installed. Where that is available they run as-is:
 They shell out to R through `tests/_r_bridge.py`, which loads the *local* R source
 with `devtools::load_all()` — so they always compare against the working tree, and an
 R-side edit is picked up without reinstalling. The repo root is derived from the
-module's own location, so the bridge follows the checkout. Current baseline: **457
-passed, 3 xfailed** (the three xfails are all `simulate.om`, reasons recorded in
-`tests/test_om_simulate_r_parity.py`). Any other failure is yours.
+module's own location, so the bridge follows the checkout. Current baseline: **460
+passed**, no xfails. Any failure is yours.
 
 ### Linting and Code Quality
 
@@ -398,8 +424,8 @@ fc.to_dataframe()    # flat pd.DataFrame with prefixed column names
 
 ## Git Workflow
 
-**Working branch**: `master` — both the R package and the Python port are developed
-here. The `Python` branch is historical.
+**Long-lived branch**: `master` — both the R package and the Python port land here.
+Feature work happens on topic branches off it. The `Python` branch is historical.
 
 ## R / Python API Parity
 

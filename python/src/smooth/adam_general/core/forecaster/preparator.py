@@ -1141,14 +1141,22 @@ def preparator(
         general_dict["parameters_number"][0][:2]
     )
 
-    # 15. Return the prepared model
+    # 15. If the backcasting head is longer than one lag cycle, keep only the last
+    # lags_model_max head states, so the returned states and the extracted initials
+    # keep exactly today's dimensions and meaning (R/adam.R).
+    states = adam_fitted.states
+    head_offset = observations_dict.get("head_length", lags_dict["lags_model_max"])
+    if head_offset > lags_dict["lags_model_max"]:
+        states = states[:, head_offset - lags_dict["lags_model_max"] :]
+
+    # 16. Return the prepared model
     return {
         "model": model_type_dict["model"],
         "time_elapsed": None,  # Time calculation could be added if needed
         "holdout": general_dict["holdout"],
         "y_fitted": y_fitted,
         "residuals": errors,
-        "states": adam_fitted.states,
+        "states": states,
         "profiles_recent_table": adam_fitted.profile,
         "persistence": matrices_dict["vec_g"],
         "transition": matrices_dict["mat_f"],

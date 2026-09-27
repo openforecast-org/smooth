@@ -500,41 +500,63 @@ test_that("The response name survives data passed by value", {
 })
 
 #### Hannan-Rissanen starting values of the ARMA parameters ####
-# The companion eigenvalues of 1 - sum(coefs * z^k), i.e. the inverse roots
+# The largest inverse root of 1 - sum(coefs * z^k)
 maxInverseRoot <- function(coefs){
     return(max(Mod(1/polyroot(c(1, -coefs)))))
+}
+# arimaHRCpp() with the bounds code of adam's "usual" unless given
+hr <- function(y, ar, ma, lags, arEstimate=TRUE, maEstimate=TRUE, arma=numeric(0),
+               useLevel=rep(1, length(lags)), bounds=1){
+    return(as.vector(smooth:::arimaHRCpp(y, ar, ma, lags, arEstimate, maEstimate, arma, useLevel, bounds)))
 }
 
 test_that("Hannan-Rissanen recovers the parameters of ARMA(1,1) and SARMA(1,1)(1,1)[12]", {
     set.seed(41)
     y <- as.vector(arima.sim(list(ar=0.6, ma=0.3), 300))
-    expect_equal(smooth:::arimaHRCpp(y, 1, 1, 1, TRUE, TRUE, numeric(0), 1),
-                 c(0.6, 0.3), tolerance=0.1, check.attributes=FALSE)
+    expect_equal(hr(y, 1, 1, 1), c(0.6, 0.3), tolerance=0.1, check.attributes=FALSE)
     set.seed(42)
     y <- as.vector(arima.sim(list(ar=c(0.7, rep(0,10), 0.5, -0.35), ma=c(0.4, rep(0,10), 0.3, 0.12)), 600))
-    expect_equal(smooth:::arimaHRCpp(y, c(1,1), c(1,1), c(1,12), TRUE, TRUE, numeric(0), c(1,1)),
-                 c(0.7, 0.4, 0.5, 0.3), tolerance=0.2, check.attributes=FALSE)
+    expect_equal(hr(y, c(1,1), c(1,1), c(1,12)), c(0.7, 0.4, 0.5, 0.3), tolerance=0.2,
+                 check.attributes=FALSE)
 })
 
-test_that("Hannan-Rissanen values are stationary and invertible", {
-    set.seed(43)
-    y <- cumsum(rnorm(200))
-    expect_lte(maxInverseRoot(smooth:::arimaHRCpp(y, 2, 0, 1, TRUE, FALSE, numeric(0), 1)), 0.9 + 1e-8)
-    expect_lte(maxInverseRoot(-smooth:::arimaHRCpp(y, 0, 2, 1, FALSE, TRUE, numeric(0), 1)), 0.9 + 1e-8)
+test_that("Hannan-Rissanen values move inside the boundary only if the cost function rejects them", {
+    # Bounds codes: 0 none, 1 adam "usual", 2 "admissible", 3 ssarima "usual"
+    set.seed(45)
+    e <- rnorm(200)
+    y <- numeric(200)
+    for(t in 2:200){
+        y[t] <- 1.03*y[t-1] + e[t]
+    }
+    arRaw <- hr(y, 1, 0, 1, maEstimate=FALSE, bounds=0)
+    expect_gt(arRaw, 1)
+    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=1), 0.99)
+    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=2), 0.99)
+    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=3), arRaw)
+    # Over-differenced white noise: a non-invertible MA with a negative sum
+    set.seed(47)
+    w <- diff(rnorm(300), differences=2)
+    maRaw <- hr(w, 0, 1, 1, arEstimate=FALSE, bounds=0)
+    expect_gt(abs(maRaw), 1)
+    expect_equal(hr(w, 0, 1, 1, arEstimate=FALSE, bounds=1), maRaw)
+    expect_equal(abs(hr(w, 0, 1, 1, arEstimate=FALSE, bounds=2)), 0.99)
+    expect_lt(abs(hr(w, 0, 1, 1, arEstimate=FALSE, bounds=3)), 1)
+    # An invertible MA(2) with a coefficient above one: only ssarima's box rejects it
+    set.seed(46)
+    x <- as.vector(arima.sim(list(ma=c(1.6, 0.64)), 1000))
+    expect_true(all(abs(hr(x, 0, 2, 1, arEstimate=FALSE, bounds=3)) < 1))
+    expect_lte(maxInverseRoot(-hr(x, 0, 2, 1, arEstimate=FALSE, bounds=2)), 0.99 + 1e-8)
 })
 
 test_that("Hannan-Rissanen falls back to the defaults and respects the provided values", {
     set.seed(41)
     y <- as.vector(arima.sim(list(ar=0.6, ma=0.3), 300))
     # Too few seasons for the seasonal level, and a level switched off
-    expect_equal(smooth:::arimaHRCpp(y[1:30], c(1,1), c(1,1), c(1,12), TRUE, TRUE, numeric(0), c(1,1))[3:4],
-                 c(0.1, -0.1))
-    expect_equal(smooth:::arimaHRCpp(y, c(1,1), c(1,1), c(1,12), TRUE, TRUE, numeric(0), c(1,0))[3:4],
-                 c(0.1, -0.1))
-    expect_equal(smooth:::arimaHRCpp(numeric(0), 1, 1, 1, TRUE, TRUE, numeric(0), 1), c(0.1, -0.1),
-                 check.attributes=FALSE)
+    expect_equal(hr(y[1:30], c(1,1), c(1,1), c(1,12))[3:4], c(0.1, -0.1))
+    expect_equal(hr(y, c(1,1), c(1,1), c(1,12), useLevel=c(1,0))[3:4], c(0.1, -0.1))
+    expect_equal(hr(numeric(0), 1, 1, 1), c(0.1, -0.1), check.attributes=FALSE)
     # AR provided: only MA is returned
-    expect_length(smooth:::arimaHRCpp(y, 1, 1, 1, FALSE, TRUE, 0.6, 1), 1)
+    expect_length(hr(y, 1, 1, 1, arEstimate=FALSE, arma=0.6), 1)
     testModel <- msarima(AirPassengers, orders=list(ar=1,i=1,ma=1), arma=list(ar=0.5))
     expect_equal(testModel$arma$ar, 0.5, check.attributes=FALSE)
 })
@@ -560,7 +582,8 @@ test_that("ARIMA with constant starts from the intercept consistent with AR", {
 test_that("ETS+ARIMA keeps the defaults for the seasonal ARIMA at the ETS seasonal lag", {
     testModel <- adam(AirPassengers, "MAM", orders=list(ar=c(1,1),ma=c(1,1)), lags=c(1,12), maxeval=1)
     expect_equal(testModel$B[c("phi1[12]","theta1[12]")], c(0.1, -0.1), check.attributes=FALSE)
-    expect_lte(abs(testModel$B["phi1[1]"]), 0.9 + 1e-8)
+    # The start is feasible: no penalty from the bounds
+    expect_lt(testModel$lossValue, 1e+100)
 })
 
 test_that("ARIMA starting values under non-normal distributions and non-likelihood losses", {

@@ -681,7 +681,7 @@ class TestADAMARIMAInitialiser:
         return pd.read_csv(path)["y"].values.astype(float)
 
     @staticmethod
-    def _hr(y, ar, ma, lags, ar_est=True, ma_est=True, arma=(), use=None):
+    def _hr(y, ar, ma, lags, ar_est=True, ma_est=True, arma=(), use=None, bounds=1):
         from smooth.adam_general import _ols
 
         lags = np.asarray(lags, dtype=np.uint64)
@@ -694,6 +694,7 @@ class TestADAMARIMAInitialiser:
             ma_est,
             np.asarray(arma, dtype=float),
             np.ones_like(lags) if use is None else np.asarray(use, dtype=np.uint64),
+            bounds,
         )
 
     @staticmethod
@@ -708,14 +709,30 @@ class TestADAMARIMAInitialiser:
         b = self._hr(self._arma(1000, 0.6, 0.3, 41), [1], [1], [1])
         np.testing.assert_allclose(b, [0.6, 0.3], atol=0.1)
 
-    def test_stationary_invertible(self):
-        """The inverse roots are within the 0.9 cap."""
-        y = np.cumsum(np.random.default_rng(43).normal(size=200))
-        ar = self._hr(y, [2], [0], [1], ma_est=False)
-        ma = self._hr(y, [0], [2], [1], ar_est=False)
-        for coefs in (ar, -ma):
-            roots = np.roots(np.r_[1.0, -coefs][::-1])
-            assert np.max(np.abs(1 / roots)) <= 0.9 + 1e-8
+    def test_feasible_only_when_rejected(self):
+        """Values move inside the boundary only if the cost function rejects them.
+
+        Bounds codes: 0 none, 1 adam "usual", 2 "admissible", 3 ssarima "usual".
+        """
+        e = np.random.default_rng(45).normal(size=200)
+        y = np.zeros(200)
+        for t in range(1, 200):
+            y[t] = 1.03 * y[t - 1] + e[t]
+        ar_raw = self._hr(y, [1], [0], [1], ma_est=False, bounds=0)
+        assert ar_raw[0] > 1
+        assert self._hr(y, [1], [0], [1], ma_est=False, bounds=1)[0] == pytest.approx(
+            0.99
+        )
+        assert self._hr(y, [1], [0], [1], ma_est=False, bounds=3)[0] == ar_raw[0]
+
+        w = np.diff(np.random.default_rng(47).normal(size=300), n=2)
+        ma_raw = self._hr(w, [0], [1], [1], ar_est=False, bounds=0)
+        assert abs(ma_raw[0]) > 1
+        assert self._hr(w, [0], [1], [1], ar_est=False, bounds=1)[0] == ma_raw[0]
+        assert abs(self._hr(w, [0], [1], [1], ar_est=False, bounds=2)[0]) == (
+            pytest.approx(0.99)
+        )
+        assert abs(self._hr(w, [0], [1], [1], ar_est=False, bounds=3)[0]) < 1
 
     def test_defaults_and_provided(self):
         """Too few seasons or a switched-off level keep the defaults."""

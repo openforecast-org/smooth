@@ -34,5 +34,6 @@ test_that("SSARIMA starts from the Hannan-Rissanen values", {
     testModel <- ssarima(y, orders=list(ar=1,i=0,ma=1), lags=1, maxeval=1)
     expect_equal(testModel$B[c("phi1[1]","theta1[1]")], c(0.6, 0.3), tolerance=0.1, check.attributes=FALSE)
     testModel <- ssarima(AirPassengers, orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)), lags=c(1,12), maxeval=1)
-    expect_true(all(abs(testModel$B[grepl("phi|theta", names(testModel$B))]) <= 0.9 + 1e-8))
+    # The start is feasible under ssarima's bounds: no penalty
+    expect_lt(testModel$lossValue, 1e+100)
 })

@@ -12,10 +12,13 @@
 //   2. OLS of w_t on w_{t-ks} and a_{t-js} gives phi and theta;
 //   3. the estimated factor is filtered out and the result goes to the next level.
 // One backfitting pass then re-estimates each level on w with all the other
-// levels filtered out. Estimated factors are shrunk so that their roots have
-// modulus at least 1/cap (stationary / invertible with a margin).
-// A level that cannot be estimated (too few seasons) keeps the defaults
-// 0.1 (AR) and -0.1 (MA).
+// levels filtered out. A level that cannot be estimated (too few seasons) keeps
+// the defaults 0.1 (AR) and -0.1 (MA).
+//
+// The estimates are returned as they are, unless the cost function would reject
+// them under its bounds (hrFeasible); then only the offending factors are moved
+// inside the boundary. The filtering between the levels uses an invertible copy
+// of each MA factor, as a non-invertible one makes the recursion explode.
 
 #include "olsCore.h"
 
@@ -35,8 +38,37 @@ inline arma::vec hrOLS(const arma::mat &X, const arma::vec &y) {
     return olsCore(X, y);
 }
 
+// Inverse roots (companion eigenvalues) of 1 - sum_k (sign * c_k) z^k: largest modulus
+inline double hrModulus(const arma::vec &coefs, double sign) {
+    arma::uword k = coefs.n_elem;
+    if(k == 0) {
+        return 0;
+    }
+    arma::mat companion(k, k, arma::fill::zeros);
+    companion.row(0) = sign * coefs.t();
+    if(k > 1) {
+        companion.submat(1, 0, k - 1, k - 2) = arma::eye(k - 1, k - 1);
+    }
+    return arma::max(arma::abs(arma::eig_gen(companion)));
+}
+
+// Scale c_k by lambda^k, so that the largest inverse root is at most target
+inline arma::vec hrScale(arma::vec coefs, double sign, double target) {
+    double modulus = hrModulus(coefs, sign);
+    if(modulus > target) {
+        for(arma::uword i = 0; i < coefs.n_elem; ++i) {
+            coefs(i) *= std::pow(target / modulus, i + 1);
+        }
+    }
+    return coefs;
+}
+
+// The inverse roots are moved to this modulus when a start is infeasible
+const double hrInside = 0.99;
+
 // u = theta(B^s)^{-1} phi(B^s) w with zero pre-sample values
-inline arma::vec hrFilter(const arma::vec &w, const arma::vec &ar, const arma::vec &ma, arma::uword s) {
+inline arma::vec hrFilter(const arma::vec &w, const arma::vec &ar, arma::vec ma, arma::uword s) {
+    ma = hrScale(ma, -1, hrInside);
     arma::uword n = w.n_elem;
     arma::vec u = w;
     for(arma::uword t = 0; t < n; ++t) {
@@ -50,30 +82,8 @@ inline arma::vec hrFilter(const arma::vec &w, const arma::vec &ar, const arma::v
     return u;
 }
 
-// Scale coefficients c_k by lambda^k so that the companion eigenvalues of the
-// polynomial 1 - sum_k (sign * c_k) z^k have modulus at most cap
-inline arma::vec hrStabilise(arma::vec coefs, double sign, double cap) {
-    arma::uword k = coefs.n_elem;
-    if(k == 0) {
-        return coefs;
-    }
-    arma::mat companion(k, k, arma::fill::zeros);
-    companion.row(0) = sign * coefs.t();
-    if(k > 1) {
-        companion.submat(1, 0, k - 1, k - 2) = arma::eye(k - 1, k - 1);
-    }
-    double modulus = arma::max(arma::abs(arma::eig_gen(companion)));
-    if(modulus > cap) {
-        double lambda = cap / modulus;
-        for(arma::uword i = 0; i < k; ++i) {
-            coefs(i) *= std::pow(lambda, i + 1);
-        }
-    }
-    return coefs;
-}
-
 // Estimate one level on the series w; false if the sample is too short
-inline bool hrLevelEstimate(const arma::vec &w, HRLevel &level, double cap) {
+inline bool hrLevelEstimate(const arma::vec &w, HRLevel &level) {
     long n = w.n_elem, s = level.lag, P = level.arOrder, Q = level.maOrder;
     long nAR = level.arEstimate * P, nMA = level.maEstimate * Q;
     if(nAR + nMA == 0) {
@@ -126,12 +136,64 @@ inline bool hrLevelEstimate(const arma::vec &w, HRLevel &level, double cap) {
     arma::vec b = hrOLS(X, target);
 
     if(nAR > 0) {
-        level.ar = hrStabilise(b.head(nAR), 1, cap);
+        level.ar = b.head(nAR);
     }
     if(nMA > 0) {
-        level.ma = hrStabilise(b.tail(nMA), -1, cap);
+        level.ma = b.tail(nMA);
     }
     return true;
+}
+
+// Expanded coefficients of prod_i phi_i(B^{s_i}) (sign 1: phi, as in 1 - sum phi_k B^k)
+// or of prod_i theta_i(B^{s_i}) (sign -1: theta, as in 1 + sum theta_k B^k)
+inline arma::vec hrExpand(const std::vector<HRLevel> &levels, double sign) {
+    arma::vec poly(1, arma::fill::ones);
+    for(const HRLevel &level : levels) {
+        const arma::vec &coefs = (sign > 0) ? level.ar : level.ma;
+        arma::vec factor(coefs.n_elem * level.lag + 1, arma::fill::zeros);
+        factor(0) = 1;
+        for(arma::uword k = 0; k < coefs.n_elem; ++k) {
+            factor((k + 1) * level.lag) = -sign * coefs(k);
+        }
+        poly = arma::conv(poly, factor);
+    }
+    return -sign * poly.tail(poly.n_elem - 1);
+}
+
+// Whether the cost function would reject the AR (sign 1) or MA (sign -1) part.
+// bounds: 0 none; 1 adam "usual"; 2 "admissible"; 3 ssarima "usual".
+// Mirrors adam_boundsChecker() in R/utils-adam.R and the CF of R/adam-ssarima.R
+inline bool hrRejected(const std::vector<HRLevel> &levels, double sign, int bounds) {
+    arma::vec coefs = hrExpand(levels, sign);
+    if(bounds == 0 || coefs.n_elem == 0) {
+        return false;
+    }
+    if(sign > 0) {
+        return bounds != 3 && arma::all(coefs > 0) && arma::accu(coefs) >= 1 && hrModulus(coefs, 1) > 1;
+    }
+    if(bounds == 3) {
+        return arma::any(arma::abs(coefs) >= 1);
+    }
+    return (bounds == 2 || arma::accu(coefs) >= 1) && hrModulus(coefs, -1) > 1;
+}
+
+// Move the estimated factors of a rejected part inside the boundary: the factors
+// outside it for the root conditions, all of them gradually for the ssarima box
+inline void hrFeasible(std::vector<HRLevel> &levels, double sign, int bounds) {
+    for(arma::uword iteration = 0; iteration < 1000 && hrRejected(levels, sign, bounds); ++iteration) {
+        for(HRLevel &level : levels) {
+            bool estimate = (sign > 0) ? level.arEstimate : level.maEstimate;
+            arma::vec &coefs = (sign > 0) ? level.ar : level.ma;
+            if(!estimate || coefs.n_elem == 0) {
+                continue;
+            }
+            double target = (bounds == 3) ? hrModulus(coefs, sign) * hrInside : hrInside;
+            coefs = hrScale(coefs, sign, target);
+        }
+        if(bounds != 3) {
+            break;
+        }
+    }
 }
 
 // Filter out all the levels in the list except the one with index skip
@@ -149,10 +211,11 @@ inline arma::vec hrFilterLevels(arma::vec w, const std::vector<HRLevel> &levels,
 // for each lag, the AR parameters (if arEstimate) and then the MA ones (if maEstimate).
 // armaParameters holds the provided values in the same traversal for the parts
 // that are not estimated. useLevel switches the estimation of a level off.
+// bounds is the code of the cost function's bounds, see hrRejected().
 inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma::uvec &maOrders,
                              const arma::uvec &lags, bool arEstimate, bool maEstimate,
                              const arma::vec &armaParameters, const arma::uvec &useLevel,
-                             double cap = 0.9) {
+                             int bounds) {
     arma::uword nLevels = lags.n_elem, nProvided = 0;
     std::vector<HRLevel> levels(nLevels);
     for(arma::uword i = 0; i < nLevels; ++i) {
@@ -196,7 +259,7 @@ inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma
         std::vector<arma::uword> estimated;
         arma::vec u = w;
         for(arma::uword idx : active) {
-            if(hrLevelEstimate(u, levels[idx], cap)) {
+            if(hrLevelEstimate(u, levels[idx])) {
                 u = hrFilter(u, levels[idx].ar, levels[idx].ma, levels[idx].lag);
                 estimated.push_back(idx);
             }
@@ -206,11 +269,13 @@ inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma
         if(estimated.size() > 1) {
             for(arma::uword idx : estimated) {
                 HRLevel candidate = levels[idx];
-                if(hrLevelEstimate(hrFilterLevels(w, levels, estimated, idx), candidate, cap)) {
+                if(hrLevelEstimate(hrFilterLevels(w, levels, estimated, idx), candidate)) {
                     levels[idx] = candidate;
                 }
             }
         }
+        hrFeasible(levels, 1, bounds);
+        hrFeasible(levels, -1, bounds);
     }
 
     std::vector<double> result;

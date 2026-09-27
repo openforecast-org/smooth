@@ -1107,11 +1107,13 @@ adam_filler <- function(B,
 # the ARIMA part (logs for multiplicative error), with the ETS part approximated
 # by a lowess decomposition, differenced as the model requires. The seasonal
 # ARIMA factors that coincide with the ETS seasonality keep the defaults.
-# Returns the AR / MA values in the order of B.
+# bounds is the code of the cost function's bounds (see hrRejected() in the
+# header): the values are moved inside the boundary only if the cost function
+# would reject them. Returns the AR / MA values in the order of B.
 #' @keywords internal
 adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal,
                                   lags, arOrders, iOrders, maOrders, arEstimate, maEstimate,
-                                  armaParameters){
+                                  armaParameters, bounds){
     # Missing and zero (intermittent) values are treated as NAs and are then
     # replaced by the mean of the transformed series
     y <- as.vector(yInSample)
@@ -1133,7 +1135,7 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
     useLevel <- !(etsModel & modelIsSeasonal & lags>1)
     return(as.vector(arimaHRCpp(y, arOrders, maOrders, lags, arEstimate, maEstimate,
                                 if(is.null(armaParameters)) numeric(0) else armaParameters,
-                                useLevel)))
+                                useLevel, bounds)))
 }
 
 #' @keywords internal
@@ -1293,7 +1295,8 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
         if(any(c(arEstimate,maEstimate))){
             armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
                                                 modelIsSeasonal, lags, arOrders, iOrders, maOrders,
-                                                arEstimate, maEstimate, armaParameters)
+                                                arEstimate, maEstimate, armaParameters,
+                                                switch(bounds, "usual"=1, "admissible"=2, 0))
             for(i in 1:length(lags)){
                 if(arRequired && arEstimate && arOrders[i]>0){
                     B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])]

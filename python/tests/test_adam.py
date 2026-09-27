@@ -723,16 +723,14 @@ class TestADAMARIMAInitialiser:
         assert self._hr(y, [1], [0], [1], ma_est=False, bounds=1)[0] == pytest.approx(
             0.99
         )
-        assert self._hr(y, [1], [0], [1], ma_est=False, bounds=3)[0] == ar_raw[0]
+        # ssarima's usual bounds keep the AR coefficients within (-1, 1)
+        assert self._hr(y, [1], [0], [1], ma_est=False, bounds=3)[0] < 1
 
+        # A non-invertible HR estimate is reflected to the invertible MA
         w = np.diff(np.random.default_rng(47).normal(size=300), n=2)
-        ma_raw = self._hr(w, [0], [1], [1], ar_est=False, bounds=0)
-        assert abs(ma_raw[0]) > 1
-        assert self._hr(w, [0], [1], [1], ar_est=False, bounds=1)[0] == ma_raw[0]
-        assert abs(self._hr(w, [0], [1], [1], ar_est=False, bounds=2)[0]) == (
-            pytest.approx(0.99)
-        )
-        assert abs(self._hr(w, [0], [1], [1], ar_est=False, bounds=3)[0]) < 1
+        ma = [self._hr(w, [0], [1], [1], ar_est=False, bounds=b)[0] for b in range(4)]
+        assert abs(ma[0]) < 1
+        assert ma == [ma[0]] * 4
 
     def test_defaults_and_provided(self):
         """Too few seasons or a switched-off level keep the defaults."""

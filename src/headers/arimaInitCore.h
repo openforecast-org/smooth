@@ -15,9 +15,11 @@
 // levels filtered out. A level that cannot be estimated (too few seasons) keeps
 // the defaults 0.1 (AR) and -0.1 (MA).
 //
-// The estimates are returned as they are, unless the cost function would reject
-// them under its bounds (hrFeasible); then only the offending factors are moved
-// inside the boundary. The filtering between the levels uses an invertible copy
+// A non-invertible MA factor is replaced by its invertible counterpart with the
+// same autocorrelations, reflecting the inverse roots outside the unit circle
+// (hrReflect). The estimates are otherwise returned as they are, unless the cost
+// function would reject them under its bounds (hrFeasible); then only the
+// offending factors are moved inside the boundary. The filtering between the levels uses an invertible copy
 // of each MA factor, as a non-invertible one makes the recursion explode.
 
 #include "olsCore.h"
@@ -61,6 +63,28 @@ inline arma::vec hrScale(arma::vec coefs, double sign, double target) {
         }
     }
     return coefs;
+}
+
+// Reflect the inverse roots of 1 + sum_j theta_j z^j outside the unit circle,
+// lambda -> 1 / conj(lambda): the invertible MA with the same autocorrelations
+inline arma::vec hrReflect(const arma::vec &ma) {
+    arma::uword k = ma.n_elem;
+    if(k == 0 || hrModulus(ma, -1) <= 1) {
+        return ma;
+    }
+    arma::mat companion(k, k, arma::fill::zeros);
+    companion.row(0) = -ma.t();
+    if(k > 1) {
+        companion.submat(1, 0, k - 1, k - 2) = arma::eye(k - 1, k - 1);
+    }
+    arma::cx_vec roots = arma::eig_gen(companion);
+    arma::cx_vec poly(1, arma::fill::ones);
+    for(arma::uword i = 0; i < k; ++i) {
+        std::complex<double> root = (std::abs(roots(i)) > 1) ? 1.0 / std::conj(roots(i)) : roots(i);
+        arma::cx_vec factor = {1.0, -root};
+        poly = arma::conv(poly, factor);
+    }
+    return arma::real(poly.tail(k));
 }
 
 // The inverse roots are moved to this modulus when a start is infeasible
@@ -139,7 +163,7 @@ inline bool hrLevelEstimate(const arma::vec &w, HRLevel &level) {
         level.ar = b.head(nAR);
     }
     if(nMA > 0) {
-        level.ma = b.tail(nMA);
+        level.ma = hrReflect(b.tail(nMA));
     }
     return true;
 }
@@ -168,17 +192,18 @@ inline bool hrRejected(const std::vector<HRLevel> &levels, double sign, int boun
     if(bounds == 0 || coefs.n_elem == 0) {
         return false;
     }
-    if(sign > 0) {
-        return bounds != 3 && arma::all(coefs > 0) && arma::accu(coefs) >= 1 && hrModulus(coefs, 1) > 1;
-    }
     if(bounds == 3) {
         return arma::any(arma::abs(coefs) >= 1);
+    }
+    if(sign > 0) {
+        return arma::all(coefs > 0) && arma::accu(coefs) >= 1 && hrModulus(coefs, 1) > 1;
     }
     return (bounds == 2 || arma::accu(coefs) >= 1) && hrModulus(coefs, -1) > 1;
 }
 
 // Move the estimated factors of a rejected part inside the boundary: the factors
 // outside it for the root conditions, all of them gradually for the ssarima box
+// (coefficients within (-1, 1) for both AR and MA)
 inline void hrFeasible(std::vector<HRLevel> &levels, double sign, int bounds) {
     for(arma::uword iteration = 0; iteration < 1000 && hrRejected(levels, sign, bounds); ++iteration) {
         for(HRLevel &level : levels) {

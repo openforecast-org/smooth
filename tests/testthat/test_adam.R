@@ -532,15 +532,15 @@ test_that("Hannan-Rissanen values move inside the boundary only if the cost func
     expect_gt(arRaw, 1)
     expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=1), 0.99)
     expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=2), 0.99)
-    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=3), arRaw)
-    # Over-differenced white noise: a non-invertible MA with a negative sum
+    # ssarima's usual bounds keep the AR coefficients within (-1, 1)
+    expect_lt(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=3), 1)
+    # Over-differenced white noise: HR lands on a non-invertible MA, which is
+    # reflected to the invertible one under any bounds
     set.seed(47)
     w <- diff(rnorm(300), differences=2)
-    maRaw <- hr(w, 0, 1, 1, arEstimate=FALSE, bounds=0)
-    expect_gt(abs(maRaw), 1)
-    expect_equal(hr(w, 0, 1, 1, arEstimate=FALSE, bounds=1), maRaw)
-    expect_equal(abs(hr(w, 0, 1, 1, arEstimate=FALSE, bounds=2)), 0.99)
-    expect_lt(abs(hr(w, 0, 1, 1, arEstimate=FALSE, bounds=3)), 1)
+    maValues <- sapply(0:3, function(b){hr(w, 0, 1, 1, arEstimate=FALSE, bounds=b)})
+    expect_lt(abs(maValues[1]), 1)
+    expect_equal(maValues, rep(maValues[1], 4))
     # An invertible MA(2) with a coefficient above one: only ssarima's box rejects it
     set.seed(46)
     x <- as.vector(arima.sim(list(ma=c(1.6, 0.64)), 1000))

@@ -339,9 +339,9 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         if(bounds=="usual"){
             # Stationarity and invertibility conditions for ARIMA
             if(arimaModel && any(c(arEstimate,maEstimate))){
-                # Calculate the polynomial roots for AR
+                # The AR coefficients within (-1, 1), as done for MA below
                 if(arEstimate &&
-                   any(abs(elements$arimaPolynomials$maPolynomial[-1])>=1)){
+                   any(abs(elements$arimaPolynomials$arPolynomial[-1])>=1)){
                    # all(elements$arimaPolynomials$arPolynomial[-1]>0) &&
                    # sum(-(elements$arimaPolynomials$arPolynomial[-1]))>=1){
                     # arPolynomialMatrix[,1] <- -elements$arimaPolynomials$arPolynomial[-1];

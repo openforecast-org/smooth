@@ -1,10 +1,80 @@
 import numpy as np
 
+from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
 from smooth.adam_general.core.utils.utils import (
+    _mean_r,
+    _sum_r,
     calculate_acf,
     calculate_pacf,
+    msdecompose,
 )
+
+
+def _arima_initialiser(
+    y_in_sample,
+    ot_logical,
+    ets_model,
+    error_type,
+    season_type,
+    model_is_seasonal,
+    lags,
+    ar_orders,
+    i_orders,
+    ma_orders,
+    ar_estimate,
+    ma_estimate,
+    arma_parameters,
+):
+    """Hannan-Rissanen starting values of the AR / MA parameters.
+
+    Mirrors R's ``adam_arimaInitialiser`` (R/utils-adam.R); the estimation itself
+    is the shared C++ ``arimaHRCore`` (src/headers/arimaInitCore.h). The series
+    is the in-sample data on the scale of the ARIMA part (logs for multiplicative
+    error), with the ETS part approximated by a lowess decomposition, differenced
+    as the model requires. Missing and zero values become the mean of the
+    transformed series. The seasonal ARIMA factors that coincide with the ETS
+    seasonality keep the defaults.
+
+    Returns the AR / MA values in the order of B.
+    """
+    y = np.asarray(y_in_sample, dtype=np.float64).ravel().copy()
+    y[~np.asarray(ot_logical, dtype=bool).ravel()] = np.nan
+    lags_arr = np.asarray(lags, dtype=np.uint64).ravel()
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        if ets_model:
+            decomposition = msdecompose(
+                y,
+                lags=[int(lag) for lag in lags_arr if lag != 1]
+                if model_is_seasonal
+                else [1],
+                type="multiplicative"
+                if "M" in (error_type, season_type)
+                else "additive",
+                smoother="lowess",
+            )
+            fitted = np.asarray(decomposition["fitted"], dtype=np.float64)
+            y = np.log(y) - np.log(fitted) if error_type == "M" else y - fitted
+        elif error_type == "M":
+            y = np.log(y)
+    finite = np.isfinite(y)
+    y[~finite] = _mean_r(y[finite])
+    for lag, order in zip(lags_arr, i_orders):
+        for _ in range(int(order)):
+            y = y[int(lag) :] - y[: -int(lag)]
+
+    use_level = ~(ets_model & model_is_seasonal & (lags_arr > 1))
+    return _ols.arima_hr(
+        y,
+        np.asarray(ar_orders, dtype=np.uint64),
+        np.asarray(ma_orders, dtype=np.uint64),
+        lags_arr,
+        bool(ar_estimate),
+        bool(ma_estimate),
+        np.asarray(arma_parameters if arma_parameters else [], dtype=np.float64),
+        use_level.astype(np.uint64),
+    )
 
 
 def initialiser(
@@ -561,97 +631,37 @@ def initialiser(
             i_orders_arr = np.array(arima_checked["i_orders"])
             lags_arr = np.array(lags_dict.get("lags_original", lags_dict["lags"]))
 
-            acf_values = [-0.1] * int(np.sum(ma_orders_arr * lags_arr))
-            pacf_values = [0.1] * int(np.sum(ar_orders_arr * lags_arr))
-
-            if not (model_type_dict["ets_model"] or np.all(i_orders_arr == 0)):
-                y_differenced = observations_dict["y_in_sample"].copy()
-                # Implement differencing if needed
-                if np.any(i_orders_arr > 0):
-                    for i, order in enumerate(arima_checked["i_orders"]):
-                        if order > 0:
-                            y_differenced = np.diff(y_differenced, n=order, axis=0)
-
-                # ACF/PACF calculation for non-seasonal models
-                if np.all(lags_arr <= 1):
-                    ma_total = int(np.sum(ma_orders_arr * lags_arr))
-                    ar_total = int(np.sum(ar_orders_arr * lags_arr))
-                    if arima_checked["ma_required"] and arima_checked["ma_estimate"]:
-                        acf_vals = calculate_acf(y_differenced, nlags=max(1, ma_total))[
-                            1:
-                        ]
-                        acf_values[: min(ma_total, len(y_differenced) - 1)] = acf_vals[
-                            : min(ma_total, len(y_differenced) - 1)
-                        ]
-                    if arima_checked["ar_required"] and arima_checked["ar_estimate"]:
-                        pacf_vals = calculate_pacf(
-                            y_differenced, nlags=max(1, ar_total)
-                        )
-                        pacf_values[: min(ar_total, len(y_differenced) - 1)] = (
-                            pacf_vals[: min(ar_total, len(pacf_vals))]
-                        )
+            arma_values = _arima_initialiser(
+                observations_dict["y_in_sample"],
+                observations_dict["ot_logical"],
+                model_type_dict["ets_model"],
+                model_type_dict["error_type"],
+                model_type_dict["season_type"],
+                model_type_dict["model_is_seasonal"],
+                lags_arr,
+                ar_orders_arr,
+                i_orders_arr,
+                ma_orders_arr,
+                arima_checked["ar_estimate"],
+                arima_checked["ma_estimate"],
+                arima_checked["arma_parameters"],
+            )
 
             arma_start_index = j
             for i, lag in enumerate(lags_dict.get("lags_original", lags_dict["lags"])):
-                if (
-                    arima_checked["ar_required"]
-                    and arima_checked["ar_estimate"]
-                    and arima_checked["ar_orders"][i] > 0
+                for part, prefix, required, estimate in (
+                    ("ar_orders", "phi", "ar_required", "ar_estimate"),
+                    ("ma_orders", "theta", "ma_required", "ma_estimate"),
                 ):
-                    indices = np.arange(1, arima_checked["ar_orders"][i] + 1) * lag - 1
-                    vals = [
-                        pacf_values[idx] if idx < len(pacf_values) else 0.1
-                        for idx in indices
-                    ]
-                    if all(not np.isnan(v) for v in vals):
-                        B[j : j + arima_checked["ar_orders"][i]] = vals
-                    else:
-                        B[j : j + arima_checked["ar_orders"][i]] = 0.1
-                    if sum(B[j : j + arima_checked["ar_orders"][i]]) > 1:
-                        B[j : j + arima_checked["ar_orders"][i]] = (
-                            B[j : j + arima_checked["ar_orders"][i]]
-                            / sum(B[j : j + arima_checked["ar_orders"][i]])
-                            - 0.01
-                        )
-                    Bl[j : j + arima_checked["ar_orders"][i]] = -5
-                    Bu[j : j + arima_checked["ar_orders"][i]] = 5
-                    names.extend(
-                        [
-                            f"phi{k + 1}[{lag}]"
-                            for k in range(arima_checked["ar_orders"][i])
+                    order = arima_checked[part][i]
+                    if order and arima_checked[required] and arima_checked[estimate]:
+                        B[j : j + order] = arma_values[
+                            j - arma_start_index : j - arma_start_index + order
                         ]
-                    )
-                    j += arima_checked["ar_orders"][i]
-
-                if (
-                    arima_checked["ma_required"]
-                    and arima_checked["ma_estimate"]
-                    and arima_checked["ma_orders"][i] > 0
-                ):
-                    indices = np.arange(1, arima_checked["ma_orders"][i] + 1) * lag - 1
-                    vals = [
-                        acf_values[idx] if idx < len(acf_values) else -0.1
-                        for idx in indices
-                    ]
-                    if all(not np.isnan(v) for v in vals):
-                        B[j : j + arima_checked["ma_orders"][i]] = vals
-                    else:
-                        B[j : j + arima_checked["ma_orders"][i]] = -0.1
-                    if sum(B[j : j + arima_checked["ma_orders"][i]]) > 1:
-                        B[j : j + arima_checked["ma_orders"][i]] = (
-                            B[j : j + arima_checked["ma_orders"][i]]
-                            / sum(B[j : j + arima_checked["ma_orders"][i]])
-                            - 0.01
-                        )
-                    Bl[j : j + arima_checked["ma_orders"][i]] = -5
-                    Bu[j : j + arima_checked["ma_orders"][i]] = 5
-                    names.extend(
-                        [
-                            f"theta{k + 1}[{lag}]"
-                            for k in range(arima_checked["ma_orders"][i])
-                        ]
-                    )
-                    j += arima_checked["ma_orders"][i]
+                        Bl[j : j + order] = -5
+                        Bu[j : j + order] = 5
+                        names.extend([f"{prefix}{k + 1}[{lag}]" for k in range(order)])
+                        j += order
 
     #  NOTE: Removed backcasting from initialiser - CF already handles backcasting for
     # complete/backcasting modes
@@ -825,6 +835,38 @@ def initialiser(
             ]
         else:
             B[j - 1] = 0  # or some other default value
+        # The constant is the intercept of ARIMA, so it needs to agree with the AR
+        # starting values (R: sum(arimaPolynomials$arPolynomial))
+        if (
+            arima_checked["arima_model"]
+            and not model_type_dict["ets_model"]
+            and adam_cpp is not None
+        ):
+            n_arma = (
+                sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
+            ) + (sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0)
+            ar_at_one = _sum_r(
+                adam_polynomialiser(
+                    adam_cpp,
+                    B[arma_start_index : arma_start_index + n_arma]
+                    if n_arma > 0
+                    else np.zeros(0),
+                    arima_checked["ar_orders"],
+                    arima_checked["i_orders"],
+                    arima_checked["ma_orders"],
+                    arima_checked["ar_estimate"],
+                    arima_checked["ma_estimate"],
+                    arima_checked["arma_parameters"]
+                    if arima_checked["arma_parameters"]
+                    else [],
+                    lags_dict.get("lags_original", lags_dict["lags"]),
+                )["ar_polynomial"]
+            )
+            B[j - 1] = (
+                B[j - 1] ** ar_at_one
+                if model_type_dict["error_type"] == "M"
+                else B[j - 1] * ar_at_one
+            )
         names.append(constants_checked["constant_name"] or "constant")
         if model_type_dict["ets_model"] or (
             arima_checked["i_orders"] is not None

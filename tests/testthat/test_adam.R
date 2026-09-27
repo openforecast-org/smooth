@@ -498,3 +498,84 @@ test_that("The response name survives data passed by value", {
     expect_lt(nchar(colnames(do.call(ces, list(y, silent=TRUE))$data)[1]), 100)
     expect_lt(nchar(colnames(do.call(ssarima, list(y, silent=TRUE))$data)[1]), 100)
 })
+
+#### Hannan-Rissanen starting values of the ARMA parameters ####
+# The companion eigenvalues of 1 - sum(coefs * z^k), i.e. the inverse roots
+maxInverseRoot <- function(coefs){
+    return(max(Mod(1/polyroot(c(1, -coefs)))))
+}
+
+test_that("Hannan-Rissanen recovers the parameters of ARMA(1,1) and SARMA(1,1)(1,1)[12]", {
+    set.seed(41)
+    y <- as.vector(arima.sim(list(ar=0.6, ma=0.3), 300))
+    expect_equal(smooth:::arimaHRCpp(y, 1, 1, 1, TRUE, TRUE, numeric(0), 1),
+                 c(0.6, 0.3), tolerance=0.1, check.attributes=FALSE)
+    set.seed(42)
+    y <- as.vector(arima.sim(list(ar=c(0.7, rep(0,10), 0.5, -0.35), ma=c(0.4, rep(0,10), 0.3, 0.12)), 600))
+    expect_equal(smooth:::arimaHRCpp(y, c(1,1), c(1,1), c(1,12), TRUE, TRUE, numeric(0), c(1,1)),
+                 c(0.7, 0.4, 0.5, 0.3), tolerance=0.2, check.attributes=FALSE)
+})
+
+test_that("Hannan-Rissanen values are stationary and invertible", {
+    set.seed(43)
+    y <- cumsum(rnorm(200))
+    expect_lte(maxInverseRoot(smooth:::arimaHRCpp(y, 2, 0, 1, TRUE, FALSE, numeric(0), 1)), 0.9 + 1e-8)
+    expect_lte(maxInverseRoot(-smooth:::arimaHRCpp(y, 0, 2, 1, FALSE, TRUE, numeric(0), 1)), 0.9 + 1e-8)
+})
+
+test_that("Hannan-Rissanen falls back to the defaults and respects the provided values", {
+    set.seed(41)
+    y <- as.vector(arima.sim(list(ar=0.6, ma=0.3), 300))
+    # Too few seasons for the seasonal level, and a level switched off
+    expect_equal(smooth:::arimaHRCpp(y[1:30], c(1,1), c(1,1), c(1,12), TRUE, TRUE, numeric(0), c(1,1))[3:4],
+                 c(0.1, -0.1))
+    expect_equal(smooth:::arimaHRCpp(y, c(1,1), c(1,1), c(1,12), TRUE, TRUE, numeric(0), c(1,0))[3:4],
+                 c(0.1, -0.1))
+    expect_equal(smooth:::arimaHRCpp(numeric(0), 1, 1, 1, TRUE, TRUE, numeric(0), 1), c(0.1, -0.1),
+                 check.attributes=FALSE)
+    # AR provided: only MA is returned
+    expect_length(smooth:::arimaHRCpp(y, 1, 1, 1, FALSE, TRUE, 0.6, 1), 1)
+    testModel <- msarima(AirPassengers, orders=list(ar=1,i=1,ma=1), arma=list(ar=0.5))
+    expect_equal(testModel$arma$ar, 0.5, check.attributes=FALSE)
+})
+
+test_that("ARIMA starting values with missing and intermittent data", {
+    y <- AirPassengers
+    y[c(10,50,90)] <- NA
+    expect_true(all(is.finite(msarima(y, orders=list(ar=1,i=1,ma=1), maxeval=1)$B)))
+    set.seed(44)
+    y <- ts(rpois(120, 0.7) * (1 + rnorm(120)^2))
+    expect_true(all(is.finite(adam(y, "MNN", orders=list(ar=1), occurrence="odds-ratio", maxeval=1)$B)))
+})
+
+test_that("ARIMA with constant starts from the intercept consistent with AR", {
+    set.seed(41)
+    y <- ts(100 + arima.sim(list(ar=0.6, ma=0.3), 200))
+    testModel <- msarima(y, orders=list(ar=1,i=0,ma=1), constant=TRUE)
+    # The implied mean of the series, constant / (1 - phi)
+    expect_equal(coef(testModel)["constant"] / (1 - coef(testModel)["phi1[1]"]), mean(y),
+                 tolerance=0.01, check.attributes=FALSE)
+})
+
+test_that("ETS+ARIMA keeps the defaults for the seasonal ARIMA at the ETS seasonal lag", {
+    testModel <- adam(AirPassengers, "MAM", orders=list(ar=c(1,1),ma=c(1,1)), lags=c(1,12), maxeval=1)
+    expect_equal(testModel$B[c("phi1[12]","theta1[12]")], c(0.1, -0.1), check.attributes=FALSE)
+    expect_lte(abs(testModel$B["phi1[1]"]), 0.9 + 1e-8)
+})
+
+test_that("ARIMA starting values under non-normal distributions and non-likelihood losses", {
+    skip_on_cran()
+    orders <- list(ar=c(1,1),i=c(1,1),ma=c(1,1))
+    for(distribution in c("dlaplace","ds","dgnorm","dgamma","dinvgauss","dlnorm")){
+        start <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), distribution=distribution, maxeval=1)
+        testModel <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), distribution=distribution)
+        expect_true(all(is.finite(start$B)))
+        expect_lte(testModel$lossValue, start$lossValue)
+    }
+    for(loss in c("MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL")){
+        start <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), loss=loss, h=12, maxeval=1)
+        testModel <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), loss=loss, h=12)
+        expect_true(all(is.finite(start$B)))
+        expect_lte(testModel$lossValue, start$lossValue)
+    }
+})

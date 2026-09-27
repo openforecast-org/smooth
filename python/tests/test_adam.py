@@ -665,3 +665,126 @@ class TestADAMPersistenceNames:
             model="ANN", lags=[1], persistence={"level": 0.3}, initial="backcasting"
         ).fit(y)
         assert both.loglik == only.loglik
+
+
+class TestADAMARIMAInitialiser:
+    """Hannan-Rissanen starting values of the ARMA parameters."""
+
+    @pytest.fixture
+    def air(self):
+        """The full AirPassengers series."""
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return pd.read_csv(path)["y"].values.astype(float)
+
+    @staticmethod
+    def _hr(y, ar, ma, lags, ar_est=True, ma_est=True, arma=(), use=None):
+        from smooth.adam_general import _ols
+
+        lags = np.asarray(lags, dtype=np.uint64)
+        return _ols.arima_hr(
+            np.asarray(y, dtype=float),
+            np.asarray(ar, dtype=np.uint64),
+            np.asarray(ma, dtype=np.uint64),
+            lags,
+            ar_est,
+            ma_est,
+            np.asarray(arma, dtype=float),
+            np.ones_like(lags) if use is None else np.asarray(use, dtype=np.uint64),
+        )
+
+    @staticmethod
+    def _arma(n, ar, ma, seed):
+        from scipy.signal import lfilter
+
+        e = np.random.default_rng(seed).normal(size=n + 200)
+        return lfilter([1, ma], [1, -ar], e)[200:]
+
+    def test_recovers_arma(self):
+        """HR lands next to the true ARMA(1,1) parameters."""
+        b = self._hr(self._arma(1000, 0.6, 0.3, 41), [1], [1], [1])
+        np.testing.assert_allclose(b, [0.6, 0.3], atol=0.1)
+
+    def test_stationary_invertible(self):
+        """The inverse roots are within the 0.9 cap."""
+        y = np.cumsum(np.random.default_rng(43).normal(size=200))
+        ar = self._hr(y, [2], [0], [1], ma_est=False)
+        ma = self._hr(y, [0], [2], [1], ar_est=False)
+        for coefs in (ar, -ma):
+            roots = np.roots(np.r_[1.0, -coefs][::-1])
+            assert np.max(np.abs(1 / roots)) <= 0.9 + 1e-8
+
+    def test_defaults_and_provided(self):
+        """Too few seasons or a switched-off level keep the defaults."""
+        y = self._arma(300, 0.6, 0.3, 41)
+        short = self._hr(y[:30], [1, 1], [1, 1], [1, 12])
+        np.testing.assert_array_equal(short[2:], [0.1, -0.1])
+        off = self._hr(y, [1, 1], [1, 1], [1, 12], use=[1, 0])
+        np.testing.assert_array_equal(off[2:], [0.1, -0.1])
+        assert len(self._hr(y, [1], [1], [1], ar_est=False, arma=[0.6])) == 1
+
+    def test_constant_is_intercept(self):
+        """The constant starts consistent with AR and the fit finds the mean."""
+        y = 100 + self._arma(200, 0.6, 0.3, 41)
+        model = ADAM(
+            model="NNN",
+            orders={"ar": [1], "i": [0], "ma": [1]},
+            lags=[1],
+            constant=True,
+        ).fit(y)
+        phi, constant = model.coef[0], model.coef[-1]
+        assert constant / (1 - phi) == pytest.approx(np.mean(y), rel=0.01)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [{"distribution": d} for d in ("dlaplace", "ds", "dgnorm", "dgamma", "dlnorm")]
+        + [{"loss": loss} for loss in ("MAE", "HAM", "MSEh", "TMSE", "GTMSE", "GPL")],
+    )
+    def test_non_normal_and_losses(self, air, kwargs):
+        """The fit improves on the starting point under any distribution and loss."""
+        args = dict(
+            model="NNN",
+            orders={"ar": [1, 1], "i": [1, 1], "ma": [1, 1]},
+            lags=[1, 12],
+            h=12,
+            **kwargs,
+        )
+        start = ADAM(**args, nlopt_kwargs={"maxeval": 1}).fit(air)
+        model = ADAM(**args).fit(air)
+        assert np.all(np.isfinite(start.coef))
+        assert model._adam_estimated["CF_value"] <= start._adam_estimated["CF_value"]
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "model, orders, lags, distribution",
+        [
+            ("NNN", {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, [1, 12], "dnorm"),
+            ("NNN", {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, [1, 12], "dgamma"),
+            ("MAM", {"ar": [1, 1], "i": [0, 0], "ma": [1, 1]}, [1, 12], "dgamma"),
+            ("AAN", {"ar": [1], "i": [0], "ma": [1]}, [1], "dnorm"),
+        ],
+    )
+    def test_starting_values_match_r(self, air, model, orders, lags, distribution):
+        """The ARMA starting values are R's, bit for bit up to the JSON round-trip."""
+        from ._r_bridge import r_array, r_to_literal
+
+        start = ADAM(
+            model=model,
+            orders=orders,
+            lags=lags,
+            distribution=distribution,
+            nlopt_kwargs={"maxeval": 1},
+        ).fit(air)
+        n_arma = sum(orders["ar"]) + sum(orders["ma"])
+        orders_r = ",".join(f"{k}={r_to_literal(v)}" for k, v in orders.items())
+        expected = r_array(
+            f"{{m <- adam(ts(y, frequency=12), '{model}', orders=list({orders_r}),"
+            f" lags={r_to_literal(lags)}, distribution='{distribution}', maxeval=1);"
+            " unname(m$B[grepl('phi|theta', names(m$B))])}",
+            R_data={"y": air},
+        )
+        k = len(start.coef) - n_arma
+        np.testing.assert_allclose(start.coef[k:], expected, rtol=1e-12)

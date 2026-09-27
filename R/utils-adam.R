@@ -1102,6 +1102,40 @@ adam_filler <- function(B,
     return(list(matVt=matVt, matWt=matWt, matF=matF, vecG=vecG, arimaPolynomials=arimaPolynomials))
 }
 
+# Starting values of the AR / MA parameters via the Hannan-Rissanen method
+# (src/headers/arimaInitCore.h). The series is the in-sample data on the scale of
+# the ARIMA part (logs for multiplicative error), with the ETS part approximated
+# by a lowess decomposition, differenced as the model requires. The seasonal
+# ARIMA factors that coincide with the ETS seasonality keep the defaults.
+# Returns the AR / MA values in the order of B.
+#' @keywords internal
+adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal,
+                                  lags, arOrders, iOrders, maOrders, arEstimate, maEstimate,
+                                  armaParameters){
+    # Missing and zero (intermittent) values are treated as NAs and are then
+    # replaced by the mean of the transformed series
+    y <- as.vector(yInSample)
+    y[!otLogical] <- NA
+    if(etsModel){
+        yDecomposition <- msdecompose(y, lags=if(modelIsSeasonal) lags[lags!=1] else 1,
+                                      type=c("additive","multiplicative")[any(c(Etype,Stype)=="M")+1],
+                                      smoother="lowess")
+        y <- switch(Etype, "M"=log(y) - log(yDecomposition$fitted), y - yDecomposition$fitted)
+    }
+    else if(Etype=="M"){
+        y <- log(y)
+    }
+    y[!is.finite(y)] <- mean(y[is.finite(y)])
+    for(i in which(iOrders>0)){
+        y <- diff(y, lag=lags[i], differences=iOrders[i])
+    }
+
+    useLevel <- !(etsModel & modelIsSeasonal & lags>1)
+    return(as.vector(arimaHRCpp(y, arOrders, maOrders, lags, arEstimate, maEstimate,
+                                if(is.null(armaParameters)) numeric(0) else armaParameters,
+                                useLevel)))
+}
+
 #' @keywords internal
 adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
                              componentsNumberETSNonSeasonal, componentsNumberETSSeasonal,
@@ -1257,63 +1291,19 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
         k <- j
         # These are filled in lags-wise
         if(any(c(arEstimate,maEstimate))){
-            acfValues <- rep(-0.1, maOrders %*% lags)
-            pacfValues <- rep(0.1, arOrders %*% lags)
-            # If this is ETS + ARIMA model or no differences model, then don't bother with initials
-            # The latter does not make sense because of non-stationarity in ACF / PACF
-            # Otherwise use ACF / PACF values as starting parameters for ARIMA
-            if(!(etsModel || all(iOrders==0))){
-                yDifferenced <- yInSample
-                # If the model has differences, take them
-                if(any(iOrders>0)){
-                    for(i in 1:length(iOrders)){
-                        if(iOrders[i]>0){
-                            yDifferenced <- diff(yDifferenced,lag=lags[i],differences=iOrders[i])
-                        }
-                    }
-                }
-                # Do ACF/PACF initialisation only for non-seasonal models
-                if(all(lags<=1)){
-                    if(maRequired && maEstimate){
-                        acfValues[1:min(maOrders %*% lags, length(yDifferenced)-1)] <-
-                            acf(yDifferenced, lag.max=max(1,maOrders %*% lags),
-                                plot=FALSE)$acf[-1]
-                    }
-                    if(arRequired && arEstimate){
-                        pacfValues[1:min(arOrders %*% lags, length(yDifferenced)-1)] <-
-                            pacf(yDifferenced, lag.max=max(1,arOrders %*% lags),
-                                 plot=FALSE)$acf
-                    }
-                }
-            }
+            armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
+                                                modelIsSeasonal, lags, arOrders, iOrders, maOrders,
+                                                arEstimate, maEstimate, armaParameters)
             for(i in 1:length(lags)){
                 if(arRequired && arEstimate && arOrders[i]>0){
-                    if(all(!is.nan(pacfValues[c(1:arOrders[i])*lags[i]]))){
-                        B[j+c(1:arOrders[i])] <- pacfValues[c(1:arOrders[i])*lags[i]]
-                    }
-                    else{
-                        B[j+c(1:arOrders[i])] <- 0.1
-                    }
-                    if(sum(B[j+c(1:arOrders[i])])>1){
-                        B[j+c(1:arOrders[i])] <- B[j+c(1:arOrders[i])] /
-                            sum(B[j+c(1:arOrders[i])]) - 0.01
-                    }
+                    B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])]
                     Bl[j+c(1:arOrders[i])] <- -5
                     Bu[j+c(1:arOrders[i])] <- 5
                     names(B)[j+1:arOrders[i]] <- paste0("phi",1:arOrders[i],"[",lags[i],"]")
                     j[] <- j + arOrders[i]
                 }
                 if(maRequired && maEstimate && maOrders[i]>0){
-                    if(all(!is.nan(acfValues[c(1:maOrders[i])*lags[i]]))){
-                        B[j+c(1:maOrders[i])] <- acfValues[c(1:maOrders[i])*lags[i]]
-                    }
-                    else{
-                        B[j+c(1:maOrders[i])] <- 0.1
-                    }
-                    if(sum(B[j+c(1:maOrders[i])])>1){
-                        B[j+c(1:maOrders[i])] <- B[j+c(1:maOrders[i])] /
-                            sum(B[j+c(1:maOrders[i])]) - 0.01
-                    }
+                    B[j+c(1:maOrders[i])] <- armaValues[j-k+c(1:maOrders[i])]
                     Bl[j+c(1:maOrders[i])] <- -5
                     Bu[j+c(1:maOrders[i])] <- 5
                     names(B)[j+1:maOrders[i]] <- paste0("theta",1:maOrders[i],"[",lags[i],"]")
@@ -1446,6 +1436,12 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     if(constantEstimate){
         j[] <- j+1
         B[j] <- matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
+        # The constant is the intercept of ARIMA, so it needs to agree with the AR starting values
+        if(arimaModel && !etsModel){
+            B[j] <- switch(Etype,
+                           "M"=B[j]^sum(arimaPolynomials$arPolynomial),
+                           B[j]*sum(arimaPolynomials$arPolynomial))
+        }
         names(B)[j] <- constantName
         if(etsModel || sum(iOrders)!=0){
             if(Etype=="A"){

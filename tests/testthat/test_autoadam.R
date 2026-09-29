@@ -121,3 +121,15 @@ test_that("auto.msarima() selects orders on a series longer than R's name limit"
     expect_lt(nchar(colnames(m$data)[1]), 100)
     expect_true(grepl("ARIMA", m$model))
 })
+
+# The smoother reaches the models of the ARIMA order selection
+test_that("auto.msarima() passes the smoother on", {
+    y <- log(AirPassengers)
+    lossValues <- sapply(c("ma","lowess"), function(s){
+        auto.msarima(y, lags=c(1,12), initial="optimal", smoother=s)$lossValue
+    })
+    expect_equal(unname(lossValues["lowess"]),
+                 msarima(y, orders=list(ar=c(0,0),i=c(1,1),ma=c(1,1)), lags=c(1,12),
+                         initial="optimal", smoother="lowess")$lossValue)
+    expect_false(isTRUE(all.equal(lossValues[1], lossValues[2])))
+})

@@ -668,7 +668,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         h=h, holdout=holdout, outliers=outliers, level=level,
                                         persistence=persistence, phi=phi, initial=initial, arma=arma,
                                         occurrence=occurrence,
-                                        ic=ic, bounds=bounds, silent=silent, ...)));
+                                        ic=ic, bounds=bounds, silent=silent,
+                                        smoother=ellipsis$smoother, ...)));
     }
 
     headLengthUser <- ellipsis$headLength;

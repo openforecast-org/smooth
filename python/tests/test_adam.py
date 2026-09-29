@@ -895,6 +895,34 @@ class TestADAMARIMAStates:
         )
 
     @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "orders, initial",
+        [
+            ({"ar": [1, 0], "i": [1, 0], "ma": [1, 2]}, "backcasting"),
+            ({"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, "backcasting"),
+            ({"ar": [2, 0], "i": [1, 1], "ma": [0, 1]}, "complete"),
+        ],
+    )
+    def test_backcasted_arima_matches_r(self, air, orders, initial):
+        """The seed of the backcasting does not drift between the CF calls."""
+        from ._r_bridge import r_dict, r_to_literal
+
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12], initial=initial).fit(
+            np.log(air)
+        )
+        orders_r = ",".join(f"{k}={r_to_literal(v)}" for k, v in orders.items())
+        expected = r_dict(
+            f"{{m <- adam(ts(y, frequency=12), 'NNN', orders=list({orders_r}),"
+            f" lags=c(1,12), initial='{initial}');"
+            " list(B=unname(m$B), loss=m$lossValue)}",
+            R_data={"y": np.log(air)},
+        )
+        assert model._adam_estimated["CF_value"] == pytest.approx(
+            expected["loss"][0], rel=1e-6
+        )
+        np.testing.assert_allclose(model.coef, expected["B"], rtol=1e-4, atol=1e-6)
+
+    @pytest.mark.r_parity
     def test_two_stage_arima_matches_r(self, air):
         """Two-stage passes the backcasted initials on as R does."""
         from ._r_bridge import r_dict

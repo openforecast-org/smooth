@@ -604,18 +604,11 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
         matWt[,2] <- phi
     }
 
-    arimaPolynomials <- NULL
-    if(arimaModel){
-        # The polynomials known before the estimation, with the estimated parameters
-        # taken as zero (for the starting values of the ARIMA initials)
-        arimaPolynomialsKnown <- lapply(
-            adamCpp$polynomialise(numeric(1+sum(arOrders, maOrders)),
-                                  arOrders, iOrders, maOrders,
+    if(arimaModel && (!arEstimate && !maEstimate)){
+        arimaPolynomials <- lapply(
+            adamCpp$polynomialise(0, arOrders, iOrders, maOrders,
                                   arEstimate, maEstimate, armaParameters, lags),
             as.vector)
-    }
-    if(arimaModel && (!arEstimate && !maEstimate)){
-        arimaPolynomials <- arimaPolynomialsKnown
         if(nrow(nonZeroARI)>0){
             matF[componentsNumberETS+nonZeroARI[,2],componentsNumberETS+nonZeroARI[,2]] <-
                 -arimaPolynomials$ariPolynomial[nonZeroARI[,1]]
@@ -628,6 +621,9 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
             vecG[componentsNumberETS+nonZeroMA[,2]] <- vecG[componentsNumberETS+nonZeroMA[,2]] +
                 arimaPolynomials$maPolynomial[nonZeroMA[,1]]
         }
+    }
+    else{
+        arimaPolynomials <- NULL
     }
 
     if(!profilesRecentProvided){
@@ -848,10 +844,11 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
             }
         }
 
-        # ARIMA initials (see adam_arimaInitials), from the pre-sample values of the
-        # series with the ARI polynomial known so far (the differences only, if the
-        # ARMA parameters are estimated). They stay neutral for ETS+ARIMA, where ETS
-        # carries the level and seasonality.
+        # ARIMA initials. The provided ones (see adam_arimaInitials) are used as they
+        # are. The estimated ones start from the pre-sample values of the series,
+        # which the initialiser (optimal) or the filler (backcasting) turn into the
+        # initials with the ARI polynomial. They stay neutral for ETS+ARIMA, where
+        # ETS carries the level and seasonality.
         if(arimaModel){
             initialRow <- componentsNumberETS+componentsNumberARIMA
             if(!initialArimaEstimate){
@@ -861,10 +858,8 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
                 constantLevel <- if(constantRequired){
                     matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]}
                 matVt[initialRow, 1:initialArimaNumber] <-
-                    adam_arimaInitials(arimaPolynomialsKnown$ariPolynomial,
-                                       adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders,
-                                                           initialArimaNumber, constantLevel),
-                                       Etype)
+                    adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders,
+                                        initialArimaNumber, constantLevel)
             }
         }
     }
@@ -1001,10 +996,19 @@ adam_filler <- function(B,
         }
     }
 
-    # Initials of ARIMA, held by the state with the largest lag (see adam_arimaInitials)
-    if(arimaModel && all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
-        matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <- B[j+1:initialArimaNumber]
-        j[] <- j+initialArimaNumber
+    # Initials of ARIMA, held by the state with the largest lag (see adam_arimaInitials):
+    # the estimated ones, or, for the backcasting, the pre-sample values stored by the
+    # creator taken through the current ARI polynomial
+    if(arimaModel && initialArimaEstimate){
+        if(all(initialType!=c("complete","backcasting","gradient"))){
+            matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <- B[j+1:initialArimaNumber]
+            j[] <- j+initialArimaNumber
+        }
+        else{
+            matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
+                adam_arimaInitials(arimaPolynomials$ariPolynomial,
+                                   matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber], Etype)
+        }
     }
 
     # Initials of the xreg. Kept in B for every initial type except "complete"
@@ -1387,18 +1391,11 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
 
     # ARIMA initials
     if(arimaModel && all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
-        # The creator holds the initials in the last ARIMA state. For a pure ARIMA
-        # they are redone with the starting values of the AR parameters.
-        initialRow <- componentsNumberETS+componentsNumberARIMA
-        B[j+1:initialArimaNumber] <- head(matVt[initialRow,1:lagsModelMax], initialArimaNumber)
-        if(!etsModel && any(c(arEstimate, maEstimate))){
-            constantLevel <- if(nrow(matVt)>initialRow+xregNumber){matVt[initialRow+xregNumber+1,1]}
-            B[j+1:initialArimaNumber] <-
-                adam_arimaInitials(arimaPolynomials$ariPolynomial,
-                                   adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders,
-                                                       initialArimaNumber, constantLevel),
-                                   Etype)
-        }
+        # The creator holds the pre-sample values in the last ARIMA state (see
+        # adam_arimaInitials), taken through the ARI polynomial of the starting values
+        B[j+1:initialArimaNumber] <-
+            adam_arimaInitials(arimaPolynomials$ariPolynomial,
+                               matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber], Etype)
         names(B)[j+1:initialArimaNumber] <- paste0("ARIMAState",1:initialArimaNumber)
 
         if(Etype=="A"){

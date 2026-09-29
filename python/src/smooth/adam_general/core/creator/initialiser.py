@@ -4,7 +4,6 @@ from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general.core.utils.polynomials import (
     adam_polynomialiser,
     arima_initials,
-    arima_pre_sample,
 )
 from smooth.adam_general.core.utils.utils import (
     _mean_r,
@@ -766,39 +765,14 @@ def initialiser(
         and arima_checked["arima_model"]
         and initials_checked["initial_arima_estimate"]
     ):
-        # The creator holds the initials in the last ARIMA state. For a pure ARIMA
-        # they are redone with the starting values of the AR parameters.
+        # The creator holds the pre-sample values in the last ARIMA state (see
+        # arima_initials), taken through the ARI polynomial of the starting values
         m = initials_checked["initial_arima_number"]
-        row = (
-            components_dict["components_number_ets"]
-            + components_dict["components_number_arima"]
-            - 1
+        B[j : j + m] = arima_initials(
+            arima_polynomials["ari_polynomial"],
+            adam_created["arima_pre_sample"],
+            model_type_dict["error_type"],
         )
-        B[j : j + m] = adam_created["mat_vt"][row, :m]
-        if (
-            not model_type_dict["ets_model"]
-            and arima_polynomials is not None
-            and (arima_checked["ar_estimate"] or arima_checked["ma_estimate"])
-        ):
-            lags = lags_dict.get("lags_original", lags_dict["lags"])
-            constant_level = None
-            if constants_checked["constant_required"]:
-                constant_level = adam_created["mat_vt"][
-                    row + explanatory_checked["xreg_number"] + 1, 0
-                ]
-            B[j : j + m] = arima_initials(
-                arima_polynomials["ari_polynomial"],
-                arima_pre_sample(
-                    observations_dict["y_in_sample"],
-                    observations_dict["ot_logical"],
-                    model_type_dict["error_type"],
-                    lags,
-                    arima_checked["i_orders"] or [0],
-                    m,
-                    constant_level,
-                ),
-                model_type_dict["error_type"],
-            )
         names.extend(
             [
                 f"ARIMAState{n}"

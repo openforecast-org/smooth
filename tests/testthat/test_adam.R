@@ -667,6 +667,17 @@ test_that("Two-stage passes the backcasted ARIMA initials on without loss", {
     }
 })
 
+test_that("The backcasting seed follows the ARMA parameters", {
+    # Near the unit root the two backcasting iterations do not forget the seed, so
+    # it has to be built with the current ARI polynomial, not the differences only
+    testModel <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, maxeval=1)
+    B <- setNames(c(-0.1322, 0.8075, 0.394, -0.5937, 0.1408), names(testModel$B))
+    lossDefault <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1)$lossValue
+    lossConverged <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1,
+                          nIterations=20)$lossValue
+    expect_lt(abs(lossDefault - lossConverged), 0.01)
+})
+
 test_that("Every ARIMA initial enters the fit, as in ssarima", {
     orders <- list(ar=c(0,0),i=c(1,0),ma=c(0,1))
     testModel <- msarima(log(AirPassengers), orders=orders, lags=c(1,12), initial="optimal")

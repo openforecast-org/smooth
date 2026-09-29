@@ -94,6 +94,17 @@ def _initialize_states(
         mat_vt[:, 0:lags_model_max] = profiles_recent_table
 
     matrices["mat_vt"] = mat_vt
+    # The filler writes the initials over the pre-sample values in place, so it
+    # reads them from this copy (R's copy-on-modify keeps them in matVt)
+    if arima_checked["arima_model"]:
+        row = (
+            model_params["components_number_ets"]
+            + model_params["components_number_arima"]
+            - 1
+        )
+        matrices["arima_pre_sample"] = mat_vt[
+            row, : initials_checked["initial_arima_number"]
+        ].copy()
     return matrices
 
 
@@ -577,19 +588,16 @@ def _initialize_arima_initials(
     """
     Place the ARIMA initials in the last ARIMA state (see ``arima_initials``).
 
-    They come from the pre-sample values of the series with the ARI polynomial
-    known so far (the differences only, if the ARMA parameters are estimated) and
-    stay neutral for ETS+ARIMA, where ETS carries the level and seasonality.
-    Mirrors the ARIMA initials block of R's ``adam_creator()``.
+    The provided ones are used as they are. The estimated ones start from the
+    pre-sample values of the series, which the initialiser (optimal) or the filler
+    (backcasting) turn into the initials with the ARI polynomial. They stay neutral
+    for ETS+ARIMA, where ETS carries the level and seasonality. Mirrors the ARIMA
+    initials block of R's ``adam_creator()``.
 
     Returns:
         np.ndarray: Updated state matrix
     """
-    from smooth.adam_general.core.utils.polynomials import (
-        adam_polynomialiser,
-        arima_initials,
-        arima_pre_sample,
-    )
+    from smooth.adam_general.core.utils.polynomials import arima_pre_sample
 
     row = (
         model_params["components_number_ets"]
@@ -600,37 +608,17 @@ def _initialize_arima_initials(
     if not initials_checked["initial_arima_estimate"]:
         mat_vt[row, 0:m] = np.asarray(initials_checked["initial_arima"])[:m]
     elif not ets_model:
-        lags = model_params.get("lags_original", [1]) or [1]
-        # The polynomials known before the estimation, with the estimated
-        # parameters taken as zero
-        ari_polynomial = adam_polynomialiser(
-            model_params["adam_cpp"],
-            np.zeros(
-                1 + sum(arima_checked["ar_orders"]) + sum(arima_checked["ma_orders"])
-            ),
-            arima_checked["ar_orders"],
-            arima_checked["i_orders"],
-            arima_checked["ma_orders"],
-            arima_checked["ar_estimate"],
-            arima_checked["ma_estimate"],
-            arima_checked["arma_parameters"] or [],
-            lags,
-        )["ari_polynomial"]
         constant_level = None
         if constants_checked["constant_required"]:
             constant_level = mat_vt[row + explanatory_checked["xreg_number"] + 1, 0]
-        mat_vt[row, 0:m] = arima_initials(
-            ari_polynomial,
-            arima_pre_sample(
-                model_params["y_in_sample"],
-                model_params["ot_logical"],
-                model_params["e_type"],
-                lags,
-                arima_checked["i_orders"] or [0],
-                m,
-                constant_level,
-            ),
+        mat_vt[row, 0:m] = arima_pre_sample(
+            model_params["y_in_sample"],
+            model_params["ot_logical"],
             model_params["e_type"],
+            model_params.get("lags_original", [1]) or [1],
+            arima_checked["i_orders"] or [0],
+            m,
+            constant_level,
         )
     return mat_vt
 

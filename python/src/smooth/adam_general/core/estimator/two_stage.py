@@ -115,7 +115,6 @@ def _run_two_stage_estimator(
         components_dict_s2,
         explanatory_dict,
         smoother=smoother,
-        adam_cpp=adam_cpp_s2,
     )
 
     b_values = initialiser(
@@ -132,6 +131,7 @@ def _run_two_stage_estimator(
         bounds=general_dict["bounds"],
         phi_dict=phi_dict,
         profile_dict=profile_dict_s2,
+        adam_cpp=adam_cpp_s2,
     )
 
     B = b_values["B"].copy()

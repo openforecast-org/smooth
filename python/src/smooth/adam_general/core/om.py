@@ -98,6 +98,7 @@ def om_initial_transform(
     constant_required: bool,
     constant_estimate: bool,
     creator_additive: bool = True,
+    arima_pre_sample: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """Transform initial state values from probability space onto the
     model-native scale before optimisation begins.
@@ -182,6 +183,9 @@ def om_initial_transform(
         if creator_additive and error_type == "M" and initial_arima_estimate:
             rows = slice(j, j + components_number_arima)
             mat_vt[rows, :lags_model_max] = np.exp(mat_vt[rows, :lags_model_max])
+            # The copy of the pre-sample values that the filler reads
+            if arima_pre_sample is not None:
+                arima_pre_sample[:] = np.exp(arima_pre_sample)
         j += components_number_arima
 
     # ---- xreg
@@ -913,12 +917,12 @@ class OM(ADAM):
             components_dict,
             self._explanatory,
             smoother=self._resolve_smoother(),
-            adam_cpp=adam_cpp,
         )
 
         # Apply occurrence-specific transform of the initial state vector
         adam_created["mat_vt"] = om_initial_transform(
             mat_vt=adam_created["mat_vt"],
+            arima_pre_sample=adam_created["arima_pre_sample"],
             occurrence=self._om_occurrence,
             error_type=original_error_type,
             trend_type=original_trend_type,
@@ -994,11 +998,11 @@ class OM(ADAM):
             self._components,
             self._explanatory,
             smoother=self._resolve_smoother(),
-            adam_cpp=self._adam_cpp,
         )
 
         adam_created["mat_vt"] = om_initial_transform(
             mat_vt=adam_created["mat_vt"],
+            arima_pre_sample=adam_created["arima_pre_sample"],
             occurrence=self._om_occurrence,
             error_type=model_type_dict["error_type"],
             trend_type=model_type_dict.get("trend_type", "N"),

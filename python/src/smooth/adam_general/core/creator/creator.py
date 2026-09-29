@@ -29,7 +29,6 @@ def creator(
     components_dict,
     explanatory_checked=None,
     smoother="global",
-    adam_cpp=None,
 ):
     """
     Create state-space matrices for ADAM model representation.
@@ -189,11 +188,6 @@ def creator(
         - "ma": Uses moving average for both
         - "global": Uses lowess for trend and "ma" for seasonality
 
-    adam_cpp : adamCore, optional
-        The C++ core from ``architector()``, for the ARIMA polynomials known before
-        the estimation (R's ``adamCpp``). Needed for the starting values of the
-        ARIMA initials of a pure ARIMA.
-
     Returns
     -------
     dict
@@ -310,7 +304,6 @@ def creator(
         profiles_dict,
     )
     model_params["smoother"] = smoother
-    model_params["adam_cpp"] = adam_cpp
 
     # Setup matrices
     matrices = _setup_matrices(
@@ -355,6 +348,7 @@ def creator(
         "mat_f": matrices["mat_f"],
         "vec_g": matrices["vec_g"],
         "arima_polynomials": matrices.get("arima_polynomials", None),
+        "arima_pre_sample": matrices.get("arima_pre_sample"),
     }
 
 

@@ -1,6 +1,9 @@
 import numpy as np
 
-from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
+from smooth.adam_general.core.utils.polynomials import (
+    adam_polynomialiser,
+    arima_initials,
+)
 
 
 def filler(
@@ -358,21 +361,29 @@ def filler(
 
                     j += lag - 1
 
-    # Initials of ARIMA, held by the last ARIMA state (see arima_initials)
-    if (
-        arima_checked["arima_model"]
-        and initials_checked["initial_type"]
-        not in ["complete", "backcasting", "gradient"]
-        and initials_checked["initial_arima_estimate"]
-    ):
+    # Initials of ARIMA, held by the last ARIMA state (see arima_initials): the
+    # estimated ones, or, for the backcasting, the pre-sample values stored by the
+    # creator taken through the current ARI polynomial
+    if arima_checked["arima_model"] and initials_checked["initial_arima_estimate"]:
         n_init = initials_checked["initial_arima_number"]
         arima_row = (
             components_dict["components_number_ets"]
             + components_dict["components_number_arima"]
             - 1
         )
-        matrices_dict["mat_vt"][arima_row, :n_init] = B[j : j + n_init]
-        j += n_init
+        if initials_checked["initial_type"] not in [
+            "complete",
+            "backcasting",
+            "gradient",
+        ]:
+            matrices_dict["mat_vt"][arima_row, :n_init] = B[j : j + n_init]
+            j += n_init
+        else:
+            matrices_dict["mat_vt"][arima_row, :n_init] = arima_initials(
+                arima_polynomials["ari_polynomial"],
+                matrices_dict["arima_pre_sample"],
+                model_type_dict["error_type"],
+            )
 
     # Xreg initial values
     if (
@@ -414,4 +425,5 @@ def filler(
         "mat_f": matrices_dict["mat_f"],
         "vec_g": matrices_dict["vec_g"],
         "arima_polynomials": matrices_dict["arima_polynomials"],
+        "arima_pre_sample": matrices_dict.get("arima_pre_sample"),
     }

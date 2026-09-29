@@ -30,8 +30,12 @@ test_that("auto.adam() ARIMA selection (NNN) on BJsales", {
     # with headLength=0, i.e. by the zero-error head of earlier versions.
     expect_equal(AICc(m), 527.259, tolerance=0.01)
     expect_equal(m$distribution, "dnorm")
+    # The fit stops at the default budget (maxeval=40*length(B)) before converging,
+    # and the AR factor (1+0.97B) nearly cancels the MA factor (1+0.98B), so these
+    # coefficients pin where the optimiser is after the budget, not an optimum.
+    # Re-pinned after the Hannan-Rissanen starting values.
     expect_equal(as.numeric(m$arma[[1]]),
-                 c(-0.040224, 0.72703), tolerance=1e-3)
+                 c(-0.019128, 0.715681), tolerance=1e-3)
 })
 
 # 3. ETS + ARIMA selection on AirPassengers

@@ -3,7 +3,8 @@ import numpy as np
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general.core.utils.polynomials import (
     adam_polynomialiser,
-    arima_seed,
+    arima_initials,
+    arima_pre_sample,
 )
 from smooth.adam_general.core.utils.utils import (
     _mean_r,
@@ -81,24 +82,6 @@ def _arima_initialiser(
         np.asarray(arma_parameters if arma_parameters else [], dtype=np.float64),
         use_level.astype(np.uint64),
         bounds,
-    )
-
-
-def _starting_polynomials(adam_cpp, B, arma_start_index, arima_checked, lags):
-    """ARIMA polynomials at the starting values of the AR / MA parameters."""
-    n_arma = (
-        sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
-    ) + (sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0)
-    return adam_polynomialiser(
-        adam_cpp,
-        B[arma_start_index : arma_start_index + n_arma] if n_arma > 0 else np.zeros(0),
-        arima_checked["ar_orders"],
-        arima_checked["i_orders"],
-        arima_checked["ma_orders"],
-        arima_checked["ar_estimate"],
-        arima_checked["ma_estimate"],
-        arima_checked["arma_parameters"] if arima_checked["arma_parameters"] else [],
-        lags,
     )
 
 
@@ -689,6 +672,21 @@ def initialiser(
                         names.extend([f"{prefix}{k + 1}[{lag}]" for k in range(order)])
                         j += order
 
+    # The polynomials at the starting values of the AR / MA parameters
+    arima_polynomials = None
+    if arima_checked["arima_model"] and adam_cpp is not None:
+        arima_polynomials = adam_polynomialiser(
+            adam_cpp,
+            B[arma_start_index:j],
+            arima_checked["ar_orders"],
+            arima_checked["i_orders"],
+            arima_checked["ma_orders"],
+            arima_checked["ar_estimate"],
+            arima_checked["ma_estimate"],
+            arima_checked["arma_parameters"] or [],
+            lags_dict.get("lags_original", lags_dict["lags"]),
+        )
+
     #  NOTE: Removed backcasting from initialiser - CF already handles backcasting for
     # complete/backcasting modes
     # This was causing double backcasting which led to different results than R
@@ -779,7 +777,7 @@ def initialiser(
         B[j : j + m] = adam_created["mat_vt"][row, :m]
         if (
             not model_type_dict["ets_model"]
-            and adam_cpp is not None
+            and arima_polynomials is not None
             and (arima_checked["ar_estimate"] or arima_checked["ma_estimate"])
         ):
             lags = lags_dict.get("lags_original", lags_dict["lags"])
@@ -788,17 +786,18 @@ def initialiser(
                 constant_level = adam_created["mat_vt"][
                     row + explanatory_checked["xreg_number"] + 1, 0
                 ]
-            B[j : j + m] = arima_seed(
-                _starting_polynomials(
-                    adam_cpp, B, arma_start_index, arima_checked, lags
-                )["ari_polynomial"],
-                observations_dict["y_in_sample"],
-                observations_dict["ot_logical"],
+            B[j : j + m] = arima_initials(
+                arima_polynomials["ari_polynomial"],
+                arima_pre_sample(
+                    observations_dict["y_in_sample"],
+                    observations_dict["ot_logical"],
+                    model_type_dict["error_type"],
+                    lags,
+                    arima_checked["i_orders"] or [0],
+                    m,
+                    constant_level,
+                ),
                 model_type_dict["error_type"],
-                lags,
-                arima_checked["i_orders"] or [0],
-                m,
-                constant_level,
             )
         names.extend(
             [
@@ -854,20 +853,8 @@ def initialiser(
             B[j - 1] = 0  # or some other default value
         # The constant is the intercept of ARIMA, so it needs to agree with the AR
         # starting values (R: sum(arimaPolynomials$arPolynomial))
-        if (
-            arima_checked["arima_model"]
-            and not model_type_dict["ets_model"]
-            and adam_cpp is not None
-        ):
-            ar_at_one = _sum_r(
-                _starting_polynomials(
-                    adam_cpp,
-                    B,
-                    arma_start_index,
-                    arima_checked,
-                    lags_dict.get("lags_original", lags_dict["lags"]),
-                )["ar_polynomial"]
-            )
+        if arima_polynomials is not None and not model_type_dict["ets_model"]:
+            ar_at_one = _sum_r(arima_polynomials["ar_polynomial"])
             B[j - 1] = (
                 B[j - 1] ** ar_at_one
                 if model_type_dict["error_type"] == "M"

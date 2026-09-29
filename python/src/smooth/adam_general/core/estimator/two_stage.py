@@ -89,7 +89,7 @@ def _run_two_stage_estimator(
         lags_dict_s2,
         observations_dict_s2,
         profile_dict_s2,
-        _,
+        adam_cpp_s2,
     ) = architector(
         model_type_dict,
         lags_dict,
@@ -115,6 +115,7 @@ def _run_two_stage_estimator(
         components_dict_s2,
         explanatory_dict,
         smoother=smoother,
+        adam_cpp=adam_cpp_s2,
     )
 
     b_values = initialiser(

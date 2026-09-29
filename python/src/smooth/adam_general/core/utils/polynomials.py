@@ -93,45 +93,6 @@ def adam_polynomialiser(
     }
 
 
-def ari_polynomial_known(arima_checked, lags):
-    """ARI polynomial known before the estimation, for the starting initials.
-
-    With the AR parameters estimated they are taken as zero, leaving the
-    differences (R's creator calls ``polynomialise`` in the same way). The
-    polynomial does not depend on the configuration of the C++ core.
-    """
-    from smooth.adam_general import _adamCore  # type: ignore[attr-defined]
-
-    core = _adamCore.adamCore(
-        lags=np.ones(1, dtype=np.uint64),
-        E="A",
-        T="N",
-        S="N",
-        nNonSeasonal=0,
-        nSeasonal=0,
-        nETS=0,
-        nArima=0,
-        nXreg=0,
-        nComponents=0,
-        constant=False,
-        adamETS=False,
-    )
-    n_arma = (
-        sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
-    ) + (sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0)
-    return adam_polynomialiser(
-        core,
-        np.zeros(max(n_arma, 1)),
-        arima_checked["ar_orders"],
-        arima_checked["i_orders"],
-        arima_checked["ma_orders"],
-        arima_checked["ar_estimate"],
-        arima_checked["ma_estimate"],
-        arima_checked["arma_parameters"] or [],
-        lags,
-    )["ari_polynomial"]
-
-
 def arima_initials(ari_polynomial, x, error_type):
     """ARIMA initials from the pre-sample values (R's ``adam_arimaInitials()``).
 
@@ -159,16 +120,6 @@ def arima_initials(ari_polynomial, x, error_type):
     for lag in np.flatnonzero(ari_polynomial[1:]) + 1:
         initials[:lag] += ari_polynomial[lag] * x[m - lag :]
     return np.exp(initials) if error_type == "M" else initials
-
-
-def arima_seed(
-    ari_polynomial, y_in_sample, ot_logical, error_type, lags, i_orders, m, constant
-):
-    """Starting ARIMA initials of a pure ARIMA (R's ``adam_arimaSeed()``)."""
-    x = arima_pre_sample(
-        y_in_sample, ot_logical, error_type, lags, i_orders, m, constant
-    )
-    return arima_initials(ari_polynomial, x, error_type)
 
 
 def arima_head_initials(mat_vt_arima, lags_model_arima, lags_model_max, error_type):

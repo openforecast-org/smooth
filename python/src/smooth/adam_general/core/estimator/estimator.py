@@ -480,6 +480,7 @@ def estimator(
         components_dict,
         explanatory_dict,
         smoother=smoother,
+        adam_cpp=adam_cpp,
     )
     # Step 3: Initialize parameters
     b_values = initialiser(

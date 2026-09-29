@@ -913,6 +913,7 @@ class OM(ADAM):
             components_dict,
             self._explanatory,
             smoother=self._resolve_smoother(),
+            adam_cpp=adam_cpp,
         )
 
         # Apply occurrence-specific transform of the initial state vector
@@ -993,6 +994,7 @@ class OM(ADAM):
             self._components,
             self._explanatory,
             smoother=self._resolve_smoother(),
+            adam_cpp=self._adam_cpp,
         )
 
         adam_created["mat_vt"] = om_initial_transform(

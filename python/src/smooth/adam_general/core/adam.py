@@ -3931,6 +3931,7 @@ class ADAM:
             components_dict=self._components,
             explanatory_checked=self._explanatory,
             smoother=self._resolve_smoother(),
+            adam_cpp=self._adam_cpp,
         )
 
         # Calculate information criterion
@@ -4133,7 +4134,7 @@ class ADAM:
                 lags_dict_copy,
                 observations_dict_copy,
                 profile_dict,
-                _,
+                adam_cpp_selected,
             ) = architector(
                 model_type_dict=model_type_dict,
                 lags_dict=lags_dict_copy,
@@ -4160,6 +4161,7 @@ class ADAM:
                 components_dict=components_dict,
                 explanatory_checked=self._explanatory,
                 smoother=self._resolve_smoother(),
+                adam_cpp=adam_cpp_selected,
             )
 
             # Make copy of general_dict for preparator
@@ -4315,6 +4317,7 @@ class ADAM:
             components_dict=self._components,
             explanatory_checked=self._explanatory,
             smoother=self._resolve_smoother(),
+            adam_cpp=self._adam_cpp,
         )
 
         # Store created matrices

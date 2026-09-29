@@ -604,11 +604,18 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
         matWt[,2] <- phi
     }
 
-    if(arimaModel && (!arEstimate && !maEstimate)){
-        arimaPolynomials <- lapply(
-            adamCpp$polynomialise(0, arOrders, iOrders, maOrders,
+    arimaPolynomials <- NULL
+    if(arimaModel){
+        # The polynomials known before the estimation, with the estimated parameters
+        # taken as zero (for the starting values of the ARIMA initials)
+        arimaPolynomialsKnown <- lapply(
+            adamCpp$polynomialise(numeric(1+sum(arOrders, maOrders)),
+                                  arOrders, iOrders, maOrders,
                                   arEstimate, maEstimate, armaParameters, lags),
             as.vector)
+    }
+    if(arimaModel && (!arEstimate && !maEstimate)){
+        arimaPolynomials <- arimaPolynomialsKnown
         if(nrow(nonZeroARI)>0){
             matF[componentsNumberETS+nonZeroARI[,2],componentsNumberETS+nonZeroARI[,2]] <-
                 -arimaPolynomials$ariPolynomial[nonZeroARI[,1]]
@@ -621,9 +628,6 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
             vecG[componentsNumberETS+nonZeroMA[,2]] <- vecG[componentsNumberETS+nonZeroMA[,2]] +
                 arimaPolynomials$maPolynomial[nonZeroMA[,1]]
         }
-    }
-    else{
-        arimaPolynomials <- NULL
     }
 
     if(!profilesRecentProvided){
@@ -854,18 +858,13 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
                 matVt[initialRow, 1:initialArimaNumber] <- initialArima[1:initialArimaNumber]
             }
             else if(!etsModel){
-                ariPolynomial <- arimaPolynomials$ariPolynomial
-                if(is.null(ariPolynomial)){
-                    ariPolynomial <- as.vector(
-                        adamCpp$polynomialise(numeric(sum(arOrders*arEstimate, maOrders*maEstimate)),
-                                              arOrders, iOrders, maOrders, arEstimate, maEstimate,
-                                              armaParameters, lags)$ariPolynomial)
-                }
                 constantLevel <- if(constantRequired){
                     matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]}
                 matVt[initialRow, 1:initialArimaNumber] <-
-                    adam_arimaSeed(ariPolynomial, yInSample, otLogical, Etype, lags, iOrders,
-                                   initialArimaNumber, constantLevel)
+                    adam_arimaInitials(arimaPolynomialsKnown$ariPolynomial,
+                                       adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders,
+                                                           initialArimaNumber, constantLevel),
+                                       Etype)
             }
         }
     }
@@ -1049,14 +1048,6 @@ adam_arimaInitials <- function(ariPolynomial, x, Etype){
         initials[1:lag] <- initials[1:lag] + ariPolynomial[lag+1] * x[m-lag+1:lag]
     }
     return(switch(Etype, "M"=exp(initials), initials))
-}
-
-# The starting ARIMA initials of a pure ARIMA, from the pre-sample values
-#' @keywords internal
-adam_arimaSeed <- function(ariPolynomial, yInSample, otLogical, Etype, lags, iOrders, m, constantLevel){
-    return(adam_arimaInitials(ariPolynomial,
-                              adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders, m, constantLevel),
-                              Etype))
 }
 
 # The ARIMA initials implied by the heads of the fitted ARIMA states (the sums
@@ -1403,8 +1394,10 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
         if(!etsModel && any(c(arEstimate, maEstimate))){
             constantLevel <- if(nrow(matVt)>initialRow+xregNumber){matVt[initialRow+xregNumber+1,1]}
             B[j+1:initialArimaNumber] <-
-                adam_arimaSeed(arimaPolynomials$ariPolynomial, yInSample, otLogical, Etype, lags, iOrders,
-                               initialArimaNumber, constantLevel)
+                adam_arimaInitials(arimaPolynomials$ariPolynomial,
+                                   adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders,
+                                                       initialArimaNumber, constantLevel),
+                                   Etype)
         }
         names(B)[j+1:initialArimaNumber] <- paste0("ARIMAState",1:initialArimaNumber)
 

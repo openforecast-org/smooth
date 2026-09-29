@@ -603,9 +603,9 @@ test_that("ARIMA starting values under non-normal distributions and non-likeliho
     }
 })
 
-#### ARIMA initials: the pre-sample values of the series ####
-# The fitted values of a pure ARI model with initials -y_pre (1/y_pre for "M"),
-# oldest first, are the ARI predictions from the series extended by y_pre
+#### ARIMA initials: the initial state of the companion form ####
+# The fitted values of a pure ARI model with the initials built from the
+# pre-sample values y_pre are the ARI predictions from the series extended by y_pre
 ariFitError <- function(y, arOrders, iOrders, lags, arValues, distribution="dnorm"){
     orders <- list(ar=arOrders, i=iOrders, ma=rep(0, length(lags)))
     arma <- if(sum(arOrders)>0) list(ar=unlist(arValues)) else NULL
@@ -616,8 +616,6 @@ ariFitError <- function(y, arOrders, iOrders, lags, arValues, distribution="dnor
     template <- fit(NULL)$B
     set.seed(1)
     yPre <- as.vector(y)[1] + rnorm(length(template), 0, sd(y)/4)
-    B <- if(distribution=="dgamma") 1/yPre else -yPre
-    names(B) <- names(template)
     # Expanded ARI polynomial
     ari <- 1
     for(j in seq_along(lags)){
@@ -628,6 +626,9 @@ ariFitError <- function(y, arOrders, iOrders, lags, arValues, distribution="dnor
             ari <- convolve(ari, rev(c(1, rep(0, lags[j]-1), -1)), type="open")
         }
     }
+    Etype <- if(distribution=="dgamma") "M" else "A"
+    B <- adam_arimaInitials(ari, switch(Etype, "M"=1/yPre, -yPre), Etype)
+    names(B) <- names(template)
     extended <- c(yPre, as.vector(y))
     if(distribution=="dgamma"){
         extended <- log(extended)
@@ -666,10 +667,18 @@ test_that("Two-stage passes the backcasted ARIMA initials on without loss", {
     }
 })
 
-test_that("MA-only states start from zero and need no initials", {
-    testModel <- msarima(log(AirPassengers), orders=list(ar=c(0,0),i=c(1,0),ma=c(0,1)), lags=c(1,12),
-                         initial="optimal")
-    expect_equal(sum(grepl("ARIMAState", names(testModel$B))), 1)
-    expect_length(testModel$initial$arima, 1)
-    expect_equal(testModel$states[1, 2], 0, check.attributes=FALSE)
+test_that("Every ARIMA initial enters the fit, as in ssarima", {
+    orders <- list(ar=c(0,0),i=c(1,0),ma=c(0,1))
+    testModel <- msarima(log(AirPassengers), orders=orders, lags=c(1,12), initial="optimal")
+    initials <- grep("ARIMAState", names(testModel$B))
+    expect_length(initials, 12)
+    expect_equal(nparam(testModel),
+                 nparam(ssarima(log(AirPassengers), orders=orders, lags=c(1,12), initial="optimal")))
+    lossChange <- sapply(initials, function(i){
+        B <- testModel$B
+        B[i] <- B[i] + 0.1
+        return(msarima(log(AirPassengers), orders=orders, lags=c(1,12), initial="optimal",
+                       B=B, maxeval=1)$lossValue - testModel$lossValue)
+    })
+    expect_true(all(abs(lossChange) > 1e-8))
 })

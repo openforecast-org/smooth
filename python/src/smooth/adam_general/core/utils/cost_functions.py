@@ -4,7 +4,6 @@ from numpy.linalg import eigvals
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
-from smooth.adam_general.core.utils.polynomials import arima_initial_row
 from smooth.adam_general.core.utils.utils import (
     _sum_r,
     calculate_entropy,
@@ -373,28 +372,6 @@ def CF(  # noqa: N802
         >>> # If cf_value is large (1e100), constraints were violated
     """
 
-    # R passes adamCreated$matVt as a parameter to every CF call, so each call
-    # gets a fresh copy (R copy-on-modify). Python mutates matrices_dict["mat_vt"]
-    # in-place. The elif branch in filler writes ari_poly*seed to the seed row
-    # (the state with the largest ARI lag), so without restoration the seed
-    # accumulates as ari_poly^N*seed after N calls. Save it before filler;
-    # restore after the Fortran copy so C++ still receives the filled value.
-    arima_seed_backup = None
-    if (
-        arima_checked["arima_model"]
-        and any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]])
-        and initials_checked["initial_type"] in ["complete", "backcasting", "gradient"]
-    ):
-        seed_row_idx = components_dict["components_number_ets"] + arima_initial_row(
-            arima_checked["non_zero_ari"], components_dict["components_number_arima"]
-        )
-        n_init = initials_checked["initial_arima_number"]
-        arima_seed_backup = (
-            seed_row_idx,
-            n_init,
-            matrices_dict["mat_vt"][seed_row_idx, :n_init].copy(),
-        )
-
     # Fill in the matrices
     adam_elements = filler(
         B,
@@ -411,8 +388,7 @@ def CF(  # noqa: N802
         adam_cpp=adam_cpp,
     )
 
-    # Capture the filler-modified state for C++ and profiles before restoring.
-    # Profiles and the Fortran copy must capture the mutated seed row (ari_poly*seed).
+    # Capture the filled state for C++ and the profiles
     profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
         :, : lags_dict["lags_model_max"]
     ]
@@ -421,13 +397,6 @@ def CF(  # noqa: N802
     # array, leaking the solved initials into the shared creator matrices
     # (R's copy-on-modify semantics never leak them)
     mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
-
-    # Restore the seed row of mat_vt before the next CF call so each
-    # optimiser step starts from the same initial state (the C++ fitter may
-    # mutate the row in place).
-    if arima_seed_backup is not None:
-        idx, n, row = arima_seed_backup
-        matrices_dict["mat_vt"][idx, :n] = row
 
     # If we estimate parameters of distribution, take it from the B vector
     if otherParameterEstimate:

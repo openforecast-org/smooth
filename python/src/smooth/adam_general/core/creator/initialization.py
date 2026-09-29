@@ -575,59 +575,43 @@ def _initialize_arima_initials(
     ets_model,
 ):
     """
-    Place the ARIMA initials in the state with the largest ARI lag.
+    Place the ARIMA initials in the last ARIMA state (see ``arima_initials``).
 
-    They are the pre-sample values of the series (zero deviations for
-    ETS+ARIMA, where ETS carries the level and seasonality; zero errors for a
-    pure MA). The ARI states follow from them in the filler. Mirrors the ARIMA
-    initials block of R's ``adam_creator()``.
+    They come from the pre-sample values of the series with the ARI polynomial
+    known so far (the differences only, if the ARMA parameters are estimated) and
+    stay neutral for ETS+ARIMA, where ETS carries the level and seasonality.
+    Mirrors the ARIMA initials block of R's ``adam_creator()``.
 
     Returns:
         np.ndarray: Updated state matrix
     """
     from smooth.adam_general.core.utils.polynomials import (
-        arima_initial_row,
-        arima_pre_sample,
+        ari_polynomial_known,
+        arima_seed,
     )
 
-    components_number_ets = model_params["components_number_ets"]
-    components_number_arima = model_params["components_number_arima"]
-    e_type = model_params["e_type"]
+    row = (
+        model_params["components_number_ets"]
+        + model_params["components_number_arima"]
+        - 1
+    )
     m = initials_checked["initial_arima_number"]
-    non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
-
-    if non_zero_ari.size > 0:
-        row = components_number_ets + arima_initial_row(
-            non_zero_ari, components_number_arima
-        )
-        if not initials_checked["initial_arima_estimate"]:
-            initials = np.asarray(initials_checked["initial_arima"])[:m]
-        elif ets_model:
-            initials = np.full(m, 0.0 if e_type == "A" else 1.0)
-        else:
-            constant_level = None
-            if constants_checked["constant_required"] and (
-                sum(arima_checked["i_orders"] or []) == 0
-            ):
-                constant_level = mat_vt[
-                    components_number_ets
-                    + components_number_arima
-                    + explanatory_checked["xreg_number"],
-                    0,
-                ]
-            initials = arima_pre_sample(
-                model_params["y_in_sample"],
-                model_params["ot_logical"],
-                e_type,
-                model_params.get("lags_original", [1]) or [1],
-                arima_checked["i_orders"] or [0],
-                m,
-                constant_level,
-            )
-        mat_vt[row, 0:m] = initials
-    elif not initials_checked["initial_arima_estimate"]:
-        mat_vt[components_number_ets + components_number_arima - 1, 0:m] = (
-            initials_checked["initial_arima"][:m]
+    if not initials_checked["initial_arima_estimate"]:
+        mat_vt[row, 0:m] = np.asarray(initials_checked["initial_arima"])[:m]
+    elif not ets_model:
+        lags = model_params.get("lags_original", [1]) or [1]
+        constant_level = None
+        if constants_checked["constant_required"]:
+            constant_level = mat_vt[row + explanatory_checked["xreg_number"] + 1, 0]
+        mat_vt[row, 0:m] = arima_seed(
+            ari_polynomial_known(arima_checked, lags),
+            model_params["y_in_sample"],
+            model_params["ot_logical"],
+            model_params["e_type"],
+            lags,
+            arima_checked["i_orders"] or [0],
+            m,
+            constant_level,
         )
     return mat_vt
 

@@ -1587,9 +1587,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             dfInitials <- dfLevelSeasonal + modelIsTrendy*initialTrendEstimate;
         }
         if(arimaModel){
-            # The ARIMA initials are the pre-sample values of the series, as many as
-            # the largest ARI lag (initialArimaNumber); the MA-only states start
-            # from zero and need none.
+            # The ARIMA initials number initialArimaNumber (= max ARIMA lag), the
+            # dimension of the initial state of the companion form (as in ssarima).
             dfInitials <- dfInitials + initialArimaNumber*initialArimaEstimate;
         }
         # xreg initials are backcast (outside B) only under "complete"; for
@@ -2092,7 +2091,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             arimaModel, initialArimaEstimate, initialArima, initialArimaNumber,
             componentsNumberETS, componentsNumberARIMA,
             arimaPolynomials, Etype,
-            xregModel, initialXregEstimate, xregNumber, nonZeroARI);
+            xregModel, initialXregEstimate, xregNumber, lagsModelARIMA);
         initialValue <- initialCollected$initialValue;
         initialEstimated <- initialCollected$initialEstimated;
 

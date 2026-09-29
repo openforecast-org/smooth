@@ -162,17 +162,16 @@ def _process_initial_values(
         initial_estimated[j] = initials_checked["initial_arima_estimate"]
         if initials_checked["initial_arima_estimate"]:
             from smooth.adam_general.core.utils.polynomials import (
-                arima_collect_initials,
+                arima_head_initials,
             )
 
-            polynomials = matrices_dict.get("arima_polynomials") or {}
-            initial_value[j] = arima_collect_initials(
-                matrices_dict["mat_vt"],
-                components_dict["components_number_ets"],
-                components_dict.get("components_number_arima", 0),
-                arima_checked["non_zero_ari"],
-                initials_checked["initial_arima_number"],
-                polynomials.get("ari_polynomial"),
+            n_ets = components_dict["components_number_ets"]
+            initial_value[j] = arima_head_initials(
+                matrices_dict["mat_vt"][
+                    n_ets : n_ets + components_dict["components_number_arima"]
+                ],
+                arima_checked["lags_model_arima"],
+                lags_dict["lags_model_max"],
                 model_type_dict["error_type"],
             )
         else:

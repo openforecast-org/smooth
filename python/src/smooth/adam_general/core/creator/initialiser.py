@@ -3,7 +3,7 @@ import numpy as np
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general.core.utils.polynomials import (
     adam_polynomialiser,
-    arima_initial_row,
+    arima_seed,
 )
 from smooth.adam_general.core.utils.utils import (
     _mean_r,
@@ -81,6 +81,24 @@ def _arima_initialiser(
         np.asarray(arma_parameters if arma_parameters else [], dtype=np.float64),
         use_level.astype(np.uint64),
         bounds,
+    )
+
+
+def _starting_polynomials(adam_cpp, B, arma_start_index, arima_checked, lags):
+    """ARIMA polynomials at the starting values of the AR / MA parameters."""
+    n_arma = (
+        sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
+    ) + (sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0)
+    return adam_polynomialiser(
+        adam_cpp,
+        B[arma_start_index : arma_start_index + n_arma] if n_arma > 0 else np.zeros(0),
+        arima_checked["ar_orders"],
+        arima_checked["i_orders"],
+        arima_checked["ma_orders"],
+        arima_checked["ar_estimate"],
+        arima_checked["ma_estimate"],
+        arima_checked["arma_parameters"] if arima_checked["arma_parameters"] else [],
+        lags,
     )
 
 
@@ -630,6 +648,7 @@ def initialiser(
         Bu[j] = 1
         j += 1
 
+    arma_start_index = j
     if arima_checked["arima_model"]:
         if any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]]):
             # Use numpy for element-wise multiplication of orders and lags
@@ -655,7 +674,6 @@ def initialiser(
                 {"usual": 1, "admissible": 2}.get(bounds, 0),
             )
 
-            arma_start_index = j
             for i, lag in enumerate(lags_dict.get("lags_original", lags_dict["lags"])):
                 for part, prefix, required, estimate in (
                     ("ar_orders", "phi", "ar_required", "ar_estimate"),
@@ -750,16 +768,38 @@ def initialiser(
         and arima_checked["arima_model"]
         and initials_checked["initial_arima_estimate"]
     ):
-        # The creator holds the initials (the pre-sample values of the series) in
-        # the state with the largest ARI lag, the last one for a pure MA. R has to
-        # bring them back from the states only when it knows the ARMA parameters
-        # at creation; this creator always stores them as they are.
-        initial_row = components_dict["components_number_ets"] + arima_initial_row(
-            arima_checked["non_zero_ari"], components_dict["components_number_arima"]
+        # The creator holds the initials in the last ARIMA state. For a pure ARIMA
+        # they are redone with the starting values of the AR parameters.
+        m = initials_checked["initial_arima_number"]
+        row = (
+            components_dict["components_number_ets"]
+            + components_dict["components_number_arima"]
+            - 1
         )
-        B[j : j + initials_checked["initial_arima_number"]] = adam_created["mat_vt"][
-            initial_row, : initials_checked["initial_arima_number"]
-        ]
+        B[j : j + m] = adam_created["mat_vt"][row, :m]
+        if (
+            not model_type_dict["ets_model"]
+            and adam_cpp is not None
+            and (arima_checked["ar_estimate"] or arima_checked["ma_estimate"])
+        ):
+            lags = lags_dict.get("lags_original", lags_dict["lags"])
+            constant_level = None
+            if constants_checked["constant_required"]:
+                constant_level = adam_created["mat_vt"][
+                    row + explanatory_checked["xreg_number"] + 1, 0
+                ]
+            B[j : j + m] = arima_seed(
+                _starting_polynomials(
+                    adam_cpp, B, arma_start_index, arima_checked, lags
+                )["ari_polynomial"],
+                observations_dict["y_in_sample"],
+                observations_dict["ot_logical"],
+                model_type_dict["error_type"],
+                lags,
+                arima_checked["i_orders"] or [0],
+                m,
+                constant_level,
+            )
         names.extend(
             [
                 f"ARIMAState{n}"
@@ -819,23 +859,12 @@ def initialiser(
             and not model_type_dict["ets_model"]
             and adam_cpp is not None
         ):
-            n_arma = (
-                sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
-            ) + (sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0)
             ar_at_one = _sum_r(
-                adam_polynomialiser(
+                _starting_polynomials(
                     adam_cpp,
-                    B[arma_start_index : arma_start_index + n_arma]
-                    if n_arma > 0
-                    else np.zeros(0),
-                    arima_checked["ar_orders"],
-                    arima_checked["i_orders"],
-                    arima_checked["ma_orders"],
-                    arima_checked["ar_estimate"],
-                    arima_checked["ma_estimate"],
-                    arima_checked["arma_parameters"]
-                    if arima_checked["arma_parameters"]
-                    else [],
+                    B,
+                    arma_start_index,
+                    arima_checked,
                     lags_dict.get("lags_original", lags_dict["lags"]),
                 )["ar_polynomial"]
             )

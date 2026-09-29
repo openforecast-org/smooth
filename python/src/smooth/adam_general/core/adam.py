@@ -5950,57 +5950,19 @@ class ADAM:
                     j += 1
                 k += sum(len(v) for v in groups.values())
 
-        # 6b. ARIMA profile fill (R/reapply.R:680-729).
-        # Optimal / two-stage initials propagate the sampled ARIMAState
-        # entries through the AR or MA polynomial onto the per-component
-        # rows of the profile cube. Backcasting / complete don't fit
-        # ARIMA initials explicitly, so this block is a no-op.
+        # 6b. ARIMA profile fill (R/reapply.R). The estimated initials (none for
+        # backcasting / complete) are held by the last ARIMA state.
         if arima_model:
-            # The estimated initials (none for backcasting / complete)
-            initial_arima_number = sum(
-                1 for nm in coef_names if nm.startswith("ARIMAState")
-            )
-            initial_type = self.initial_type
+            arima_initial_index = [
+                i for i, nm in enumerate(coef_names) if nm.startswith("ARIMAState")
+            ]
+            initial_arima_number = len(arima_initial_index)
             n_ets_arima = self._components["components_number_ets"]
             n_arima_comp = self._components["components_number_arima"]
-            if (
-                initial_type in ("optimal", "two-stage")
-                and (ar_estimate or ma_estimate)
-                and initial_arima_number > 0
-            ):
-                from smooth.adam_general.core.utils.polynomials import (
-                    adam_polynomialiser,
-                    arima_states,
-                )
-
-                e_type = self._model_type.get("error_type", "A")
-                for s in range(nsim):
-                    b_slice = random_parameters[
-                        s, poly_index + 1 : poly_index + 1 + n_arma
-                    ]
-                    polys = adam_polynomialiser(
-                        adam_cpp=self._adam_cpp,
-                        B=b_slice,
-                        ar_orders=ar_orders_padded,
-                        i_orders=i_orders_padded,
-                        ma_orders=ma_orders_padded,
-                        ar_estimate=bool(ar_estimate),
-                        ma_estimate=bool(ma_estimate),
-                        arma_parameters=arma_params_arr,
-                        lags=lags_arima,
-                    )
-                    sampled = random_parameters[s, k : k + initial_arima_number]
-                    if non_zero_ari.size > 0:
-                        rows = n_ets_arima + non_zero_ari[:, 1].astype(int)
-                        profiles_recent_array[rows, :initial_arima_number, s] = (
-                            arima_states(
-                                polys["ari_polynomial"], non_zero_ari, sampled, e_type
-                            )
-                        )
-                    else:
-                        profiles_recent_array[
-                            n_ets_arima + n_arima_comp - 1, :initial_arima_number, s
-                        ] = sampled
+            if initial_arima_number > 0:
+                profiles_recent_array[
+                    n_ets_arima + n_arima_comp - 1, :initial_arima_number, :
+                ] = random_parameters[:, arima_initial_index].T
             j = n_ets_arima + n_arima_comp
             k += initial_arima_number
 

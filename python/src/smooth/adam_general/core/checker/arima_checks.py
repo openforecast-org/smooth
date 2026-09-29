@@ -213,9 +213,8 @@ def _get_polynomial_indices(ar_orders, i_orders, ma_orders, lags):
         _pairs(ma_indices),
         lags_model_arima,
         len(lags_model_arima),
-        # The initials are the pre-sample values of the ARI part up to its largest
-        # lag; a pure MA keeps the initials of its MA states (R's parametersChecker)
-        max(ari_indices) if ari_indices else max(lags_model_arima),
+        # The initials are based on the longest lag (see arima_initials)
+        max(lags_model_arima),
     )
 
 
@@ -423,12 +422,8 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
         )
 
         components_number_arima = len(lags_model_arima)
-        # The initials are the pre-sample values of the ARI part up to its largest
-        # lag; a pure MA keeps the initials of its MA states (R's parametersChecker)
-        if non_zero_ari_lags:
-            initial_arima_number = max(non_zero_ari_lags)
-        else:
-            initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
+        # The initials are based on the longest lag (see arima_initials)
+        initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
         # Component names
         if components_number_arima > 1:
             components_names_arima = [

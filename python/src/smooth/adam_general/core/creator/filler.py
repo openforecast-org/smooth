@@ -1,10 +1,6 @@
 import numpy as np
 
-from smooth.adam_general.core.utils.polynomials import (
-    adam_polynomialiser,
-    arima_initial_row,
-    arima_states,
-)
+from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
 
 
 def filler(
@@ -362,65 +358,21 @@ def filler(
 
                     j += lag - 1
 
-    # Ensure arima_polynomials is available for initials section
-    if arima_checked["arima_model"] and adam_cpp is None:
-        arima_polynomials = matrices_dict.get("arima_polynomials", {})
-
-    # Initials of ARIMA
-    if arima_checked["arima_model"]:
-        if (
-            initials_checked["initial_type"]
-            not in ["complete", "backcasting", "gradient"]
-            and initials_checked["initial_arima_estimate"]
-        ):
-            # print(f"DEBUG - Processing ARIMA initial values starting at index {j}")
-            arima_index = (
-                components_dict["components_number_ets"]
-                + components_dict["components_number_arima"]
-                - 1
-            )
-
-            n_init = initials_checked["initial_arima_number"]
-            init_vals = B[j : j + n_init]
-            non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
-
-            # Spread the estimated initials across the ARI rows, exactly as R
-            # does (utils-adam.R:1017-1037). The last ARIMA row takes B raw
-            # *only* when there are no ARI terms at all -- a pure MA, whose ARI
-            # polynomial is just 1, so the general expression degenerates to B
-            # itself. Writing it unconditionally, as this did, overwrote the
-            # creator's seed whenever the last ARIMA state is reached only by
-            # the MA polynomial, which is a different model from R's.
-            if non_zero_ari.size > 0:
-                ari_indices = (
-                    components_dict["components_number_ets"] + non_zero_ari[:, 1]
-                )
-                matrices_dict["mat_vt"][ari_indices, :n_init] = arima_states(
-                    arima_polynomials["ariPolynomial"],
-                    non_zero_ari,
-                    init_vals,
-                    model_type_dict["error_type"],
-                )
-            else:
-                matrices_dict["mat_vt"][arima_index, :n_init] = init_vals
-
-            j += n_init
-        elif any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]]) and (
-            np.asarray(arima_checked["non_zero_ari"]).size > 0
-        ):
-            # Propagate the initials held by the state with the largest ARI lag
-            non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
-            n_init = initials_checked["initial_arima_number"]
-            initial_row = components_dict["components_number_ets"] + arima_initial_row(
-                non_zero_ari, components_dict["components_number_arima"]
-            )
-            ari_indices = components_dict["components_number_ets"] + non_zero_ari[:, 1]
-            matrices_dict["mat_vt"][ari_indices, :n_init] = arima_states(
-                arima_polynomials["ariPolynomial"],
-                non_zero_ari,
-                matrices_dict["mat_vt"][initial_row, :n_init].copy(),
-                model_type_dict["error_type"],
-            )
+    # Initials of ARIMA, held by the last ARIMA state (see arima_initials)
+    if (
+        arima_checked["arima_model"]
+        and initials_checked["initial_type"]
+        not in ["complete", "backcasting", "gradient"]
+        and initials_checked["initial_arima_estimate"]
+    ):
+        n_init = initials_checked["initial_arima_number"]
+        arima_row = (
+            components_dict["components_number_ets"]
+            + components_dict["components_number_arima"]
+            - 1
+        )
+        matrices_dict["mat_vt"][arima_row, :n_init] = B[j : j + n_init]
+        j += n_init
 
     # Xreg initial values
     if (

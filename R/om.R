@@ -1045,7 +1045,7 @@ om <- function(data,
             nla$arimaModel, nla$initialArimaEstimate, initialArima, initialArimaNumber,
             adamArchitect$componentsNumberETS, componentsNumberARIMA,
             adamFilled$arimaPolynomials, nla$Etype,
-            xregModel, nla$initialXregEstimate, xregNumber, nonZeroARI);
+            xregModel, nla$initialXregEstimate, xregNumber, lagsModelARIMA);
 
         # ARMA parameters
         if(nla$arimaModel && (nla$arRequired || nla$maRequired)){

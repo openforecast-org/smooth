@@ -247,18 +247,17 @@ def _run_two_stage_estimator(
         n_arima = initials_dict.get("initial_arima_number", 0)
         if initials_dict.get("initial_arima_estimate", False) and n_arima > 0:
             from smooth.adam_general.core.utils.polynomials import (
-                arima_collect_initials,
+                arima_head_initials,
             )
 
-            polynomials = adam_estimated_s1["matrices"].get("arima_polynomials") or {}
+            n_ets = components_dict_s1.get("components_number_ets", 0)
             initial_states.extend(
-                arima_collect_initials(
-                    mat_vt_s1,
-                    components_dict_s1.get("components_number_ets", 0),
-                    components_dict_s1.get("components_number_arima", 0),
-                    arima_dict["non_zero_ari"],
-                    n_arima,
-                    polynomials.get("ari_polynomial"),
+                arima_head_initials(
+                    mat_vt_s1[
+                        n_ets : n_ets + components_dict_s1["components_number_arima"]
+                    ],
+                    arima_dict["lags_model_arima"],
+                    lags_model_max_s1,
                     model_type_dict["error_type"],
                 ).tolist()
             )

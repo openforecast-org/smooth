@@ -725,29 +725,12 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     # ARIMA states in the profileRecent
     if(arimaModel){
         j <- componentsNumberETS;
-        # The estimated initials, held by the ARI state with the largest lag
+        # The estimated initials, held by the last ARIMA state (see adam_arimaInitials)
         arimaInitialNames <- parametersNames[substr(parametersNames,1,10)=="ARIMAState"];
         initialArimaNumber <- length(arimaInitialNames);
-
-        # This is needed in order to propagate initials of ARIMA to all components
-        if(initialArimaNumber>0 && any(c(arEstimate,maEstimate))){
-            for(i in 1:nsim){
-                # Call the function returning ARI and MA polynomials
-                ### This is not optimal, as the polynomialiser() is called twice (for parameters and here),
-                ### but this is simpler
-                arimaPolynomials <- lapply(adamCpp$polynomialise(randomParameters[i,polyIndex+1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
-                                                                 arOrders, iOrders, maOrders,
-                                                                 arEstimate, maEstimate, armaParameters, lags), as.vector);
-                if(nrow(nonZeroARI)>0){
-                    profilesRecentArray[j+nonZeroARI[,2], 1:initialArimaNumber, i] <-
-                        adam_arimaStates(arimaPolynomials$ariPolynomial, nonZeroARI,
-                                         randomParameters[i, arimaInitialNames], Etype);
-                }
-                else{
-                    profilesRecentArray[j+componentsNumberARIMA, 1:initialArimaNumber, i] <-
-                        randomParameters[i, arimaInitialNames];
-                }
-            }
+        if(initialArimaNumber>0){
+            profilesRecentArray[j+componentsNumberARIMA, 1:initialArimaNumber, ] <-
+                t(randomParameters[, arimaInitialNames, drop=FALSE]);
         }
         j <- j+componentsNumberARIMA;
         k <- k+initialArimaNumber;

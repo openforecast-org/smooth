@@ -93,42 +93,107 @@ def adam_polynomialiser(
     }
 
 
-def arima_states(ari_polynomial, non_zero_ari, x, error_type):
-    """ARI states of ADAM ARIMA from its initials (R's ``adam_arimaStates()``).
+def ari_polynomial_known(arima_checked, lags):
+    """ARI polynomial known before the estimation, for the starting initials.
 
-    ADAM's ARI state with lag L is ``v_{L,t} = eta_L y_t`` (plus the MA term), so
-    with zero errors before the sample all of them follow from the pre-sample
-    values of the series. The initials ``x`` are these values in the convention
-    of ``initial["arima"]``: ``-y`` (``1/y`` for "M"), oldest first, ``x[m-1]``
-    at time 0, ``m`` being the largest ARI lag. The component with lag L reads
-    its column c at time c-L, so it gets ``ari_L * x[m-L+c]``; its columns
-    beyond L are cyclic repeats.
+    With the AR parameters estimated they are taken as zero, leaving the
+    differences (R's creator calls ``polynomialise`` in the same way). The
+    polynomial does not depend on the configuration of the C++ core.
+    """
+    from smooth.adam_general import _adamCore  # type: ignore[attr-defined]
 
-    Returns the states of the ARI rows in the order of ``non_zero_ari``, whose
-    rows are ``[lag, state index]``.
+    core = _adamCore.adamCore(
+        lags=np.ones(1, dtype=np.uint64),
+        E="A",
+        T="N",
+        S="N",
+        nNonSeasonal=0,
+        nSeasonal=0,
+        nETS=0,
+        nArima=0,
+        nXreg=0,
+        nComponents=0,
+        constant=False,
+        adamETS=False,
+    )
+    n_arma = (
+        sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
+    ) + (sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0)
+    return adam_polynomialiser(
+        core,
+        np.zeros(max(n_arma, 1)),
+        arima_checked["ar_orders"],
+        arima_checked["i_orders"],
+        arima_checked["ma_orders"],
+        arima_checked["ar_estimate"],
+        arima_checked["ma_estimate"],
+        arima_checked["arma_parameters"] or [],
+        lags,
+    )["ari_polynomial"]
+
+
+def arima_initials(ari_polynomial, x, error_type):
+    """ARIMA initials from the pre-sample values (R's ``adam_arimaInitials()``).
+
+    In the profile table, the column k of the ARIMA state with lag L is its value
+    at time k-L, so the fitted value at time k (k <= m, the largest ARIMA lag)
+    receives the column k of all the states with lags L >= k and nothing else
+    from the head. Only these m sums
+    are identified, which makes the ARIMA initials the same as the initial state
+    of ssarima's companion form. They are held by the state with the largest lag,
+    the last one, the other heads being zero (one for "M", where the sums are
+    products).
+
+    With zero errors before the sample, the ARI state with lag L is ``ari_L``
+    times the pre-sample value ``x`` in the convention of
+    :func:`arima_pre_sample` (``-y``, ``1/y`` for "M"; oldest first, ``x[m-1]``
+    at time 0), so the initial k is the sum of ``ari_L * x[m-L+k]`` over the ARI
+    lags L >= k.
     """
     x = np.asarray(x, dtype=np.float64).ravel()
     m = x.size
     if error_type == "M":
         x = np.log(x)
-    columns = np.arange(m)
-    non_zero_ari = np.atleast_2d(np.asarray(non_zero_ari, dtype=int))
-    states = np.empty((non_zero_ari.shape[0], m))
-    for i, lag in enumerate(non_zero_ari[:, 0]):
-        states[i] = ari_polynomial[lag] * x[m - lag + (columns % lag)]
-    return np.exp(states) if error_type == "M" else states
+    ari_polynomial = np.asarray(ari_polynomial, dtype=np.float64).ravel()
+    initials = np.zeros(m)
+    for lag in np.flatnonzero(ari_polynomial[1:]) + 1:
+        initials[:lag] += ari_polynomial[lag] * x[m - lag :]
+    return np.exp(initials) if error_type == "M" else initials
 
 
-def arima_initial_row(non_zero_ari, components_number_arima):
-    """Index within the ARIMA block of the state holding the initials.
+def arima_seed(
+    ari_polynomial, y_in_sample, ot_logical, error_type, lags, i_orders, m, constant
+):
+    """Starting ARIMA initials of a pure ARIMA (R's ``adam_arimaSeed()``)."""
+    x = arima_pre_sample(
+        y_in_sample, ot_logical, error_type, lags, i_orders, m, constant
+    )
+    return arima_initials(ari_polynomial, x, error_type)
 
-    The ARI component with the largest lag, or the last ARIMA state for a pure
-    MA (R's ``adam_arimaInitialRow()``, 0-based here).
+
+def arima_head_initials(mat_vt_arima, lags_model_arima, lags_model_max, error_type):
+    """ARIMA initials implied by the heads of the fitted ARIMA states.
+
+    R's ``adam_arimaHeadInitials()``: the sums of :func:`arima_initials` for the
+    states estimated in any way, e.g. by backcasting. The fitted states are
+    aligned in time: the head column c (0-based) is the time c+1-lags_model_max,
+    so the state with lag L gives to the time k its column lags_model_max-L+k-1.
     """
-    non_zero_ari = np.atleast_2d(np.asarray(non_zero_ari, dtype=int))
-    if non_zero_ari.size > 0:
-        return int(non_zero_ari[np.argmax(non_zero_ari[:, 0]), 1])
-    return components_number_arima - 1
+    lags_arima = np.asarray(lags_model_arima, dtype=int).ravel()
+    head = np.asarray(mat_vt_arima, dtype=np.float64)[:, :lags_model_max]
+    if error_type == "M":
+        head = np.log(head)
+    initials = np.array(
+        [
+            sum(
+                head[i, lags_model_max - lag + k - 1]
+                for i, lag in enumerate(lags_arima)
+                if lag >= k
+            )
+            for k in range(1, int(lags_arima.max()) + 1)
+        ]
+    )
+    return np.exp(initials) if error_type == "M" else initials
 
 
 def arima_pre_sample(
@@ -140,8 +205,8 @@ def arima_pre_sample(
     observations backwards (the level, the slope if the model has differences,
     and the seasonal patterns) on the scale of the ARIMA part. With no
     differences, the constant is the level, and the values are deviations from
-    it. Returned in the convention of ``initial["arima"]`` (see
-    :func:`arima_states`).
+    it. Returned as ``-y`` (``1/y`` for "M"), oldest first (see
+    :func:`arima_initials`).
     """
     from smooth.adam_general.core.utils.utils import _mean_r, msdecompose
 
@@ -167,35 +232,8 @@ def arima_pre_sample(
     for i, lag in enumerate(seasonal_lags):
         pattern = np.asarray(decomposition["seasonal"][i])
         y_pre = y_pre + pattern[(times - 1) % lag]
-    if constant_level is not None:
+    if constant_level is not None and not np.any(np.asarray(i_orders) > 0):
         y_pre = y_pre - (
             np.log(constant_level) if error_type == "M" else constant_level
         )
     return np.exp(-y_pre) if error_type == "M" else -y_pre
-
-
-def arima_collect_initials(
-    mat_vt,
-    components_number_ets,
-    components_number_arima,
-    non_zero_ari,
-    initial_arima_number,
-    ari_polynomial,
-    error_type,
-):
-    """ARIMA initials from the fitted states (R's ``adam_initial_collector()``).
-
-    The state with the largest ARI lag holds ``ari_m`` times the initials, so
-    they are its first ``initial_arima_number`` values divided by the last
-    coefficient of the ARI polynomial (on logs for "M").
-    """
-    row = components_number_ets + arima_initial_row(
-        non_zero_ari, components_number_arima
-    )
-    values = np.asarray(mat_vt[row, :initial_arima_number], dtype=np.float64)
-    tail = None if ari_polynomial is None else float(np.asarray(ari_polynomial)[-1])
-    if tail is None or tail == 0:
-        return values
-    if error_type == "M":
-        return np.exp(np.log(values) / tail)
-    return values / tail

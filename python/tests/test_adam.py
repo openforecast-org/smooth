@@ -806,7 +806,7 @@ class TestADAMARIMAInitialiser:
 
 
 class TestADAMARIMAStates:
-    """ARIMA initials: the pre-sample values of the series, aligned by lag."""
+    """ARIMA initials: the initial state of the companion form, as in ssarima."""
 
     @pytest.fixture
     def air(self):
@@ -818,31 +818,39 @@ class TestADAMARIMAStates:
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
         return pd.read_csv(path)["y"].values.astype(float)
 
-    def test_states_are_aligned_by_lag(self):
-        """Component L gets ari_L * x[m-L+c] in its column c (oldest first)."""
-        from smooth.adam_general.core.utils.polynomials import arima_states
+    def test_initials_sum_the_ari_states_by_time(self):
+        """Initial k sums ari_L * x[m-L+k] over the ARI lags L >= k."""
+        from smooth.adam_general.core.utils.polynomials import arima_initials
 
-        # (1 - B)(1 - B^12): components with lags 1, 12 and 13
+        # (1 - B)(1 - B^12): ARI lags 1, 12 and 13
         ari = np.zeros(14)
         ari[[0, 1, 12, 13]] = [1, -1, -1, 1]
-        non_zero_ari = np.array([[1, 0], [12, 1], [13, 2]])
         x = np.arange(1.0, 14.0)
-        states = arima_states(ari, non_zero_ari, x, "A")
-        assert states[0, 0] == -x[12]
-        np.testing.assert_array_equal(states[1, :12], -x[1:13])
-        np.testing.assert_array_equal(states[2, :13], x)
+        expected = x.copy()  # lag 13: x[k-1]
+        expected[:12] -= x[1:13]  # lag 12: -x[k]
+        expected[0] -= x[12]  # lag 1: -x[12]
+        np.testing.assert_array_equal(arima_initials(ari, x, "A"), expected)
 
-    def test_ma_only_states_need_no_initials(self, air):
-        """The MA-only states start from zero, and only ARI lags have initials."""
-        model = ADAM(
-            model="NNN",
-            orders={"ar": [0, 0], "i": [1, 0], "ma": [0, 1]},
-            lags=[1, 12],
-            initial="optimal",
-        ).fit(np.log(air))
-        assert sum(name.startswith("ARIMAState") for name in model.coef_names) == 1
-        # States are components x time: the MA-only state is the second one
-        assert np.asarray(model.states)[1, 0] == 0
+    def test_head_initials_read_the_fitted_heads_by_time(self):
+        """The state with lag L gives the time k its fitted column max-L+k."""
+        from smooth.adam_general.core.utils.polynomials import arima_head_initials
+
+        head = np.arange(1.0, 13.0).reshape(3, 4)
+        # Lags 1, 2 and 4: time 1 <- [0,3] + [1,2] + [2,0]; time 2 <- [1,3] + [2,1]
+        expected = [4 + 7 + 9, 8 + 10, 11, 12]
+        np.testing.assert_array_equal(
+            arima_head_initials(head, [1, 2, 4], 4, "A"), expected
+        )
+
+    def test_every_initial_enters_the_fit(self, air):
+        """The MA-only states have initials too, each changing the loss."""
+        orders = {"ar": [0, 0], "i": [1, 0], "ma": [0, 1]}
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12], initial="optimal").fit(
+            np.log(air)
+        )
+        names = [n for n in model.coef_names if n.startswith("ARIMAState")]
+        assert len(names) == 12
+        assert np.all(np.asarray(model.states)[:-1, :12] == 0)
 
     @pytest.mark.r_parity
     @pytest.mark.parametrize(

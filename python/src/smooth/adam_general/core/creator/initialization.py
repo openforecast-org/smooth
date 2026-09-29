@@ -619,6 +619,7 @@ def _initialize_arima_initials(
             arima_checked["i_orders"] or [0],
             m,
             constant_level,
+            model_params["smoother"],
         )
     return mat_vt
 

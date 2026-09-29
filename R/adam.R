@@ -700,7 +700,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         return(adam_initialiser(...,
                                 ets=ets, bounds=bounds, yInSample=yInSample,
                                 otLogical=otLogical, iOrders=iOrders,
-                                armaParameters=armaParameters, other=other));
+                                armaParameters=armaParameters, other=other, smoother=smoother));
     }
     scaler <- function(...){
         return(adam_scaler(...));

@@ -132,6 +132,7 @@ def _run_two_stage_estimator(
         phi_dict=phi_dict,
         profile_dict=profile_dict_s2,
         adam_cpp=adam_cpp_s2,
+        smoother=smoother,
     )
 
     B = b_values["B"].copy()

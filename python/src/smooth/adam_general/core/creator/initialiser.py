@@ -29,13 +29,15 @@ def _arima_initialiser(
     ma_estimate,
     arma_parameters,
     bounds,
+    smoother,
 ):
     """Hannan-Rissanen starting values of the AR / MA parameters.
 
     Mirrors R's ``adam_arimaInitialiser`` (R/utils-adam.R); the estimation itself
     is the shared C++ ``arimaHRCore`` (src/headers/arimaInitCore.h). The series
     is the in-sample data on the scale of the ARIMA part (logs for multiplicative
-    error), with the ETS part approximated by a lowess decomposition, differenced
+    error), with the ETS part approximated by the decomposition that gives the ETS
+    initials (the same smoother), differenced
     as the model requires. Missing and zero values become the mean of the
     transformed series. The seasonal ARIMA factors that coincide with the ETS
     seasonality keep the defaults. ``bounds`` is the code of the cost function's
@@ -58,7 +60,7 @@ def _arima_initialiser(
                 type="multiplicative"
                 if "M" in (error_type, season_type)
                 else "additive",
-                smoother="lowess",
+                smoother=smoother,
             )
             fitted = np.asarray(decomposition["fitted"], dtype=np.float64)
             y = np.log(y) - np.log(fitted) if error_type == "M" else y - fitted
@@ -108,6 +110,7 @@ def initialiser(
     other_value=2.0,
     profile_dict=None,  # Added
     adam_cpp=None,
+    smoother=None,
 ):
     """
     Initialize parameter vector and bounds for ADAM optimization.
@@ -654,6 +657,7 @@ def initialiser(
                 arima_checked["ma_estimate"],
                 arima_checked["arma_parameters"],
                 {"usual": 1, "admissible": 2}.get(bounds, 0),
+                smoother,
             )
 
             for i, lag in enumerate(lags_dict.get("lags_original", lags_dict["lags"])):

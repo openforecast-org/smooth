@@ -859,7 +859,7 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
                     matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]}
                 matVt[initialRow, 1:initialArimaNumber] <-
                     adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders,
-                                        initialArimaNumber, constantLevel)
+                                        initialArimaNumber, constantLevel, smoother)
             }
         }
     }
@@ -1069,13 +1069,15 @@ adam_arimaHeadInitials <- function(matVtARIMA, lagsModelARIMA, lagsModelMax, Ety
     return(switch(Etype, "M"=exp(initials), initials))
 }
 
-# Pre-sample values of the series for the ARIMA initials: a lowess decomposition
-# extended m observations backwards (the level, the slope if the model has
-# differences, and the seasonal patterns) on the scale of the ARIMA part. With no
-# differences, the constant is the level, and the values are deviations from it.
+# Pre-sample values of the series for the ARIMA initials: the decomposition that
+# gives the ETS initials (the same smoother), extended m observations backwards
+# (the level, the trend if the model has differences, and the seasonal patterns)
+# on the scale of the ARIMA part. msdecompose() already extrapolates its initial
+# level to the time 1-lagsMax, over any gap of the smoother. With no differences,
+# the constant is the level, and the values are deviations from it.
 # Returned as -y (1/y for "M"), oldest first (see adam_arimaInitials).
 #' @keywords internal
-adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, constantLevel=NULL){
+adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, constantLevel, smoother){
     y <- as.vector(yInSample)
     y[!otLogical] <- NA
     if(Etype=="M"){
@@ -1083,28 +1085,27 @@ adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, c
         y[!is.finite(y)] <- NA
     }
     seasonalLags <- lags[lags>1 & lags*2<sum(!is.na(y))]
-    yDecomposition <- msdecompose(y, lags=if(length(seasonalLags)>0) seasonalLags else 1,
-                                  smoother="lowess")
-    trend <- yDecomposition$states[,"level"]
-    slope <- 0
-    if(any(iOrders>0)){
-        slope <- mean(diff(trend[1:min(length(trend), max(24, 2*max(lags)))]))
-    }
+    decompositionLags <- if(length(seasonalLags)>0) seasonalLags else 1
+    yDecomposition <- msdecompose(y, lags=decompositionLags, smoother=smoother)
+    slope <- if(any(iOrders>0)) yDecomposition$initial$nonseasonal["trend"] else 0
     times <- (1-m):0
-    yPre <- trend[1] + slope*(times-1)
+    # The level at the time 1, then the slope from there
+    yPre <- yDecomposition$initial$nonseasonal["level"] +
+        yDecomposition$initial$nonseasonal["trend"]*max(decompositionLags) + slope*(times-1)
     for(i in seq_along(seasonalLags)){
         yPre <- yPre + yDecomposition$seasonal[[i]][((times-1) %% seasonalLags[i]) + 1]
     }
     if(!is.null(constantLevel) && all(iOrders==0)){
         yPre <- yPre - switch(Etype, "M"=log(constantLevel), constantLevel)
     }
-    return(switch(Etype, "M"=exp(-yPre), -yPre))
+    return(as.vector(switch(Etype, "M"=exp(-yPre), -yPre)))
 }
 
 # Starting values of the AR / MA parameters via the Hannan-Rissanen method
 # (src/headers/arimaInitCore.h). The series is the in-sample data on the scale of
 # the ARIMA part (logs for multiplicative error), with the ETS part approximated
-# by a lowess decomposition, differenced as the model requires. The seasonal
+# by the decomposition that gives the ETS initials (the same smoother), differenced
+# as the model requires. The seasonal
 # ARIMA factors that coincide with the ETS seasonality keep the defaults.
 # bounds is the code of the cost function's bounds (see hrRejected() in the
 # header): the values are moved inside the boundary only if the cost function
@@ -1112,7 +1113,7 @@ adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, c
 #' @keywords internal
 adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal,
                                   lags, arOrders, iOrders, maOrders, arEstimate, maEstimate,
-                                  armaParameters, bounds){
+                                  armaParameters, bounds, smoother){
     # Missing and zero (intermittent) values are treated as NAs and are then
     # replaced by the mean of the transformed series
     y <- as.vector(yInSample)
@@ -1120,7 +1121,7 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
     if(etsModel){
         yDecomposition <- msdecompose(y, lags=if(modelIsSeasonal) lags[lags!=1] else 1,
                                       type=c("additive","multiplicative")[any(c(Etype,Stype)=="M")+1],
-                                      smoother="lowess")
+                                      smoother=smoother)
         y <- switch(Etype, "M"=log(y) - log(yDecomposition$fitted), y - yDecomposition$fitted)
     }
     else if(Etype=="M"){
@@ -1156,7 +1157,8 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
                              xregParametersEstimated, xregParametersPersistence,
                              constantEstimate, constantName, otherParameterEstimate,
                              adamCpp,
-                             ets, bounds, yInSample, otLogical, iOrders, armaParameters, other){
+                             ets, bounds, yInSample, otLogical, iOrders, armaParameters, other,
+                             smoother){
     # The vector of logicals for persistence elements
     persistenceEstimateVector <- c(persistenceLevelEstimate,
                                    modelIsTrendy&persistenceTrendEstimate,
@@ -1295,7 +1297,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
             armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
                                                 modelIsSeasonal, lags, arOrders, iOrders, maOrders,
                                                 arEstimate, maEstimate, armaParameters,
-                                                switch(bounds, "usual"=1, "admissible"=2, 0))
+                                                switch(bounds, "usual"=1, "admissible"=2, 0), smoother)
             for(i in 1:length(lags)){
                 if(arRequired && arEstimate && arOrders[i]>0){
                     B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])]

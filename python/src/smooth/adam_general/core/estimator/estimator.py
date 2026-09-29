@@ -499,6 +499,7 @@ def estimator(
         adam_cpp=adam_cpp,
         other_parameter_estimate=other_parameter_estimate,
         other_value=other if other is not None else 2.0,
+        smoother=smoother,
     )
     # Get initial parameter vector and bounds; user-provided values are used as-is
     B = np.asarray(B_initial, dtype=float) if B_initial is not None else b_values["B"]

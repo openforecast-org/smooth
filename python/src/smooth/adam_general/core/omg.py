@@ -1097,6 +1097,7 @@ class OMG:
             phi_dict=side["phi"],
             profile_dict=side["profile"],
             adam_cpp=side["adam_cpp"],
+            smoother=side["scaffold"]._resolve_smoother(),
             other_parameter_estimate=False,
             other_value=2.0,
         )

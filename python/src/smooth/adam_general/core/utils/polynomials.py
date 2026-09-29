@@ -148,18 +148,19 @@ def arima_head_initials(mat_vt_arima, lags_model_arima, lags_model_max, error_ty
 
 
 def arima_pre_sample(
-    y_in_sample, ot_logical, error_type, lags, i_orders, m, constant_level=None
+    y_in_sample, ot_logical, error_type, lags, i_orders, m, constant_level, smoother
 ):
     """Pre-sample values of the series for the ARIMA initials.
 
-    R's ``adam_arimaPreSample()``: a lowess decomposition extended ``m``
-    observations backwards (the level, the slope if the model has differences,
-    and the seasonal patterns) on the scale of the ARIMA part. With no
-    differences, the constant is the level, and the values are deviations from
-    it. Returned as ``-y`` (``1/y`` for "M"), oldest first (see
-    :func:`arima_initials`).
+    R's ``adam_arimaPreSample()``: the decomposition that gives the ETS initials
+    (the same smoother), extended ``m`` observations backwards (the level, the
+    trend if the model has differences, and the seasonal patterns) on the scale of
+    the ARIMA part. ``msdecompose`` already extrapolates its initial level to the
+    time 1-lags_max, over any gap of the smoother. With no differences, the
+    constant is the level, and the values are deviations from it. Returned as
+    ``-y`` (``1/y`` for "M"), oldest first (see :func:`arima_initials`).
     """
-    from smooth.adam_general.core.utils.utils import _mean_r, msdecompose
+    from smooth.adam_general.core.utils.utils import msdecompose
 
     y = np.asarray(y_in_sample, dtype=np.float64).ravel().copy()
     y[~np.asarray(ot_logical, dtype=bool).ravel()] = np.nan
@@ -170,16 +171,16 @@ def arima_pre_sample(
     lags = [int(lag) for lag in np.asarray(lags).ravel()]
     n_valid = int(np.sum(~np.isnan(y)))
     seasonal_lags = [lag for lag in lags if lag > 1 and lag * 2 < n_valid]
-    decomposition = msdecompose(
-        y, lags=seasonal_lags if seasonal_lags else [1], smoother="lowess"
+    decomposition_lags = seasonal_lags if seasonal_lags else [1]
+    decomposition = msdecompose(y, lags=decomposition_lags, smoother=smoother)
+    level = float(decomposition["initial"]["nonseasonal"]["level"])
+    trend = float(decomposition["initial"]["nonseasonal"]["trend"])
+    slope = (
+        trend if any(int(order) > 0 for order in np.asarray(i_orders).ravel()) else 0.0
     )
-    trend = np.asarray(decomposition["states"])[:, 0]
-    slope = 0.0
-    if any(int(order) > 0 for order in np.asarray(i_orders).ravel()):
-        head = min(trend.size, max(24, 2 * max(lags)))
-        slope = _mean_r(np.diff(trend[:head]))
     times = np.arange(1 - m, 1)
-    y_pre = trend[0] + slope * (times - 1)
+    # The level at the time 1, then the slope from there
+    y_pre = level + trend * max(decomposition_lags) + slope * (times - 1)
     for i, lag in enumerate(seasonal_lags):
         pattern = np.asarray(decomposition["seasonal"][i])
         y_pre = y_pre + pattern[(times - 1) % lag]

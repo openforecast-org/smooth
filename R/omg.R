@@ -427,7 +427,7 @@ omg <- function(data,
             checkerA$otherParameterEstimate,
             adamCppA,
             etsA, bounds, ot, otLogicalInternal,
-            checkerA$iOrders, checkerA$armaParameters, checkerA$other)
+            checkerA$iOrders, checkerA$armaParameters, checkerA$other, smoother)
 
         BValuesB <- adam_initialiser(
             checkerB$etsModel, checkerB$Etype, checkerB$Ttype, checkerB$Stype,
@@ -457,7 +457,7 @@ omg <- function(data,
             checkerB$otherParameterEstimate,
             adamCppB,
             etsB, bounds, ot, otLogicalInternal,
-            checkerB$iOrders, checkerB$armaParameters, checkerB$other)
+            checkerB$iOrders, checkerB$armaParameters, checkerB$other, smoother)
 
         # Capture user-supplied B / lb / ub from ellipses BEFORE the joint
         # defaults shadow them (B, lb, ub were extracted by

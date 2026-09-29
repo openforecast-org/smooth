@@ -1062,6 +1062,7 @@ class OM(ADAM):
             adam_cpp=adam_cpp,
             other_parameter_estimate=False,
             other_value=2.0,
+            smoother=self._resolve_smoother(),
         )
 
         # Optimisation knobs (subset of nlopt_kwargs we care about for OM)

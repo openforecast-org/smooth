@@ -753,7 +753,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                 armaValues <- adam_arimaInitialiser(yInSample, otLogical, FALSE, "A", "N", FALSE,
                                                     lags, arOrders, iOrders, maOrders,
                                                     arEstimate, maEstimate, armaParameters,
-                                                    switch(bounds, "usual"=3, "admissible"=2, 0));
+                                                    switch(bounds, "usual"=3, "admissible"=2, 0), NULL);
                 for(i in 1:length(lags)){
                     if(arRequired && arEstimate && arOrders[i]>0){
                         B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])];

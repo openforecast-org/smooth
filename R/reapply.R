@@ -724,52 +724,32 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     # if(gumModel){}
     # ARIMA states in the profileRecent
     if(arimaModel){
-        # See if the initials were estimated
-        # initialArimaNumber <- sum(substr(parametersNames,1,10)=="ARIMAState");
-        initialArimaNumber <- sum(substr(colnames(object$states),1,10)=="ARIMAState");
+        j <- componentsNumberETS;
+        # The estimated initials, held by the ARI state with the largest lag
+        arimaInitialNames <- parametersNames[substr(parametersNames,1,10)=="ARIMAState"];
+        initialArimaNumber <- length(arimaInitialNames);
 
         # This is needed in order to propagate initials of ARIMA to all components
-        if(any(object$initialType==c("optimal","two-stage")) && any(c(arEstimate,maEstimate))){
-            if(nrow(nonZeroARI)>0 && nrow(nonZeroARI)>=nrow(nonZeroMA)){
-                for(i in 1:nsim){
-                    # Call the function returning ARI and MA polynomials
-                    ### This is not optimal, as the polynomialiser() is called twice (for parameters and here),
-                    ### but this is simpler
-                    arimaPolynomials <- lapply(adamCpp$polynomialise(randomParameters[i,polyIndex+1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
-                                                                     arOrders, iOrders, maOrders,
-                                                                     arEstimate, maEstimate, armaParameters, lags), as.vector);
-                    profilesRecentArray[j+componentsNumberARIMA, 1:initialArimaNumber, i] <-
-                        randomParameters[i, k+1:initialArimaNumber];
+        if(initialArimaNumber>0 && any(c(arEstimate,maEstimate))){
+            for(i in 1:nsim){
+                # Call the function returning ARI and MA polynomials
+                ### This is not optimal, as the polynomialiser() is called twice (for parameters and here),
+                ### but this is simpler
+                arimaPolynomials <- lapply(adamCpp$polynomialise(randomParameters[i,polyIndex+1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
+                                                                 arOrders, iOrders, maOrders,
+                                                                 arEstimate, maEstimate, armaParameters, lags), as.vector);
+                if(nrow(nonZeroARI)>0){
                     profilesRecentArray[j+nonZeroARI[,2], 1:initialArimaNumber, i] <-
-                        switch(Etype,
-                               "A"= arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                                   t(profilesRecentArray[j+componentsNumberARIMA,
-                                                         1:initialArimaNumber, i]),
-                               "M"=exp(arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                                           t(log(profilesRecentArray[j+componentsNumberARIMA,
-                                                                     1:initialArimaNumber, i]))));
+                        adam_arimaStates(arimaPolynomials$ariPolynomial, nonZeroARI,
+                                         randomParameters[i, arimaInitialNames], Etype);
                 }
-            }
-            else{
-                for(i in 1:nsim){
-                    # Call the function returning ARI and MA polynomials
-                    arimaPolynomials <- lapply(adamCpp$polynomialise(randomParameters[i,polyIndex+1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
-                                                                     arOrders, iOrders, maOrders,
-                                                                     arEstimate, maEstimate, armaParameters, lags), as.vector);
-                    profilesRecentArray[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber, i] <-
-                        randomParameters[i, k+1:initialArimaNumber];
-                    profilesRecentArray[j+nonZeroMA[,2], 1:initialArimaNumber, i] <-
-                        switch(Etype,
-                               "A"=arimaPolynomials$maPolynomial[nonZeroMA[,1]] %*%
-                                   t(profilesRecentArray[componentsNumberETS+componentsNumberARIMA,
-                                                         1:initialArimaNumber, i]),
-                               "M"=exp(arimaPolynomials$maPolynomial[nonZeroMA[,1]] %*%
-                                           t(log(profilesRecentArray[componentsNumberETS+componentsNumberARIMA,
-                                                                     1:initialArimaNumber, i]))));
+                else{
+                    profilesRecentArray[j+componentsNumberARIMA, 1:initialArimaNumber, i] <-
+                        randomParameters[i, arimaInitialNames];
                 }
             }
         }
-        j <- j+initialArimaNumber;
+        j <- j+componentsNumberARIMA;
         k <- k+initialArimaNumber;
     }
     # Regression part

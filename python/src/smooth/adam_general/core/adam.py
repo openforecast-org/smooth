@@ -5956,12 +5956,10 @@ class ADAM:
         # rows of the profile cube. Backcasting / complete don't fit
         # ARIMA initials explicitly, so this block is a no-op.
         if arima_model:
-            initial_arima_number = self._arima.get("initial_arima_number")
-            if initial_arima_number is None:
-                initial_arima_number = sum(
-                    1 for nm in coef_names if nm.startswith("ARIMAState")
-                )
-            initial_arima_number = int(initial_arima_number)
+            # The estimated initials (none for backcasting / complete)
+            initial_arima_number = sum(
+                1 for nm in coef_names if nm.startswith("ARIMAState")
+            )
             initial_type = self.initial_type
             n_ets_arima = self._components["components_number_ets"]
             n_arima_comp = self._components["components_number_arima"]
@@ -5972,13 +5970,10 @@ class ADAM:
             ):
                 from smooth.adam_general.core.utils.polynomials import (
                     adam_polynomialiser,
+                    arima_states,
                 )
 
                 e_type = self._model_type.get("error_type", "A")
-                ari_dominant = non_zero_ari.size > 0 and (
-                    not non_zero_ma.size
-                    or non_zero_ari.shape[0] >= non_zero_ma.shape[0]
-                )
                 for s in range(nsim):
                     b_slice = random_parameters[
                         s, poly_index + 1 : poly_index + 1 + n_arma
@@ -5994,42 +5989,19 @@ class ADAM:
                         arma_parameters=arma_params_arr,
                         lags=lags_arima,
                     )
-                    ari_poly = polys["ari_polynomial"]
-                    ma_poly = polys["ma_polynomial"]
                     sampled = random_parameters[s, k : k + initial_arima_number]
-                    if ari_dominant:
-                        mother_row = j + n_arima_comp - 1
-                        profiles_recent_array[mother_row, :initial_arima_number, s] = (
-                            sampled
+                    if non_zero_ari.size > 0:
+                        rows = n_ets_arima + non_zero_ari[:, 1].astype(int)
+                        profiles_recent_array[rows, :initial_arima_number, s] = (
+                            arima_states(
+                                polys["ari_polynomial"], non_zero_ari, sampled, e_type
+                            )
                         )
-                        for row in non_zero_ari:
-                            target = j + int(row[1])
-                            coeff = ari_poly[int(row[0])]
-                            if e_type == "A":
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = coeff * sampled
-                            else:
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = np.exp(coeff * np.log(np.abs(sampled) + 1e-300))
                     else:
-                        mother_row = n_ets_arima + n_arima_comp - 1
-                        profiles_recent_array[mother_row, :initial_arima_number, s] = (
-                            sampled
-                        )
-                        for row in non_zero_ma:
-                            target = j + int(row[1])
-                            coeff = ma_poly[int(row[0])]
-                            if e_type == "A":
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = coeff * sampled
-                            else:
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = np.exp(coeff * np.log(np.abs(sampled) + 1e-300))
-            j += initial_arima_number
+                        profiles_recent_array[
+                            n_ets_arima + n_arima_comp - 1, :initial_arima_number, s
+                        ] = sampled
+            j = n_ets_arima + n_arima_comp
             k += initial_arima_number
 
         # 6b. xreg profile fill (R/reapply.R:730-740).

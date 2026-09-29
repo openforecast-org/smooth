@@ -446,8 +446,11 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             nonZeroMA <- NULL;
         }
         else{
-            # Number of initials needed. This is based on the longest one. The others are just its transformations
-            initialArimaNumber <- max(lagsModelARIMA);
+            # Number of initials needed: the pre-sample values of the ARI part up to its
+            # largest lag. The other ARI states are their transformations, and the
+            # MA-only states start from zero errors. A pure MA has no ARI part and
+            # keeps the initials of its MA states instead.
+            initialArimaNumber <- if(nrow(nonZeroARI)>0){max(nonZeroARI[,1])-1} else {max(lagsModelARIMA)};
         }
     }
     else{
@@ -1127,7 +1130,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                             # If there is something else left, this must be ARIMA
                             if(all(!is.na(initial[j+c(1:initialArimaNumber)]))){
                                 initialArima <- initial[j+c(1:initialArimaNumber)];
-                                j <- j+max(lagsModelARIMA);
+                                j <- j+initialArimaNumber;
                                 initialArimaEstimate[] <- FALSE;
                             }
                         }

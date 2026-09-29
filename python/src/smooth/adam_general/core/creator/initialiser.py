@@ -1,7 +1,10 @@
 import numpy as np
 
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
-from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
+from smooth.adam_general.core.utils.polynomials import (
+    adam_polynomialiser,
+    arima_initial_row,
+)
 from smooth.adam_general.core.utils.utils import (
     _mean_r,
     _sum_r,
@@ -747,47 +750,16 @@ def initialiser(
         and arima_checked["arima_model"]
         and initials_checked["initial_arima_estimate"]
     ):
-        # Fix: Python 0-based indexing requires -1 (R uses 1-based)
+        # The creator holds the initials (the pre-sample values of the series) in
+        # the state with the largest ARI lag, the last one for a pure MA. R has to
+        # bring them back from the states only when it knows the ARMA parameters
+        # at creation; this creator always stores them as they are.
+        initial_row = components_dict["components_number_ets"] + arima_initial_row(
+            arima_checked["non_zero_ari"], components_dict["components_number_arima"]
+        )
         B[j : j + initials_checked["initial_arima_number"]] = adam_created["mat_vt"][
-            components_dict["components_number_ets"]
-            + components_dict["components_number_arima"]
-            - 1,
-            : initials_checked["initial_arima_number"],
+            initial_row, : initials_checked["initial_arima_number"]
         ]
-        # Normalise the ARIMA initial state by the tail of the ARI polynomial.
-        if adam_cpp is not None:
-            n_ar = (
-                sum(arima_checked["ar_orders"]) if arima_checked["ar_estimate"] else 0
-            )
-            n_ma = (
-                sum(arima_checked["ma_orders"]) if arima_checked["ma_estimate"] else 0
-            )
-            n_arma = n_ar + n_ma
-            # Runs for every ARIMA, including a pure ARIMA(0,d,0) with no ARMA
-            # parameters to estimate: the ARI polynomial is built from the
-            # differencing orders alone, and its tail is what sets the sign of
-            # the seed. Guarding this on n_arma > 0 left ARIMA(0,d,0) with an
-            # unnormalised seed, which for odd d is the wrong sign entirely --
-            # (1-B) has tail -1, while (1-B)^2 has tail +1 and hid the bug.
-            # R applies the division unconditionally (utils-adam.R:1352).
-            arima_polys = adam_polynomialiser(
-                adam_cpp,
-                B[arma_start_index : arma_start_index + n_arma]
-                if n_arma > 0
-                else np.zeros(0),
-                arima_checked["ar_orders"],
-                arima_checked["i_orders"],
-                arima_checked["ma_orders"],
-                arima_checked["ar_estimate"],
-                arima_checked["ma_estimate"],
-                arima_checked["arma_parameters"]
-                if arima_checked["arma_parameters"]
-                else [],
-                lags_dict.get("lags_original", lags_dict["lags"]),
-            )
-            ari_tail = arima_polys["ari_polynomial"][-1]
-            if ari_tail != 0:
-                B[j : j + initials_checked["initial_arima_number"]] /= ari_tail
         names.extend(
             [
                 f"ARIMAState{n}"

@@ -797,56 +797,10 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
             }
         }
 
+        # ARIMA states start from zero errors and zero deviations. The initials are
+        # set after the constant, which they may depend on
         if(arimaModel){
-            if(initialArimaEstimate){
-                matVt[componentsNumberETS+1:componentsNumberARIMA, 1:initialArimaNumber] <-
-                    switch(Etype, "A"=0, "M"=1)
-                if(any(lags>1) && obsInSample > max(lags)*2){
-                    yDecomposition <- tail(msdecompose(yInSample,
-                                                       lags=lags[lags!=1],
-                                                       type=switch(Etype,
-                                                                   "A"="additive",
-                                                                   "M"="multiplicative"),
-                                                       smoother=smoother)$seasonal, 1)[[1]]
-                }
-                else if(any(lags>1) && obsInSample <= max(lags)*2){
-                    yDecomposition <- yInSample[otLogical][1:obsInSample]
-                }
-                else{
-                    yDecomposition <- switch(Etype,
-                                             "A"=mean(yInSample[otLogical]),
-                                             "M"=exp(mean(log(yInSample[otLogical]))));
-                                             # "A"=mean(diff(yInSample[otLogical])),
-                                             # "M"=exp(mean(diff(log(yInSample[otLogical])))))
-                }
-                matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
-                    rep(yDecomposition, ceiling(initialArimaNumber/max(lags)))[1:initialArimaNumber]
-            }
-            else{
-                matVt[componentsNumberETS+1:componentsNumberARIMA, 1:initialArimaNumber] <-
-                    switch(Etype, "A"=0, "M"=1)
-                # Provided ARIMA initials must be placed the SAME way the
-                # estimated path does (adam_filler): spread
-                # ariPolynomial %*% initials across the ARI rows. The collector
-                # reports initial$arima by reading the last ARI row and dividing
-                # by tail(ariPolynomial), so placing the reported values raw in
-                # the last row (the previous behaviour) dropped that factor and
-                # produced a different state -> a different likelihood for the
-                # same reported parameters. This mirrors the filler exactly, so
-                # providing the collected initials now round-trips.
-                if(!is.null(arimaPolynomials) && nrow(nonZeroARI)>0){
-                    matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
-                        switch(Etype,
-                               "A"=arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                                   t(initialArima[1:initialArimaNumber]),
-                               "M"=exp(arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                                           t(log(initialArima[1:initialArimaNumber]))))
-                }
-                else{
-                    matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
-                        initialArima[1:initialArimaNumber]
-                }
-            }
+            matVt[componentsNumberETS+1:componentsNumberARIMA, 1:lagsModelMax] <- switch(Etype, "A"=0, "M"=1)
         }
 
         if(xregModel){
@@ -888,28 +842,39 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
                         matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
                 }
             }
-            if(arimaModel && initialArimaEstimate){
-                # Rows carrying the level that the constant now accounts for. A
-                # pure MA has no ARI terms, so nonZeroARI is empty and indexing
-                # by it would debias nothing at all -- leaving the state seeded
-                # at mean(y) while the constant is also mean(y), so the first
-                # fitted value double counted the level. Fall back to every
-                # ARIMA row there; where ARI terms do exist the two sets
-                # coincide anyway.
-                arimaRows <- if(nrow(nonZeroARI)>0){
-                                 componentsNumberETS+nonZeroARI[,2];
-                             } else { componentsNumberETS+1:componentsNumberARIMA; }
-                if(Etype=="A"){
-                    matVt[arimaRows,1:initialArimaNumber] <-
-                        matVt[arimaRows,1:initialArimaNumber] -
-                        matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
-                }
-                else{
-                    matVt[arimaRows,1:initialArimaNumber] <-
-                        matVt[arimaRows,1:initialArimaNumber] /
-                        matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
-                }
+        }
+
+        # ARIMA initials: the pre-sample values of the series (zero deviations for
+        # ETS+ARIMA, where ETS carries the level and seasonality; zero errors for a
+        # pure MA), placed in the row of the largest ARI lag. The ARI states follow
+        # from them in the filler, or here if the polynomials are already known.
+        if(arimaModel && nrow(nonZeroARI)>0){
+            initialRow <- componentsNumberETS+adam_arimaInitialRow(nonZeroARI, componentsNumberARIMA)
+            if(!initialArimaEstimate){
+                arimaInitials <- initialArima[1:initialArimaNumber]
             }
+            else if(etsModel){
+                arimaInitials <- rep(switch(Etype, "A"=0, "M"=1), initialArimaNumber)
+            }
+            else{
+                constantLevel <- NULL
+                if(constantRequired && sum(iOrders)==0){
+                    constantLevel <- matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
+                }
+                arimaInitials <- adam_arimaPreSample(yInSample, otLogical, Etype, lags, iOrders,
+                                                     initialArimaNumber, constantLevel)
+            }
+            if(!is.null(arimaPolynomials)){
+                matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
+                    adam_arimaStates(arimaPolynomials$ariPolynomial, nonZeroARI, arimaInitials, Etype)
+            }
+            else{
+                matVt[initialRow, 1:initialArimaNumber] <- arimaInitials
+            }
+        }
+        else if(arimaModel && !initialArimaEstimate){
+            matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber] <-
+                initialArima[1:initialArimaNumber]
         }
     }
     else{
@@ -1050,11 +1015,8 @@ adam_filler <- function(B,
         if(all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
             if(nrow(nonZeroARI)>0){
                 matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
-                    switch(Etype,
-                           "A"=arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                               t(B[j+1:initialArimaNumber]),
-                           "M"=exp(arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                                       t(log(B[j+1:initialArimaNumber]))))
+                    adam_arimaStates(arimaPolynomials$ariPolynomial, nonZeroARI,
+                                     B[j+1:initialArimaNumber], Etype)
             }
             else{
                 # A pure MA (no AR, no differencing) has an ARI polynomial of
@@ -1070,15 +1032,11 @@ adam_filler <- function(B,
             j[] <- j+initialArimaNumber
         }
         # This is needed in order to propagate initials of ARIMA to all components
-        else if(any(c(arEstimate,maEstimate))){
+        else if(any(c(arEstimate,maEstimate)) && nrow(nonZeroARI)>0){
             matVt[componentsNumberETS+nonZeroARI[,2], 1:initialArimaNumber] <-
-                switch(Etype,
-                       "A"= arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                           t(matVt[componentsNumberETS+componentsNumberARIMA,
-                                   1:initialArimaNumber]),
-                       "M"=exp(arimaPolynomials$ariPolynomial[nonZeroARI[,1]] %*%
-                                   t(log(matVt[componentsNumberETS+componentsNumberARIMA,
-                                               1:initialArimaNumber]))))
+                adam_arimaStates(arimaPolynomials$ariPolynomial, nonZeroARI,
+                                 matVt[componentsNumberETS+adam_arimaInitialRow(nonZeroARI, componentsNumberARIMA),
+                                       1:initialArimaNumber], Etype)
         }
     }
 
@@ -1100,6 +1058,67 @@ adam_filler <- function(B,
     }
 
     return(list(matVt=matVt, matWt=matWt, matF=matF, vecG=vecG, arimaPolynomials=arimaPolynomials))
+}
+
+# The ARIMA initial states. ADAM's ARI state with lag L is v_{L,t} = eta_L y_t
+# (+ the MA term), so with zero errors before the sample all of them follow from
+# the pre-sample values of the series. The initials x are these values in the
+# convention of initial$arima: -y (1/y for "M"), oldest first, x[m] at time 0,
+# m being the largest ARI lag. The component with lag L reads its column c at
+# time c-L, so it gets ari_L * x[m-L+c]; its columns beyond L are cyclic repeats.
+# Returns the states of the ARI rows in the order of nonZeroARI.
+#' @keywords internal
+adam_arimaStates <- function(ariPolynomial, nonZeroARI, x, Etype){
+    m <- length(x)
+    x <- switch(Etype, "M"=log(x), x)
+    states <- vapply(seq_len(nrow(nonZeroARI)), function(i){
+        lag <- nonZeroARI[i,1]-1
+        return(ariPolynomial[nonZeroARI[i,1]] * x[m - lag + ((0:(m-1)) %% lag) + 1])
+    }, numeric(m))
+    states <- matrix(states, nrow(nonZeroARI), m, byrow=TRUE)
+    return(switch(Etype, "M"=exp(states), states))
+}
+
+# The row of the ARIMA state holding the initials: the ARI component with the
+# largest lag, or the last ARIMA state for a pure MA
+#' @keywords internal
+adam_arimaInitialRow <- function(nonZeroARI, componentsNumberARIMA){
+    if(nrow(nonZeroARI)>0){
+        return(nonZeroARI[which.max(nonZeroARI[,1]),2])
+    }
+    return(componentsNumberARIMA)
+}
+
+# Pre-sample values of the series for the ARIMA initials: a lowess decomposition
+# extended m observations backwards (the level, the slope if the model has
+# differences, and the seasonal patterns) on the scale of the ARIMA part. With no
+# differences, the constant is the level, and the values are deviations from it.
+# Returned in the convention of initial$arima (see adam_arimaStates).
+#' @keywords internal
+adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, constantLevel=NULL){
+    y <- as.vector(yInSample)
+    y[!otLogical] <- NA
+    if(Etype=="M"){
+        y <- suppressWarnings(log(y))
+        y[!is.finite(y)] <- NA
+    }
+    seasonalLags <- lags[lags>1 & lags*2<sum(!is.na(y))]
+    yDecomposition <- msdecompose(y, lags=if(length(seasonalLags)>0) seasonalLags else 1,
+                                  smoother="lowess")
+    trend <- yDecomposition$states[,"level"]
+    slope <- 0
+    if(any(iOrders>0)){
+        slope <- mean(diff(trend[1:min(length(trend), max(24, 2*max(lags)))]))
+    }
+    times <- (1-m):0
+    yPre <- trend[1] + slope*(times-1)
+    for(i in seq_along(seasonalLags)){
+        yPre <- yPre + yDecomposition$seasonal[[i]][((times-1) %% seasonalLags[i]) + 1]
+    }
+    if(!is.null(constantLevel)){
+        yPre <- yPre - switch(Etype, "M"=log(constantLevel), constantLevel)
+    }
+    return(switch(Etype, "M"=exp(-yPre), -yPre))
 }
 
 # Starting values of the AR / MA parameters via the Hannan-Rissanen method
@@ -1392,15 +1411,21 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
 
     # ARIMA initials
     if(arimaModel && all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
-        B[j+1:initialArimaNumber] <-
-            head(matVt[componentsNumberETS+componentsNumberARIMA,1:lagsModelMax],
-                 initialArimaNumber)
+        # The creator holds the initials in the state with the largest ARI lag, which
+        # is the one with lag initialArimaNumber (the last state for a pure MA)
+        initialRow <- componentsNumberETS+which(lagsModelARIMA==initialArimaNumber)[1]
+        B[j+1:initialArimaNumber] <- head(matVt[initialRow,1:lagsModelMax], initialArimaNumber)
         names(B)[j+1:initialArimaNumber] <- paste0("ARIMAState",1:initialArimaNumber)
 
-        # Fix initial state if the polynomial is not zero
-        if(tail(arimaPolynomials$ariPolynomial,1)!=0){
-            B[j+1:initialArimaNumber] <- B[j+1:initialArimaNumber] /
-                tail(arimaPolynomials$ariPolynomial,1)
+        # With the ARMA parameters provided, the creator has already written the
+        # states, ari_m * initials: bring them back to the initials
+        if(!any(c(arEstimate, maEstimate)) && tail(arimaPolynomials$ariPolynomial,1)!=0 &&
+           length(arimaPolynomials$ariPolynomial)-1==initialArimaNumber){
+            B[j+1:initialArimaNumber] <- switch(Etype,
+                                                "A"=B[j+1:initialArimaNumber] /
+                                                    tail(arimaPolynomials$ariPolynomial,1),
+                                                "M"=exp(log(B[j+1:initialArimaNumber]) /
+                                                            tail(arimaPolynomials$ariPolynomial,1)))
         }
 
         if(Etype=="A"){
@@ -1741,7 +1766,7 @@ adam_initial_collector <- function(matVt, etsModel, modelIsTrendy, modelIsSeason
                                    initialArimaNumber,
                                    componentsNumberETS, componentsNumberARIMA,
                                    arimaPolynomials, Etype,
-                                   xregModel, initialXregEstimate, xregNumber){
+                                   xregModel, initialXregEstimate, xregNumber, nonZeroARI=NULL){
     initialValue <- vector("list", etsModel*(1+modelIsTrendy+modelIsSeasonal)+arimaModel+xregModel);
     initialValueETS <- vector("list", etsModel*length(lagsModel));
     initialValueNames <- vector("character", etsModel*(1+modelIsTrendy+modelIsSeasonal)+arimaModel+xregModel);
@@ -1804,7 +1829,10 @@ adam_initial_collector <- function(matVt, etsModel, modelIsTrendy, modelIsSeason
         j[] <- j+1;
         initialEstimated[j] <- initialArimaEstimate;
         if(initialArimaEstimate){
-            initialValue[[j]] <- head(matVt[componentsNumberETS+componentsNumberARIMA,],initialArimaNumber);
+            # The initials are held by the ARI state with the largest lag
+            initialRow <- if(is.null(nonZeroARI)){componentsNumberARIMA} else {
+                adam_arimaInitialRow(nonZeroARI, componentsNumberARIMA)}
+            initialValue[[j]] <- head(matVt[componentsNumberETS+initialRow,],initialArimaNumber);
             # Fix the values to get proper initials, not just the values of states
             if(tail(arimaPolynomials$ariPolynomial,1)!=0){
                 initialValue[[j]] <- switch(Etype,

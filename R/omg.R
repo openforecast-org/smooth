@@ -1056,7 +1056,8 @@ omg <- function(data,
             checker$initialArima, checker$initialArimaNumber,
             adamArchitect$componentsNumberETS, checker$componentsNumberARIMA,
             adamFilled$arimaPolynomials, checker$Etype,
-            checker$xregModel, checker$initialXregEstimate, checker$xregNumber)
+            checker$xregModel, checker$initialXregEstimate, checker$xregNumber,
+            checker$nonZeroARI)
 
         if(checker$arimaModel && (checker$arRequired || checker$maRequired)) {
             armaParametersList <- vector("list", checker$arRequired + checker$maRequired)

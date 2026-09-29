@@ -77,6 +77,18 @@ def _initialize_states(
                 explanatory_checked,
                 ets_model,
             )
+
+        # ARIMA initials, after the constant they may depend on
+        if arima_checked["arima_model"]:
+            mat_vt = _initialize_arima_initials(
+                mat_vt,
+                model_params,
+                initials_checked,
+                arima_checked,
+                explanatory_checked,
+                constants_checked,
+                ets_model,
+            )
     else:
         # If profiles are provided, use them directly
         mat_vt[:, 0:lags_model_max] = profiles_recent_table
@@ -536,82 +548,87 @@ def _initialize_arima_states(
     mat_vt, model_params, initials_checked, arima_checked, observations_dict
 ):
     """
-    Initialize ARIMA model states.
+    Initialize ARIMA model states at zero errors and zero deviations.
 
-    Args:
-        mat_vt: State matrix
-        model_params: Dictionary containing model parameters
-        initials_checked: Dictionary of initial values
-        arima_checked: Dictionary of ARIMA parameters
-        observations_dict: Dictionary containing observation information
+    The initials are set after the constant, which they may depend on, by
+    :func:`_initialize_arima_initials` (R's ``adam_creator()``).
 
     Returns:
         np.ndarray: Updated state matrix
     """
-    # Get parameters
+    components_number_ets = model_params["components_number_ets"]
+    components_number_arima = model_params["components_number_arima"]
+    mat_vt[
+        components_number_ets : components_number_ets + components_number_arima,
+        0 : model_params["lags_model_max"],
+    ] = 0 if model_params["e_type"] == "A" else 1
+    return mat_vt
+
+
+def _initialize_arima_initials(
+    mat_vt,
+    model_params,
+    initials_checked,
+    arima_checked,
+    explanatory_checked,
+    constants_checked,
+    ets_model,
+):
+    """
+    Place the ARIMA initials in the state with the largest ARI lag.
+
+    They are the pre-sample values of the series (zero deviations for
+    ETS+ARIMA, where ETS carries the level and seasonality; zero errors for a
+    pure MA). The ARI states follow from them in the filler. Mirrors the ARIMA
+    initials block of R's ``adam_creator()``.
+
+    Returns:
+        np.ndarray: Updated state matrix
+    """
+    from smooth.adam_general.core.utils.polynomials import (
+        arima_initial_row,
+        arima_pre_sample,
+    )
+
     components_number_ets = model_params["components_number_ets"]
     components_number_arima = model_params["components_number_arima"]
     e_type = model_params["e_type"]
-    y_in_sample = model_params["y_in_sample"]
-    ot_logical = model_params["ot_logical"]
+    m = initials_checked["initial_arima_number"]
+    non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
 
-    if initials_checked["initial_arima_estimate"]:
-        mat_vt[
-            components_number_ets : components_number_ets + components_number_arima,
-            0 : initials_checked["initial_arima_number"],
-        ] = 0 if e_type == "A" else 1
-
-        # Use the user-specified lags rather than the ETS-only lags here:
-        # the ETS-only list can be empty for pure ARIMA models, but the
-        # ARIMA initialiser still needs the original seasonal periods.
-        lags_original = model_params.get("lags_original", [1]) or [1]
-        obs_in_sample = model_params["obs_in_sample"]
-
-        has_seasonal = any(lag > 1 for lag in lags_original)
-        if has_seasonal and obs_in_sample > max(lags_original) * 2:
-            # We need the full time-varying seasonal series (length T) from
-            # msdecompose, not the static one-period pattern. Using the
-            # static ``["initial"]["seasonal"][-1]`` produces wrong seed-row
-            # values for columns 12..initial_arima_number-1.
-            y_decomposition = msdecompose(
-                y_in_sample,
-                [lag for lag in lags_original if lag != 1],
-                type="additive" if e_type == "A" else "multiplicative",
-                smoother=model_params["smoother"],
-            )["seasonal"][-1]
-        elif has_seasonal:
-            y_decomposition = y_in_sample[ot_logical][:obs_in_sample]
+    if non_zero_ari.size > 0:
+        row = components_number_ets + arima_initial_row(
+            non_zero_ari, components_number_arima
+        )
+        if not initials_checked["initial_arima_estimate"]:
+            initials = np.asarray(initials_checked["initial_arima"])[:m]
+        elif ets_model:
+            initials = np.full(m, 0.0 if e_type == "A" else 1.0)
         else:
-            y_decomposition = (
-                np.mean(y_in_sample[ot_logical])
-                if e_type == "A"
-                else np.exp(np.mean(np.log(y_in_sample[ot_logical])))
-                # np.mean(np.diff(y_in_sample[ot_logical]))
-                # if e_type == "A"
-                # else np.exp(np.mean(np.diff(np.log(y_in_sample[ot_logical]))))
+            constant_level = None
+            if constants_checked["constant_required"] and (
+                sum(arima_checked["i_orders"] or []) == 0
+            ):
+                constant_level = mat_vt[
+                    components_number_ets
+                    + components_number_arima
+                    + explanatory_checked["xreg_number"],
+                    0,
+                ]
+            initials = arima_pre_sample(
+                model_params["y_in_sample"],
+                model_params["ot_logical"],
+                e_type,
+                model_params.get("lags_original", [1]) or [1],
+                arima_checked["i_orders"] or [0],
+                m,
+                constant_level,
             )
-
-        # Tile using max of original lags (R: ceiling(initialArimaNumber/max(lags)))
-        max_arima_lag = max(lags_original) if has_seasonal else 1
-        mat_vt[
-            components_number_ets + components_number_arima - 1,
-            0 : initials_checked["initial_arima_number"],
-        ] = np.tile(
-            y_decomposition,
-            int(np.ceil(initials_checked["initial_arima_number"] / max_arima_lag)),
-        )[: initials_checked["initial_arima_number"]]
-    else:
-        mat_vt[
-            components_number_ets : components_number_ets + components_number_arima,
-            0 : initials_checked["initial_arima_number"],
-        ] = 0 if e_type == "A" else 1
-        mat_vt[
-            components_number_ets + components_number_arima - 1,
-            0 : initials_checked["initial_arima_number"],
-        ] = initials_checked["initial_arima"][
-            : initials_checked["initial_arima_number"]
-        ]
-
+        mat_vt[row, 0:m] = initials
+    elif not initials_checked["initial_arima_estimate"]:
+        mat_vt[components_number_ets + components_number_arima - 1, 0:m] = (
+            initials_checked["initial_arima"][:m]
+        )
     return mat_vt
 
 
@@ -747,30 +764,5 @@ def _initialize_constant(
                 + explanatory_checked["xreg_number"],
                 0,
             ]
-
-    # If ARIMA is done, debias states. Only the rows carrying the level the
-    # constant now accounts for -- the ARI rows -- as R does
-    # (utils-adam.R:858-878). An MA-only row holds no level, so debiasing it
-    # seeds it at -constant instead of 0. A pure MA has no ARI terms at all, and
-    # there R falls back to every ARIMA row (otherwise nothing would be
-    # debiased and the first fitted value would double count the level).
-    if arima_checked["arima_model"] and initials_checked["initial_arima_estimate"]:
-        non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
-        if non_zero_ari.size > 0:
-            arima_rows = components_number_ets + non_zero_ari[:, 1].astype(int)
-        else:
-            arima_rows = components_number_ets + np.arange(components_number_arima)
-
-        constant_value = mat_vt[
-            components_number_ets
-            + components_number_arima
-            + explanatory_checked["xreg_number"],
-            0,
-        ]
-        cols = slice(0, initials_checked["initial_arima_number"])
-        if e_type == "A":
-            mat_vt[arima_rows, cols] -= constant_value
-        else:
-            mat_vt[arima_rows, cols] /= constant_value
 
     return mat_vt

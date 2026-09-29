@@ -97,6 +97,7 @@ def om_initial_transform(
     initial_xreg_estimate: bool,
     constant_required: bool,
     constant_estimate: bool,
+    creator_additive: bool = True,
 ) -> np.ndarray:
     """Transform initial state values from probability space onto the
     model-native scale before optimisation begins.
@@ -174,7 +175,13 @@ def om_initial_transform(
     # not probabilities. Running ``_transform`` on them turns the default
     # seed of 0 into log(0) = -Inf for Etype="A", which corrupts the initial
     # parameter vector handed to the optimiser.
+    # The creator usually runs with error_type="A" here (``creator_additive``).
+    # For a multiplicative model its ARIMA values are then on the log scale, so a
+    # zero deviation has to become exp(0) = 1 rather than log(0) downstream.
     if arima_model:
+        if creator_additive and error_type == "M" and initial_arima_estimate:
+            rows = slice(j, j + components_number_arima)
+            mat_vt[rows, :lags_model_max] = np.exp(mat_vt[rows, :lags_model_max])
         j += components_number_arima
 
     # ---- xreg
@@ -1023,6 +1030,7 @@ class OM(ADAM):
             initial_xreg_estimate=self._initials.get("initial_xreg_estimate", False),
             constant_required=self._constant.get("constant_required", False),
             constant_estimate=self._constant.get("constant_estimate", False),
+            creator_additive=False,
         )
 
         return adam_created

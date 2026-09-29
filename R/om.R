@@ -879,7 +879,7 @@ om <- function(data,
                 nla$arimaModel, componentsNumberARIMA,
                 nla$initialArimaEstimate, initialArimaNumber,
                 xregModel, xregNumber, nla$initialXregEstimate,
-                constantRequired, constantEstimate);
+                constantRequired, constantEstimate, creatorAdditive=FALSE);
         }
 
         adamFilled <- adam_filler(res$B,
@@ -1045,7 +1045,7 @@ om <- function(data,
             nla$arimaModel, nla$initialArimaEstimate, initialArima, initialArimaNumber,
             adamArchitect$componentsNumberETS, componentsNumberARIMA,
             adamFilled$arimaPolynomials, nla$Etype,
-            xregModel, nla$initialXregEstimate, xregNumber);
+            xregModel, nla$initialXregEstimate, xregNumber, nonZeroARI);
 
         # ARMA parameters
         if(nla$arimaModel && (nla$arRequired || nla$maRequired)){
@@ -1664,7 +1664,7 @@ om_initial_transform <- function(matVt, occurrence, Etype, Ttype, Stype,
                                  arimaModel, componentsNumberARIMA,
                                  initialArimaEstimate, initialArimaNumber,
                                  xregModel, xregNumber, initialXregEstimate,
-                                 constantRequired, constantEstimate){
+                                 constantRequired, constantEstimate, creatorAdditive=TRUE){
 
     occurrenceTransformer <- function(value){
         value <- switch(occurrence,
@@ -1745,7 +1745,14 @@ om_initial_transform <- function(matVt, occurrence, Etype, Ttype, Stype,
     # not probabilities. Running occurrenceTransformer() on them turns the
     # default seed of 0 into log(0) = -Inf for Etype="A", which corrupts the
     # initial parameter vector handed to nloptr.
+    # The creator usually runs with Etype="A" here (creatorAdditive). For a
+    # multiplicative model its ARIMA values are then on the log scale, so a zero
+    # deviation has to become exp(0) = 1 rather than log(0) downstream.
     if(arimaModel){
+        if(creatorAdditive && Etype=="M" && initialArimaEstimate){
+            matVt[j+1:componentsNumberARIMA, 1:lagsModelMax] <-
+                exp(matVt[j+1:componentsNumberARIMA, 1:lagsModelMax]);
+        }
         j[] <- j + componentsNumberARIMA;
     }
 

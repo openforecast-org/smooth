@@ -1,6 +1,10 @@
 import numpy as np
 
-from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
+from smooth.adam_general.core.utils.polynomials import (
+    adam_polynomialiser,
+    arima_initial_row,
+    arima_states,
+)
 
 
 def filler(
@@ -391,46 +395,32 @@ def filler(
                 ari_indices = (
                     components_dict["components_number_ets"] + non_zero_ari[:, 1]
                 )
-                ari_poly_vals = arima_polynomials["ariPolynomial"][
-                    non_zero_ari[:, 0]
-                ].reshape(-1, 1)
-                if model_type_dict["error_type"] == "A":
-                    matrices_dict["mat_vt"][ari_indices, :n_init] = (
-                        ari_poly_vals @ init_vals.reshape(1, -1)
-                    )
-                else:  # "M"
-                    matrices_dict["mat_vt"][ari_indices, :n_init] = np.exp(
-                        ari_poly_vals @ np.log(init_vals).reshape(1, -1)
-                    )
+                matrices_dict["mat_vt"][ari_indices, :n_init] = arima_states(
+                    arima_polynomials["ariPolynomial"],
+                    non_zero_ari,
+                    init_vals,
+                    model_type_dict["error_type"],
+                )
             else:
                 matrices_dict["mat_vt"][arima_index, :n_init] = init_vals
 
             j += n_init
-        elif any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]]):
-            last_arima_row_idx = (
-                components_dict["components_number_ets"]
-                + components_dict["components_number_arima"]
-                - 1
+        elif any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]]) and (
+            np.asarray(arima_checked["non_zero_ari"]).size > 0
+        ):
+            # Propagate the initials held by the state with the largest ARI lag
+            non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
+            n_init = initials_checked["initial_arima_number"]
+            initial_row = components_dict["components_number_ets"] + arima_initial_row(
+                non_zero_ari, components_dict["components_number_arima"]
             )
-            ari_indices = (
-                components_dict["components_number_ets"]
-                + arima_checked["non_zero_ari"][:, 1]
+            ari_indices = components_dict["components_number_ets"] + non_zero_ari[:, 1]
+            matrices_dict["mat_vt"][ari_indices, :n_init] = arima_states(
+                arima_polynomials["ariPolynomial"],
+                non_zero_ari,
+                matrices_dict["mat_vt"][initial_row, :n_init].copy(),
+                model_type_dict["error_type"],
             )
-            ari_poly_vals = arima_polynomials["ariPolynomial"][
-                arima_checked["non_zero_ari"][:, 0]
-            ].reshape(-1, 1)
-            last_arima_row = matrices_dict["mat_vt"][
-                last_arima_row_idx, : initials_checked["initial_arima_number"]
-            ].copy()
-
-            if model_type_dict["error_type"] == "A":
-                matrices_dict["mat_vt"][
-                    ari_indices, : initials_checked["initial_arima_number"]
-                ] = ari_poly_vals @ last_arima_row.reshape(1, -1)
-            else:  # "M"
-                matrices_dict["mat_vt"][
-                    ari_indices, : initials_checked["initial_arima_number"]
-                ] = np.exp(ari_poly_vals @ np.log(last_arima_row).reshape(1, -1))
 
     # Xreg initial values
     if (

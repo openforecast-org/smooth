@@ -2092,7 +2092,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             arimaModel, initialArimaEstimate, initialArima, initialArimaNumber,
             componentsNumberETS, componentsNumberARIMA,
             arimaPolynomials, Etype,
-            xregModel, initialXregEstimate, xregNumber);
+            xregModel, initialXregEstimate, xregNumber, nonZeroARI);
         initialValue <- initialCollected$initialValue;
         initialEstimated <- initialCollected$initialEstimated;
 

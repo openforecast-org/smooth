@@ -602,3 +602,74 @@ test_that("ARIMA starting values under non-normal distributions and non-likeliho
         expect_lte(testModel$lossValue, start$lossValue)
     }
 })
+
+#### ARIMA initials: the pre-sample values of the series ####
+# The fitted values of a pure ARI model with initials -y_pre (1/y_pre for "M"),
+# oldest first, are the ARI predictions from the series extended by y_pre
+ariFitError <- function(y, arOrders, iOrders, lags, arValues, distribution="dnorm"){
+    orders <- list(ar=arOrders, i=iOrders, ma=rep(0, length(lags)))
+    arma <- if(sum(arOrders)>0) list(ar=unlist(arValues)) else NULL
+    fit <- function(B){
+        return(adam(y, "NNN", orders=orders, lags=lags, initial="optimal", arma=arma,
+                    distribution=distribution, B=B, maxeval=1))
+    }
+    template <- fit(NULL)$B
+    set.seed(1)
+    yPre <- as.vector(y)[1] + rnorm(length(template), 0, sd(y)/4)
+    B <- if(distribution=="dgamma") 1/yPre else -yPre
+    names(B) <- names(template)
+    # Expanded ARI polynomial
+    ari <- 1
+    for(j in seq_along(lags)){
+        factorAR <- c(1, rep(0, length(arValues[[j]])*lags[j]))
+        factorAR[seq_along(arValues[[j]])*lags[j]+1] <- -arValues[[j]]
+        ari <- convolve(ari, rev(factorAR), type="open")
+        for(d in seq_len(iOrders[j])){
+            ari <- convolve(ari, rev(c(1, rep(0, lags[j]-1), -1)), type="open")
+        }
+    }
+    extended <- c(yPre, as.vector(y))
+    if(distribution=="dgamma"){
+        extended <- log(extended)
+    }
+    n <- length(B) + 20
+    predicted <- sapply(1:n, function(t){-sum(ari[-1] * extended[t + length(B) - seq_along(ari[-1])])})
+    if(distribution=="dgamma"){
+        predicted <- exp(predicted)
+    }
+    return(max(abs(predicted - fitted(fit(B))[1:n])))
+}
+
+test_that("ARIMA initials give the ARI predictions from the pre-sample values", {
+    expect_lt(ariFitError(AirPassengers, c(0,0), c(1,1), c(1,12), list(numeric(0), numeric(0))), 1e-8)
+    expect_lt(ariFitError(AirPassengers, c(1,1), c(1,1), c(1,12), list(0.3, 0.4)), 1e-8)
+    expect_lt(ariFitError(AirPassengers, c(0,2), c(0,1), c(1,12), list(numeric(0), c(0.3,0.2))), 1e-8)
+    expect_lt(ariFitError(AirPassengers, c(1,1), c(1,1), c(1,12), list(0.3, 0.4), "dgamma"), 1e-8)
+})
+
+test_that("ARIMA initials of a double seasonal model give the ARI predictions", {
+    skip_on_cran()
+    set.seed(3)
+    y <- ts(100 + cumsum(rnorm(800))/5 + 5*sin(2*pi*(1:800)/24) + 3*sin(2*pi*(1:800)/168), frequency=24)
+    expect_lt(ariFitError(y, c(1,1,0), c(0,1,1), c(1,24,168), list(0.5, 0.3, numeric(0))), 1e-8)
+})
+
+test_that("Two-stage passes the backcasted ARIMA initials on without loss", {
+    skip_on_cran()
+    y <- log(AirPassengers)
+    for(orders in list(list(ar=c(0,0),i=c(1,1),ma=c(1,1)), list(ar=c(1,1),i=c(1,1),ma=c(1,1)))){
+        backcasted <- msarima(y, orders=orders, lags=c(1,12), initial="backcasting")
+        B <- c(backcasted$B, unlist(backcasted$initial$arima))
+        names(B) <- names(msarima(y, orders=orders, lags=c(1,12), initial="optimal", maxeval=1)$B)
+        expect_lte(msarima(y, orders=orders, lags=c(1,12), initial="optimal", B=B, maxeval=1)$lossValue,
+                   backcasted$lossValue + 1e-6)
+    }
+})
+
+test_that("MA-only states start from zero and need no initials", {
+    testModel <- msarima(log(AirPassengers), orders=list(ar=c(0,0),i=c(1,0),ma=c(0,1)), lags=c(1,12),
+                         initial="optimal")
+    expect_equal(sum(grepl("ARIMAState", names(testModel$B))), 1)
+    expect_length(testModel$initial$arima, 1)
+    expect_equal(testModel$states[1, 2], 0, check.attributes=FALSE)
+})

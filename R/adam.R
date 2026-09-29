@@ -1587,9 +1587,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             dfInitials <- dfLevelSeasonal + modelIsTrendy*initialTrendEstimate;
         }
         if(arimaModel){
-            # The ARIMA initials estimated under "optimal" number initialArimaNumber
-            # (= max ARIMA lag); this equals the identifiable rank of the ARIMA
-            # initial-state design (the over-parameterised lower lags are redundant).
+            # The ARIMA initials are the pre-sample values of the series, as many as
+            # the largest ARI lag (initialArimaNumber); the MA-only states start
+            # from zero and need none.
             dfInitials <- dfInitials + initialArimaNumber*initialArimaEstimate;
         }
         # xreg initials are backcast (outside B) only under "complete"; for

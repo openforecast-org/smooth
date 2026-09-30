@@ -764,3 +764,11 @@ test_that("A fit stuck on a penalty restarts from zero smoothing and small ARMA 
                                         regressors="adapt", distribution="dnorm"))
     expect_lt(testModel$lossValue, 1E+100)
 })
+
+test_that("With nothing to optimise, the fit does not restart", {
+    # RIDGE with lambda=1 fixes the smoothing parameters and backcasting the initials,
+    # so B is empty: the restart selected its parameters by name and failed
+    testModel <- adam(AirPassengers, "AAN", loss="RIDGE", lambda=1)
+    expect_length(testModel$B, 0)
+    expect_equal(unname(testModel$persistence), c(0, 0))
+})

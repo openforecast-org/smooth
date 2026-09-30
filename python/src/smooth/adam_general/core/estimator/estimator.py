@@ -576,8 +576,9 @@ def estimator(
 
     # Step 10a: if the optimisation got stuck on a penalty (every penalty is at
     # least 1e100), retry with zero smoothing parameters and small ARMA
-    # parameters, selected by name as in R/adam.R
-    if not np.isfinite(CF_value) or CF_value >= 1e100:
+    # parameters, selected by name as in R/adam.R, unless there is nothing to
+    # optimise (LASSO / RIDGE with lambda=1 and backcasting)
+    if len(B) > 0 and (not np.isfinite(CF_value) or CF_value >= 1e100):
         B[:] = B_start
         names = list(b_values["names"])
         for i, name in enumerate(names):

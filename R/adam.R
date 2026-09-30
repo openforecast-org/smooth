@@ -1511,8 +1511,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         res$call <- quote(nloptr(x0=B, eval_f=CF, lb=lb, ub=ub, opts=opts));
 
         # If the optimisation got stuck on a penalty (every penalty is at least 1e+100),
-        # give it another try with zero smoothing parameters and small ARMA parameters
-        if(!BProvided && (is.infinite(res$objective) || res$objective>=1e+100)){
+        # give it another try with zero smoothing parameters and small ARMA parameters,
+        # unless there is nothing to optimise (LASSO / RIDGE with lambda=1 and backcasting)
+        if(!BProvided && length(B)>0 && (is.infinite(res$objective) || res$objective>=1e+100)){
             BNames <- names(B);
             B[BNames %in% c("alpha","beta") | startsWith(BNames, "gamma")] <- 0;
             B[grepl("^(phi|theta)[0-9]+\\[", BNames)] <- 0.01;

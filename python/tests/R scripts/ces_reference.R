@@ -3,10 +3,14 @@
 ## ground-truth outputs for Python CES comparison tests.
 ##
 ## Run from the smooth package root:
-##   Rscript "python/tests/R scripts/ces_reference.R"
+##   Rscript "python/tests/R scripts/ces_reference.R" [output directory]
 ##
-## Outputs written to:  python/tests/data/ces_reference.json
-##                      python/tests/data/ces_*.csv
+## Outputs written to:  <output directory>/ces_reference.json
+##                      <output directory>/ces_*.csv
+## test_ces.py runs it into a temporary directory on every session, so that R and
+## Python are compared on the same machine: the fits go through BLAS / LAPACK (the
+## QR of msdecompose, the eigenvalues of the admissible bounds), whose last bits,
+## and so the optimiser's path, depend on the library and the processor.
 
 ## Load the *local* R source, exactly as python/tests/_r_bridge.py does, so the
 ## fixtures always track the working tree rather than whatever version happens to
@@ -14,7 +18,10 @@
 suppressMessages(suppressWarnings(devtools::load_all(".", quiet = TRUE)))
 library(jsonlite)
 
-OUT_DIR <- "python/tests/data"
+OUT_DIR <- commandArgs(trailingOnly = TRUE)[1]
+if (is.na(OUT_DIR)) {
+    OUT_DIR <- "python/tests/data"
+}
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 
 results <- list()

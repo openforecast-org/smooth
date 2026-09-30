@@ -615,7 +615,7 @@ def _initialize_arima_initials(
             model_params["y_in_sample"],
             model_params["ot_logical"],
             model_params["e_type"],
-            model_params.get("lags_original", [1]) or [1],
+            model_params.get("lags", [1]) or [1],
             arima_checked["i_orders"] or [0],
             m,
             constant_level,

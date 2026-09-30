@@ -240,7 +240,7 @@ def filler(
             arima_checked["arma_parameters"]
             if arima_checked["arma_parameters"]
             else [],
-            lags_dict.get("lags_original", lags_dict["lags"]),
+            lags_dict["lags"],
         )
         # Alias: polynomialiser returns snake_case; bounds checking uses camelCase
         arima_polynomials["ariPolynomial"] = arima_polynomials["ari_polynomial"]
@@ -337,7 +337,7 @@ def filler(
                         - components_dict["components_number_ets_seasonal"]
                         + k
                     )
-                    lag = lags_dict["lags"][seasonal_index]
+                    lag = lags_dict["lags_model"][seasonal_index]
 
                     # Read lag-1 free seasonal values from B and store them.
                     # The lag-th seasonal slot is determined by the constraint

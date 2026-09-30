@@ -1380,7 +1380,7 @@ class ADAM:
                 ar_orders = self._arima.get("ar_orders", [0]) or [0]
                 i_orders = self._arima.get("i_orders", [0]) or [0]
                 ma_orders = self._arima.get("ma_orders", [0]) or [0]
-                lags = self._lags_model.get("lags_original", [1]) or [1]
+                lags = self._lags_model.get("lags", [1]) or [1]
                 has_xreg_arima = (
                     self._explanatory.get("xreg_model", False) and not is_ets
                 )
@@ -5220,7 +5220,7 @@ class ADAM:
 
         if arima_model and bounds_type != "none":
             ar_bounds = arima_parameter_bounds(
-                names, params, self._arima, self._lags_model["lags_original"]
+                names, params, self._arima, self._lags_model["lags"]
             )
             for name, (lower, upper) in ar_bounds.items():
                 k = idx[name]
@@ -5608,7 +5608,7 @@ class ADAM:
         if arima_model and bounds_mode != "none":
             from smooth.adam_general.core.utils.bounds import arima_parameter_bounds
 
-            lags = self._lags_model["lags_original"]
+            lags = self._lags_model["lags"]
             ar_bounds = arima_parameter_bounds(
                 self.coef_names, self.coef, self._arima, lags
             )
@@ -5710,14 +5710,7 @@ class ADAM:
             ar_orders_padded = list(self._arima["ar_orders"])
             i_orders_padded = list(self._arima["i_orders"])
             ma_orders_padded = list(self._arima["ma_orders"])
-            # Mirror filler.py's lookup: ``lags_original`` is the truth for
-            # the polynomialise call; ``lags`` in ``_lags_model`` may be
-            # the empty / expanded form depending on model layout.
-            lags_arima = list(
-                self._lags_model.get("lags_original")
-                or self._lags_model.get("lags")
-                or [1]
-            )
+            lags_arima = list(self._lags_model.get("lags") or [1])
             arma_params_arr = np.asarray(
                 self._arima.get("arma_parameters") or [], dtype=float
             ).ravel()

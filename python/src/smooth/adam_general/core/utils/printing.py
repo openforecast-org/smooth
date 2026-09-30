@@ -283,14 +283,10 @@ def _format_arma_parameters(model: Any, digits: int = 4) -> str:
     ar_orders = arima.get("ar_orders") or []
     ma_orders = arima.get("ma_orders") or []
 
-    # Get lags from lags_original (the input lags, aligned with ar/ma orders)
+    # The input lags, aligned with the ar / ma orders
     lags: List[Any] = []
     if hasattr(model, "_lags_model") and model._lags_model:
-        lags = (
-            model._lags_model.get("lags_original")
-            or model._lags_model.get("lags")
-            or []
-        )
+        lags = model._lags_model.get("lags") or []
     if not lags and hasattr(model, "_config"):
         lags = model._config.get("lags") or [1]
 

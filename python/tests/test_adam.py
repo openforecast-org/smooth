@@ -397,6 +397,42 @@ class TestADAMARIMAOrders:
         assert arima["ma_orders"] == [0, 1]
 
 
+class TestADAMLags:
+    """``_lags_model["lags"]`` stays the user's lags, as R's ``lags``."""
+
+    @pytest.fixture
+    def log_air(self):
+        """The log of AirPassengers."""
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return np.log(pd.read_csv(path)["y"].values.astype(float))
+
+    def test_lags_of_pure_arima(self, log_air):
+        """A pure SARIMA has no ETS component lags, but its lags are still [1, 12]."""
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12]).fit(log_air)
+        assert model.lags_used == [1, 12]
+
+    @pytest.mark.r_parity
+    def test_lasso_arima_matches_r(self, log_air):
+        """The LASSO penalty trims the ARMA parameters by their lags, as in R."""
+        from ._r_bridge import r_array
+
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(
+            model="NNN", orders=orders, lags=[1, 12], loss="LASSO", lambda_param=0.1
+        ).fit(log_air)
+        expected = r_array(
+            "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12), loss='LASSO',"
+            " lambda=0.1, orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1))); unname(coef(m))}",
+            R_data={"y": log_air},
+        )
+        np.testing.assert_allclose(model.coef, expected, rtol=1e-6)
+
+
 class TestADAMArmaFixed:
     """Tests for fixed ARMA parameters via the arma argument."""
 

@@ -657,7 +657,7 @@ def initialiser(
             ma_orders_arr = np.array(arima_checked["ma_orders"])
             ar_orders_arr = np.array(arima_checked["ar_orders"])
             i_orders_arr = np.array(arima_checked["i_orders"])
-            lags_arr = np.array(lags_dict.get("lags_original", lags_dict["lags"]))
+            lags_arr = np.array(lags_dict["lags"])
 
             arma_values = _arima_initialiser(
                 observations_dict["y_in_sample"],
@@ -688,7 +688,7 @@ def initialiser(
                 else None,
             )
 
-            for i, lag in enumerate(lags_dict.get("lags_original", lags_dict["lags"])):
+            for i, lag in enumerate(lags_dict["lags"]):
                 for part, prefix, required, estimate in (
                     ("ar_orders", "phi", "ar_required", "ar_estimate"),
                     ("ma_orders", "theta", "ma_required", "ma_estimate"),
@@ -715,7 +715,7 @@ def initialiser(
             arima_checked["ar_estimate"],
             arima_checked["ma_estimate"],
             arima_checked["arma_parameters"] or [],
-            lags_dict.get("lags_original", lags_dict["lags"]),
+            lags_dict["lags"],
         )
 
     #  NOTE: Removed backcasting from initialiser - CF already handles backcasting for
@@ -759,7 +759,7 @@ def initialiser(
                             - components_dict["components_number_ets_seasonal"]
                             + k
                         )
-                        lag = lags_dict["lags"][seasonal_index]
+                        lag = lags_dict["lags_model"][seasonal_index]
 
                         # Get the values from mat_vt (make sure dimensions match)
                         seasonal_values = adam_created["mat_vt"][

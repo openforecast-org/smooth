@@ -38,6 +38,17 @@ py::array_t<double> arima_hr_wrapper(const arma::vec& y, const arma::uvec& ar_or
     return arr;
 }
 
+py::array_t<double> arima_parameter_bounds_wrapper(const arma::vec& values, arma::uword j,
+                                                   double sign) {
+    arma::vec b = arimaParameterBounds(values, j, sign);
+    py::array_t<double> arr({static_cast<py::ssize_t>(b.n_elem)});
+    auto buf = arr.mutable_unchecked<1>();
+    for(size_t i = 0; i < b.n_elem; i++) {
+        buf(i) = b(i);
+    }
+    return arr;
+}
+
 PYBIND11_MODULE(_ols, m) {
     m.doc() = "Shared C++ OLS solver (pivoted QR with rank cutoff)";
     m.def(
@@ -61,5 +72,13 @@ PYBIND11_MODULE(_ols, m) {
         py::arg("arma_parameters"),
         py::arg("use_level"),
         py::arg("bounded")
+    );
+    m.def(
+        "arima_parameter_bounds",
+        &arima_parameter_bounds_wrapper,
+        "Bounds of one AR / MA parameter within its factor (see arimaBounds.h).",
+        py::arg("values"),
+        py::arg("j"),
+        py::arg("sign")
     );
 }

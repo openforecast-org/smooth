@@ -5,44 +5,6 @@ from smooth.adam_general.core.utils.cost_functions import CF, log_Lik_ADAM
 # Note: adam_cpp instance is passed to functions that need C++ integration
 
 
-def _setup_arima_polynomials(model_type_dict, arima_dict, lags_dict):
-    """
-    Set up companion matrices for ARIMA polynomials.
-
-    Parameters
-    ----------
-    model_type_dict : dict
-        Model type specification
-    arima_dict : dict
-        ARIMA components specification
-    lags_dict : dict
-        Lags information
-
-    Returns
-    -------
-    tuple
-        AR and MA polynomial matrices
-    """
-    if model_type_dict["arima_model"]:
-        # R uses original user-provided lags (not lagsModel) for companion matrices
-        lags = lags_dict.get("lags_original", lags_dict["lags"])
-        # AR polynomials - use dot product (R's %*%) since lags is an array
-        ar_dim = int(np.dot(arima_dict["ar_orders"], lags))
-        ar_polynomial_matrix = np.zeros((ar_dim, ar_dim))
-        if ar_polynomial_matrix.shape[0] > 1:
-            ar_polynomial_matrix[:-1, 1:] = np.eye(ar_polynomial_matrix.shape[0] - 1)
-
-        # MA polynomials - use dot product (R's %*%) since lags is an array
-        ma_dim = int(np.dot(arima_dict["ma_orders"], lags))
-        ma_polynomial_matrix = np.zeros((ma_dim, ma_dim))
-        if ma_polynomial_matrix.shape[0] > 1:
-            ma_polynomial_matrix[:-1, 1:] = np.eye(ma_polynomial_matrix.shape[0] - 1)
-
-        return ar_polynomial_matrix, ma_polynomial_matrix
-    else:
-        return None, None
-
-
 def _set_distribution(general_dict, model_type_dict):
     """
     Set distribution based on error term and loss function.
@@ -251,8 +213,6 @@ def _create_objective_function(
     general_dict,
     adam_cpp,
     print_level,
-    ar_polynomial_matrix=None,
-    ma_polynomial_matrix=None,
     other=None,
     other_parameter_estimate=False,
 ):
@@ -321,8 +281,6 @@ def _create_objective_function(
                 bounds=general_dict["bounds"],
                 other=other,
                 otherParameterEstimate=other_parameter_estimate,
-                arPolynomialMatrix=ar_polynomial_matrix,
-                maPolynomialMatrix=ma_polynomial_matrix,
             )
         except Exception:
             cf_value = 1e100

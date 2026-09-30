@@ -4871,9 +4871,6 @@ class ADAM:
         vcov falls back to the Hessian) for non-likelihood losses or occurrence
         (intermittent) models, which R also routes to the Hessian.
         """
-        from smooth.adam_general.core.estimator.optimization import (
-            _setup_arima_polynomials,
-        )
         from smooth.adam_general.core.utils.cost_functions import CF
         from smooth.adam_general.core.utils.utils import calculate_likelihood, scaler
         from smooth.adam_general.core.utils.var_covar import covar_opg
@@ -4883,9 +4880,6 @@ class ADAM:
         if self._occurrence.get("occurrence_model", False):
             return None
 
-        ar_poly, ma_poly = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         obs_dict = self._observations
         ot_logical = np.asarray(obs_dict["ot_logical"]).ravel()
         obs = int(obs_dict["obs_in_sample"])
@@ -4922,8 +4916,6 @@ class ADAM:
                 bounds="none",
                 other=other,
                 otherParameterEstimate=other_est,
-                arPolynomialMatrix=ar_poly,
-                maPolynomialMatrix=ma_poly,
                 regressors=self._explanatory.get("regressors"),
                 return_fitted=True,
             )
@@ -5167,7 +5159,7 @@ class ADAM:
         the same per-sub-model clamping to slices of a joint CI half-width.
         """
         from smooth.adam_general.core.utils.bounds import (
-            ar_polynomial_bounds,
+            arima_parameter_bounds,
             eigen_bounds,
         )
 
@@ -5232,49 +5224,14 @@ class ADAM:
                     lo[s] = max(-params[s], lo[s])
                     hi[s] = max(-params[s], hi[s])
 
-        if arima_model:
-            self._clamp_arima_bounds(
-                names, params, lo, hi, idx, eigen_bounds, ar_polynomial_bounds
+        if arima_model and bounds_type != "none":
+            ar_bounds = arima_parameter_bounds(
+                names, params, self._arima, self._lags_model["lags_original"]
             )
-
-    def _clamp_arima_bounds(
-        self, names, params, lo, hi, idx, eigen_bounds, ar_polynomial_bounds
-    ):
-        """Clamp ARIMA AR (phi*) and MA (theta*) CIs (R confint.adam:4544-4590)."""
-        other = self._prepared.get("other", {})
-        poly = other.get("polynomial", {})
-        ari_polynomial = np.asarray(poly.get("ariPolynomial", []), dtype=float).ravel()
-        ar_polynomial = np.asarray(poly.get("arPolynomial", []), dtype=float).ravel()
-        non_zero_ari = np.atleast_2d(np.asarray(self._arima.get("non_zero_ari", [])))
-        non_zero_ma = np.atleast_2d(np.asarray(self._arima.get("non_zero_ma", [])))
-        ar_poly_matrix = other.get("ar_polynomial_matrix")
-        n_ets = self._components["components_number_ets"]
-
-        vec_g = np.asarray(self._adam_created["vec_g"], dtype=float).ravel()
-        static_args = self._eigen_static_args()
-
-        thetas = [nm for nm in names if nm.startswith("theta")]
-        for i, nm in enumerate(thetas):
-            k = idx[nm]
-            psi_row = n_ets + int(non_zero_ma[i, 1])
-            b1, b2 = eigen_bounds(vec_g, psi_row, **static_args)
-            adj = 0.0
-            if non_zero_ari.size and np.any(non_zero_ari[:, 1] == i):
-                ari_index = np.where(non_zero_ari[:, 1] == i)[0][0]
-                adj = ari_polynomial[int(non_zero_ari[ari_index, 0])]
-            lo[k] = max(b1 - params[k] + adj, lo[k])
-            hi[k] = min(b2 - params[k] + adj, hi[k])
-
-        if ar_poly_matrix is not None and len(ar_polynomial) > 0:
-            ar_mat = np.asarray(ar_poly_matrix, dtype=float)
-            nonzero_pos = [j for j in range(len(ar_polynomial)) if ar_polynomial[j]]
-            ar_positions = nonzero_pos[1:]  # drop the leading 1
-            phis = [nm for nm in names if nm.startswith("phi") and len(nm) > 3]
-            for i, nm in enumerate(phis):
-                k = idx[nm]
-                b1, b2 = ar_polynomial_bounds(ar_mat, ar_polynomial, ar_positions[i])
-                lo[k] = max(b1 - params[k], lo[k])
-                hi[k] = min(b2 - params[k], hi[k])
+            for name, (lower, upper) in ar_bounds.items():
+                k = idx[name]
+                lo[k] = max(lower - params[k], lo[k])
+                hi[k] = min(upper - params[k], hi[k])
 
     def summary(self, level: float = 0.95, digits: int = 4, type=None):  # noqa: A002
         """
@@ -5650,74 +5607,25 @@ class ADAM:
             _clip_ets_multiplicative_states(random_parameters, idx, self._model_type)
         _clip_deltas(random_parameters, idx)
 
-        # 3b. ARIMA parameter clipping (R/reapply.R:391-436).
-        # ``theta`` (MA) bounds come from ``eigen_bounds`` on the psi row;
-        # ``phi`` (AR) bounds come from ``ar_polynomial_bounds`` on the
-        # companion matrix. When an ARI element is present for a given
-        # theta, the bounds shift by ``ariPolynomial[nonZeroARI]`` so the
-        # net ``theta - ariPolynomial`` lies inside the psi region.
+        # 3b. Stationarity and invertibility of the ARMA factors (R/reapply.R)
         arima_model = self._model_type.get("arima_model", False)
-        other_dict = (self._prepared or {}).get("other") or {}
-        if arima_model:
-            from smooth.adam_general.core.utils.bounds import (
-                ar_polynomial_bounds,
-                eigen_bounds,
-            )
+        non_zero_ari = np.atleast_2d(np.asarray(self._arima.get("non_zero_ari", [])))
+        non_zero_ma = np.atleast_2d(np.asarray(self._arima.get("non_zero_ma", [])))
+        if arima_model and bounds_mode != "none":
+            from smooth.adam_general.core.utils.bounds import arima_parameter_bounds
 
-            poly = other_dict.get("polynomial", {}) or {}
-            ari_polynomial = np.asarray(
-                poly.get("ariPolynomial", poly.get("ari_polynomial", [])),
-                dtype=float,
-            ).ravel()
-            ar_polynomial = np.asarray(
-                poly.get("arPolynomial", poly.get("ar_polynomial", [])),
-                dtype=float,
-            ).ravel()
-            non_zero_ari = np.atleast_2d(
-                np.asarray(self._arima.get("non_zero_ari", []))
+            lags = self._lags_model["lags_original"]
+            ar_bounds = arima_parameter_bounds(
+                self.coef_names, self.coef, self._arima, lags
             )
-            non_zero_ma = np.atleast_2d(np.asarray(self._arima.get("non_zero_ma", [])))
-            ar_poly_matrix = other_dict.get("ar_polynomial_matrix")
-            n_ets_arima_clip = self._components["components_number_ets"]
-            vec_g_eig = np.asarray(self._adam_created["vec_g"], dtype=float).ravel()
-            static_args = self._eigen_static_args()
-
-            thetas = [nm for nm in coef_names if nm.startswith("theta")]
-            for i, nm in enumerate(thetas):
-                col = idx[nm]
-                psi_row = n_ets_arima_clip + int(non_zero_ma[i, 1])
-                lo, hi = eigen_bounds(vec_g_eig, psi_row, **static_args)
-                adj = 0.0
-                if non_zero_ari.size and np.any(non_zero_ari[:, 1] == i):
-                    ari_index = np.where(non_zero_ari[:, 1] == i)[0][0]
-                    adj = ari_polynomial[int(non_zero_ari[ari_index, 0])]
+            for name, (lower, upper) in ar_bounds.items():
+                col = idx[name]
                 np.clip(
                     random_parameters[:, col],
-                    lo + adj,
-                    hi + adj,
+                    lower,
+                    upper,
                     out=random_parameters[:, col],
                 )
-
-            if ar_poly_matrix is not None and len(ar_polynomial) > 0:
-                ar_mat = np.asarray(ar_poly_matrix, dtype=float)
-                nonzero_pos = [
-                    pos for pos in range(len(ar_polynomial)) if ar_polynomial[pos]
-                ]
-                ar_positions = nonzero_pos[1:]  # drop the leading 1
-                phis = [nm for nm in coef_names if nm.startswith("phi") and len(nm) > 3]
-                for i, nm in enumerate(phis):
-                    if i >= len(ar_positions):
-                        break
-                    col = idx[nm]
-                    lo, hi = ar_polynomial_bounds(
-                        ar_mat, ar_polynomial, ar_positions[i]
-                    )
-                    np.clip(
-                        random_parameters[:, col],
-                        lo,
-                        hi,
-                        out=random_parameters[:, col],
-                    )
 
         # 4. Build the per-draw cubes (R/reapply.R:447-469)
         n = int(self.nobs)

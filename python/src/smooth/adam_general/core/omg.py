@@ -22,7 +22,6 @@ from numpy.typing import NDArray
 from smooth.adam_general.core.creator import initialiser
 from smooth.adam_general.core.estimator.optimization import (
     _configure_optimizer,
-    _setup_arima_polynomials,
 )
 from smooth.adam_general.core.om import (
     OM,
@@ -1014,9 +1013,6 @@ class OMG:
         )
 
         adam_cpp, adam_created, profile_dict = scaffold._build_om_artifacts()
-        ar_pm, ma_pm = _setup_arima_polynomials(
-            scaffold._model_type, scaffold._arima, scaffold._lags_model
-        )
 
         return {
             "scaffold": scaffold,
@@ -1033,8 +1029,6 @@ class OMG:
             "observations_dict": scaffold._observations,
             "profile": profile_dict,
             "adam_cpp": adam_cpp,
-            "ar_polynomial_matrix": ar_pm,
-            "ma_polynomial_matrix": ma_pm,
             "occurrence_str": occurrence,
             "occurrence_char": scaffold._occurrence_char,
         }

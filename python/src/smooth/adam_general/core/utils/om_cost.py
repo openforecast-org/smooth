@@ -57,8 +57,6 @@ def om_cf(  # noqa: N802
     occurrence,
     occurrence_char,
     bounds="usual",
-    arPolynomialMatrix=None,  # noqa: N803
-    maPolynomialMatrix=None,  # noqa: N803
     regressors=None,
     return_fitted=False,
 ):

@@ -40,7 +40,6 @@ from smooth.adam_general.core.creator import (
 )
 from smooth.adam_general.core.estimator.optimization import (
     _configure_optimizer,
-    _setup_arima_polynomials,
 )
 from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
@@ -1102,9 +1101,6 @@ class OM(ADAM):
             else np.asarray(b_values["Bu"], dtype=float)
         )
 
-        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         algorithm = kwargs.get("algorithm", "NLOPT_LN_NELDERMEAD")
         xtol_rel = kwargs.get("xtol_rel", 1e-6)
         xtol_abs = kwargs.get("xtol_abs", 1e-8)
@@ -1161,8 +1157,6 @@ class OM(ADAM):
                     occurrence=self._om_occurrence,
                     occurrence_char=self._occurrence_char,
                     bounds=self._general["bounds"],
-                    arPolynomialMatrix=ar_polynomial_matrix,
-                    maPolynomialMatrix=ma_polynomial_matrix,
                     regressors=regressors,
                 )
             except Exception:
@@ -1667,9 +1661,6 @@ class OM(ADAM):
 
         self._check_is_fitted()
 
-        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         general_for_cf = dict(self._general)
         general_for_cf["loss"] = self._general.get("loss", "likelihood")
 
@@ -1707,8 +1698,6 @@ class OM(ADAM):
                 occurrence=self._om_occurrence,
                 occurrence_char=self._occurrence_char,
                 bounds="none",
-                arPolynomialMatrix=ar_polynomial_matrix,
-                maPolynomialMatrix=ma_polynomial_matrix,
                 regressors=self._explanatory.get("regressors"),
             )
 
@@ -1729,9 +1718,6 @@ class OM(ADAM):
         if self._general.get("loss", "likelihood") != "likelihood":
             return None
 
-        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         general_for_cf = dict(self._general)
         general_for_cf["loss"] = self._general.get("loss", "likelihood")
         pristine = getattr(self, "_fi_pristine", None)
@@ -1762,8 +1748,6 @@ class OM(ADAM):
                 occurrence=self._om_occurrence,
                 occurrence_char=self._occurrence_char,
                 bounds="none",
-                arPolynomialMatrix=ar_polynomial_matrix,
-                maPolynomialMatrix=ma_polynomial_matrix,
                 regressors=self._explanatory.get("regressors"),
                 return_fitted=True,
             )

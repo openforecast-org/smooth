@@ -935,6 +935,42 @@ class TestARIMABounds:
             )
 
 
+    def test_parameter_bounds_match_the_roots(self):
+        """The bounds of a parameter within its factor are those of the roots."""
+        from smooth.adam_general import _ols
+
+        values = np.array([0.1, 0.2, 0.3])
+        grid = np.arange(-3, 3, 0.001)
+        stable = [
+            np.all(np.abs(np.roots([-0.3, -v, -0.1, 1])) > 1) for v in grid
+        ]
+        np.testing.assert_allclose(
+            _ols.arima_parameter_bounds(values, 1, -1.0),
+            [grid[stable].min(), grid[stable].max()],
+            atol=2e-3,
+        )
+        assert np.all(np.isnan(_ols.arima_parameter_bounds(np.array([1.2]), 0, 1.0)))
+
+    @pytest.mark.r_parity
+    def test_confint_matches_r(self):
+        """The ARMA confidence intervals are clamped to the same region as in R."""
+        import pathlib
+
+        import pandas as pd
+
+        from ._r_bridge import r_array
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        orders = {"ar": [2, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12]).fit(y)
+        expected = r_array(
+            "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12),"
+            " orders=list(ar=c(2,1), i=c(1,1), ma=c(1,1))); unname(confint(m))}",
+            R_data={"y": y},
+        )
+        np.testing.assert_allclose(model.confint().values, expected, rtol=1e-6)
+
 class TestADAMARIMAStates:
     """ARIMA initials: the initial state of the companion form, as in ssarima."""
 

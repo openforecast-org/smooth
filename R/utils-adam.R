@@ -1558,7 +1558,6 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
                                 arimaModel, arEstimate, maEstimate,
                                 xregModel, regressors, xregNumber, componentsNumberARIMA,
                                 lagsModelAll, obsInSample,
-                                arPolynomialMatrix, maPolynomialMatrix,
                                 phiEstimate){
     # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)
     if(bounds!="none" && arimaModel){

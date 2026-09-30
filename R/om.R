@@ -624,22 +624,6 @@ om <- function(data,
             B_used[1] <- 0.1;
         }
 
-        # ARIMA companion matrices for bounds checking
-        if(arimaModel){
-            arPolynomialMatrix <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(arPolynomialMatrix) > 1){
-                arPolynomialMatrix[2:nrow(arPolynomialMatrix)-1, 2:nrow(arPolynomialMatrix)] <-
-                    diag(nrow(arPolynomialMatrix) - 1);
-            }
-            maPolynomialMatrix <- matrix(0, maOrders %*% lags, maOrders %*% lags);
-            if(nrow(maPolynomialMatrix) > 1){
-                maPolynomialMatrix[2:nrow(maPolynomialMatrix)-1, 2:nrow(maPolynomialMatrix)] <-
-                    diag(nrow(maPolynomialMatrix) - 1);
-            }
-        } else {
-            arPolynomialMatrix <- maPolynomialMatrix <- NULL;
-        }
-
         # All arguments needed by omCF_local are passed explicitly to nloptr
         # below, so the cost function never reads them from the surrounding
         # closure (which is shared across the model-pool loop and could leak
@@ -676,8 +660,6 @@ om <- function(data,
             armaParameters=armaParameters,
             nonZeroARI=nonZeroARI, nonZeroMA=nonZeroMA,
             arimaPolynomials=adamCreated$arimaPolynomials,
-            arPolynomialMatrix=arPolynomialMatrix,
-            maPolynomialMatrix=maPolynomialMatrix,
             xregModel=xregModel, xregNumber=xregNumber,
             xregParametersMissing=xregParametersMissing,
             xregParametersIncluded=xregParametersIncluded,
@@ -1373,25 +1355,6 @@ om <- function(data,
             xregModel, xregNumber, initialXregEstimate,
             constantRequired, constantEstimate);
 
-        # ARIMA companion matrices (parallel to omEstimator lines 578-590).
-        if(arimaModel){
-            arPolynomialMatrixUse <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(arPolynomialMatrixUse) > 1){
-                arPolynomialMatrixUse[2:nrow(arPolynomialMatrixUse)-1,
-                                      2:nrow(arPolynomialMatrixUse)] <-
-                    diag(nrow(arPolynomialMatrixUse) - 1);
-            }
-            maPolynomialMatrixUse <- matrix(0, maOrders %*% lags, maOrders %*% lags);
-            if(nrow(maPolynomialMatrixUse) > 1){
-                maPolynomialMatrixUse[2:nrow(maPolynomialMatrixUse)-1,
-                                      2:nrow(maPolynomialMatrixUse)] <-
-                    diag(nrow(maPolynomialMatrixUse) - 1);
-            }
-        } else {
-            arPolynomialMatrixUse <- NULL;
-            maPolynomialMatrixUse <- NULL;
-        }
-
         # Full nloptrArgs, identical shape to omEstimator's (line 597-642).
         nloptrArgsUse <- list(
             etsModel=etsModel, Etype=Etype, Ttype=Ttype, Stype=Stype,
@@ -1427,8 +1390,6 @@ om <- function(data,
             armaParameters=armaParameters,
             nonZeroARI=nonZeroARI, nonZeroMA=nonZeroMA,
             arimaPolynomials=adamCreatedUse$arimaPolynomials,
-            arPolynomialMatrix=arPolynomialMatrixUse,
-            maPolynomialMatrix=maPolynomialMatrixUse,
             xregModel=xregModel, xregNumber=xregNumber,
             xregParametersMissing=xregParametersMissing,
             xregParametersIncluded=xregParametersIncluded,
@@ -1518,10 +1479,6 @@ om <- function(data,
                 nlaFI$initialArimaEstimate       <- iAriFI;
                 nlaFI$initialXregEstimate        <- iXrgFI;
                 nlaFI$bounds                     <- "none";
-                if(arimaModel){
-                    nlaFI$arPolynomialMatrix <- NULL;
-                    nlaFI$maPolynomialMatrix <- NULL;
-                }
 
                 CFAtOptimum <- do.call(omCF_local,
                                        c(list(B=B_for_FI), nlaFI));
@@ -1810,7 +1767,6 @@ omCF_local <- function(B,
                        arOrders, iOrders, maOrders,
                        arRequired, maRequired, armaParameters,
                        nonZeroARI, nonZeroMA, arimaPolynomials,
-                       arPolynomialMatrix, maPolynomialMatrix,
                        xregModel, xregNumber,
                        xregParametersMissing, xregParametersIncluded,
                        xregParametersEstimated, xregParametersPersistence,
@@ -1853,7 +1809,6 @@ omCF_local <- function(B,
                                    xregModel, regressors, xregNumber,
                                    componentsNumberARIMA,
                                    lagsModelAll, obsInSample,
-                                   arPolynomialMatrix, maPolynomialMatrix,
                                    phiEstimate);
     if(penalty != 0){
         return(penalty);

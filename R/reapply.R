@@ -428,47 +428,14 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
 
     # Correct the bounds for the ARIMA model
     if(arimaModel){
-        #### Deal with ARIMA parameters ####
-        ariPolynomial <- object$other$polynomial$ariPolynomial;
-        arPolynomial <- object$other$polynomial$arPolynomial;
-        maPolynomial <- object$other$polynomial$maPolynomial;
         nonZeroARI <- object$other$ARIMAIndices$nonZeroARI;
         nonZeroMA <- object$other$ARIMAIndices$nonZeroMA;
-        arPolynomialMatrix <- object$other$arPolynomialMatrix;
-        # Locate all thetas for ARIMA
-        thetas <- which(substr(parametersNames,1,5)=="theta");
-        # Locate phi for ARIMA (they are always phi1, phi2 etc)
-        phis <- which((substr(parametersNames,1,3)=="phi") & (nchar(parametersNames)>3));
-        # Do loop for thetas
-        if(length(thetas)>0){
-            # MA parameters
-            for(i in 1:length(thetas)){
-                psiBounds <- eigenBounds(object, persistence,
-                                         variableNumber=which(substr(names(object$persistence),1,3)=="psi")[nonZeroMA[i,2]]);
-                # If there are ARI elements in persistence, subtract (-(-x)) them to get proper bounds
-                if(any(nonZeroARI[,2]==i)){
-                    ariIndex <- which(nonZeroARI[,2]==i);
-                    randomParameters[randomParameters[,thetas[i]]-ariPolynomial[nonZeroARI[ariIndex,1]]<psiBounds[1],thetas[i]] <-
-                        psiBounds[1]+ariPolynomial[nonZeroARI[ariIndex,1]];
-                    randomParameters[randomParameters[,thetas[i]]-ariPolynomial[nonZeroARI[ariIndex,1]]>psiBounds[2],thetas[i]] <-
-                        psiBounds[2]+ariPolynomial[nonZeroARI[ariIndex,1]];
-                }
-                else{
-                    randomParameters[randomParameters[,thetas[i]]<psiBounds[1],thetas[i]] <- psiBounds[1];
-                    randomParameters[randomParameters[,thetas[i]]>psiBounds[2],thetas[i]] <- psiBounds[2];
-                }
-            }
-        }
-        # Locate phi for ARIMA (they are always phi1, phi2 etc)
-        if(length(phis)>0){
-            # AR parameters
-            for(i in 1:length(phis)){
-                # Get bounds for AR based on stationarity condition
-                phiBounds <- arPolinomialsBounds(arPolynomialMatrix, arPolynomial,
-                                                 which(arPolynomial==arPolynomial[arPolynomial!=0][-1][i]));
-
-                randomParameters[randomParameters[,phis[i]]<phiBounds[1],phis[i]] <- phiBounds[1];
-                randomParameters[randomParameters[,phis[i]]>phiBounds[2],phis[i]] <- phiBounds[2];
+        # Stationarity and invertibility of the ARMA factors
+        if(object$bounds!="none"){
+            armaBounds <- arimaParameterBounds(object$arma, colnames(randomParameters));
+            for(parameter in rownames(armaBounds)){
+                randomParameters[,parameter] <- pmin(pmax(randomParameters[,parameter], armaBounds[parameter,1]),
+                                                     armaBounds[parameter,2]);
             }
         }
     }

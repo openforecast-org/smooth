@@ -21,6 +21,10 @@ arimaHRCpp <- function(y, arOrders, maOrders, lags, arEstimate, maEstimate, arma
     .Call('_smooth_arimaHRCpp', PACKAGE = 'smooth', y, arOrders, maOrders, lags, arEstimate, maEstimate, armaParameters, useLevel, bounded)
 }
 
+arimaParameterBoundsCpp <- function(values, j, sign) {
+    .Call('_smooth_arimaParameterBoundsCpp', PACKAGE = 'smooth', values, j, sign)
+}
+
 forecasterwrap <- function(matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX) {
     .Call('_smooth_forecasterwrap', PACKAGE = 'smooth', matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX)
 }

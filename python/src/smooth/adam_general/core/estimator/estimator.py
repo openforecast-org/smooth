@@ -13,7 +13,6 @@ from .optimization import (
     _create_objective_function,
     _run_optimization,
     _set_distribution,
-    _setup_arima_polynomials,
     _setup_optimization_parameters,
 )
 from .two_stage import _run_two_stage_estimator
@@ -508,11 +507,6 @@ def estimator(
     lb = np.asarray(lb, dtype=float) if lb is not None else b_values["Bl"]
     ub = np.asarray(ub, dtype=float) if ub is not None else b_values["Bu"]
 
-    # Step 4: Set up ARIMA polynomials if needed
-    ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-        model_type_dict, arima_dict, lags_dict
-    )
-
     # Step 5: Set appropriate distribution
     general_dict = _set_distribution(general_dict, model_type_dict)
 
@@ -563,8 +557,6 @@ def estimator(
         general_dict,
         adam_cpp,
         print_level,
-        ar_polynomial_matrix=ar_polynomial_matrix,
-        ma_polynomial_matrix=ma_polynomial_matrix,
         other=other,
         other_parameter_estimate=other_parameter_estimate,
     )

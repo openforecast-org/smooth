@@ -87,6 +87,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// arimaParameterBoundsCpp
+arma::vec arimaParameterBoundsCpp(const arma::vec& values, int j, double sign);
+RcppExport SEXP _smooth_arimaParameterBoundsCpp(SEXP valuesSEXP, SEXP jSEXP, SEXP signSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< int >::type j(jSEXP);
+    Rcpp::traits::input_parameter< double >::type sign(signSEXP);
+    rcpp_result_gen = Rcpp::wrap(arimaParameterBoundsCpp(values, j, sign));
+    return rcpp_result_gen;
+END_RCPP
+}
 // forecasterwrap
 RcppExport SEXP forecasterwrap(SEXP matvt, SEXP matF, SEXP matw, SEXP h, SEXP Etype, SEXP Ttype, SEXP Stype, SEXP lagsModel, SEXP matxt, SEXP matat, SEXP matFX);
 RcppExport SEXP _smooth_forecasterwrap(SEXP matvtSEXP, SEXP matFSEXP, SEXP matwSEXP, SEXP hSEXP, SEXP EtypeSEXP, SEXP TtypeSEXP, SEXP StypeSEXP, SEXP lagsModelSEXP, SEXP matxtSEXP, SEXP matatSEXP, SEXP matFXSEXP) {

@@ -516,46 +516,6 @@ omg <- function(data,
             B_used[seq_len(length(B_B)) + nParamsA] <- 0
         }
 
-        # ARIMA companion matrices for A
-        if(checkerA$arimaModel) {
-            arPolynomialMatrixA <- matrix(0, checkerA$arOrders %*% lags,
-                                          checkerA$arOrders %*% lags)
-            if(nrow(arPolynomialMatrixA) > 1) {
-                arPolynomialMatrixA[2:nrow(arPolynomialMatrixA)-1,
-                                    2:nrow(arPolynomialMatrixA)] <-
-                    diag(nrow(arPolynomialMatrixA) - 1)
-            }
-            maPolynomialMatrixA <- matrix(0, checkerA$maOrders %*% lags,
-                                          checkerA$maOrders %*% lags)
-            if(nrow(maPolynomialMatrixA) > 1) {
-                maPolynomialMatrixA[2:nrow(maPolynomialMatrixA)-1,
-                                    2:nrow(maPolynomialMatrixA)] <-
-                    diag(nrow(maPolynomialMatrixA) - 1)
-            }
-        } else {
-            arPolynomialMatrixA <- maPolynomialMatrixA <- NULL
-        }
-
-        # ARIMA companion matrices for B
-        if(checkerB$arimaModel) {
-            arPolynomialMatrixB <- matrix(0, checkerB$arOrders %*% lags,
-                                          checkerB$arOrders %*% lags)
-            if(nrow(arPolynomialMatrixB) > 1) {
-                arPolynomialMatrixB[2:nrow(arPolynomialMatrixB)-1,
-                                    2:nrow(arPolynomialMatrixB)] <-
-                    diag(nrow(arPolynomialMatrixB) - 1)
-            }
-            maPolynomialMatrixB <- matrix(0, checkerB$maOrders %*% lags,
-                                          checkerB$maOrders %*% lags)
-            if(nrow(maPolynomialMatrixB) > 1) {
-                maPolynomialMatrixB[2:nrow(maPolynomialMatrixB)-1,
-                                    2:nrow(maPolynomialMatrixB)] <-
-                    diag(nrow(maPolynomialMatrixB) - 1)
-            }
-        } else {
-            arPolynomialMatrixB <- maPolynomialMatrixB <- NULL
-        }
-
         # B-side scalars for omfitGeneral
         nNonSeasonalB <- adamArchitectB$componentsNumberETSNonSeasonal
         nSeasonalB    <- adamArchitectB$componentsNumberETSSeasonal
@@ -603,8 +563,6 @@ omg <- function(data,
             armaParametersA=checkerA$armaParameters,
             nonZeroARIA=checkerA$nonZeroARI, nonZeroMAA=checkerA$nonZeroMA,
             arimaPolynomialsA=adamCreatedA$arimaPolynomials,
-            arPolynomialMatrixA=arPolynomialMatrixA,
-            maPolynomialMatrixA=maPolynomialMatrixA,
             xregModelA=checkerA$xregModel, xregNumberA=checkerA$xregNumber,
             xregParametersMissingA=checkerA$xregParametersMissing,
             xregParametersIncludedA=checkerA$xregParametersIncluded,
@@ -649,8 +607,6 @@ omg <- function(data,
             armaParametersB=checkerB$armaParameters,
             nonZeroARIB=checkerB$nonZeroARI, nonZeroMAB=checkerB$nonZeroMA,
             arimaPolynomialsB=adamCreatedB$arimaPolynomials,
-            arPolynomialMatrixB=arPolynomialMatrixB,
-            maPolynomialMatrixB=maPolynomialMatrixB,
             xregModelB=checkerB$xregModel, xregNumberB=checkerB$xregNumber,
             xregParametersMissingB=checkerB$xregParametersMissing,
             xregParametersIncludedB=checkerB$xregParametersIncluded,
@@ -796,14 +752,6 @@ omg <- function(data,
                 # Disable bounds so omgCF_local never short-circuits with
                 # 1e+300 during the hessian probes.
                 nlaFI$bounds <- "none"
-                if(checkerA$arimaModel) {
-                    nlaFI$arPolynomialMatrixA <- NULL
-                    nlaFI$maPolynomialMatrixA <- NULL
-                }
-                if(checkerB$arimaModel) {
-                    nlaFI$arPolynomialMatrixB <- NULL
-                    nlaFI$maPolynomialMatrixB <- NULL
-                }
 
                 CFAtOptimum <- do.call(omgCF_local, c(list(B=B_use), nlaFI))
                 omgCF_for_FI <- function(B) {
@@ -1309,7 +1257,6 @@ omgCF_local <- function(B,
                         arOrdersA, iOrdersA, maOrdersA,
                         arRequiredA, maRequiredA, armaParametersA,
                         nonZeroARIA, nonZeroMAA, arimaPolynomialsA,
-                        arPolynomialMatrixA, maPolynomialMatrixA,
                         xregModelA, xregNumberA,
                         xregParametersMissingA, xregParametersIncludedA,
                         xregParametersEstimatedA, xregParametersPersistenceA,
@@ -1334,7 +1281,6 @@ omgCF_local <- function(B,
                         arOrdersB, iOrdersB, maOrdersB,
                         arRequiredB, maRequiredB, armaParametersB,
                         nonZeroARIB, nonZeroMAB, arimaPolynomialsB,
-                        arPolynomialMatrixB, maPolynomialMatrixB,
                         xregModelB, xregNumberB,
                         xregParametersMissingB, xregParametersIncludedB,
                         xregParametersEstimatedB, xregParametersPersistenceB,
@@ -1410,7 +1356,7 @@ omgCF_local <- function(B,
                                     arimaModelA, arEstimateA, maEstimateA,
                                     xregModelA, regressors, xregNumberA, componentsNumberARIMAA,
                                     lagsModelAllA, obsInSample,
-                                    arPolynomialMatrixA, maPolynomialMatrixA, phiEstimateA)
+                                    phiEstimateA)
 
     penaltyB <- adam_bounds_checker(elemB, elemB$arimaPolynomials, bounds,
                                     etsModelB, modelIsTrendyB, modelIsSeasonalB,
@@ -1419,7 +1365,7 @@ omgCF_local <- function(B,
                                     arimaModelB, arEstimateB, maEstimateB,
                                     xregModelB, regressors, xregNumberB, componentsNumberARIMAB,
                                     lagsModelAllB, obsInSample,
-                                    arPolynomialMatrixB, maPolynomialMatrixB, phiEstimateB)
+                                    phiEstimateB)
 
     if(penaltyA + penaltyB > 0) { return(1e+300) }
 

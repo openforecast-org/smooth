@@ -136,8 +136,6 @@ def CF(  # noqa: N802
     bounds="usual",
     other=None,
     otherParameterEstimate=False,
-    arPolynomialMatrix=None,
-    maPolynomialMatrix=None,
     regressors=None,
     return_fitted=False,
 ):
@@ -302,10 +300,6 @@ def CF(  # noqa: N802
         normal)
     otherParameterEstimate : bool, optional
         Whether to estimate distribution parameters from B vector
-    arPolynomialMatrix : numpy.ndarray, optional
-        Companion matrix for AR polynomial (for bounds checking)
-    maPolynomialMatrix : numpy.ndarray, optional
-        Companion matrix for MA polynomial (for bounds checking)
     regressors : str, optional
         Regressor handling method ('use', 'select', 'adapt')
 

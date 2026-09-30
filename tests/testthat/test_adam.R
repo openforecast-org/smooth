@@ -711,6 +711,24 @@ test_that("Every ARIMA initial enters the fit, as in ssarima", {
 })
 
 #### Stationarity and invertibility, factor by factor ####
+test_that("confint keeps the ARMA parameters within their stationary / invertible factors", {
+    # A parameter of an AR(3) with the others fixed, against the roots
+    x <- c(0.1, 0.2, 0.3)
+    grid <- seq(-3, 3, 0.001)
+    stable <- sapply(grid, function(v){x[2] <- v; return(all(Mod(polyroot(c(1,-x)))>1))})
+    expect_equal(as.vector(arimaParameterBoundsCpp(c(0.1, 0.2, 0.3), 1, -1)), range(grid[stable]),
+                 tolerance=2e-3)
+    expect_equal(as.vector(arimaParameterBoundsCpp(c(1.2, 0.5), 1, 1)), c(0.2, 1))
+    expect_true(all(is.nan(arimaParameterBoundsCpp(1.2, 0, 1))))
+    # The old AR bounds stopped at +-4.82; phi1 of a stationary AR(2) lies within (phi2-1, 1-phi2)
+    testModel <- msarima(BJsales, orders=list(ar=2, i=1, ma=2))
+    phi2 <- coef(testModel)[["phi2[1]"]]
+    expect_equal(unname(confint(testModel)["phi1[1]", 2:3]), c(phi2-1, 1-phi2), tolerance=1e-6)
+    # The upper bound of the admissible alpha of ANN, (0, 2), was stuck at 5.01
+    testModel <- adam(BJsales, "ANN", bounds="admissible")
+    expect_equal(unname(eigenBounds(testModel, as.matrix(testModel$persistence), 1)[2]), 2.01)
+})
+
 test_that("The ARIMA bounds reject exactly the non-invertible MA and non-stationary AR", {
     y <- log(AirPassengers)
     lossAt <- function(orders, values, fitter=msarima){

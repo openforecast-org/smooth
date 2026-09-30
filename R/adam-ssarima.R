@@ -157,8 +157,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         orders <- orders(model);
         arma <- model$arma;
         arimaPolynomials <- model$other$polynomial;
-        arPolynomialMatrix <- model$other$arPolynomialMatrix;
-        maPolynomialMatrix <- model$other$maPolynomialMatrix;
         constant <- model$constant;
         if(is.null(constant)){
             constant <- FALSE;
@@ -170,7 +168,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         modelDo <- modelDoOriginal <- "estimate";
         initialValueProvided <- NULL;
         arimaPolynomials <- NULL;
-        arPolynomialMatrix <- maPolynomialMatrix <- NULL;
     }
 
     # SSARIMA is checked as ADAM ARIMA
@@ -885,20 +882,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
             # ub <- BValues$Bu;
         }
 
-        # Companion matrices for the polynomials calculation -> stationarity / stability checks
-        if(arimaModel){
-            # AR polynomials
-            arPolynomialMatrix <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(arPolynomialMatrix)>1){
-                arPolynomialMatrix[2:nrow(arPolynomialMatrix)-1,2:nrow(arPolynomialMatrix)] <- diag(nrow(arPolynomialMatrix)-1);
-            }
-            # MA polynomials
-            maPolynomialMatrix <- matrix(0, maOrders %*% lags, maOrders %*% lags);
-            if(nrow(maPolynomialMatrix)>1){
-                maPolynomialMatrix[2:nrow(maPolynomialMatrix)-1,2:nrow(maPolynomialMatrix)] <- diag(nrow(maPolynomialMatrix)-1);
-            }
-        }
-
         #### Parameters of the nloptr and optimisation ####
         # Print level defined
         print_level_hidden <- print_level;
@@ -1167,8 +1150,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         }
 
         otherReturned <- list(polynomial=arimaPolynomials,
-                              arPolynomialMatrix=arPolynomialMatrix,
-                              maPolynomialMatrix=maPolynomialMatrix,
                               ARIMAIndices=list(nonZeroARI=nonZeroARI,nonZeroMA=nonZeroMA));
     }
     else{

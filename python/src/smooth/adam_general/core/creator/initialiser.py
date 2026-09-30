@@ -38,10 +38,10 @@ def _arima_initialiser(
     is the shared C++ ``arimaHRCore`` (src/headers/arimaInitCore.h). The series
     is the in-sample data on the scale of the ARIMA part (logs for multiplicative
     error), with the ETS part approximated by the decomposition that gives the ETS
-    initials (the same smoother) and the regressors (``xreg_in_sample``, or None)
-    by OLS on what is left, differenced
-    as the model requires. Missing and zero values become the mean of the
-    transformed series. The seasonal ARIMA factors that coincide with the ETS
+    initials (the same smoother), differenced as the model requires, and the
+    regressors (``xreg_in_sample``, or None, differenced alike) by OLS on the
+    differences. Missing and zero values become the mean of the transformed
+    series. The seasonal ARIMA factors that coincide with the ETS
     seasonality keep the defaults. With ``bounded``, the factors that the cost
     function would reject (not stationary AR, not invertible MA, see
     src/headers/arimaBounds.h) are moved inside the boundary.
@@ -68,16 +68,26 @@ def _arima_initialiser(
             y = np.log(y) - np.log(fitted) if error_type == "M" else y - fitted
         elif error_type == "M":
             y = np.log(y)
+    # The series with missing values filled, the one with NaNs to track which
+    # differences are observed, and the regressors, all differenced alike
     finite = np.isfinite(y)
+    y_filled = y.copy()
+    y_filled[~finite] = _mean_r(y[finite])
+    columns = [y_filled, y]
     if xreg_in_sample is not None:
-        xreg_finite = np.column_stack(
-            [np.ones(int(finite.sum())), np.asarray(xreg_in_sample)[finite]]
-        )
-        y[finite] = y[finite] - xreg_finite @ _ols.ols(xreg_finite, y[finite])
-    y[~finite] = _mean_r(y[finite])
-    for lag, order in zip(lags_arr, i_orders):
-        for _ in range(int(order)):
-            y = y[int(lag) :] - y[: -int(lag)]
+        columns.append(np.asarray(xreg_in_sample, dtype=np.float64))
+    y_diffs = np.column_stack(columns)
+    with np.errstate(invalid="ignore"):
+        for lag, order in zip(lags_arr, i_orders):
+            for _ in range(int(order)):
+                y_diffs = y_diffs[int(lag) :] - y_diffs[: -int(lag)]
+    y = y_diffs[:, 0].copy()
+    # Regression on the differences: in levels, an integrated error makes it spurious
+    if xreg_in_sample is not None:
+        observed = np.isfinite(y_diffs[:, 1])
+        xreg_diffs = np.column_stack([np.ones(len(y)), y_diffs[:, 2:]])
+        y = y - xreg_diffs @ _ols.ols(xreg_diffs[observed], y[observed])
+        y[~observed] = _mean_r(y[observed])
 
     use_level = ~(ets_model & model_is_seasonal & (lags_arr > 1))
     return _ols.arima_hr(

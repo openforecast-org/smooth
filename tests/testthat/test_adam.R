@@ -580,6 +580,14 @@ test_that("Hannan-Rissanen runs on the residuals of the regression", {
                           ssarima(dat, orders=list(ar=1), constant=TRUE, maxeval=1))){
         expect_equal(testModel$B[["phi1[1]"]], 0.6, tolerance=0.1)
     }
+    # With differences, the regression is on the differenced series and regressors
+    set.seed(49)
+    x <- cumsum(rnorm(300))
+    y <- 100 + 3*x + cumsum(as.vector(arima.sim(list(ma=0.5), 300)))
+    xregDiffs <- cbind(1, diff(x))
+    residuals <- diff(y) - xregDiffs %*% olsCpp(xregDiffs, diff(y))
+    expect_equal(adam(data.frame(y=y, x=x), "NNN", orders=list(i=1, ma=1), maxeval=1)$B[["theta1[1]"]],
+                 hr(residuals, 0, 1, 1, arEstimate=FALSE))
     # The seasonal MA taken from the series with monthly dummies stuck the fit at 826.34
     xreg <- data.frame(y=as.vector(AirPassengers), temporaldummy(AirPassengers)[,-1])
     testModel <- suppressWarnings(adam(xreg, "MMN", lags=c(1,12), orders=list(ma=c(0,2)),

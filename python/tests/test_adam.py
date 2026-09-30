@@ -749,6 +749,27 @@ class TestADAMARIMAInitialiser:
         ).fit(y, X=x.reshape(-1, 1))
         assert start.coef[0] == pytest.approx(0.6, abs=0.1)
 
+    @pytest.mark.r_parity
+    def test_regression_on_differences_matches_r(self):
+        """With differences, HR runs on the regression of the differences, as in R."""
+        from ._r_bridge import r_array
+
+        rng = np.random.default_rng(49)
+        # Short: the bridge passes the data on Rscript's command line
+        x = np.cumsum(rng.normal(size=120))
+        y = 100 + 3 * x + np.cumsum(self._arma(120, 0.0, 0.5, 49))
+        start = ADAM(
+            model="NNN",
+            orders={"ar": [0], "i": [1], "ma": [1]},
+            nlopt_kwargs={"maxeval": 1},
+        ).fit(y, X=x.reshape(-1, 1))
+        expected = r_array(
+            "{m <- adam(data.frame(y=y, x=x), 'NNN', orders=list(i=1, ma=1),"
+            " maxeval=1); unname(m$B['theta1[1]'])}",
+            R_data={"y": y, "x": x},
+        )
+        np.testing.assert_allclose(start.coef[:1], expected, rtol=1e-12)
+
     def test_constant_is_intercept(self):
         """The constant starts consistent with AR and the fit finds the mean."""
         y = 100 + self._arma(200, 0.6, 0.3, 41)

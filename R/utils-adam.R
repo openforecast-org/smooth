@@ -1128,14 +1128,21 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
     else if(Etype=="M"){
         y <- log(y)
     }
-    if(!is.null(xregInSample)){
-        finite <- is.finite(y)
-        xregFinite <- cbind(1, xregInSample[finite,,drop=FALSE])
-        y[finite] <- y[finite] - xregFinite %*% olsCpp(xregFinite, y[finite])
-    }
-    y[!is.finite(y)] <- mean(y[is.finite(y)])
+    # The series with missing values filled, the one with NAs to track which
+    # differences are observed, and the regressors, all differenced alike
+    yFilled <- y
+    yFilled[!is.finite(y)] <- mean(y[is.finite(y)])
+    yDiffs <- cbind(yFilled, y, xregInSample)
     for(i in which(iOrders>0)){
-        y <- diff(y, lag=lags[i], differences=iOrders[i])
+        yDiffs <- diff(yDiffs, lag=lags[i], differences=iOrders[i])
+    }
+    y <- yDiffs[,1]
+    # Regression on the differences: in levels, an integrated error makes it spurious
+    if(!is.null(xregInSample)){
+        observed <- is.finite(yDiffs[,2])
+        xregDiffs <- cbind(1, yDiffs[,-c(1,2),drop=FALSE])
+        y <- as.vector(y - xregDiffs %*% olsCpp(xregDiffs[observed,,drop=FALSE], y[observed]))
+        y[!observed] <- mean(y[observed])
     }
 
     useLevel <- !(etsModel & modelIsSeasonal & lags>1)

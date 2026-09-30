@@ -77,11 +77,13 @@ test_that("auto.adam() with regressors='adapt' on AirPassengers+xreg", {
                    distribution=c("dnorm","dlnorm"), lags=c(1,12),
                    regressors="adapt", silent=TRUE)
     # With the ETS smoother for the Hannan-Rissanen values of ETS+ARIMA, an AR(1)
-    # on top of ETSX(MMN) lowers AICc from 1090.929 (ETSX(MMN) with dlnorm)
-    expect_equal(m$distribution, "dnorm")
+    # on top of ETSX(MMN) lowers AICc from 1090.929 (ETSX(MMN) with dlnorm). With the
+    # Hannan-Rissanen values on the residuals of the regression, the dlnorm one reaches
+    # 1083.697 and beats the dnorm one (1083.931 before, 1084.049 now)
+    expect_equal(m$distribution, "dlnorm")
     expect_equal(modelType(m), "MMN")
     expect_equal(orders(m)$ar, c(1, 0))
-    expect_equal(AICc(m), 1083.931, tolerance=0.01)
+    expect_equal(AICc(m), 1083.697, tolerance=0.01)
 })
 
 # 7. Outliers = "use"

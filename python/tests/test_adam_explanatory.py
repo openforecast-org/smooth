@@ -197,6 +197,29 @@ def test_etsx_adapt_dummies_match_r():
     assert model._adam_estimated["CF_value"] == pytest.approx(expected[-1], rel=1e-8)
 
 
+@pytest.mark.r_parity
+def test_etsx_occurrence_initials_match_r():
+    """Intermittent demand with a multiplicative error: the initials of the
+    regressors come from the non-zero demand, as R's subset (log(0) was clamped)."""
+    from ._r_bridge import r_array
+
+    rng = np.random.default_rng(44)
+    x = rng.normal(5, 1, 120)
+    y = rng.poisson(0.7, 120) * (1 + x + rng.normal(size=120) ** 2)
+    start = ADAM(
+        model="MNN",
+        occurrence="odds-ratio",
+        distribution="dnorm",
+        nlopt_kwargs={"maxeval": 1},
+    ).fit(y, X=x.reshape(-1, 1))
+    expected = r_array(
+        "{m <- adam(data.frame(y=y, x=x), 'MNN', occurrence='odds-ratio',"
+        " distribution='dnorm', maxeval=1); unname(m$B)}",
+        R_data={"y": y, "x": x},
+    )
+    np.testing.assert_allclose(start.coef, expected, rtol=1e-10)
+
+
 def test_etsx_single_regressor(etsx_data):
     y, X = etsx_data
     model = ADAM(model="ANN", regressors="use")

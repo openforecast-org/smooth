@@ -954,7 +954,7 @@ def parameters_checker(
         "nsim": nsim,
         "scenarios": scenarios,
         "ellipsis": ellipsis,
-        "lambda": lambda_param if lambda_param is not None else 1,
+        "lambda": lambda_param if lambda_param is not None else 0,
     }
     # Add custom loss function if provided
     if loss_function is not None:
@@ -964,7 +964,7 @@ def parameters_checker(
     if model_do == "estimate":
         est_params = _initialize_estimation_params(
             loss=loss,
-            lambda_param=lambda_param if lambda_param is not None else 1,
+            lambda_param=lambda_param,
             ets_info=ets_info,
             arima_info=arima_info,
             silent=silent,
@@ -972,7 +972,7 @@ def parameters_checker(
         # Update general dict with estimation parameters
         general_dict.update(
             {
-                "lambda": est_params.get("lambda", 1),
+                "lambda": est_params["lambda"],
                 "lambda_": est_params.get("lambda_"),
                 "arma_params": est_params.get("arma_params", None),
             }
@@ -1070,6 +1070,7 @@ def parameters_checker(
             ic=ic,
             xreg_names_from_input=xreg_names_from_input,
             initial_xreg=initials_dict.get("initial_xreg"),
+            ot_logical=observations_dict["ot_logical"] if occurrence_model else None,
         )
         # For "select": if no variables survived selection, disable xreg
         if not xreg_dict["xreg_model"]:
@@ -1210,6 +1211,7 @@ def _process_xreg(
     ic,
     xreg_names_from_input=None,
     initial_xreg=None,
+    ot_logical=None,
 ):
     """Process explanatory variables and return a populated xreg_dict.
 
@@ -1225,6 +1227,9 @@ def _process_xreg(
     initial_xreg : np.ndarray or None
         User-supplied initial coefficient values, shape (p, 1). If provided,
         skips ALM computation and uses these values as optimizer seed.
+    ot_logical : array-like of bool or None
+        The non-zero in-sample observations of an occurrence model, the only ones
+        the initials are estimated on (R's ``subset``); None uses all of them.
 
     Returns
     -------
@@ -1298,12 +1303,21 @@ def _process_xreg(
         # As R's xregInitialiser, a trend is added to get rid of the bias and dropped
         # afterwards, unless asked for, or a regressor is a trend itself: alm() drops
         # the first of two variables correlated above 0.999
-        trend = np.arange(1.0, obs_in_sample + 1)
+        # An occurrence model estimates them on the non-zero demand only, as R's
+        # subset, so that log(y) of the multiplicative models is defined
+        subset = (
+            np.ones(obs_in_sample, dtype=bool)
+            if ot_logical is None
+            else np.asarray(ot_logical, dtype=bool).ravel()[:obs_in_sample]
+        )
+        X_sub, y_sub = X_in_sel[subset], y_is[subset]
+        # The trend keeps the time index of the observations
+        trend = np.arange(1.0, obs_in_sample + 1)[subset]
         with np.errstate(invalid="ignore", divide="ignore"):
             trend_collinear = any(
-                abs(np.corrcoef(column, trend)[0, 1]) >= 0.999 for column in X_in_sel.T
+                abs(np.corrcoef(column, trend)[0, 1]) >= 0.999 for column in X_sub.T
             )
-        X_aug = np.column_stack([np.ones(obs_in_sample), X_in_sel])
+        X_aug = np.column_stack([np.ones(len(y_sub)), X_sub])
         if "trend" not in names_selected and not trend_collinear:
             X_aug = np.column_stack([X_aug, trend])
         # R log-transforms y for multiplicative models with these distributions
@@ -1342,12 +1356,12 @@ def _process_xreg(
             """Get response for multiplicative ALM: log(y) if needed."""
             resolved = distribution if distribution != "default" else "dlnorm"
             if resolved in _log_dists:
-                return np.log(np.maximum(y_is, 1e-10))
-            return y_is
+                return np.log(y_sub)
+            return y_sub
 
         if e_type == "A":
             xreg_initials = [
-                {"initial_xreg": _fit_alm(y_is, "A").reshape(-1, 1)},
+                {"initial_xreg": _fit_alm(y_sub, "A").reshape(-1, 1)},
                 None,
             ]
         elif e_type == "M":
@@ -1358,7 +1372,7 @@ def _process_xreg(
         else:
             # "Z" — error type selection, need both additive and multiplicative
             xreg_initials = [
-                {"initial_xreg": _fit_alm(y_is, "A").reshape(-1, 1)},
+                {"initial_xreg": _fit_alm(y_sub, "A").reshape(-1, 1)},
                 {"initial_xreg": _fit_alm(_mult_response(), "M").reshape(-1, 1)},
             ]
 

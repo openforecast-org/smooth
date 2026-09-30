@@ -153,7 +153,7 @@ def omg_cf(  # noqa: N802
     adam_ets: bool = False,
     loss: str = "likelihood",
     loss_function=None,
-    reg_lambda: Optional[float] = None,
+    lambda_param: Optional[float] = None,
     return_fitted: bool = False,
 ):
     """OMG cost function — joint Bernoulli likelihood on combined probability
@@ -348,7 +348,7 @@ def omg_cf(  # noqa: N802
     if loss in ("LASSO", "RIDGE"):
         from smooth.adam_general.core.utils.cost_functions import trim_b_for_penalty
 
-        lam = float(reg_lambda if reg_lambda is not None else 0.0)
+        lam = float(lambda_param if lambda_param is not None else 0.0)
         # Trim each side separately (each has its own component layout)
         # and concatenate for the joint penalty.
         B_pen_a = trim_b_for_penalty(  # noqa: N806

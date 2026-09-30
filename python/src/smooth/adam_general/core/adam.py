@@ -712,7 +712,6 @@ class ADAM:
         nlopt_lower: Optional[Dict[str, Any]] = None,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         # specific to losses or distributions
-        reg_lambda: Optional[float] = None,
         gnorm_shape: Optional[float] = None,
         smoother: SmootherType = SMOOTHER_DEFAULT,
         ets: Literal["conventional", "adam"] = "conventional",
@@ -803,7 +802,9 @@ class ADAM:
         fast : bool, default=False
             Whether to use faster, possibly less accurate, estimation methods.
         lambda_param : Optional[float], default=None
-            Lambda parameter for Box-Cox transformation or regularization.
+            The regularisation parameter of ``loss="LASSO"`` / ``"RIDGE"``, R's
+            ``lambda`` (also accepted as ``**{"lambda": ...}``). Zero, with a
+            warning, when not provided for these losses, as in R.
         profiles_recent_provided : bool, default=False
             Whether recent profiles (e.g., for exogenous variables) are provided.
         profiles_recent_table : Optional[Any], default=None
@@ -845,8 +846,6 @@ class ADAM:
                     "xtol_rel": 1e-8,
                     "algorithm": "NLOPT_LN_SBPLX"
                 })
-        reg_lambda : Optional[float], default=None
-            Regularization parameter specifically for LASSO/RIDGE losses.
         gnorm_shape : Optional[float], default=None
             Shape parameter 's' for the generalized normal distribution.
         smoother : {"default", "ma", "lowess", "supsmu", "global"}, default="default"
@@ -893,7 +892,6 @@ class ADAM:
         self.nlopt_upper = nlopt_upper
         self.nlopt_lower = nlopt_lower
         self.nlopt_kwargs = nlopt_kwargs
-        self.reg_lambda = reg_lambda
         self.gnorm_shape = gnorm_shape
         if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
             raise ValueError(
@@ -1302,7 +1300,6 @@ class ADAM:
             "n_iterations": self.n_iterations,
             "head_length": self.head_length,
             "arma": self.arma,
-            "reg_lambda": self.reg_lambda,
             "gnorm_shape": self.gnorm_shape,
             "lambda_param": self.lambda_param,
             "fast": self.fast,
@@ -3788,8 +3785,8 @@ class ADAM:
 
             if self._model_type["arima_model"]:
                 # Pre-set ARMA parameters
-                self._arima["ar_estimate"] = [False]
-                self._arima["ma_estimate"] = [False]
+                self._arima["ar_estimate"] = False
+                self._arima["ma_estimate"] = False
                 self._preset_arima_parameters()
 
             self._general["lambda"] = 0

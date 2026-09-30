@@ -103,7 +103,7 @@ class OMG:
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE"],
             Callable,
         ] = "likelihood",
-        reg_lambda: Optional[float] = None,
+        lambda_param: Optional[float] = None,
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
         bounds: Literal["usual", "admissible", "none"] = "usual",
         verbose: int = 0,
@@ -149,7 +149,7 @@ class OMG:
         self.initial = initial
         self.loss = loss
         self.loss_function = loss_function
-        self.reg_lambda = reg_lambda
+        self.lambda_param = lambda_param
         self.ic = ic
         self.bounds = bounds
         self.verbose = verbose
@@ -227,7 +227,7 @@ class OMG:
                 adam_ets=(self.ets == "adam"),
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
             )
         else:
             cf_value = self._optimise(B_used, lb, ub, side_a, side_b, n_params_a)
@@ -253,7 +253,7 @@ class OMG:
                 adam_ets=(self.ets == "adam"),
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
                 return_fitted=True,
             ),
             dtype=np.float64,
@@ -538,7 +538,7 @@ class OMG:
                 adam_ets=adam_ets,
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
             )
 
         return numerical_hessian(_cost, self._B_joint, step_size=step_size)
@@ -584,7 +584,7 @@ class OMG:
                 adam_ets=adam_ets,
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
                 return_fitted=True,
             )
             p = np.asarray(p, dtype=float).ravel()
@@ -794,7 +794,7 @@ class OMG:
             # Carry the callable through so bootstrap refits replay the
             # same custom loss; otherwise the resolved string flag.
             loss=self.loss_function if self.loss_function is not None else self.loss,
-            reg_lambda=self.reg_lambda,
+            lambda_param=self.lambda_param,
             ic=self.ic,
             bounds=self.bounds,
             verbose=0,
@@ -1122,7 +1122,7 @@ class OMG:
                     adam_ets=_adam_ets,
                     loss=self.loss,  # type: ignore[arg-type]
                     loss_function=self.loss_function,
-                    reg_lambda=self.reg_lambda,
+                    lambda_param=self.lambda_param,
                 )
             except Exception:
                 cf = 1e100

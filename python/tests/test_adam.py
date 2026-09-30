@@ -433,6 +433,44 @@ class TestADAMLags:
         np.testing.assert_allclose(model.coef, expected, rtol=1e-6)
 
 
+class TestADAMRegularisation:
+    """LASSO / RIDGE: ``lambda_param`` is R's ``lambda``, zero when not provided."""
+
+    @pytest.fixture
+    def log_air(self):
+        """The log of AirPassengers."""
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return np.log(pd.read_csv(path)["y"].values.astype(float))
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "kwargs, r_args",
+        [
+            ({}, ""),
+            ({"lambda_param": 1, "initial": "optimal"}, ", lambda=1, initial='optimal'"),
+        ],
+    )
+    def test_lambda_matches_r(self, log_air, kwargs, r_args):
+        """A missing lambda is zero, and lambda=1 estimates the initials only."""
+        from ._r_bridge import r_array
+
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(
+            model="NNN", orders=orders, lags=[1, 12], loss="LASSO", **kwargs
+        ).fit(log_air)
+        expected = r_array(
+            "{m <- suppressWarnings(adam(ts(y, frequency=12), 'NNN', lags=c(1,12),"
+            f" loss='LASSO', orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1)){r_args}));"
+            " unname(m$B)}",
+            R_data={"y": log_air},
+        )
+        np.testing.assert_allclose(model._adam_estimated["B"], expected, rtol=1e-6)
+
+
 class TestADAMArmaFixed:
     """Tests for fixed ARMA parameters via the arma argument."""
 

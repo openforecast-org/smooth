@@ -476,7 +476,7 @@ class OM(ADAM):
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE", "custom"],
             Callable,
         ] = "likelihood",
-        reg_lambda: Optional[float] = None,
+        lambda_param: Optional[float] = None,
         h: int = 0,
         holdout: bool = False,
         # ``float`` permitted so the "fixed" occurrence path can set persistence=0.
@@ -558,13 +558,8 @@ class OM(ADAM):
             nlopt_kwargs=nlopt_kwargs,
             ets=ets,
             smoother=smoother,
-            reg_lambda=reg_lambda,
-            # ``reg_lambda`` is the user-facing name on OM (mirrors ADAM's
-            # public surface), but the cost function reads
-            # ``_general["lambda"]`` which is populated from
-            # ``lambda_param`` in ``parameters_checker``. Forward both so
-            # LASSO / RIDGE actually see the chosen weight.
-            lambda_param=reg_lambda,
+            # R's om() takes a missing lambda as zero, without a warning
+            lambda_param=0 if lambda_param is None else lambda_param,
             **kwargs,
         )
 
@@ -758,7 +753,6 @@ class OM(ADAM):
                 if self._general.get("loss") == "custom"
                 else self.loss
             ),
-            "reg_lambda": self.reg_lambda,
             "ic": self.ic,
             "bounds": self.bounds,
             "occurrence": self._om_occurrence,

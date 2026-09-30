@@ -90,12 +90,12 @@ class TestLossMenu:
 
     @pytest.mark.parametrize("loss", ["LASSO", "RIDGE"])
     def test_regularised_losses_fit(self, intermittent_y, loss):
-        m = OMG(model_a="ANN", model_b="ANN", loss=loss, reg_lambda=0.3).fit(
+        m = OMG(model_a="ANN", model_b="ANN", loss=loss, lambda_param=0.3).fit(
             intermittent_y
         )
         assert m.loss == loss
         assert np.isfinite(m.loss_value)
-        assert m.reg_lambda == 0.3
+        assert m.lambda_param == 0.3
 
     def test_custom_callable_loss(self, intermittent_y):
         def cube_abs(actual, fitted, B):  # noqa: N803

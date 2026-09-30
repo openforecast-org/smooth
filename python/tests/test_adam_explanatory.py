@@ -158,6 +158,45 @@ def test_etsx_adapt_aic_better_than_null(etsx_data):
 
 # --- edge cases ---
 
+def test_etsx_adapt_deltas_within_bounds(etsx_data):
+    """The usual bounds keep the smoothing parameters of the regressors in [0, 1]."""
+    y, X = etsx_data
+    model = ADAM(model="AAN", regressors="adapt").fit(y, X=X)
+    deltas = [v for n, v in zip(model.coef_names, model.coef) if n.startswith("delta")]
+    assert deltas and all(0 <= d <= 1 for d in deltas)
+
+
+@pytest.mark.r_parity
+def test_etsx_adapt_dummies_match_r():
+    """Monthly dummies with adapt: the initials (with R's auxiliary trend) and the
+    fit agree with R."""
+    from ._r_bridge import r_array
+
+    air = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")
+    y = air["y"].values.astype(float)
+    X = np.zeros((len(y), 11))
+    for month in range(1, 12):
+        X[month::12, month - 1] = 1
+    kw = dict(
+        model="MMN",
+        lags=[1, 12],
+        orders={"ar": [0, 0], "i": [0, 0], "ma": [0, 2]},
+        distribution="dnorm",
+        regressors="adapt",
+    )
+    start = ADAM(**kw, nlopt_kwargs={"maxeval": 1}).fit(y, X=X)
+    model = ADAM(**kw).fit(y, X=X)
+    expected = r_array(
+        "{X <- temporaldummy(ts(y, frequency=12))[,-1];"
+        " f <- function(...) adam(data.frame(y=y, X), 'MMN', lags=c(1,12),"
+        " orders=list(ma=c(0,2)), distribution='dnorm', regressors='adapt', ...);"
+        " c(f(maxeval=1)$B, f()$lossValue)}",
+        R_data={"y": y},
+    )
+    np.testing.assert_allclose(start.coef, expected[:-1], rtol=1e-10)
+    assert model._adam_estimated["CF_value"] == pytest.approx(expected[-1], rel=1e-8)
+
+
 def test_etsx_single_regressor(etsx_data):
     y, X = etsx_data
     model = ADAM(model="ANN", regressors="use")

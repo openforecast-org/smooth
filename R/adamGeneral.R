@@ -1408,6 +1408,12 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     }
                     # This is needed to see if trend was asked explicitly. If not, we add it to get rid of bias
                     trendIncluded <- any(colnames(xregData)[-1]=="trend");
+                    # Unless a regressor is a trend itself: alm() drops the first of two variables
+                    # correlated above 0.999, which would be the regressor rather than the trend
+                    xregNumeric <- Filter(is.numeric, as.data.frame(xregData)[which(subset),-1,drop=FALSE]);
+                    trendCollinear <- ncol(xregNumeric)>0 &&
+                        any(abs(suppressWarnings(cor(xregNumeric, seq_len(nrow(xregNumeric)))))>=0.999, na.rm=TRUE);
+                    trendIncluded <- trendIncluded || trendCollinear;
                     formulaIsAbsent <- is.null(formulaToUse);
                     formulaOriginal <- formulaToUse;
                     # If the formula is not provided, construct one
@@ -1453,7 +1459,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                             }
                         }
                         else{
-                            trendIncluded <- any(all.vars(formulaToUse)[-1]=="trend");
+                            trendIncluded <- any(all.vars(formulaToUse)[-1]=="trend") || trendCollinear;
                             # If formula contains only one element, or several, but no logs, then change response formula
                             if((length(formulaToUse[[2]])==1 ||
                                 (length(formulaToUse[[2]])>1 & !any(as.character(formulaToUse[[2]])=="log"))) &&

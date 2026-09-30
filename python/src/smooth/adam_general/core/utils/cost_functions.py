@@ -117,6 +117,122 @@ def trim_b_for_penalty(
     return B_penalty
 
 
+def adam_bounds_checker(
+    adam_elements,
+    bounds,
+    model_type_dict,
+    components_dict,
+    lags_dict,
+    arima_checked,
+    explanatory_checked,
+    phi_dict,
+    constants_checked,
+    obs_in_sample,
+):
+    """Penalty for parameters outside the bounds, or 0 (R's ``adam_bounds_checker``).
+
+    Shared by ``CF``, ``om_cf`` and ``omg_cf``: stationarity / invertibility of
+    the ARIMA factors, then the ``"usual"`` restrictions of ETS and of the
+    ``regressors="adapt"`` smoothing parameters, or the ``"admissible"`` check of
+    the discount matrix of the non-ARIMA components.
+    """
+    adapt = explanatory_checked.get("regressors") == "adapt"
+    # Stationary AR and invertible MA, factor by factor
+    if bounds != "none":
+        penalty = arima_bounds_penalty(
+            arima_checked, adam_elements["arima_polynomials"]
+        )
+        if penalty > 0:
+            return penalty
+
+    if bounds == "usual":
+        if model_type_dict["ets_model"]:
+            if any(
+                adam_elements["vec_g"][: components_dict["components_number_ets"]] > 1
+            ) or any(
+                adam_elements["vec_g"][: components_dict["components_number_ets"]] < 0
+            ):
+                return 1e300
+            if model_type_dict["model_is_trendy"]:
+                if adam_elements["vec_g"][1] > adam_elements["vec_g"][0]:
+                    return 1e300
+                if model_type_dict["model_is_seasonal"] and any(
+                    adam_elements["vec_g"][
+                        components_dict[
+                            "components_number_ets_non_seasonal"
+                        ] : components_dict["components_number_ets_non_seasonal"]
+                        + components_dict["components_number_ets_seasonal"]
+                    ]
+                    > (1 - adam_elements["vec_g"][0])
+                ):
+                    return 1e300
+
+            elif model_type_dict["model_is_seasonal"] and any(
+                adam_elements["vec_g"][
+                    components_dict[
+                        "components_number_ets_non_seasonal"
+                    ] : components_dict["components_number_ets_non_seasonal"]
+                    + components_dict["components_number_ets_seasonal"]
+                ]
+                > (1 - adam_elements["vec_g"][0])
+            ):
+                return 1e300
+
+            if phi_dict["phi_estimate"] and (
+                adam_elements["mat_f"][1, 1] > 1 or adam_elements["mat_f"][1, 1] < 0
+            ):
+                return 1e300
+
+        if explanatory_checked["xreg_model"] and adapt:
+            xreg_start = (
+                components_dict["components_number_ets"]
+                + components_dict["components_number_arima"]
+            )
+            deltas = adam_elements["vec_g"][
+                xreg_start : xreg_start + explanatory_checked["xreg_number"]
+            ]
+            if np.any(deltas > 1) or np.any(deltas < 0):
+                return 1e100 * np.max(np.abs(deltas - 0.5))
+
+    elif bounds == "admissible":
+        # The discount matrix split by lags is meaningless for the lagged ARIMA,
+        # which has one state per lag: its states are checked above instead
+        n_ets = components_dict["components_number_ets"]
+        components_other = np.setdiff1d(
+            np.arange(len(lags_dict["lags_model_all"])),
+            np.arange(n_ets, n_ets + components_dict["components_number_arima"]),
+        )
+        if components_other.size > 0 and (
+            model_type_dict["ets_model"] or arima_checked["arima_model"]
+        ):
+            has_delta = explanatory_checked["xreg_model"] and adapt
+            eigenValues = smooth_eigens(
+                persistence=np.asfortranarray(
+                    adam_elements["vec_g"][components_other].reshape(-1, 1),
+                    dtype=np.float64,
+                ),
+                transition=np.asfortranarray(
+                    adam_elements["mat_f"][np.ix_(components_other, components_other)],
+                    dtype=np.float64,
+                ),
+                measurement=np.asfortranarray(
+                    adam_elements["mat_wt"][:, components_other], dtype=np.float64
+                ),
+                lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32)[
+                    components_other
+                ],
+                xreg_model=explanatory_checked["xreg_model"],
+                obs_in_sample=obs_in_sample,
+                has_delta=has_delta,
+                xreg_number=explanatory_checked["xreg_number"],
+                constant_required=constants_checked["constant_required"],
+            )
+            if np.any(eigenValues > 1 + 1e-50):
+                return 1e100 * np.max(eigenValues)
+
+    return 0
+
+
 def CF(  # noqa: N802
     B,
     model_type_dict,
@@ -136,7 +252,6 @@ def CF(  # noqa: N802
     bounds="usual",
     other=None,
     otherParameterEstimate=False,
-    regressors=None,
     return_fitted=False,
 ):
     """
@@ -300,8 +415,6 @@ def CF(  # noqa: N802
         normal)
     otherParameterEstimate : bool, optional
         Whether to estimate distribution parameters from B vector
-    regressors : str, optional
-        Regressor handling method ('use', 'select', 'adapt')
 
     Returns
     -------
@@ -400,98 +513,20 @@ def CF(  # noqa: N802
     # Check the bounds, classical restrictions
     # print(components_dict['components_number_ets_non_seasonal'])
 
-    # Stationary AR and invertible MA, factor by factor (R's adam_bounds_checker)
-    if bounds != "none":
-        penalty = arima_bounds_penalty(
-            arima_checked, adam_elements["arima_polynomials"]
-        )
-        if penalty > 0:
-            return penalty
-
-    if bounds == "usual":
-        if model_type_dict["ets_model"]:
-            if any(
-                adam_elements["vec_g"][: components_dict["components_number_ets"]] > 1
-            ) or any(
-                adam_elements["vec_g"][: components_dict["components_number_ets"]] < 0
-            ):
-                return 1e300
-            if model_type_dict["model_is_trendy"]:
-                if adam_elements["vec_g"][1] > adam_elements["vec_g"][0]:
-                    return 1e300
-                if model_type_dict["model_is_seasonal"] and any(
-                    adam_elements["vec_g"][
-                        components_dict[
-                            "components_number_ets_non_seasonal"
-                        ] : components_dict["components_number_ets_non_seasonal"]
-                        + components_dict["components_number_ets_seasonal"]
-                    ]
-                    > (1 - adam_elements["vec_g"][0])
-                ):
-                    return 1e300
-
-            elif model_type_dict["model_is_seasonal"] and any(
-                adam_elements["vec_g"][
-                    components_dict[
-                        "components_number_ets_non_seasonal"
-                    ] : components_dict["components_number_ets_non_seasonal"]
-                    + components_dict["components_number_ets_seasonal"]
-                ]
-                > (1 - adam_elements["vec_g"][0])
-            ):
-                return 1e300
-
-            if phi_dict["phi_estimate"] and (
-                adam_elements["mat_f"][1, 1] > 1 or adam_elements["mat_f"][1, 1] < 0
-            ):
-                return 1e300
-
-        if explanatory_checked["xreg_model"] and regressors == "adapt":
-            xreg_start = (
-                components_dict["components_number_ets"]
-                + components_dict["components_number_arima"]
-            )
-            deltas = adam_elements["vec_g"][
-                xreg_start : xreg_start + explanatory_checked["xreg_number"]
-            ]
-            if np.any(deltas > 1) or np.any(deltas < 0):
-                return 1e100 * np.max(np.abs(deltas - 0.5))
-
-    elif bounds == "admissible":
-        # The discount matrix split by lags is meaningless for the lagged ARIMA,
-        # which has one state per lag: its states are checked above instead
-        n_ets = components_dict["components_number_ets"]
-        components_other = np.setdiff1d(
-            np.arange(len(lags_dict["lags_model_all"])),
-            np.arange(n_ets, n_ets + components_dict["components_number_arima"]),
-        )
-        if components_other.size > 0 and (
-            model_type_dict["ets_model"] or arima_checked["arima_model"]
-        ):
-            has_delta = explanatory_checked["xreg_model"] and regressors == "adapt"
-            eigenValues = smooth_eigens(
-                persistence=np.asfortranarray(
-                    adam_elements["vec_g"][components_other].reshape(-1, 1),
-                    dtype=np.float64,
-                ),
-                transition=np.asfortranarray(
-                    adam_elements["mat_f"][np.ix_(components_other, components_other)],
-                    dtype=np.float64,
-                ),
-                measurement=np.asfortranarray(
-                    adam_elements["mat_wt"][:, components_other], dtype=np.float64
-                ),
-                lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32)[
-                    components_other
-                ],
-                xreg_model=explanatory_checked["xreg_model"],
-                obs_in_sample=observations_dict["obs_in_sample"],
-                has_delta=has_delta,
-                xreg_number=explanatory_checked["xreg_number"],
-                constant_required=constants_checked["constant_required"],
-            )
-            if np.any(eigenValues > 1 + 1e-50):
-                return 1e100 * np.max(eigenValues)
+    penalty = adam_bounds_checker(
+        adam_elements,
+        bounds,
+        model_type_dict,
+        components_dict,
+        lags_dict,
+        arima_checked,
+        explanatory_checked,
+        phi_dict,
+        constants_checked,
+        observations_dict["obs_in_sample"],
+    )
+    if penalty > 0:
+        return penalty
 
     y_in_sample = np.asarray(observations_dict["y_in_sample"], dtype=np.float64)
     ot = np.asarray(observations_dict["ot"], dtype=np.float64)

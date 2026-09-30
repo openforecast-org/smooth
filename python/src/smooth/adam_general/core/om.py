@@ -1114,7 +1114,6 @@ class OM(ADAM):
             nlopt, algorithm.replace("NLOPT_", ""), nlopt.LN_NELDERMEAD
         )
 
-        regressors = self._explanatory.get("regressors")
         # Mirror R: omCF receives `loss` separately; we store it in a dict for
         # om_cf to read. ``loss_function`` is already in ``_general`` from
         # ADAM's checker when the user passes a callable.
@@ -1157,7 +1156,6 @@ class OM(ADAM):
                     occurrence=self._om_occurrence,
                     occurrence_char=self._occurrence_char,
                     bounds=self._general["bounds"],
-                    regressors=regressors,
                 )
             except Exception:
                 cf_value = 1e100
@@ -1698,7 +1696,6 @@ class OM(ADAM):
                 occurrence=self._om_occurrence,
                 occurrence_char=self._occurrence_char,
                 bounds="none",
-                regressors=self._explanatory.get("regressors"),
             )
 
         return numerical_hessian(_cost, self.coef, step_size=step_size)
@@ -1748,7 +1745,6 @@ class OM(ADAM):
                 occurrence=self._om_occurrence,
                 occurrence_char=self._occurrence_char,
                 bounds="none",
-                regressors=self._explanatory.get("regressors"),
                 return_fitted=True,
             )
             p = np.asarray(p, dtype=float).ravel()

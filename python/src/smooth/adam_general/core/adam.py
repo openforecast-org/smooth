@@ -4911,7 +4911,6 @@ class ADAM:
                 bounds="none",
                 other=other,
                 otherParameterEstimate=other_est,
-                regressors=self._explanatory.get("regressors"),
                 return_fitted=True,
             )
             if not isinstance(result, tuple):

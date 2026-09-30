@@ -17,7 +17,7 @@ from typing import Optional
 import numpy as np
 
 from smooth.adam_general.core.creator import filler
-from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
+from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
 
 
 def _side_probe_basis(side, elem, o_type="g"):
@@ -142,32 +142,6 @@ def omg_link_function(fitted_a, fitted_b, error_type_a, error_type_b):
     return 1.0 / (1.0 + np.exp(np.log(fb) - fa))
 
 
-def _ets_bounds_check(model_type_dict, components_dict, vec_g, mat_f, phi_dict):
-    """Mirror of the ETS "usual" bounds branch in ``CF`` and ``om_cf``."""
-    if not model_type_dict["ets_model"]:
-        return 0.0
-    n_ets = components_dict["components_number_ets"]
-    if any(vec_g[:n_ets] > 1) or any(vec_g[:n_ets] < 0):
-        return 1e300
-    if model_type_dict["model_is_trendy"]:
-        if vec_g[1] > vec_g[0]:
-            return 1e300
-        n_ns = components_dict["components_number_ets_non_seasonal"]
-        n_seas = components_dict["components_number_ets_seasonal"]
-        if model_type_dict["model_is_seasonal"] and any(
-            vec_g[n_ns : n_ns + n_seas] > (1 - vec_g[0])
-        ):
-            return 1e300
-    elif model_type_dict["model_is_seasonal"]:
-        n_ns = components_dict["components_number_ets_non_seasonal"]
-        n_seas = components_dict["components_number_ets_seasonal"]
-        if any(vec_g[n_ns : n_ns + n_seas] > (1 - vec_g[0])):
-            return 1e300
-    if phi_dict["phi_estimate"] and (mat_f[1, 1] > 1 or mat_f[1, 1] < 0):
-        return 1e300
-    return 0.0
-
-
 def omg_cf(  # noqa: N802
     B,
     *,
@@ -235,32 +209,22 @@ def omg_cf(  # noqa: N802
         adam_cpp=side_b["adam_cpp"],
     )
 
-    if bounds != "none":
-        for side, elem in ((side_a, elem_a), (side_b, elem_b)):
-            penalty = arima_bounds_penalty(side["arima"], elem["arima_polynomials"])
-            if penalty > 0:
-                return float(penalty)
-
-    if bounds == "usual":
-        penalty_a = _ets_bounds_check(
-            side_a["model_type_dict"],
-            side_a["components_dict"],
-            elem_a["vec_g"],
-            elem_a["mat_f"],
-            side_a["phi"],
+    # Each side's bounds, shared with CF (R's adam_bounds_checker)
+    for side, elem in ((side_a, elem_a), (side_b, elem_b)):
+        penalty = adam_bounds_checker(
+            elem,
+            bounds,
+            side["model_type_dict"],
+            side["components_dict"],
+            side["lags_dict"],
+            side["arima"],
+            side["explanatory"],
+            side["phi"],
+            side["constant"],
+            observations_dict["obs_in_sample"],
         )
-        if penalty_a > 0:
-            return float(penalty_a)
-
-        penalty_b = _ets_bounds_check(
-            side_b["model_type_dict"],
-            side_b["components_dict"],
-            elem_b["vec_g"],
-            elem_b["mat_f"],
-            side_b["phi"],
-        )
-        if penalty_b > 0:
-            return float(penalty_b)
+        if penalty > 0:
+            return float(penalty)
 
     # Refresh the profile seed from the freshly-filled mat_vt
     side_a["profile"]["profiles_recent_table"][:] = elem_a["mat_vt"][

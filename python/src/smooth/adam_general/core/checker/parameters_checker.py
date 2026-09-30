@@ -1295,7 +1295,17 @@ def _process_xreg(
             {"initial_xreg": initial_xreg_flat.reshape(-1, 1)},
         ]
     else:
+        # As R's xregInitialiser, a trend is added to get rid of the bias and dropped
+        # afterwards, unless asked for, or a regressor is a trend itself: alm() drops
+        # the first of two variables correlated above 0.999
+        trend = np.arange(1.0, obs_in_sample + 1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            trend_collinear = any(
+                abs(np.corrcoef(column, trend)[0, 1]) >= 0.999 for column in X_in_sel.T
+            )
         X_aug = np.column_stack([np.ones(obs_in_sample), X_in_sel])
+        if "trend" not in names_selected and not trend_collinear:
+            X_aug = np.column_stack([X_aug, trend])
         # R log-transforms y for multiplicative models with these distributions
         # (adamGeneral.R:1400). For dlnorm/dgamma/dinvgauss the distribution
         # itself handles the multiplicative structure, so no log-transform.
@@ -1319,8 +1329,12 @@ def _process_xreg(
             alm_dist = _resolve_dist_for_alm(etype, distribution)
             try:
                 alm = ALM(distribution=alm_dist)
-                alm.fit(X_aug, y_response, feature_names=names_selected)
-                return np.asarray(alm.coef, dtype=float)
+                alm.fit(
+                    X_aug,
+                    y_response,
+                    feature_names=[*names_selected, "trend"][: X_aug.shape[1] - 1],
+                )
+                return np.asarray(alm.coef, dtype=float)[:p]
             except Exception:
                 return np.zeros(p)
 

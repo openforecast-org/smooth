@@ -571,6 +571,13 @@ test_that("ARIMA with constant starts from the intercept consistent with AR", {
                  tolerance=0.01, check.attributes=FALSE)
 })
 
+test_that("A regressor that is a trend is kept rather than the auxiliary trend of its initials", {
+    # alm(y~x+trend) dropped x, collinear with the trend, and the creator then failed
+    x <- (0:299)/10
+    testModel <- adam(data.frame(y=2*x+sin(x), x=x), "NNN", orders=list(i=1, ma=1), maxeval=1)
+    expect_true(any(names(coef(testModel))=="x"))
+})
+
 test_that("Hannan-Rissanen runs on the residuals of the regression", {
     set.seed(48)
     x <- rnorm(200, 10, 5)

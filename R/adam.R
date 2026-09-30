@@ -1258,6 +1258,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                xregParametersEstimated, xregParametersPersistence,
                                constantEstimate, constantName, otherParameterEstimate,
                                adamCpp);
+        # The B provided by the user is the starting point and is never replaced
+        BProvided <- !is.null(B);
         if(!is.null(B)){
             if(!is.null(names(B))){
                 B <- B[names(B) %in% names(BValues$B)];
@@ -1530,15 +1532,12 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                           nloptrArgs)));
         res$call <- quote(nloptr(x0=B, eval_f=CF, lb=lb, ub=ub, opts=opts));
 
-        if(is.infinite(res$objective) || res$objective==1e+300){
-            # If the optimisation didn't work, give it another try with zero initials for smoothing parameters
-            if(etsModel){
-                B[1:componentsNumberETS] <- 0;
-            }
-            if(arimaModel){
-                B[componentsNumberETS+persistenceXregEstimate*xregNumber+
-                      c(1:sum(arOrders*arEstimate,maOrders*maEstimate))] <- 0.01;
-            }
+        # If the optimisation got stuck on a penalty (every penalty is at least 1e+100),
+        # give it another try with zero smoothing parameters and small ARMA parameters
+        if(!BProvided && (is.infinite(res$objective) || res$objective>=1e+100)){
+            BNames <- names(B);
+            B[BNames %in% c("alpha","beta") | startsWith(BNames, "gamma")] <- 0;
+            B[grepl("^(phi|theta)[0-9]+\\[", BNames)] <- 0.01;
             opts <- list(algorithm=algorithm, xtol_rel=xtol_rel,
                          ftol_rel=ftol_rel, ftol_abs=ftol_abs,
                          maxeval=maxevalUsed, maxtime=maxtime, print_level=print_level);

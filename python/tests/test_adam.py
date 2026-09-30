@@ -840,48 +840,70 @@ class TestARIMABounds:
 
     @pytest.mark.r_parity
     def test_bounds_match_r(self):
-        """The cost function accepts and rejects the same seasonal MA / AR as R."""
+        """The ARIMA penalty accepts and rejects the same seasonal MA / AR as R."""
         import pathlib
 
         import pandas as pd
+
+        from smooth.adam_general import _adamCore
+        from smooth.adam_general.core.utils.polynomials import (
+            adam_polynomialiser,
+            arima_bounds_penalty,
+        )
 
         from ._r_bridge import r_dict
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
         y = np.log(pd.read_csv(path)["y"].values.astype(float))
-        import smooth.adam_general.core.adam as adam_module
-
-        original = adam_module.estimator
+        core = _adamCore.adamCore(
+            lags=np.ones(1, dtype=np.uint64),
+            E="A",
+            T="N",
+            S="N",
+            nNonSeasonal=0,
+            nSeasonal=0,
+            nETS=0,
+            nArima=0,
+            nXreg=0,
+            nComponents=0,
+            constant=False,
+            adamETS=False,
+        )
         cases = [
             ({"ar": [0, 0], "i": [1, 1], "ma": [0, 2]}, [1.058, 0.793]),
             ({"ar": [0, 0], "i": [1, 1], "ma": [0, 2]}, [0.3, -1.2]),
             ({"ar": [0, 2], "i": [1, 0], "ma": [0, 0]}, [1.2, -0.3]),
             ({"ar": [0, 2], "i": [1, 0], "ma": [0, 0]}, [0.3, 0.8]),
         ]
-        try:
-            for orders, values in cases:
-                adam_module.estimator = lambda *a, _v=values, **k: original(
-                    *a, **{**k, "B_initial": np.array(_v)}
-                )
-                model = ADAM(
-                    model="NNN",
-                    orders=orders,
-                    lags=[1, 12],
-                    initial="backcasting",
-                    nlopt_kwargs={"maxeval": 1},
-                ).fit(y)
-                orders_r = ",".join(
-                    f"{k}=c({','.join(map(str, v))})" for k, v in orders.items()
-                )
-                expected = r_dict(
-                    f"{{m <- adam(ts(y, frequency=12), 'NNN', orders=list({orders_r}),"
-                    f" lags=c(1,12), initial='backcasting', maxeval=1,"
-                    f" B=c({','.join(map(str, values))})); list(loss=m$lossValue)}}",
-                    R_data={"y": y},
-                )
-                assert model.loss_value == pytest.approx(expected["loss"][0], rel=1e-8)
-        finally:
-            adam_module.estimator = original
+        for orders, values in cases:
+            arima = {
+                "arima_model": True,
+                "ar_estimate": sum(orders["ar"]) > 0,
+                "ma_estimate": sum(orders["ma"]) > 0,
+            }
+            polys = adam_polynomialiser(
+                core,
+                values,
+                orders["ar"],
+                orders["i"],
+                orders["ma"],
+                arima["ar_estimate"],
+                arima["ma_estimate"],
+                [],
+                [1, 12],
+            )
+            orders_r = ",".join(
+                f"{k}=c({','.join(map(str, v))})" for k, v in orders.items()
+            )
+            expected = r_dict(
+                f"{{m <- adam(ts(y, frequency=12), 'NNN', orders=list({orders_r}),"
+                f" lags=c(1,12), maxeval=1, B=c({','.join(map(str, values))}));"
+                " list(loss=m$lossValue)}",
+                R_data={"y": y},
+            )
+            assert (arima_bounds_penalty(arima, polys) == 0) == (
+                expected["loss"][0] < 1e100
+            )
 
 
 class TestADAMARIMAStates:

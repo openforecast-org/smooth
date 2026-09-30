@@ -706,3 +706,12 @@ test_that("The ARIMA bounds reject exactly the non-invertible MA and non-station
         expect_equal(lossAt(ordersAR, phi) < 1E+100, all(Mod(polyroot(c(1, -phi)))>1))
     }
 })
+
+test_that("A fit stuck on a penalty restarts from zero smoothing and small ARMA parameters", {
+    skip_on_cran()
+    xreg <- data.frame(y=AirPassengers, x=factor(temporaldummy(AirPassengers, factors=TRUE)))
+    # The first run starts on the NaN penalty and moves to the bounds penalties
+    expect_no_warning(testModel <- adam(xreg, "MMN", lags=c(1,12), orders=list(ar=c(0,0),i=c(0,0),ma=c(0,2)),
+                                        regressors="adapt", distribution="dnorm"))
+    expect_lt(testModel$lossValue, 1E+100)
+})

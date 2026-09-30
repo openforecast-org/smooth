@@ -1200,7 +1200,7 @@ class OM(ADAM):
         # infeasibility plateau, but ONLY when the user did NOT supply their
         # own B — otherwise their B is the authoritative starting point.
         # Failsafe mirrors R/om.R: all params 0.001 with alpha bumped to 0.01.
-        if user_B is None and (not np.isfinite(cf_value) or cf_value >= 1e300):
+        if user_B is None and (not np.isfinite(cf_value) or cf_value >= 1e100):
             B[:] = 0.001
             if len(B) > 0:
                 B[0] = 0.01

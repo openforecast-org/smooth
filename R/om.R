@@ -716,7 +716,7 @@ om <- function(data,
             # Retry from BValues$B if the first run hit the infeasibility plateau,
             # but only when the user did NOT supply their own B — their B is the
             # authoritative starting point and must not be silently replaced.
-            if(is.null(B) && (is.infinite(res$objective) || res$objective == 1e+300)){
+            if(is.null(B) && (is.infinite(res$objective) || res$objective >= 1e+100)){
                 B_used[] <- BValues$B;
                 B_used[] <- 0.001;
                 B_used[1] <- 0.01;

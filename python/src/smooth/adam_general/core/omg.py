@@ -1159,7 +1159,7 @@ class OMG:
         # Mirrors the failsafe in R/omg.R: all params 0.001 with the two
         # leading alphas (A-side and B-side) bumped to 0.01.
         user_B_supplied = kwargs.get("B") is not None  # noqa: N806
-        if not user_B_supplied and (not np.isfinite(cf_value) or cf_value >= 1e300):
+        if not user_B_supplied and (not np.isfinite(cf_value) or cf_value >= 1e100):
             B_used[:] = 0.001
             if len(B_used) > 0:
                 B_used[0] = 0.01  # alpha for A-side

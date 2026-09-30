@@ -847,7 +847,7 @@ omg <- function(data,
             # point. Mirrors the failsafe in om()'s retry block: all params
             # set to 0.001 with the two leading alphas (A-side and B-side)
             # bumped to 0.01, which keeps the multiplicative recursion stable.
-            if(is.null(userB) && (is.infinite(res$objective) || res$objective == 1e+300)) {
+            if(is.null(userB) && (is.infinite(res$objective) || res$objective >= 1e+100)) {
                 B_used[] <- 0.001
                 B_used[1] <- 0.01                # alpha for A-side
                 B_used[nParamsA + 1] <- 0.01     # alpha for B-side

@@ -1,3 +1,5 @@
+import re
+
 import nlopt
 import numpy as np
 
@@ -580,55 +582,17 @@ def estimator(
     # Step 9a: a BOBYQA refinement pass was tried in the past but produced
     # less stable ARIMA estimates, so only the Nelder-Mead pass is run.
 
-    # Step 10a: Retry optimisation with zero smoothing parameters if the
-    # initial optimisation failed to converge (non-finite or penalty-valued
-    # cost function).
-    if not np.isfinite(CF_value) or CF_value >= 1e300:
+    # Step 10a: if the optimisation got stuck on a penalty (every penalty is at
+    # least 1e100), retry with zero smoothing parameters and small ARMA
+    # parameters, selected by name as in R/adam.R
+    if not np.isfinite(CF_value) or CF_value >= 1e100:
         B[:] = B_start
-
-        # Calculate number of ETS persistence parameters (alpha, beta, gamma)
-        components_number_ets = 0
-        if model_type_dict["ets_model"]:
-            # Build persistence estimate vector with proper seasonal expansion
-            persistence_estimate_vector = [
-                persistence_dict["persistence_level_estimate"],
-                model_type_dict["model_is_trendy"]
-                and persistence_dict["persistence_trend_estimate"],
-            ]
-            if model_type_dict["model_is_seasonal"]:
-                persistence_estimate_vector.extend(
-                    persistence_dict["persistence_seasonal_estimate"]
-                )
-            components_number_ets = sum(persistence_estimate_vector)
-            if components_number_ets > 0:
-                B[:components_number_ets] = 0
-
-        if arima_dict["arima_model"]:
-            # Calculate starting index for ARIMA parameters
-            #  Match R's calculation exactly: componentsNumberETS +
-            # persistenceXregEstimate*xregNumber
-            # Note: R's retry code doesn't account for phi, so we match that behavior
-            ar_ma_start = components_number_ets
-            if (
-                explanatory_dict["xreg_model"]
-                and persistence_dict["persistence_xreg_estimate"]
-            ):
-                ar_ma_start += max(
-                    explanatory_dict["xreg_parameters_persistence"] or [0]
-                )
-
-            # Calculate number of ARIMA parameters
-            ar_orders = arima_dict.get("ar_orders", [])
-            ma_orders = arima_dict.get("ma_orders", [])
-            ar_estimate = arima_dict.get("ar_estimate", False)
-            ma_estimate = arima_dict.get("ma_estimate", False)
-
-            ar_count = sum(ar_orders) if ar_estimate else 0
-            ma_count = sum(ma_orders) if ma_estimate else 0
-            ar_ma_count = ar_count + ma_count
-
-            if ar_ma_count > 0:
-                B[ar_ma_start : ar_ma_start + ar_ma_count] = 0.01
+        names = list(b_values["names"])
+        for i, name in enumerate(names):
+            if name in ("alpha", "beta") or name.startswith("gamma"):
+                B[i] = 0
+            elif re.match(r"^(phi|theta)[0-9]+\[", name):
+                B[i] = 0.01
 
         # Retry optimization with reset parameters
         opt2 = nlopt.opt(nlopt_algorithm, len(B))

@@ -81,7 +81,7 @@ def arima_parameter_bounds(names, params, arima, lags):
     Translation of R's ``arimaParameterBounds``: each parameter is bounded within
     its factor (the same type and lag), with the others at their values, by the
     shared C++ ``arimaParameterBounds`` (src/headers/arimaBounds.h). The fixed
-    values come from ``arima["arma_parameters"]`` (all AR, then all MA). The
+    values come from ``arima["arma_parameters"]`` (lag by lag, AR then MA). The
     parameters of factors that are not stationary / invertible are left out.
 
     Returns a dict of parameter name to (lower, upper).
@@ -89,19 +89,17 @@ def arima_parameter_bounds(names, params, arima, lags):
     from smooth.adam_general import _ols
 
     estimated = dict(zip(names, params))
-    fixed = list(arima.get("arma_parameters") or [])
+    fixed = iter(arima.get("arma_parameters") or [])
     factors: dict = {}
-    position = 0
-    for kind, orders, estimate in (
-        ("phi", arima["ar_orders"], arima["ar_estimate"]),
-        ("theta", arima["ma_orders"], arima["ma_estimate"]),
-    ):
-        for lag, order in zip(lags, orders):
+    for lag, ar_order, ma_order in zip(lags, arima["ar_orders"], arima["ma_orders"]):
+        for kind, order, estimate in (
+            ("phi", ar_order, arima["ar_estimate"]),
+            ("theta", ma_order, arima["ma_estimate"]),
+        ):
             for j in range(int(order)):
                 name = f"{kind}{j + 1}[{lag}]"
-                value = estimated[name] if estimate else fixed[position]
+                value = estimated[name] if estimate else next(fixed)
                 factors.setdefault((kind, lag), []).append((name, value))
-                position += 1
 
     bounds = {}
     for (kind, _), members in factors.items():

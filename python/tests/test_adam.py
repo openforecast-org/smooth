@@ -515,6 +515,39 @@ class TestADAMRegularisation:
 class TestADAMArmaFixed:
     """Tests for fixed ARMA parameters via the arma argument."""
 
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "arma, arma_r",
+        [
+            ({"ar": [0.2, 0.3], "ma": [-0.4, -0.5]}, "list(ar=c(0.2,0.3), ma=c(-0.4,-0.5))"),
+            ({"ma": [-0.4, -0.5]}, "list(ma=c(-0.4,-0.5))"),
+            ({"ar": [0.2, 0.3]}, "list(ar=c(0.2,0.3))"),
+        ],
+    )
+    def test_seasonal_arma_matches_r(self, arma, arma_r):
+        """Provided ARMA values are read lag by lag, AR then MA, as in R."""
+        import pathlib
+
+        import pandas as pd
+
+        from ._r_bridge import r_array
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        model = ADAM(
+            model="NNN",
+            orders={"ar": [1, 1], "i": [1, 1], "ma": [1, 1]},
+            lags=[1, 12],
+            arma=arma,
+            initial="optimal",
+        ).fit(y)
+        expected = r_array(
+            "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12), initial='optimal',"
+            f" orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1)), arma={arma_r}); m$lossValue}}",
+            R_data={"y": y},
+        )
+        assert model._adam_estimated["CF_value"] == pytest.approx(float(expected[0]), rel=1e-8)
+
     @pytest.fixture
     def arima_series(self):
         np.random.seed(42)

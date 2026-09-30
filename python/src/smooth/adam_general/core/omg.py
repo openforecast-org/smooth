@@ -24,6 +24,7 @@ from smooth.adam_general.core.estimator.optimization import (
     _configure_optimizer,
 )
 from smooth.adam_general.core.om import (
+    MIXED_MODELS,
     OM,
     om_preparator,
 )
@@ -1074,8 +1075,7 @@ class OMG:
             ub[:] = np.asarray(user_ub, dtype=float)
 
         # The mixed models that are dangerous to start from the initialiser's values
-        # start from no smoothing, side by side, as R's omg()
-        mixed = ("AAM", "AMA", "MAA", "AMN", "MMA", "MNA", "ANM")
+        # start from no smoothing, side by side, as in OM, unless B is provided
         for side, side_slice in (
             (side_a, slice(0, n_params_a)),
             (side_b, slice(n_params_a, len(B_used))),
@@ -1084,7 +1084,7 @@ class OMG:
             ets_type = "".join(
                 model_type[k] for k in ("error_type", "trend_type", "season_type")
             )
-            if ets_type in mixed:
+            if user_B is None and ets_type in MIXED_MODELS:
                 B_used[side_slice] = 0
 
         return B_used, lb, ub, n_params_a

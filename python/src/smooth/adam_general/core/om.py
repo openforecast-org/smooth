@@ -409,6 +409,11 @@ def om_preparator(
     }
 
 
+# The mixed ETS models that are dangerous to start from the initialiser's values,
+# and that OM and OMG start from no smoothing instead (R's om_mixedModel)
+MIXED_MODELS = ("AAM", "AMA", "MAA", "MAN", "AMN", "MMA", "MNA", "ANM")
+
+
 class OM(ADAM):
     """Occurrence model — state-space model for the probability of demand occurrence.
 
@@ -1088,11 +1093,10 @@ class OM(ADAM):
         ets_type = "".join(
             self._model_type[k] for k in ("error_type", "trend_type", "season_type")
         )
-        mixed = ("AAM", "AMA", "MAA", "MAN", "AMN", "MMA", "MNA", "ANM")
         if (
             user_B is None
             and len(B)
-            and (ets_type in mixed or self._om_occurrence == "direct")
+            and (ets_type in MIXED_MODELS or self._om_occurrence == "direct")
         ):
             B[:] = 0
             B[0] = 0.1

@@ -530,3 +530,29 @@ def test_omg_penalty_matches_r():
         R_data={"y": y},
     )
     assert model.loss_value == pytest.approx(float(expected[0]), rel=1e-8)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize(
+    "B, r_args",
+    [
+        # MAN starts from no smoothing, as in OM
+        (None, ""),
+        # unless B is provided
+        ([0.05, 0.01, 1, 0.001, 0.05, 1], ", B=c(0.05,0.01,1,0.001,0.05,1), maxeval=1"),
+    ],
+)
+def test_omg_mixed_model_matches_r(B, r_args):
+    """The dangerous mixed models start as in R's omg(), which keeps a provided B."""
+    from ._r_bridge import r_array
+
+    rng = np.random.default_rng(44)
+    y = rng.poisson(0.7, 120) * 1.0
+    kwargs = {"nlopt_kwargs": {"B": B, "maxeval": 1}} if B is not None else {}
+    model = OMG(model_a="MAN", model_b="MNN", initial="optimal", **kwargs).fit(y)
+    expected = r_array(
+        "{m <- suppressWarnings(omg(y, modelA='MAN', modelB='MNN', initial='optimal'"
+        f"{r_args})); m$lossValue}}",
+        R_data={"y": y},
+    )
+    assert model.loss_value == pytest.approx(float(expected[0]), rel=1e-8)

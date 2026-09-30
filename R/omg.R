@@ -497,22 +497,12 @@ omg <- function(data,
         EtypeA <- checkerA$Etype; TtypeA <- checkerA$Ttype; StypeA <- checkerA$Stype
         EtypeB <- checkerB$Etype; TtypeB <- checkerB$Ttype; StypeB <- checkerB$Stype
 
-        if((EtypeA=="A" && TtypeA=="A" && StypeA=="M") ||
-           (EtypeA=="A" && TtypeA=="M" && StypeA=="A") ||
-           (EtypeA=="M" && TtypeA=="A" && StypeA=="A") ||
-           (EtypeA=="A" && TtypeA=="M" && StypeA=="N") ||
-           (EtypeA=="M" && TtypeA=="M" && StypeA=="A") ||
-           (EtypeA=="M" && TtypeA=="N" && StypeA=="A") ||
-           (EtypeA=="A" && TtypeA=="N" && StypeA=="M")) {
+        # The dangerous mixed models start from no smoothing, side by side, as in
+        # om(), unless the user provided B
+        if(is.null(userB) && om_mixedModel(EtypeA, TtypeA, StypeA)){
             B_used[seq_len(nParamsA)] <- 0
         }
-        if((EtypeB=="A" && TtypeB=="A" && StypeB=="M") ||
-           (EtypeB=="A" && TtypeB=="M" && StypeB=="A") ||
-           (EtypeB=="M" && TtypeB=="A" && StypeB=="A") ||
-           (EtypeB=="A" && TtypeB=="M" && StypeB=="N") ||
-           (EtypeB=="M" && TtypeB=="M" && StypeB=="A") ||
-           (EtypeB=="M" && TtypeB=="N" && StypeB=="A") ||
-           (EtypeB=="A" && TtypeB=="N" && StypeB=="M")) {
+        if(is.null(userB) && om_mixedModel(EtypeB, TtypeB, StypeB)){
             B_used[seq_len(length(B_B)) + nParamsA] <- 0
         }
 

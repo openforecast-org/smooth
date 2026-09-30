@@ -610,16 +610,7 @@ om <- function(data,
         # Treat the dangerous mixed models — but ONLY when the user did not
         # supply their own B via ellipses. A user-provided B is treated as
         # the authoritative starting point.
-        if(is.null(B) &&
-           ((Etype=="A" && Ttype=="A" && Stype=="M") ||
-            (Etype=="A" && Ttype=="M" && Stype=="A") ||
-            (Etype=="M" && Ttype=="A" && Stype=="A") ||
-            (Etype=="M" && Ttype=="A" && Stype=="N") ||
-            (Etype=="A" && Ttype=="M" && Stype=="N") ||
-            (Etype=="M" && Ttype=="M" && Stype=="A") ||
-            (Etype=="M" && Ttype=="N" && Stype=="A") ||
-            (Etype=="A" && Ttype=="N" && Stype=="M") ||
-            occurrence=="direct")){
+        if(is.null(B) && (om_mixedModel(Etype, Ttype, Stype) || occurrence=="direct")){
             B_used[] <- 0;
             B_used[1] <- 0.1;
         }
@@ -1743,6 +1734,13 @@ omLinkFunction <- function(x, Etype, occurrence){
            "fixed"              =,
            "direct"             = pmin(pmax(x, 0), 1),
            x);
+}
+
+# The mixed ETS models that are dangerous to start from the initialiser's values,
+# and that om() and omg() start from no smoothing instead
+#' @keywords internal
+om_mixedModel <- function(Etype, Ttype, Stype){
+    return(any(paste0(Etype, Ttype, Stype)==c("AAM","AMA","MAA","MAN","AMN","MMA","MNA","ANM")));
 }
 
 # File-scope occurrence-model cost function. Used by omEstimator() during

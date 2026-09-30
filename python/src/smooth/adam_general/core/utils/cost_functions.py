@@ -1,9 +1,9 @@
 import numpy as np
-from numpy.linalg import eigvals
 
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
 from smooth.adam_general.core.utils.utils import (
     _sum_r,
     calculate_entropy,
@@ -406,33 +406,15 @@ def CF(  # noqa: N802
     # Check the bounds, classical restrictions
     # print(components_dict['components_number_ets_non_seasonal'])
 
+    # Stationary AR and invertible MA, factor by factor (R's adam_bounds_checker)
+    if bounds != "none":
+        penalty = arima_bounds_penalty(
+            arima_checked, adam_elements["arima_polynomials"]
+        )
+        if penalty > 0:
+            return penalty
+
     if bounds == "usual":
-        if arima_checked["arima_model"] and any(
-            [arima_checked["ar_estimate"], arima_checked["ma_estimate"]]
-        ):
-            if (
-                arima_checked["ar_estimate"]
-                and np.all(-adam_elements["arima_polynomials"]["arPolynomial"][1:] > 0)
-                and sum(-adam_elements["arima_polynomials"]["arPolynomial"][1:]) >= 1
-            ):
-                arPolynomialMatrix[:, 0] = -adam_elements["arima_polynomials"][
-                    "arPolynomial"
-                ][1:]
-                arPolyroots = np.abs(eigvals(arPolynomialMatrix))
-                if any(arPolyroots > 1):
-                    return 1e100 * max(arPolyroots)
-
-            if (
-                arima_checked["ma_estimate"]
-                and sum(adam_elements["arima_polynomials"]["maPolynomial"][1:]) >= 1
-            ):
-                maPolynomialMatrix[:, 0] = adam_elements["arima_polynomials"][
-                    "maPolynomial"
-                ][1:]
-                maPolyroots = np.abs(eigvals(maPolynomialMatrix))
-                if any(maPolyroots > 1):
-                    return 1e100 * max(abs(maPolyroots))
-
         if model_type_dict["ets_model"]:
             if any(
                 adam_elements["vec_g"][: components_dict["components_number_ets"]] > 1
@@ -482,36 +464,32 @@ def CF(  # noqa: N802
                 return 1e100 * np.max(np.abs(deltas - 0.5))
 
     elif bounds == "admissible":
-        if arima_checked["arima_model"]:
-            # Mirror R's admissible AR-check (utils-adam.R:1484-1486):
-            # AND of (all -arPoly[1:] > 0) AND (sum -arPoly[1:] >= 1).  The
-            # legacy `or sum(...) < 0` clause was a stale rule that fired the
-            # AR-eigvals penalty on B-points where R passes through to the
-            # state-space smoothEigens check; on ARIMA-only fits with negative
-            # AR seeds (e.g. NLopt simplex probes with ar1[1] ~= -2) it pushed
-            # Py into a different basin from R.
-            ar_neg_coefs = -adam_elements["arima_polynomials"]["arPolynomial"][1:]
-            if (
-                arima_checked["ar_estimate"]
-                and np.all(np.asarray(ar_neg_coefs) > 0)
-                and sum(ar_neg_coefs) >= 1
-            ):
-                arPolynomialMatrix[:, 0] = ar_neg_coefs
-                eigenValues = np.abs(eigvals(arPolynomialMatrix))
-                if any(eigenValues > 1):
-                    return 1e100 * np.max(eigenValues)
-
-        if model_type_dict["ets_model"] or arima_checked["arima_model"]:
+        # The discount matrix split by lags is meaningless for the lagged ARIMA,
+        # which has one state per lag: its states are checked above instead
+        n_ets = components_dict["components_number_ets"]
+        components_other = np.setdiff1d(
+            np.arange(len(lags_dict["lags_model_all"])),
+            np.arange(n_ets, n_ets + components_dict["components_number_arima"]),
+        )
+        if components_other.size > 0 and (
+            model_type_dict["ets_model"] or arima_checked["arima_model"]
+        ):
             has_delta = explanatory_checked["xreg_model"] and regressors == "adapt"
             eigenValues = smooth_eigens(
                 persistence=np.asfortranarray(
-                    adam_elements["vec_g"].reshape(-1, 1), dtype=np.float64
+                    adam_elements["vec_g"][components_other].reshape(-1, 1),
+                    dtype=np.float64,
                 ),
-                transition=np.asfortranarray(adam_elements["mat_f"], dtype=np.float64),
+                transition=np.asfortranarray(
+                    adam_elements["mat_f"][np.ix_(components_other, components_other)],
+                    dtype=np.float64,
+                ),
                 measurement=np.asfortranarray(
-                    adam_elements["mat_wt"], dtype=np.float64
+                    adam_elements["mat_wt"][:, components_other], dtype=np.float64
                 ),
-                lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32),
+                lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32)[
+                    components_other
+                ],
                 xreg_model=explanatory_checked["xreg_model"],
                 obs_in_sample=observations_dict["obs_in_sample"],
                 has_delta=has_delta,

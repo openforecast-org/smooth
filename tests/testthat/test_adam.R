@@ -500,13 +500,9 @@ test_that("The response name survives data passed by value", {
 })
 
 #### Hannan-Rissanen starting values of the ARMA parameters ####
-# The largest inverse root of 1 - sum(coefs * z^k)
-maxInverseRoot <- function(coefs){
-    return(max(Mod(1/polyroot(c(1, -coefs)))))
-}
 # arimaHRCpp() with the bounds code of adam's "usual" unless given
 hr <- function(y, ar, ma, lags, arEstimate=TRUE, maEstimate=TRUE, arma=numeric(0),
-               useLevel=rep(1, length(lags)), bounds=1){
+               useLevel=rep(1, length(lags)), bounds=TRUE){
     return(as.vector(smooth:::arimaHRCpp(y, ar, ma, lags, arEstimate, maEstimate, arma, useLevel, bounds)))
 }
 
@@ -521,31 +517,27 @@ test_that("Hannan-Rissanen recovers the parameters of ARMA(1,1) and SARMA(1,1)(1
 })
 
 test_that("Hannan-Rissanen values move inside the boundary only if the cost function rejects them", {
-    # Bounds codes: 0 none, 1 adam "usual", 2 "admissible", 3 ssarima "usual"
     set.seed(45)
     e <- rnorm(200)
     y <- numeric(200)
     for(t in 2:200){
         y[t] <- 1.03*y[t-1] + e[t]
     }
-    arRaw <- hr(y, 1, 0, 1, maEstimate=FALSE, bounds=0)
+    arRaw <- hr(y, 1, 0, 1, maEstimate=FALSE, bounds=FALSE)
     expect_gt(arRaw, 1)
-    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=1), 0.99)
-    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=2), 0.99)
-    # ssarima's usual bounds keep the AR coefficients within (-1, 1)
-    expect_lt(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=3), 1)
+    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=TRUE), 0.99)
     # Over-differenced white noise: HR lands on a non-invertible MA, which is
-    # reflected to the invertible one under any bounds
+    # reflected to the invertible one with or without the bounds
     set.seed(47)
     w <- diff(rnorm(300), differences=2)
-    maValues <- sapply(0:3, function(b){hr(w, 0, 1, 1, arEstimate=FALSE, bounds=b)})
+    maValues <- sapply(c(FALSE, TRUE), function(b){hr(w, 0, 1, 1, arEstimate=FALSE, bounds=b)})
     expect_lt(abs(maValues[1]), 1)
-    expect_equal(maValues, rep(maValues[1], 4))
-    # An invertible MA(2) with a coefficient above one: only ssarima's box rejects it
+    expect_equal(maValues[2], maValues[1])
+    # An invertible MA(2) with a coefficient above one is kept as it is
     set.seed(46)
     x <- as.vector(arima.sim(list(ma=c(1.6, 0.64)), 1000))
-    expect_true(all(abs(hr(x, 0, 2, 1, arEstimate=FALSE, bounds=3)) < 1))
-    expect_lte(maxInverseRoot(-hr(x, 0, 2, 1, arEstimate=FALSE, bounds=2)), 0.99 + 1e-8)
+    expect_equal(hr(x, 0, 2, 1, arEstimate=FALSE, bounds=TRUE), hr(x, 0, 2, 1, arEstimate=FALSE, bounds=FALSE))
+    expect_gt(max(abs(hr(x, 0, 2, 1, arEstimate=FALSE, bounds=TRUE))), 1)
 })
 
 test_that("Hannan-Rissanen falls back to the defaults and respects the provided values", {
@@ -692,4 +684,25 @@ test_that("Every ARIMA initial enters the fit, as in ssarima", {
                        B=B, maxeval=1)$lossValue - testModel$lossValue)
     })
     expect_true(all(abs(lossChange) > 1e-8))
+})
+
+#### Stationarity and invertibility, factor by factor ####
+test_that("The ARIMA bounds reject exactly the non-invertible MA and non-stationary AR", {
+    y <- log(AirPassengers)
+    lossAt <- function(orders, values, fitter=msarima){
+        B <- setNames(values, names(fitter(y, orders=orders, lags=c(1,12), maxeval=1)$B))
+        return(fitter(y, orders=orders, lags=c(1,12), B=B, maxeval=1)$lossValue)
+    }
+    # The MA is 1 + theta_1 B^12 + theta_2 B^24
+    ordersMA <- list(ar=c(0,0), i=c(1,1), ma=c(0,2))
+    for(theta in list(c(1.058,0.793), c(-1.058,0.793), c(0.5,0.6), c(0.3,-1.2), c(1.2,0.1))){
+        invertible <- all(Mod(polyroot(c(1, theta)))>1)
+        expect_equal(lossAt(ordersMA, theta) < 1E+100, invertible)
+        expect_equal(lossAt(ordersMA, theta, ssarima) < 1E+100, invertible)
+    }
+    # The AR is 1 - phi_1 B^12 - phi_2 B^24
+    ordersAR <- list(ar=c(0,2), i=c(1,0), ma=c(0,0))
+    for(phi in list(c(0.5,0.4), c(1.2,-0.3), c(-0.5,0.6), c(0.3,0.8))){
+        expect_equal(lossAt(ordersAR, phi) < 1E+100, all(Mod(polyroot(c(1, -phi)))>1))
+    }
 })

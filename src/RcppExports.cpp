@@ -69,8 +69,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // arimaHRCpp
-arma::vec arimaHRCpp(const arma::vec& y, const arma::uvec& arOrders, const arma::uvec& maOrders, const arma::uvec& lags, bool arEstimate, bool maEstimate, const arma::vec& armaParameters, const arma::uvec& useLevel, int bounds);
-RcppExport SEXP _smooth_arimaHRCpp(SEXP ySEXP, SEXP arOrdersSEXP, SEXP maOrdersSEXP, SEXP lagsSEXP, SEXP arEstimateSEXP, SEXP maEstimateSEXP, SEXP armaParametersSEXP, SEXP useLevelSEXP, SEXP boundsSEXP) {
+arma::vec arimaHRCpp(const arma::vec& y, const arma::uvec& arOrders, const arma::uvec& maOrders, const arma::uvec& lags, bool arEstimate, bool maEstimate, const arma::vec& armaParameters, const arma::uvec& useLevel, bool bounded);
+RcppExport SEXP _smooth_arimaHRCpp(SEXP ySEXP, SEXP arOrdersSEXP, SEXP maOrdersSEXP, SEXP lagsSEXP, SEXP arEstimateSEXP, SEXP maEstimateSEXP, SEXP armaParametersSEXP, SEXP useLevelSEXP, SEXP boundedSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -82,8 +82,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< bool >::type maEstimate(maEstimateSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type armaParameters(armaParametersSEXP);
     Rcpp::traits::input_parameter< const arma::uvec& >::type useLevel(useLevelSEXP);
-    Rcpp::traits::input_parameter< int >::type bounds(boundsSEXP);
-    rcpp_result_gen = Rcpp::wrap(arimaHRCpp(y, arOrders, maOrders, lags, arEstimate, maEstimate, armaParameters, useLevel, bounds));
+    Rcpp::traits::input_parameter< bool >::type bounded(boundedSEXP);
+    rcpp_result_gen = Rcpp::wrap(arimaHRCpp(y, arOrders, maOrders, lags, arEstimate, maEstimate, armaParameters, useLevel, bounded));
     return rcpp_result_gen;
 END_RCPP
 }

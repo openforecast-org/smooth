@@ -18,11 +18,12 @@
 // A non-invertible MA factor is replaced by its invertible counterpart with the
 // same autocorrelations, reflecting the inverse roots outside the unit circle
 // (hrReflect). The estimates are otherwise returned as they are, unless the cost
-// function would reject them under its bounds (hrFeasible); then only the
+// function would reject them (hrFeasible); then only the
 // offending factors are moved inside the boundary. The filtering between the levels uses an invertible copy
 // of each MA factor, as a non-invertible one makes the recursion explode.
 
 #include "olsCore.h"
+#include "arimaBounds.h"
 
 struct HRLevel {
     arma::uword lag, arOrder, maOrder;
@@ -168,55 +169,21 @@ inline bool hrLevelEstimate(const arma::vec &w, HRLevel &level) {
     return true;
 }
 
-// Expanded coefficients of prod_i phi_i(B^{s_i}) (sign 1: phi, as in 1 - sum phi_k B^k)
-// or of prod_i theta_i(B^{s_i}) (sign -1: theta, as in 1 + sum theta_k B^k)
-inline arma::vec hrExpand(const std::vector<HRLevel> &levels, double sign) {
-    arma::vec poly(1, arma::fill::ones);
-    for(const HRLevel &level : levels) {
-        const arma::vec &coefs = (sign > 0) ? level.ar : level.ma;
-        arma::vec factor(coefs.n_elem * level.lag + 1, arma::fill::zeros);
-        factor(0) = 1;
-        for(arma::uword k = 0; k < coefs.n_elem; ++k) {
-            factor((k + 1) * level.lag) = -sign * coefs(k);
-        }
-        poly = arma::conv(poly, factor);
-    }
-    return -sign * poly.tail(poly.n_elem - 1);
+// The largest reflection coefficient of the AR (sign 1) or MA (sign -1) factor of a
+// level, in the form 1 + c z of arimaBounds.h: c = -phi or theta
+inline double hrReflection(const HRLevel &level, double sign) {
+    const arma::vec &coefs = (sign > 0) ? level.ar : level.ma;
+    return (coefs.n_elem == 0) ? 0 : arimaReflection(-sign * coefs);
 }
 
-// Whether the cost function would reject the AR (sign 1) or MA (sign -1) part.
-// bounds: 0 none; 1 adam "usual"; 2 "admissible"; 3 ssarima "usual".
-// Mirrors adam_boundsChecker() in R/utils-adam.R and the CF of R/adam-ssarima.R
-inline bool hrRejected(const std::vector<HRLevel> &levels, double sign, int bounds) {
-    arma::vec coefs = hrExpand(levels, sign);
-    if(bounds == 0 || coefs.n_elem == 0) {
-        return false;
-    }
-    if(bounds == 3) {
-        return arma::any(arma::abs(coefs) >= 1);
-    }
-    if(sign > 0) {
-        return arma::all(coefs > 0) && arma::accu(coefs) >= 1 && hrModulus(coefs, 1) > 1;
-    }
-    return (bounds == 2 || arma::accu(coefs) >= 1) && hrModulus(coefs, -1) > 1;
-}
-
-// Move the estimated factors of a rejected part inside the boundary: the factors
-// outside it for the root conditions, all of them gradually for the ssarima box
-// (coefficients within (-1, 1) for both AR and MA)
-inline void hrFeasible(std::vector<HRLevel> &levels, double sign, int bounds) {
-    for(arma::uword iteration = 0; iteration < 1000 && hrRejected(levels, sign, bounds); ++iteration) {
-        for(HRLevel &level : levels) {
-            bool estimate = (sign > 0) ? level.arEstimate : level.maEstimate;
+// Move the estimated factors that the cost function would reject, the not
+// stationary AR and not invertible MA ones (arimaBounds.h), inside the boundary
+inline void hrFeasible(std::vector<HRLevel> &levels, double sign) {
+    for(HRLevel &level : levels) {
+        bool estimate = (sign > 0) ? level.arEstimate : level.maEstimate;
+        if(estimate && hrReflection(level, sign) >= 1) {
             arma::vec &coefs = (sign > 0) ? level.ar : level.ma;
-            if(!estimate || coefs.n_elem == 0) {
-                continue;
-            }
-            double target = (bounds == 3) ? hrModulus(coefs, sign) * hrInside : hrInside;
-            coefs = hrScale(coefs, sign, target);
-        }
-        if(bounds != 3) {
-            break;
+            coefs = hrScale(coefs, sign, hrInside);
         }
     }
 }
@@ -236,11 +203,11 @@ inline arma::vec hrFilterLevels(arma::vec w, const std::vector<HRLevel> &levels,
 // for each lag, the AR parameters (if arEstimate) and then the MA ones (if maEstimate).
 // armaParameters holds the provided values in the same traversal for the parts
 // that are not estimated. useLevel switches the estimation of a level off.
-// bounds is the code of the cost function's bounds, see hrRejected().
+// bounded switches the stationarity / invertibility checks of the cost function on.
 inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma::uvec &maOrders,
                              const arma::uvec &lags, bool arEstimate, bool maEstimate,
                              const arma::vec &armaParameters, const arma::uvec &useLevel,
-                             int bounds) {
+                             bool bounded) {
     arma::uword nLevels = lags.n_elem, nProvided = 0;
     std::vector<HRLevel> levels(nLevels);
     for(arma::uword i = 0; i < nLevels; ++i) {
@@ -299,8 +266,10 @@ inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma
                 }
             }
         }
-        hrFeasible(levels, 1, bounds);
-        hrFeasible(levels, -1, bounds);
+        if(bounded) {
+            hrFeasible(levels, 1);
+            hrFeasible(levels, -1);
+        }
     }
 
     std::vector<double> result;

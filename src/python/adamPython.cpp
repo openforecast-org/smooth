@@ -21,7 +21,9 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("arPolynomial", &PolyResult::arPolynomial)
         .def_readonly("iPolynomial", &PolyResult::iPolynomial)
         .def_readonly("ariPolynomial", &PolyResult::ariPolynomial)
-        .def_readonly("maPolynomial", &PolyResult::maPolynomial);
+        .def_readonly("maPolynomial", &PolyResult::maPolynomial)
+        .def_readonly("arReflection", &PolyResult::arReflection)
+        .def_readonly("maReflection", &PolyResult::maReflection);
 
     // Bind FitResult struct
     py::class_<FitResult>(m, "FitResult")

@@ -27,9 +27,9 @@ py::array_t<double> arima_hr_wrapper(const arma::vec& y, const arma::uvec& ar_or
                                      const arma::uvec& ma_orders, const arma::uvec& lags,
                                      bool ar_estimate, bool ma_estimate,
                                      const arma::vec& arma_parameters, const arma::uvec& use_level,
-                                     int bounds) {
+                                     bool bounded) {
     arma::vec b = arimaHRCore(y, ar_orders, ma_orders, lags, ar_estimate, ma_estimate,
-                              arma_parameters, use_level, bounds);
+                              arma_parameters, use_level, bounded);
     py::array_t<double> arr({static_cast<py::ssize_t>(b.n_elem)});
     auto buf = arr.mutable_unchecked<1>();
     for(size_t i = 0; i < b.n_elem; i++) {
@@ -60,6 +60,6 @@ PYBIND11_MODULE(_ols, m) {
         py::arg("ma_estimate"),
         py::arg("arma_parameters"),
         py::arg("use_level"),
-        py::arg("bounds")
+        py::arg("bounded")
     );
 }

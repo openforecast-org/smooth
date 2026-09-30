@@ -9,10 +9,10 @@ Bernoulli log-likelihood (or MSE on the binary indicators).
 from __future__ import annotations
 
 import numpy as np
-from numpy.linalg import eigvals
 
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
 from smooth.adam_general.core.utils.utils import _sum_r
 
 
@@ -101,32 +101,13 @@ def om_cf(  # noqa: N802
 
     # 2. Bounds checking (mirror CF's "usual" branch — admissible/none not
     #    used by om() but support graceful pass-through)
+    if bounds != "none":
+        penalty = arima_bounds_penalty(
+            arima_checked, adam_elements["arima_polynomials"]
+        )
+        if penalty > 0:
+            return penalty
     if bounds == "usual":
-        if arima_checked["arima_model"] and any(
-            [arima_checked["ar_estimate"], arima_checked["ma_estimate"]]
-        ):
-            if (
-                arima_checked["ar_estimate"]
-                and np.all(-adam_elements["arima_polynomials"]["arPolynomial"][1:] > 0)
-                and sum(-adam_elements["arima_polynomials"]["arPolynomial"][1:]) >= 1
-            ):
-                arPolynomialMatrix[:, 0] = -adam_elements["arima_polynomials"][
-                    "arPolynomial"
-                ][1:]
-                roots = np.abs(eigvals(arPolynomialMatrix))
-                if any(roots > 1):
-                    return 1e100 * max(roots)
-            if (
-                arima_checked["ma_estimate"]
-                and sum(adam_elements["arima_polynomials"]["maPolynomial"][1:]) >= 1
-            ):
-                maPolynomialMatrix[:, 0] = adam_elements["arima_polynomials"][
-                    "maPolynomial"
-                ][1:]
-                roots = np.abs(eigvals(maPolynomialMatrix))
-                if any(roots > 1):
-                    return 1e100 * max(abs(roots))
-
         if model_type_dict["ets_model"]:
             n_ets = components_dict["components_number_ets"]
             vec_g = adam_elements["vec_g"]

@@ -90,7 +90,28 @@ def adam_polynomialiser(
         "i_polynomial": np.asarray(result.iPolynomial).flatten(),
         "ari_polynomial": np.asarray(result.ariPolynomial).flatten(),
         "ma_polynomial": np.asarray(result.maPolynomial).flatten(),
+        "ar_reflection": float(result.arReflection),
+        "ma_reflection": float(result.maReflection),
     }
+
+
+def arima_bounds_penalty(arima_checked, arima_polynomials):
+    """Penalty for a not stationary AR or not invertible MA part.
+
+    R's ARIMA check in ``adam_bounds_checker()``: the largest reflection
+    coefficient of the estimated factors (``src/headers/arimaBounds.h``, returned
+    by :func:`adam_polynomialiser`), which is below one exactly when each AR factor
+    is stationary and each MA one invertible.
+    """
+    if not arima_checked["arima_model"] or not (
+        arima_checked["ar_estimate"] or arima_checked["ma_estimate"]
+    ):
+        return 0.0
+    reflection = max(
+        arima_checked["ar_estimate"] * arima_polynomials["ar_reflection"],
+        arima_checked["ma_estimate"] * arima_polynomials["ma_reflection"],
+    )
+    return 1e100 * reflection if reflection >= 1 else 0.0
 
 
 def arima_initials(ari_polynomial, x, error_type):

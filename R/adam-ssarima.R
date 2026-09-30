@@ -335,34 +335,17 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         elements <- filler(B, matVt, matF, vecG, matWt, arRequired=arRequired, maRequired=maRequired,
                            arEstimate=arEstimate, maEstimate=maEstimate);
 
+        # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)
+        if(bounds!="none" && arimaModel){
+            arimaReflection <- max(arEstimate*elements$arimaPolynomials$arReflection,
+                                   maEstimate*elements$arimaPolynomials$maReflection);
+            if(arimaReflection>=1){
+                return(1E+100*arimaReflection);
+            }
+        }
+
         #### The usual bounds ####
         if(bounds=="usual"){
-            # Stationarity and invertibility conditions for ARIMA
-            if(arimaModel && any(c(arEstimate,maEstimate))){
-                # The AR coefficients within (-1, 1), as done for MA below
-                if(arEstimate &&
-                   any(abs(elements$arimaPolynomials$arPolynomial[-1])>=1)){
-                   # all(elements$arimaPolynomials$arPolynomial[-1]>0) &&
-                   # sum(-(elements$arimaPolynomials$arPolynomial[-1]))>=1){
-                    # arPolynomialMatrix[,1] <- -elements$arimaPolynomials$arPolynomial[-1];
-                    # arPolyroots <- abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values);
-                    # if(any(arPolyroots>1)){
-                        return(1E+100);
-                    # }
-                }
-                # Calculate the polynomial roots of MA
-                if(maEstimate &&
-                   any(abs(elements$arimaPolynomials$maPolynomial[-1])>=1)){
-                   # sum(elements$arimaPolynomials$maPolynomial[-1])>=1){
-                    # maPolynomialMatrix[,1] <- elements$arimaPolynomials$maPolynomial[-1];
-                    # maPolyroots <- abs(eigen(maPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values);
-                    # if(any(maPolyroots>1)){
-                    #     return(1E+100*max(abs(maPolyroots)));
-                    # }
-                    return(1E+100);
-                }
-            }
-
             # Smoothing parameters for the explanatory variables (0, 1) region
             if(xregModel && regressors=="adapt"){
                 if(any(elements$vecG[componentsNumberARIMA+1:xregNumber]>1) ||
@@ -373,19 +356,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         }
         #### The admissible bounds ####
         else if(bounds=="admissible"){
-            if(arimaModel){
-                # Stationarity condition of ARIMA
-                # Calculate the polynomial roots for AR
-                if(arEstimate &&
-                   (all(-elements$arimaPolynomials$arPolynomial[-1]>0) &
-                    sum(-(elements$arimaPolynomials$arPolynomial[-1]))>=1)){
-                    arPolynomialMatrix[,1] <- -elements$arimaPolynomials$arPolynomial[-1];
-                    eigenValues <- abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values);
-                    if(any(eigenValues>1)){
-                        return(1E+100*max(eigenValues));
-                    }
-                }
-
+            if(xregModel){
                 # Stability / invertibility condition
                 eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
                                             lagsModelAll, xregModel, obsInSample);
@@ -753,7 +724,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                 armaValues <- adam_arimaInitialiser(yInSample, otLogical, FALSE, "A", "N", FALSE,
                                                     lags, arOrders, iOrders, maOrders,
                                                     arEstimate, maEstimate, armaParameters,
-                                                    switch(bounds, "usual"=3, "admissible"=2, 0), NULL);
+                                                    bounds!="none", NULL);
                 for(i in 1:length(lags)){
                     if(arRequired && arEstimate && arOrders[i]>0){
                         B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])];

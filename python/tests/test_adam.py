@@ -805,6 +805,85 @@ class TestADAMARIMAInitialiser:
         np.testing.assert_allclose(start.coef[k:], expected, rtol=1e-12)
 
 
+class TestARIMABounds:
+    """Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)."""
+
+    def test_reflection_matches_the_roots(self):
+        """The largest reflection coefficient is below one exactly when all roots are outside."""
+        from smooth.adam_general import _adamCore
+        from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
+
+        core = _adamCore.adamCore(
+            lags=np.ones(1, dtype=np.uint64),
+            E="A",
+            T="N",
+            S="N",
+            nNonSeasonal=0,
+            nSeasonal=0,
+            nETS=0,
+            nArima=0,
+            nXreg=0,
+            nComponents=0,
+            constant=False,
+            adamETS=False,
+        )
+        rng = np.random.default_rng(3)
+        for _ in range(200):
+            theta = rng.uniform(-2, 2, 3)
+            polys = adam_polynomialiser(
+                core, theta, [0, 0], [0, 0], [1, 2], False, True, [], [1, 12]
+            )
+            invertible = np.all(np.abs(np.roots([theta[2], theta[1], 1])) > 1) and (
+                abs(theta[0]) < 1
+            )
+            assert (polys["ma_reflection"] < 1) == invertible
+
+    @pytest.mark.r_parity
+    def test_bounds_match_r(self):
+        """The cost function accepts and rejects the same seasonal MA / AR as R."""
+        import pathlib
+
+        import pandas as pd
+
+        from ._r_bridge import r_dict
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        import smooth.adam_general.core.adam as adam_module
+
+        original = adam_module.estimator
+        cases = [
+            ({"ar": [0, 0], "i": [1, 1], "ma": [0, 2]}, [1.058, 0.793]),
+            ({"ar": [0, 0], "i": [1, 1], "ma": [0, 2]}, [0.3, -1.2]),
+            ({"ar": [0, 2], "i": [1, 0], "ma": [0, 0]}, [1.2, -0.3]),
+            ({"ar": [0, 2], "i": [1, 0], "ma": [0, 0]}, [0.3, 0.8]),
+        ]
+        try:
+            for orders, values in cases:
+                adam_module.estimator = lambda *a, _v=values, **k: original(
+                    *a, **{**k, "B_initial": np.array(_v)}
+                )
+                model = ADAM(
+                    model="NNN",
+                    orders=orders,
+                    lags=[1, 12],
+                    initial="backcasting",
+                    nlopt_kwargs={"maxeval": 1},
+                ).fit(y)
+                orders_r = ",".join(
+                    f"{k}=c({','.join(map(str, v))})" for k, v in orders.items()
+                )
+                expected = r_dict(
+                    f"{{m <- adam(ts(y, frequency=12), 'NNN', orders=list({orders_r}),"
+                    f" lags=c(1,12), initial='backcasting', maxeval=1,"
+                    f" B=c({','.join(map(str, values))})); list(loss=m$lossValue)}}",
+                    R_data={"y": y},
+                )
+                assert model.loss_value == pytest.approx(expected["loss"][0], rel=1e-8)
+        finally:
+            adam_module.estimator = original
+
+
 class TestADAMARIMAStates:
     """ARIMA initials: the initial state of the companion form, as in ssarima."""
 

@@ -15,9 +15,9 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
-from numpy.linalg import eigvals
 
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
 
 
 def _side_probe_basis(side, elem, o_type="g"):
@@ -168,29 +168,6 @@ def _ets_bounds_check(model_type_dict, components_dict, vec_g, mat_f, phi_dict):
     return 0.0
 
 
-def _arima_bounds_check(arima_checked, arima_polynomials, ar_pm, ma_pm):
-    """Mirror of the ARIMA "usual" bounds branch in ``CF`` and ``om_cf``."""
-    if not arima_checked["arima_model"]:
-        return 0.0
-    if not (arima_checked["ar_estimate"] or arima_checked["ma_estimate"]):
-        return 0.0
-    if (
-        arima_checked["ar_estimate"]
-        and np.all(-arima_polynomials["arPolynomial"][1:] > 0)
-        and sum(-arima_polynomials["arPolynomial"][1:]) >= 1
-    ):
-        ar_pm[:, 0] = -arima_polynomials["arPolynomial"][1:]
-        roots = np.abs(eigvals(ar_pm))
-        if any(roots > 1):
-            return 1e100 * max(roots)
-    if arima_checked["ma_estimate"] and sum(arima_polynomials["maPolynomial"][1:]) >= 1:
-        ma_pm[:, 0] = arima_polynomials["maPolynomial"][1:]
-        roots = np.abs(eigvals(ma_pm))
-        if any(roots > 1):
-            return 1e100 * max(abs(roots))
-    return 0.0
-
-
 def omg_cf(  # noqa: N802
     B,
     *,
@@ -258,6 +235,12 @@ def omg_cf(  # noqa: N802
         adam_cpp=side_b["adam_cpp"],
     )
 
+    if bounds != "none":
+        for side, elem in ((side_a, elem_a), (side_b, elem_b)):
+            penalty = arima_bounds_penalty(side["arima"], elem["arima_polynomials"])
+            if penalty > 0:
+                return float(penalty)
+
     if bounds == "usual":
         penalty_a = _ets_bounds_check(
             side_a["model_type_dict"],
@@ -268,14 +251,6 @@ def omg_cf(  # noqa: N802
         )
         if penalty_a > 0:
             return float(penalty_a)
-        penalty_a = _arima_bounds_check(
-            side_a["arima"],
-            elem_a.get("arima_polynomials", {}),
-            side_a.get("ar_polynomial_matrix"),
-            side_a.get("ma_polynomial_matrix"),
-        )
-        if penalty_a > 0:
-            return float(penalty_a)
 
         penalty_b = _ets_bounds_check(
             side_b["model_type_dict"],
@@ -283,14 +258,6 @@ def omg_cf(  # noqa: N802
             elem_b["vec_g"],
             elem_b["mat_f"],
             side_b["phi"],
-        )
-        if penalty_b > 0:
-            return float(penalty_b)
-        penalty_b = _arima_bounds_check(
-            side_b["arima"],
-            elem_b.get("arima_polynomials", {}),
-            side_b.get("ar_polynomial_matrix"),
-            side_b.get("ma_polynomial_matrix"),
         )
         if penalty_b > 0:
             return float(penalty_b)

@@ -1107,13 +1107,13 @@ adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, c
 # by the decomposition that gives the ETS initials (the same smoother), differenced
 # as the model requires. The seasonal
 # ARIMA factors that coincide with the ETS seasonality keep the defaults.
-# bounds is the code of the cost function's bounds (see hrRejected() in the
-# header): the values are moved inside the boundary only if the cost function
-# would reject them. Returns the AR / MA values in the order of B.
+# With bounded, the factors that the cost function would reject (not stationary AR,
+# not invertible MA, see src/headers/arimaBounds.h) are moved inside the boundary.
+# Returns the AR / MA values in the order of B.
 #' @keywords internal
 adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal,
                                   lags, arOrders, iOrders, maOrders, arEstimate, maEstimate,
-                                  armaParameters, bounds, smoother){
+                                  armaParameters, bounded, smoother){
     # Missing and zero (intermittent) values are treated as NAs and are then
     # replaced by the mean of the transformed series
     y <- as.vector(yInSample)
@@ -1135,7 +1135,7 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
     useLevel <- !(etsModel & modelIsSeasonal & lags>1)
     return(as.vector(arimaHRCpp(y, arOrders, maOrders, lags, arEstimate, maEstimate,
                                 if(is.null(armaParameters)) numeric(0) else armaParameters,
-                                useLevel, bounds)))
+                                useLevel, bounded)))
 }
 
 #' @keywords internal
@@ -1297,7 +1297,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
             armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
                                                 modelIsSeasonal, lags, arOrders, iOrders, maOrders,
                                                 arEstimate, maEstimate, armaParameters,
-                                                switch(bounds, "usual"=1, "admissible"=2, 0), smoother)
+                                                bounds!="none", smoother)
             for(i in 1:length(lags)){
                 if(arRequired && arEstimate && arOrders[i]>0){
                     B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])]
@@ -1544,27 +1544,16 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
                                 lagsModelAll, obsInSample,
                                 arPolynomialMatrix, maPolynomialMatrix,
                                 phiEstimate){
-    if(bounds=="usual"){
-        if(arimaModel && any(c(arEstimate, maEstimate))){
-            if(arEstimate &&
-               (all(-arimaPolynomials$arPolynomial[-1]>0) &
-                sum(-(arimaPolynomials$arPolynomial[-1]))>=1)){
-                arPolynomialMatrix[,1] <- -arimaPolynomials$arPolynomial[-1];
-                arPolyroots <- abs(eigen(arPolynomialMatrix, symmetric=FALSE,
-                                         only.values=TRUE)$values);
-                if(any(arPolyroots>1)){
-                    return(1E+100*max(arPolyroots));
-                }
-            }
-            if(maEstimate && sum(arimaPolynomials$maPolynomial[-1])>=1){
-                maPolynomialMatrix[,1] <- arimaPolynomials$maPolynomial[-1];
-                maPolyroots <- abs(eigen(maPolynomialMatrix, symmetric=FALSE,
-                                         only.values=TRUE)$values);
-                if(any(maPolyroots>1)){
-                    return(1E+100*max(abs(maPolyroots)));
-                }
-            }
+    # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)
+    if(bounds!="none" && arimaModel){
+        arimaReflection <- max(arEstimate*arimaPolynomials$arReflection,
+                               maEstimate*arimaPolynomials$maReflection);
+        if(arimaReflection>=1){
+            return(1E+100*arimaReflection);
         }
+    }
+
+    if(bounds=="usual"){
 
         if(etsModel){
             if(any(adamElements$vecG[1:componentsNumberETS]>1) ||
@@ -1603,22 +1592,17 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
         }
     }
     else if(bounds=="admissible"){
-        if(arimaModel){
-            if(arEstimate &&
-               (all(-arimaPolynomials$arPolynomial[-1]>0) &
-                sum(-(arimaPolynomials$arPolynomial[-1]))>=1)){
-                arPolynomialMatrix[,1] <- -arimaPolynomials$arPolynomial[-1];
-                eigenValues <- abs(eigen(arPolynomialMatrix, symmetric=FALSE,
-                                         only.values=TRUE)$values);
-                if(any(eigenValues>1)){
-                    return(1E+100*max(eigenValues));
-                }
+        # The discount matrix split by lags is meaningless for the lagged ARIMA,
+        # which has one state per lag: its states are checked above instead
+        componentsOther <- setdiff(seq_along(lagsModelAll), componentsNumberETS+seq_len(componentsNumberARIMA))
+        if(length(componentsOther)>0){
+            eigenValues <- smoothEigens(adamElements$vecG[componentsOther,,drop=FALSE],
+                                        adamElements$matF[componentsOther,componentsOther,drop=FALSE],
+                                        adamElements$matWt[,componentsOther,drop=FALSE],
+                                        lagsModelAll[componentsOther], xregModel, obsInSample);
+            if(any(eigenValues>1+1E-50)){
+                return(1E+100*max(eigenValues));
             }
-        }
-        eigenValues <- smoothEigens(adamElements$vecG, adamElements$matF,
-                                    adamElements$matWt, lagsModelAll, xregModel, obsInSample);
-        if(any(eigenValues>1+1E-50)){
-            return(1E+100*max(eigenValues));
         }
     }
     return(0);

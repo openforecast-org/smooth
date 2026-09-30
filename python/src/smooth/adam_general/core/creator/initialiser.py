@@ -28,7 +28,7 @@ def _arima_initialiser(
     ar_estimate,
     ma_estimate,
     arma_parameters,
-    bounds,
+    bounded,
     smoother,
 ):
     """Hannan-Rissanen starting values of the AR / MA parameters.
@@ -40,9 +40,9 @@ def _arima_initialiser(
     initials (the same smoother), differenced
     as the model requires. Missing and zero values become the mean of the
     transformed series. The seasonal ARIMA factors that coincide with the ETS
-    seasonality keep the defaults. ``bounds`` is the code of the cost function's
-    bounds (see ``hrRejected()`` in the header): the values are moved inside the
-    boundary only if the cost function would reject them.
+    seasonality keep the defaults. With ``bounded``, the factors that the cost
+    function would reject (not stationary AR, not invertible MA, see
+    src/headers/arimaBounds.h) are moved inside the boundary.
 
     Returns the AR / MA values in the order of B.
     """
@@ -82,7 +82,7 @@ def _arima_initialiser(
         bool(ma_estimate),
         np.asarray(arma_parameters if arma_parameters else [], dtype=np.float64),
         use_level.astype(np.uint64),
-        bounds,
+        bool(bounded),
     )
 
 
@@ -656,7 +656,7 @@ def initialiser(
                 arima_checked["ar_estimate"],
                 arima_checked["ma_estimate"],
                 arima_checked["arma_parameters"],
-                {"usual": 1, "admissible": 2}.get(bounds, 0),
+                bounds != "none",
                 smoother,
             )
 

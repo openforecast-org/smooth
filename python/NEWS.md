@@ -3,7 +3,7 @@
 Release history of the Python implementation of the **smooth** forecasting package.
 
 
-## v1.0.9 (unreleased)
+## v1.1.0 (unreleased)
 
 Changes:
 * The ARIMA initials of `ADAM` are the initial state of the companion form, as in `ssarima`: as many as the largest ARIMA lag, held by the last ARIMA state, and all of them enter the fit. They start from the decomposition of the ETS initials (the same `smoother`) extended backwards, the backcasting seed following the current ARMA parameters, and the reported `initial["arima"]` of a backcasted model reads the time-aligned heads of the fitted states, so `two-stage` hands the backcasted fit over exactly. Mirrors the R fix; see the R `NEWS`.

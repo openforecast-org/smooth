@@ -1,7 +1,7 @@
 Package: smooth
 Type: Package
 Title: Forecasting Using State Space Models
-Version: 4.5.3.41001
+Version: 4.6.0.41001
 Date: 2026-09-21
 Authors@R: person("Ivan", "Svetunkov", email = "ivan@svetunkov.com", role = c("aut", "cre"),
                   comment = c("Director of the OpenForecast consultancy company, UK",

@@ -30,6 +30,7 @@ def _arima_initialiser(
     arma_parameters,
     bounded,
     smoother,
+    xreg_in_sample,
 ):
     """Hannan-Rissanen starting values of the AR / MA parameters.
 
@@ -37,7 +38,8 @@ def _arima_initialiser(
     is the shared C++ ``arimaHRCore`` (src/headers/arimaInitCore.h). The series
     is the in-sample data on the scale of the ARIMA part (logs for multiplicative
     error), with the ETS part approximated by the decomposition that gives the ETS
-    initials (the same smoother), differenced
+    initials (the same smoother) and the regressors (``xreg_in_sample``, or None)
+    by OLS on what is left, differenced
     as the model requires. Missing and zero values become the mean of the
     transformed series. The seasonal ARIMA factors that coincide with the ETS
     seasonality keep the defaults. With ``bounded``, the factors that the cost
@@ -67,6 +69,11 @@ def _arima_initialiser(
         elif error_type == "M":
             y = np.log(y)
     finite = np.isfinite(y)
+    if xreg_in_sample is not None:
+        xreg_finite = np.column_stack(
+            [np.ones(int(finite.sum())), np.asarray(xreg_in_sample)[finite]]
+        )
+        y[finite] = y[finite] - xreg_finite @ _ols.ols(xreg_finite, y[finite])
     y[~finite] = _mean_r(y[finite])
     for lag, order in zip(lags_arr, i_orders):
         for _ in range(int(order)):
@@ -658,6 +665,17 @@ def initialiser(
                 arima_checked["arma_parameters"],
                 bounds != "none",
                 smoother,
+                adam_created["mat_wt"][
+                    : len(observations_dict["y_in_sample"]),
+                    components_dict["components_number_ets"]
+                    + components_dict["components_number_arima"] : components_dict[
+                        "components_number_ets"
+                    ]
+                    + components_dict["components_number_arima"]
+                    + explanatory_checked["xreg_number"],
+                ]
+                if explanatory_checked["xreg_model"]
+                else None,
             )
 
             for i, lag in enumerate(lags_dict.get("lags_original", lags_dict["lags"])):

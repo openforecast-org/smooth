@@ -1104,7 +1104,8 @@ adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, c
 # Starting values of the AR / MA parameters via the Hannan-Rissanen method
 # (src/headers/arimaInitCore.h). The series is the in-sample data on the scale of
 # the ARIMA part (logs for multiplicative error), with the ETS part approximated
-# by the decomposition that gives the ETS initials (the same smoother), differenced
+# by the decomposition that gives the ETS initials (the same smoother) and the
+# regressors (xregInSample, a matrix or NULL) by OLS on what is left, differenced
 # as the model requires. The seasonal
 # ARIMA factors that coincide with the ETS seasonality keep the defaults.
 # With bounded, the factors that the cost function would reject (not stationary AR,
@@ -1113,7 +1114,7 @@ adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, c
 #' @keywords internal
 adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal,
                                   lags, arOrders, iOrders, maOrders, arEstimate, maEstimate,
-                                  armaParameters, bounded, smoother){
+                                  armaParameters, bounded, smoother, xregInSample){
     # Missing and zero (intermittent) values are treated as NAs and are then
     # replaced by the mean of the transformed series
     y <- as.vector(yInSample)
@@ -1126,6 +1127,11 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
     }
     else if(Etype=="M"){
         y <- log(y)
+    }
+    if(!is.null(xregInSample)){
+        finite <- is.finite(y)
+        xregFinite <- cbind(1, xregInSample[finite,,drop=FALSE])
+        y[finite] <- y[finite] - xregFinite %*% olsCpp(xregFinite, y[finite])
     }
     y[!is.finite(y)] <- mean(y[is.finite(y)])
     for(i in which(iOrders>0)){
@@ -1158,7 +1164,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
                              constantEstimate, constantName, otherParameterEstimate,
                              adamCpp,
                              ets, bounds, yInSample, otLogical, iOrders, armaParameters, other,
-                             smoother){
+                             smoother, matWt){
     # The vector of logicals for persistence elements
     persistenceEstimateVector <- c(persistenceLevelEstimate,
                                    modelIsTrendy&persistenceTrendEstimate,
@@ -1297,7 +1303,10 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
             armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
                                                 modelIsSeasonal, lags, arOrders, iOrders, maOrders,
                                                 arEstimate, maEstimate, armaParameters,
-                                                bounds!="none", smoother)
+                                                bounds!="none", smoother,
+                                                if(xregModel){matWt[seq_along(yInSample),
+                                                                    componentsNumberETS+componentsNumberARIMA+
+                                                                        1:xregNumber, drop=FALSE]})
             for(i in 1:length(lags)){
                 if(arRequired && arEstimate && arOrders[i]>0){
                     B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])]

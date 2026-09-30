@@ -571,6 +571,22 @@ test_that("ARIMA with constant starts from the intercept consistent with AR", {
                  tolerance=0.01, check.attributes=FALSE)
 })
 
+test_that("Hannan-Rissanen runs on the residuals of the regression", {
+    set.seed(48)
+    x <- rnorm(200, 10, 5)
+    dat <- data.frame(y=100 + 5*x + as.vector(arima.sim(list(ar=0.6), 200)), x=x)
+    # On the series itself, the regressor hides the AR(1): phi started at -0.03
+    for(testModel in list(adam(dat, "NNN", orders=list(ar=1), constant=TRUE, maxeval=1),
+                          ssarima(dat, orders=list(ar=1), constant=TRUE, maxeval=1))){
+        expect_equal(testModel$B[["phi1[1]"]], 0.6, tolerance=0.1)
+    }
+    # The seasonal MA taken from the series with monthly dummies stuck the fit at 826.34
+    xreg <- data.frame(y=as.vector(AirPassengers), temporaldummy(AirPassengers)[,-1])
+    testModel <- suppressWarnings(adam(xreg, "MMN", lags=c(1,12), orders=list(ma=c(0,2)),
+                                       distribution="dnorm", regressors="adapt"))
+    expect_lt(testModel$lossValue, 516)
+})
+
 test_that("ETS+ARIMA keeps the defaults for the seasonal ARIMA at the ETS seasonal lag", {
     testModel <- adam(AirPassengers, "MAM", orders=list(ar=c(1,1),ma=c(1,1)), lags=c(1,12), maxeval=1)
     expect_equal(testModel$B[c("phi1[12]","theta1[12]")], c(0.1, -0.1), check.attributes=FALSE)

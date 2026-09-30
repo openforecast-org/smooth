@@ -681,7 +681,7 @@ class TestADAMARIMAInitialiser:
         return pd.read_csv(path)["y"].values.astype(float)
 
     @staticmethod
-    def _hr(y, ar, ma, lags, ar_est=True, ma_est=True, arma=(), use=None, bounds=1):
+    def _hr(y, ar, ma, lags, ar_est=True, ma_est=True, arma=(), use=None, bounds=True):
         from smooth.adam_general import _ols
 
         lags = np.asarray(lags, dtype=np.uint64)
@@ -710,27 +710,20 @@ class TestADAMARIMAInitialiser:
         np.testing.assert_allclose(b, [0.6, 0.3], atol=0.1)
 
     def test_feasible_only_when_rejected(self):
-        """Values move inside the boundary only if the cost function rejects them.
-
-        Bounds codes: 0 none, 1 adam "usual", 2 "admissible", 3 ssarima "usual".
-        """
+        """Values move inside the boundary only if the cost function rejects them."""
         e = np.random.default_rng(45).normal(size=200)
         y = np.zeros(200)
         for t in range(1, 200):
             y[t] = 1.03 * y[t - 1] + e[t]
-        ar_raw = self._hr(y, [1], [0], [1], ma_est=False, bounds=0)
+        ar_raw = self._hr(y, [1], [0], [1], ma_est=False, bounds=False)
         assert ar_raw[0] > 1
-        assert self._hr(y, [1], [0], [1], ma_est=False, bounds=1)[0] == pytest.approx(
-            0.99
-        )
-        # ssarima's usual bounds keep the AR coefficients within (-1, 1)
-        assert self._hr(y, [1], [0], [1], ma_est=False, bounds=3)[0] < 1
+        assert self._hr(y, [1], [0], [1], ma_est=False)[0] == pytest.approx(0.99)
 
         # A non-invertible HR estimate is reflected to the invertible MA
         w = np.diff(np.random.default_rng(47).normal(size=300), n=2)
-        ma = [self._hr(w, [0], [1], [1], ar_est=False, bounds=b)[0] for b in range(4)]
+        ma = [self._hr(w, [0], [1], [1], ar_est=False, bounds=b)[0] for b in (False, True)]
         assert abs(ma[0]) < 1
-        assert ma == [ma[0]] * 4
+        assert ma[1] == ma[0]
 
     def test_defaults_and_provided(self):
         """Too few seasons or a switched-off level keep the defaults."""
@@ -740,6 +733,21 @@ class TestADAMARIMAInitialiser:
         off = self._hr(y, [1, 1], [1, 1], [1, 12], use=[1, 0])
         np.testing.assert_array_equal(off[2:], [0.1, -0.1])
         assert len(self._hr(y, [1], [1], [1], ar_est=False, arma=[0.6])) == 1
+
+    def test_regression_residuals(self):
+        """HR runs on the residuals of the regression, not on the series."""
+        from scipy.signal import lfilter
+
+        rng = np.random.default_rng(48)
+        x = rng.normal(10, 5, 200)
+        y = 100 + 5 * x + lfilter([1], [1, -0.6], rng.normal(size=400))[200:]
+        start = ADAM(
+            model="NNN",
+            orders={"ar": [1]},
+            constant=True,
+            nlopt_kwargs={"maxeval": 1},
+        ).fit(y, X=x.reshape(-1, 1))
+        assert start.coef[0] == pytest.approx(0.6, abs=0.1)
 
     def test_constant_is_intercept(self):
         """The constant starts consistent with AR and the fit finds the mean."""

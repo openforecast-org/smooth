@@ -579,7 +579,7 @@ om <- function(data,
                                     otherParameterEstimate,
                                     adamCpp,
                                     ets, bounds, ot, otLogicalInternal,
-                                    iOrders, armaParameters, other, smoother);
+                                    iOrders, armaParameters, other, smoother, adamCreated$matWt);
 
         # Respect user-supplied B / lb / ub from ellipses (mirrors adam.R
         # lines 1229-1361). Named B is filtered by name match against the

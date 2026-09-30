@@ -1257,7 +1257,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                xregModel, xregNumber,
                                xregParametersEstimated, xregParametersPersistence,
                                constantEstimate, constantName, otherParameterEstimate,
-                               adamCpp);
+                               adamCpp, matWt=adamCreated$matWt);
         # The B provided by the user is the starting point and is never replaced
         BProvided <- !is.null(B);
         if(!is.null(B)){
@@ -2785,7 +2785,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                        xregModel, xregNumber,
                                        xregParametersEstimated, xregParametersPersistence,
                                        constantRequired, constantName, FALSE,
-                                       adamCpp);
+                                       adamCpp, matWt=matWt);
                 # Create the vector of initials for the optimisation
                 B <- BValues$B;
             }

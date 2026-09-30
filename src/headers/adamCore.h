@@ -3,6 +3,7 @@
 #include "ssOccurrence.h"
 #include "olsCore.h"
 #include "adamGradient.h"
+#include "arimaBounds.h"
 
 // ============================================================================
 // STRUCTURE DEFINITIONS
@@ -14,6 +15,10 @@ struct PolyResult {
     arma::vec iPolynomial;
     arma::vec ariPolynomial;
     arma::vec maPolynomial;
+    // The largest reflection coefficients of the AR / MA factors (arimaBounds.h):
+    // below one exactly when the AR part is stationary / the MA one invertible
+    double arReflection;
+    double maReflection;
 };
 
 // Result structure for fitter
@@ -630,6 +635,21 @@ public:
         // ariPolynomial contains 1 in the first place
         ariPolynomial = polyMult(arPolynomial, iPolynomial);
 
+        // Stationarity / invertibility, factor by factor (c = -phi and theta)
+        double arReflection = 0, maReflection = 0;
+        for(unsigned int i=0; i<lagsARIMA.n_rows; ++i){
+            if(arOrders(i) * lagsARIMA(i) != 0){
+                arma::uvec positions = arma::regspace<arma::uvec>(1, arOrders(i)) * lagsARIMA(i);
+                arma::vec factor = arParameters.col(i);
+                arReflection = std::max(arReflection, arimaReflection(factor.elem(positions)));
+            }
+            if(maOrders(i) * lagsARIMA(i) != 0){
+                arma::uvec positions = arma::regspace<arma::uvec>(1, maOrders(i)) * lagsARIMA(i);
+                arma::vec factor = maParameters.col(i);
+                maReflection = std::max(maReflection, arimaReflection(factor.elem(positions)));
+            }
+        }
+
         // Check if the length of polynomials is correct. Fix if needed
         // This might happen if one of parameters became equal to zero
         if(maPolynomial.n_rows!=sum(maOrders % lagsARIMA)+1){
@@ -647,6 +667,8 @@ public:
         result.iPolynomial = iPolynomial;
         result.ariPolynomial = ariPolynomial;
         result.maPolynomial = maPolynomial;
+        result.arReflection = arReflection;
+        result.maReflection = maReflection;
         return result;
     }
 

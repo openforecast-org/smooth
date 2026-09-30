@@ -68,6 +68,38 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// arimaHRCpp
+arma::vec arimaHRCpp(const arma::vec& y, const arma::uvec& arOrders, const arma::uvec& maOrders, const arma::uvec& lags, bool arEstimate, bool maEstimate, const arma::vec& armaParameters, const arma::uvec& useLevel, bool bounded);
+RcppExport SEXP _smooth_arimaHRCpp(SEXP ySEXP, SEXP arOrdersSEXP, SEXP maOrdersSEXP, SEXP lagsSEXP, SEXP arEstimateSEXP, SEXP maEstimateSEXP, SEXP armaParametersSEXP, SEXP useLevelSEXP, SEXP boundedSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type arOrders(arOrdersSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type maOrders(maOrdersSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type lags(lagsSEXP);
+    Rcpp::traits::input_parameter< bool >::type arEstimate(arEstimateSEXP);
+    Rcpp::traits::input_parameter< bool >::type maEstimate(maEstimateSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type armaParameters(armaParametersSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type useLevel(useLevelSEXP);
+    Rcpp::traits::input_parameter< bool >::type bounded(boundedSEXP);
+    rcpp_result_gen = Rcpp::wrap(arimaHRCpp(y, arOrders, maOrders, lags, arEstimate, maEstimate, armaParameters, useLevel, bounded));
+    return rcpp_result_gen;
+END_RCPP
+}
+// arimaParameterBoundsCpp
+arma::vec arimaParameterBoundsCpp(const arma::vec& values, int j, double sign);
+RcppExport SEXP _smooth_arimaParameterBoundsCpp(SEXP valuesSEXP, SEXP jSEXP, SEXP signSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< int >::type j(jSEXP);
+    Rcpp::traits::input_parameter< double >::type sign(signSEXP);
+    rcpp_result_gen = Rcpp::wrap(arimaParameterBoundsCpp(values, j, sign));
+    return rcpp_result_gen;
+END_RCPP
+}
 // forecasterwrap
 RcppExport SEXP forecasterwrap(SEXP matvt, SEXP matF, SEXP matw, SEXP h, SEXP Etype, SEXP Ttype, SEXP Stype, SEXP lagsModel, SEXP matxt, SEXP matat, SEXP matFX);
 RcppExport SEXP _smooth_forecasterwrap(SEXP matvtSEXP, SEXP matFSEXP, SEXP matwSEXP, SEXP hSEXP, SEXP EtypeSEXP, SEXP TtypeSEXP, SEXP StypeSEXP, SEXP lagsModelSEXP, SEXP matxtSEXP, SEXP matatSEXP, SEXP matFXSEXP) {

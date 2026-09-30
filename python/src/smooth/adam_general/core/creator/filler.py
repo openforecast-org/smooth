@@ -1,6 +1,9 @@
 import numpy as np
 
-from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
+from smooth.adam_general.core.utils.polynomials import (
+    adam_polynomialiser,
+    arima_initials,
+)
 
 
 def filler(
@@ -237,7 +240,7 @@ def filler(
             arima_checked["arma_parameters"]
             if arima_checked["arma_parameters"]
             else [],
-            lags_dict.get("lags_original", lags_dict["lags"]),
+            lags_dict["lags"],
         )
         # Alias: polynomialiser returns snake_case; bounds checking uses camelCase
         arima_polynomials["ariPolynomial"] = arima_polynomials["ari_polynomial"]
@@ -334,7 +337,7 @@ def filler(
                         - components_dict["components_number_ets_seasonal"]
                         + k
                     )
-                    lag = lags_dict["lags"][seasonal_index]
+                    lag = lags_dict["lags_model"][seasonal_index]
 
                     # Read lag-1 free seasonal values from B and store them.
                     # The lag-th seasonal slot is determined by the constraint
@@ -358,79 +361,29 @@ def filler(
 
                     j += lag - 1
 
-    # Ensure arima_polynomials is available for initials section
-    if arima_checked["arima_model"] and adam_cpp is None:
-        arima_polynomials = matrices_dict.get("arima_polynomials", {})
-
-    # Initials of ARIMA
-    if arima_checked["arima_model"]:
-        if (
-            initials_checked["initial_type"]
-            not in ["complete", "backcasting", "gradient"]
-            and initials_checked["initial_arima_estimate"]
-        ):
-            # print(f"DEBUG - Processing ARIMA initial values starting at index {j}")
-            arima_index = (
-                components_dict["components_number_ets"]
-                + components_dict["components_number_arima"]
-                - 1
-            )
-
-            n_init = initials_checked["initial_arima_number"]
-            init_vals = B[j : j + n_init]
-            non_zero_ari = np.atleast_2d(np.asarray(arima_checked["non_zero_ari"]))
-
-            # Spread the estimated initials across the ARI rows, exactly as R
-            # does (utils-adam.R:1017-1037). The last ARIMA row takes B raw
-            # *only* when there are no ARI terms at all -- a pure MA, whose ARI
-            # polynomial is just 1, so the general expression degenerates to B
-            # itself. Writing it unconditionally, as this did, overwrote the
-            # creator's seed whenever the last ARIMA state is reached only by
-            # the MA polynomial, which is a different model from R's.
-            if non_zero_ari.size > 0:
-                ari_indices = (
-                    components_dict["components_number_ets"] + non_zero_ari[:, 1]
-                )
-                ari_poly_vals = arima_polynomials["ariPolynomial"][
-                    non_zero_ari[:, 0]
-                ].reshape(-1, 1)
-                if model_type_dict["error_type"] == "A":
-                    matrices_dict["mat_vt"][ari_indices, :n_init] = (
-                        ari_poly_vals @ init_vals.reshape(1, -1)
-                    )
-                else:  # "M"
-                    matrices_dict["mat_vt"][ari_indices, :n_init] = np.exp(
-                        ari_poly_vals @ np.log(init_vals).reshape(1, -1)
-                    )
-            else:
-                matrices_dict["mat_vt"][arima_index, :n_init] = init_vals
-
+    # Initials of ARIMA, held by the last ARIMA state (see arima_initials): the
+    # estimated ones, or, for the backcasting, the pre-sample values stored by the
+    # creator taken through the current ARI polynomial
+    if arima_checked["arima_model"] and initials_checked["initial_arima_estimate"]:
+        n_init = initials_checked["initial_arima_number"]
+        arima_row = (
+            components_dict["components_number_ets"]
+            + components_dict["components_number_arima"]
+            - 1
+        )
+        if initials_checked["initial_type"] not in [
+            "complete",
+            "backcasting",
+            "gradient",
+        ]:
+            matrices_dict["mat_vt"][arima_row, :n_init] = B[j : j + n_init]
             j += n_init
-        elif any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]]):
-            last_arima_row_idx = (
-                components_dict["components_number_ets"]
-                + components_dict["components_number_arima"]
-                - 1
+        else:
+            matrices_dict["mat_vt"][arima_row, :n_init] = arima_initials(
+                arima_polynomials["ari_polynomial"],
+                matrices_dict["arima_pre_sample"],
+                model_type_dict["error_type"],
             )
-            ari_indices = (
-                components_dict["components_number_ets"]
-                + arima_checked["non_zero_ari"][:, 1]
-            )
-            ari_poly_vals = arima_polynomials["ariPolynomial"][
-                arima_checked["non_zero_ari"][:, 0]
-            ].reshape(-1, 1)
-            last_arima_row = matrices_dict["mat_vt"][
-                last_arima_row_idx, : initials_checked["initial_arima_number"]
-            ].copy()
-
-            if model_type_dict["error_type"] == "A":
-                matrices_dict["mat_vt"][
-                    ari_indices, : initials_checked["initial_arima_number"]
-                ] = ari_poly_vals @ last_arima_row.reshape(1, -1)
-            else:  # "M"
-                matrices_dict["mat_vt"][
-                    ari_indices, : initials_checked["initial_arima_number"]
-                ] = np.exp(ari_poly_vals @ np.log(last_arima_row).reshape(1, -1))
 
     # Xreg initial values
     if (
@@ -472,4 +425,5 @@ def filler(
         "mat_f": matrices_dict["mat_f"],
         "vec_g": matrices_dict["vec_g"],
         "arima_polynomials": matrices_dict["arima_polynomials"],
+        "arima_pre_sample": matrices_dict.get("arima_pre_sample"),
     }

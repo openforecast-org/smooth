@@ -1,9 +1,9 @@
 import numpy as np
-from numpy.linalg import eigvals
 
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
 from smooth.adam_general.core.utils.utils import (
     _sum_r,
     calculate_entropy,
@@ -11,6 +11,30 @@ from smooth.adam_general.core.utils.utils import (
     calculate_multistep_loss,
     scaler,
 )
+
+
+def lasso_denominators(loss, mat_wt, components_dict, xreg_number, y_in_sample):
+    """The scales of LASSO / RIDGE (R's ``adam_lassoDenominators``).
+
+    The standard deviations of the explanatory variables (``denominator``), which
+    normalise their parameters, and of the differenced series (``y_denominator``),
+    which normalises the errors of ADAM; None for the other losses.
+    """
+    result = {"denominator": None, "y_denominator": None}
+    if loss in ("LASSO", "RIDGE"):
+        if xreg_number > 0:
+            start = components_dict["components_number_ets"] + components_dict.get(
+                "components_number_arima", 0
+            )
+            denominator = np.std(
+                np.asarray(mat_wt)[:, start : start + xreg_number], axis=0, ddof=1
+            )
+            denominator[np.isinf(denominator)] = 1
+            result["denominator"] = denominator
+        result["y_denominator"] = max(
+            np.std(np.diff(np.asarray(y_in_sample, dtype=float).ravel()), ddof=1), 1
+        )
+    return result
 
 
 def trim_b_for_penalty(
@@ -24,97 +48,195 @@ def trim_b_for_penalty(
     model_type_dict,
     lags_dict,
     general,
+    constant_estimate=False,
+    other_parameter_estimate=False,
 ):
-    """Build the trimmed/transformed parameter vector for LASSO/RIDGE penalty.
+    """The parameters of the LASSO / RIDGE penalty (R's CF in R/adam.R).
 
-    Mirrors the block in the additive/ARIMA ADAM CF (R/adam.R:894-937,
-    `cost_functions.py:544-677` pre-refactor): drops initial-state entries
-    from ``B``, shrinks ``phi`` and the AR coefficients to ``1 - x``
-    (so the penalty pushes them toward 1, not 0), keeps MA as-is, and
-    normalises xreg coefficients by the additive ``y_denominator``.
+    The estimated parameters, found in ``B`` as the filler does, shifted to be zero
+    at their shrinkage targets: no smoothing, ``phi`` and AR of one, MA and
+    regressors of zero, the additive regressors normalised by the
+    ``denominator``. The initial states are not shrunk.
 
-    Shared by ADAM's ``CF``, ``om_cf`` (for ``OM``) and ``omg_cf``
-    (for ``OMG``) so the regularisation acts on the exact same parameter
-    subset across all three.
+    Shared by ADAM's ``CF``, ``om_cf`` (for ``OM``) and ``omg_cf`` (for ``OMG``).
     """
-    components_ets = int(components_dict.get("components_number_ets", 0) or 0)
-    persistence_xreg_est = int(
-        persistence_checked.get("persistence_xreg_estimate", False) or 0
-    )
-    xreg_num = int(explanatory_checked.get("xreg_number", 0) or 0)
-    phi_est = int(phi_dict.get("phi_estimate", False) or 0)
-    ar_orders = arima_checked.get("ar_orders") if arima_checked else None
-    ma_orders = arima_checked.get("ma_orders") if arima_checked else None
-    arima_model = arima_checked.get("arima_model", False) if arima_checked else False
+    B = np.asarray(B, dtype=float)  # noqa: N806
+    ets_model = model_type_dict["ets_model"]
+    arima_model = bool(arima_checked and arima_checked.get("arima_model", False))
+    xreg_model = bool(explanatory_checked.get("xreg_model", False))
 
-    if ar_orders is None or (hasattr(ar_orders, "__len__") and len(ar_orders) == 0):
-        ar_orders = [0]
-    if ma_orders is None or (hasattr(ma_orders, "__len__") and len(ma_orders) == 0):
-        ma_orders = [0]
+    n_smoothing = 0
+    if persistence_checked.get("persistence_estimate", False):
+        if ets_model:
+            n_smoothing += int(persistence_checked["persistence_level_estimate"])
+            if model_type_dict["model_is_trendy"]:
+                n_smoothing += int(persistence_checked["persistence_trend_estimate"])
+            if model_type_dict["model_is_seasonal"]:
+                n_smoothing += int(
+                    np.sum(persistence_checked["persistence_seasonal_estimate"])
+                )
+        if xreg_model and persistence_checked.get("persistence_xreg_estimate", False):
+            n_smoothing += max(explanatory_checked["xreg_parameters_persistence"])
+    n_phi = int(bool(ets_model and phi_dict.get("phi_estimate", False)))
 
-    persistence_to_skip = (
-        components_ets
-        + persistence_xreg_est * xreg_num
-        + phi_est
-        + sum(ar_orders)
-        + sum(ma_orders)
-    )
+    ar_estimated: list = []
+    if arima_model:
+        ar_est = bool(arima_checked["ar_estimate"])
+        ma_est = bool(arima_checked["ma_estimate"])
+        for ar_order, ma_order in zip(
+            arima_checked["ar_orders"], arima_checked["ma_orders"]
+        ):
+            ar_estimated += [True] * (ar_est * ar_order) + [False] * (ma_est * ma_order)
+    arma = B[n_smoothing + n_phi : n_smoothing + n_phi + len(ar_estimated)]
+    ar_mask = np.asarray(ar_estimated, dtype=bool)
 
-    B_penalty = np.asarray(B, dtype=float).copy()  # noqa: N806
-
-    if phi_est:
-        phi_idx = components_ets + persistence_xreg_est * xreg_num
-        if phi_idx < len(B_penalty):
-            B_penalty[phi_idx] = 1 - B_penalty[phi_idx]
-
-    j = components_ets + persistence_xreg_est * xreg_num + phi_est
-
-    if arima_model and (sum(ma_orders) > 0 or sum(ar_orders) > 0):
-        lags = lags_dict.get("lags", [1]) if lags_dict else [1]
-        if not hasattr(lags, "__len__"):
-            lags = [lags]
-        for i in range(len(lags)):
-            ar_order_i = ar_orders[i] if i < len(ar_orders) else 0
-            ma_order_i = ma_orders[i] if i < len(ma_orders) else 0
-            if ar_order_i > 0 and j + ar_order_i <= len(B_penalty):
-                B_penalty[j : j + ar_order_i] = 1 - B_penalty[j : j + ar_order_i]
-            j += ar_order_i + ma_order_i
-
-    initial_type = (
-        initials_checked.get("initial_type", "optimal")
-        if initials_checked
-        else "optimal"
-    )
-    if isinstance(initial_type, list):
-        initial_type_matches = any(
-            t in ("optimal", "backcasting", "two-stage") for t in initial_type
+    n_xreg = 0
+    xreg_estimated = None
+    if (
+        xreg_model
+        and initials_checked.get("initial_type") != "complete"
+        and initials_checked.get("initial_estimate", False)
+        and initials_checked.get("initial_xreg_estimate", False)
+    ):
+        xreg_estimated = (
+            np.asarray(explanatory_checked["xreg_parameters_estimated"], dtype=int) == 1
         )
-    else:
-        initial_type_matches = initial_type in (
-            "optimal",
-            "backcasting",
-            "two-stage",
-        )
+        n_xreg = int(xreg_estimated.sum())
+    end = len(B) - int(other_parameter_estimate) - int(constant_estimate)
+    xreg = B[end - n_xreg : end]
+    denominator = general.get("denominator")
+    if (
+        n_xreg > 0
+        and model_type_dict.get("error_type") == "A"
+        and denominator is not None
+    ):
+        xreg = xreg / np.asarray(denominator, dtype=float)[xreg_estimated]
 
-    if initial_type_matches:
-        if xreg_num > 0:
-            denominator = general.get("denominator")
-            error_type = model_type_dict.get("error_type", "A")
-            if error_type == "A" and denominator is not None:
-                B_penalty = np.concatenate(
-                    [
-                        B_penalty[:persistence_to_skip],
-                        B_penalty[-xreg_num:] / denominator,
+    return np.concatenate(
+        [
+            B[:n_smoothing],
+            1 - B[n_smoothing : n_smoothing + n_phi],
+            1 - arma[ar_mask],
+            arma[~ar_mask],
+            xreg,
+        ]
+    )
+
+
+def adam_bounds_checker(
+    adam_elements,
+    bounds,
+    model_type_dict,
+    components_dict,
+    lags_dict,
+    arima_checked,
+    explanatory_checked,
+    phi_dict,
+    constants_checked,
+    obs_in_sample,
+):
+    """Penalty for parameters outside the bounds, or 0 (R's ``adam_bounds_checker``).
+
+    Shared by ``CF``, ``om_cf`` and ``omg_cf``: stationarity / invertibility of
+    the ARIMA factors, then the ``"usual"`` restrictions of ETS and of the
+    ``regressors="adapt"`` smoothing parameters, or the ``"admissible"`` check of
+    the discount matrix of the non-ARIMA components.
+    """
+    adapt = explanatory_checked.get("regressors") == "adapt"
+    # Stationary AR and invertible MA, factor by factor
+    if bounds != "none":
+        penalty = arima_bounds_penalty(
+            arima_checked, adam_elements["arima_polynomials"]
+        )
+        if penalty > 0:
+            return penalty
+
+    if bounds == "usual":
+        if model_type_dict["ets_model"]:
+            if any(
+                adam_elements["vec_g"][: components_dict["components_number_ets"]] > 1
+            ) or any(
+                adam_elements["vec_g"][: components_dict["components_number_ets"]] < 0
+            ):
+                return 1e300
+            if model_type_dict["model_is_trendy"]:
+                if adam_elements["vec_g"][1] > adam_elements["vec_g"][0]:
+                    return 1e300
+                if model_type_dict["model_is_seasonal"] and any(
+                    adam_elements["vec_g"][
+                        components_dict[
+                            "components_number_ets_non_seasonal"
+                        ] : components_dict["components_number_ets_non_seasonal"]
+                        + components_dict["components_number_ets_seasonal"]
                     ]
-                )
-            else:
-                B_penalty = np.concatenate(
-                    [B_penalty[:persistence_to_skip], B_penalty[-xreg_num:]]
-                )
-        else:
-            B_penalty = B_penalty[:persistence_to_skip]
+                    > (1 - adam_elements["vec_g"][0])
+                ):
+                    return 1e300
 
-    return B_penalty
+            elif model_type_dict["model_is_seasonal"] and any(
+                adam_elements["vec_g"][
+                    components_dict[
+                        "components_number_ets_non_seasonal"
+                    ] : components_dict["components_number_ets_non_seasonal"]
+                    + components_dict["components_number_ets_seasonal"]
+                ]
+                > (1 - adam_elements["vec_g"][0])
+            ):
+                return 1e300
+
+            if phi_dict["phi_estimate"] and (
+                adam_elements["mat_f"][1, 1] > 1 or adam_elements["mat_f"][1, 1] < 0
+            ):
+                return 1e300
+
+        if explanatory_checked["xreg_model"] and adapt:
+            xreg_start = (
+                components_dict["components_number_ets"]
+                + components_dict["components_number_arima"]
+            )
+            deltas = adam_elements["vec_g"][
+                xreg_start : xreg_start + explanatory_checked["xreg_number"]
+            ]
+            if np.any(deltas > 1) or np.any(deltas < 0):
+                return 1e100 * np.max(np.abs(deltas - 0.5))
+
+    elif bounds == "admissible":
+        # The discount matrix split by lags is meaningless for the lagged ARIMA,
+        # which has one state per lag: its states are checked above instead
+        n_ets = components_dict["components_number_ets"]
+        components_other = np.setdiff1d(
+            np.arange(len(lags_dict["lags_model_all"])),
+            np.arange(n_ets, n_ets + components_dict["components_number_arima"]),
+        )
+        if components_other.size > 0 and (
+            model_type_dict["ets_model"] or arima_checked["arima_model"]
+        ):
+            has_delta = explanatory_checked["xreg_model"] and adapt
+            eigenValues = smooth_eigens(
+                persistence=np.asfortranarray(
+                    adam_elements["vec_g"][components_other].reshape(-1, 1),
+                    dtype=np.float64,
+                ),
+                transition=np.asfortranarray(
+                    adam_elements["mat_f"][np.ix_(components_other, components_other)],
+                    dtype=np.float64,
+                ),
+                measurement=np.asfortranarray(
+                    adam_elements["mat_wt"][:, components_other], dtype=np.float64
+                ),
+                lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32)[
+                    components_other
+                ],
+                xreg_model=explanatory_checked["xreg_model"],
+                obs_in_sample=obs_in_sample,
+                has_delta=has_delta,
+                xreg_number=explanatory_checked["xreg_number"],
+                constant_required=constants_checked["constant_required"],
+            )
+            if np.any(eigenValues > 1 + 1e-50):
+                return 1e100 * np.max(eigenValues)
+
+    return 0
 
 
 def CF(  # noqa: N802
@@ -136,9 +258,6 @@ def CF(  # noqa: N802
     bounds="usual",
     other=None,
     otherParameterEstimate=False,
-    arPolynomialMatrix=None,
-    maPolynomialMatrix=None,
-    regressors=None,
     return_fitted=False,
 ):
     """
@@ -302,12 +421,6 @@ def CF(  # noqa: N802
         normal)
     otherParameterEstimate : bool, optional
         Whether to estimate distribution parameters from B vector
-    arPolynomialMatrix : numpy.ndarray, optional
-        Companion matrix for AR polynomial (for bounds checking)
-    maPolynomialMatrix : numpy.ndarray, optional
-        Companion matrix for MA polynomial (for bounds checking)
-    regressors : str, optional
-        Regressor handling method ('use', 'select', 'adapt')
 
     Returns
     -------
@@ -372,30 +485,6 @@ def CF(  # noqa: N802
         >>> # If cf_value is large (1e100), constraints were violated
     """
 
-    # R passes adamCreated$matVt as a parameter to every CF call, so each call
-    # gets a fresh copy (R copy-on-modify). Python mutates matrices_dict["mat_vt"]
-    # in-place. The elif branch in filler writes ari_poly*seed to the seed row
-    # (last ARIMA state), so without restoration the seed accumulates as
-    # ari_poly^N*seed after N calls. Save it before filler; restore after the
-    # Fortran copy so C++ still receives the correctly filled value.
-    arima_seed_backup = None
-    if (
-        arima_checked["arima_model"]
-        and any([arima_checked["ar_estimate"], arima_checked["ma_estimate"]])
-        and initials_checked["initial_type"] in ["complete", "backcasting", "gradient"]
-    ):
-        seed_row_idx = (
-            components_dict["components_number_ets"]
-            + components_dict["components_number_arima"]
-            - 1
-        )
-        n_init = initials_checked["initial_arima_number"]
-        arima_seed_backup = (
-            seed_row_idx,
-            n_init,
-            matrices_dict["mat_vt"][seed_row_idx, :n_init].copy(),
-        )
-
     # Fill in the matrices
     adam_elements = filler(
         B,
@@ -412,8 +501,7 @@ def CF(  # noqa: N802
         adam_cpp=adam_cpp,
     )
 
-    # Capture the filler-modified state for C++ and profiles before restoring.
-    # Profiles and the Fortran copy must capture the mutated seed row (ari_poly*seed).
+    # Capture the filled state for C++ and the profiles
     profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
         :, : lags_dict["lags_model_max"]
     ]
@@ -423,13 +511,6 @@ def CF(  # noqa: N802
     # (R's copy-on-modify semantics never leak them)
     mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
 
-    # Restore the seed row of mat_vt before the next CF call so each
-    # optimiser step starts from the same initial state (the C++ fitter may
-    # mutate the row in place).
-    if arima_seed_backup is not None:
-        idx, n, row = arima_seed_backup
-        matrices_dict["mat_vt"][idx, :n] = row
-
     # If we estimate parameters of distribution, take it from the B vector
     if otherParameterEstimate:
         other = abs(B[-1])
@@ -438,120 +519,20 @@ def CF(  # noqa: N802
     # Check the bounds, classical restrictions
     # print(components_dict['components_number_ets_non_seasonal'])
 
-    if bounds == "usual":
-        if arima_checked["arima_model"] and any(
-            [arima_checked["ar_estimate"], arima_checked["ma_estimate"]]
-        ):
-            if (
-                arima_checked["ar_estimate"]
-                and np.all(-adam_elements["arima_polynomials"]["arPolynomial"][1:] > 0)
-                and sum(-adam_elements["arima_polynomials"]["arPolynomial"][1:]) >= 1
-            ):
-                arPolynomialMatrix[:, 0] = -adam_elements["arima_polynomials"][
-                    "arPolynomial"
-                ][1:]
-                arPolyroots = np.abs(eigvals(arPolynomialMatrix))
-                if any(arPolyroots > 1):
-                    return 1e100 * max(arPolyroots)
-
-            if (
-                arima_checked["ma_estimate"]
-                and sum(adam_elements["arima_polynomials"]["maPolynomial"][1:]) >= 1
-            ):
-                maPolynomialMatrix[:, 0] = adam_elements["arima_polynomials"][
-                    "maPolynomial"
-                ][1:]
-                maPolyroots = np.abs(eigvals(maPolynomialMatrix))
-                if any(maPolyroots > 1):
-                    return 1e100 * max(abs(maPolyroots))
-
-        if model_type_dict["ets_model"]:
-            if any(
-                adam_elements["vec_g"][: components_dict["components_number_ets"]] > 1
-            ) or any(
-                adam_elements["vec_g"][: components_dict["components_number_ets"]] < 0
-            ):
-                return 1e300
-            if model_type_dict["model_is_trendy"]:
-                if adam_elements["vec_g"][1] > adam_elements["vec_g"][0]:
-                    return 1e300
-                if model_type_dict["model_is_seasonal"] and any(
-                    adam_elements["vec_g"][
-                        components_dict[
-                            "components_number_ets_non_seasonal"
-                        ] : components_dict["components_number_ets_non_seasonal"]
-                        + components_dict["components_number_ets_seasonal"]
-                    ]
-                    > (1 - adam_elements["vec_g"][0])
-                ):
-                    return 1e300
-
-            elif model_type_dict["model_is_seasonal"] and any(
-                adam_elements["vec_g"][
-                    components_dict[
-                        "components_number_ets_non_seasonal"
-                    ] : components_dict["components_number_ets_non_seasonal"]
-                    + components_dict["components_number_ets_seasonal"]
-                ]
-                > (1 - adam_elements["vec_g"][0])
-            ):
-                return 1e300
-
-            if phi_dict["phi_estimate"] and (
-                adam_elements["mat_f"][1, 1] > 1 or adam_elements["mat_f"][1, 1] < 0
-            ):
-                return 1e300
-
-        if explanatory_checked["xreg_model"] and regressors == "adapt":
-            xreg_start = (
-                components_dict["components_number_ets"]
-                + components_dict["components_number_arima"]
-            )
-            deltas = adam_elements["vec_g"][
-                xreg_start : xreg_start + explanatory_checked["xreg_number"]
-            ]
-            if np.any(deltas > 1) or np.any(deltas < 0):
-                return 1e100 * np.max(np.abs(deltas - 0.5))
-
-    elif bounds == "admissible":
-        if arima_checked["arima_model"]:
-            # Mirror R's admissible AR-check (utils-adam.R:1484-1486):
-            # AND of (all -arPoly[1:] > 0) AND (sum -arPoly[1:] >= 1).  The
-            # legacy `or sum(...) < 0` clause was a stale rule that fired the
-            # AR-eigvals penalty on B-points where R passes through to the
-            # state-space smoothEigens check; on ARIMA-only fits with negative
-            # AR seeds (e.g. NLopt simplex probes with ar1[1] ~= -2) it pushed
-            # Py into a different basin from R.
-            ar_neg_coefs = -adam_elements["arima_polynomials"]["arPolynomial"][1:]
-            if (
-                arima_checked["ar_estimate"]
-                and np.all(np.asarray(ar_neg_coefs) > 0)
-                and sum(ar_neg_coefs) >= 1
-            ):
-                arPolynomialMatrix[:, 0] = ar_neg_coefs
-                eigenValues = np.abs(eigvals(arPolynomialMatrix))
-                if any(eigenValues > 1):
-                    return 1e100 * np.max(eigenValues)
-
-        if model_type_dict["ets_model"] or arima_checked["arima_model"]:
-            has_delta = explanatory_checked["xreg_model"] and regressors == "adapt"
-            eigenValues = smooth_eigens(
-                persistence=np.asfortranarray(
-                    adam_elements["vec_g"].reshape(-1, 1), dtype=np.float64
-                ),
-                transition=np.asfortranarray(adam_elements["mat_f"], dtype=np.float64),
-                measurement=np.asfortranarray(
-                    adam_elements["mat_wt"], dtype=np.float64
-                ),
-                lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32),
-                xreg_model=explanatory_checked["xreg_model"],
-                obs_in_sample=observations_dict["obs_in_sample"],
-                has_delta=has_delta,
-                xreg_number=explanatory_checked["xreg_number"],
-                constant_required=constants_checked["constant_required"],
-            )
-            if np.any(eigenValues > 1 + 1e-50):
-                return 1e100 * np.max(eigenValues)
+    penalty = adam_bounds_checker(
+        adam_elements,
+        bounds,
+        model_type_dict,
+        components_dict,
+        lags_dict,
+        arima_checked,
+        explanatory_checked,
+        phi_dict,
+        constants_checked,
+        observations_dict["obs_in_sample"],
+    )
+    if penalty > 0:
+        return penalty
 
     y_in_sample = np.asarray(observations_dict["y_in_sample"], dtype=np.float64)
     ot = np.asarray(observations_dict["ot"], dtype=np.float64)
@@ -689,6 +670,8 @@ def CF(  # noqa: N802
                 model_type_dict,
                 lags_dict,
                 general,
+                constants_checked["constant_estimate"],
+                otherParameterEstimate,
             )
 
             # Flatten errors to avoid potential broadcasting issues

@@ -579,7 +579,7 @@ om <- function(data,
                                     otherParameterEstimate,
                                     adamCpp,
                                     ets, bounds, ot, otLogicalInternal,
-                                    iOrders, armaParameters, other);
+                                    iOrders, armaParameters, other, smoother, adamCreated$matWt);
 
         # Respect user-supplied B / lb / ub from ellipses (mirrors adam.R
         # lines 1229-1361). Named B is filtered by name match against the
@@ -610,34 +610,9 @@ om <- function(data,
         # Treat the dangerous mixed models — but ONLY when the user did not
         # supply their own B via ellipses. A user-provided B is treated as
         # the authoritative starting point.
-        if(is.null(B) &&
-           ((Etype=="A" && Ttype=="A" && Stype=="M") ||
-            (Etype=="A" && Ttype=="M" && Stype=="A") ||
-            (Etype=="M" && Ttype=="A" && Stype=="A") ||
-            (Etype=="M" && Ttype=="A" && Stype=="N") ||
-            (Etype=="A" && Ttype=="M" && Stype=="N") ||
-            (Etype=="M" && Ttype=="M" && Stype=="A") ||
-            (Etype=="M" && Ttype=="N" && Stype=="A") ||
-            (Etype=="A" && Ttype=="N" && Stype=="M") ||
-            occurrence=="direct")){
+        if(is.null(B) && (om_mixedModel(Etype, Ttype, Stype) || occurrence=="direct")){
             B_used[] <- 0;
             B_used[1] <- 0.1;
-        }
-
-        # ARIMA companion matrices for bounds checking
-        if(arimaModel){
-            arPolynomialMatrix <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(arPolynomialMatrix) > 1){
-                arPolynomialMatrix[2:nrow(arPolynomialMatrix)-1, 2:nrow(arPolynomialMatrix)] <-
-                    diag(nrow(arPolynomialMatrix) - 1);
-            }
-            maPolynomialMatrix <- matrix(0, maOrders %*% lags, maOrders %*% lags);
-            if(nrow(maPolynomialMatrix) > 1){
-                maPolynomialMatrix[2:nrow(maPolynomialMatrix)-1, 2:nrow(maPolynomialMatrix)] <-
-                    diag(nrow(maPolynomialMatrix) - 1);
-            }
-        } else {
-            arPolynomialMatrix <- maPolynomialMatrix <- NULL;
         }
 
         # All arguments needed by omCF_local are passed explicitly to nloptr
@@ -676,8 +651,6 @@ om <- function(data,
             armaParameters=armaParameters,
             nonZeroARI=nonZeroARI, nonZeroMA=nonZeroMA,
             arimaPolynomials=adamCreated$arimaPolynomials,
-            arPolynomialMatrix=arPolynomialMatrix,
-            maPolynomialMatrix=maPolynomialMatrix,
             xregModel=xregModel, xregNumber=xregNumber,
             xregParametersMissing=xregParametersMissing,
             xregParametersIncluded=xregParametersIncluded,
@@ -716,7 +689,7 @@ om <- function(data,
             # Retry from BValues$B if the first run hit the infeasibility plateau,
             # but only when the user did NOT supply their own B — their B is the
             # authoritative starting point and must not be silently replaced.
-            if(is.null(B) && (is.infinite(res$objective) || res$objective == 1e+300)){
+            if(is.null(B) && (is.infinite(res$objective) || res$objective >= 1e+100)){
                 B_used[] <- BValues$B;
                 B_used[] <- 0.001;
                 B_used[1] <- 0.01;
@@ -879,7 +852,7 @@ om <- function(data,
                 nla$arimaModel, componentsNumberARIMA,
                 nla$initialArimaEstimate, initialArimaNumber,
                 xregModel, xregNumber, nla$initialXregEstimate,
-                constantRequired, constantEstimate);
+                constantRequired, constantEstimate, creatorAdditive=FALSE);
         }
 
         adamFilled <- adam_filler(res$B,
@@ -1045,7 +1018,7 @@ om <- function(data,
             nla$arimaModel, nla$initialArimaEstimate, initialArima, initialArimaNumber,
             adamArchitect$componentsNumberETS, componentsNumberARIMA,
             adamFilled$arimaPolynomials, nla$Etype,
-            xregModel, nla$initialXregEstimate, xregNumber);
+            xregModel, nla$initialXregEstimate, xregNumber, lagsModelARIMA);
 
         # ARMA parameters
         if(nla$arimaModel && (nla$arRequired || nla$maRequired)){
@@ -1373,25 +1346,6 @@ om <- function(data,
             xregModel, xregNumber, initialXregEstimate,
             constantRequired, constantEstimate);
 
-        # ARIMA companion matrices (parallel to omEstimator lines 578-590).
-        if(arimaModel){
-            arPolynomialMatrixUse <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(arPolynomialMatrixUse) > 1){
-                arPolynomialMatrixUse[2:nrow(arPolynomialMatrixUse)-1,
-                                      2:nrow(arPolynomialMatrixUse)] <-
-                    diag(nrow(arPolynomialMatrixUse) - 1);
-            }
-            maPolynomialMatrixUse <- matrix(0, maOrders %*% lags, maOrders %*% lags);
-            if(nrow(maPolynomialMatrixUse) > 1){
-                maPolynomialMatrixUse[2:nrow(maPolynomialMatrixUse)-1,
-                                      2:nrow(maPolynomialMatrixUse)] <-
-                    diag(nrow(maPolynomialMatrixUse) - 1);
-            }
-        } else {
-            arPolynomialMatrixUse <- NULL;
-            maPolynomialMatrixUse <- NULL;
-        }
-
         # Full nloptrArgs, identical shape to omEstimator's (line 597-642).
         nloptrArgsUse <- list(
             etsModel=etsModel, Etype=Etype, Ttype=Ttype, Stype=Stype,
@@ -1427,8 +1381,6 @@ om <- function(data,
             armaParameters=armaParameters,
             nonZeroARI=nonZeroARI, nonZeroMA=nonZeroMA,
             arimaPolynomials=adamCreatedUse$arimaPolynomials,
-            arPolynomialMatrix=arPolynomialMatrixUse,
-            maPolynomialMatrix=maPolynomialMatrixUse,
             xregModel=xregModel, xregNumber=xregNumber,
             xregParametersMissing=xregParametersMissing,
             xregParametersIncluded=xregParametersIncluded,
@@ -1518,10 +1470,6 @@ om <- function(data,
                 nlaFI$initialArimaEstimate       <- iAriFI;
                 nlaFI$initialXregEstimate        <- iXrgFI;
                 nlaFI$bounds                     <- "none";
-                if(arimaModel){
-                    nlaFI$arPolynomialMatrix <- NULL;
-                    nlaFI$maPolynomialMatrix <- NULL;
-                }
 
                 CFAtOptimum <- do.call(omCF_local,
                                        c(list(B=B_for_FI), nlaFI));
@@ -1664,7 +1612,7 @@ om_initial_transform <- function(matVt, occurrence, Etype, Ttype, Stype,
                                  arimaModel, componentsNumberARIMA,
                                  initialArimaEstimate, initialArimaNumber,
                                  xregModel, xregNumber, initialXregEstimate,
-                                 constantRequired, constantEstimate){
+                                 constantRequired, constantEstimate, creatorAdditive=TRUE){
 
     occurrenceTransformer <- function(value){
         value <- switch(occurrence,
@@ -1745,7 +1693,14 @@ om_initial_transform <- function(matVt, occurrence, Etype, Ttype, Stype,
     # not probabilities. Running occurrenceTransformer() on them turns the
     # default seed of 0 into log(0) = -Inf for Etype="A", which corrupts the
     # initial parameter vector handed to nloptr.
+    # The creator usually runs with Etype="A" here (creatorAdditive). For a
+    # multiplicative model its ARIMA values are then on the log scale, so a zero
+    # deviation has to become exp(0) = 1 rather than log(0) downstream.
     if(arimaModel){
+        if(creatorAdditive && Etype=="M" && initialArimaEstimate){
+            matVt[j+1:componentsNumberARIMA, 1:lagsModelMax] <-
+                exp(matVt[j+1:componentsNumberARIMA, 1:lagsModelMax]);
+        }
         j[] <- j + componentsNumberARIMA;
     }
 
@@ -1781,6 +1736,13 @@ omLinkFunction <- function(x, Etype, occurrence){
            x);
 }
 
+# The mixed ETS models that are dangerous to start from the initialiser's values,
+# and that om() and omg() start from no smoothing instead
+#' @keywords internal
+om_mixedModel <- function(Etype, Ttype, Stype){
+    return(any(paste0(Etype, Ttype, Stype)==c("AAM","AMA","MAA","MAN","AMN","MMA","MNA","ANM")));
+}
+
 # File-scope occurrence-model cost function. Used by omEstimator() during
 # optimisation and by the modelDo=="use" branch of om() for FI computation.
 # Takes all dependencies as explicit arguments — no closure state.
@@ -1803,7 +1765,6 @@ omCF_local <- function(B,
                        arOrders, iOrders, maOrders,
                        arRequired, maRequired, armaParameters,
                        nonZeroARI, nonZeroMA, arimaPolynomials,
-                       arPolynomialMatrix, maPolynomialMatrix,
                        xregModel, xregNumber,
                        xregParametersMissing, xregParametersIncluded,
                        xregParametersEstimated, xregParametersPersistence,
@@ -1846,7 +1807,6 @@ omCF_local <- function(B,
                                    xregModel, regressors, xregNumber,
                                    componentsNumberARIMA,
                                    lagsModelAll, obsInSample,
-                                   arPolynomialMatrix, maPolynomialMatrix,
                                    phiEstimate);
     if(penalty != 0){
         return(penalty);
@@ -1892,11 +1852,18 @@ omCF_local <- function(B,
         CFValue <- mean(sqrt(abs(errors)));
     }
     else if(any(loss == c("LASSO","RIDGE"))){
-        # Trim initials out of B for the penalty — same convention as
-        # adam() (R/adam.R:897-916). For non-ARIMA OM the typical B is just
-        # the persistence; we keep that intact and drop nothing if there
-        # are no initials in B.
-        BPenalty <- B;
+        # The penalty on the estimated parameters, as in adam()
+        BPenalty <- adam_penaltyParameters(B, Etype, etsModel, modelIsTrendy, modelIsSeasonal,
+                                           persistenceEstimate, persistenceLevelEstimate,
+                                           persistenceTrendEstimate, persistenceSeasonalEstimate,
+                                           xregModel, persistenceXregEstimate,
+                                           xregParametersPersistence, phiEstimate,
+                                           arimaModel, arEstimate, maEstimate, arOrders, maOrders,
+                                           initialType, initialEstimate, initialXregEstimate,
+                                           xregParametersEstimated, constantEstimate, FALSE,
+                                           adam_lassoDenominators(loss, matWt, componentsNumberETS,
+                                                                  componentsNumberARIMA, xregNumber,
+                                                                  ot)$denominator);
         errorTerm <- (1 - lambda) * sqrt(mean(errors^2));
         if(loss == "LASSO"){
             CFValue <- errorTerm + lambda * sum(abs(BPenalty));

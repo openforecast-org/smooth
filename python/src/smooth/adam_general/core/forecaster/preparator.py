@@ -468,12 +468,19 @@ def _process_initial_values(
             j += 1
         initial_estimated[j] = initials_checked["initial_arima_estimate"]
         if initials_checked["initial_arima_estimate"]:
-            initial_value[j] = matrices_dict["mat_vt"][
-                components_dict["components_number_ets"]
-                + components_dict.get("components_number_arima", 0)
-                - 1,
-                : initials_checked["initial_arima_number"],
-            ]
+            from smooth.adam_general.core.utils.polynomials import (
+                arima_head_initials,
+            )
+
+            n_ets = components_dict["components_number_ets"]
+            initial_value[j] = arima_head_initials(
+                matrices_dict["mat_vt"][
+                    n_ets : n_ets + components_dict["components_number_arima"]
+                ],
+                arima_checked["lags_model_arima"],
+                lags_dict["lags_model_max"],
+                model_type_dict["error_type"],
+            )
         else:
             initial_value[j] = initials_checked["initial_arima"]
         initial_value_names[j] = "arima"
@@ -565,7 +572,7 @@ def _calculate_scale_parameter(
 
 
 def _process_other_parameters(
-    constants_checked, adam_estimated, general_dict, arima_checked, lags_dict=None
+    constants_checked, adam_estimated, general_dict, arima_checked
 ):
     """
     Process additional parameters like constants and ARIMA polynomials.
@@ -580,8 +587,6 @@ def _process_other_parameters(
         Dictionary with general model parameters
     arima_checked : dict
         Dictionary with ARIMA model parameters
-    lags_dict : dict, optional
-        Dictionary with lag-related information
 
     Returns
     -------
@@ -615,25 +620,6 @@ def _process_other_parameters(
             "nonZeroARI": arima_checked["non_zero_ari"],
             "nonZeroMA": arima_checked["non_zero_ma"],
         }
-
-        # Create AR polynomial matrix (R: arOrders %*% lags)
-        if lags_dict is not None:
-            lags_original = lags_dict.get("lags_original", lags_dict["lags"])
-            ar_matrix_size = int(np.dot(arima_checked["ar_orders"], lags_original))
-            other_returned["ar_polynomial_matrix"] = np.zeros(
-                (ar_matrix_size, ar_matrix_size)
-            )
-
-            if other_returned["ar_polynomial_matrix"].shape[0] > 1:
-                # Set diagonal elements to 1 except first row/col
-                other_returned["ar_polynomial_matrix"][1:-1, 2:] = np.eye(
-                    other_returned["ar_polynomial_matrix"].shape[0] - 2
-                )
-
-                if arima_checked["ar_required"]:
-                    other_returned["ar_polynomial_matrix"][:, 0] = -adam_estimated[
-                        "arima_polynomials"
-                    ]["ar_polynomial"][1:]
 
         other_returned["arma_parameters"] = arima_checked["arma_parameters"]
 
@@ -1128,7 +1114,7 @@ def preparator(
 
     # 13. Process constant and other parameters
     constant_value, other_returned = _process_other_parameters(
-        constants_checked, adam_estimated, general_dict, arima_checked, lags_dict
+        constants_checked, adam_estimated, general_dict, arima_checked
     )
 
     # 14. Update parameters number

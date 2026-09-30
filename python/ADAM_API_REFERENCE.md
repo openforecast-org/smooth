@@ -30,7 +30,6 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 | `regressors` | `"use" \| "select" \| "adapt"` | `"use"` | How to handle external regressors |
 | `distribution` | `str \| None` | `None` | Error distribution (`"dnorm"`, `"dgamma"`, `"dlaplace"`, `"dlnorm"`, `"dinvgauss"`, `"ds"`, `"dgnorm"`). Auto-selected if `None` |
 | `loss` | `str` | `"likelihood"` | Loss function (`"likelihood"`, `"MSE"`, `"MAE"`, `"HAM"`, `"MSEh"`, `"TMSE"`, `"GTMSE"`, `"GPL"`, `"MSCE"`, `"LASSO"`, `"RIDGE"`, etc.) |
-| `loss_horizon` | `int \| None` | `None` | Steps for multi-step loss functions |
 | `ic` | `"AIC" \| "AICc" \| "BIC" \| "BICc"` | `"AICc"` | Information criterion for model selection |
 | `bounds` | `"usual" \| "admissible" \| "none"` | `"usual"` | Parameter bounds during optimization |
 
@@ -74,11 +73,10 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 | `h` | `int \| None` | `None` | Forecast horizon (can also be set in `predict()`) |
 | `holdout` | `bool` | `False` | Withhold last `h` observations for validation |
 | `fast` | `bool` | `False` | Use faster, possibly less accurate estimation |
-| `lambda_param` | `float \| None` | `None` | Box-Cox transformation or regularization lambda |
+| `lambda_param` | `float \| None` | `None` | Regularisation parameter of LASSO / RIDGE (R's `lambda`); zero, with a warning, when not provided |
 | `frequency` | `str \| None` | `None` | Time series frequency (e.g. `"D"`, `"M"`); auto-detected from pandas DatetimeIndex |
 | `profiles_recent_provided` | `bool` | `False` | Whether recent seasonal profiles are provided |
 | `profiles_recent_table` | `Any \| None` | `None` | Table of recent profile data |
-| `reg_lambda` | `float \| None` | `None` | Accepted but **not read** by the cost function — use `lambda_param` (or `**{"lambda": …}`) for LASSO/RIDGE. `reg_lambda` is `OM` / `OMG`'s name for it |
 | `gnorm_shape` | `float \| None` | `None` | Shape parameter for generalized normal distribution |
 | `smoother` | `"lowess" \| "ma" \| "global"` | `"lowess"` | Smoother for decomposition in initial state estimation |
 

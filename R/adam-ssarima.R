@@ -157,8 +157,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         orders <- orders(model);
         arma <- model$arma;
         arimaPolynomials <- model$other$polynomial;
-        arPolynomialMatrix <- model$other$arPolynomialMatrix;
-        maPolynomialMatrix <- model$other$maPolynomialMatrix;
         constant <- model$constant;
         if(is.null(constant)){
             constant <- FALSE;
@@ -170,7 +168,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         modelDo <- modelDoOriginal <- "estimate";
         initialValueProvided <- NULL;
         arimaPolynomials <- NULL;
-        arPolynomialMatrix <- maPolynomialMatrix <- NULL;
     }
 
     # SSARIMA is checked as ADAM ARIMA
@@ -335,34 +332,17 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         elements <- filler(B, matVt, matF, vecG, matWt, arRequired=arRequired, maRequired=maRequired,
                            arEstimate=arEstimate, maEstimate=maEstimate);
 
+        # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)
+        if(bounds!="none" && arimaModel){
+            arimaReflection <- max(arEstimate*elements$arimaPolynomials$arReflection,
+                                   maEstimate*elements$arimaPolynomials$maReflection);
+            if(arimaReflection>=1){
+                return(1E+100*arimaReflection);
+            }
+        }
+
         #### The usual bounds ####
         if(bounds=="usual"){
-            # Stationarity and invertibility conditions for ARIMA
-            if(arimaModel && any(c(arEstimate,maEstimate))){
-                # Calculate the polynomial roots for AR
-                if(arEstimate &&
-                   any(abs(elements$arimaPolynomials$maPolynomial[-1])>=1)){
-                   # all(elements$arimaPolynomials$arPolynomial[-1]>0) &&
-                   # sum(-(elements$arimaPolynomials$arPolynomial[-1]))>=1){
-                    # arPolynomialMatrix[,1] <- -elements$arimaPolynomials$arPolynomial[-1];
-                    # arPolyroots <- abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values);
-                    # if(any(arPolyroots>1)){
-                        return(1E+100);
-                    # }
-                }
-                # Calculate the polynomial roots of MA
-                if(maEstimate &&
-                   any(abs(elements$arimaPolynomials$maPolynomial[-1])>=1)){
-                   # sum(elements$arimaPolynomials$maPolynomial[-1])>=1){
-                    # maPolynomialMatrix[,1] <- elements$arimaPolynomials$maPolynomial[-1];
-                    # maPolyroots <- abs(eigen(maPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values);
-                    # if(any(maPolyroots>1)){
-                    #     return(1E+100*max(abs(maPolyroots)));
-                    # }
-                    return(1E+100);
-                }
-            }
-
             # Smoothing parameters for the explanatory variables (0, 1) region
             if(xregModel && regressors=="adapt"){
                 if(any(elements$vecG[componentsNumberARIMA+1:xregNumber]>1) ||
@@ -373,19 +353,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         }
         #### The admissible bounds ####
         else if(bounds=="admissible"){
-            if(arimaModel){
-                # Stationarity condition of ARIMA
-                # Calculate the polynomial roots for AR
-                if(arEstimate &&
-                   (all(-elements$arimaPolynomials$arPolynomial[-1]>0) &
-                    sum(-(elements$arimaPolynomials$arPolynomial[-1]))>=1)){
-                    arPolynomialMatrix[,1] <- -elements$arimaPolynomials$arPolynomial[-1];
-                    eigenValues <- abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values);
-                    if(any(eigenValues>1)){
-                        return(1E+100*max(eigenValues));
-                    }
-                }
-
+            if(xregModel){
                 # Stability / invertibility condition
                 eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
                                             lagsModelAll, xregModel, obsInSample);
@@ -748,61 +716,24 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
             }
 
             # These are filled in lags-wise
+            k <- j;
             if(any(c(arEstimate,maEstimate))){
-                acfValues <- rep(-0.1, maOrders %*% lags);
-                pacfValues <- rep(0.1, arOrders %*% lags);
-                if(!all(iOrders==0)){
-                    yDifferenced <- yInSample;
-                    # If the model has differences, take them
-                    if(any(iOrders>0)){
-                        for(i in 1:length(iOrders)){
-                            if(iOrders[i]>0){
-                                yDifferenced <- diff(yDifferenced,lag=lags[i],differences=iOrders[i]);
-                            }
-                        }
-                    }
-                    # Do ACF/PACF initialisation only for non-seasonal models
-                    # if(all(lags<=1)){
-                    if(maRequired && maEstimate){
-                        # If the sample is smaller than lags, it will be substituted by default values
-                        acfValues[1:min(maOrders %*% lags, length(yDifferenced)-1)] <-
-                            acf(yDifferenced,lag.max=max(1,maOrders %*% lags),plot=FALSE)$acf[-1];
-                    }
-                    if(arRequired && arEstimate){
-                        # If the sample is smaller than lags, it will be substituted by default values
-                        pacfValues[1:min(arOrders %*% lags, length(yDifferenced)-1)] <-
-                            pacf(yDifferenced,lag.max=max(1,arOrders %*% lags),plot=FALSE)$acf;
-                    }
-                    # }
-                }
+                armaValues <- adam_arimaInitialiser(yInSample, otLogical, FALSE, "A", "N", FALSE,
+                                                    lags, arOrders, iOrders, maOrders,
+                                                    arEstimate, maEstimate, armaParameters,
+                                                    bounds!="none", NULL,
+                                                    if(xregModel){matWt[,componentsNumberARIMA+1:xregNumber,
+                                                                        drop=FALSE]});
                 for(i in 1:length(lags)){
                     if(arRequired && arEstimate && arOrders[i]>0){
-                        if(all(!is.nan(pacfValues[c(1:arOrders[i])*lags[i]]))){
-                            B[j+c(1:arOrders[i])] <- pacfValues[c(1:arOrders[i])*lags[i]];
-                        }
-                        else{
-                            B[j+c(1:arOrders[i])] <- 0.1;
-                        }
-                        if(sum(B[j+c(1:arOrders[i])])>1){
-                            B[j+c(1:arOrders[i])] <- B[j+c(1:arOrders[i])] / sum(B[j+c(1:arOrders[i])]) - 0.01;
-                        }
-                        # B[j+c(1:arOrders[i])] <- rep(0.1,arOrders[i]);
+                        B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])];
                         Bl[j+c(1:arOrders[i])] <- -5;
                         Bu[j+c(1:arOrders[i])] <- 5;
                         names(B)[j+1:arOrders[i]] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
                         j[] <- j + arOrders[i];
                     }
                     if(maRequired && maEstimate && maOrders[i]>0){
-                        if(all(!is.nan(acfValues[c(1:maOrders[i])*lags[i]]))){
-                            B[j+c(1:maOrders[i])] <- acfValues[c(1:maOrders[i])*lags[i]];
-                        }
-                        else{
-                            B[j+c(1:maOrders[i])] <- 0.1;
-                        }
-                        if(sum(B[j+c(1:maOrders[i])])>1){
-                            B[j+c(1:maOrders[i])] <- B[j+c(1:maOrders[i])] / sum(B[j+c(1:maOrders[i])]) - 0.01;
-                        }
-                        # B[j+c(1:maOrders[i])] <- rep(-0.1,maOrders[i]);
+                        B[j+c(1:maOrders[i])] <- armaValues[j-k+c(1:maOrders[i])];
                         Bl[j+c(1:maOrders[i])] <- -5;
                         Bu[j+c(1:maOrders[i])] <- 5;
                         names(B)[j+1:maOrders[i]] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
@@ -841,6 +772,12 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
             if(constantEstimate){
                 j[] <- j+1;
                 B[j] <- matVt[componentsNumberARIMA+xregNumber+1,1];
+                # The constant is the intercept of ARIMA, so it needs to agree with the AR starting values
+                if(arimaModel){
+                    B[j] <- B[j] * sum(adamCpp$polynomialise(B[k+seq_len(sum(arOrders*arEstimate+maOrders*maEstimate))],
+                                                             arOrders, iOrders, maOrders, arEstimate, maEstimate,
+                                                             armaParameters, lags)$arPolynomial);
+                }
                 names(B)[j] <- constantName;
                 if(sum(iOrders)!=0){
                     Bu[j] <- quantile(diff(yInSample[otLogical]),0.6);
@@ -943,20 +880,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
             # Not used in the estimation because they lead to wrong estimates
             # lb <- BValues$Bl;
             # ub <- BValues$Bu;
-        }
-
-        # Companion matrices for the polynomials calculation -> stationarity / stability checks
-        if(arimaModel){
-            # AR polynomials
-            arPolynomialMatrix <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(arPolynomialMatrix)>1){
-                arPolynomialMatrix[2:nrow(arPolynomialMatrix)-1,2:nrow(arPolynomialMatrix)] <- diag(nrow(arPolynomialMatrix)-1);
-            }
-            # MA polynomials
-            maPolynomialMatrix <- matrix(0, maOrders %*% lags, maOrders %*% lags);
-            if(nrow(maPolynomialMatrix)>1){
-                maPolynomialMatrix[2:nrow(maPolynomialMatrix)-1,2:nrow(maPolynomialMatrix)] <- diag(nrow(maPolynomialMatrix)-1);
-            }
         }
 
         #### Parameters of the nloptr and optimisation ####
@@ -1227,8 +1150,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         }
 
         otherReturned <- list(polynomial=arimaPolynomials,
-                              arPolynomialMatrix=arPolynomialMatrix,
-                              maPolynomialMatrix=maPolynomialMatrix,
                               ARIMAIndices=list(nonZeroARI=nonZeroARI,nonZeroMA=nonZeroMA));
     }
     else{

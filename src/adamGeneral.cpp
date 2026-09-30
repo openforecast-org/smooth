@@ -19,7 +19,9 @@ namespace Rcpp {
             Named("arPolynomial") = result.arPolynomial,
             Named("iPolynomial") = result.iPolynomial,
             Named("ariPolynomial") = result.ariPolynomial,
-            Named("maPolynomial") = result.maPolynomial
+            Named("maPolynomial") = result.maPolynomial,
+            Named("arReflection") = result.arReflection,
+            Named("maReflection") = result.maReflection
         );
     }
 

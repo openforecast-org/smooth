@@ -213,6 +213,7 @@ def _get_polynomial_indices(ar_orders, i_orders, ma_orders, lags):
         _pairs(ma_indices),
         lags_model_arima,
         len(lags_model_arima),
+        # The initials are based on the longest lag (see arima_initials)
         max(lags_model_arima),
     )
 
@@ -421,6 +422,7 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
         )
 
         components_number_arima = len(lags_model_arima)
+        # The initials are based on the longest lag (see arima_initials)
         initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
         # Component names
         if components_number_arima > 1:
@@ -444,40 +446,35 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
     arima_result["ar_estimate"] = ar_required
     arima_result["ma_estimate"] = ma_required
 
-    # Initialize ARMA parameters (will be filled during estimation)
-    arima_parameters = []
-    if ar_required:
-        for i in range(len(ar_orders)):
-            for j in range(ar_orders[i]):
-                arima_parameters.append(0.0)
-    if ma_required:
-        for i in range(len(ma_orders)):
-            for j in range(ma_orders[i]):
-                arima_parameters.append(0.0)
-
-    arima_result["arma_parameters"] = arima_parameters if arima_parameters else None
-
-    # Apply fixed ARMA values from `arma` dict
+    # The provided ARMA parameters, as R's parametersChecker: lag by lag, the AR of
+    # the lag, then its MA, of those provided only, which is the order in which the
+    # polynomialiser reads them. A wrong number of them switches to estimation
+    arma_parameters: list = []
     if arma is not None and isinstance(arma, dict):
-        ar_fixed = arma.get("ar", None)
-        ma_fixed = arma.get("ma", None)
-        n_ar = sum(ar_orders)
-        n_ma = sum(ma_orders)
-
-        if ar_fixed is not None and ar_required:
-            ar_fixed = (
-                [ar_fixed] if isinstance(ar_fixed, (int, float)) else list(ar_fixed)
-            )
-            arima_result["ar_estimate"] = False
-            arima_parameters[:n_ar] = ar_fixed[:n_ar]
-
-        if ma_fixed is not None and ma_required:
-            ma_fixed = (
-                [ma_fixed] if isinstance(ma_fixed, (int, float)) else list(ma_fixed)
-            )
-            arima_result["ma_estimate"] = False
-            arima_parameters[n_ar : n_ar + n_ma] = ma_fixed[:n_ma]
-
-        arima_result["arma_parameters"] = arima_parameters if arima_parameters else None
+        fixed = {}
+        for kind, orders, required in (
+            ("ar", ar_orders, ar_required),
+            ("ma", ma_orders, ma_required),
+        ):
+            values = arma.get(kind)
+            if values is None or not required:
+                continue
+            values = [values] if isinstance(values, (int, float)) else list(values)
+            if len(values) != sum(orders):
+                warnings.warn(
+                    f"The number of provided {kind.upper()} parameters is "
+                    f"{len(values)} while I need {sum(orders)}. "
+                    "Switching to estimation.",
+                    stacklevel=2,
+                )
+                continue
+            fixed[kind] = iter(values)
+            arima_result[f"{kind}_estimate"] = False
+        for ar_order, ma_order in zip(ar_orders, ma_orders):
+            if "ar" in fixed:
+                arma_parameters += [next(fixed["ar"]) for _ in range(ar_order)]
+            if "ma" in fixed:
+                arma_parameters += [next(fixed["ma"]) for _ in range(ma_order)]
+    arima_result["arma_parameters"] = arma_parameters if arma_parameters else None
 
     return arima_result

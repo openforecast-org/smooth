@@ -397,8 +397,156 @@ class TestADAMARIMAOrders:
         assert arima["ma_orders"] == [0, 1]
 
 
+class TestADAMLags:
+    """``_lags_model["lags"]`` stays the user's lags, as R's ``lags``."""
+
+    @pytest.fixture
+    def log_air(self):
+        """The log of AirPassengers."""
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return np.log(pd.read_csv(path)["y"].values.astype(float))
+
+    def test_lags_of_pure_arima(self, log_air):
+        """A pure SARIMA has no ETS component lags, but its lags are still [1, 12]."""
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12]).fit(log_air)
+        assert model.lags_used == [1, 12]
+
+    @pytest.mark.r_parity
+    def test_lasso_arima_matches_r(self, log_air):
+        """The LASSO penalty trims the ARMA parameters by their lags, as in R."""
+        from ._r_bridge import r_array
+
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(
+            model="NNN", orders=orders, lags=[1, 12], loss="LASSO", lambda_param=0.1
+        ).fit(log_air)
+        expected = r_array(
+            "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12), loss='LASSO',"
+            " lambda=0.1, orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1))); unname(coef(m))}",
+            R_data={"y": log_air},
+        )
+        np.testing.assert_allclose(model.coef, expected, rtol=1e-6)
+
+
+class TestADAMRegularisation:
+    """LASSO / RIDGE: ``lambda_param`` is R's ``lambda``, zero when not provided."""
+
+    @pytest.fixture
+    def log_air(self):
+        """The log of AirPassengers."""
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return np.log(pd.read_csv(path)["y"].values.astype(float))
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "kwargs, r_args",
+        [
+            ({}, ""),
+            ({"lambda_param": 1, "initial": "optimal"}, ", lambda=1, initial='optimal'"),
+        ],
+    )
+    def test_lambda_matches_r(self, log_air, kwargs, r_args):
+        """A missing lambda is zero, and lambda=1 estimates the initials only."""
+        from ._r_bridge import r_array
+
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(
+            model="NNN", orders=orders, lags=[1, 12], loss="LASSO", **kwargs
+        ).fit(log_air)
+        expected = r_array(
+            "{m <- suppressWarnings(adam(ts(y, frequency=12), 'NNN', lags=c(1,12),"
+            f" loss='LASSO', orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1)){r_args}));"
+            " unname(m$B)}",
+            R_data={"y": log_air},
+        )
+        np.testing.assert_allclose(model._adam_estimated["B"], expected, rtol=1e-6)
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "kwargs, r_args, with_x",
+        [
+            # Nothing is left to estimate: the loss at the targets, zero
+            ({"model": "AAN", "loss": "RIDGE", "lambda_param": 1}, "'AAN', loss='RIDGE', lambda=1", False),
+            # The constant after the regressors is not shrunk
+            (
+                {"model": "NNN", "orders": {"ar": [1], "i": [1], "ma": [1]},
+                 "constant": True, "loss": "LASSO", "lambda_param": 0.1},
+                "'NNN', orders=list(ar=1,i=1,ma=1), constant=TRUE, loss='LASSO', lambda=0.1",
+                True,
+            ),
+            # Provided smoothing: the rest is found where it is in B
+            (
+                {"model": "AAN", "persistence": {"alpha": 0.3}, "loss": "LASSO", "lambda_param": 0.1},
+                "'AAN', persistence=list(alpha=0.3), loss='LASSO', lambda=0.1",
+                False,
+            ),
+            # Nothing to estimate without LASSO either: the loss, not inf
+            ({"model": "AAN", "persistence": {"alpha": 0.3, "beta": 0.1}}, "'AAN', persistence=list(alpha=0.3, beta=0.1)", False),
+        ],
+    )
+    def test_penalty_and_use_match_r(self, log_air, kwargs, r_args, with_x):
+        """The penalised parameters and the fixed models give R's B and loss."""
+        from ._r_bridge import r_array
+
+        y = np.exp(log_air)
+        rng = np.random.default_rng(3)
+        X = np.column_stack([rng.normal(size=len(y)), rng.normal(5, 1, len(y))])
+        model = ADAM(lags=[1, 12], **kwargs).fit(y, X=X if with_x else None)
+        data = "data.frame(y=y, x1=x1, x2=x2)" if with_x else "ts(y, frequency=12)"
+        expected = r_array(
+            f"{{m <- suppressWarnings(adam({data}, {r_args}, lags=c(1,12)));"
+            " c(m$lossValue, unname(m$B))}",
+            R_data={"y": y, "x1": X[:, 0], "x2": X[:, 1]},
+        )
+        estimated = model._adam_estimated
+        assert estimated["CF_value"] == pytest.approx(expected[0], rel=1e-8, abs=1e-12)
+        np.testing.assert_allclose(estimated["B"], expected[1:], rtol=1e-5, atol=1e-8)
+
+
 class TestADAMArmaFixed:
     """Tests for fixed ARMA parameters via the arma argument."""
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "arma, arma_r",
+        [
+            ({"ar": [0.2, 0.3], "ma": [-0.4, -0.5]}, "list(ar=c(0.2,0.3), ma=c(-0.4,-0.5))"),
+            ({"ma": [-0.4, -0.5]}, "list(ma=c(-0.4,-0.5))"),
+            ({"ar": [0.2, 0.3]}, "list(ar=c(0.2,0.3))"),
+        ],
+    )
+    def test_seasonal_arma_matches_r(self, arma, arma_r):
+        """Provided ARMA values are read lag by lag, AR then MA, as in R."""
+        import pathlib
+
+        import pandas as pd
+
+        from ._r_bridge import r_array
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        model = ADAM(
+            model="NNN",
+            orders={"ar": [1, 1], "i": [1, 1], "ma": [1, 1]},
+            lags=[1, 12],
+            arma=arma,
+            initial="optimal",
+        ).fit(y)
+        expected = r_array(
+            "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12), initial='optimal',"
+            f" orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1)), arma={arma_r}); m$lossValue}}",
+            R_data={"y": y},
+        )
+        assert model._adam_estimated["CF_value"] == pytest.approx(float(expected[0]), rel=1e-8)
 
     @pytest.fixture
     def arima_series(self):
@@ -665,3 +813,458 @@ class TestADAMPersistenceNames:
             model="ANN", lags=[1], persistence={"level": 0.3}, initial="backcasting"
         ).fit(y)
         assert both.loglik == only.loglik
+
+
+class TestADAMARIMAInitialiser:
+    """Hannan-Rissanen starting values of the ARMA parameters."""
+
+    @pytest.fixture
+    def air(self):
+        """The full AirPassengers series."""
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return pd.read_csv(path)["y"].values.astype(float)
+
+    @staticmethod
+    def _hr(y, ar, ma, lags, ar_est=True, ma_est=True, arma=(), use=None, bounds=True):
+        from smooth.adam_general import _ols
+
+        lags = np.asarray(lags, dtype=np.uint64)
+        return _ols.arima_hr(
+            np.asarray(y, dtype=float),
+            np.asarray(ar, dtype=np.uint64),
+            np.asarray(ma, dtype=np.uint64),
+            lags,
+            ar_est,
+            ma_est,
+            np.asarray(arma, dtype=float),
+            np.ones_like(lags) if use is None else np.asarray(use, dtype=np.uint64),
+            bounds,
+        )
+
+    @staticmethod
+    def _arma(n, ar, ma, seed):
+        from scipy.signal import lfilter
+
+        e = np.random.default_rng(seed).normal(size=n + 200)
+        return lfilter([1, ma], [1, -ar], e)[200:]
+
+    def test_recovers_arma(self):
+        """HR lands next to the true ARMA(1,1) parameters."""
+        b = self._hr(self._arma(1000, 0.6, 0.3, 41), [1], [1], [1])
+        np.testing.assert_allclose(b, [0.6, 0.3], atol=0.1)
+
+    def test_feasible_only_when_rejected(self):
+        """Values move inside the boundary only if the cost function rejects them."""
+        e = np.random.default_rng(45).normal(size=200)
+        y = np.zeros(200)
+        for t in range(1, 200):
+            y[t] = 1.03 * y[t - 1] + e[t]
+        ar_raw = self._hr(y, [1], [0], [1], ma_est=False, bounds=False)
+        assert ar_raw[0] > 1
+        assert self._hr(y, [1], [0], [1], ma_est=False)[0] == pytest.approx(0.99)
+
+        # A non-invertible HR estimate is reflected to the invertible MA
+        w = np.diff(np.random.default_rng(47).normal(size=300), n=2)
+        ma = [self._hr(w, [0], [1], [1], ar_est=False, bounds=b)[0] for b in (False, True)]
+        assert abs(ma[0]) < 1
+        assert ma[1] == ma[0]
+
+    def test_defaults_and_provided(self):
+        """Too few seasons or a switched-off level keep the defaults."""
+        y = self._arma(300, 0.6, 0.3, 41)
+        short = self._hr(y[:30], [1, 1], [1, 1], [1, 12])
+        np.testing.assert_array_equal(short[2:], [0.1, -0.1])
+        off = self._hr(y, [1, 1], [1, 1], [1, 12], use=[1, 0])
+        np.testing.assert_array_equal(off[2:], [0.1, -0.1])
+        assert len(self._hr(y, [1], [1], [1], ar_est=False, arma=[0.6])) == 1
+
+    def test_regression_residuals(self):
+        """HR runs on the residuals of the regression, not on the series."""
+        from scipy.signal import lfilter
+
+        rng = np.random.default_rng(48)
+        x = rng.normal(10, 5, 200)
+        y = 100 + 5 * x + lfilter([1], [1, -0.6], rng.normal(size=400))[200:]
+        start = ADAM(
+            model="NNN",
+            orders={"ar": [1]},
+            constant=True,
+            nlopt_kwargs={"maxeval": 1},
+        ).fit(y, X=x.reshape(-1, 1))
+        assert start.coef[0] == pytest.approx(0.6, abs=0.1)
+
+    @pytest.mark.r_parity
+    def test_regression_on_differences_matches_r(self):
+        """With differences, HR runs on the regression of the differences, as in R."""
+        from ._r_bridge import r_array
+
+        rng = np.random.default_rng(49)
+        # Short: the bridge passes the data on Rscript's command line
+        x = np.cumsum(rng.normal(size=120))
+        y = 100 + 3 * x + np.cumsum(self._arma(120, 0.0, 0.5, 49))
+        start = ADAM(
+            model="NNN",
+            orders={"ar": [0], "i": [1], "ma": [1]},
+            nlopt_kwargs={"maxeval": 1},
+        ).fit(y, X=x.reshape(-1, 1))
+        expected = r_array(
+            "{m <- adam(data.frame(y=y, x=x), 'NNN', orders=list(i=1, ma=1),"
+            " maxeval=1); unname(m$B['theta1[1]'])}",
+            R_data={"y": y, "x": x},
+        )
+        np.testing.assert_allclose(start.coef[:1], expected, rtol=1e-12)
+
+    def test_constant_is_intercept(self):
+        """The constant starts consistent with AR and the fit finds the mean."""
+        y = 100 + self._arma(200, 0.6, 0.3, 41)
+        model = ADAM(
+            model="NNN",
+            orders={"ar": [1], "i": [0], "ma": [1]},
+            lags=[1],
+            constant=True,
+        ).fit(y)
+        phi, constant = model.coef[0], model.coef[-1]
+        assert constant / (1 - phi) == pytest.approx(np.mean(y), rel=0.01)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [{"distribution": d} for d in ("dlaplace", "ds", "dgnorm", "dgamma", "dlnorm")]
+        + [{"loss": loss} for loss in ("MAE", "HAM", "MSEh", "TMSE", "GTMSE", "GPL")],
+    )
+    def test_non_normal_and_losses(self, air, kwargs):
+        """The fit improves on the starting point under any distribution and loss."""
+        args = dict(
+            model="NNN",
+            orders={"ar": [1, 1], "i": [1, 1], "ma": [1, 1]},
+            lags=[1, 12],
+            h=12,
+            **kwargs,
+        )
+        start = ADAM(**args, nlopt_kwargs={"maxeval": 1}).fit(air)
+        model = ADAM(**args).fit(air)
+        assert np.all(np.isfinite(start.coef))
+        assert model._adam_estimated["CF_value"] <= start._adam_estimated["CF_value"]
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "model, orders, lags, distribution",
+        [
+            ("NNN", {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, [1, 12], "dnorm"),
+            ("NNN", {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, [1, 12], "dgamma"),
+            ("MAM", {"ar": [1, 1], "i": [0, 0], "ma": [1, 1]}, [1, 12], "dgamma"),
+            ("AAN", {"ar": [1], "i": [0], "ma": [1]}, [1], "dnorm"),
+        ],
+    )
+    def test_starting_values_match_r(self, air, model, orders, lags, distribution):
+        """The ARMA starting values are R's, bit for bit up to the JSON round-trip."""
+        from ._r_bridge import r_array, r_to_literal
+
+        start = ADAM(
+            model=model,
+            orders=orders,
+            lags=lags,
+            distribution=distribution,
+            nlopt_kwargs={"maxeval": 1},
+        ).fit(air)
+        n_arma = sum(orders["ar"]) + sum(orders["ma"])
+        orders_r = ",".join(f"{k}={r_to_literal(v)}" for k, v in orders.items())
+        expected = r_array(
+            f"{{m <- adam(ts(y, frequency=12), '{model}', orders=list({orders_r}),"
+            f" lags={r_to_literal(lags)}, distribution='{distribution}', maxeval=1);"
+            " unname(m$B[grepl('phi|theta', names(m$B))])}",
+            R_data={"y": air},
+        )
+        k = len(start.coef) - n_arma
+        np.testing.assert_allclose(start.coef[k:], expected, rtol=1e-12)
+
+
+class TestARIMABounds:
+    """Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)."""
+
+    def test_reflection_matches_the_roots(self):
+        """The largest reflection coefficient is below one exactly when all roots are outside."""
+        from smooth.adam_general import _adamCore
+        from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
+
+        core = _adamCore.adamCore(
+            lags=np.ones(1, dtype=np.uint64),
+            E="A",
+            T="N",
+            S="N",
+            nNonSeasonal=0,
+            nSeasonal=0,
+            nETS=0,
+            nArima=0,
+            nXreg=0,
+            nComponents=0,
+            constant=False,
+            adamETS=False,
+        )
+        rng = np.random.default_rng(3)
+        for _ in range(200):
+            theta = rng.uniform(-2, 2, 3)
+            polys = adam_polynomialiser(
+                core, theta, [0, 0], [0, 0], [1, 2], False, True, [], [1, 12]
+            )
+            invertible = np.all(np.abs(np.roots([theta[2], theta[1], 1])) > 1) and (
+                abs(theta[0]) < 1
+            )
+            assert (polys["ma_reflection"] < 1) == invertible
+
+    @pytest.mark.r_parity
+    def test_bounds_match_r(self):
+        """The ARIMA penalty accepts and rejects the same seasonal MA / AR as R."""
+        import pathlib
+
+        import pandas as pd
+
+        from smooth.adam_general import _adamCore
+        from smooth.adam_general.core.utils.polynomials import (
+            adam_polynomialiser,
+            arima_bounds_penalty,
+        )
+
+        from ._r_bridge import r_dict
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        core = _adamCore.adamCore(
+            lags=np.ones(1, dtype=np.uint64),
+            E="A",
+            T="N",
+            S="N",
+            nNonSeasonal=0,
+            nSeasonal=0,
+            nETS=0,
+            nArima=0,
+            nXreg=0,
+            nComponents=0,
+            constant=False,
+            adamETS=False,
+        )
+        cases = [
+            ({"ar": [0, 0], "i": [1, 1], "ma": [0, 2]}, [1.058, 0.793]),
+            ({"ar": [0, 0], "i": [1, 1], "ma": [0, 2]}, [0.3, -1.2]),
+            ({"ar": [0, 2], "i": [1, 0], "ma": [0, 0]}, [1.2, -0.3]),
+            ({"ar": [0, 2], "i": [1, 0], "ma": [0, 0]}, [0.3, 0.8]),
+        ]
+        for orders, values in cases:
+            arima = {
+                "arima_model": True,
+                "ar_estimate": sum(orders["ar"]) > 0,
+                "ma_estimate": sum(orders["ma"]) > 0,
+            }
+            polys = adam_polynomialiser(
+                core,
+                values,
+                orders["ar"],
+                orders["i"],
+                orders["ma"],
+                arima["ar_estimate"],
+                arima["ma_estimate"],
+                [],
+                [1, 12],
+            )
+            orders_r = ",".join(
+                f"{k}=c({','.join(map(str, v))})" for k, v in orders.items()
+            )
+            expected = r_dict(
+                f"{{m <- adam(ts(y, frequency=12), 'NNN', orders=list({orders_r}),"
+                f" lags=c(1,12), maxeval=1, B=c({','.join(map(str, values))}));"
+                " list(loss=m$lossValue)}",
+                R_data={"y": y},
+            )
+            assert (arima_bounds_penalty(arima, polys) == 0) == (
+                expected["loss"][0] < 1e100
+            )
+
+
+    def test_parameter_bounds_match_the_roots(self):
+        """The bounds of a parameter within its factor are those of the roots."""
+        from smooth.adam_general import _ols
+
+        values = np.array([0.1, 0.2, 0.3])
+        grid = np.arange(-3, 3, 0.001)
+        stable = [
+            np.all(np.abs(np.roots([-0.3, -v, -0.1, 1])) > 1) for v in grid
+        ]
+        np.testing.assert_allclose(
+            _ols.arima_parameter_bounds(values, 1, -1.0),
+            [grid[stable].min(), grid[stable].max()],
+            atol=2e-3,
+        )
+        assert np.all(np.isnan(_ols.arima_parameter_bounds(np.array([1.2]), 0, 1.0)))
+
+    @pytest.mark.r_parity
+    def test_confint_matches_r(self):
+        """The ARMA confidence intervals are clamped to the same region as in R."""
+        import pathlib
+
+        import pandas as pd
+
+        from ._r_bridge import r_array
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        orders = {"ar": [2, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12]).fit(y)
+        expected = r_array(
+            "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12),"
+            " orders=list(ar=c(2,1), i=c(1,1), ma=c(1,1))); unname(confint(m))}",
+            R_data={"y": y},
+        )
+        np.testing.assert_allclose(model.confint().values, expected, rtol=1e-6)
+
+class TestADAMARIMAStates:
+    """ARIMA initials: the initial state of the companion form, as in ssarima."""
+
+    @pytest.fixture
+    def air(self):
+        """The full AirPassengers series."""
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return pd.read_csv(path)["y"].values.astype(float)
+
+    def test_initials_sum_the_ari_states_by_time(self):
+        """Initial k sums ari_L * x[m-L+k] over the ARI lags L >= k."""
+        from smooth.adam_general.core.utils.polynomials import arima_initials
+
+        # (1 - B)(1 - B^12): ARI lags 1, 12 and 13
+        ari = np.zeros(14)
+        ari[[0, 1, 12, 13]] = [1, -1, -1, 1]
+        x = np.arange(1.0, 14.0)
+        expected = x.copy()  # lag 13: x[k-1]
+        expected[:12] -= x[1:13]  # lag 12: -x[k]
+        expected[0] -= x[12]  # lag 1: -x[12]
+        np.testing.assert_array_equal(arima_initials(ari, x, "A"), expected)
+
+    def test_head_initials_read_the_fitted_heads_by_time(self):
+        """The state with lag L gives the time k its fitted column max-L+k."""
+        from smooth.adam_general.core.utils.polynomials import arima_head_initials
+
+        head = np.arange(1.0, 13.0).reshape(3, 4)
+        # Lags 1, 2 and 4: time 1 <- [0,3] + [1,2] + [2,0]; time 2 <- [1,3] + [2,1]
+        expected = [4 + 7 + 9, 8 + 10, 11, 12]
+        np.testing.assert_array_equal(
+            arima_head_initials(head, [1, 2, 4], 4, "A"), expected
+        )
+
+    def test_every_initial_enters_the_fit(self, air):
+        """The MA-only states have initials too, each changing the loss."""
+        orders = {"ar": [0, 0], "i": [1, 0], "ma": [0, 1]}
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12], initial="optimal").fit(
+            np.log(air)
+        )
+        names = [n for n in model.coef_names if n.startswith("ARIMAState")]
+        assert len(names) == 12
+        assert np.all(np.asarray(model.states)[:-1, :12] == 0)
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "model, orders, lags, extra, log_data",
+        [
+            ("NNN", {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, [1, 12], "", True),
+            ("NNN", {"ar": [0, 2], "i": [0, 1], "ma": [0, 0]}, [1, 12], "", True),
+            ("NNN", {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, [1, 12], "dg", False),
+            ("NNN", {"ar": [1, 1], "i": [0, 0], "ma": [0, 0]}, [1, 12], "c", True),
+            ("NNN", {"ar": [0, 0], "i": [1, 1], "ma": [1, 1]}, [1, 12], "c", True),
+            ("NNN", {"ar": [0, 0], "i": [1, 0], "ma": [0, 1]}, [1, 12], "", True),
+            ("MAM", {"ar": [1, 1], "i": [0, 0], "ma": [1, 1]}, [1, 12], "dg", False),
+            ("ANA", {"ar": [1, 1], "i": [0, 0], "ma": [1, 1]}, [1, 12], "", False),
+        ],
+    )
+    def test_optimal_arima_matches_r(self, air, model, orders, lags, extra, log_data):
+        """Starting B, loss and fitted values of optimal ARIMA agree with R."""
+        from ._r_bridge import r_dict, r_to_literal
+
+        y = np.log(air) if log_data else air
+        distribution = "dgamma" if extra == "dg" else "dnorm"
+        constant = extra == "c"
+        args = dict(
+            model=model,
+            orders=orders,
+            lags=lags,
+            distribution=distribution,
+            constant=constant,
+            initial="optimal",
+        )
+        start = ADAM(**args, nlopt_kwargs={"maxeval": 1}).fit(y)
+        fitted = ADAM(**args).fit(y)
+        orders_r = ",".join(f"{k}={r_to_literal(v)}" for k, v in orders.items())
+        call = (
+            f"adam(ts(y, frequency=12), '{model}', orders=list({orders_r}),"
+            f" lags={r_to_literal(lags)}, distribution='{distribution}',"
+            f" constant={'TRUE' if constant else 'FALSE'}, initial='optimal'"
+        )
+        expected = r_dict(
+            f"{{m0 <- {call}, maxeval=1); m <- {call});"
+            " list(B=unname(m0$B), loss=m$lossValue, fitted=as.vector(fitted(m)))}",
+            R_data={"y": y},
+        )
+        np.testing.assert_allclose(start.coef, expected["B"], rtol=1e-8, atol=1e-10)
+        assert fitted._adam_estimated["CF_value"] == pytest.approx(
+            expected["loss"][0], rel=1e-6
+        )
+        np.testing.assert_allclose(
+            np.asarray(fitted.fitted).ravel(), expected["fitted"], rtol=1e-5
+        )
+
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "orders, initial",
+        [
+            ({"ar": [1, 0], "i": [1, 0], "ma": [1, 2]}, "backcasting"),
+            ({"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}, "backcasting"),
+            ({"ar": [2, 0], "i": [1, 1], "ma": [0, 1]}, "complete"),
+        ],
+    )
+    def test_backcasted_arima_matches_r(self, air, orders, initial):
+        """The seed of the backcasting does not drift between the CF calls."""
+        from ._r_bridge import r_dict, r_to_literal
+
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12], initial=initial).fit(
+            np.log(air)
+        )
+        orders_r = ",".join(f"{k}={r_to_literal(v)}" for k, v in orders.items())
+        expected = r_dict(
+            f"{{m <- adam(ts(y, frequency=12), 'NNN', orders=list({orders_r}),"
+            f" lags=c(1,12), initial='{initial}');"
+            " list(B=unname(m$B), loss=m$lossValue)}",
+            R_data={"y": np.log(air)},
+        )
+        assert model._adam_estimated["CF_value"] == pytest.approx(
+            expected["loss"][0], rel=1e-6
+        )
+        np.testing.assert_allclose(model.coef, expected["B"], rtol=1e-4, atol=1e-6)
+
+    @pytest.mark.r_parity
+    def test_two_stage_arima_matches_r(self, air):
+        """Two-stage passes the backcasted initials on as R does."""
+        from ._r_bridge import r_dict
+
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1]}
+        model = ADAM(model="NNN", orders=orders, lags=[1, 12], initial="two-stage").fit(
+            np.log(air)
+        )
+        expected = r_dict(
+            "{m <- adam(ts(y, frequency=12), 'NNN', orders=list(ar=c(1,1), i=c(1,1),"
+            " ma=c(1,1)), lags=c(1,12), initial='two-stage');"
+            " list(loss=m$lossValue, arima=unname(m$initial$arima))}",
+            R_data={"y": np.log(air)},
+        )
+        assert model._adam_estimated["CF_value"] == pytest.approx(
+            expected["loss"][0], rel=1e-6
+        )
+        arima_initials = [
+            value
+            for name, value in zip(model.coef_names, model.coef)
+            if name.startswith("ARIMAState")
+        ]
+        np.testing.assert_allclose(arima_initials, expected["arima"], rtol=1e-5)

@@ -446,7 +446,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             nonZeroMA <- NULL;
         }
         else{
-            # Number of initials needed. This is based on the longest one. The others are just its transformations
+            # Number of initials needed. This is based on the longest one (see adam_arimaInitials)
             initialArimaNumber <- max(lagsModelARIMA);
         }
     }
@@ -1127,7 +1127,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                             # If there is something else left, this must be ARIMA
                             if(all(!is.na(initial[j+c(1:initialArimaNumber)]))){
                                 initialArima <- initial[j+c(1:initialArimaNumber)];
-                                j <- j+max(lagsModelARIMA);
+                                j <- j+initialArimaNumber;
                                 initialArimaEstimate[] <- FALSE;
                             }
                         }
@@ -1408,6 +1408,12 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     }
                     # This is needed to see if trend was asked explicitly. If not, we add it to get rid of bias
                     trendIncluded <- any(colnames(xregData)[-1]=="trend");
+                    # Unless a regressor is a trend itself: alm() drops the first of two variables
+                    # correlated above 0.999, which would be the regressor rather than the trend
+                    xregNumeric <- Filter(is.numeric, as.data.frame(xregData)[which(subset),-1,drop=FALSE]);
+                    trendCollinear <- ncol(xregNumeric)>0 &&
+                        any(abs(suppressWarnings(cor(xregNumeric, seq_len(nrow(xregNumeric)))))>=0.999, na.rm=TRUE);
+                    trendIncluded <- trendIncluded || trendCollinear;
                     formulaIsAbsent <- is.null(formulaToUse);
                     formulaOriginal <- formulaToUse;
                     # If the formula is not provided, construct one
@@ -1453,7 +1459,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                             }
                         }
                         else{
-                            trendIncluded <- any(all.vars(formulaToUse)[-1]=="trend");
+                            trendIncluded <- any(all.vars(formulaToUse)[-1]=="trend") || trendCollinear;
                             # If formula contains only one element, or several, but no logs, then change response formula
                             if((length(formulaToUse[[2]])==1 ||
                                 (length(formulaToUse[[2]])>1 & !any(as.character(formulaToUse[[2]])=="log"))) &&
@@ -2829,6 +2835,34 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         phiEstimate <- FALSE;
         parametersNumber[1,1] <- 0;
         parametersNumber[2,1] <- 2;
+    }
+
+    # LASSO / RIDGE with lambda=1 is the penalty alone, which is zero with the parameters
+    # at their shrinkage targets: no smoothing, phi=1, AR=1 and MA=0. They are set to
+    # them, leaving the initials and the regressors, estimated with lambda=0 in adam(),
+    # or nothing, and then the model is used as it is
+    if(any(loss==c("LASSO","RIDGE")) && lambda==1){
+        if(etsModel){
+            persistenceEstimate[] <- persistenceLevelEstimate[] <- persistenceTrendEstimate[] <-
+                persistenceSeasonalEstimate[] <- phiEstimate[] <- FALSE;
+            persistenceLevel <- persistenceTrend <- persistenceSeasonal <- 0;
+            phi <- 1;
+        }
+        if(xregModel){
+            persistenceXregEstimate[] <- FALSE;
+            persistenceXreg <- 0;
+        }
+        if(arimaModel){
+            arEstimate[] <- maEstimate[] <- FALSE;
+            armaParameters <- NULL;
+            for(i in seq_along(lags)){
+                armaParameters <- c(armaParameters,
+                                    setNames(rep(1, arOrders[i]),
+                                             paste0("phi", seq_len(arOrders[i]), "[", lags[i], "]")),
+                                    setNames(rep(0, maOrders[i]),
+                                             paste0("theta", seq_len(maOrders[i]), "[", lags[i], "]")));
+            }
+        }
     }
 
     # See if the estimation of the model is not needed (do we estimate anything?)

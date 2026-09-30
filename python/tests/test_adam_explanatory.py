@@ -158,6 +158,68 @@ def test_etsx_adapt_aic_better_than_null(etsx_data):
 
 # --- edge cases ---
 
+def test_etsx_adapt_deltas_within_bounds(etsx_data):
+    """The usual bounds keep the smoothing parameters of the regressors in [0, 1]."""
+    y, X = etsx_data
+    model = ADAM(model="AAN", regressors="adapt").fit(y, X=X)
+    deltas = [v for n, v in zip(model.coef_names, model.coef) if n.startswith("delta")]
+    assert deltas and all(0 <= d <= 1 for d in deltas)
+
+
+@pytest.mark.r_parity
+def test_etsx_adapt_dummies_match_r():
+    """Monthly dummies with adapt: the initials (with R's auxiliary trend) and the
+    fit agree with R."""
+    from ._r_bridge import r_array
+
+    air = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")
+    y = air["y"].values.astype(float)
+    X = np.zeros((len(y), 11))
+    for month in range(1, 12):
+        X[month::12, month - 1] = 1
+    kw = dict(
+        model="MMN",
+        lags=[1, 12],
+        orders={"ar": [0, 0], "i": [0, 0], "ma": [0, 2]},
+        distribution="dnorm",
+        regressors="adapt",
+    )
+    start = ADAM(**kw, nlopt_kwargs={"maxeval": 1}).fit(y, X=X)
+    model = ADAM(**kw).fit(y, X=X)
+    expected = r_array(
+        "{X <- temporaldummy(ts(y, frequency=12))[,-1];"
+        " f <- function(...) adam(data.frame(y=y, X), 'MMN', lags=c(1,12),"
+        " orders=list(ma=c(0,2)), distribution='dnorm', regressors='adapt', ...);"
+        " c(f(maxeval=1)$B, f()$lossValue)}",
+        R_data={"y": y},
+    )
+    np.testing.assert_allclose(start.coef, expected[:-1], rtol=1e-10)
+    assert model._adam_estimated["CF_value"] == pytest.approx(expected[-1], rel=1e-8)
+
+
+@pytest.mark.r_parity
+def test_etsx_occurrence_initials_match_r():
+    """Intermittent demand with a multiplicative error: the initials of the
+    regressors come from the non-zero demand, as R's subset (log(0) was clamped)."""
+    from ._r_bridge import r_array
+
+    rng = np.random.default_rng(44)
+    x = rng.normal(5, 1, 120)
+    y = rng.poisson(0.7, 120) * (1 + x + rng.normal(size=120) ** 2)
+    start = ADAM(
+        model="MNN",
+        occurrence="odds-ratio",
+        distribution="dnorm",
+        nlopt_kwargs={"maxeval": 1},
+    ).fit(y, X=x.reshape(-1, 1))
+    expected = r_array(
+        "{m <- adam(data.frame(y=y, x=x), 'MNN', occurrence='odds-ratio',"
+        " distribution='dnorm', maxeval=1); unname(m$B)}",
+        R_data={"y": y, "x": x},
+    )
+    np.testing.assert_allclose(start.coef, expected, rtol=1e-10)
+
+
 def test_etsx_single_regressor(etsx_data):
     y, X = etsx_data
     model = ADAM(model="ANN", regressors="use")

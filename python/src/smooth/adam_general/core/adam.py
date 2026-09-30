@@ -670,7 +670,6 @@ class ADAM:
         # call sites that hold runtime-validated strings.
         distribution: Optional[Union[DISTRIBUTION_OPTIONS, str]] = None,
         loss: LOSS_OPTIONS = "likelihood",
-        loss_horizon: Optional[int] = None,
         # outlier detection
         outliers: Literal["ignore", "use", "select"] = "ignore",
         outliers_level: float = 0.99,
@@ -713,7 +712,6 @@ class ADAM:
         nlopt_lower: Optional[Dict[str, Any]] = None,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         # specific to losses or distributions
-        reg_lambda: Optional[float] = None,
         gnorm_shape: Optional[float] = None,
         smoother: SmootherType = SMOOTHER_DEFAULT,
         ets: Literal["conventional", "adam"] = "conventional",
@@ -770,8 +768,6 @@ class ADAM:
             on the loss function.
         loss : LOSS_OPTIONS, default="likelihood"
             Loss function for parameter estimation.
-        loss_horizon : Optional[int], default=None
-            Number of steps for multi-step loss functions (e.g., MSEh).
         outliers : Literal["ignore", "use", "select"], default="ignore"
             Outlier handling: ``"ignore"`` skips detection; ``"use"`` detects
             outliers and includes their dummies as fixed regressors; ``"select"``
@@ -806,7 +802,9 @@ class ADAM:
         fast : bool, default=False
             Whether to use faster, possibly less accurate, estimation methods.
         lambda_param : Optional[float], default=None
-            Lambda parameter for Box-Cox transformation or regularization.
+            The regularisation parameter of ``loss="LASSO"`` / ``"RIDGE"``, R's
+            ``lambda`` (also accepted as ``**{"lambda": ...}``). Zero, with a
+            warning, when not provided for these losses, as in R.
         profiles_recent_provided : bool, default=False
             Whether recent profiles (e.g., for exogenous variables) are provided.
         profiles_recent_table : Optional[Any], default=None
@@ -848,8 +846,6 @@ class ADAM:
                     "xtol_rel": 1e-8,
                     "algorithm": "NLOPT_LN_SBPLX"
                 })
-        reg_lambda : Optional[float], default=None
-            Regularization parameter specifically for LASSO/RIDGE losses.
         gnorm_shape : Optional[float], default=None
             Shape parameter 's' for the generalized normal distribution.
         smoother : {"default", "ma", "lowess", "supsmu", "global"}, default="default"
@@ -880,7 +876,6 @@ class ADAM:
         self.regressors = regressors
         self.distribution = distribution
         self.loss = loss
-        self.loss_horizon = loss_horizon
         self.outliers = outliers
         self.outliers_level = outliers_level
         self.ic = ic
@@ -897,7 +892,6 @@ class ADAM:
         self.nlopt_upper = nlopt_upper
         self.nlopt_lower = nlopt_lower
         self.nlopt_kwargs = nlopt_kwargs
-        self.reg_lambda = reg_lambda
         self.gnorm_shape = gnorm_shape
         if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
             raise ValueError(
@@ -1295,7 +1289,6 @@ class ADAM:
             "regressors": self.regressors,
             "distribution": self.distribution,
             "loss": self.loss,
-            "loss_horizon": self.loss_horizon,
             "outliers": self.outliers,
             "outliers_level": self.outliers_level,
             "ic": self.ic,
@@ -1307,7 +1300,6 @@ class ADAM:
             "n_iterations": self.n_iterations,
             "head_length": self.head_length,
             "arma": self.arma,
-            "reg_lambda": self.reg_lambda,
             "gnorm_shape": self.gnorm_shape,
             "lambda_param": self.lambda_param,
             "fast": self.fast,
@@ -1385,7 +1377,7 @@ class ADAM:
                 ar_orders = self._arima.get("ar_orders", [0]) or [0]
                 i_orders = self._arima.get("i_orders", [0]) or [0]
                 ma_orders = self._arima.get("ma_orders", [0]) or [0]
-                lags = self._lags_model.get("lags_original", [1]) or [1]
+                lags = self._lags_model.get("lags", [1]) or [1]
                 has_xreg_arima = (
                     self._explanatory.get("xreg_model", False) and not is_ets
                 )
@@ -3765,40 +3757,6 @@ class ADAM:
         self.model = "Regression"
         self.time_elapsed_ = time.time() - self._start_time
 
-    def _handle_lasso_ridge_special_case(self):
-        """
-        Handle special case for LASSO/RIDGE with lambda=1.
-
-        Sets appropriate parameter values. This is a special case where we use
-        MSE to estimate initials only and disable other parameter estimation.
-        """
-        if self._general["loss"] in ["LASSO", "RIDGE"] and self._general["lambda"] == 1:
-            if self._model_type["ets_model"]:
-                # Pre-set ETS parameters
-                self._persistence["persistence_estimate"] = False
-                self._persistence["persistence_level_estimate"] = False
-                self._persistence["persistence_trend_estimate"] = False
-                self._persistence["persistence_seasonal_estimate"] = [False]
-                self._persistence["persistence_level"] = 0
-                self._persistence["persistence_trend"] = 0
-                self._persistence["persistence_seasonal"] = [0]
-                # Phi
-                self._phi_internal["phi_estimate"] = False
-                self._phi_internal["phi"] = 1
-
-            if self._model_type["xreg_model"]:
-                # ETSX parameters
-                self._persistence["persistence_xreg_estimate"] = False
-                self._persistence["persistence_xreg"] = 0
-
-            if self._model_type["arima_model"]:
-                # Pre-set ARMA parameters
-                self._arima["ar_estimate"] = [False]
-                self._arima["ma_estimate"] = [False]
-                self._preset_arima_parameters()
-
-            self._general["lambda"] = 0
-
     def _fit_occurrence_model(self, y):
         """Fit an occurrence model on ``y`` and return it.
 
@@ -3829,25 +3787,12 @@ class ADAM:
         m.fit(y)
         return m
 
-    def _preset_arima_parameters(self):
-        """Set up ARIMA parameters for special cases where estimation is disabled."""
-        arma_parameters = []
-        for i, lag in enumerate(self._lags_model["lags"]):
-            if self._arima["ar_orders"][i] > 0:
-                arma_parameters.extend([1] * self._arima["ar_orders"][i])
-            if self._arima["ma_orders"][i] > 0:
-                arma_parameters.extend([0] * self._arima["ma_orders"][i])
-        self._arima["arma_parameters"] = arma_parameters
-
     def _execute_estimation(self, estimation=True):
         """
         Execute model estimation when model_do is 'estimate'.
 
         This handles parameter estimation and model creation.
         """
-        # Handle special case for LASSO/RIDGE with lambda=1
-        self._handle_lasso_ridge_special_case()
-
         # Estimate the model
         # Note: estimator() handles two-stage initialization internally
         if estimation:
@@ -4871,9 +4816,6 @@ class ADAM:
         vcov falls back to the Hessian) for non-likelihood losses or occurrence
         (intermittent) models, which R also routes to the Hessian.
         """
-        from smooth.adam_general.core.estimator.optimization import (
-            _setup_arima_polynomials,
-        )
         from smooth.adam_general.core.utils.cost_functions import CF
         from smooth.adam_general.core.utils.utils import calculate_likelihood, scaler
         from smooth.adam_general.core.utils.var_covar import covar_opg
@@ -4883,9 +4825,6 @@ class ADAM:
         if self._occurrence.get("occurrence_model", False):
             return None
 
-        ar_poly, ma_poly = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         obs_dict = self._observations
         ot_logical = np.asarray(obs_dict["ot_logical"]).ravel()
         obs = int(obs_dict["obs_in_sample"])
@@ -4922,9 +4861,6 @@ class ADAM:
                 bounds="none",
                 other=other,
                 otherParameterEstimate=other_est,
-                arPolynomialMatrix=ar_poly,
-                maPolynomialMatrix=ma_poly,
-                regressors=self._explanatory.get("regressors"),
                 return_fitted=True,
             )
             if not isinstance(result, tuple):
@@ -5167,7 +5103,7 @@ class ADAM:
         the same per-sub-model clamping to slices of a joint CI half-width.
         """
         from smooth.adam_general.core.utils.bounds import (
-            ar_polynomial_bounds,
+            arima_parameter_bounds,
             eigen_bounds,
         )
 
@@ -5232,49 +5168,14 @@ class ADAM:
                     lo[s] = max(-params[s], lo[s])
                     hi[s] = max(-params[s], hi[s])
 
-        if arima_model:
-            self._clamp_arima_bounds(
-                names, params, lo, hi, idx, eigen_bounds, ar_polynomial_bounds
+        if arima_model and bounds_type != "none":
+            ar_bounds = arima_parameter_bounds(
+                names, params, self._arima, self._lags_model["lags"]
             )
-
-    def _clamp_arima_bounds(
-        self, names, params, lo, hi, idx, eigen_bounds, ar_polynomial_bounds
-    ):
-        """Clamp ARIMA AR (phi*) and MA (theta*) CIs (R confint.adam:4544-4590)."""
-        other = self._prepared.get("other", {})
-        poly = other.get("polynomial", {})
-        ari_polynomial = np.asarray(poly.get("ariPolynomial", []), dtype=float).ravel()
-        ar_polynomial = np.asarray(poly.get("arPolynomial", []), dtype=float).ravel()
-        non_zero_ari = np.atleast_2d(np.asarray(self._arima.get("non_zero_ari", [])))
-        non_zero_ma = np.atleast_2d(np.asarray(self._arima.get("non_zero_ma", [])))
-        ar_poly_matrix = other.get("ar_polynomial_matrix")
-        n_ets = self._components["components_number_ets"]
-
-        vec_g = np.asarray(self._adam_created["vec_g"], dtype=float).ravel()
-        static_args = self._eigen_static_args()
-
-        thetas = [nm for nm in names if nm.startswith("theta")]
-        for i, nm in enumerate(thetas):
-            k = idx[nm]
-            psi_row = n_ets + int(non_zero_ma[i, 1])
-            b1, b2 = eigen_bounds(vec_g, psi_row, **static_args)
-            adj = 0.0
-            if non_zero_ari.size and np.any(non_zero_ari[:, 1] == i):
-                ari_index = np.where(non_zero_ari[:, 1] == i)[0][0]
-                adj = ari_polynomial[int(non_zero_ari[ari_index, 0])]
-            lo[k] = max(b1 - params[k] + adj, lo[k])
-            hi[k] = min(b2 - params[k] + adj, hi[k])
-
-        if ar_poly_matrix is not None and len(ar_polynomial) > 0:
-            ar_mat = np.asarray(ar_poly_matrix, dtype=float)
-            nonzero_pos = [j for j in range(len(ar_polynomial)) if ar_polynomial[j]]
-            ar_positions = nonzero_pos[1:]  # drop the leading 1
-            phis = [nm for nm in names if nm.startswith("phi") and len(nm) > 3]
-            for i, nm in enumerate(phis):
-                k = idx[nm]
-                b1, b2 = ar_polynomial_bounds(ar_mat, ar_polynomial, ar_positions[i])
-                lo[k] = max(b1 - params[k], lo[k])
-                hi[k] = min(b2 - params[k], hi[k])
+            for name, (lower, upper) in ar_bounds.items():
+                k = idx[name]
+                lo[k] = max(lower - params[k], lo[k])
+                hi[k] = min(upper - params[k], hi[k])
 
     def summary(self, level: float = 0.95, digits: int = 4, type=None):  # noqa: A002
         """
@@ -5650,74 +5551,25 @@ class ADAM:
             _clip_ets_multiplicative_states(random_parameters, idx, self._model_type)
         _clip_deltas(random_parameters, idx)
 
-        # 3b. ARIMA parameter clipping (R/reapply.R:391-436).
-        # ``theta`` (MA) bounds come from ``eigen_bounds`` on the psi row;
-        # ``phi`` (AR) bounds come from ``ar_polynomial_bounds`` on the
-        # companion matrix. When an ARI element is present for a given
-        # theta, the bounds shift by ``ariPolynomial[nonZeroARI]`` so the
-        # net ``theta - ariPolynomial`` lies inside the psi region.
+        # 3b. Stationarity and invertibility of the ARMA factors (R/reapply.R)
         arima_model = self._model_type.get("arima_model", False)
-        other_dict = (self._prepared or {}).get("other") or {}
-        if arima_model:
-            from smooth.adam_general.core.utils.bounds import (
-                ar_polynomial_bounds,
-                eigen_bounds,
-            )
+        non_zero_ari = np.atleast_2d(np.asarray(self._arima.get("non_zero_ari", [])))
+        non_zero_ma = np.atleast_2d(np.asarray(self._arima.get("non_zero_ma", [])))
+        if arima_model and bounds_mode != "none":
+            from smooth.adam_general.core.utils.bounds import arima_parameter_bounds
 
-            poly = other_dict.get("polynomial", {}) or {}
-            ari_polynomial = np.asarray(
-                poly.get("ariPolynomial", poly.get("ari_polynomial", [])),
-                dtype=float,
-            ).ravel()
-            ar_polynomial = np.asarray(
-                poly.get("arPolynomial", poly.get("ar_polynomial", [])),
-                dtype=float,
-            ).ravel()
-            non_zero_ari = np.atleast_2d(
-                np.asarray(self._arima.get("non_zero_ari", []))
+            lags = self._lags_model["lags"]
+            ar_bounds = arima_parameter_bounds(
+                self.coef_names, self.coef, self._arima, lags
             )
-            non_zero_ma = np.atleast_2d(np.asarray(self._arima.get("non_zero_ma", [])))
-            ar_poly_matrix = other_dict.get("ar_polynomial_matrix")
-            n_ets_arima_clip = self._components["components_number_ets"]
-            vec_g_eig = np.asarray(self._adam_created["vec_g"], dtype=float).ravel()
-            static_args = self._eigen_static_args()
-
-            thetas = [nm for nm in coef_names if nm.startswith("theta")]
-            for i, nm in enumerate(thetas):
-                col = idx[nm]
-                psi_row = n_ets_arima_clip + int(non_zero_ma[i, 1])
-                lo, hi = eigen_bounds(vec_g_eig, psi_row, **static_args)
-                adj = 0.0
-                if non_zero_ari.size and np.any(non_zero_ari[:, 1] == i):
-                    ari_index = np.where(non_zero_ari[:, 1] == i)[0][0]
-                    adj = ari_polynomial[int(non_zero_ari[ari_index, 0])]
+            for name, (lower, upper) in ar_bounds.items():
+                col = idx[name]
                 np.clip(
                     random_parameters[:, col],
-                    lo + adj,
-                    hi + adj,
+                    lower,
+                    upper,
                     out=random_parameters[:, col],
                 )
-
-            if ar_poly_matrix is not None and len(ar_polynomial) > 0:
-                ar_mat = np.asarray(ar_poly_matrix, dtype=float)
-                nonzero_pos = [
-                    pos for pos in range(len(ar_polynomial)) if ar_polynomial[pos]
-                ]
-                ar_positions = nonzero_pos[1:]  # drop the leading 1
-                phis = [nm for nm in coef_names if nm.startswith("phi") and len(nm) > 3]
-                for i, nm in enumerate(phis):
-                    if i >= len(ar_positions):
-                        break
-                    col = idx[nm]
-                    lo, hi = ar_polynomial_bounds(
-                        ar_mat, ar_polynomial, ar_positions[i]
-                    )
-                    np.clip(
-                        random_parameters[:, col],
-                        lo,
-                        hi,
-                        out=random_parameters[:, col],
-                    )
 
         # 4. Build the per-draw cubes (R/reapply.R:447-469)
         n = int(self.nobs)
@@ -5808,14 +5660,7 @@ class ADAM:
             ar_orders_padded = list(self._arima["ar_orders"])
             i_orders_padded = list(self._arima["i_orders"])
             ma_orders_padded = list(self._arima["ma_orders"])
-            # Mirror filler.py's lookup: ``lags_original`` is the truth for
-            # the polynomialise call; ``lags`` in ``_lags_model`` may be
-            # the empty / expanded form depending on model layout.
-            lags_arima = list(
-                self._lags_model.get("lags_original")
-                or self._lags_model.get("lags")
-                or [1]
-            )
+            lags_arima = list(self._lags_model.get("lags") or [1])
             arma_params_arr = np.asarray(
                 self._arima.get("arma_parameters") or [], dtype=float
             ).ravel()
@@ -5950,86 +5795,20 @@ class ADAM:
                     j += 1
                 k += sum(len(v) for v in groups.values())
 
-        # 6b. ARIMA profile fill (R/reapply.R:680-729).
-        # Optimal / two-stage initials propagate the sampled ARIMAState
-        # entries through the AR or MA polynomial onto the per-component
-        # rows of the profile cube. Backcasting / complete don't fit
-        # ARIMA initials explicitly, so this block is a no-op.
+        # 6b. ARIMA profile fill (R/reapply.R). The estimated initials (none for
+        # backcasting / complete) are held by the last ARIMA state.
         if arima_model:
-            initial_arima_number = self._arima.get("initial_arima_number")
-            if initial_arima_number is None:
-                initial_arima_number = sum(
-                    1 for nm in coef_names if nm.startswith("ARIMAState")
-                )
-            initial_arima_number = int(initial_arima_number)
-            initial_type = self.initial_type
+            arima_initial_index = [
+                i for i, nm in enumerate(coef_names) if nm.startswith("ARIMAState")
+            ]
+            initial_arima_number = len(arima_initial_index)
             n_ets_arima = self._components["components_number_ets"]
             n_arima_comp = self._components["components_number_arima"]
-            if (
-                initial_type in ("optimal", "two-stage")
-                and (ar_estimate or ma_estimate)
-                and initial_arima_number > 0
-            ):
-                from smooth.adam_general.core.utils.polynomials import (
-                    adam_polynomialiser,
-                )
-
-                e_type = self._model_type.get("error_type", "A")
-                ari_dominant = non_zero_ari.size > 0 and (
-                    not non_zero_ma.size
-                    or non_zero_ari.shape[0] >= non_zero_ma.shape[0]
-                )
-                for s in range(nsim):
-                    b_slice = random_parameters[
-                        s, poly_index + 1 : poly_index + 1 + n_arma
-                    ]
-                    polys = adam_polynomialiser(
-                        adam_cpp=self._adam_cpp,
-                        B=b_slice,
-                        ar_orders=ar_orders_padded,
-                        i_orders=i_orders_padded,
-                        ma_orders=ma_orders_padded,
-                        ar_estimate=bool(ar_estimate),
-                        ma_estimate=bool(ma_estimate),
-                        arma_parameters=arma_params_arr,
-                        lags=lags_arima,
-                    )
-                    ari_poly = polys["ari_polynomial"]
-                    ma_poly = polys["ma_polynomial"]
-                    sampled = random_parameters[s, k : k + initial_arima_number]
-                    if ari_dominant:
-                        mother_row = j + n_arima_comp - 1
-                        profiles_recent_array[mother_row, :initial_arima_number, s] = (
-                            sampled
-                        )
-                        for row in non_zero_ari:
-                            target = j + int(row[1])
-                            coeff = ari_poly[int(row[0])]
-                            if e_type == "A":
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = coeff * sampled
-                            else:
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = np.exp(coeff * np.log(np.abs(sampled) + 1e-300))
-                    else:
-                        mother_row = n_ets_arima + n_arima_comp - 1
-                        profiles_recent_array[mother_row, :initial_arima_number, s] = (
-                            sampled
-                        )
-                        for row in non_zero_ma:
-                            target = j + int(row[1])
-                            coeff = ma_poly[int(row[0])]
-                            if e_type == "A":
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = coeff * sampled
-                            else:
-                                profiles_recent_array[
-                                    target, :initial_arima_number, s
-                                ] = np.exp(coeff * np.log(np.abs(sampled) + 1e-300))
-            j += initial_arima_number
+            if initial_arima_number > 0:
+                profiles_recent_array[
+                    n_ets_arima + n_arima_comp - 1, :initial_arima_number, :
+                ] = random_parameters[:, arima_initial_index].T
+            j = n_ets_arima + n_arima_comp
             k += initial_arima_number
 
         # 6b. xreg profile fill (R/reapply.R:730-740).

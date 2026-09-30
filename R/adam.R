@@ -668,7 +668,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         h=h, holdout=holdout, outliers=outliers, level=level,
                                         persistence=persistence, phi=phi, initial=initial, arma=arma,
                                         occurrence=occurrence,
-                                        ic=ic, bounds=bounds, silent=silent, ...)));
+                                        ic=ic, bounds=bounds, silent=silent,
+                                        smoother=ellipsis$smoother, ...)));
     }
 
     headLengthUser <- ellipsis$headLength;
@@ -700,7 +701,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         return(adam_initialiser(...,
                                 ets=ets, bounds=bounds, yInSample=yInSample,
                                 otLogical=otLogical, iOrders=iOrders,
-                                armaParameters=armaParameters, other=other));
+                                armaParameters=armaParameters, other=other, smoother=smoother));
     }
     scaler <- function(...){
         return(adam_scaler(...));
@@ -736,7 +737,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                    bounds, loss, lossFunction, distribution, horizon, multisteps,
                    denominator=NULL, yDenominator=NULL,
                    other, otherParameterEstimate, lambda,
-                   arPolynomialMatrix, maPolynomialMatrix,
                    adamCpp){
 
         # Fill in the matrices
@@ -780,7 +780,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                             arimaModel, arEstimate, maEstimate,
                                             xregModel, regressors, xregNumber, componentsNumberARIMA,
                                             lagsModelAll, obsInSample,
-                                            arPolynomialMatrix, maPolynomialMatrix,
                                             phiEstimate);
         if(penaltyValue != 0) {
             return(penaltyValue);
@@ -919,49 +918,22 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsInSample;
             }
             else if(any(loss==c("LASSO","RIDGE"))){
-                ### All of this is needed in order to get rid of initial level, trend, seasonal and xreg parameters
-                # Define, how many elements to skip (we don't normalise smoothing parameters)
-                persistenceToSkip <- componentsNumberETS + persistenceXregEstimate*xregNumber +
-                    phiEstimate + sum(arOrders) + sum(maOrders);
-
-                # Shrink phi to 1
-                if(phiEstimate){
-                    B[componentsNumberETS + persistenceXregEstimate*xregNumber + 1] <-
-                        1-B[componentsNumberETS + persistenceXregEstimate*xregNumber + 1];
-                }
-                j <- componentsNumberETS + persistenceXregEstimate*xregNumber + phiEstimate;
-
-                # No good understanding how to shrink ARMA. Do these just because:
-                # Shrink AR parameters to 1 and
-                # Shrink MA parameters to 0
-                if(arimaModel && (sum(maOrders)>0 || sum(arOrders)>0)){
-                    for(i in 1:length(lags)){
-                        B[j+c(1:arOrders[i])] <- 1-B[j+c(1:arOrders[i])];
-                        B[j+arOrders[i]+c(1:maOrders[i])] <- B[j+arOrders[i]+c(1:maOrders[i])];
-                        j[] <- j+arOrders[i]+maOrders[i];
-                    }
-                }
-
-                # Don't do anything with the initial states of ETS and ARIMA. Just drop them (don't shrink)
-                if(any(initialType==c("backcasting","optimal","two-stage"))){
-                    # If there are explanatory variables, shrink their parameters
-                    if(xregNumber>0){
-                        # Normalise parameters of xreg if they are additive. Otherwise leave - they will be small and close to zero
-                        B <- switch(Etype,
-                                    "A"=c(B[1:persistenceToSkip],tail(B,xregNumber) / denominator),
-                                    "M"=c(B[1:persistenceToSkip],tail(B,xregNumber)));
-                    }
-                    else{
-                        B <- B[1:persistenceToSkip];
-                    }
-                }
+                BShrunk <- adam_penaltyParameters(B, Etype, etsModel, modelIsTrendy, modelIsSeasonal,
+                                                  persistenceEstimate, persistenceLevelEstimate,
+                                                  persistenceTrendEstimate, persistenceSeasonalEstimate,
+                                                  xregModel, persistenceXregEstimate,
+                                                  xregParametersPersistence, phiEstimate,
+                                                  arimaModel, arEstimate, maEstimate, arOrders, maOrders,
+                                                  initialType, initialEstimate, initialXregEstimate,
+                                                  xregParametersEstimated, constantEstimate,
+                                                  otherParameterEstimate, denominator);
 
                 CFValue <- (switch(Etype,
                                    "A"=(1-lambda)* sqrt(sum((adamFitted$errors/yDenominator)^2)/obsInSample),
                                    "M"=(1-lambda)* sqrt(sum(log(1+adamFitted$errors)^2)/obsInSample)) +
                                 switch(loss,
-                                       "LASSO"=lambda * sum(abs(B)),
-                                       "RIDGE"=lambda * sqrt(sum(B^2))));
+                                       "LASSO"=lambda * sum(abs(BShrunk)),
+                                       "RIDGE"=lambda * sqrt(sum(BShrunk^2))));
             }
             else if(loss=="custom"){
                 CFValue <- lossFunction(actual=yInSample,fitted=adamFitted$fitted,B=B);
@@ -1023,7 +995,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                            bounds, loss, lossFunction, distribution, horizon, multisteps,
                            denominator=NULL, yDenominator=NULL,
                            other, otherParameterEstimate, lambda,
-                           arPolynomialMatrix, maPolynomialMatrix,
                            adamCpp){
 
         if(!multisteps){
@@ -1066,7 +1037,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                     constantRequired, constantEstimate,
                                     bounds="none", lossNew, lossFunction, distributionNew, horizon, multisteps,
                                     denominator, yDenominator, other, otherParameterEstimate, lambda,
-                                    arPolynomialMatrix, maPolynomialMatrix, adamCpp);
+                                    adamCpp);
 
                 # print(B);
                 # print(logLikReturn)
@@ -1126,7 +1097,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                bounds="none", loss, lossFunction, distribution, horizon, multisteps,
                                denominator, yDenominator,
                                other, otherParameterEstimate, lambda,
-                               arPolynomialMatrix, maPolynomialMatrix, adamCpp);
+                               adamCpp);
 
             # Concentrated log-likelihoods for the multistep losses
             logLikReturn[] <- -switch(loss,
@@ -1256,7 +1227,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                xregModel, xregNumber,
                                xregParametersEstimated, xregParametersPersistence,
                                constantEstimate, constantName, otherParameterEstimate,
-                               adamCpp);
+                               adamCpp, matWt=adamCreated$matWt);
+        # The B provided by the user is the starting point and is never replaced
+        BProvided <- !is.null(B);
         if(!is.null(B)){
             if(!is.null(names(B))){
                 B <- B[names(B) %in% names(BValues$B)];
@@ -1399,23 +1372,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             ub[ub<B] <- B[ub<B]+0.1;
         }
 
-        # Companion matrices for the polynomials calculation -> stationarity/stability checks
-        if(arimaModel){
-            # AR polynomials
-            arPolynomialMatrix <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(arPolynomialMatrix)>1){
-                arPolynomialMatrix[2:nrow(arPolynomialMatrix)-1,2:nrow(arPolynomialMatrix)] <- diag(nrow(arPolynomialMatrix)-1);
-            }
-            # MA polynomials
-            maPolynomialMatrix <- matrix(0, maOrders %*% lags, maOrders %*% lags);
-            if(nrow(maPolynomialMatrix)>1){
-                maPolynomialMatrix[2:nrow(maPolynomialMatrix)-1,2:nrow(maPolynomialMatrix)] <- diag(nrow(maPolynomialMatrix)-1);
-            }
-        }
-        else{
-            maPolynomialMatrix <- arPolynomialMatrix <- NULL;
-        }
-
         # If the distribution is default, change it according to the error term
         if(distribution=="default"){
             distributionNew <- switch(loss,
@@ -1456,22 +1412,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
         }
 
-        # Prepare the denominator needed for the shrinkage of explanatory variables in LASSO / RIDGE
-        if(any(loss==c("LASSO","RIDGE"))){
-            if(xregNumber>0){
-                denominator <- apply(adamCreated$matWt[,componentsNumberETS+componentsNumberARIMA+1:xregNumber,
-                                                       drop=FALSE], 2, sd);
-                denominator[is.infinite(denominator)] <- 1;
-            }
-            else{
-                denominator <- NULL;
-            }
-            yDenominator <- max(sd(diff(yInSample)),1);
-        }
-        else{
-            denominator <- NULL;
-            yDenominator <- NULL;
-        }
+        # The scales of the explanatory variables and of the series for LASSO / RIDGE
+        list2env(adam_lassoDenominators(loss, adamCreated$matWt, componentsNumberETS, componentsNumberARIMA,
+                                        xregNumber, yInSample), environment());
 
         ##### Parameter estimation ####
         # Parameters are chosen to speed up the optimisation process and have decent accuracy
@@ -1518,8 +1461,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                            denominator=denominator, yDenominator=yDenominator,
                            other=other, otherParameterEstimate=otherParameterEstimate,
                            lambda=lambda,
-                           arPolynomialMatrix=arPolynomialMatrix,
-                           maPolynomialMatrix=maPolynomialMatrix,
                            adamCpp=adamCpp);
         opts <- list(algorithm=algorithm, xtol_rel=xtol_rel, xtol_abs=xtol_abs,
                      ftol_rel=ftol_rel, ftol_abs=ftol_abs,
@@ -1529,15 +1470,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                           nloptrArgs)));
         res$call <- quote(nloptr(x0=B, eval_f=CF, lb=lb, ub=ub, opts=opts));
 
-        if(is.infinite(res$objective) || res$objective==1e+300){
-            # If the optimisation didn't work, give it another try with zero initials for smoothing parameters
-            if(etsModel){
-                B[1:componentsNumberETS] <- 0;
-            }
-            if(arimaModel){
-                B[componentsNumberETS+persistenceXregEstimate*xregNumber+
-                      c(1:sum(arOrders*arEstimate,maOrders*maEstimate))] <- 0.01;
-            }
+        # If the optimisation got stuck on a penalty (every penalty is at least 1e+100),
+        # give it another try with zero smoothing parameters and small ARMA parameters,
+        # unless there is nothing to optimise (LASSO / RIDGE with lambda=1 and backcasting)
+        if(!BProvided && length(B)>0 && (is.infinite(res$objective) || res$objective>=1e+100)){
+            BNames <- names(B);
+            B[BNames %in% c("alpha","beta") | startsWith(BNames, "gamma")] <- 0;
+            B[grepl("^(phi|theta)[0-9]+\\[", BNames)] <- 0.01;
             opts <- list(algorithm=algorithm, xtol_rel=xtol_rel,
                          ftol_rel=ftol_rel, ftol_abs=ftol_abs,
                          maxeval=maxevalUsed, maxtime=maxtime, print_level=print_level);
@@ -1559,10 +1498,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # Prepare the values to return
         B[] <- res$solution;
         CFValue <- res$objective;
-        # A fix for the special case of LASSO/RIDGE with lambda==1
-        if(any(loss==c("LASSO","RIDGE")) && lambda==1){
-            CFValue[] <- 0;
-        }
 
         # Initial states consume the SAME degrees of freedom however they are
         # obtained (optimised, backcast, complete-backcast or gradient-solved):
@@ -1587,9 +1522,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             dfInitials <- dfLevelSeasonal + modelIsTrendy*initialTrendEstimate;
         }
         if(arimaModel){
-            # The ARIMA initials estimated under "optimal" number initialArimaNumber
-            # (= max ARIMA lag); this equals the identifiable rank of the ARIMA
-            # initial-state design (the over-parameterised lower lags are redundant).
+            # The ARIMA initials number initialArimaNumber (= max ARIMA lag), the
+            # dimension of the initial state of the companion form (as in ssarima).
             dfInitials <- dfInitials + initialArimaNumber*initialArimaEstimate;
         }
         # xreg initials are backcast (outside B) only under "complete"; for
@@ -1628,7 +1562,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                 constantRequired, constantEstimate,
                                                 bounds, loss, lossFunction, distributionNew, horizon, multisteps,
                                                 denominator, yDenominator, other, otherParameterEstimate, lambda,
-                                                arPolynomialMatrix, maPolynomialMatrix, adamCpp),
+                                                adamCpp),
                                      # The distribution scale is always an estimated
                                      # parameter: every reported logLik is a concentrated
                                      # likelihood, so the scale counts for every loss.
@@ -2092,7 +2026,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             arimaModel, initialArimaEstimate, initialArima, initialArimaNumber,
             componentsNumberETS, componentsNumberARIMA,
             arimaPolynomials, Etype,
-            xregModel, initialXregEstimate, xregNumber);
+            xregModel, initialXregEstimate, xregNumber, lagsModelARIMA);
         initialValue <- initialCollected$initialValue;
         initialEstimated <- initialCollected$initialEstimated;
 
@@ -2177,15 +2111,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         if(arimaModel){
             otherReturned$polynomial <- arimaPolynomials;
             otherReturned$ARIMAIndices <- list(nonZeroARI=nonZeroARI,nonZeroMA=nonZeroMA);
-            otherReturned$arPolynomialMatrix <- matrix(0, arOrders %*% lags, arOrders %*% lags);
-            if(nrow(otherReturned$arPolynomialMatrix)>1){
-                otherReturned$arPolynomialMatrix[2:nrow(otherReturned$arPolynomialMatrix)-1,
-                                                 2:nrow(otherReturned$arPolynomialMatrix)] <-
-                    diag(nrow(otherReturned$arPolynomialMatrix)-1);
-                if(arRequired){
-                    otherReturned$arPolynomialMatrix[,1] <- -arimaPolynomials$arPolynomial[-1];
-                }
-            }
             otherReturned$armaParameters <- armaParameters;
         }
 
@@ -2283,43 +2208,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
     ##### Estimate the specified model #####
     if(modelDo=="estimate"){
-        # If this is LASSO/RIDGE with lambda=1, use MSE to estimate initials only
+        # LASSO / RIDGE with lambda=1 have their parameters set in the parametersChecker,
+        # and what is left (the initials and the regressors) is estimated with lambda=0
         lambdaOriginal <- lambda;
         if(any(loss==c("LASSO","RIDGE")) && lambda==1){
-            if(etsModel){
-                # Pre-set ETS parameters
-                persistenceEstimate[] <- FALSE;
-                persistenceLevelEstimate[] <- persistenceTrendEstimate[] <-
-                    persistenceSeasonalEstimate[] <- FALSE;
-                persistenceLevel <- persistenceTrend <- persistenceSeasonal <- 0;
-                # Phi
-                phiEstimate[] <- FALSE;
-                phi <- 1;
-            }
-            if(xregModel){
-                # ETSX parameters
-                persistenceXregEstimate[] <- FALSE;
-                persistenceXreg <- 0;
-            }
-            if(arimaModel){
-                # Pre-set ARMA parameters
-                arEstimate[] <- FALSE;
-                maEstimate[] <- FALSE;
-                armaParameters <- vector("numeric",sum(arOrders)+sum(maOrders));
-                j <- 0;
-                for(i in 1:length(lags)){
-                    if(arOrders[i]>0){
-                        armaParameters[j+1:arOrders[i]] <- 1;
-                        names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                        j <- j + arOrders[i];
-                    }
-                    if(maOrders[i]>0){
-                        armaParameters[j+1:maOrders[i]] <- 0;
-                        names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                        j <- j + maOrders[i];
-                    }
-                }
-            }
             lambda <- 0;
         }
 
@@ -2675,16 +2567,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                adamCpp);
         list2env(adamCreated, environment());
 
-        # Prepare the denominator needed for the shrinkage of explanatory variables in LASSO / RIDGE
-        if(xregNumber>0 && any(loss==c("LASSO","RIDGE"))){
-            denominator <- apply(matWt, 2, sd);
-            denominator[is.infinite(denominator)] <- 1;
-            yDenominator <- max(sd(diff(yInSample)),1);
-        }
-        else{
-            denominator <- NULL;
-            yDenominator <- NULL;
-        }
+        # The scales of the explanatory variables and of the series for LASSO / RIDGE
+        list2env(adam_lassoDenominators(loss, matWt, componentsNumberETS, componentsNumberARIMA,
+                                        xregNumber, yInSample), environment());
 
         CFValue <- CF(B=0, etsModel=etsModel, Etype=Etype, Ttype=Ttype, Stype=Stype, modelIsTrendy=modelIsTrendy,
                       modelIsSeasonal=modelIsSeasonal, yInSample=yInSample,
@@ -2719,7 +2604,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                       horizon=horizon, multisteps=multisteps,
                       denominator=denominator, yDenominator=yDenominator,
                       other=other, otherParameterEstimate=otherParameterEstimate, lambda=lambda,
-                      arPolynomialMatrix=NULL, maPolynomialMatrix=NULL,
                       adamCpp);
 
         # Degrees of freedom for the "use" path. Nothing is optimised, but the
@@ -2764,7 +2648,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                 constantRequired, constantEstimate,
                                                 bounds, loss, lossFunction, distributionNew, horizon,
                                                 multisteps, denominator, yDenominator, other, otherParameterEstimate, lambda,
-                                                arPolynomialMatrix=NULL, maPolynomialMatrix=NULL,
                                                 adamCpp)
                                      ,nobs=obsInSample,df=parametersNumber[1,5],class="logLik")
 
@@ -2786,7 +2669,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                        xregModel, xregNumber,
                                        xregParametersEstimated, xregParametersPersistence,
                                        constantRequired, constantName, FALSE,
-                                       adamCpp);
+                                       adamCpp, matWt=matWt);
                 # Create the vector of initials for the optimisation
                 B <- BValues$B;
             }
@@ -2873,7 +2756,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             if(arimaModel){
                 maEstimateFI <- maRequired;
                 arEstimateFI <- arRequired;
-                maPolynomialMatrix <- arPolynomialMatrix <- NULL;
             }
 
             # This is needed in order to avoid the 1e+300 in the CF
@@ -2914,7 +2796,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                            horizon=horizon, multisteps=multisteps,
                            denominator=denominator, yDenominator=yDenominator,
                            other=other, otherParameterEstimate=otherParameterEstimateFI, lambda=lambda,
-                           arPolynomialMatrix=arPolynomialMatrix, maPolynomialMatrix=maPolynomialMatrix,
                            adamCpp=adamCpp)
             }
             FI <- -hessianCpp(logLikADAM_FI, B, h=stepSize);
@@ -4471,7 +4352,7 @@ eigenBounds <- function(object, persistence, variableNumber=1){
     while(eigenValuesTested){
         persistence[variableNumber,] <- persistence[variableNumber,] - 0.01;
         eigenValuesTested[] <- eigenValues(object, persistence);
-        if(persistence[variableNumber,]<-5){
+        if(persistence[variableNumber,] < -5){
             persistence[variableNumber,] <- 5;
             break;
         }
@@ -4480,40 +4361,24 @@ eigenBounds <- function(object, persistence, variableNumber=1){
     return(c(lowerBound, upperBound));
 }
 
-# Function for the bounds of the AR parameters
-arPolinomialsBounds <- function(arPolynomialMatrix,arPolynomial,variableNumber){
-    # The lower bound
-    arPolynomial[variableNumber] <- -5;
-    arPolynomialMatrix[,1] <- -arPolynomial[-1];
-    arPolyroots <- any(abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values)>1);
-    stoppingCriteria <- 20;
-    i <- 1;
-    while(arPolyroots){
-        arPolynomial[variableNumber] <- arPolynomial[variableNumber] +0.01;
-        arPolynomialMatrix[,1] <- -arPolynomial[-1];
-        arPolyroots[] <- any(abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values)>1);
-        i[] <- i+1;
-        if(i>=stoppingCriteria){
-            break;
+# The bounds of the ARMA parameters among parametersNames, each within its factor
+# with the others at their values (src/headers/arimaBounds.h). The parameters of
+# the factors that are not stationary / invertible are left out
+arimaParameterBounds <- function(arma, parametersNames){
+    armaValues <- c(arma$ar, arma$ma);
+    armaNames <- names(armaValues);
+    # The factor of a parameter: the same type and lag
+    armaFactors <- sub("[0-9]+\\[", "[", armaNames);
+    armaBounds <- matrix(NA, 0, 2);
+    for(parameter in intersect(parametersNames, armaNames)){
+        factorValues <- armaValues[armaFactors==armaFactors[armaNames==parameter]];
+        bounds <- arimaParameterBoundsCpp(factorValues, which(names(factorValues)==parameter)-1,
+                                          if(startsWith(parameter, "phi")){-1}else{1});
+        if(all(is.finite(bounds))){
+            armaBounds <- rbind(armaBounds, matrix(bounds, 1, 2, dimnames=list(parameter, NULL)));
         }
     }
-    lowerBound <- arPolynomial[variableNumber]-0.01;
-    # The upper bound
-    arPolynomial[variableNumber] <- 5;
-    arPolynomialMatrix[,1] <- -arPolynomial[-1];
-    arPolyroots <- any(abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values)>1);
-    i[] <- 1;
-    while(arPolyroots){
-        arPolynomial[variableNumber] <- arPolynomial[variableNumber] -0.01;
-        arPolynomialMatrix[,1] <- -arPolynomial[-1];
-        arPolyroots[] <- any(abs(eigen(arPolynomialMatrix, symmetric=FALSE, only.values=TRUE)$values)>1);
-        i[] <- i+1;
-        if(i>=stoppingCriteria){
-            break;
-        }
-    }
-    upperBound <- arPolynomial[variableNumber]+0.01;
-    return(c(lowerBound, upperBound));
+    return(armaBounds);
 }
 
 
@@ -4658,53 +4523,12 @@ confint.adam <- function(object, parm, level=0.95,
             }
         }
 
-        # Correct the bounds for the ARIMA model
-        if(arimaModel){
-            #### Deal with ARIMA parameters ####
-            ariPolynomial <- object$other$polynomial$ariPolynomial;
-            arPolynomial <- object$other$polynomial$arPolynomial;
-            maPolynomial <- object$other$polynomial$maPolynomial;
-            nonZeroARI <- object$other$ARIMAIndices$nonZeroARI;
-            nonZeroMA <- object$other$ARIMAIndices$nonZeroMA;
-            arPolynomialMatrix <- object$other$arPolynomialMatrix;
-            # Locate all thetas for ARIMA
-            thetas <- which(substr(parametersNames,1,5)=="theta");
-            # Locate phi for ARIMA (they are always phi1, phi2 etc)
-            phis <- which((substr(parametersNames,1,3)=="phi") & (nchar(parametersNames)>3));
-            # Do loop for thetas
-            if(length(thetas)>0){
-                # MA parameters
-                for(i in 1:length(thetas)){
-                    # In this case, we check, where the standard condition is violated for an element of persistence,
-                    # and then substitute the ARI part from that.
-                    psiBounds <- eigenBounds(object, persistence,
-                                             variableNumber=which(substr(names(object$persistence),1,3)=="psi")[nonZeroMA[i,2]]);
-                    # If there are ARI elements in persistence, subtract (-(-x)) them to get proper bounds
-                    if(any(nonZeroARI[,2]==i)){
-                        ariIndex <- which(nonZeroARI[,2]==i);
-                        adamCoefBounds[thetas[i],1] <- max(psiBounds[1]-parameters[thetas[i]]+ariPolynomial[nonZeroARI[ariIndex,1]],
-                                                           adamCoefBounds[thetas[i],1]);
-                        adamCoefBounds[thetas[i],2] <- min(psiBounds[2]-parameters[thetas[i]]+ariPolynomial[nonZeroARI[ariIndex,1]],
-                                                           adamCoefBounds[thetas[i],2]);
-                    }
-                    else{
-                        adamCoefBounds[thetas[i],1] <- max(psiBounds[1]-parameters[thetas[i]], adamCoefBounds[thetas[i],1]);
-                        adamCoefBounds[thetas[i],2] <- min(psiBounds[2]-parameters[thetas[i]], adamCoefBounds[thetas[i],2]);
-                    }
-                }
-            }
-            # Locate phi for ARIMA (they are always phi1, phi2 etc)
-            if(length(phis)>0){
-                # AR parameters
-                for(i in 1:length(phis)){
-                    # Get bounds for AR based on stationarity condition
-                    phiBounds <- arPolinomialsBounds(arPolynomialMatrix, arPolynomial,
-                                                     which(arPolynomial==arPolynomial[arPolynomial!=0][-1][i]));
-
-                    adamCoefBounds[phis[i],1] <- max(phiBounds[1]-parameters[phis[i]], adamCoefBounds[phis[i],1]);
-                    adamCoefBounds[phis[i],2] <- min(phiBounds[2]-parameters[phis[i]], adamCoefBounds[phis[i],2]);
-                }
-            }
+        # Correct the bounds for the ARIMA model: stationarity and invertibility
+        if(arimaModel && object$bounds!="none"){
+            armaBounds <- arimaParameterBounds(object$arma, parametersNames);
+            armaNames <- rownames(armaBounds);
+            adamCoefBounds[armaNames,1] <- pmax(armaBounds[,1]-parameters[armaNames], adamCoefBounds[armaNames,1]);
+            adamCoefBounds[armaNames,2] <- pmin(armaBounds[,2]-parameters[armaNames], adamCoefBounds[armaNames,2]);
         }
 
         adamCoefBounds[] <- adamCoefBounds+parameters;

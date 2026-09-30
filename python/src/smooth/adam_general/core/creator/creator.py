@@ -348,6 +348,7 @@ def creator(
         "mat_f": matrices["mat_f"],
         "vec_g": matrices["vec_g"],
         "arima_polynomials": matrices.get("arima_polynomials", None),
+        "arima_pre_sample": matrices.get("arima_pre_sample"),
     }
 
 
@@ -403,7 +404,6 @@ def _extract_model_parameters(
     lags_model_arima = lags_dict["lags_model_arima"]
     lags_model_all = lags_dict["lags_model_all"]
     lags_model_max = lags_dict["lags_model_max"]
-    lags_original = lags_dict.get("lags_original", lags) or [1]
 
     # Extract profiles info
     profiles_recent_table = profiles_dict["profiles_recent_table"]
@@ -431,7 +431,6 @@ def _extract_model_parameters(
         "lags_model_arima": lags_model_arima,
         "lags_model_all": lags_model_all,
         "lags_model_max": lags_model_max,
-        "lags_original": lags_original,
         "profiles_recent_table": profiles_recent_table,
         "profiles_recent_provided": profiles_recent_provided,
     }

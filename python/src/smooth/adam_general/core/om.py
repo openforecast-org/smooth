@@ -40,7 +40,6 @@ from smooth.adam_general.core.creator import (
 )
 from smooth.adam_general.core.estimator.optimization import (
     _configure_optimizer,
-    _setup_arima_polynomials,
 )
 from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
@@ -97,6 +96,8 @@ def om_initial_transform(
     initial_xreg_estimate: bool,
     constant_required: bool,
     constant_estimate: bool,
+    creator_additive: bool = True,
+    arima_pre_sample: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """Transform initial state values from probability space onto the
     model-native scale before optimisation begins.
@@ -174,7 +175,16 @@ def om_initial_transform(
     # not probabilities. Running ``_transform`` on them turns the default
     # seed of 0 into log(0) = -Inf for Etype="A", which corrupts the initial
     # parameter vector handed to the optimiser.
+    # The creator usually runs with error_type="A" here (``creator_additive``).
+    # For a multiplicative model its ARIMA values are then on the log scale, so a
+    # zero deviation has to become exp(0) = 1 rather than log(0) downstream.
     if arima_model:
+        if creator_additive and error_type == "M" and initial_arima_estimate:
+            rows = slice(j, j + components_number_arima)
+            mat_vt[rows, :lags_model_max] = np.exp(mat_vt[rows, :lags_model_max])
+            # The copy of the pre-sample values that the filler reads
+            if arima_pre_sample is not None:
+                arima_pre_sample[:] = np.exp(arima_pre_sample)
         j += components_number_arima
 
     # ---- xreg
@@ -399,6 +409,26 @@ def om_preparator(
     }
 
 
+# The mixed ETS models that are dangerous to start from the initialiser's values,
+# and that OM and OMG start from no smoothing instead (R's om_mixedModel)
+MIXED_MODELS = ("AAM", "AMA", "MAA", "MAN", "AMN", "MMA", "MNA", "ANM")
+
+
+def draw_occurrence(probability, seed=None):
+    """Draw 0/1 occurrences as R's ``rbinom``: NaN probabilities give NaN draws.
+
+    The probability is bounded by ``[0, 1]`` as in R. A NaN one (a collapsed latent
+    state) stays NaN, and so does its draw, with R's "NAs produced" warning.
+    """
+    probability = np.clip(probability, 0.0, 1.0)
+    valid = ~np.isnan(probability)
+    occurrence = np.full(probability.shape, np.nan)
+    occurrence[valid] = np.random.default_rng(seed).binomial(1, probability[valid])
+    if not valid.all():
+        warnings.warn("NAs produced in the occurrence draws", stacklevel=3)
+    return probability, occurrence
+
+
 class OM(ADAM):
     """Occurrence model — state-space model for the probability of demand occurrence.
 
@@ -466,7 +496,7 @@ class OM(ADAM):
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE", "custom"],
             Callable,
         ] = "likelihood",
-        reg_lambda: Optional[float] = None,
+        lambda_param: Optional[float] = None,
         h: int = 0,
         holdout: bool = False,
         # ``float`` permitted so the "fixed" occurrence path can set persistence=0.
@@ -548,13 +578,8 @@ class OM(ADAM):
             nlopt_kwargs=nlopt_kwargs,
             ets=ets,
             smoother=smoother,
-            reg_lambda=reg_lambda,
-            # ``reg_lambda`` is the user-facing name on OM (mirrors ADAM's
-            # public surface), but the cost function reads
-            # ``_general["lambda"]`` which is populated from
-            # ``lambda_param`` in ``parameters_checker``. Forward both so
-            # LASSO / RIDGE actually see the chosen weight.
-            lambda_param=reg_lambda,
+            # R's om() takes a missing lambda as zero, without a warning
+            lambda_param=0 if lambda_param is None else lambda_param,
             **kwargs,
         )
 
@@ -748,7 +773,6 @@ class OM(ADAM):
                 if self._general.get("loss") == "custom"
                 else self.loss
             ),
-            "reg_lambda": self.reg_lambda,
             "ic": self.ic,
             "bounds": self.bounds,
             "occurrence": self._om_occurrence,
@@ -911,6 +935,7 @@ class OM(ADAM):
         # Apply occurrence-specific transform of the initial state vector
         adam_created["mat_vt"] = om_initial_transform(
             mat_vt=adam_created["mat_vt"],
+            arima_pre_sample=adam_created["arima_pre_sample"],
             occurrence=self._om_occurrence,
             error_type=original_error_type,
             trend_type=original_trend_type,
@@ -990,6 +1015,7 @@ class OM(ADAM):
 
         adam_created["mat_vt"] = om_initial_transform(
             mat_vt=adam_created["mat_vt"],
+            arima_pre_sample=adam_created["arima_pre_sample"],
             occurrence=self._om_occurrence,
             error_type=model_type_dict["error_type"],
             trend_type=model_type_dict.get("trend_type", "N"),
@@ -1023,6 +1049,7 @@ class OM(ADAM):
             initial_xreg_estimate=self._initials.get("initial_xreg_estimate", False),
             constant_required=self._constant.get("constant_required", False),
             constant_estimate=self._constant.get("constant_estimate", False),
+            creator_additive=False,
         )
 
         return adam_created
@@ -1048,6 +1075,7 @@ class OM(ADAM):
             adam_cpp=adam_cpp,
             other_parameter_estimate=False,
             other_value=2.0,
+            smoother=self._resolve_smoother(),
         )
 
         # Optimisation knobs (subset of nlopt_kwargs we care about for OM)
@@ -1075,6 +1103,18 @@ class OM(ADAM):
                         B[names.index(k)] = float(v)
             else:
                 B[:] = np.asarray(user_B, dtype=float)
+        # The mixed models that are dangerous to start from the initialiser's values
+        # and the direct occurrence start from no smoothing, as R's om()
+        ets_type = "".join(
+            self._model_type[k] for k in ("error_type", "trend_type", "season_type")
+        )
+        if (
+            user_B is None
+            and len(B)
+            and (ets_type in MIXED_MODELS or self._om_occurrence == "direct")
+        ):
+            B[:] = 0
+            B[0] = 0.1
 
         lb = (
             np.asarray(user_lb, dtype=float)
@@ -1087,9 +1127,6 @@ class OM(ADAM):
             else np.asarray(b_values["Bu"], dtype=float)
         )
 
-        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         algorithm = kwargs.get("algorithm", "NLOPT_LN_NELDERMEAD")
         xtol_rel = kwargs.get("xtol_rel", 1e-6)
         xtol_abs = kwargs.get("xtol_abs", 1e-8)
@@ -1103,7 +1140,6 @@ class OM(ADAM):
             nlopt, algorithm.replace("NLOPT_", ""), nlopt.LN_NELDERMEAD
         )
 
-        regressors = self._explanatory.get("regressors")
         # Mirror R: omCF receives `loss` separately; we store it in a dict for
         # om_cf to read. ``loss_function`` is already in ``_general`` from
         # ADAM's checker when the user passes a callable.
@@ -1146,9 +1182,6 @@ class OM(ADAM):
                     occurrence=self._om_occurrence,
                     occurrence_char=self._occurrence_char,
                     bounds=self._general["bounds"],
-                    arPolynomialMatrix=ar_polynomial_matrix,
-                    maPolynomialMatrix=ma_polynomial_matrix,
-                    regressors=regressors,
                 )
             except Exception:
                 cf_value = 1e100
@@ -1185,7 +1218,7 @@ class OM(ADAM):
         # infeasibility plateau, but ONLY when the user did NOT supply their
         # own B — otherwise their B is the authoritative starting point.
         # Failsafe mirrors R/om.R: all params 0.001 with alpha bumped to 0.01.
-        if user_B is None and (not np.isfinite(cf_value) or cf_value >= 1e300):
+        if user_B is None and (not np.isfinite(cf_value) or cf_value >= 1e100):
             B[:] = 0.001
             if len(B) > 0:
                 B[0] = 0.01
@@ -1652,9 +1685,6 @@ class OM(ADAM):
 
         self._check_is_fitted()
 
-        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         general_for_cf = dict(self._general)
         general_for_cf["loss"] = self._general.get("loss", "likelihood")
 
@@ -1692,9 +1722,6 @@ class OM(ADAM):
                 occurrence=self._om_occurrence,
                 occurrence_char=self._occurrence_char,
                 bounds="none",
-                arPolynomialMatrix=ar_polynomial_matrix,
-                maPolynomialMatrix=ma_polynomial_matrix,
-                regressors=self._explanatory.get("regressors"),
             )
 
         return numerical_hessian(_cost, self.coef, step_size=step_size)
@@ -1714,9 +1741,6 @@ class OM(ADAM):
         if self._general.get("loss", "likelihood") != "likelihood":
             return None
 
-        ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-            self._model_type, self._arima, self._lags_model
-        )
         general_for_cf = dict(self._general)
         general_for_cf["loss"] = self._general.get("loss", "likelihood")
         pristine = getattr(self, "_fi_pristine", None)
@@ -1747,9 +1771,6 @@ class OM(ADAM):
                 occurrence=self._om_occurrence,
                 occurrence_char=self._occurrence_char,
                 bounds="none",
-                arPolynomialMatrix=ar_polynomial_matrix,
-                maPolynomialMatrix=ma_polynomial_matrix,
-                regressors=self._explanatory.get("regressors"),
                 return_fitted=True,
             )
             p = np.asarray(p, dtype=float).ravel()
@@ -1880,17 +1901,9 @@ class OM(ADAM):
         probability = np.asarray(probability, dtype=np.float64).reshape(
             n_obs_out, nsim_out
         )
-        # ``om_link_function``'s odds-ratio paths can overshoot under
-        # extreme latent noise; clip uniformly as a numerical guard.
-        # NaN can appear on multiplicative-ETS paths where the latent
-        # state collapses to zero — replace with the neutral 0.5 so
-        # the downstream binomial draw is well-defined.
-        probability = np.nan_to_num(probability, nan=0.5, posinf=1.0, neginf=0.0)
-        probability = np.clip(probability, 0.0, 1.0)
 
         # 4. 0/1 indicator draw, seeded from the master seed.
-        rng = np.random.default_rng(seed)
-        occurrence_data = rng.binomial(1, probability)
+        probability, occurrence_data = draw_occurrence(probability, seed)
 
         # 5. Output assembly.
         if nsim_out == 1:

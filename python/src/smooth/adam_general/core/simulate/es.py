@@ -512,9 +512,7 @@ def _true_log_lik(
         )
     if randomizer_name == "rlnorm":
         col_mse = (mat_errors**2).mean(axis=0)
-        return -obs / 2.0 * (log2pi_p1 + np.log(col_mse)) - np.log(
-            np.maximum(mat_yt, 1e-300)
-        ).sum(axis=0)
+        return -obs / 2.0 * (log2pi_p1 + np.log(col_mse)) - np.log(mat_yt).sum(axis=0)
     if randomizer_name == "rinvgauss":
         return -0.5 * (
             obs
@@ -522,7 +520,7 @@ def _true_log_lik(
                 np.log((mat_errors**2 / (1.0 + mat_errors)).mean(axis=0) / (2 * np.pi))
                 - 1
             )
-            + np.log(np.maximum(mat_yt / (1.0 + mat_errors), 1e-300)).sum(axis=0)
-            - 3 * np.log(np.maximum(mat_yt, 1e-300)).sum(axis=0)
+            + np.log(mat_yt / (1.0 + mat_errors)).sum(axis=0)
+            - 3 * np.log(mat_yt).sum(axis=0)
         )
     return None

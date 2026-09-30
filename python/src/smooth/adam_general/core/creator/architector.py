@@ -442,11 +442,8 @@ def _setup_lags(lags_dict, model_type_dict, components_dict):
 
     # Update lags dictionary
     lags_dict_updated = lags_dict.copy()
-    lags_dict_updated["lags_original"] = lags_dict[
-        "lags"
-    ]  # R keeps original `lags` intact
+    # ``lags`` stays the user's lags, aligned with the ARIMA orders, as in R
     lags_dict_updated["lags_model"] = lags_model
-    lags_dict_updated["lags"] = lags_model
     lags_dict_updated["lags_model_arima"] = lags_model_arima
     lags_dict_updated["lags_model_all"] = lags_model_all
     lags_dict_updated["lags_model_max"] = lags_model_max

@@ -355,7 +355,7 @@ sim.es <- function(model="ANN", obs=10, nsim=1,
                 matG[2,] <- runif(nsim,0,matG[1,]);
             }
             if(Stype!="N"){
-                matG[persistenceLength,] <- runif(nsim,0,max(0,1-matG[1]));
+                matG[persistenceLength,] <- runif(nsim,0,pmax(0,1-matG[1,]));
             }
         }
         ### In case of admissible bounds, do some stuff
@@ -571,7 +571,7 @@ sim.es <- function(model="ANN", obs=10, nsim=1,
     }
     else if(randomizer=="rinvgauss"){
         veclikelihood <- -0.5*(obs*(log(colMeans(matErrors^2/(1+matErrors))/(2*pi))-1) +
-                                   sum(log(matYt/(1+matErrors))) - 3*sum(log(matYt)));
+                                   colSums(log(matYt/(1+matErrors))) - 3*colSums(log(matYt)));
     }
     # If this is something unknown, forget about it
     else{

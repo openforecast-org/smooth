@@ -498,3 +498,296 @@ test_that("The response name survives data passed by value", {
     expect_lt(nchar(colnames(do.call(ces, list(y, silent=TRUE))$data)[1]), 100)
     expect_lt(nchar(colnames(do.call(ssarima, list(y, silent=TRUE))$data)[1]), 100)
 })
+
+#### Hannan-Rissanen starting values of the ARMA parameters ####
+# arimaHRCpp() with the bounds code of adam's "usual" unless given
+hr <- function(y, ar, ma, lags, arEstimate=TRUE, maEstimate=TRUE, arma=numeric(0),
+               useLevel=rep(1, length(lags)), bounds=TRUE){
+    return(as.vector(smooth:::arimaHRCpp(y, ar, ma, lags, arEstimate, maEstimate, arma, useLevel, bounds)))
+}
+
+test_that("Hannan-Rissanen recovers the parameters of ARMA(1,1) and SARMA(1,1)(1,1)[12]", {
+    set.seed(41)
+    y <- as.vector(arima.sim(list(ar=0.6, ma=0.3), 300))
+    expect_equal(hr(y, 1, 1, 1), c(0.6, 0.3), tolerance=0.1, check.attributes=FALSE)
+    set.seed(42)
+    y <- as.vector(arima.sim(list(ar=c(0.7, rep(0,10), 0.5, -0.35), ma=c(0.4, rep(0,10), 0.3, 0.12)), 600))
+    expect_equal(hr(y, c(1,1), c(1,1), c(1,12)), c(0.7, 0.4, 0.5, 0.3), tolerance=0.2,
+                 check.attributes=FALSE)
+})
+
+test_that("Hannan-Rissanen values move inside the boundary only if the cost function rejects them", {
+    set.seed(45)
+    e <- rnorm(200)
+    y <- numeric(200)
+    for(t in 2:200){
+        y[t] <- 1.03*y[t-1] + e[t]
+    }
+    arRaw <- hr(y, 1, 0, 1, maEstimate=FALSE, bounds=FALSE)
+    expect_gt(arRaw, 1)
+    expect_equal(hr(y, 1, 0, 1, maEstimate=FALSE, bounds=TRUE), 0.99)
+    # Over-differenced white noise: HR lands on a non-invertible MA, which is
+    # reflected to the invertible one with or without the bounds
+    set.seed(47)
+    w <- diff(rnorm(300), differences=2)
+    maValues <- sapply(c(FALSE, TRUE), function(b){hr(w, 0, 1, 1, arEstimate=FALSE, bounds=b)})
+    expect_lt(abs(maValues[1]), 1)
+    expect_equal(maValues[2], maValues[1])
+    # An invertible MA(2) with a coefficient above one is kept as it is
+    set.seed(46)
+    x <- as.vector(arima.sim(list(ma=c(1.6, 0.64)), 1000))
+    expect_equal(hr(x, 0, 2, 1, arEstimate=FALSE, bounds=TRUE), hr(x, 0, 2, 1, arEstimate=FALSE, bounds=FALSE))
+    expect_gt(max(abs(hr(x, 0, 2, 1, arEstimate=FALSE, bounds=TRUE))), 1)
+})
+
+test_that("Hannan-Rissanen falls back to the defaults and respects the provided values", {
+    set.seed(41)
+    y <- as.vector(arima.sim(list(ar=0.6, ma=0.3), 300))
+    # Too few seasons for the seasonal level, and a level switched off
+    expect_equal(hr(y[1:30], c(1,1), c(1,1), c(1,12))[3:4], c(0.1, -0.1))
+    expect_equal(hr(y, c(1,1), c(1,1), c(1,12), useLevel=c(1,0))[3:4], c(0.1, -0.1))
+    expect_equal(hr(numeric(0), 1, 1, 1), c(0.1, -0.1), check.attributes=FALSE)
+    # AR provided: only MA is returned
+    expect_length(hr(y, 1, 1, 1, arEstimate=FALSE, arma=0.6), 1)
+    testModel <- msarima(AirPassengers, orders=list(ar=1,i=1,ma=1), arma=list(ar=0.5))
+    expect_equal(testModel$arma$ar, 0.5, check.attributes=FALSE)
+})
+
+test_that("ARIMA starting values with missing and intermittent data", {
+    y <- AirPassengers
+    y[c(10,50,90)] <- NA
+    expect_true(all(is.finite(msarima(y, orders=list(ar=1,i=1,ma=1), maxeval=1)$B)))
+    set.seed(44)
+    y <- ts(rpois(120, 0.7) * (1 + rnorm(120)^2))
+    expect_true(all(is.finite(adam(y, "MNN", orders=list(ar=1), occurrence="odds-ratio", maxeval=1)$B)))
+})
+
+test_that("ARIMA with constant starts from the intercept consistent with AR", {
+    set.seed(41)
+    y <- ts(100 + arima.sim(list(ar=0.6, ma=0.3), 200))
+    testModel <- msarima(y, orders=list(ar=1,i=0,ma=1), constant=TRUE)
+    # The implied mean of the series, constant / (1 - phi)
+    expect_equal(coef(testModel)["constant"] / (1 - coef(testModel)["phi1[1]"]), mean(y),
+                 tolerance=0.01, check.attributes=FALSE)
+})
+
+test_that("A regressor that is a trend is kept rather than the auxiliary trend of its initials", {
+    # alm(y~x+trend) dropped x, collinear with the trend, and the creator then failed
+    x <- (0:299)/10
+    testModel <- adam(data.frame(y=2*x+sin(x), x=x), "NNN", orders=list(i=1, ma=1), maxeval=1)
+    expect_true(any(names(coef(testModel))=="x"))
+})
+
+test_that("Hannan-Rissanen runs on the residuals of the regression", {
+    set.seed(48)
+    x <- rnorm(200, 10, 5)
+    dat <- data.frame(y=100 + 5*x + as.vector(arima.sim(list(ar=0.6), 200)), x=x)
+    # On the series itself, the regressor hides the AR(1): phi started at -0.03
+    for(testModel in list(adam(dat, "NNN", orders=list(ar=1), constant=TRUE, maxeval=1),
+                          ssarima(dat, orders=list(ar=1), constant=TRUE, maxeval=1))){
+        expect_equal(testModel$B[["phi1[1]"]], 0.6, tolerance=0.1)
+    }
+    # With differences, the regression is on the differenced series and regressors
+    set.seed(49)
+    x <- cumsum(rnorm(300))
+    y <- 100 + 3*x + cumsum(as.vector(arima.sim(list(ma=0.5), 300)))
+    xregDiffs <- cbind(1, diff(x))
+    residuals <- diff(y) - xregDiffs %*% olsCpp(xregDiffs, diff(y))
+    expect_equal(adam(data.frame(y=y, x=x), "NNN", orders=list(i=1, ma=1), maxeval=1)$B[["theta1[1]"]],
+                 hr(residuals, 0, 1, 1, arEstimate=FALSE))
+    # The seasonal MA taken from the series with monthly dummies stuck the fit at 826.34
+    xreg <- data.frame(y=as.vector(AirPassengers), temporaldummy(AirPassengers)[,-1])
+    testModel <- suppressWarnings(adam(xreg, "MMN", lags=c(1,12), orders=list(ma=c(0,2)),
+                                       distribution="dnorm", regressors="adapt"))
+    expect_lt(testModel$lossValue, 516)
+})
+
+test_that("ETS+ARIMA keeps the defaults for the seasonal ARIMA at the ETS seasonal lag", {
+    testModel <- adam(AirPassengers, "MAM", orders=list(ar=c(1,1),ma=c(1,1)), lags=c(1,12), maxeval=1)
+    expect_equal(testModel$B[c("phi1[12]","theta1[12]")], c(0.1, -0.1), check.attributes=FALSE)
+    # The start is feasible: no penalty from the bounds
+    expect_lt(testModel$lossValue, 1e+100)
+})
+
+test_that("ARIMA starting values under non-normal distributions and non-likelihood losses", {
+    skip_on_cran()
+    orders <- list(ar=c(1,1),i=c(1,1),ma=c(1,1))
+    for(distribution in c("dlaplace","ds","dgnorm","dgamma","dinvgauss","dlnorm")){
+        start <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), distribution=distribution, maxeval=1)
+        testModel <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), distribution=distribution)
+        expect_true(all(is.finite(start$B)))
+        expect_lte(testModel$lossValue, start$lossValue)
+    }
+    for(loss in c("MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL")){
+        start <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), loss=loss, h=12, maxeval=1)
+        testModel <- adam(AirPassengers, "NNN", orders=orders, lags=c(1,12), loss=loss, h=12)
+        expect_true(all(is.finite(start$B)))
+        expect_lte(testModel$lossValue, start$lossValue)
+    }
+})
+
+#### ARIMA initials: the initial state of the companion form ####
+# The fitted values of a pure ARI model with the initials built from the
+# pre-sample values y_pre are the ARI predictions from the series extended by y_pre
+ariFitError <- function(y, arOrders, iOrders, lags, arValues, distribution="dnorm"){
+    orders <- list(ar=arOrders, i=iOrders, ma=rep(0, length(lags)))
+    arma <- if(sum(arOrders)>0) list(ar=unlist(arValues)) else NULL
+    fit <- function(B){
+        return(adam(y, "NNN", orders=orders, lags=lags, initial="optimal", arma=arma,
+                    distribution=distribution, B=B, maxeval=1))
+    }
+    template <- fit(NULL)$B
+    set.seed(1)
+    yPre <- as.vector(y)[1] + rnorm(length(template), 0, sd(y)/4)
+    # Expanded ARI polynomial
+    ari <- 1
+    for(j in seq_along(lags)){
+        factorAR <- c(1, rep(0, length(arValues[[j]])*lags[j]))
+        factorAR[seq_along(arValues[[j]])*lags[j]+1] <- -arValues[[j]]
+        ari <- convolve(ari, rev(factorAR), type="open")
+        for(d in seq_len(iOrders[j])){
+            ari <- convolve(ari, rev(c(1, rep(0, lags[j]-1), -1)), type="open")
+        }
+    }
+    Etype <- if(distribution=="dgamma") "M" else "A"
+    B <- adam_arimaInitials(ari, switch(Etype, "M"=1/yPre, -yPre), Etype)
+    names(B) <- names(template)
+    extended <- c(yPre, as.vector(y))
+    if(distribution=="dgamma"){
+        extended <- log(extended)
+    }
+    n <- length(B) + 20
+    predicted <- sapply(1:n, function(t){-sum(ari[-1] * extended[t + length(B) - seq_along(ari[-1])])})
+    if(distribution=="dgamma"){
+        predicted <- exp(predicted)
+    }
+    return(max(abs(predicted - fitted(fit(B))[1:n])))
+}
+
+test_that("ARIMA initials give the ARI predictions from the pre-sample values", {
+    expect_lt(ariFitError(AirPassengers, c(0,0), c(1,1), c(1,12), list(numeric(0), numeric(0))), 1e-8)
+    expect_lt(ariFitError(AirPassengers, c(1,1), c(1,1), c(1,12), list(0.3, 0.4)), 1e-8)
+    expect_lt(ariFitError(AirPassengers, c(0,2), c(0,1), c(1,12), list(numeric(0), c(0.3,0.2))), 1e-8)
+    expect_lt(ariFitError(AirPassengers, c(1,1), c(1,1), c(1,12), list(0.3, 0.4), "dgamma"), 1e-8)
+})
+
+test_that("ARIMA initials of a double seasonal model give the ARI predictions", {
+    skip_on_cran()
+    set.seed(3)
+    y <- ts(100 + cumsum(rnorm(800))/5 + 5*sin(2*pi*(1:800)/24) + 3*sin(2*pi*(1:800)/168), frequency=24)
+    expect_lt(ariFitError(y, c(1,1,0), c(0,1,1), c(1,24,168), list(0.5, 0.3, numeric(0))), 1e-8)
+})
+
+test_that("Two-stage passes the backcasted ARIMA initials on without loss", {
+    skip_on_cran()
+    y <- log(AirPassengers)
+    for(orders in list(list(ar=c(0,0),i=c(1,1),ma=c(1,1)), list(ar=c(1,1),i=c(1,1),ma=c(1,1)))){
+        backcasted <- msarima(y, orders=orders, lags=c(1,12), initial="backcasting")
+        B <- c(backcasted$B, unlist(backcasted$initial$arima))
+        names(B) <- names(msarima(y, orders=orders, lags=c(1,12), initial="optimal", maxeval=1)$B)
+        expect_lte(msarima(y, orders=orders, lags=c(1,12), initial="optimal", B=B, maxeval=1)$lossValue,
+                   backcasted$lossValue + 1e-6)
+    }
+})
+
+test_that("The backcasting seed follows the ARMA parameters", {
+    # Near the unit root the two backcasting iterations do not forget the seed, so
+    # it has to be built with the current ARI polynomial, not the differences only
+    testModel <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, maxeval=1)
+    B <- setNames(c(-0.1322, 0.8075, 0.394, -0.5937, 0.1408), names(testModel$B))
+    lossDefault <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1)$lossValue
+    lossConverged <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1,
+                          nIterations=20)$lossValue
+    expect_lt(abs(lossDefault - lossConverged), 0.01)
+})
+
+test_that("Every ARIMA initial enters the fit, as in ssarima", {
+    orders <- list(ar=c(0,0),i=c(1,0),ma=c(0,1))
+    testModel <- msarima(log(AirPassengers), orders=orders, lags=c(1,12), initial="optimal")
+    initials <- grep("ARIMAState", names(testModel$B))
+    expect_length(initials, 12)
+    expect_equal(nparam(testModel),
+                 nparam(ssarima(log(AirPassengers), orders=orders, lags=c(1,12), initial="optimal")))
+    lossChange <- sapply(initials, function(i){
+        B <- testModel$B
+        B[i] <- B[i] + 0.1
+        return(msarima(log(AirPassengers), orders=orders, lags=c(1,12), initial="optimal",
+                       B=B, maxeval=1)$lossValue - testModel$lossValue)
+    })
+    expect_true(all(abs(lossChange) > 1e-8))
+})
+
+#### Stationarity and invertibility, factor by factor ####
+test_that("confint keeps the ARMA parameters within their stationary / invertible factors", {
+    # A parameter of an AR(3) with the others fixed, against the roots
+    x <- c(0.1, 0.2, 0.3)
+    grid <- seq(-3, 3, 0.001)
+    stable <- sapply(grid, function(v){x[2] <- v; return(all(Mod(polyroot(c(1,-x)))>1))})
+    expect_equal(as.vector(arimaParameterBoundsCpp(c(0.1, 0.2, 0.3), 1, -1)), range(grid[stable]),
+                 tolerance=2e-3)
+    expect_equal(as.vector(arimaParameterBoundsCpp(c(1.2, 0.5), 1, 1)), c(0.2, 1))
+    expect_true(all(is.nan(arimaParameterBoundsCpp(1.2, 0, 1))))
+    # The old AR bounds stopped at +-4.82; phi1 of a stationary AR(2) lies within (phi2-1, 1-phi2)
+    testModel <- msarima(BJsales, orders=list(ar=2, i=1, ma=2))
+    phi2 <- coef(testModel)[["phi2[1]"]]
+    expect_equal(unname(confint(testModel)["phi1[1]", 2:3]), c(phi2-1, 1-phi2), tolerance=1e-6)
+    # The upper bound of the admissible alpha of ANN, (0, 2), was stuck at 5.01
+    testModel <- adam(BJsales, "ANN", bounds="admissible")
+    expect_equal(unname(eigenBounds(testModel, as.matrix(testModel$persistence), 1)[2]), 2.01)
+})
+
+test_that("The ARIMA bounds reject exactly the non-invertible MA and non-stationary AR", {
+    y <- log(AirPassengers)
+    lossAt <- function(orders, values, fitter=msarima){
+        B <- setNames(values, names(fitter(y, orders=orders, lags=c(1,12), maxeval=1)$B))
+        return(fitter(y, orders=orders, lags=c(1,12), B=B, maxeval=1)$lossValue)
+    }
+    # The MA is 1 + theta_1 B^12 + theta_2 B^24
+    ordersMA <- list(ar=c(0,0), i=c(1,1), ma=c(0,2))
+    for(theta in list(c(1.058,0.793), c(-1.058,0.793), c(0.5,0.6), c(0.3,-1.2), c(1.2,0.1))){
+        invertible <- all(Mod(polyroot(c(1, theta)))>1)
+        expect_equal(lossAt(ordersMA, theta) < 1E+100, invertible)
+        expect_equal(lossAt(ordersMA, theta, ssarima) < 1E+100, invertible)
+    }
+    # The AR is 1 - phi_1 B^12 - phi_2 B^24
+    ordersAR <- list(ar=c(0,2), i=c(1,0), ma=c(0,0))
+    for(phi in list(c(0.5,0.4), c(1.2,-0.3), c(-0.5,0.6), c(0.3,0.8))){
+        expect_equal(lossAt(ordersAR, phi) < 1E+100, all(Mod(polyroot(c(1, -phi)))>1))
+    }
+})
+
+test_that("A fit stuck on a penalty restarts from zero smoothing and small ARMA parameters", {
+    skip_on_cran()
+    xreg <- data.frame(y=AirPassengers, x=factor(temporaldummy(AirPassengers, factors=TRUE)))
+    # The first run starts on the NaN penalty and moves to the bounds penalties
+    expect_no_warning(testModel <- adam(xreg, "MMN", lags=c(1,12), orders=list(ar=c(0,0),i=c(0,0),ma=c(0,2)),
+                                        regressors="adapt", distribution="dnorm"))
+    expect_lt(testModel$lossValue, 1E+100)
+})
+
+test_that("LASSO / RIDGE with lambda=1 fix the parameters at their shrinkage targets", {
+    # Nothing is left with backcasting: the model is used as it is, with a zero loss
+    testModel <- adam(AirPassengers, "AAN", loss="RIDGE", lambda=1)
+    expect_length(testModel$B, 0)
+    expect_equal(unname(testModel$persistence), c(0, 0))
+    expect_equal(testModel$lossValue, 0)
+    testModel <- adam(log(AirPassengers), "NNN", orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)),
+                      lags=c(1,12), loss="LASSO", lambda=1)
+    expect_equal(unname(unlist(testModel$arma)), c(1, 1, 0, 0))
+    # With optimal initials, only these are estimated
+    expect_named(adam(AirPassengers, "AAN", loss="RIDGE", lambda=1, initial="optimal")$B,
+                 c("level", "trend"))
+})
+
+test_that("LASSO / RIDGE shrink the estimated parameters wherever they are in B", {
+    set.seed(3)
+    x <- data.frame(y=as.vector(AirPassengers), x1=rnorm(144), x2=rnorm(144, 5))
+    # The constant after the regressors is not shrunk, the regressors are
+    testModel <- adam(x, "NNN", orders=list(ar=1,i=1,ma=1), constant=TRUE, loss="LASSO", lambda=0.1)
+    expect_equal(unname(coef(testModel)[c("x1","x2")]), c(0, 0), tolerance=1e-4)
+    expect_gt(abs(coef(testModel)[["drift"]]), 1)
+    # With the AR provided, the MA parameters are shrunk to zero, not to one
+    testModel <- adam(log(AirPassengers), "NNN", orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)),
+                      lags=c(1,12), arma=list(ar=c(0.2,0.3)), loss="LASSO", lambda=0.1)
+    expect_equal(unname(coef(testModel)), c(0, 0), tolerance=1e-3)
+})

@@ -369,3 +369,22 @@ test_that("omg() accepts a callable for custom loss", {
     expect_true(is.function(m$lossFunction))
     expect_true(is.finite(m$lossValue))
 })
+
+test_that("omg LASSO penalises the estimated parameters of both sides, not the initials", {
+    set.seed(44)
+    y <- rpois(120, 0.7)
+    testModel <- omg(y, modelA="MNN", modelB="MNN", loss="LASSO", lambda=0.5, initial="optimal")
+    B <- c(testModel$modelA$B, testModel$modelB$B)
+    errors <- (y!=0) - fitted(testModel)
+    expect_equal(testModel$lossValue,
+                 0.5*sqrt(mean(errors^2)) + 0.5*sum(abs(B[names(B)=="alpha"])))
+})
+
+test_that("omg keeps the provided B of a mixed model, as om", {
+    set.seed(44)
+    y <- rpois(120, 0.7)
+    # MAN is started from no smoothing, unless B is provided
+    BProvided <- c(0.05, 0.01, 1, 0.001, 0.05, 1)
+    testModel <- omg(y, modelA="MAN", modelB="MNN", initial="optimal", B=BProvided, maxeval=1)
+    expect_equal(unname(c(testModel$modelA$B, testModel$modelB$B)), BProvided)
+})

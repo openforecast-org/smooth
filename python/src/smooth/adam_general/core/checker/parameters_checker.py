@@ -954,7 +954,7 @@ def parameters_checker(
         "nsim": nsim,
         "scenarios": scenarios,
         "ellipsis": ellipsis,
-        "lambda": lambda_param if lambda_param is not None else 1,
+        "lambda": lambda_param if lambda_param is not None else 0,
     }
     # Add custom loss function if provided
     if loss_function is not None:
@@ -964,7 +964,7 @@ def parameters_checker(
     if model_do == "estimate":
         est_params = _initialize_estimation_params(
             loss=loss,
-            lambda_param=lambda_param if lambda_param is not None else 1,
+            lambda_param=lambda_param,
             ets_info=ets_info,
             arima_info=arima_info,
             silent=silent,
@@ -972,7 +972,7 @@ def parameters_checker(
         # Update general dict with estimation parameters
         general_dict.update(
             {
-                "lambda": est_params.get("lambda", 1),
+                "lambda": est_params["lambda"],
                 "lambda_": est_params.get("lambda_"),
                 "arma_params": est_params.get("arma_params", None),
             }
@@ -1070,6 +1070,7 @@ def parameters_checker(
             ic=ic,
             xreg_names_from_input=xreg_names_from_input,
             initial_xreg=initials_dict.get("initial_xreg"),
+            ot_logical=observations_dict["ot_logical"] if occurrence_model else None,
         )
         # For "select": if no variables survived selection, disable xreg
         if not xreg_dict["xreg_model"]:
@@ -1098,6 +1099,15 @@ def parameters_checker(
             "xreg_parameters_estimated": None,
             "xreg_parameters_persistence": None,
         }
+
+    # LASSO / RIDGE with lambda=1 is the penalty alone, which is zero with the
+    # parameters at their shrinkage targets: no smoothing, phi=1, AR=1 and MA=0. They
+    # are set to them, as in R's parametersChecker, leaving the initials and the
+    # regressors, or nothing, and then the model is used as it is (the estimator)
+    if loss in ("LASSO", "RIDGE") and general_dict["lambda"] == 1:
+        _lasso_ridge_targets(
+            model_type_dict, persistence_dict, phi_dict, arima_dict, lags_dict
+        )
 
     # Calculate number of parameters using the new n_param table structure
     from smooth.adam_general.core.utils.n_param import build_n_param_table
@@ -1141,6 +1151,34 @@ def parameters_checker(
         xreg_dict,
         params_info,
     )
+
+
+def _lasso_ridge_targets(
+    model_type_dict, persistence_dict, phi_dict, arima_dict, lags_dict
+):
+    """Set the parameters to the shrinkage targets of LASSO / RIDGE, in place."""
+    if model_type_dict["ets_model"]:
+        persistence_dict.update(
+            persistence_estimate=False,
+            persistence_level_estimate=False,
+            persistence_trend_estimate=False,
+            persistence_seasonal_estimate=[False]
+            * len(persistence_dict["persistence_seasonal_estimate"]),
+            persistence_level=0,
+            persistence_trend=0,
+            persistence_seasonal=[0] * len(persistence_dict["persistence_seasonal"]),
+        )
+        phi_dict.update(phi_estimate=False, phi=1)
+    if model_type_dict["xreg_model"]:
+        persistence_dict.update(persistence_xreg_estimate=False, persistence_xreg=0)
+    if arima_dict["arima_model"]:
+        # AR of one and MA of zero, lag by lag, as the polynomialiser reads them
+        arma_parameters: list = []
+        for ar_order, ma_order in zip(arima_dict["ar_orders"], arima_dict["ma_orders"]):
+            arma_parameters += [1.0] * ar_order + [0.0] * ma_order
+        arima_dict.update(
+            ar_estimate=False, ma_estimate=False, arma_parameters=arma_parameters
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1210,6 +1248,7 @@ def _process_xreg(
     ic,
     xreg_names_from_input=None,
     initial_xreg=None,
+    ot_logical=None,
 ):
     """Process explanatory variables and return a populated xreg_dict.
 
@@ -1225,6 +1264,9 @@ def _process_xreg(
     initial_xreg : np.ndarray or None
         User-supplied initial coefficient values, shape (p, 1). If provided,
         skips ALM computation and uses these values as optimizer seed.
+    ot_logical : array-like of bool or None
+        The non-zero in-sample observations of an occurrence model, the only ones
+        the initials are estimated on (R's ``subset``); None uses all of them.
 
     Returns
     -------
@@ -1295,7 +1337,26 @@ def _process_xreg(
             {"initial_xreg": initial_xreg_flat.reshape(-1, 1)},
         ]
     else:
-        X_aug = np.column_stack([np.ones(obs_in_sample), X_in_sel])
+        # As R's xregInitialiser, a trend is added to get rid of the bias and dropped
+        # afterwards, unless asked for, or a regressor is a trend itself: alm() drops
+        # the first of two variables correlated above 0.999
+        # An occurrence model estimates them on the non-zero demand only, as R's
+        # subset, so that log(y) of the multiplicative models is defined
+        subset = (
+            np.ones(obs_in_sample, dtype=bool)
+            if ot_logical is None
+            else np.asarray(ot_logical, dtype=bool).ravel()[:obs_in_sample]
+        )
+        X_sub, y_sub = X_in_sel[subset], y_is[subset]
+        # The trend keeps the time index of the observations
+        trend = np.arange(1.0, obs_in_sample + 1)[subset]
+        with np.errstate(invalid="ignore", divide="ignore"):
+            trend_collinear = any(
+                abs(np.corrcoef(column, trend)[0, 1]) >= 0.999 for column in X_sub.T
+            )
+        X_aug = np.column_stack([np.ones(len(y_sub)), X_sub])
+        if "trend" not in names_selected and not trend_collinear:
+            X_aug = np.column_stack([X_aug, trend])
         # R log-transforms y for multiplicative models with these distributions
         # (adamGeneral.R:1400). For dlnorm/dgamma/dinvgauss the distribution
         # itself handles the multiplicative structure, so no log-transform.
@@ -1319,8 +1380,12 @@ def _process_xreg(
             alm_dist = _resolve_dist_for_alm(etype, distribution)
             try:
                 alm = ALM(distribution=alm_dist)
-                alm.fit(X_aug, y_response, feature_names=names_selected)
-                return np.asarray(alm.coef, dtype=float)
+                alm.fit(
+                    X_aug,
+                    y_response,
+                    feature_names=[*names_selected, "trend"][: X_aug.shape[1] - 1],
+                )
+                return np.asarray(alm.coef, dtype=float)[:p]
             except Exception:
                 return np.zeros(p)
 
@@ -1328,12 +1393,12 @@ def _process_xreg(
             """Get response for multiplicative ALM: log(y) if needed."""
             resolved = distribution if distribution != "default" else "dlnorm"
             if resolved in _log_dists:
-                return np.log(np.maximum(y_is, 1e-10))
-            return y_is
+                return np.log(y_sub)
+            return y_sub
 
         if e_type == "A":
             xreg_initials = [
-                {"initial_xreg": _fit_alm(y_is, "A").reshape(-1, 1)},
+                {"initial_xreg": _fit_alm(y_sub, "A").reshape(-1, 1)},
                 None,
             ]
         elif e_type == "M":
@@ -1344,7 +1409,7 @@ def _process_xreg(
         else:
             # "Z" — error type selection, need both additive and multiplicative
             xreg_initials = [
-                {"initial_xreg": _fit_alm(y_is, "A").reshape(-1, 1)},
+                {"initial_xreg": _fit_alm(y_sub, "A").reshape(-1, 1)},
                 {"initial_xreg": _fit_alm(_mult_response(), "M").reshape(-1, 1)},
             ]
 

@@ -1,3 +1,5 @@
+import re
+
 import nlopt
 import numpy as np
 
@@ -11,7 +13,6 @@ from .optimization import (
     _create_objective_function,
     _run_optimization,
     _set_distribution,
-    _setup_arima_polynomials,
     _setup_optimization_parameters,
 )
 from .two_stage import _run_two_stage_estimator
@@ -499,16 +500,12 @@ def estimator(
         adam_cpp=adam_cpp,
         other_parameter_estimate=other_parameter_estimate,
         other_value=other if other is not None else 2.0,
+        smoother=smoother,
     )
     # Get initial parameter vector and bounds; user-provided values are used as-is
     B = np.asarray(B_initial, dtype=float) if B_initial is not None else b_values["B"]
     lb = np.asarray(lb, dtype=float) if lb is not None else b_values["Bl"]
     ub = np.asarray(ub, dtype=float) if ub is not None else b_values["Bu"]
-
-    # Step 4: Set up ARIMA polynomials if needed
-    ar_polynomial_matrix, ma_polynomial_matrix = _setup_arima_polynomials(
-        model_type_dict, arima_dict, lags_dict
-    )
 
     # Step 5: Set appropriate distribution
     general_dict = _set_distribution(general_dict, model_type_dict)
@@ -525,23 +522,12 @@ def estimator(
         components_dict,
     )
 
-    # Step 7: Create and configure optimizer
-    # Convert algorithm string to nlopt constant
-    nlopt_algorithm = getattr(
-        nlopt, algorithm.replace("NLOPT_", ""), nlopt.LN_NELDERMEAD
-    )
-    opt = nlopt.opt(nlopt_algorithm, len(B))
-    opt = _configure_optimizer(
-        opt,
-        lb,
-        ub,
-        maxeval_used,
-        maxtime,
-        xtol_rel=xtol_rel,
-        xtol_abs=xtol_abs,
-        ftol_rel=ftol_rel,
-        ftol_abs=ftol_abs,
-    )
+    # LASSO / RIDGE with lambda=1 have their parameters at the shrinkage targets
+    # (parameters_checker); what is left (the initials and the regressors) is
+    # estimated with lambda=0, as in R
+    lambda_original = general_dict["lambda"]
+    if general_dict["loss"] in ("LASSO", "RIDGE") and lambda_original == 1 and len(B):
+        general_dict["lambda"] = 0
 
     # Step 8: Create objective function
     objective_wrapper = _create_objective_function(
@@ -560,74 +546,52 @@ def estimator(
         general_dict,
         adam_cpp,
         print_level,
-        ar_polynomial_matrix=ar_polynomial_matrix,
-        ma_polynomial_matrix=ma_polynomial_matrix,
         other=other,
         other_parameter_estimate=other_parameter_estimate,
     )
 
-    # Set objective function
-    opt.set_min_objective(objective_wrapper)
-
-    # Step 9: Run optimization. Keep the starting vector: R's nloptr leaves x0
-    # untouched, so the retry below restarts from the initialiser's B, not from
-    # wherever the failed run stopped (R/adam.R estimator).
+    # Step 9: Run optimization, unless there is nothing to estimate: then, as R's
+    # modelDo="use", the loss at the given parameters. Keep the starting vector:
+    # R's nloptr leaves x0 untouched, so the retry below restarts from the
+    # initialiser's B, not from wherever the failed run stopped (R/adam.R).
+    nlopt_algorithm = getattr(
+        nlopt, algorithm.replace("NLOPT_", ""), nlopt.LN_NELDERMEAD
+    )
     B_start = B.copy()
-    B[:] = _run_optimization(opt, B)
-    CF_value = opt.last_optimum_value()
+    if len(B) == 0:
+        CF_value = objective_wrapper(B, np.empty(0))
+    else:
+        opt = nlopt.opt(nlopt_algorithm, len(B))
+        opt = _configure_optimizer(
+            opt,
+            lb,
+            ub,
+            maxeval_used,
+            maxtime,
+            xtol_rel=xtol_rel,
+            xtol_abs=xtol_abs,
+            ftol_rel=ftol_rel,
+            ftol_abs=ftol_abs,
+        )
+        opt.set_min_objective(objective_wrapper)
+        B[:] = _run_optimization(opt, B)
+        CF_value = opt.last_optimum_value()
 
     # Step 9a: a BOBYQA refinement pass was tried in the past but produced
     # less stable ARIMA estimates, so only the Nelder-Mead pass is run.
 
-    # Step 10a: Retry optimisation with zero smoothing parameters if the
-    # initial optimisation failed to converge (non-finite or penalty-valued
-    # cost function).
-    if not np.isfinite(CF_value) or CF_value >= 1e300:
+    # Step 10a: if the optimisation got stuck on a penalty (every penalty is at
+    # least 1e100), retry with zero smoothing parameters and small ARMA
+    # parameters, selected by name as in R/adam.R, unless there is nothing to
+    # optimise (LASSO / RIDGE with lambda=1 and backcasting)
+    if len(B) > 0 and (not np.isfinite(CF_value) or CF_value >= 1e100):
         B[:] = B_start
-
-        # Calculate number of ETS persistence parameters (alpha, beta, gamma)
-        components_number_ets = 0
-        if model_type_dict["ets_model"]:
-            # Build persistence estimate vector with proper seasonal expansion
-            persistence_estimate_vector = [
-                persistence_dict["persistence_level_estimate"],
-                model_type_dict["model_is_trendy"]
-                and persistence_dict["persistence_trend_estimate"],
-            ]
-            if model_type_dict["model_is_seasonal"]:
-                persistence_estimate_vector.extend(
-                    persistence_dict["persistence_seasonal_estimate"]
-                )
-            components_number_ets = sum(persistence_estimate_vector)
-            if components_number_ets > 0:
-                B[:components_number_ets] = 0
-
-        if arima_dict["arima_model"]:
-            # Calculate starting index for ARIMA parameters
-            #  Match R's calculation exactly: componentsNumberETS +
-            # persistenceXregEstimate*xregNumber
-            # Note: R's retry code doesn't account for phi, so we match that behavior
-            ar_ma_start = components_number_ets
-            if (
-                explanatory_dict["xreg_model"]
-                and persistence_dict["persistence_xreg_estimate"]
-            ):
-                ar_ma_start += max(
-                    explanatory_dict["xreg_parameters_persistence"] or [0]
-                )
-
-            # Calculate number of ARIMA parameters
-            ar_orders = arima_dict.get("ar_orders", [])
-            ma_orders = arima_dict.get("ma_orders", [])
-            ar_estimate = arima_dict.get("ar_estimate", False)
-            ma_estimate = arima_dict.get("ma_estimate", False)
-
-            ar_count = sum(ar_orders) if ar_estimate else 0
-            ma_count = sum(ma_orders) if ma_estimate else 0
-            ar_ma_count = ar_count + ma_count
-
-            if ar_ma_count > 0:
-                B[ar_ma_start : ar_ma_start + ar_ma_count] = 0.01
+        names = list(b_values["names"])
+        for i, name in enumerate(names):
+            if name in ("alpha", "beta") or name.startswith("gamma"):
+                B[i] = 0
+            elif re.match(r"^(phi|theta)[0-9]+\[", name):
+                B[i] = 0.01
 
         # Retry optimization with reset parameters
         opt2 = nlopt.opt(nlopt_algorithm, len(B))
@@ -646,12 +610,7 @@ def estimator(
         B[:] = _run_optimization(opt2, B)
         CF_value = opt2.last_optimum_value()
 
-    # A fix for the special case of LASSO/RIDGE with lambda==1
-    if (
-        any(general_dict["loss"] == loss_type for loss_type in ["LASSO", "RIDGE"])
-        and general_dict["lambda"] == 1
-    ):
-        CF_value = 0
+    general_dict["lambda"] = lambda_original
 
     n_param_estimated = len(B)
 

@@ -603,8 +603,8 @@ def _initialize_estimation_params(
     ----------
     loss : str
         Loss function name
-    lambda_param : float
-        Lambda parameter for LASSO/RIDGE
+    lambda_param : float or None
+        The regularisation parameter of LASSO / RIDGE; zero when not provided
     ets_info : dict
         ETS model information
     arima_info : dict
@@ -618,16 +618,15 @@ def _initialize_estimation_params(
         Dictionary with estimation parameters
     """
     # Initialize result
-    result = {"lambda": lambda_param}
+    result = {"lambda": 0 if lambda_param is None else lambda_param}
 
-    # Handle specialized loss functions
+    # As R's parametersChecker, a missing lambda of LASSO / RIDGE is zero
     if loss in ["LASSO", "RIDGE"]:
-        # Adjust lambda if needed
-        if lambda_param <= 0:
-            _warn(f"Lambda must be positive for {loss}. Setting it to 1.", silent)
-            result["lambda"] = 1.0
-
-        # Set lambda directly in the result
+        if lambda_param is None:
+            _warn(
+                "You have not provided lambda parameter. I will set it to zero.",
+                silent,
+            )
         result["lambda_"] = result["lambda"]
 
     # Add ARMA parameters if needed

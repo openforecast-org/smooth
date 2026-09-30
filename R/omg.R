@@ -427,7 +427,7 @@ omg <- function(data,
             checkerA$otherParameterEstimate,
             adamCppA,
             etsA, bounds, ot, otLogicalInternal,
-            checkerA$iOrders, checkerA$armaParameters, checkerA$other)
+            checkerA$iOrders, checkerA$armaParameters, checkerA$other, smoother, adamCreatedA$matWt)
 
         BValuesB <- adam_initialiser(
             checkerB$etsModel, checkerB$Etype, checkerB$Ttype, checkerB$Stype,
@@ -457,7 +457,7 @@ omg <- function(data,
             checkerB$otherParameterEstimate,
             adamCppB,
             etsB, bounds, ot, otLogicalInternal,
-            checkerB$iOrders, checkerB$armaParameters, checkerB$other)
+            checkerB$iOrders, checkerB$armaParameters, checkerB$other, smoother, adamCreatedB$matWt)
 
         # Capture user-supplied B / lb / ub from ellipses BEFORE the joint
         # defaults shadow them (B, lb, ub were extracted by
@@ -497,63 +497,13 @@ omg <- function(data,
         EtypeA <- checkerA$Etype; TtypeA <- checkerA$Ttype; StypeA <- checkerA$Stype
         EtypeB <- checkerB$Etype; TtypeB <- checkerB$Ttype; StypeB <- checkerB$Stype
 
-        if((EtypeA=="A" && TtypeA=="A" && StypeA=="M") ||
-           (EtypeA=="A" && TtypeA=="M" && StypeA=="A") ||
-           (EtypeA=="M" && TtypeA=="A" && StypeA=="A") ||
-           (EtypeA=="A" && TtypeA=="M" && StypeA=="N") ||
-           (EtypeA=="M" && TtypeA=="M" && StypeA=="A") ||
-           (EtypeA=="M" && TtypeA=="N" && StypeA=="A") ||
-           (EtypeA=="A" && TtypeA=="N" && StypeA=="M")) {
+        # The dangerous mixed models start from no smoothing, side by side, as in
+        # om(), unless the user provided B
+        if(is.null(userB) && om_mixedModel(EtypeA, TtypeA, StypeA)){
             B_used[seq_len(nParamsA)] <- 0
         }
-        if((EtypeB=="A" && TtypeB=="A" && StypeB=="M") ||
-           (EtypeB=="A" && TtypeB=="M" && StypeB=="A") ||
-           (EtypeB=="M" && TtypeB=="A" && StypeB=="A") ||
-           (EtypeB=="A" && TtypeB=="M" && StypeB=="N") ||
-           (EtypeB=="M" && TtypeB=="M" && StypeB=="A") ||
-           (EtypeB=="M" && TtypeB=="N" && StypeB=="A") ||
-           (EtypeB=="A" && TtypeB=="N" && StypeB=="M")) {
+        if(is.null(userB) && om_mixedModel(EtypeB, TtypeB, StypeB)){
             B_used[seq_len(length(B_B)) + nParamsA] <- 0
-        }
-
-        # ARIMA companion matrices for A
-        if(checkerA$arimaModel) {
-            arPolynomialMatrixA <- matrix(0, checkerA$arOrders %*% lags,
-                                          checkerA$arOrders %*% lags)
-            if(nrow(arPolynomialMatrixA) > 1) {
-                arPolynomialMatrixA[2:nrow(arPolynomialMatrixA)-1,
-                                    2:nrow(arPolynomialMatrixA)] <-
-                    diag(nrow(arPolynomialMatrixA) - 1)
-            }
-            maPolynomialMatrixA <- matrix(0, checkerA$maOrders %*% lags,
-                                          checkerA$maOrders %*% lags)
-            if(nrow(maPolynomialMatrixA) > 1) {
-                maPolynomialMatrixA[2:nrow(maPolynomialMatrixA)-1,
-                                    2:nrow(maPolynomialMatrixA)] <-
-                    diag(nrow(maPolynomialMatrixA) - 1)
-            }
-        } else {
-            arPolynomialMatrixA <- maPolynomialMatrixA <- NULL
-        }
-
-        # ARIMA companion matrices for B
-        if(checkerB$arimaModel) {
-            arPolynomialMatrixB <- matrix(0, checkerB$arOrders %*% lags,
-                                          checkerB$arOrders %*% lags)
-            if(nrow(arPolynomialMatrixB) > 1) {
-                arPolynomialMatrixB[2:nrow(arPolynomialMatrixB)-1,
-                                    2:nrow(arPolynomialMatrixB)] <-
-                    diag(nrow(arPolynomialMatrixB) - 1)
-            }
-            maPolynomialMatrixB <- matrix(0, checkerB$maOrders %*% lags,
-                                          checkerB$maOrders %*% lags)
-            if(nrow(maPolynomialMatrixB) > 1) {
-                maPolynomialMatrixB[2:nrow(maPolynomialMatrixB)-1,
-                                    2:nrow(maPolynomialMatrixB)] <-
-                    diag(nrow(maPolynomialMatrixB) - 1)
-            }
-        } else {
-            arPolynomialMatrixB <- maPolynomialMatrixB <- NULL
         }
 
         # B-side scalars for omfitGeneral
@@ -603,8 +553,6 @@ omg <- function(data,
             armaParametersA=checkerA$armaParameters,
             nonZeroARIA=checkerA$nonZeroARI, nonZeroMAA=checkerA$nonZeroMA,
             arimaPolynomialsA=adamCreatedA$arimaPolynomials,
-            arPolynomialMatrixA=arPolynomialMatrixA,
-            maPolynomialMatrixA=maPolynomialMatrixA,
             xregModelA=checkerA$xregModel, xregNumberA=checkerA$xregNumber,
             xregParametersMissingA=checkerA$xregParametersMissing,
             xregParametersIncludedA=checkerA$xregParametersIncluded,
@@ -649,8 +597,6 @@ omg <- function(data,
             armaParametersB=checkerB$armaParameters,
             nonZeroARIB=checkerB$nonZeroARI, nonZeroMAB=checkerB$nonZeroMA,
             arimaPolynomialsB=adamCreatedB$arimaPolynomials,
-            arPolynomialMatrixB=arPolynomialMatrixB,
-            maPolynomialMatrixB=maPolynomialMatrixB,
             xregModelB=checkerB$xregModel, xregNumberB=checkerB$xregNumber,
             xregParametersMissingB=checkerB$xregParametersMissing,
             xregParametersIncludedB=checkerB$xregParametersIncluded,
@@ -796,14 +742,6 @@ omg <- function(data,
                 # Disable bounds so omgCF_local never short-circuits with
                 # 1e+300 during the hessian probes.
                 nlaFI$bounds <- "none"
-                if(checkerA$arimaModel) {
-                    nlaFI$arPolynomialMatrixA <- NULL
-                    nlaFI$maPolynomialMatrixA <- NULL
-                }
-                if(checkerB$arimaModel) {
-                    nlaFI$arPolynomialMatrixB <- NULL
-                    nlaFI$maPolynomialMatrixB <- NULL
-                }
 
                 CFAtOptimum <- do.call(omgCF_local, c(list(B=B_use), nlaFI))
                 omgCF_for_FI <- function(B) {
@@ -847,7 +785,7 @@ omg <- function(data,
             # point. Mirrors the failsafe in om()'s retry block: all params
             # set to 0.001 with the two leading alphas (A-side and B-side)
             # bumped to 0.01, which keeps the multiplicative recursion stable.
-            if(is.null(userB) && (is.infinite(res$objective) || res$objective == 1e+300)) {
+            if(is.null(userB) && (is.infinite(res$objective) || res$objective >= 1e+100)) {
                 B_used[] <- 0.001
                 B_used[1] <- 0.01                # alpha for A-side
                 B_used[nParamsA + 1] <- 0.01     # alpha for B-side
@@ -1056,7 +994,8 @@ omg <- function(data,
             checker$initialArima, checker$initialArimaNumber,
             adamArchitect$componentsNumberETS, checker$componentsNumberARIMA,
             adamFilled$arimaPolynomials, checker$Etype,
-            checker$xregModel, checker$initialXregEstimate, checker$xregNumber)
+            checker$xregModel, checker$initialXregEstimate, checker$xregNumber,
+            checker$lagsModelARIMA)
 
         if(checker$arimaModel && (checker$arRequired || checker$maRequired)) {
             armaParametersList <- vector("list", checker$arRequired + checker$maRequired)
@@ -1308,7 +1247,6 @@ omgCF_local <- function(B,
                         arOrdersA, iOrdersA, maOrdersA,
                         arRequiredA, maRequiredA, armaParametersA,
                         nonZeroARIA, nonZeroMAA, arimaPolynomialsA,
-                        arPolynomialMatrixA, maPolynomialMatrixA,
                         xregModelA, xregNumberA,
                         xregParametersMissingA, xregParametersIncludedA,
                         xregParametersEstimatedA, xregParametersPersistenceA,
@@ -1333,7 +1271,6 @@ omgCF_local <- function(B,
                         arOrdersB, iOrdersB, maOrdersB,
                         arRequiredB, maRequiredB, armaParametersB,
                         nonZeroARIB, nonZeroMAB, arimaPolynomialsB,
-                        arPolynomialMatrixB, maPolynomialMatrixB,
                         xregModelB, xregNumberB,
                         xregParametersMissingB, xregParametersIncludedB,
                         xregParametersEstimatedB, xregParametersPersistenceB,
@@ -1409,7 +1346,7 @@ omgCF_local <- function(B,
                                     arimaModelA, arEstimateA, maEstimateA,
                                     xregModelA, regressors, xregNumberA, componentsNumberARIMAA,
                                     lagsModelAllA, obsInSample,
-                                    arPolynomialMatrixA, maPolynomialMatrixA, phiEstimateA)
+                                    phiEstimateA)
 
     penaltyB <- adam_bounds_checker(elemB, elemB$arimaPolynomials, bounds,
                                     etsModelB, modelIsTrendyB, modelIsSeasonalB,
@@ -1418,7 +1355,7 @@ omgCF_local <- function(B,
                                     arimaModelB, arEstimateB, maEstimateB,
                                     xregModelB, regressors, xregNumberB, componentsNumberARIMAB,
                                     lagsModelAllB, obsInSample,
-                                    arPolynomialMatrixB, maPolynomialMatrixB, phiEstimateB)
+                                    phiEstimateB)
 
     if(penaltyA + penaltyB > 0) { return(1e+300) }
 
@@ -1515,11 +1452,34 @@ omgCF_local <- function(B,
     } else if(loss == "HAM"){
         return(mean(sqrt(abs(errors))))
     } else if(any(loss == c("LASSO","RIDGE"))){
+        # The penalty on the estimated parameters of both sides, as in adam()
+        BPenalty <- c(adam_penaltyParameters(B_A, EtypeA, etsModelA, modelIsTrendyA, modelIsSeasonalA,
+                                             persistenceEstimateA, persistenceLevelEstimateA,
+                                             persistenceTrendEstimateA, persistenceSeasonalEstimateA,
+                                             xregModelA, persistenceXregEstimateA,
+                                             xregParametersPersistenceA, phiEstimateA,
+                                             arimaModelA, arEstimateA, maEstimateA, arOrdersA, maOrdersA,
+                                             initialTypeA, initialEstimateA, initialXregEstimateA,
+                                             xregParametersEstimatedA, constantEstimateA, FALSE,
+                                             adam_lassoDenominators(loss, matWtA, componentsNumberETSA,
+                                                                    componentsNumberARIMAA, xregNumberA,
+                                                                    ot)$denominator),
+                      adam_penaltyParameters(B_B, EtypeB, etsModelB, modelIsTrendyB, modelIsSeasonalB,
+                                             persistenceEstimateB, persistenceLevelEstimateB,
+                                             persistenceTrendEstimateB, persistenceSeasonalEstimateB,
+                                             xregModelB, persistenceXregEstimateB,
+                                             xregParametersPersistenceB, phiEstimateB,
+                                             arimaModelB, arEstimateB, maEstimateB, arOrdersB, maOrdersB,
+                                             initialTypeB, initialEstimateB, initialXregEstimateB,
+                                             xregParametersEstimatedB, constantEstimateB, FALSE,
+                                             adam_lassoDenominators(loss, matWtB, componentsNumberETSB,
+                                                                    componentsNumberARIMAB, xregNumberB,
+                                                                    ot)$denominator))
         errorTerm <- (1 - lambda) * sqrt(mean(errors^2))
         if(loss == "LASSO"){
-            return(errorTerm + lambda * sum(abs(B)))
+            return(errorTerm + lambda * sum(abs(BPenalty)))
         } else {
-            return(errorTerm + lambda * sqrt(sum(B^2)))
+            return(errorTerm + lambda * sqrt(sum(BPenalty^2)))
         }
     } else {
         # Fallback to likelihood for any unrecognised string.

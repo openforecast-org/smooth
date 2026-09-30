@@ -158,7 +158,9 @@ class AutoMSARIMA(AutoADAM):
                 "ma": ma_order if ma_order is not None else 0,
                 "select": True,
             }
-            ar_order = i_order = ma_order = None  # avoid the both-supplied warning
+        # The defaults of the scalar orders are not None: with orders given, they
+        # are dropped, avoiding the both-supplied warning
+        ar_order = i_order = ma_order = None
 
         super().__init__(
             model="NNN",

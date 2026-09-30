@@ -22,10 +22,11 @@ from numpy.typing import NDArray
 from smooth.adam_general.core.creator import initialiser
 from smooth.adam_general.core.estimator.optimization import (
     _configure_optimizer,
-    _setup_arima_polynomials,
 )
 from smooth.adam_general.core.om import (
+    MIXED_MODELS,
     OM,
+    draw_occurrence,
     om_preparator,
 )
 from smooth.adam_general.core.utils.ic import ic_function
@@ -104,7 +105,7 @@ class OMG:
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE"],
             Callable,
         ] = "likelihood",
-        reg_lambda: Optional[float] = None,
+        lambda_param: Optional[float] = None,
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
         bounds: Literal["usual", "admissible", "none"] = "usual",
         verbose: int = 0,
@@ -150,7 +151,7 @@ class OMG:
         self.initial = initial
         self.loss = loss
         self.loss_function = loss_function
-        self.reg_lambda = reg_lambda
+        self.lambda_param = lambda_param
         self.ic = ic
         self.bounds = bounds
         self.verbose = verbose
@@ -228,7 +229,7 @@ class OMG:
                 adam_ets=(self.ets == "adam"),
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
             )
         else:
             cf_value = self._optimise(B_used, lb, ub, side_a, side_b, n_params_a)
@@ -254,7 +255,7 @@ class OMG:
                 adam_ets=(self.ets == "adam"),
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
                 return_fitted=True,
             ),
             dtype=np.float64,
@@ -539,7 +540,7 @@ class OMG:
                 adam_ets=adam_ets,
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
             )
 
         return numerical_hessian(_cost, self._B_joint, step_size=step_size)
@@ -585,7 +586,7 @@ class OMG:
                 adam_ets=adam_ets,
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
-                reg_lambda=self.reg_lambda,
+                lambda_param=self.lambda_param,
                 return_fitted=True,
             )
             p = np.asarray(p, dtype=float).ravel()
@@ -795,7 +796,7 @@ class OMG:
             # Carry the callable through so bootstrap refits replay the
             # same custom loss; otherwise the resolved string flag.
             loss=self.loss_function if self.loss_function is not None else self.loss,
-            reg_lambda=self.reg_lambda,
+            lambda_param=self.lambda_param,
             ic=self.ic,
             bounds=self.bounds,
             verbose=0,
@@ -1014,9 +1015,6 @@ class OMG:
         )
 
         adam_cpp, adam_created, profile_dict = scaffold._build_om_artifacts()
-        ar_pm, ma_pm = _setup_arima_polynomials(
-            scaffold._model_type, scaffold._arima, scaffold._lags_model
-        )
 
         return {
             "scaffold": scaffold,
@@ -1033,8 +1031,6 @@ class OMG:
             "observations_dict": scaffold._observations,
             "profile": profile_dict,
             "adam_cpp": adam_cpp,
-            "ar_polynomial_matrix": ar_pm,
-            "ma_polynomial_matrix": ma_pm,
             "occurrence_str": occurrence,
             "occurrence_char": scaffold._occurrence_char,
         }
@@ -1079,6 +1075,19 @@ class OMG:
         if user_ub is not None:
             ub[:] = np.asarray(user_ub, dtype=float)
 
+        # The mixed models that are dangerous to start from the initialiser's values
+        # start from no smoothing, side by side, as in OM, unless B is provided
+        for side, side_slice in (
+            (side_a, slice(0, n_params_a)),
+            (side_b, slice(n_params_a, len(B_used))),
+        ):
+            model_type = side["model_type_dict"]
+            ets_type = "".join(
+                model_type[k] for k in ("error_type", "trend_type", "season_type")
+            )
+            if user_B is None and ets_type in MIXED_MODELS:
+                B_used[side_slice] = 0
+
         return B_used, lb, ub, n_params_a
 
     def _initial_B_side(self, side):  # noqa: N802
@@ -1097,6 +1106,7 @@ class OMG:
             phi_dict=side["phi"],
             profile_dict=side["profile"],
             adam_cpp=side["adam_cpp"],
+            smoother=side["scaffold"]._resolve_smoother(),
             other_parameter_estimate=False,
             other_value=2.0,
         )
@@ -1127,7 +1137,7 @@ class OMG:
                     adam_ets=_adam_ets,
                     loss=self.loss,  # type: ignore[arg-type]
                     loss_function=self.loss_function,
-                    reg_lambda=self.reg_lambda,
+                    lambda_param=self.lambda_param,
                 )
             except Exception:
                 cf = 1e100
@@ -1158,7 +1168,7 @@ class OMG:
         # Mirrors the failsafe in R/omg.R: all params 0.001 with the two
         # leading alphas (A-side and B-side) bumped to 0.01.
         user_B_supplied = kwargs.get("B") is not None  # noqa: N806
-        if not user_B_supplied and (not np.isfinite(cf_value) or cf_value >= 1e300):
+        if not user_B_supplied and (not np.isfinite(cf_value) or cf_value >= 1e100):
             B_used[:] = 0.001
             if len(B_used) > 0:
                 B_used[0] = 0.01  # alpha for A-side
@@ -1370,11 +1380,7 @@ class OMG:
         prob = np.asarray(prob, dtype=np.float64)
         if prob.ndim == 1:
             prob = prob.reshape(-1, 1)
-        prob = np.nan_to_num(prob, nan=0.5, posinf=1.0, neginf=0.0)
-        prob = np.clip(prob, 0.0, 1.0)
-
-        rng = np.random.default_rng(seed)
-        occurrence_data = rng.binomial(1, prob)
+        prob, occurrence_data = draw_occurrence(prob, seed)
 
         obs_out, nsim_out = prob.shape
         if nsim_out == 1:

@@ -15,9 +15,9 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
-from numpy.linalg import eigvals
 
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
 
 
 def _side_probe_basis(side, elem, o_type="g"):
@@ -142,55 +142,6 @@ def omg_link_function(fitted_a, fitted_b, error_type_a, error_type_b):
     return 1.0 / (1.0 + np.exp(np.log(fb) - fa))
 
 
-def _ets_bounds_check(model_type_dict, components_dict, vec_g, mat_f, phi_dict):
-    """Mirror of the ETS "usual" bounds branch in ``CF`` and ``om_cf``."""
-    if not model_type_dict["ets_model"]:
-        return 0.0
-    n_ets = components_dict["components_number_ets"]
-    if any(vec_g[:n_ets] > 1) or any(vec_g[:n_ets] < 0):
-        return 1e300
-    if model_type_dict["model_is_trendy"]:
-        if vec_g[1] > vec_g[0]:
-            return 1e300
-        n_ns = components_dict["components_number_ets_non_seasonal"]
-        n_seas = components_dict["components_number_ets_seasonal"]
-        if model_type_dict["model_is_seasonal"] and any(
-            vec_g[n_ns : n_ns + n_seas] > (1 - vec_g[0])
-        ):
-            return 1e300
-    elif model_type_dict["model_is_seasonal"]:
-        n_ns = components_dict["components_number_ets_non_seasonal"]
-        n_seas = components_dict["components_number_ets_seasonal"]
-        if any(vec_g[n_ns : n_ns + n_seas] > (1 - vec_g[0])):
-            return 1e300
-    if phi_dict["phi_estimate"] and (mat_f[1, 1] > 1 or mat_f[1, 1] < 0):
-        return 1e300
-    return 0.0
-
-
-def _arima_bounds_check(arima_checked, arima_polynomials, ar_pm, ma_pm):
-    """Mirror of the ARIMA "usual" bounds branch in ``CF`` and ``om_cf``."""
-    if not arima_checked["arima_model"]:
-        return 0.0
-    if not (arima_checked["ar_estimate"] or arima_checked["ma_estimate"]):
-        return 0.0
-    if (
-        arima_checked["ar_estimate"]
-        and np.all(-arima_polynomials["arPolynomial"][1:] > 0)
-        and sum(-arima_polynomials["arPolynomial"][1:]) >= 1
-    ):
-        ar_pm[:, 0] = -arima_polynomials["arPolynomial"][1:]
-        roots = np.abs(eigvals(ar_pm))
-        if any(roots > 1):
-            return 1e100 * max(roots)
-    if arima_checked["ma_estimate"] and sum(arima_polynomials["maPolynomial"][1:]) >= 1:
-        ma_pm[:, 0] = arima_polynomials["maPolynomial"][1:]
-        roots = np.abs(eigvals(ma_pm))
-        if any(roots > 1):
-            return 1e100 * max(abs(roots))
-    return 0.0
-
-
 def omg_cf(  # noqa: N802
     B,
     *,
@@ -202,7 +153,7 @@ def omg_cf(  # noqa: N802
     adam_ets: bool = False,
     loss: str = "likelihood",
     loss_function=None,
-    reg_lambda: Optional[float] = None,
+    lambda_param: Optional[float] = None,
     return_fitted: bool = False,
 ):
     """OMG cost function — joint Bernoulli likelihood on combined probability
@@ -258,42 +209,22 @@ def omg_cf(  # noqa: N802
         adam_cpp=side_b["adam_cpp"],
     )
 
-    if bounds == "usual":
-        penalty_a = _ets_bounds_check(
-            side_a["model_type_dict"],
-            side_a["components_dict"],
-            elem_a["vec_g"],
-            elem_a["mat_f"],
-            side_a["phi"],
+    # Each side's bounds, shared with CF (R's adam_bounds_checker)
+    for side, elem in ((side_a, elem_a), (side_b, elem_b)):
+        penalty = adam_bounds_checker(
+            elem,
+            bounds,
+            side["model_type_dict"],
+            side["components_dict"],
+            side["lags_dict"],
+            side["arima"],
+            side["explanatory"],
+            side["phi"],
+            side["constant"],
+            observations_dict["obs_in_sample"],
         )
-        if penalty_a > 0:
-            return float(penalty_a)
-        penalty_a = _arima_bounds_check(
-            side_a["arima"],
-            elem_a.get("arima_polynomials", {}),
-            side_a.get("ar_polynomial_matrix"),
-            side_a.get("ma_polynomial_matrix"),
-        )
-        if penalty_a > 0:
-            return float(penalty_a)
-
-        penalty_b = _ets_bounds_check(
-            side_b["model_type_dict"],
-            side_b["components_dict"],
-            elem_b["vec_g"],
-            elem_b["mat_f"],
-            side_b["phi"],
-        )
-        if penalty_b > 0:
-            return float(penalty_b)
-        penalty_b = _arima_bounds_check(
-            side_b["arima"],
-            elem_b.get("arima_polynomials", {}),
-            side_b.get("ar_polynomial_matrix"),
-            side_b.get("ma_polynomial_matrix"),
-        )
-        if penalty_b > 0:
-            return float(penalty_b)
+        if penalty > 0:
+            return float(penalty)
 
     # Refresh the profile seed from the freshly-filled mat_vt
     side_a["profile"]["profiles_recent_table"][:] = elem_a["mat_vt"][
@@ -415,34 +346,37 @@ def omg_cf(  # noqa: N802
     if loss == "HAM":
         return float(np.mean(np.sqrt(np.abs(residual))))
     if loss in ("LASSO", "RIDGE"):
-        from smooth.adam_general.core.utils.cost_functions import trim_b_for_penalty
-
-        lam = float(reg_lambda if reg_lambda is not None else 0.0)
-        # Trim each side separately (each has its own component layout)
-        # and concatenate for the joint penalty.
-        B_pen_a = trim_b_for_penalty(  # noqa: N806
-            B[:n_params_a],
-            side_a["components_dict"],
-            side_a["persistence"],
-            side_a["explanatory"],
-            side_a["phi"],
-            side_a["arima"],
-            side_a["initials"],
-            side_a["model_type_dict"],
-            side_a["lags_dict"],
-            {},
+        from smooth.adam_general.core.utils.cost_functions import (
+            lasso_denominators,
+            trim_b_for_penalty,
         )
-        B_pen_b = trim_b_for_penalty(  # noqa: N806
-            B[n_params_a:],
-            side_b["components_dict"],
-            side_b["persistence"],
-            side_b["explanatory"],
-            side_b["phi"],
-            side_b["arima"],
-            side_b["initials"],
-            side_b["model_type_dict"],
-            side_b["lags_dict"],
-            {},
+
+        lam = float(lambda_param if lambda_param is not None else 0.0)
+        # The penalty on the estimated parameters of each side, as in ADAM
+        B_sides = (B[:n_params_a], B[n_params_a:])  # noqa: N806
+        B_pen_a, B_pen_b = (  # noqa: N806
+            trim_b_for_penalty(
+                B_side,
+                side["components_dict"],
+                side["persistence"],
+                side["explanatory"],
+                side["phi"],
+                side["arima"],
+                side["initials"],
+                side["model_type_dict"],
+                side["lags_dict"],
+                lasso_denominators(
+                    loss,
+                    elem["mat_wt"],
+                    side["components_dict"],
+                    side["explanatory"]["xreg_number"],
+                    ot,
+                ),
+                side["constant"]["constant_estimate"],
+            )
+            for B_side, side, elem in zip(  # noqa: N806
+                B_sides, (side_a, side_b), (elem_a, elem_b)
+            )
         )
         B_penalty = np.concatenate([B_pen_a, B_pen_b])  # noqa: N806
 

@@ -89,7 +89,7 @@ def _run_two_stage_estimator(
         lags_dict_s2,
         observations_dict_s2,
         profile_dict_s2,
-        _,
+        adam_cpp_s2,
     ) = architector(
         model_type_dict,
         lags_dict,
@@ -131,6 +131,8 @@ def _run_two_stage_estimator(
         bounds=general_dict["bounds"],
         phi_dict=phi_dict,
         profile_dict=profile_dict_s2,
+        adam_cpp=adam_cpp_s2,
+        smoother=smoother,
     )
 
     B = b_values["B"].copy()
@@ -198,11 +200,11 @@ def _run_two_stage_estimator(
     initial_states = []
     current_row = 0
 
-    # Level
-    if initials_dict.get("initial_level_estimate", False):
-        initial_states.append(mat_vt_s1[current_row, 0])
-        current_row += 1
-    elif model_type_dict.get("ets_model", False):
+    # Level: only an ETS model has one (initial_level_estimate is also set for
+    # a pure ARIMA, whose first state is an ARIMA one)
+    if model_type_dict.get("ets_model", False):
+        if initials_dict.get("initial_level_estimate", False):
+            initial_states.append(mat_vt_s1[current_row, 0])
         current_row += 1
 
     # Trend
@@ -241,13 +243,27 @@ def _run_two_stage_estimator(
                 initial_states.extend(full_seasonal[:-1].tolist())
             current_row += 1
 
-    # ARIMA initials
+    # ARIMA initials: the pre-sample values as Stage 1 reports them in
+    # initial$arima, as R passes them on (R/adam.R, two-stage)
     if arima_dict.get("arima_model", False):
         n_arima = initials_dict.get("initial_arima_number", 0)
         if initials_dict.get("initial_arima_estimate", False) and n_arima > 0:
-            for i in range(n_arima):
-                initial_states.append(mat_vt_s1[current_row + i, lags_model_max_s1 - 1])
-            current_row += n_arima
+            from smooth.adam_general.core.utils.polynomials import (
+                arima_head_initials,
+            )
+
+            n_ets = components_dict_s1.get("components_number_ets", 0)
+            initial_states.extend(
+                arima_head_initials(
+                    mat_vt_s1[
+                        n_ets : n_ets + components_dict_s1["components_number_arima"]
+                    ],
+                    arima_dict["lags_model_arima"],
+                    lags_model_max_s1,
+                    model_type_dict["error_type"],
+                ).tolist()
+            )
+            current_row += components_dict_s1.get("components_number_arima", 0)
 
     # xreg initials
     if explanatory_dict.get("xreg_model", False):

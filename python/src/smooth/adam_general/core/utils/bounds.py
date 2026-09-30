@@ -1,8 +1,8 @@
 """Admissible-region bounds for ADAM parameters.
 
 Direct translations of R's ``eigenValues`` / ``eigenBounds`` /
-``arPolinomialsBounds`` (``R/adam.R:4332-4403``), used by ``confint`` to clamp
-parameter confidence intervals to the region in which the model is stable
+``arimaParameterBounds`` (``R/adam.R``), used by ``confint`` and ``reapply`` to
+clamp parameters to the region in which the model is stable
 (``bounds="admissible"``) or stationary/invertible (ARIMA).
 """
 
@@ -75,48 +75,41 @@ def eigen_bounds(vec_g, variable_index, **static_args):
     return lower_bound, upper_bound
 
 
-def ar_polynomial_bounds(ar_polynomial_matrix, ar_polynomial, variable_index):
-    """Stationarity bounds for a single AR parameter.
+def arima_parameter_bounds(names, params, arima, lags):
+    """Stationarity / invertibility bounds of the ARMA parameters among ``names``.
 
-    Translation of R's ``arPolinomialsBounds`` (``R/adam.R:4370``): grid-search
-    the AR coefficient at ``variable_index`` so the AR companion matrix has all
-    eigenvalue moduli <= 1, with a 20-step stopping criterion in each direction.
+    Translation of R's ``arimaParameterBounds``: each parameter is bounded within
+    its factor (the same type and lag), with the others at their values, by the
+    shared C++ ``arimaParameterBounds`` (src/headers/arimaBounds.h). The fixed
+    values come from ``arima["arma_parameters"]`` (lag by lag, AR then MA). The
+    parameters of factors that are not stationary / invertible are left out.
+
+    Returns a dict of parameter name to (lower, upper).
     """
-    mat = np.array(ar_polynomial_matrix, dtype=float)
-    ar = np.asarray(ar_polynomial, dtype=float).copy()
-    stopping_criteria = 20
+    from smooth.adam_general import _ols
 
-    def _roots_outside():
-        mat[:, 0] = -ar[1:]
-        try:
-            eig = np.linalg.eigvals(mat)
-        except np.linalg.LinAlgError:
-            # ``Eigenvalues did not converge`` happens on numerically
-            # pathological companion matrices that can appear at the
-            # extreme ends of the grid search — treat them as outside
-            # the stability region so the search advances toward the
-            # admissible interior.
-            return True
-        return bool(np.any(np.abs(eig) > 1))
+    estimated = dict(zip(names, params))
+    fixed = iter(arima.get("arma_parameters") or [])
+    factors: dict = {}
+    for lag, ar_order, ma_order in zip(lags, arima["ar_orders"], arima["ma_orders"]):
+        for kind, order, estimate in (
+            ("phi", ar_order, arima["ar_estimate"]),
+            ("theta", ma_order, arima["ma_estimate"]),
+        ):
+            for j in range(int(order)):
+                name = f"{kind}{j + 1}[{lag}]"
+                value = estimated[name] if estimate else next(fixed)
+                factors.setdefault((kind, lag), []).append((name, value))
 
-    # Lower bound
-    ar[variable_index] = -5.0
-    i = 1
-    while _roots_outside():
-        ar[variable_index] += 0.01
-        i += 1
-        if i >= stopping_criteria:
-            break
-    lower_bound = ar[variable_index] - 0.01
-
-    # Upper bound
-    ar[variable_index] = 5.0
-    i = 1
-    while _roots_outside():
-        ar[variable_index] -= 0.01
-        i += 1
-        if i >= stopping_criteria:
-            break
-    upper_bound = ar[variable_index] + 0.01
-
-    return lower_bound, upper_bound
+    bounds = {}
+    for (kind, _), members in factors.items():
+        values = np.array([value for _, value in members], dtype=float)
+        for j, (name, _) in enumerate(members):
+            if name not in estimated:
+                continue
+            lower, upper = _ols.arima_parameter_bounds(
+                values, j, -1.0 if kind == "phi" else 1.0
+            )
+            if np.isfinite(lower) and np.isfinite(upper):
+                bounds[name] = (float(lower), float(upper))
+    return bounds

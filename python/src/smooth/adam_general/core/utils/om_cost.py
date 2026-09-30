@@ -9,9 +9,9 @@ Bernoulli log-likelihood (or MSE on the binary indicators).
 from __future__ import annotations
 
 import numpy as np
-from numpy.linalg import eigvals
 
 from smooth.adam_general.core.creator import filler
+from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import _sum_r
 
@@ -57,9 +57,6 @@ def om_cf(  # noqa: N802
     occurrence,
     occurrence_char,
     bounds="usual",
-    arPolynomialMatrix=None,  # noqa: N803
-    maPolynomialMatrix=None,  # noqa: N803
-    regressors=None,
     return_fitted=False,
 ):
     """OM cost function (Bernoulli log-likelihood or MSE on binary indicators).
@@ -99,57 +96,21 @@ def om_cf(  # noqa: N802
     # the om preparator later re-seeds from (R's copy-on-modify never leaks it).
     mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
 
-    # 2. Bounds checking (mirror CF's "usual" branch — admissible/none not
-    #    used by om() but support graceful pass-through)
-    if bounds == "usual":
-        if arima_checked["arima_model"] and any(
-            [arima_checked["ar_estimate"], arima_checked["ma_estimate"]]
-        ):
-            if (
-                arima_checked["ar_estimate"]
-                and np.all(-adam_elements["arima_polynomials"]["arPolynomial"][1:] > 0)
-                and sum(-adam_elements["arima_polynomials"]["arPolynomial"][1:]) >= 1
-            ):
-                arPolynomialMatrix[:, 0] = -adam_elements["arima_polynomials"][
-                    "arPolynomial"
-                ][1:]
-                roots = np.abs(eigvals(arPolynomialMatrix))
-                if any(roots > 1):
-                    return 1e100 * max(roots)
-            if (
-                arima_checked["ma_estimate"]
-                and sum(adam_elements["arima_polynomials"]["maPolynomial"][1:]) >= 1
-            ):
-                maPolynomialMatrix[:, 0] = adam_elements["arima_polynomials"][
-                    "maPolynomial"
-                ][1:]
-                roots = np.abs(eigvals(maPolynomialMatrix))
-                if any(roots > 1):
-                    return 1e100 * max(abs(roots))
-
-        if model_type_dict["ets_model"]:
-            n_ets = components_dict["components_number_ets"]
-            vec_g = adam_elements["vec_g"]
-            if any(vec_g[:n_ets] > 1) or any(vec_g[:n_ets] < 0):
-                return 1e300
-            if model_type_dict["model_is_trendy"]:
-                if vec_g[1] > vec_g[0]:
-                    return 1e300
-                n_ns = components_dict["components_number_ets_non_seasonal"]
-                n_seas = components_dict["components_number_ets_seasonal"]
-                if model_type_dict["model_is_seasonal"] and any(
-                    vec_g[n_ns : n_ns + n_seas] > (1 - vec_g[0])
-                ):
-                    return 1e300
-            elif model_type_dict["model_is_seasonal"]:
-                n_ns = components_dict["components_number_ets_non_seasonal"]
-                n_seas = components_dict["components_number_ets_seasonal"]
-                if any(vec_g[n_ns : n_ns + n_seas] > (1 - vec_g[0])):
-                    return 1e300
-            if phi_dict["phi_estimate"] and (
-                adam_elements["mat_f"][1, 1] > 1 or adam_elements["mat_f"][1, 1] < 0
-            ):
-                return 1e300
+    # 2. Bounds checking, shared with CF (R's adam_bounds_checker)
+    penalty = adam_bounds_checker(
+        adam_elements,
+        bounds,
+        model_type_dict,
+        components_dict,
+        lags_dict,
+        arima_checked,
+        explanatory_checked,
+        phi_dict,
+        constants_checked,
+        observations_dict["obs_in_sample"],
+    )
+    if penalty > 0:
+        return penalty
 
     # 3. Run the C++ fitter with O=occurrence_char and y=ot=binary indicators
     ot = np.asarray(observations_dict["ot"], dtype=np.float64)
@@ -258,9 +219,20 @@ def om_cf(  # noqa: N802
     elif loss == "HAM":
         cf_value = float(np.mean(np.sqrt(np.abs(residual))))
     elif loss in ("LASSO", "RIDGE"):
-        from smooth.adam_general.core.utils.cost_functions import trim_b_for_penalty
+        from smooth.adam_general.core.utils.cost_functions import (
+            lasso_denominators,
+            trim_b_for_penalty,
+        )
 
         lam = float(general.get("lambda", 0) or 0.0)
+        # The penalty on the estimated parameters, as in ADAM
+        denominator = lasso_denominators(
+            loss,
+            adam_elements["mat_wt"],
+            components_dict,
+            explanatory_checked["xreg_number"],
+            ot,
+        )["denominator"]
         B_penalty = trim_b_for_penalty(  # noqa: N806
             B,
             components_dict,
@@ -271,7 +243,8 @@ def om_cf(  # noqa: N802
             initials_checked,
             model_type_dict,
             lags_dict,
-            general,
+            {"denominator": denominator},
+            constants_checked["constant_estimate"],
         )
         obs_in_sample = observations_dict.get("obs_in_sample", len(residual))
         # Error term identical in shape to ADAM's additive branch but

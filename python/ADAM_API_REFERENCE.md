@@ -30,7 +30,6 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 | `regressors` | `"use" \| "select" \| "adapt"` | `"use"` | How to handle external regressors |
 | `distribution` | `str \| None` | `None` | Error distribution (`"dnorm"`, `"dgamma"`, `"dlaplace"`, `"dlnorm"`, `"dinvgauss"`, `"ds"`, `"dgnorm"`). Auto-selected if `None` |
 | `loss` | `str` | `"likelihood"` | Loss function (`"likelihood"`, `"MSE"`, `"MAE"`, `"HAM"`, `"MSEh"`, `"TMSE"`, `"GTMSE"`, `"GPL"`, `"MSCE"`, `"LASSO"`, `"RIDGE"`, etc.) |
-| `loss_horizon` | `int \| None` | `None` | Steps for multi-step loss functions |
 | `ic` | `"AIC" \| "AICc" \| "BIC" \| "BICc"` | `"AICc"` | Information criterion for model selection |
 | `bounds` | `"usual" \| "admissible" \| "none"` | `"usual"` | Parameter bounds during optimization |
 

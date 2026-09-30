@@ -425,7 +425,6 @@ class AutoADAM(ADAM):
             "smoother",
             "ets",
             "nlopt_kwargs",
-            "loss_horizon",
             "reg_lambda",
             "lambda_param",
             "gnorm_shape",

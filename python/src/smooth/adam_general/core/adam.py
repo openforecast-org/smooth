@@ -670,7 +670,6 @@ class ADAM:
         # call sites that hold runtime-validated strings.
         distribution: Optional[Union[DISTRIBUTION_OPTIONS, str]] = None,
         loss: LOSS_OPTIONS = "likelihood",
-        loss_horizon: Optional[int] = None,
         # outlier detection
         outliers: Literal["ignore", "use", "select"] = "ignore",
         outliers_level: float = 0.99,
@@ -770,8 +769,6 @@ class ADAM:
             on the loss function.
         loss : LOSS_OPTIONS, default="likelihood"
             Loss function for parameter estimation.
-        loss_horizon : Optional[int], default=None
-            Number of steps for multi-step loss functions (e.g., MSEh).
         outliers : Literal["ignore", "use", "select"], default="ignore"
             Outlier handling: ``"ignore"`` skips detection; ``"use"`` detects
             outliers and includes their dummies as fixed regressors; ``"select"``
@@ -880,7 +877,6 @@ class ADAM:
         self.regressors = regressors
         self.distribution = distribution
         self.loss = loss
-        self.loss_horizon = loss_horizon
         self.outliers = outliers
         self.outliers_level = outliers_level
         self.ic = ic
@@ -1295,7 +1291,6 @@ class ADAM:
             "regressors": self.regressors,
             "distribution": self.distribution,
             "loss": self.loss,
-            "loss_horizon": self.loss_horizon,
             "outliers": self.outliers,
             "outliers_level": self.outliers_level,
             "ic": self.ic,

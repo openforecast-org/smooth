@@ -160,3 +160,14 @@ def test_omg_simulate_seasonal_lags(y_seasonal_intermittent):
     arr = np.asarray(sim.probability)
     assert arr.shape == (72, 2)
     assert (arr >= 0).all() and (arr <= 1).all()
+
+
+def test_draw_occurrence_keeps_nan_as_r():
+    from smooth.adam_general.core.om import draw_occurrence
+
+    prob = np.array([[0.0, np.nan], [1.0, 1.5]])
+    with pytest.warns(UserWarning, match="NAs produced"):
+        bounded, occ = draw_occurrence(prob, seed=1)
+    assert np.isnan(bounded[0, 1]) and bounded[1, 1] == 1.0
+    assert np.isnan(occ[0, 1])
+    assert occ[0, 0] == 0 and occ[1, 0] == 1 and occ[1, 1] == 1

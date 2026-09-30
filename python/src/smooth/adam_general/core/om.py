@@ -414,6 +414,21 @@ def om_preparator(
 MIXED_MODELS = ("AAM", "AMA", "MAA", "MAN", "AMN", "MMA", "MNA", "ANM")
 
 
+def draw_occurrence(probability, seed=None):
+    """Draw 0/1 occurrences as R's ``rbinom``: NaN probabilities give NaN draws.
+
+    The probability is bounded by ``[0, 1]`` as in R. A NaN one (a collapsed latent
+    state) stays NaN, and so does its draw, with R's "NAs produced" warning.
+    """
+    probability = np.clip(probability, 0.0, 1.0)
+    valid = ~np.isnan(probability)
+    occurrence = np.full(probability.shape, np.nan)
+    occurrence[valid] = np.random.default_rng(seed).binomial(1, probability[valid])
+    if not valid.all():
+        warnings.warn("NAs produced in the occurrence draws", stacklevel=3)
+    return probability, occurrence
+
+
 class OM(ADAM):
     """Occurrence model — state-space model for the probability of demand occurrence.
 
@@ -1886,17 +1901,9 @@ class OM(ADAM):
         probability = np.asarray(probability, dtype=np.float64).reshape(
             n_obs_out, nsim_out
         )
-        # ``om_link_function``'s odds-ratio paths can overshoot under
-        # extreme latent noise; clip uniformly as a numerical guard.
-        # NaN can appear on multiplicative-ETS paths where the latent
-        # state collapses to zero — replace with the neutral 0.5 so
-        # the downstream binomial draw is well-defined.
-        probability = np.nan_to_num(probability, nan=0.5, posinf=1.0, neginf=0.0)
-        probability = np.clip(probability, 0.0, 1.0)
 
         # 4. 0/1 indicator draw, seeded from the master seed.
-        rng = np.random.default_rng(seed)
-        occurrence_data = rng.binomial(1, probability)
+        probability, occurrence_data = draw_occurrence(probability, seed)
 
         # 5. Output assembly.
         if nsim_out == 1:

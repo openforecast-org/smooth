@@ -157,3 +157,21 @@ test_that("sim.es reproduces the fitted first observation for trended-seasonal E
                  as.numeric(fitted(fit))[1],
                  tolerance=1e-6)
 })
+
+test_that("sim.es bounds each seasonal smoothing parameter by its own alpha", {
+    set.seed(1)
+    x <- sim.es("ANA", frequency=4, obs=20, nsim=200)
+    expect_true(all(x$persistence[2,] <= 1-x$persistence[1,]))
+})
+
+test_that("sim.es gives each inverse Gaussian simulation its own likelihood", {
+    set.seed(2)
+    y <- sim.es("MNN", obs=30, nsim=3, randomizer="rinvgauss", mean=1, dispersion=0.1)
+    e <- y$residuals
+    d <- y$data
+    expected <- sapply(1:3, function(i){
+        return(-0.5*(30*(log(mean(e[,i]^2/(1+e[,i]))/(2*pi))-1) +
+                         sum(log(d[,i]/(1+e[,i]))) - 3*sum(log(d[,i]))))
+    })
+    expect_equal(as.numeric(y$logLik), expected)
+})

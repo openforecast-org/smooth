@@ -26,6 +26,7 @@ from smooth.adam_general.core.estimator.optimization import (
 from smooth.adam_general.core.om import (
     MIXED_MODELS,
     OM,
+    draw_occurrence,
     om_preparator,
 )
 from smooth.adam_general.core.utils.ic import ic_function
@@ -1379,11 +1380,7 @@ class OMG:
         prob = np.asarray(prob, dtype=np.float64)
         if prob.ndim == 1:
             prob = prob.reshape(-1, 1)
-        prob = np.nan_to_num(prob, nan=0.5, posinf=1.0, neginf=0.0)
-        prob = np.clip(prob, 0.0, 1.0)
-
-        rng = np.random.default_rng(seed)
-        occurrence_data = rng.binomial(1, prob)
+        prob, occurrence_data = draw_occurrence(prob, seed)
 
         obs_out, nsim_out = prob.shape
         if nsim_out == 1:

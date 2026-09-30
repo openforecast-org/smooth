@@ -45,6 +45,11 @@ Changes:
 * `test_fi_r_comparison.py` recovers R's observed Fisher information from `vcov(m, type="hessian")` rather than from `vcov(m)`. R's default is `type="opg"`, a different estimator that agrees with the observed FI only asymptotically, so the test had been comparing two different quantities and failing by up to 80x. Against the Hessian-based vcov, Python's FI at R's coefficients matches to 2.7e-11.
 * `test_auto_adam_vs_r.py` compares ARIMA orders with trailing zeros trimmed. R collapses `m$orders` to a plain vector when no ARIMA is selected, reporting `0` where Python reports one zero per lag; both mean "no ARIMA", but the comparison was length-sensitive.
 
+Bugfixes:
+* `sim_es` no longer floors `mat_yt` at 1e-300 inside the logarithms of the log-normal and inverse Gaussian log-likelihoods, as R: a non-positive value gives `NaN` / `-Inf` rather than a silently finite likelihood.
+* `OM.simulate()` and `OMG.simulate()` turned a `NaN` probability (a collapsed latent state) into 0.5, drawing a coin flip. It now stays `NaN`, and so does its occurrence, with R's "NAs produced" warning, as `rbinom` does. Both use one helper, `draw_occurrence`; the occurrences are therefore floats.
+* Removed `_extract_initialiser_params` and `_calculate_initial_parameters_and_bounds` from the initialiser. Nothing called them; they clipped the ARIMA constant into its bounds and floored multiplicative ARIMA initials at 0, where R (and the initialiser in use) takes `abs()` and widens the bounds.
+
 ## v1.0.8 (Release date: 2026-08-27)
 
 Changes:

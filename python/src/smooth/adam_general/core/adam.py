@@ -3757,40 +3757,6 @@ class ADAM:
         self.model = "Regression"
         self.time_elapsed_ = time.time() - self._start_time
 
-    def _handle_lasso_ridge_special_case(self):
-        """
-        Handle special case for LASSO/RIDGE with lambda=1.
-
-        Sets appropriate parameter values. This is a special case where we use
-        MSE to estimate initials only and disable other parameter estimation.
-        """
-        if self._general["loss"] in ["LASSO", "RIDGE"] and self._general["lambda"] == 1:
-            if self._model_type["ets_model"]:
-                # Pre-set ETS parameters
-                self._persistence["persistence_estimate"] = False
-                self._persistence["persistence_level_estimate"] = False
-                self._persistence["persistence_trend_estimate"] = False
-                self._persistence["persistence_seasonal_estimate"] = [False]
-                self._persistence["persistence_level"] = 0
-                self._persistence["persistence_trend"] = 0
-                self._persistence["persistence_seasonal"] = [0]
-                # Phi
-                self._phi_internal["phi_estimate"] = False
-                self._phi_internal["phi"] = 1
-
-            if self._model_type["xreg_model"]:
-                # ETSX parameters
-                self._persistence["persistence_xreg_estimate"] = False
-                self._persistence["persistence_xreg"] = 0
-
-            if self._model_type["arima_model"]:
-                # Pre-set ARMA parameters
-                self._arima["ar_estimate"] = False
-                self._arima["ma_estimate"] = False
-                self._preset_arima_parameters()
-
-            self._general["lambda"] = 0
-
     def _fit_occurrence_model(self, y):
         """Fit an occurrence model on ``y`` and return it.
 
@@ -3821,25 +3787,12 @@ class ADAM:
         m.fit(y)
         return m
 
-    def _preset_arima_parameters(self):
-        """Set up ARIMA parameters for special cases where estimation is disabled."""
-        arma_parameters = []
-        for i, lag in enumerate(self._lags_model["lags"]):
-            if self._arima["ar_orders"][i] > 0:
-                arma_parameters.extend([1] * self._arima["ar_orders"][i])
-            if self._arima["ma_orders"][i] > 0:
-                arma_parameters.extend([0] * self._arima["ma_orders"][i])
-        self._arima["arma_parameters"] = arma_parameters
-
     def _execute_estimation(self, estimation=True):
         """
         Execute model estimation when model_do is 'estimate'.
 
         This handles parameter estimation and model creation.
         """
-        # Handle special case for LASSO/RIDGE with lambda=1
-        self._handle_lasso_ridge_special_case()
-
         # Estimate the model
         # Note: estimator() handles two-stage initialization internally
         if estimation:

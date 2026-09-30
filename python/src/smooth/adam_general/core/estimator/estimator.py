@@ -522,23 +522,12 @@ def estimator(
         components_dict,
     )
 
-    # Step 7: Create and configure optimizer
-    # Convert algorithm string to nlopt constant
-    nlopt_algorithm = getattr(
-        nlopt, algorithm.replace("NLOPT_", ""), nlopt.LN_NELDERMEAD
-    )
-    opt = nlopt.opt(nlopt_algorithm, len(B))
-    opt = _configure_optimizer(
-        opt,
-        lb,
-        ub,
-        maxeval_used,
-        maxtime,
-        xtol_rel=xtol_rel,
-        xtol_abs=xtol_abs,
-        ftol_rel=ftol_rel,
-        ftol_abs=ftol_abs,
-    )
+    # LASSO / RIDGE with lambda=1 have their parameters at the shrinkage targets
+    # (parameters_checker); what is left (the initials and the regressors) is
+    # estimated with lambda=0, as in R
+    lambda_original = general_dict["lambda"]
+    if general_dict["loss"] in ("LASSO", "RIDGE") and lambda_original == 1 and len(B):
+        general_dict["lambda"] = 0
 
     # Step 8: Create objective function
     objective_wrapper = _create_objective_function(
@@ -561,15 +550,32 @@ def estimator(
         other_parameter_estimate=other_parameter_estimate,
     )
 
-    # Set objective function
-    opt.set_min_objective(objective_wrapper)
-
-    # Step 9: Run optimization. Keep the starting vector: R's nloptr leaves x0
-    # untouched, so the retry below restarts from the initialiser's B, not from
-    # wherever the failed run stopped (R/adam.R estimator).
+    # Step 9: Run optimization, unless there is nothing to estimate: then, as R's
+    # modelDo="use", the loss at the given parameters. Keep the starting vector:
+    # R's nloptr leaves x0 untouched, so the retry below restarts from the
+    # initialiser's B, not from wherever the failed run stopped (R/adam.R).
+    nlopt_algorithm = getattr(
+        nlopt, algorithm.replace("NLOPT_", ""), nlopt.LN_NELDERMEAD
+    )
     B_start = B.copy()
-    B[:] = _run_optimization(opt, B)
-    CF_value = opt.last_optimum_value()
+    if len(B) == 0:
+        CF_value = objective_wrapper(B, np.empty(0))
+    else:
+        opt = nlopt.opt(nlopt_algorithm, len(B))
+        opt = _configure_optimizer(
+            opt,
+            lb,
+            ub,
+            maxeval_used,
+            maxtime,
+            xtol_rel=xtol_rel,
+            xtol_abs=xtol_abs,
+            ftol_rel=ftol_rel,
+            ftol_abs=ftol_abs,
+        )
+        opt.set_min_objective(objective_wrapper)
+        B[:] = _run_optimization(opt, B)
+        CF_value = opt.last_optimum_value()
 
     # Step 9a: a BOBYQA refinement pass was tried in the past but produced
     # less stable ARIMA estimates, so only the Nelder-Mead pass is run.
@@ -604,12 +610,7 @@ def estimator(
         B[:] = _run_optimization(opt2, B)
         CF_value = opt2.last_optimum_value()
 
-    # A fix for the special case of LASSO/RIDGE with lambda==1
-    if (
-        any(general_dict["loss"] == loss_type for loss_type in ["LASSO", "RIDGE"])
-        and general_dict["lambda"] == 1
-    ):
-        CF_value = 0
+    general_dict["lambda"] = lambda_original
 
     n_param_estimated = len(B)
 

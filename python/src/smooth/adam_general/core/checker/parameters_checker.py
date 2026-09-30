@@ -1100,6 +1100,15 @@ def parameters_checker(
             "xreg_parameters_persistence": None,
         }
 
+    # LASSO / RIDGE with lambda=1 is the penalty alone, which is zero with the
+    # parameters at their shrinkage targets: no smoothing, phi=1, AR=1 and MA=0. They
+    # are set to them, as in R's parametersChecker, leaving the initials and the
+    # regressors, or nothing, and then the model is used as it is (the estimator)
+    if loss in ("LASSO", "RIDGE") and general_dict["lambda"] == 1:
+        _lasso_ridge_targets(
+            model_type_dict, persistence_dict, phi_dict, arima_dict, lags_dict
+        )
+
     # Calculate number of parameters using the new n_param table structure
     from smooth.adam_general.core.utils.n_param import build_n_param_table
 
@@ -1142,6 +1151,34 @@ def parameters_checker(
         xreg_dict,
         params_info,
     )
+
+
+def _lasso_ridge_targets(
+    model_type_dict, persistence_dict, phi_dict, arima_dict, lags_dict
+):
+    """Set the parameters to the shrinkage targets of LASSO / RIDGE, in place."""
+    if model_type_dict["ets_model"]:
+        persistence_dict.update(
+            persistence_estimate=False,
+            persistence_level_estimate=False,
+            persistence_trend_estimate=False,
+            persistence_seasonal_estimate=[False]
+            * len(persistence_dict["persistence_seasonal_estimate"]),
+            persistence_level=0,
+            persistence_trend=0,
+            persistence_seasonal=[0] * len(persistence_dict["persistence_seasonal"]),
+        )
+        phi_dict.update(phi_estimate=False, phi=1)
+    if model_type_dict["xreg_model"]:
+        persistence_dict.update(persistence_xreg_estimate=False, persistence_xreg=0)
+    if arima_dict["arima_model"]:
+        # AR of one and MA of zero, lag by lag, as the polynomialiser reads them
+        arma_parameters: list = []
+        for ar_order, ma_order in zip(arima_dict["ar_orders"], arima_dict["ma_orders"]):
+            arma_parameters += [1.0] * ar_order + [0.0] * ma_order
+        arima_dict.update(
+            ar_estimate=False, ma_estimate=False, arma_parameters=arma_parameters
+        )
 
 
 # ---------------------------------------------------------------------------

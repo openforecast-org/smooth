@@ -918,49 +918,35 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsInSample;
             }
             else if(any(loss==c("LASSO","RIDGE"))){
-                ### All of this is needed in order to get rid of initial level, trend, seasonal and xreg parameters
-                # Define, how many elements to skip (we don't normalise smoothing parameters)
-                persistenceToSkip <- componentsNumberETS + persistenceXregEstimate*xregNumber +
-                    phiEstimate + sum(arOrders) + sum(maOrders);
-
-                # Shrink phi to 1
-                if(phiEstimate){
-                    B[componentsNumberETS + persistenceXregEstimate*xregNumber + 1] <-
-                        1-B[componentsNumberETS + persistenceXregEstimate*xregNumber + 1];
-                }
-                j <- componentsNumberETS + persistenceXregEstimate*xregNumber + phiEstimate;
-
-                # No good understanding how to shrink ARMA. Do these just because:
-                # Shrink AR parameters to 1 and
-                # Shrink MA parameters to 0
-                if(arimaModel && (sum(maOrders)>0 || sum(arOrders)>0)){
-                    for(i in 1:length(lags)){
-                        B[j+c(1:arOrders[i])] <- 1-B[j+c(1:arOrders[i])];
-                        B[j+arOrders[i]+c(1:maOrders[i])] <- B[j+arOrders[i]+c(1:maOrders[i])];
-                        j[] <- j+arOrders[i]+maOrders[i];
-                    }
-                }
-
-                # Don't do anything with the initial states of ETS and ARIMA. Just drop them (don't shrink)
-                if(any(initialType==c("backcasting","optimal","two-stage"))){
-                    # If there are explanatory variables, shrink their parameters
-                    if(xregNumber>0){
-                        # Normalise parameters of xreg if they are additive. Otherwise leave - they will be small and close to zero
-                        B <- switch(Etype,
-                                    "A"=c(B[1:persistenceToSkip],tail(B,xregNumber) / denominator),
-                                    "M"=c(B[1:persistenceToSkip],tail(B,xregNumber)));
-                    }
-                    else{
-                        B <- B[1:persistenceToSkip];
-                    }
-                }
+                # The estimated parameters, found in B as the filler does, shifted to be zero
+                # at their shrinkage targets: no smoothing, phi and AR of one ("no good
+                # understanding how to shrink ARMA"), MA and regressors of zero, the additive
+                # regressors normalised. The initial states are not shrunk
+                nSmoothing <- persistenceEstimate *
+                    (etsModel * (persistenceLevelEstimate + modelIsTrendy*persistenceTrendEstimate +
+                                     modelIsSeasonal*sum(persistenceSeasonalEstimate)) +
+                         xregModel * persistenceXregEstimate * max(c(0, xregParametersPersistence)));
+                nPhi <- etsModel * phiEstimate;
+                arOrdersEstimated <- arimaModel * arEstimate * arOrders;
+                maOrdersEstimated <- arimaModel * maEstimate * maOrders;
+                arma <- B[nSmoothing + nPhi + seq_len(sum(arOrdersEstimated, maOrdersEstimated))];
+                arEstimated <- as.logical(unlist(lapply(seq_along(arOrdersEstimated), function(i){
+                    return(rep(c(TRUE,FALSE), c(arOrdersEstimated[i], maOrdersEstimated[i])))})));
+                xregEstimated <- xregModel && (initialType!="complete") && initialEstimate && initialXregEstimate;
+                nXreg <- xregEstimated * sum(xregParametersEstimated);
+                xreg <- B[length(B) - otherParameterEstimate - constantEstimate - nXreg + seq_len(nXreg)];
+                BShrunk <- c(B[seq_len(nSmoothing)], 1-B[nSmoothing + seq_len(nPhi)],
+                             1-arma[arEstimated], arma[!arEstimated],
+                             switch(Etype,
+                                    "A"=xreg / denominator[xregParametersEstimated==1],
+                                    "M"=xreg));
 
                 CFValue <- (switch(Etype,
                                    "A"=(1-lambda)* sqrt(sum((adamFitted$errors/yDenominator)^2)/obsInSample),
                                    "M"=(1-lambda)* sqrt(sum(log(1+adamFitted$errors)^2)/obsInSample)) +
                                 switch(loss,
-                                       "LASSO"=lambda * sum(abs(B)),
-                                       "RIDGE"=lambda * sqrt(sum(B^2))));
+                                       "LASSO"=lambda * sum(abs(BShrunk)),
+                                       "RIDGE"=lambda * sqrt(sum(BShrunk^2))));
             }
             else if(loss=="custom"){
                 CFValue <- lossFunction(actual=yInSample,fitted=adamFitted$fitted,B=B);
@@ -1538,10 +1524,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # Prepare the values to return
         B[] <- res$solution;
         CFValue <- res$objective;
-        # A fix for the special case of LASSO/RIDGE with lambda==1
-        if(any(loss==c("LASSO","RIDGE")) && lambda==1){
-            CFValue[] <- 0;
-        }
 
         # Initial states consume the SAME degrees of freedom however they are
         # obtained (optimised, backcast, complete-backcast or gradient-solved):
@@ -2252,43 +2234,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
     ##### Estimate the specified model #####
     if(modelDo=="estimate"){
-        # If this is LASSO/RIDGE with lambda=1, use MSE to estimate initials only
+        # LASSO / RIDGE with lambda=1 have their parameters set in the parametersChecker,
+        # and what is left (the initials and the regressors) is estimated with lambda=0
         lambdaOriginal <- lambda;
         if(any(loss==c("LASSO","RIDGE")) && lambda==1){
-            if(etsModel){
-                # Pre-set ETS parameters
-                persistenceEstimate[] <- FALSE;
-                persistenceLevelEstimate[] <- persistenceTrendEstimate[] <-
-                    persistenceSeasonalEstimate[] <- FALSE;
-                persistenceLevel <- persistenceTrend <- persistenceSeasonal <- 0;
-                # Phi
-                phiEstimate[] <- FALSE;
-                phi <- 1;
-            }
-            if(xregModel){
-                # ETSX parameters
-                persistenceXregEstimate[] <- FALSE;
-                persistenceXreg <- 0;
-            }
-            if(arimaModel){
-                # Pre-set ARMA parameters
-                arEstimate[] <- FALSE;
-                maEstimate[] <- FALSE;
-                armaParameters <- vector("numeric",sum(arOrders)+sum(maOrders));
-                j <- 0;
-                for(i in 1:length(lags)){
-                    if(arOrders[i]>0){
-                        armaParameters[j+1:arOrders[i]] <- 1;
-                        names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                        j <- j + arOrders[i];
-                    }
-                    if(maOrders[i]>0){
-                        armaParameters[j+1:maOrders[i]] <- 0;
-                        names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                        j <- j + maOrders[i];
-                    }
-                }
-            }
             lambda <- 0;
         }
 

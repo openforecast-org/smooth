@@ -24,97 +24,79 @@ def trim_b_for_penalty(
     model_type_dict,
     lags_dict,
     general,
+    constant_estimate=False,
+    other_parameter_estimate=False,
 ):
-    """Build the trimmed/transformed parameter vector for LASSO/RIDGE penalty.
+    """The parameters of the LASSO / RIDGE penalty (R's CF in R/adam.R).
 
-    Mirrors the block in the additive/ARIMA ADAM CF (R/adam.R:894-937,
-    `cost_functions.py:544-677` pre-refactor): drops initial-state entries
-    from ``B``, shrinks ``phi`` and the AR coefficients to ``1 - x``
-    (so the penalty pushes them toward 1, not 0), keeps MA as-is, and
-    normalises xreg coefficients by the additive ``y_denominator``.
+    The estimated parameters, found in ``B`` as the filler does, shifted to be zero
+    at their shrinkage targets: no smoothing, ``phi`` and AR of one, MA and
+    regressors of zero, the additive regressors normalised by the
+    ``denominator``. The initial states are not shrunk.
 
-    Shared by ADAM's ``CF``, ``om_cf`` (for ``OM``) and ``omg_cf``
-    (for ``OMG``) so the regularisation acts on the exact same parameter
-    subset across all three.
+    Shared by ADAM's ``CF``, ``om_cf`` (for ``OM``) and ``omg_cf`` (for ``OMG``).
     """
-    components_ets = int(components_dict.get("components_number_ets", 0) or 0)
-    persistence_xreg_est = int(
-        persistence_checked.get("persistence_xreg_estimate", False) or 0
-    )
-    xreg_num = int(explanatory_checked.get("xreg_number", 0) or 0)
-    phi_est = int(phi_dict.get("phi_estimate", False) or 0)
-    ar_orders = arima_checked.get("ar_orders") if arima_checked else None
-    ma_orders = arima_checked.get("ma_orders") if arima_checked else None
-    arima_model = arima_checked.get("arima_model", False) if arima_checked else False
+    B = np.asarray(B, dtype=float)  # noqa: N806
+    ets_model = model_type_dict["ets_model"]
+    arima_model = bool(arima_checked and arima_checked.get("arima_model", False))
+    xreg_model = bool(explanatory_checked.get("xreg_model", False))
 
-    if ar_orders is None or (hasattr(ar_orders, "__len__") and len(ar_orders) == 0):
-        ar_orders = [0]
-    if ma_orders is None or (hasattr(ma_orders, "__len__") and len(ma_orders) == 0):
-        ma_orders = [0]
-
-    persistence_to_skip = (
-        components_ets
-        + persistence_xreg_est * xreg_num
-        + phi_est
-        + sum(ar_orders)
-        + sum(ma_orders)
-    )
-
-    B_penalty = np.asarray(B, dtype=float).copy()  # noqa: N806
-
-    if phi_est:
-        phi_idx = components_ets + persistence_xreg_est * xreg_num
-        if phi_idx < len(B_penalty):
-            B_penalty[phi_idx] = 1 - B_penalty[phi_idx]
-
-    j = components_ets + persistence_xreg_est * xreg_num + phi_est
-
-    if arima_model and (sum(ma_orders) > 0 or sum(ar_orders) > 0):
-        lags = lags_dict.get("lags", [1]) if lags_dict else [1]
-        if not hasattr(lags, "__len__"):
-            lags = [lags]
-        for i in range(len(lags)):
-            ar_order_i = ar_orders[i] if i < len(ar_orders) else 0
-            ma_order_i = ma_orders[i] if i < len(ma_orders) else 0
-            if ar_order_i > 0 and j + ar_order_i <= len(B_penalty):
-                B_penalty[j : j + ar_order_i] = 1 - B_penalty[j : j + ar_order_i]
-            j += ar_order_i + ma_order_i
-
-    initial_type = (
-        initials_checked.get("initial_type", "optimal")
-        if initials_checked
-        else "optimal"
-    )
-    if isinstance(initial_type, list):
-        initial_type_matches = any(
-            t in ("optimal", "backcasting", "two-stage") for t in initial_type
-        )
-    else:
-        initial_type_matches = initial_type in (
-            "optimal",
-            "backcasting",
-            "two-stage",
-        )
-
-    if initial_type_matches:
-        if xreg_num > 0:
-            denominator = general.get("denominator")
-            error_type = model_type_dict.get("error_type", "A")
-            if error_type == "A" and denominator is not None:
-                B_penalty = np.concatenate(
-                    [
-                        B_penalty[:persistence_to_skip],
-                        B_penalty[-xreg_num:] / denominator,
-                    ]
+    n_smoothing = 0
+    if persistence_checked.get("persistence_estimate", False):
+        if ets_model:
+            n_smoothing += int(persistence_checked["persistence_level_estimate"])
+            if model_type_dict["model_is_trendy"]:
+                n_smoothing += int(persistence_checked["persistence_trend_estimate"])
+            if model_type_dict["model_is_seasonal"]:
+                n_smoothing += int(
+                    np.sum(persistence_checked["persistence_seasonal_estimate"])
                 )
-            else:
-                B_penalty = np.concatenate(
-                    [B_penalty[:persistence_to_skip], B_penalty[-xreg_num:]]
-                )
-        else:
-            B_penalty = B_penalty[:persistence_to_skip]
+        if xreg_model and persistence_checked.get("persistence_xreg_estimate", False):
+            n_smoothing += max(explanatory_checked["xreg_parameters_persistence"])
+    n_phi = int(bool(ets_model and phi_dict.get("phi_estimate", False)))
 
-    return B_penalty
+    ar_estimated: list = []
+    if arima_model:
+        ar_est = bool(arima_checked["ar_estimate"])
+        ma_est = bool(arima_checked["ma_estimate"])
+        for ar_order, ma_order in zip(
+            arima_checked["ar_orders"], arima_checked["ma_orders"]
+        ):
+            ar_estimated += [True] * (ar_est * ar_order) + [False] * (ma_est * ma_order)
+    arma = B[n_smoothing + n_phi : n_smoothing + n_phi + len(ar_estimated)]
+    ar_mask = np.asarray(ar_estimated, dtype=bool)
+
+    n_xreg = 0
+    xreg_estimated = None
+    if (
+        xreg_model
+        and initials_checked.get("initial_type") != "complete"
+        and initials_checked.get("initial_estimate", False)
+        and initials_checked.get("initial_xreg_estimate", False)
+    ):
+        xreg_estimated = (
+            np.asarray(explanatory_checked["xreg_parameters_estimated"], dtype=int) == 1
+        )
+        n_xreg = int(xreg_estimated.sum())
+    end = len(B) - int(other_parameter_estimate) - int(constant_estimate)
+    xreg = B[end - n_xreg : end]
+    denominator = general.get("denominator")
+    if (
+        n_xreg > 0
+        and model_type_dict.get("error_type") == "A"
+        and denominator is not None
+    ):
+        xreg = xreg / np.asarray(denominator, dtype=float)[xreg_estimated]
+
+    return np.concatenate(
+        [
+            B[:n_smoothing],
+            1 - B[n_smoothing : n_smoothing + n_phi],
+            1 - arma[ar_mask],
+            arma[~ar_mask],
+            xreg,
+        ]
+    )
 
 
 def adam_bounds_checker(
@@ -664,6 +646,8 @@ def CF(  # noqa: N802
                 model_type_dict,
                 lags_dict,
                 general,
+                constants_checked["constant_estimate"],
+                otherParameterEstimate,
             )
 
             # Flatten errors to avoid potential broadcasting issues

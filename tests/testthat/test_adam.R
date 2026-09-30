@@ -765,10 +765,29 @@ test_that("A fit stuck on a penalty restarts from zero smoothing and small ARMA 
     expect_lt(testModel$lossValue, 1E+100)
 })
 
-test_that("With nothing to optimise, the fit does not restart", {
-    # RIDGE with lambda=1 fixes the smoothing parameters and backcasting the initials,
-    # so B is empty: the restart selected its parameters by name and failed
+test_that("LASSO / RIDGE with lambda=1 fix the parameters at their shrinkage targets", {
+    # Nothing is left with backcasting: the model is used as it is, with a zero loss
     testModel <- adam(AirPassengers, "AAN", loss="RIDGE", lambda=1)
     expect_length(testModel$B, 0)
     expect_equal(unname(testModel$persistence), c(0, 0))
+    expect_equal(testModel$lossValue, 0)
+    testModel <- adam(log(AirPassengers), "NNN", orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)),
+                      lags=c(1,12), loss="LASSO", lambda=1)
+    expect_equal(unname(unlist(testModel$arma)), c(1, 1, 0, 0))
+    # With optimal initials, only these are estimated
+    expect_named(adam(AirPassengers, "AAN", loss="RIDGE", lambda=1, initial="optimal")$B,
+                 c("level", "trend"))
+})
+
+test_that("LASSO / RIDGE shrink the estimated parameters wherever they are in B", {
+    set.seed(3)
+    x <- data.frame(y=as.vector(AirPassengers), x1=rnorm(144), x2=rnorm(144, 5))
+    # The constant after the regressors is not shrunk, the regressors are
+    testModel <- adam(x, "NNN", orders=list(ar=1,i=1,ma=1), constant=TRUE, loss="LASSO", lambda=0.1)
+    expect_equal(unname(coef(testModel)[c("x1","x2")]), c(0, 0), tolerance=1e-4)
+    expect_gt(abs(coef(testModel)[["drift"]]), 1)
+    # With the AR provided, the MA parameters are shrunk to zero, not to one
+    testModel <- adam(log(AirPassengers), "NNN", orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)),
+                      lags=c(1,12), arma=list(ar=c(0.2,0.3)), loss="LASSO", lambda=0.1)
+    expect_equal(unname(coef(testModel)), c(0, 0), tolerance=1e-3)
 })

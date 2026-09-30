@@ -470,6 +470,47 @@ class TestADAMRegularisation:
         )
         np.testing.assert_allclose(model._adam_estimated["B"], expected, rtol=1e-6)
 
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize(
+        "kwargs, r_args, with_x",
+        [
+            # Nothing is left to estimate: the loss at the targets, zero
+            ({"model": "AAN", "loss": "RIDGE", "lambda_param": 1}, "'AAN', loss='RIDGE', lambda=1", False),
+            # The constant after the regressors is not shrunk
+            (
+                {"model": "NNN", "orders": {"ar": [1], "i": [1], "ma": [1]},
+                 "constant": True, "loss": "LASSO", "lambda_param": 0.1},
+                "'NNN', orders=list(ar=1,i=1,ma=1), constant=TRUE, loss='LASSO', lambda=0.1",
+                True,
+            ),
+            # Provided smoothing: the rest is found where it is in B
+            (
+                {"model": "AAN", "persistence": {"alpha": 0.3}, "loss": "LASSO", "lambda_param": 0.1},
+                "'AAN', persistence=list(alpha=0.3), loss='LASSO', lambda=0.1",
+                False,
+            ),
+            # Nothing to estimate without LASSO either: the loss, not inf
+            ({"model": "AAN", "persistence": {"alpha": 0.3, "beta": 0.1}}, "'AAN', persistence=list(alpha=0.3, beta=0.1)", False),
+        ],
+    )
+    def test_penalty_and_use_match_r(self, log_air, kwargs, r_args, with_x):
+        """The penalised parameters and the fixed models give R's B and loss."""
+        from ._r_bridge import r_array
+
+        y = np.exp(log_air)
+        rng = np.random.default_rng(3)
+        X = np.column_stack([rng.normal(size=len(y)), rng.normal(5, 1, len(y))])
+        model = ADAM(lags=[1, 12], **kwargs).fit(y, X=X if with_x else None)
+        data = "data.frame(y=y, x1=x1, x2=x2)" if with_x else "ts(y, frequency=12)"
+        expected = r_array(
+            f"{{m <- suppressWarnings(adam({data}, {r_args}, lags=c(1,12)));"
+            " c(m$lossValue, unname(m$B))}",
+            R_data={"y": y, "x1": X[:, 0], "x2": X[:, 1]},
+        )
+        estimated = model._adam_estimated
+        assert estimated["CF_value"] == pytest.approx(expected[0], rel=1e-8, abs=1e-12)
+        np.testing.assert_allclose(estimated["B"], expected[1:], rtol=1e-5, atol=1e-8)
+
 
 class TestADAMArmaFixed:
     """Tests for fixed ARMA parameters via the arma argument."""

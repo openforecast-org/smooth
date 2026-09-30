@@ -104,6 +104,24 @@ class TestAutoMSARIMAFit:
         model = AutoMSARIMA(lags=[1], ar_order=1, i_order=1, ma_order=1)
         assert model.fit(simple_series) is model
 
+    def test_nlopt_kwargs_reach_the_candidates(self):
+        """The optimiser settings reach every candidate, as R's ellipsis does."""
+        import warnings
+
+        from smooth import MSARIMA
+
+        y = np.log(AIRPASSENGERS)
+        orders = {"ar": [1, 1], "i": [1, 1], "ma": [1, 1], "select": True}
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            model = AutoMSARIMA(
+                lags=[1, 12], orders=orders, nlopt_kwargs={"maxeval": 1}
+            ).fit(y)
+        direct = MSARIMA(
+            orders=model.orders, lags=[1, 12], nlopt_kwargs={"maxeval": 1}
+        ).fit(y)
+        np.testing.assert_array_equal(model.coef, direct.coef)
+
     def test_fit_sets_coef(self, fitted_nonseasonal):
         """coef is populated after fit."""
         assert fitted_nonseasonal.coef is not None

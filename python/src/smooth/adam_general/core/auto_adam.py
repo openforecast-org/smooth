@@ -410,7 +410,10 @@ class AutoADAM(ADAM):
             regressors=self.regressors,
             verbose=0,  # always silent during selection
         )
-        # Forward any extra kwargs stored in self (e.g. occurrence, arma)
+        # Forward any extra kwargs stored in self (e.g. occurrence, arma), as
+        # R's auto.adam() passes its ellipsis to every adam(). B, lb and ub
+        # (nlopt_initial / lower / upper) are left out: their length depends on
+        # the candidate model
         for attr in (
             "occurrence",
             "arma",
@@ -421,6 +424,12 @@ class AutoADAM(ADAM):
             "fast",
             "smoother",
             "ets",
+            "nlopt_kwargs",
+            "loss_horizon",
+            "reg_lambda",
+            "lambda_param",
+            "gnorm_shape",
+            "step_size",
         ):
             val = getattr(self, attr, None)
             if val is not None:

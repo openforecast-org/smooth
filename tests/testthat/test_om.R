@@ -473,3 +473,12 @@ test_that("om gradient falls back to backcasting for a custom loss", {
                               initial="gradient", loss=lossCustom, silent=TRUE))
     expect_equal(mG$lossValue, mB$lossValue, tolerance = 1e-8)
 })
+
+test_that("om LASSO penalises the estimated parameters as adam, not the initials", {
+    set.seed(44)
+    y <- rpois(120, 0.7)
+    testModel <- om(y, "MNN", occurrence="odds-ratio", loss="LASSO", lambda=0.5, initial="optimal")
+    errors <- (y!=0) - fitted(testModel)
+    expect_equal(testModel$lossValue,
+                 0.5*sqrt(mean(errors^2)) + 0.5*abs(testModel$B[["alpha"]]))
+})

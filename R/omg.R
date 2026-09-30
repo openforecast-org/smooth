@@ -1462,11 +1462,34 @@ omgCF_local <- function(B,
     } else if(loss == "HAM"){
         return(mean(sqrt(abs(errors))))
     } else if(any(loss == c("LASSO","RIDGE"))){
+        # The penalty on the estimated parameters of both sides, as in adam()
+        BPenalty <- c(adam_penaltyParameters(B_A, EtypeA, etsModelA, modelIsTrendyA, modelIsSeasonalA,
+                                             persistenceEstimateA, persistenceLevelEstimateA,
+                                             persistenceTrendEstimateA, persistenceSeasonalEstimateA,
+                                             xregModelA, persistenceXregEstimateA,
+                                             xregParametersPersistenceA, phiEstimateA,
+                                             arimaModelA, arEstimateA, maEstimateA, arOrdersA, maOrdersA,
+                                             initialTypeA, initialEstimateA, initialXregEstimateA,
+                                             xregParametersEstimatedA, constantEstimateA, FALSE,
+                                             adam_lassoDenominators(loss, matWtA, componentsNumberETSA,
+                                                                    componentsNumberARIMAA, xregNumberA,
+                                                                    ot)$denominator),
+                      adam_penaltyParameters(B_B, EtypeB, etsModelB, modelIsTrendyB, modelIsSeasonalB,
+                                             persistenceEstimateB, persistenceLevelEstimateB,
+                                             persistenceTrendEstimateB, persistenceSeasonalEstimateB,
+                                             xregModelB, persistenceXregEstimateB,
+                                             xregParametersPersistenceB, phiEstimateB,
+                                             arimaModelB, arEstimateB, maEstimateB, arOrdersB, maOrdersB,
+                                             initialTypeB, initialEstimateB, initialXregEstimateB,
+                                             xregParametersEstimatedB, constantEstimateB, FALSE,
+                                             adam_lassoDenominators(loss, matWtB, componentsNumberETSB,
+                                                                    componentsNumberARIMAB, xregNumberB,
+                                                                    ot)$denominator))
         errorTerm <- (1 - lambda) * sqrt(mean(errors^2))
         if(loss == "LASSO"){
-            return(errorTerm + lambda * sum(abs(B)))
+            return(errorTerm + lambda * sum(abs(BPenalty)))
         } else {
-            return(errorTerm + lambda * sqrt(sum(B^2)))
+            return(errorTerm + lambda * sqrt(sum(BPenalty^2)))
         }
     } else {
         # Fallback to likelihood for any unrecognised string.

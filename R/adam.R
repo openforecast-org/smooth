@@ -918,28 +918,15 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsInSample;
             }
             else if(any(loss==c("LASSO","RIDGE"))){
-                # The estimated parameters, found in B as the filler does, shifted to be zero
-                # at their shrinkage targets: no smoothing, phi and AR of one ("no good
-                # understanding how to shrink ARMA"), MA and regressors of zero, the additive
-                # regressors normalised. The initial states are not shrunk
-                nSmoothing <- persistenceEstimate *
-                    (etsModel * (persistenceLevelEstimate + modelIsTrendy*persistenceTrendEstimate +
-                                     modelIsSeasonal*sum(persistenceSeasonalEstimate)) +
-                         xregModel * persistenceXregEstimate * max(c(0, xregParametersPersistence)));
-                nPhi <- etsModel * phiEstimate;
-                arOrdersEstimated <- arimaModel * arEstimate * arOrders;
-                maOrdersEstimated <- arimaModel * maEstimate * maOrders;
-                arma <- B[nSmoothing + nPhi + seq_len(sum(arOrdersEstimated, maOrdersEstimated))];
-                arEstimated <- as.logical(unlist(lapply(seq_along(arOrdersEstimated), function(i){
-                    return(rep(c(TRUE,FALSE), c(arOrdersEstimated[i], maOrdersEstimated[i])))})));
-                xregEstimated <- xregModel && (initialType!="complete") && initialEstimate && initialXregEstimate;
-                nXreg <- xregEstimated * sum(xregParametersEstimated);
-                xreg <- B[length(B) - otherParameterEstimate - constantEstimate - nXreg + seq_len(nXreg)];
-                BShrunk <- c(B[seq_len(nSmoothing)], 1-B[nSmoothing + seq_len(nPhi)],
-                             1-arma[arEstimated], arma[!arEstimated],
-                             switch(Etype,
-                                    "A"=xreg / denominator[xregParametersEstimated==1],
-                                    "M"=xreg));
+                BShrunk <- adam_penaltyParameters(B, Etype, etsModel, modelIsTrendy, modelIsSeasonal,
+                                                  persistenceEstimate, persistenceLevelEstimate,
+                                                  persistenceTrendEstimate, persistenceSeasonalEstimate,
+                                                  xregModel, persistenceXregEstimate,
+                                                  xregParametersPersistence, phiEstimate,
+                                                  arimaModel, arEstimate, maEstimate, arOrders, maOrders,
+                                                  initialType, initialEstimate, initialXregEstimate,
+                                                  xregParametersEstimated, constantEstimate,
+                                                  otherParameterEstimate, denominator);
 
                 CFValue <- (switch(Etype,
                                    "A"=(1-lambda)* sqrt(sum((adamFitted$errors/yDenominator)^2)/obsInSample),
@@ -1425,22 +1412,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
         }
 
-        # Prepare the denominator needed for the shrinkage of explanatory variables in LASSO / RIDGE
-        if(any(loss==c("LASSO","RIDGE"))){
-            if(xregNumber>0){
-                denominator <- apply(adamCreated$matWt[,componentsNumberETS+componentsNumberARIMA+1:xregNumber,
-                                                       drop=FALSE], 2, sd);
-                denominator[is.infinite(denominator)] <- 1;
-            }
-            else{
-                denominator <- NULL;
-            }
-            yDenominator <- max(sd(diff(yInSample)),1);
-        }
-        else{
-            denominator <- NULL;
-            yDenominator <- NULL;
-        }
+        # The scales of the explanatory variables and of the series for LASSO / RIDGE
+        list2env(adam_lassoDenominators(loss, adamCreated$matWt, componentsNumberETS, componentsNumberARIMA,
+                                        xregNumber, yInSample), environment());
 
         ##### Parameter estimation ####
         # Parameters are chosen to speed up the optimisation process and have decent accuracy
@@ -2593,16 +2567,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                adamCpp);
         list2env(adamCreated, environment());
 
-        # Prepare the denominator needed for the shrinkage of explanatory variables in LASSO / RIDGE
-        if(xregNumber>0 && any(loss==c("LASSO","RIDGE"))){
-            denominator <- apply(matWt, 2, sd);
-            denominator[is.infinite(denominator)] <- 1;
-            yDenominator <- max(sd(diff(yInSample)),1);
-        }
-        else{
-            denominator <- NULL;
-            yDenominator <- NULL;
-        }
+        # The scales of the explanatory variables and of the series for LASSO / RIDGE
+        list2env(adam_lassoDenominators(loss, matWt, componentsNumberETS, componentsNumberARIMA,
+                                        xregNumber, yInSample), environment());
 
         CFValue <- CF(B=0, etsModel=etsModel, Etype=Etype, Ttype=Ttype, Stype=Stype, modelIsTrendy=modelIsTrendy,
                       modelIsSeasonal=modelIsSeasonal, yInSample=yInSample,

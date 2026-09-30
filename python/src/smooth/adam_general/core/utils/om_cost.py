@@ -219,9 +219,20 @@ def om_cf(  # noqa: N802
     elif loss == "HAM":
         cf_value = float(np.mean(np.sqrt(np.abs(residual))))
     elif loss in ("LASSO", "RIDGE"):
-        from smooth.adam_general.core.utils.cost_functions import trim_b_for_penalty
+        from smooth.adam_general.core.utils.cost_functions import (
+            lasso_denominators,
+            trim_b_for_penalty,
+        )
 
         lam = float(general.get("lambda", 0) or 0.0)
+        # The penalty on the estimated parameters, as in ADAM
+        denominator = lasso_denominators(
+            loss,
+            adam_elements["mat_wt"],
+            components_dict,
+            explanatory_checked["xreg_number"],
+            ot,
+        )["denominator"]
         B_penalty = trim_b_for_penalty(  # noqa: N806
             B,
             components_dict,
@@ -232,7 +243,8 @@ def om_cf(  # noqa: N802
             initials_checked,
             model_type_dict,
             lags_dict,
-            general,
+            {"denominator": denominator},
+            constants_checked["constant_estimate"],
         )
         obs_in_sample = observations_dict.get("obs_in_sample", len(residual))
         # Error term identical in shape to ADAM's additive branch but

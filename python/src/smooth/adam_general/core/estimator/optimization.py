@@ -1,6 +1,10 @@
 import numpy as np
 
-from smooth.adam_general.core.utils.cost_functions import CF, log_Lik_ADAM
+from smooth.adam_general.core.utils.cost_functions import (
+    CF,
+    lasso_denominators,
+    log_Lik_ADAM,
+)
 
 # Note: adam_cpp instance is passed to functions that need C++ integration
 
@@ -96,37 +100,16 @@ def _setup_optimization_parameters(
         # ):
         #     maxeval_used = len(B) * 80
 
-    # Handle LASSO/RIDGE denominator calculation
-    if general_dict["loss"] in ["LASSO", "RIDGE"]:
-        if explanatory_dict["xreg_number"] > 0:
-            # Get component counts for slicing xreg columns only
-            components_number_ets = components_dict["components_number_ets"]
-            components_number_arima = components_dict.get("components_number_arima", 0)
-            xreg_number = explanatory_dict["xreg_number"]
-
-            # Slice only xreg columns from mat_wt (after ETS and ARIMA components)
-            xreg_start = components_number_ets + components_number_arima
-            xreg_end = xreg_start + xreg_number
-            mat_wt_xreg = adam_created["mat_wt"][:, xreg_start:xreg_end]
-
-            # Calculate standard deviation for each xreg column using the
-            # unbiased sample estimator (n-1 denominator, ddof=1).
-            general_dict_updated["denominator"] = np.std(mat_wt_xreg, axis=0, ddof=1)
-            # Replace infinite values with 1
-            general_dict_updated["denominator"][
-                np.isinf(general_dict_updated["denominator"])
-            ] = 1
-        else:
-            general_dict_updated["denominator"] = None
-
-        # Calculate denominator for y values using the unbiased sample
-        # estimator (n-1 denominator, ddof=1).
-        y_diff = np.diff(observations_dict["y_in_sample"])
-        y_std = np.std(y_diff, ddof=1)
-        general_dict_updated["y_denominator"] = max(y_std, 1)
-    else:
-        general_dict_updated["denominator"] = None
-        general_dict_updated["y_denominator"] = None
+    # The scales of the explanatory variables and of the series for LASSO / RIDGE
+    general_dict_updated.update(
+        lasso_denominators(
+            general_dict["loss"],
+            adam_created["mat_wt"],
+            components_dict,
+            explanatory_dict["xreg_number"],
+            observations_dict["y_in_sample"],
+        )
+    )
 
     general_dict_updated["multisteps"] = multisteps
 

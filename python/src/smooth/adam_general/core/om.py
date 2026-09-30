@@ -1083,6 +1083,19 @@ class OM(ADAM):
                         B[names.index(k)] = float(v)
             else:
                 B[:] = np.asarray(user_B, dtype=float)
+        # The mixed models that are dangerous to start from the initialiser's values
+        # and the direct occurrence start from no smoothing, as R's om()
+        ets_type = "".join(
+            self._model_type[k] for k in ("error_type", "trend_type", "season_type")
+        )
+        mixed = ("AAM", "AMA", "MAA", "MAN", "AMN", "MMA", "MNA", "ANM")
+        if (
+            user_B is None
+            and len(B)
+            and (ets_type in mixed or self._om_occurrence == "direct")
+        ):
+            B[:] = 0
+            B[0] = 0.1
 
         lb = (
             np.asarray(user_lb, dtype=float)

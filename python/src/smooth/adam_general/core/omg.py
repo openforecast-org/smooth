@@ -1073,6 +1073,20 @@ class OMG:
         if user_ub is not None:
             ub[:] = np.asarray(user_ub, dtype=float)
 
+        # The mixed models that are dangerous to start from the initialiser's values
+        # start from no smoothing, side by side, as R's omg()
+        mixed = ("AAM", "AMA", "MAA", "AMN", "MMA", "MNA", "ANM")
+        for side, side_slice in (
+            (side_a, slice(0, n_params_a)),
+            (side_b, slice(n_params_a, len(B_used))),
+        ):
+            model_type = side["model_type_dict"]
+            ets_type = "".join(
+                model_type[k] for k in ("error_type", "trend_type", "season_type")
+            )
+            if ets_type in mixed:
+                B_used[side_slice] = 0
+
         return B_used, lb, ub, n_params_a
 
     def _initial_B_side(self, side):  # noqa: N802

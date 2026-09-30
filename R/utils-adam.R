@@ -1549,6 +1549,58 @@ adam_ic_weights <- function(icSelection, threshold=1e-5){
 }
 
 #### Bounds checker for ARIMA stationarity and ETS smoothing parameter constraints ####
+# The scales of LASSO / RIDGE: the standard deviations of the explanatory variables
+# (denominator), which normalise their parameters, and of the differenced series
+# (yDenominator), which normalises the errors of adam()
+#' @keywords internal
+adam_lassoDenominators <- function(loss, matWt, componentsNumberETS, componentsNumberARIMA,
+                                   xregNumber, yInSample){
+    denominator <- yDenominator <- NULL;
+    if(any(loss==c("LASSO","RIDGE"))){
+        if(xregNumber>0){
+            denominator <- apply(matWt[,componentsNumberETS+componentsNumberARIMA+1:xregNumber,drop=FALSE],
+                                 2, sd);
+            denominator[is.infinite(denominator)] <- 1;
+        }
+        yDenominator <- max(sd(diff(yInSample)),1);
+    }
+    return(list(denominator=denominator, yDenominator=yDenominator));
+}
+
+# The estimated parameters of the LASSO / RIDGE penalty, found in B as the filler does,
+# shifted to be zero at their shrinkage targets: no smoothing, phi and AR of one ("no
+# good understanding how to shrink ARMA"), MA and regressors of zero, the additive
+# regressors normalised by their standard deviations (denominator). The initial states
+# are not shrunk. Shared by adam(), om() and omg()
+#' @keywords internal
+adam_penaltyParameters <- function(B, Etype, etsModel, modelIsTrendy, modelIsSeasonal,
+                                   persistenceEstimate, persistenceLevelEstimate,
+                                   persistenceTrendEstimate, persistenceSeasonalEstimate,
+                                   xregModel, persistenceXregEstimate, xregParametersPersistence,
+                                   phiEstimate, arimaModel, arEstimate, maEstimate, arOrders, maOrders,
+                                   initialType, initialEstimate, initialXregEstimate,
+                                   xregParametersEstimated, constantEstimate, otherParameterEstimate,
+                                   denominator){
+    nSmoothing <- persistenceEstimate *
+        (etsModel * (persistenceLevelEstimate + modelIsTrendy*persistenceTrendEstimate +
+                         modelIsSeasonal*sum(persistenceSeasonalEstimate)) +
+             xregModel * persistenceXregEstimate * max(c(0, xregParametersPersistence)));
+    nPhi <- etsModel * phiEstimate;
+    arOrdersEstimated <- arimaModel * arEstimate * arOrders;
+    maOrdersEstimated <- arimaModel * maEstimate * maOrders;
+    arma <- B[nSmoothing + nPhi + seq_len(sum(arOrdersEstimated, maOrdersEstimated))];
+    arEstimated <- as.logical(unlist(lapply(seq_along(arOrdersEstimated), function(i){
+        return(rep(c(TRUE,FALSE), c(arOrdersEstimated[i], maOrdersEstimated[i])))})));
+    xregEstimated <- xregModel && (initialType!="complete") && initialEstimate && initialXregEstimate;
+    nXreg <- xregEstimated * sum(xregParametersEstimated);
+    xreg <- B[length(B) - otherParameterEstimate - constantEstimate - nXreg + seq_len(nXreg)];
+    if(Etype=="A" && nXreg>0){
+        xreg <- xreg / denominator[xregParametersEstimated==1];
+    }
+    return(c(B[seq_len(nSmoothing)], 1-B[nSmoothing + seq_len(nPhi)],
+             1-arma[arEstimated], arma[!arEstimated], xreg));
+}
+
 #' @keywords internal
 adam_bounds_checker <- function(adamElements, arimaPolynomials,
                                 bounds,

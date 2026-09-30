@@ -483,3 +483,46 @@ class TestOMvcovType:
             warnings.simplefilter("always")
             m.vcov(bootstrap=True, nsim=20)
             assert any(issubclass(x.category, DeprecationWarning) for x in w)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize(
+    "kwargs, r_call, with_x",
+    [
+        (
+            {"model": "MNN", "loss": "LASSO", "lambda_param": 0.3},
+            "om(y, 'MNN', occurrence='odds-ratio', loss='LASSO', lambda=0.3)",
+            False,
+        ),
+        (
+            {"model": "MNN", "loss": "RIDGE", "lambda_param": 0.3},
+            "om(data.frame(y=y, x=x), 'MNN', occurrence='odds-ratio', loss='RIDGE',"
+            " lambda=0.3)",
+            True,
+        ),
+        # A mixed model starts from no smoothing, as in R
+        (
+            {"model": "MAN", "loss": "LASSO", "lambda_param": 0.2, "initial": "optimal"},
+            "om(y, 'MAN', occurrence='odds-ratio', loss='LASSO', lambda=0.2,"
+            " initial='optimal')",
+            False,
+        ),
+    ],
+)
+def test_om_penalty_matches_r(kwargs, r_call, with_x):
+    """LASSO / RIDGE penalise the estimated parameters as ADAM, in R and Python."""
+    from ._r_bridge import r_array
+
+    rng = np.random.default_rng(44)
+    x = rng.normal(5, 1, 120)
+    y = rng.poisson(0.7, 120) * (1 + x + rng.normal(size=120) ** 2)
+    model = OM(occurrence="odds-ratio", **kwargs).fit(
+        y, X=x.reshape(-1, 1) if with_x else None
+    )
+    expected = r_array(
+        f"{{m <- suppressWarnings({r_call}); c(m$lossValue, unname(m$B))}}",
+        R_data={"y": y, "x": x},
+    )
+    estimated = model._adam_estimated
+    assert estimated["CF_value"] == pytest.approx(expected[0], rel=1e-8)
+    np.testing.assert_allclose(estimated["B"], expected[1:], rtol=1e-5, atol=1e-8)

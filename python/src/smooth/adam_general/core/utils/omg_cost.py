@@ -346,34 +346,37 @@ def omg_cf(  # noqa: N802
     if loss == "HAM":
         return float(np.mean(np.sqrt(np.abs(residual))))
     if loss in ("LASSO", "RIDGE"):
-        from smooth.adam_general.core.utils.cost_functions import trim_b_for_penalty
+        from smooth.adam_general.core.utils.cost_functions import (
+            lasso_denominators,
+            trim_b_for_penalty,
+        )
 
         lam = float(lambda_param if lambda_param is not None else 0.0)
-        # Trim each side separately (each has its own component layout)
-        # and concatenate for the joint penalty.
-        B_pen_a = trim_b_for_penalty(  # noqa: N806
-            B[:n_params_a],
-            side_a["components_dict"],
-            side_a["persistence"],
-            side_a["explanatory"],
-            side_a["phi"],
-            side_a["arima"],
-            side_a["initials"],
-            side_a["model_type_dict"],
-            side_a["lags_dict"],
-            {},
-        )
-        B_pen_b = trim_b_for_penalty(  # noqa: N806
-            B[n_params_a:],
-            side_b["components_dict"],
-            side_b["persistence"],
-            side_b["explanatory"],
-            side_b["phi"],
-            side_b["arima"],
-            side_b["initials"],
-            side_b["model_type_dict"],
-            side_b["lags_dict"],
-            {},
+        # The penalty on the estimated parameters of each side, as in ADAM
+        B_sides = (B[:n_params_a], B[n_params_a:])  # noqa: N806
+        B_pen_a, B_pen_b = (  # noqa: N806
+            trim_b_for_penalty(
+                B_side,
+                side["components_dict"],
+                side["persistence"],
+                side["explanatory"],
+                side["phi"],
+                side["arima"],
+                side["initials"],
+                side["model_type_dict"],
+                side["lags_dict"],
+                lasso_denominators(
+                    loss,
+                    elem["mat_wt"],
+                    side["components_dict"],
+                    side["explanatory"]["xreg_number"],
+                    ot,
+                ),
+                side["constant"]["constant_estimate"],
+            )
+            for B_side, side, elem in zip(  # noqa: N806
+                B_sides, (side_a, side_b), (elem_a, elem_b)
+            )
         )
         B_penalty = np.concatenate([B_pen_a, B_pen_b])  # noqa: N806
 

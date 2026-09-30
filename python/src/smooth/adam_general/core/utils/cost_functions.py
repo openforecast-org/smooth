@@ -13,6 +13,30 @@ from smooth.adam_general.core.utils.utils import (
 )
 
 
+def lasso_denominators(loss, mat_wt, components_dict, xreg_number, y_in_sample):
+    """The scales of LASSO / RIDGE (R's ``adam_lassoDenominators``).
+
+    The standard deviations of the explanatory variables (``denominator``), which
+    normalise their parameters, and of the differenced series (``y_denominator``),
+    which normalises the errors of ADAM; None for the other losses.
+    """
+    result = {"denominator": None, "y_denominator": None}
+    if loss in ("LASSO", "RIDGE"):
+        if xreg_number > 0:
+            start = components_dict["components_number_ets"] + components_dict.get(
+                "components_number_arima", 0
+            )
+            denominator = np.std(
+                np.asarray(mat_wt)[:, start : start + xreg_number], axis=0, ddof=1
+            )
+            denominator[np.isinf(denominator)] = 1
+            result["denominator"] = denominator
+        result["y_denominator"] = max(
+            np.std(np.diff(np.asarray(y_in_sample, dtype=float).ravel()), ddof=1), 1
+        )
+    return result
+
+
 def trim_b_for_penalty(
     B,  # noqa: N803
     components_dict,

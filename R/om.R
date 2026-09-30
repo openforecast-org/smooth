@@ -1854,11 +1854,18 @@ omCF_local <- function(B,
         CFValue <- mean(sqrt(abs(errors)));
     }
     else if(any(loss == c("LASSO","RIDGE"))){
-        # Trim initials out of B for the penalty — same convention as
-        # adam() (R/adam.R:897-916). For non-ARIMA OM the typical B is just
-        # the persistence; we keep that intact and drop nothing if there
-        # are no initials in B.
-        BPenalty <- B;
+        # The penalty on the estimated parameters, as in adam()
+        BPenalty <- adam_penaltyParameters(B, Etype, etsModel, modelIsTrendy, modelIsSeasonal,
+                                           persistenceEstimate, persistenceLevelEstimate,
+                                           persistenceTrendEstimate, persistenceSeasonalEstimate,
+                                           xregModel, persistenceXregEstimate,
+                                           xregParametersPersistence, phiEstimate,
+                                           arimaModel, arEstimate, maEstimate, arOrders, maOrders,
+                                           initialType, initialEstimate, initialXregEstimate,
+                                           xregParametersEstimated, constantEstimate, FALSE,
+                                           adam_lassoDenominators(loss, matWt, componentsNumberETS,
+                                                                  componentsNumberARIMA, xregNumber,
+                                                                  ot)$denominator);
         errorTerm <- (1 - lambda) * sqrt(mean(errors^2));
         if(loss == "LASSO"){
             CFValue <- errorTerm + lambda * sum(abs(BPenalty));

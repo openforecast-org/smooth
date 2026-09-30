@@ -512,3 +512,21 @@ class TestOMGvcovType:
         np.testing.assert_allclose(m.vcov().values, v_opg)
         assert np.all(np.linalg.eigvalsh((v_opg + v_opg.T) / 2) > -1e-6)
         assert not np.allclose(v_opg, v_h, atol=1e-6)
+
+
+@pytest.mark.r_parity
+def test_omg_penalty_matches_r():
+    """LASSO penalises the estimated parameters of both sides, as in R."""
+    from ._r_bridge import r_array
+
+    rng = np.random.default_rng(44)
+    y = rng.poisson(0.7, 120) * 1.0
+    model = OMG(
+        model_a="MNN", model_b="MNN", loss="LASSO", lambda_param=0.3, initial="optimal"
+    ).fit(y)
+    expected = r_array(
+        "{m <- omg(y, modelA='MNN', modelB='MNN', loss='LASSO', lambda=0.3,"
+        " initial='optimal'); m$lossValue}",
+        R_data={"y": y},
+    )
+    assert model.loss_value == pytest.approx(float(expected[0]), rel=1e-8)

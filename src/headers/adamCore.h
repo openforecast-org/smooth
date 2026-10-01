@@ -1585,7 +1585,7 @@ public:
                     }
                 }
                 // Loop for the model construction
-                for(int i=H; i<obs+H; i=i+1) {
+                for(int i=H; i<obs+(int)H; i=i+1) {
                     /* # Measurement equation and the error term */
                     matYfit(i-H,k) = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                             arrayWt.slice(k).row(i-H), E, T, S,
@@ -1637,7 +1637,7 @@ public:
                             -arrayProfilesRecent.slice(k)(nComponents-1);
                     }
 
-                    for(int i=obs+H-1; i>=H; i=i-1) {
+                    for(int i=obs+H-1; i>=(int)H; i=i-1) {
                         /* # Measurement equation and the error term */
                         matYfit(i-H,k) = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                                 arrayWt.slice(k).row(i-H), E, T, S,

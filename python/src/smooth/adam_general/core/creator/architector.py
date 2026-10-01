@@ -317,10 +317,15 @@ def architector(
         else False,
         adamETS=adam_ets,
     )
-    # ADAM's ARIMA carries the constant in the measurement vector with an identity
-    # transition, so the drift must NOT be flipped in the backward pass (unlike
-    # ssarima's companion form, where the flip is exactly right).
-    adam_cpp.flipConstant = False
+    # Time reversal multiplies the drift of an integrated series by (-1)^(d+D),
+    # so it is flipped with the trend
+    adam_cpp.flipConstant = bool(
+        constants_checked
+        and constants_checked.get("constant_required", False)
+        and arima_checked
+        and arima_checked.get("arima_model", False)
+        and sum(arima_checked.get("i_orders") or [0]) % 2 == 1
+    )
     # Head length for backcasting: one full lag cycle by default, so the head is
     # filtered against the model's own backcasts. 0 switches the filtering off.
     adam_cpp.headLength = head_resolved["flag"]

@@ -680,11 +680,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                 componentsNumberARIMA=componentsNumberARIMA,
                                 obsAll=obsAll, yIndexAll=yIndexAll, yClasses=yClasses,
                                 adamETS=adamETS,
-                                # ADAM's ARIMA carries the constant in the measurement
-                                # vector with an identity transition, so the drift must NOT
-                                # be flipped in the backward pass (unlike ssarima's
-                                # companion form, where the flip is exactly right)
-                                flipConstant=FALSE,
+                                # Time reversal multiplies the drift of an integrated
+                                # series by (-1)^(d+D), so it is flipped with the trend
+                                flipConstant=constantRequired && arimaModel &&
+                                    (sum(iOrders) %% 2 == 1),
                                 headLength=headLengthUser));
     }
     creator <- function(...){

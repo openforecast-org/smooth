@@ -68,4 +68,6 @@ test_that("backcasting reproduces noise-free series of time-symmetric models", {
     # The airline model, with states at lags 1, 12 and 13, converges to the exact fit
     expect_lt(max(abs(residuals(adam(seasonal, "NNN", lags=c(1,12), orders=list(i=c(1,1), ma=c(1,1)),
                                      arma=list(ma=c(-0.5,-0.5)), constant=FALSE, nIterations=5)))), 1e-8)
+    # The drift of an odd number of differences is flipped with the trend
+    expect_lt(max(abs(residuals(adam(line, "NNN", orders=list(i=1), constant=TRUE)))), 1e-8)
 })

@@ -280,9 +280,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, adamETS);
-    # ADAM's ARIMA keeps the constant in the measurement vector, so the drift is not
-    # flipped in the backward pass (see the note in adam())
-    adamCpp$flipConstant <- FALSE;
+    # The drift is flipped with the trend when d+D is odd (see the note in adam())
+    adamCpp$flipConstant <- constantRequired && arimaModel &&
+        (sum(if(is.list(object$orders)) object$orders$i else object$orders[2]) %% 2 == 1);
     adamCpp$headLength <- headLength;
 
     # Generate the data from the multivariate normal

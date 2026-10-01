@@ -77,8 +77,8 @@ def test_states_keep_their_shape_whatever_the_head_length(y):
     assert np.asarray(cycle.states).shape == np.asarray(long.states).shape
 
 
-# 4. The C++ kernel gets the resolved flag, and the drift is never flipped
-def test_architector_sets_the_kernel_flag_and_never_flips_the_drift(y):
+# 4. The C++ kernel gets the resolved flag, and the drift is flipped when d+D is odd
+def test_architector_sets_the_kernel_flags(y):
     default = _fit(y, None)
     assert default._adam_cpp.headLength == M
     assert default._adam_cpp.flipConstant is False
@@ -86,16 +86,18 @@ def test_architector_sets_the_kernel_flag_and_never_flips_the_drift(y):
     legacy = _fit(y, 0)
     assert legacy._adam_cpp.headLength == 0
 
-    # An odd total order of differencing used to flip the drift; ADAM carries the
-    # constant in the measurement vector, so it must not.
-    arima = ADAM(
-        model="NNN",
-        lags=[1],
-        orders={"ar": [0], "i": [1], "ma": [1]},
-        constant=True,
-        initial="backcasting",
-    ).fit(y)
-    assert arima._adam_cpp.flipConstant is False
+    # Time reversal multiplies the drift by (-1)^(d+D)
+    def _arima(i_orders):
+        return ADAM(
+            model="NNN",
+            lags=[1, M],
+            orders={"ar": [0, 0], "i": i_orders, "ma": [1, 0]},
+            constant=True,
+            initial="backcasting",
+        ).fit(y)
+
+    assert _arima([1, 0])._adam_cpp.flipConstant is True
+    assert _arima([1, 1])._adam_cpp.flipConstant is False
 
 
 # 5. CES resolves the head the same way
@@ -147,5 +149,7 @@ def test_backcasting_reproduces_noise_free_series():
         constant=False,
         n_iterations=5,
     ).fit(seasonal)
-    for model in (ets, arima, airline):
+    # The drift of an odd number of differences is flipped with the trend
+    drift = ADAM("NNN", i_order=1, constant=True).fit(line)
+    for model in (ets, arima, airline, drift):
         assert np.max(np.abs(np.asarray(model.residuals, dtype=float))) < 1e-8

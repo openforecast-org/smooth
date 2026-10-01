@@ -35,7 +35,7 @@ extract_ces <- function(m, h) {
 
     # Bounds of the deterministic interval types, h x 2 for levels 0.8 and 0.95
     intervals <- list()
-    for (interval in c("prediction", "semiparametric", "empirical")) {
+    for (interval in c("prediction", "semiparametric", "nonparametric", "empirical")) {
         f <- forecast(m, h = h, interval = interval, level = c(0.8, 0.95))
         intervals[[interval]] <- list(lower = unname(as.matrix(f$lower)),
                                       upper = unname(as.matrix(f$upper)))

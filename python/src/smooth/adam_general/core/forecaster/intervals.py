@@ -1,13 +1,13 @@
 import greybox as gb
+import nlopt
 import numpy as np
-from scipy.optimize import minimize
 from scipy.special import gamma
 
 from smooth.adam_general.core.utils.distributions import (
     generate_errors,
     normalize_errors,
 )
-from smooth.adam_general.core.utils.utils import scale_debias, scale_variance
+from smooth.adam_general.core.utils.utils import _sum_r, scale_debias, scale_variance
 from smooth.adam_general.core.utils.var_covar import (
     covar_anal,
     sigma,
@@ -603,17 +603,16 @@ def generate_simulation_interval(
 _LOG_DISTS = frozenset({"dinvgauss", "dgamma", "dlnorm", "dls", "dllaplace", "dlgnorm"})
 
 
-def _fit_power_quantile(errors, horizons, level):
-    """Fit a power-law quantile ``q_k = A0 * k^A1`` by minimising the pinball loss.
+def _fit_power_quantile(errors, level):
+    """Power-law quantile ``A1 * j^A2``, ``j = 1..h``, of the multistep errors.
 
-    Used for nonparametric prediction intervals: ``A0`` and ``A1`` are
-    chosen so the quantile across horizons matches the empirical multistep
-    residual distribution at the requested level.
+    Mirrors R's ``adam_quantilePower`` (Taylor & Bunn): for a given ``A2`` the
+    pinball loss is minimised by the weighted quantile of ``e / j^A2`` with
+    weights ``j^A2``, so only ``A2`` is optimised, with NLopt's Nelder-Mead.
 
     Parameters
     ----------
     errors : np.ndarray, shape (T-h, h)
-    horizons : np.ndarray, shape (h,)
     level : float
         Quantile level in [0, 1].
 
@@ -621,24 +620,41 @@ def _fit_power_quantile(errors, horizons, level):
     -------
     np.ndarray, shape (h,)
     """
+    errors = np.asarray(errors, dtype=np.float64)
+    h = errors.shape[1]
+    # Column-major, as R's errors[!is.na(errors)] and col(errors)
+    values = errors.ravel(order="F")
+    horizons = np.repeat(np.arange(1, h + 1, dtype=np.float64), errors.shape[0])
+    keep = ~np.isnan(values)
+    values, horizons = values[keep], horizons[keep]
 
-    def pinball_total(params):
-        a0, a1 = params
-        total = 0.0
-        for i, k in enumerate(horizons):
-            q_k = a0 * (k**a1)
-            diff = errors[:, i] - q_k
-            total += np.sum(np.where(diff >= 0, level * diff, (level - 1) * diff))
-        return total
+    def quantile_a1(power):
+        weights = horizons**power
+        ratios = values / weights
+        ordering = np.argsort(ratios, kind="stable")
+        # R's cumsum() accumulates in long double and stores doubles
+        cumulative = np.cumsum(weights[ordering].astype(np.longdouble)).astype(
+            np.float64
+        )
+        return ratios[ordering][np.argmax(cumulative >= level * cumulative[-1])]
 
-    result = minimize(
-        pinball_total,
-        x0=[1.0, 1.0],
-        method="Nelder-Mead",
-        options={"xatol": 1e-6, "fatol": 1e-6, "maxiter": 5000},
-    )
-    a0, a1 = result.x
-    return np.array([a0 * (k**a1) for k in horizons])
+    def pinball(x, grad):
+        residuals = values - quantile_a1(x[0]) * horizons ** x[0]
+        return float(
+            (1 - level) * _sum_r(np.abs(residuals[residuals < 0]))
+            + level * _sum_r(np.abs(residuals[residuals >= 0]))
+        )
+
+    opt = nlopt.opt(nlopt.LN_NELDERMEAD, 1)
+    opt.set_min_objective(pinball)
+    opt.set_lower_bounds([-2.0])
+    opt.set_upper_bounds([4.0])
+    # Explicitly, as R's nloptr would otherwise default xtol_rel to 1e-4
+    opt.set_xtol_rel(1e-8)
+    opt.set_xtol_abs(1e-6)
+    opt.set_maxeval(500)
+    power = opt.optimize([0.5])[0]
+    return quantile_a1(power) * np.arange(1, h + 1, dtype=np.float64) ** power
 
 
 def generate_multistep_interval(
@@ -730,12 +746,11 @@ def generate_multistep_interval(
             y_lower[i] = [np.quantile(col, q) for q in level_low]
             y_upper[i] = [np.quantile(col, q) for q in level_up]
     else:  # nonparametric, h > 1
-        horizons = np.arange(1, h + 1, dtype=float)
         y_lower = np.column_stack(
-            [_fit_power_quantile(adam_errors, horizons, q) for q in level_low]
+            [_fit_power_quantile(adam_errors, q) for q in level_low]
         )
         y_upper = np.column_stack(
-            [_fit_power_quantile(adam_errors, horizons, q) for q in level_up]
+            [_fit_power_quantile(adam_errors, q) for q in level_up]
         )
 
     pred_col = yf.reshape(-1, 1)

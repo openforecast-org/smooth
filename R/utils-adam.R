@@ -1620,6 +1620,33 @@ adam_errorsSimulate <- function(n, distribution, scale, other, dfT){
                   "dlgnorm"=exp(rgnorm(n, 0, scale, other$shape))-1));
 }
 
+# The power-law quantile A1*j^A2, j=1..h, of the multistep errors at the level,
+# minimising the pinball loss (Taylor & Bunn). For a given A2 the best A1 is the
+# weighted quantile of e/j^A2 with weights j^A2, so only A2 is optimised.
+#' @keywords internal
+adam_quantilePower <- function(errors, level){
+    h <- ncol(errors);
+    horizons <- col(errors)[!is.na(errors)];
+    errors <- errors[!is.na(errors)];
+    # The weighted quantile of errors/j^power: the first value reaching the level
+    quantileA1 <- function(power){
+        weights <- horizons^power;
+        ratios <- errors / weights;
+        ordering <- order(ratios);
+        weightsCumulative <- cumsum(weights[ordering]);
+        return(ratios[ordering][which(weightsCumulative >= level*weightsCumulative[length(ordering)])[1]]);
+    }
+    pinball <- function(power){
+        residualsQuantile <- errors - quantileA1(power)*horizons^power;
+        return((1-level)*sum(abs(residualsQuantile[residualsQuantile<0])) +
+                   level*sum(abs(residualsQuantile[residualsQuantile>=0])));
+    }
+    power <- nloptr(0.5, pinball, lb=-2, ub=4,
+                    opts=list(algorithm="NLOPT_LN_NELDERMEAD", xtol_rel=1e-8, xtol_abs=1e-6,
+                              maxeval=500))$solution;
+    return(quantileA1(power)*c(1:h)^power);
+}
+
 #### IC weights (Akaike weights) ####
 #' @keywords internal
 adam_ic_weights <- function(icSelection, threshold=1e-5){

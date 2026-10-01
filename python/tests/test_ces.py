@@ -331,7 +331,9 @@ class CESCaseTests:
             f"Max forecast diff: {np.max(np.abs(p_fc - r_fc))}"
         )
 
-    @pytest.mark.parametrize("interval", ["prediction", "semiparametric", "empirical"])
+    @pytest.mark.parametrize(
+        "interval", ["prediction", "semiparametric", "nonparametric", "empirical"]
+    )
     def test_interval(self, interval):
         h = self.ref["python_params"]["h"]
         fc = self.m.predict(h=h, interval=interval, level=[0.8, 0.95])

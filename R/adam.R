@@ -6563,23 +6563,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 # Do quantile regression for h>1 and scalars for the level (no change across h)
                 # transpose is needed in order to compare correctly
                 if(all(t(levelNew)==levelNew[1,])){
-                    # Quantile regression function
-                    intervalQuantile <- function(A, alpha){
-                        ee[] <- adamErrors - (A[1]*xe^A[2]);
-                        return((1-alpha)*sum(abs(ee[ee<0]))+alpha*sum(abs(ee[ee>=0])));
-                    }
-
-                    ee <- adamErrors;
-                    xe <- matrix(c(1:h),nrow=nrow(ee),ncol=ncol(ee),byrow=TRUE);
-
                     for(i in 1:nLevels){
-                        # lower quantiles
-                        A <- nlminb(rep(1,2),intervalQuantile,alpha=levelLow[1,i])$par;
-                        yLower[,i] <- A[1]*c(1:h)^A[2];
-
-                        # upper quantiles
-                        A[] <- nlminb(rep(1,2),intervalQuantile,alpha=levelUp[1,i])$par;
-                        yUpper[,i] <- A[1]*c(1:h)^A[2];
+                        yLower[,i] <- adam_quantilePower(adamErrors, levelLow[1,i]);
+                        yUpper[,i] <- adam_quantilePower(adamErrors, levelUp[1,i]);
                     }
                 }
                 # Otherwise just return quantiles of errors

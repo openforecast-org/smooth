@@ -20,6 +20,7 @@ Bugfixes:
 * A provided `gnorm_shape` was lost after `fit()`: `predict()` recomputed the scale with beta=2 (5.15 became 6.48) and `rstandard()` failed.
 * The simulated intervals of occurrence models de-biased the scale with df over all the observations rather than the non-zero ones, as R: on an intermittent `dgamma` series the 95% upper bound was 14.88 against R's 17.78.
 * `reforecast()` drew the Laplace errors with sigma/2 rather than sigma/sqrt(2); `rstandard()` multiplied the Laplace residuals by n/df instead of dividing; with a scale model `extract_scale()` and `extract_sigma()` mapped the scale model's fitted values as R did, wrongly for `ds`, `dgnorm`, Laplace, Gamma and Inverse Gaussian (see the R `NEWS`).
+* The scale model's likelihood, entropy and standardised residuals are fixed as in R: the log-normal location, the multiplicative Generalised Normal, the `dnorm` / `dlnorm` entropy of the zero observations, and the standardised residuals of `dgnorm`, `dlnorm` and `dgamma` (see the R `NEWS`).
 
 ## v1.1.0 (Release date: 2026-09-30)
 

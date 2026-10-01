@@ -107,7 +107,7 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                                                # suppressWarnings is needed, because the check is done for scalar alpha
                                                "M"=suppressWarnings(dgnorm(q=yInSampleSM[otLogical],
                                                                            mu=yFittedSM[otLogical],
-                                                                           scale=fitted[otLogical]*(yFittedSM[otLogical])^other,
+                                                                           scale=fitted[otLogical]*yFittedSM[otLogical],
                                                                            shape=other, log=TRUE))),
                                # "dlogis"=switch(EtypeSM,
                                #                 "A"=dlogis(x=yInSampleSM[otLogical],
@@ -116,14 +116,14 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                                #                 "M"=dlogis(x=yInSampleSM[otLogical],
                                #                            location=yFittedSM[otLogical],
                                #                            scale=fitted[otLogical]*yFittedSM[otLogical], log=TRUE)),
-                               # "dalaplace"=switch(EtypeSM,
-                               #                    "A"=dalaplace(q=yInSampleSM[otLogical],
-                               #                                  mu=yFittedSM[otLogical],
-                               #                                  scale=fitted[otLogical], alpha=other, log=TRUE),
-                               #                    "M"=dalaplace(q=yInSampleSM[otLogical],
-                               #                                  mu=yFittedSM[otLogical],
-                               #                                  scale=fitted[otLogical]*yFittedSM[otLogical],
-                               #                                  alpha=other, log=TRUE)),
+                               "dalaplace"=switch(EtypeSM,
+                                                  "A"=dalaplace(q=yInSampleSM[otLogical],
+                                                                mu=yFittedSM[otLogical],
+                                                                scale=fitted[otLogical], alpha=other, log=TRUE),
+                                                  "M"=dalaplace(q=yInSampleSM[otLogical],
+                                                                mu=yFittedSM[otLogical],
+                                                                scale=fitted[otLogical]*yFittedSM[otLogical],
+                                                                alpha=other, log=TRUE)),
                                # "dlnorm"=dlnorm(x=yInSampleSM[otLogical],
                                #                 meanlog=Re(log(as.complex(yFittedSM[otLogical])))-scaleSM^2/2-log(fitted[otLogical]),
                                #                 sdlog=scaleSM, log=TRUE),
@@ -138,7 +138,7 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                                #                  scale=fitted[otLogical], shape=other, log=TRUE) -log(yInSampleSM[otLogical]),
                                # abs() is needed for rare cases, when negative values are produced for E="A" models
                                "dlnorm"=dlnorm(x=yInSampleSM[otLogical],
-                                               meanlog=Re(log(as.complex(yFittedSM[otLogical])))-fitted[otLogical]^2/2,
+                                               meanlog=Re(log(as.complex(yFittedSM[otLogical])))-fitted[otLogical]/2,
                                                sdlog=sqrt(fitted[otLogical]), log=TRUE),
                                "dinvgauss"=dinvgauss(x=yInSampleSM[otLogical], mean=abs(yFittedSM[otLogical]),
                                                      dispersion=abs(fitted[otLogical]/yFittedSM[otLogical]), log=TRUE),
@@ -149,11 +149,12 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         # The differential entropy for the models with the missing data
         if(occurrenceModel){
             CFValue[] <- CFValue + sum(switch(distribution,
-                                              "dnorm" =,
+                                              # The scale is sigma^2 for dnorm and dlnorm
+                                              "dnorm" = (log(sqrt(2*pi*fitted[!otLogical]))+0.5),
                                               # "dfnorm" =,
                                               # "dbcnorm" =,
                                               # "dlogitnorm" =,
-                                              "dlnorm" = (log(sqrt(2*pi)*fitted[!otLogical])+0.5),
+                                              "dlnorm" = (log(sqrt(2*pi*fitted[!otLogical]))+0.5-fitted[!otLogical]/2),
                                               # "dlgnorm" =,
                                               "dgnorm" =(1/other-
                                                                       log(other /
@@ -162,7 +163,7 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                                               "dgamma" = (1/fitted[!otLogical] + log(fitted[!otLogical]) +
                                                                       log(gamma(1/fitted[!otLogical])) +
                                                                       (1-1/fitted[!otLogical])*digamma(1/fitted[!otLogical])),
-                                              # "dalaplace" =,
+                                              "dalaplace" =,
                                               # "dllaplace" =,
                                               "dlaplace" = (1 + log(2*fitted[!otLogical])),
                                               # "dls" =,
@@ -192,8 +193,8 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     # scale response (and warned when the two are not multiples).
     et[otLogical] <- switch(distribution,
                    "dnorm"=et[otLogical]^2,
-                   "dlaplace"=,
-                   "dalaplace"=abs(et[otLogical]),
+                   "dlaplace"=abs(et[otLogical]),
+                   "dalaplace"=et[otLogical]*(other-(et[otLogical]<=0)*1),
                    "ds"=0.5*abs(et[otLogical])^0.5,
                    # "dgnorm"=(other*sum(abs(errors)^other)/obsInSample)^{1/other}
                    "dgnorm"=(other*abs(et[otLogical])^other)^{1/other},
@@ -221,7 +222,7 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                              "M"=(object$holdout[,responseName]-object$forecast)/object$forecast);
         newCall$data[obsInSample+1:h,responseName] <- switch(distribution,
                                                              "dnorm"=etForecast^2,
-                                                             # "dalaplace"=,
+                                                             "dalaplace"=etForecast*(other-(etForecast<=0)*1),
                                                              "dlaplace"=abs(etForecast),
                                                              "ds"=0.5*abs(etForecast)^0.5,
                                                              "dgnorm"=(other*abs(etForecast)^other)^{1/other},
@@ -321,7 +322,9 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         adamModel$fitted <- exp(adamModel$fitted);
         adamModel$forecast <- exp(adamModel$forecast);
         adamModel$data[,responseName] <- exp(adamModel$data[,responseName]);
-        adamModel$holdout[,responseName] <- exp(adamModel$holdout[,responseName]);
+        if(holdout){
+            adamModel$holdout[,responseName] <- exp(adamModel$holdout[,responseName]);
+        }
         adamModel$model <- paste0(adamModel$model," in logs");
     }
 
@@ -334,11 +337,13 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                                     # S(0, 1)
                                     "ds"=as.vector(residuals(object))/fitted(adamModel)^2,
                                     # GN(0, 1, beta)
-                                    "dgnorm"=as.vector(residuals(object))/fitted(adamModel)^{1/other},
-                                    # Make this logN(-1/2, 1)
-                                    "dlnorm"=exp((log(as.vector(residuals(object)))+fitted(adamModel)^2/2-0.5)/fitted(adamModel))-1,
-                                    # This becomes Gamma(sigma^-2, 1)
-                                    "dgamma"=as.vector(residuals(object))/sqrt(fitted(adamModel))-1,
+                                    "dgnorm"=as.vector(residuals(object))/fitted(adamModel),
+                                    # Make this logN(-1/2, 1): (log(1+e) + sigma^2/2) / sigma ~ N(0, 1);
+                                    # residuals() adds 1
+                                    "dlnorm"=exp((log(as.vector(residuals(object)))+fitted(adamModel)/2)/
+                                                     sqrt(fitted(adamModel))-0.5)-1,
+                                    # (1+e) = sigma^2 eta, with eta ~ Gamma(sigma^-2, 1); residuals() adds 1
+                                    "dgamma"=as.vector(residuals(object))/fitted(adamModel)-1,
                                     # IG(sigma^2, 1)
                                     "dinvgauss"=adamModel$residuals,
                                     # All the others

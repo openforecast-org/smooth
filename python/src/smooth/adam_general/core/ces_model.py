@@ -21,7 +21,10 @@ from smooth.adam_general.core.ces.cost_function import ces_cf
 from smooth.adam_general.core.ces.creator import ces_creator
 from smooth.adam_general.core.ces.filler import ces_filler
 from smooth.adam_general.core.ces.initialiser import ces_initialiser
-from smooth.adam_general.core.creator.architector import adam_head_length
+from smooth.adam_general.core.creator.architector import (
+    adam_head_length,
+    adam_profile_creator,
+)
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 
@@ -855,6 +858,7 @@ class CES:
         self._adam_cpp = adam_cpp
         self._lags_model_all = lags_model_all
         self._lags_model_max = lags_model_max
+        self._head_geometry = head_length
         self._components_number = components_number
         self._xreg_number = xreg_number
         self._obs_in_sample = obs_in_sample
@@ -900,7 +904,6 @@ class CES:
         mat_wt = self._mat_wt
         mat_f = self._mat_f
         profiles_recent = self._profiles_recent_table
-        index_lookup = self._index_lookup_table
 
         # Prepare forecast measurement matrix
         if h <= mat_wt.shape[0]:
@@ -916,26 +919,15 @@ class CES:
                 :, self._components_number : self._components_number + self._xreg_number
             ] = X_future
 
-        # Forecast index lookup
-        idx_start = self._lags_model_max + self._obs_in_sample
-        idx_end = idx_start + h
-        if idx_end <= index_lookup.shape[1]:
-            ilt_forecast = index_lookup[:, idx_start:idx_end]
-        else:
-            # Extend by tiling
-            available = index_lookup[:, idx_start:]
-            needed = h - available.shape[1]
-            if needed > 0:
-                tile_src = index_lookup[
-                    :,
-                    self._lags_model_max : self._lags_model_max + self._obs_in_sample,
-                ]
-                extension = np.tile(tile_src, (1, (needed // tile_src.shape[1]) + 1))[
-                    :, :needed
-                ]
-                ilt_forecast = np.hstack([available, extension])
-            else:
-                ilt_forecast = available[:, :h]
+        # Forecast index lookup: the table for obs + h, as ADAM's predict, so the
+        # seasonal cells keep their phase past the in-sample table
+        head = self._head_geometry
+        ilt_forecast = adam_profile_creator(
+            lags_model_all=self._lags_model_all,
+            lags_model_max=self._lags_model_max,
+            obs_all=self._obs_in_sample + h,
+            head_length=head,
+        )["index_lookup_table"][:, head + self._obs_in_sample :][:, :h]
 
         y_forecast = self._adam_cpp.forecast(
             matrixWt=np.asfortranarray(mat_wt_forecast, dtype=np.float64),

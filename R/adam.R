@@ -5525,8 +5525,8 @@ predict.adam <- function(object, newdata=NULL, interval=c("none", "confidence", 
     model <- modelType(object);
     Etype <- errorType(object);
 
-    # Extract variance and amend it in case of confidence interval
-    s2 <- sigma(object)^2;
+    # The variance implied by the scale, de-biased
+    s2 <- adam_varianceDebiased(object);
 
     # If this is a mixture model, produce forecasts for the occurrence
     if(!is.null(object$occurrence)){
@@ -6320,8 +6320,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         #### Approximate and confidence interval ####
         # Produce covariance matrix and use it
         if(any(interval=="approximate")){
-            # The variance of the model
-            s2 <- sigma(object)^2;
+            # The variance of the model implied by the scale, de-biased; with a scale
+            # model it is replaced by its forecasts below
+            s2 <- mean(adam_varianceDebiased(object));
             # If scale model is included, produce forecasts
             if(is.scale(object$scale)){
                 s2Forecast <- adam_scaleModelVariance(object, h, newdata);
@@ -6398,7 +6399,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                     vcovMulti <- adam_scaleModelVariance(object, h, newdata);
                 }
                 else{
-                    vcovMulti <- sigma(object)^2;
+                    vcovMulti <- adam_varianceDebiased(object);
                 }
                 adamErrors <- as.matrix(residuals(object));
             }
@@ -6993,7 +6994,8 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
     componentsNumberARIMA <- componentsDefined$componentsNumberARIMA;
     constantRequired <- componentsDefined$constantRequired;
 
-    s2 <- sigma(object)^2;
+    # The variance implied by the scale, de-biased
+    s2 <- mean(adam_varianceDebiased(object));
     matWt <- tail(object$measurement,h);
     vecG <- matrix(object$persistence, ncol=1);
     if(ncol(object$data)>1){

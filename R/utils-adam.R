@@ -1583,12 +1583,20 @@ adam_scaleVariance <- function(scale, distribution, other){
                   scale));
 }
 
+# The de-biased variance of the error term implied by the scale, or by the scale
+# model's values. This, not sigma(), feeds the analytical intervals, so they come
+# from the same estimate of the distribution as the likelihood and the simulations.
+#' @keywords internal
+adam_varianceDebiased <- function(object, scaleValue=extractScale(object)){
+    return(adam_scaleVariance(scaleValue, object$distribution, object$other)*
+               nobs(object)/adam_dfScale(object));
+}
+
 # The de-biased variance from the scale model's forecasts
 #' @keywords internal
 adam_scaleModelVariance <- function(object, h, newdata){
     scaleValue <- forecast(object$scale,h=h,newdata=newdata,interval="none")$mean;
-    scaleValue[] <- adam_scaleVariance(scaleValue, object$distribution, object$other)*
-        nobs(object)/adam_dfScale(object);
+    scaleValue[] <- adam_varianceDebiased(object, scaleValue);
     return(scaleValue);
 }
 

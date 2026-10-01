@@ -10,7 +10,6 @@ from smooth.adam_general.core.utils.distributions import (
 from smooth.adam_general.core.utils.utils import _sum_r, scale_debias, scale_variance
 from smooth.adam_general.core.utils.var_covar import (
     covar_anal,
-    sigma,
     var_anal,
 )
 
@@ -107,7 +106,15 @@ def generate_prediction_interval(
     # Estimate sigma. The error type decides how residuals(object) is
     # reconstructed for the ratio-domain distributions.
     e_type = model_type_dict["error_type"]  # "A" or "M"
-    s2 = sigma(observations_dict, params_info, general, prepared_model, e_type) ** 2
+    # The variance implied by the scale, de-biased (R: adam_varianceDebiased), so the
+    # analytical intervals use the same estimate as the likelihood and simulations
+    s2 = (
+        scale_variance(
+            prepared_model["scale"], general["distribution"], general.get("other")
+        )
+        * observations_dict["obs_in_sample"]
+        / _df_scale(general, observations_dict, params_info)
+    )
     s2_forecast = _scale_model_variance(general, observations_dict, params_info)
 
     # lines 8015 to 8022
@@ -728,7 +735,8 @@ def generate_multistep_interval(
             params_info,
             level_low,
             level_up,
-            scale_2d_override=np.atleast_1d(vcov).reshape(-1, 1),
+            # At h=1, R uses the variance of the model, as the approximate interval
+            scale_2d_override=np.atleast_1d(vcov).reshape(-1, 1) if h > 1 else None,
         )
 
     n_levels = len(level_low)

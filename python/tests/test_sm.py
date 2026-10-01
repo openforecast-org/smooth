@@ -228,8 +228,7 @@ def test_scale_model_widens_or_narrows_against_the_constant_scale(distribution):
     Without this the previous two assertions would still pass if the scale
     forecast were computed and then quietly dropped. A flat scale model sitting
     on the estimated scale must instead reproduce the constant-scale interval,
-    as both are then the same model. That holds for dnorm only: elsewhere the
-    constant-scale interval uses sigma^2, not the variance the scale implies.
+    as both are then the same model.
     """
     plain = ADAM(model="ANN", lags=[1], distribution=distribution)
     plain.fit(_series("positive"))
@@ -239,7 +238,7 @@ def test_scale_model_widens_or_narrows_against_the_constant_scale(distribution):
     flat_width = np.asarray(flat.upper, float) - np.asarray(flat.lower, float)
     varying_width = np.asarray(varying.upper, float) - np.asarray(varying.lower, float)
     scale_fitted = np.asarray(location.scale_model.fitted, float)
-    if distribution == "dnorm" and np.allclose(scale_fitted, plain.scale, rtol=1e-10):
+    if np.allclose(scale_fitted, plain.scale, rtol=1e-10):
         np.testing.assert_allclose(flat_width, varying_width, rtol=1e-10)
     else:
         assert not np.allclose(flat_width, varying_width)

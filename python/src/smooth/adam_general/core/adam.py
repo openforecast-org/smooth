@@ -6837,8 +6837,18 @@ class ADAM:
         else:
             mat_wt = meas_raw[-h:]
         lags_all = np.asarray(self._lags_model["lags_model_all"]).flatten()
-        sigma_val = float(self.sigma) if self.sigma is not None else float("nan")
-        s2 = sigma_val * sigma_val
+        # The variance implied by the scale, de-biased (R: adam_varianceDebiased)
+        s2 = float(
+            np.mean(
+                scale_variance(
+                    self.extract_scale(),
+                    self.distribution_,
+                    getattr(self, "other", None),
+                )
+            )
+            * self.nobs
+            / self._df_scale
+        )
 
         # Dispatch on error_type / distribution to mirror the
         # intervals.py branch (line 81-104). Multiplicative-error models on

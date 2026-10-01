@@ -358,3 +358,13 @@ def test_initial_xreg_combined_with_level(etsx_data):
                  initial={"level": 10.0, "xreg": [2.0, -1.5]})
     model.fit(y, X)
     assert model._explanatory["xreg_model"] is True
+
+
+def test_pure_regression_scale_is_sigma_squared():
+    """A pure regression stores sigma^2 as its scale, as the other ADAM models."""
+    rng = np.random.default_rng(1)
+    x = rng.normal(size=(100, 1))
+    y = 10 + 2 * x[:, 0] + rng.normal(0, 10, 100)
+    model = ADAM(model="NNN", lags=[1]).fit(y, X=x)
+    residuals = np.asarray(model.residuals, dtype=float)
+    assert model.scale == pytest.approx(np.mean(residuals**2), rel=1e-10)

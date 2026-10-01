@@ -791,3 +791,8 @@ test_that("LASSO / RIDGE shrink the estimated parameters wherever they are in B"
                       lags=c(1,12), arma=list(ar=c(0.2,0.3)), loss="LASSO", lambda=0.1)
     expect_equal(unname(coef(testModel)), c(0, 0), tolerance=1e-3)
 })
+
+test_that("Pure regression stores sigma^2 as the scale, as the other ADAM models", {
+    testModel <- adam(cbind(y=BJsales, x=BJsales.lead), "NNN", silent=TRUE);
+    expect_equal(testModel$scale, mean(residuals(testModel)^2));
+})

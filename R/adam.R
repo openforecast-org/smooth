@@ -634,7 +634,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$lossFunction <- checkerReturn$lossFunction;
         modelReturned$logLik <- logLik(checkerReturn);
         modelReturned$distribution <- checkerReturn$distribution;
-        modelReturned$scale <- checkerReturn$scale;
+        # alm() reports the standard deviation for dnorm and dlnorm; ADAM's scale is sigma^2
+        modelReturned$scale <- switch(checkerReturn$distribution,
+                                      "dnorm"=,"dlnorm"=checkerReturn$scale^2,
+                                      checkerReturn$scale);
         modelReturned$other <- checkerReturn$other;
         modelReturned$B <- coef(checkerReturn);
         modelReturned$lags <- 1;

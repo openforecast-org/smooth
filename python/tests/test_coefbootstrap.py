@@ -86,13 +86,13 @@ def test_adam_coefbootstrap_replicates_differ():
 
 def test_adam_uses_provided_start_and_bounds(y_continuous):
     """B, lb and ub in nlopt_kwargs reach the optimiser and are not modified."""
-    start = np.array([0.5, 100.0])
+    start = np.array([0.1, 100.0])
     m = ADAM(
         model="ANN",
         initial="optimal",
         nlopt_kwargs={"B": start, "lb": [0.0, 0.0], "ub": [0.2, 1000.0]},
     ).fit(y_continuous)
-    np.testing.assert_array_equal(start, [0.5, 100.0])
+    np.testing.assert_array_equal(start, [0.1, 100.0])
     assert m.coef[0] <= 0.2
 
 

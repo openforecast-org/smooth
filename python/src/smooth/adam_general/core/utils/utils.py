@@ -818,16 +818,27 @@ def _sum_r(values, axis=None):
     constant level -- into a 1-ulp difference, which then flips the selected
     model. Squaring still happens in double, as in R.
 
+    The accumulation is sequential, as R's: ``np.sum`` adds pairwise even in
+    long double, which rounds differently often enough to send the optimiser
+    elsewhere (one ulp in 154 CES likelihoods on Tourism Q375 moved the fit
+    from -802.66 to -799.98). ``np.cumsum`` adds in order.
+
     ``np.longdouble`` is 80-bit on x86-64 Linux; where the platform makes it an
-    alias of double this degrades to the plain pairwise sum.
+    alias of double this degrades to the plain sequential sum.
 
     ``axis`` gives R's ``colSums()`` / ``rowSums()``, which use the same long
     double accumulator and also round back to double.
     """
-    total = np.sum(np.asarray(values, dtype=float), axis=axis, dtype=np.longdouble)
+    values = np.asarray(values, dtype=float)
     if axis is None:
-        return float(total)
-    return np.asarray(total, dtype=float)
+        values = values.ravel()
+        axis = 0
+    if values.shape[axis] == 0:
+        total = np.sum(values, axis=axis)
+    else:
+        running = np.cumsum(values, axis=axis, dtype=np.longdouble)
+        total = np.take(running, -1, axis=axis)
+    return float(total) if np.ndim(total) == 0 else np.asarray(total, dtype=float)
 
 
 # Overflow here is the infeasibility signal, not a defect. During optimisation

@@ -838,6 +838,9 @@ class ADAM:
               "NLOPT_LN_SBPLX" (Subplex), "NLOPT_LN_COBYLA" (COBYLA),
               "NLOPT_LN_BOBYQA" (BOBYQA). Use "LN_" prefix for derivative-free
               algorithms.
+            - ``B``, ``lb``, ``ub`` (array-like): starting values and bounds of
+              the parameter vector, as R's ``adam(B=, lb=, ub=)``. They apply to
+              the estimated model only and are ignored during model selection.
 
             Example::
 
@@ -3787,6 +3790,14 @@ class ADAM:
         m.fit(y)
         return m
 
+    def _nlopt_params(self) -> Dict[str, Any]:
+        """The optimiser settings without B, lb and ub, which fit one model only."""
+        return {
+            key: value
+            for key, value in (self.nlopt_kwargs or {}).items()
+            if key not in ("B", "lb", "ub")
+        }
+
     def _execute_estimation(self, estimation=True):
         """
         Execute model estimation when model_do is 'estimate'.
@@ -3809,7 +3820,10 @@ class ADAM:
             else:
                 other_value = float(self.gnorm_shape)
 
-            nlopt_params = self.nlopt_kwargs if self.nlopt_kwargs else {}
+            nlopt_params = self._nlopt_params()
+            for key, name in (("B", "B_initial"), ("lb", "lb"), ("ub", "ub")):
+                if (self.nlopt_kwargs or {}).get(key) is not None:
+                    nlopt_params[name] = self.nlopt_kwargs[key]
             self._adam_estimated = estimator(
                 general_dict=self._general,
                 model_type_dict=self._model_type,
@@ -3982,7 +3996,7 @@ class ADAM:
             initials_results=self._initials,
             criterion=self._general["ic"],
             silent=self.verbose == 0,
-            nlopt_kwargs=self.nlopt_kwargs,
+            nlopt_kwargs=self._nlopt_params(),
             smoother=self._resolve_smoother(),
         )
         # print(self._adam_selected)
@@ -5347,7 +5361,7 @@ class ADAM:
                 f"(obs_minimum={obs_minimum}, nobs={nobs}). R warns and "
                 "falls back to method='dsr' here, which is not yet ported."
             )
-        change_origin = initial_type in ("backcasting", "complete")
+        change_origin = initial_type in ("backcasting", "complete", "gradient")
         if replace or prob is not None:
             # User explicitly asked for iid-style sampling; honour it.
             idx_list = list(case_resample_indices(nobs, size, nsim, replace, prob, rng))
@@ -5373,6 +5387,14 @@ class ADAM:
             include_model_kwarg = True
         refit_kwargs["holdout"] = False
         refit_kwargs.setdefault("verbose", 0)
+        # As R, each refit starts from the estimates and is not bounded
+        start = np.asarray(self.coef, dtype=float)
+        refit_kwargs["nlopt_kwargs"] = {
+            **(getattr(self, "nlopt_kwargs", None) or {}),
+            "B": start,
+            "lb": np.full(start.shape, -np.inf),
+            "ub": np.full(start.shape, np.inf),
+        }
 
         actuals = np.asarray(self.actuals, dtype=float)
 

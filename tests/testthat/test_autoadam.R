@@ -23,13 +23,14 @@ test_that("auto.adam() ARIMA selection (NNN) on BJsales", {
                    orders=list(ar=c(2,0), i=c(2,0), ma=c(2,0), select=TRUE),
                    distribution="dnorm", silent=TRUE)
     expect_equal(modelType(m), "NNN")
-    # Re-pinned after the stationarity / invertibility checks factor by factor:
-    # the old checks let ARIMA(2,1,2) reach a non-invertible MA (root 0.994); with
-    # the MA kept invertible, ARIMA(1,1,2) with drift wins (AICc 523.568 against
-    # 527.259 before), without the nearly cancelling AR / MA pair.
-    expect_equal(AICc(m), 523.568, tolerance=0.01)
+    # Re-pinned after the drift flip in backcasting: ARIMA(0,1,0) with drift now
+    # fits its first observation, so the residuals that guide the ACF / PACF steps
+    # of the selection change and the path ends at ARIMA(2,1,2) with drift (AICc
+    # 527.452; ARIMA(1,1,2) with drift, selected before, has 523.443 but is not
+    # on the new path).
+    expect_equal(AICc(m), 527.452, tolerance=0.01)
     expect_equal(m$distribution, "dnorm")
-    expect_equal(as.numeric(m$arma[[1]]), 0.830514, tolerance=1e-3)
+    expect_equal(as.numeric(m$arma[[1]]), c(-0.026419, 0.719587), tolerance=1e-3)
 })
 
 # 3. ETS + ARIMA selection on AirPassengers
@@ -53,7 +54,9 @@ test_that("auto.adam() with regressors='use' on AirPassengers+xreg", {
                    regressors="use", silent=TRUE)
     expect_equal(m$distribution, "dlnorm")
     expect_equal(modelType(m), "ANM")
-    expect_equal(AICc(m), 1110.799, tolerance=0.01)
+    # Re-pinned after the per-lag turns of backcasting: ETSX(ANM) with drift fits
+    # better (AICc 1096.216 against 1104.974 before)
+    expect_equal(AICc(m), 1096.216, tolerance=0.01)
     expect_equal(length(m$persistence), 15)
 })
 

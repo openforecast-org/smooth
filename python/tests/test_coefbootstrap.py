@@ -72,6 +72,30 @@ def test_adam_coefbootstrap_seed_reproducible(y_continuous):
     )
 
 
+def test_adam_coefbootstrap_replicates_differ():
+    """Each refit starts from the estimates, as in R, without sharing them:
+    the replicates are estimated on windows of different lengths."""
+    e = np.random.default_rng(1).standard_normal(120)
+    y = 100 + np.cumsum(0.3 * e) + e
+    m = ADAM(model="ANN", initial="optimal").fit(y)
+    coef = np.array(m.coef)
+    boot = m.coefbootstrap(nsim=10, seed=3)
+    np.testing.assert_array_equal(np.asarray(m.coef), coef)
+    assert len(np.unique(boot.coefficients["alpha"].round(6))) > 1
+
+
+def test_adam_uses_provided_start_and_bounds(y_continuous):
+    """B, lb and ub in nlopt_kwargs reach the optimiser and are not modified."""
+    start = np.array([0.1, 100.0])
+    m = ADAM(
+        model="ANN",
+        initial="optimal",
+        nlopt_kwargs={"B": start, "lb": [0.0, 0.0], "ub": [0.2, 1000.0]},
+    ).fit(y_continuous)
+    np.testing.assert_array_equal(start, [0.1, 100.0])
+    assert m.coef[0] <= 0.2
+
+
 def test_es_inherits_coefbootstrap(y_continuous):
     """ES is an ADAM subclass — it should inherit a working coefbootstrap."""
     with _silence_inner_warnings():

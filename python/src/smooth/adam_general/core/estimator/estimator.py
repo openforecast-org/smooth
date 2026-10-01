@@ -503,7 +503,7 @@ def estimator(
         smoother=smoother,
     )
     # Get initial parameter vector and bounds; user-provided values are used as-is
-    B = np.asarray(B_initial, dtype=float) if B_initial is not None else b_values["B"]
+    B = np.array(B_initial, dtype=float) if B_initial is not None else b_values["B"]
     lb = np.asarray(lb, dtype=float) if lb is not None else b_values["Bl"]
     ub = np.asarray(ub, dtype=float) if ub is not None else b_values["Bu"]
 
@@ -583,8 +583,12 @@ def estimator(
     # Step 10a: if the optimisation got stuck on a penalty (every penalty is at
     # least 1e100), retry with zero smoothing parameters and small ARMA
     # parameters, selected by name as in R/adam.R, unless there is nothing to
-    # optimise (LASSO / RIDGE with lambda=1 and backcasting)
-    if len(B) > 0 and (not np.isfinite(CF_value) or CF_value >= 1e100):
+    # optimise (LASSO / RIDGE with lambda=1 and backcasting) or B was provided
+    if (
+        B_initial is None
+        and len(B) > 0
+        and (not np.isfinite(CF_value) or CF_value >= 1e100)
+    ):
         B[:] = B_start
         names = list(b_values["names"])
         for i, name in enumerate(names):

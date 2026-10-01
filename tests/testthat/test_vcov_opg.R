@@ -264,3 +264,19 @@ test_that("type default is opg, and the deprecated bootstrap= still maps through
     # Deprecated bootstrap=TRUE warns and routes to the bootstrap covariance.
     expect_warning(vcov(m, bootstrap = TRUE, nsim = 50), "deprecated")
 })
+
+test_that("the Hessian covariance works for ARIMA with backcasting", {
+    testModel <- adam(BJsales, "NNN", orders=list(ar=1, i=1, ma=1), initial="backcasting")
+    vcovHessian <- vcov(testModel, type="hessian")
+    expect_equal(dim(vcovHessian), c(2, 2))
+    expect_true(all(is.finite(diag(vcovHessian))))
+})
+
+test_that("a fit with all parameters provided reports the likelihood of its residuals", {
+    # The backcasting ARIMA seed goes through the ARI polynomial in the returned fit
+    # as in the loss; with a slowly forgetting MA a raw seed changed the residuals
+    testModel <- adam(log(AirPassengers), "NNN", lags=c(1,12),
+                      orders=list(ar=c(2,1), i=c(1,1), ma=c(1,1)),
+                      arma=list(ar=c(0.5739,0.2664,-0.1364), ma=c(-0.98,-0.5313)))
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)), tolerance=1e-8)
+})

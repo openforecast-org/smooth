@@ -419,7 +419,7 @@ private:
     // Private helper: shared loop control for fit(), omfit(), omfitGeneral()
     template<typename ForwardFn, typename BackwardFn,
              typename HeadFillFwdFn, typename HeadFillBwdFn,
-             typename TrendReversalFn, typename HeadForwardFn>
+             typename TrendReversalFn, typename HeadForwardFn, typename TailTurnFn>
     void fitLoopImpl(int obs, int H,
                      bool backcast, unsigned int nIterations,
                      ForwardFn forwardStep,
@@ -428,7 +428,8 @@ private:
                      HeadFillBwdFn headFillBwd,
                      TrendReversalFn trendReversal,
                      HeadForwardFn headForwardStep,
-                     bool useHeadFilter) {
+                     bool useHeadFilter,
+                     TailTurnFn tailTurn) {
         // Without backcasting there is nothing to iterate: one forward pass, no backward run.
         if(!backcast) { nIterations = 1; }
         // Loop for the backcast
@@ -449,12 +450,14 @@ private:
             }
             ////// Backwards run
             if(backcast && j<nIterations) {
+                // Move the states past the end of the sample, where the backward pass reads them
+                tailTurn();
                 // Change the specific element in the state vector to negative/inverse
                 trendReversal();
                 for (int i=obs+H-1; i>=H; i=i-1) {
                     backwardStep(i);
                 }
-                // Fill in the head of the series.
+                // Move the states into the head of the series.
                 headFillBwd();
                 // Restore the specific element in the state vector
                 trendReversal();
@@ -462,17 +465,18 @@ private:
         }
     }
 
-    // Overload for omfitGeneral (preserves existing behavior)
+    // Overload for omfitGeneral (no head filter)
     template<typename ForwardFn, typename BackwardFn,
              typename HeadFillFwdFn, typename HeadFillBwdFn,
-             typename TrendReversalFn>
+             typename TrendReversalFn, typename TailTurnFn>
     void fitLoopImpl(int obs, int lagsModelMax,
                      bool backcast, unsigned int nIterations,
                      ForwardFn forwardStep,
                      BackwardFn backwardStep,
                      HeadFillFwdFn headFillFwd,
                      HeadFillBwdFn headFillBwd,
-                     TrendReversalFn trendReversal) {
+                     TrendReversalFn trendReversal,
+                     TailTurnFn tailTurn) {
         auto noopHeadForward = [&]() {
             if(lagsModelMax > 1) {
                 headFillFwd();
@@ -480,14 +484,85 @@ private:
         };
         fitLoopImpl(obs, lagsModelMax, backcast, nIterations,
                     forwardStep, backwardStep, headFillFwd, headFillBwd,
-                    trendReversal, noopHeadForward, false);
+                    trendReversal, noopHeadForward, false, tailTurn);
     }
 
-    // Private helper: is the existing trend/drift flip already the exact time reversal?
-    // It is for a pure ETS model without a damped trend (the flip plus the phase
-    // alignment of the lookup table reproduce the exact junction map), so filtering the
-    // head there cannot change the result and is pure cost. ARIMA states, regressors and
-    // a damped trend all break that exactness, so the head is filtered for them.
+    // Private helper: one turn of the backcast. The backward pass reads a state with lag L
+    // at t+L, the forward pass at t-L, so at a turn each state is moved exactly L zero-error
+    // steps with the model's own transition: forward from time s0=obs+1 (dir=+1) before the
+    // backward pass, backward from s0=0 (dir=-1) after it, plus `extra` steps when the head
+    // is filtered. The slope states (trend, drift) are flipped around the backward pass by
+    // trendReversal(), as before. Optionally records, for the first nCasts times, the
+    // model's predictions (the pseudo-observations of the head filter) and the states after
+    // each step (the head of matVt, from time 0 backwards). rowLags is passed explicitly so
+    // that model B of omfitGeneral, with its own lags, can use the same helper.
+    void turnPerLag(arma::mat &profile, arma::mat const &matrixF, arma::uvec const &rowLags,
+                    long s0, int dir, unsigned int extra, arma::rowvec const &rowW,
+                    char const E_, char const T_, char const S_,
+                    unsigned int const nETS_, unsigned int const nNonSeasonal_,
+                    unsigned int const nSeasonal_, unsigned int const nArima_,
+                    unsigned int const nXreg_, unsigned int const nComponents_,
+                    bool const constant_, arma::vec *casts=nullptr,
+                    arma::mat *trajectory=nullptr) const {
+        unsigned int nCasts = (casts == nullptr) ? 0 : casts->n_elem;
+        unsigned int nTrajectory = (trajectory == nullptr) ? 0 : trajectory->n_cols;
+        unsigned int nSteps = std::max(extra + (unsigned int) rowLags.max(), nTrajectory);
+        arma::mat scratch = profile;
+        arma::uvec cells(nComponents_);
+        for(unsigned int k=1; k<=nSteps; ++k) {
+            // The profile cells read at time t: the lookup table's phase of each row
+            long t = s0 + dir * (long)(k - 1);
+            for(unsigned int r=0; r<nComponents_; ++r) {
+                long L = rowLags(r);
+                cells(r) = r + nComponents_ * (((t - 1) % L + L) % L);
+            }
+            if(k <= nCasts) {
+                (*casts)(dir < 0 ? nCasts - k : k - 1) =
+                    adamWvalue(scratch(cells), rowW, E_, T_, S_, nETS_, nNonSeasonal_,
+                               nSeasonal_, nArima_, nXreg_, nComponents_, constant_);
+            }
+            scratch(cells) = adamFvalue(scratch(cells), matrixF, E_, T_, S_, nETS_, nNonSeasonal_,
+                                        nSeasonal_, nArima_, nComponents_, constant_);
+            if(k <= nTrajectory) {
+                trajectory->col(nTrajectory - k) = scratch(cells);
+            }
+            for(unsigned int r=0; r<nComponents_; ++r) {
+                if(extra + rowLags(r) == k) {
+                    profile.row(r) = scratch.row(r);
+                }
+            }
+        }
+    }
+
+    // Private helper: the lag of each row of a lookup table, as the number of distinct
+    // profile cells it uses over the sample (the calendar shifts reuse existing cells)
+    static arma::uvec lookupLags(arma::umat const &indexLookupTable, unsigned int H, int obs) {
+        arma::uvec rowLags(indexLookupTable.n_rows);
+        for(unsigned int r=0; r<indexLookupTable.n_rows; ++r) {
+            rowLags(r) = arma::unique(indexLookupTable.row(r).cols(H, H + obs - 1)).eval().n_elem;
+        }
+        return rowLags;
+    }
+
+    // Private helper: undo the backward-pass flip of the trend in recorded states
+    static void unflipTrend(arma::mat &states, char const T_) {
+        if(T_ == 'A') { states.row(1) = -states.row(1); }
+        else if(T_ == 'M') { states.row(1) = 1/states.row(1); }
+    }
+
+    // Private helper: undo the backward-pass flips of the slope states in recorded states
+    void unflipSlopes(arma::mat &states) const {
+        unflipTrend(states, T);
+        if(constant && flipConstant) {
+            states.row(nComponents-1) = -states.row(nComponents-1);
+        }
+    }
+
+    // Private helper: is the backcast turn already the exact time reversal? It is for a
+    // pure ETS model without a damped trend (the per-lag turns plus the trend flip), so
+    // filtering the head there cannot change the result and is pure cost. ARIMA states,
+    // regressors and a damped trend are not exactly reversed by the turns, so the head is
+    // filtered for them.
     bool headFlipIsExact(arma::mat const &matrixF) const {
         if(nArima != 0 || nXreg != 0) { return false; }
         if(T == 'N') { return true; }
@@ -696,7 +771,7 @@ public:
             H = lagsModelMax;
         }
         // Skip the head filtering where the flip is already exact and the head has the
-        // legacy length, so those models keep the legacy path bit-for-bit.
+        // default length: there it cannot change the result.
         bool useHeadFilter = (headLength > 0) &&
             !(headFlipIsExact(matrixF) && H == (unsigned int)lagsModelMax);
 
@@ -750,10 +825,20 @@ public:
                            vectorG, vecErrors(idx), vecYfit(idx), adamETS);
         };
 
-        // How to fill in the head before the forward pass
+        // The states of the head as the backward pass leaves them, from time -H+1 to 0
+        arma::mat headStates(nComponents, H, arma::fill::zeros);
+        bool afterBackcast = false;
+
+        // How to fill in the head before the forward pass: from the seed on the first pass,
+        // from the head left by the backward pass afterwards (the states already sit at time 0)
         auto headFillFwd = [&]() {
-            refineHeadFwd(matrixVt, profilesRecent, matrixF,
-                          indexLookupTable, lagsModelMax, H);
+            if(afterBackcast) {
+                matrixVt.cols(0, H-1) = headStates;
+            }
+            else {
+                refineHeadFwd(matrixVt, profilesRecent, matrixF,
+                              indexLookupTable, lagsModelMax, H);
+            }
         };
 
         // How to revert the trend component for backcasting.
@@ -767,27 +852,20 @@ public:
             }
         };
 
-        // How to fix the head after the backwards pass and record predicted backcasts
+        // Before the backward pass: each state moves its lag past the end of the sample
+        auto tailTurn = [&]() {
+            turnPerLag(profilesRecent, matrixF, lags, obs+1, 1, 0, wHead, E, T, S,
+                       nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+        };
+
+        // After the backward pass: each state moves its lag (plus the filtered head) before
+        // the sample, recording the backward predictions there as the head's backcasts
         auto headFillBwd = [&]() {
-            if(useHeadFilter && T != 'N') {
-                profilesRecent(indexLookupTable.col(H-1).rows(0,1)) =
-                    adamFvalue(profilesRecent(indexLookupTable.col(H-1)),
-                               matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
-                               nComponents, constant).rows(0,1);
-            }
-            for (int i=H-1; i>=0; i=i-1) {
-                arma::vec vHead = adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                                             matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal,
-                                             nArima, nComponents, constant);
-                profilesRecent(indexLookupTable.col(i)) = vHead;
-                if(useHeadFilter) {
-                    trendReversal();
-                    double yHat = adamWvalue(profilesRecent(indexLookupTable.col(i)), wHead, E, T, S,
-                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                    backcasts(i) = yHat;
-                    trendReversal();
-                }
-            }
+            afterBackcast = true;
+            turnPerLag(profilesRecent, matrixF, lags, 0, -1, useHeadFilter ? H : 0, wHead,
+                       E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                       useHeadFilter ? &backcasts : nullptr, &headStates);
+            unflipSlopes(headStates);
         };
 
         // How to filter over the backcast head on subsequent forward passes
@@ -814,7 +892,7 @@ public:
         // Do the fit!
         fitLoopImpl(obs, H, backcast, nIterations,
                     forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal,
-                    headForwardStep, useHeadFilter);
+                    headForwardStep, useHeadFilter, tailTurn);
 
         FitResult result;
         result.states = matrixVt;
@@ -907,7 +985,19 @@ public:
                            vectorGB, vecErrorsB(idx), vecBfit(idx), adamETSB);
         };
 
+        // The lags of model B come from its own lookup table
+        const arma::uvec lagsB = lookupLags(indexLookupTableB, lagsModelMaxA, obs);
+        // The head states as the backward pass leaves them, from time -H+1 to 0
+        arma::mat headStatesA(nComponents, lagsModelMaxA, arma::fill::zeros);
+        arma::mat headStatesB(nComponentsB, lagsModelMaxA, arma::fill::zeros);
+        bool afterBackcast = false;
+
         auto headFillFwd = [&]() {
+            if(afterBackcast) {
+                matrixVtA.cols(0, lagsModelMaxA-1) = headStatesA;
+                matrixVtB.cols(0, lagsModelMaxA-1) = headStatesB;
+                return;
+            }
             // Model A: full trend-aware refinement via the shared helper
             refineHeadFwd(matrixVtA, profilesRecentA, matrixFA,
                           indexLookupTableA, lagsModelMaxA);
@@ -917,16 +1007,26 @@ public:
             }
         };
 
+        // Each state of both models moves its lag past the end of the sample
+        auto tailTurn = [&]() {
+            turnPerLag(profilesRecentA, matrixFA, lags, obs+1, 1, 0, matrixWtA.row(0),
+                       E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+            turnPerLag(profilesRecentB, matrixFB, lagsB, obs+1, 1, 0, matrixWtB.row(0),
+                       EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB,
+                       constantB);
+        };
+
+        // ... and its lag before the sample after the backward pass
         auto headFillBwd = [&]() {
-            // Fill in the head of the series for both models
-            for (int i=lagsModelMaxA-1; i>=0; i=i-1) {
-                profilesRecentA(indexLookupTableA.col(i)) =
-                    adamFvalue(profilesRecentA(indexLookupTableA.col(i)),
-                               matrixFA, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                profilesRecentB(indexLookupTableB.col(i)) =
-                    adamFvalue(profilesRecentB(indexLookupTableB.col(i)),
-                               matrixFB, EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nComponentsB, constantB);
-            }
+            afterBackcast = true;
+            turnPerLag(profilesRecentA, matrixFA, lags, 0, -1, 0, matrixWtA.row(0),
+                       E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                       nullptr, &headStatesA);
+            turnPerLag(profilesRecentB, matrixFB, lagsB, 0, -1, 0, matrixWtB.row(0),
+                       EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB,
+                       constantB, nullptr, &headStatesB);
+            unflipTrend(headStatesA, T);
+            unflipTrend(headStatesB, TB);
         };
 
         // Reverse/restore both models' trends symmetrically
@@ -938,7 +1038,7 @@ public:
         };
 
         fitLoopImpl(obs, lagsModelMaxA, backcast, nIterations,
-                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal);
+                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal, tailTurn);
 
         OmFitGeneralResult result;
         result.statesA   = matrixVtA;
@@ -1439,12 +1539,18 @@ public:
         for(unsigned int k=0; k<nSeries; k=k+1){
             // Loop for the backcasting
             arma::vec backcasts(H, arma::fill::zeros);
+            // The head states as the backward pass leaves them, from time -H+1 to 0
+            arma::mat headStates(nComponents, H, arma::fill::zeros);
             // Same gate as in fit(): no filtering where the flip is already exact
             bool useHeadFilter = (headLength > 0) &&
                 !(headFlipIsExact(arrayF.slice(k)) && H == (unsigned int)lagsModelMax);
             const arma::rowvec wHead = arrayWt.slice(k).row(0);
             for (unsigned int j=1; j<=nIterations; j=j+1) {
-                if(j == 1 || !useHeadFilter) {
+                if(j > 1 && !useHeadFilter) {
+                    // After the backward pass the states already sit at time 0
+                    arrayVt.slice(k).cols(0, H-1) = headStates;
+                }
+                else if(j == 1 || !useHeadFilter) {
                     // Refine the head via the shared helper so it is walked one step
                     // per column across the head cycle (or copied verbatim when T=='N').
                     if(H > 1) {
@@ -1512,6 +1618,11 @@ public:
 
                 ////// Backwards run
                 if(backcast && j<(nIterations)){
+                    // Each state moves its lag past the end of the sample
+                    arma::mat profile = arrayProfilesRecent.slice(k);
+                    turnPerLag(profile, arrayF.slice(k), lags, obs+1, 1, 0, wHead, E, T, S,
+                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                    arrayProfilesRecent.slice(k) = profile;
                     // Change the specific element in the state vector to negative
                     if(T=='A'){
                         arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
@@ -1553,44 +1664,14 @@ public:
                                                   matrixG.col(k), vecErrors(i-H), matYfit(i-H,k), adamETS);
                     }
 
-                    // Fill in the head of the series (backward pass) and record backcasts
-                    if(useHeadFilter && T != 'N') {
-                        arrayProfilesRecent.slice(k).elem(indexLookupTable.col(H-1).rows(0,1)) =
-                            adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(H-1)),
-                                       arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
-                                       nComponents, constant).rows(0,1);
-                    }
-                    for(int i=H-1; i>=0; i=i-1) {
-                        arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                            adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
-                                       arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant);
-                        if(useHeadFilter) {
-                            if(T=='A'){
-                                arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
-                            }
-                            else if(T=='M'){
-                                arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
-                            }
-                            if(constant && flipConstant){
-                                arrayProfilesRecent.slice(k)(nComponents-1) =
-                                    -arrayProfilesRecent.slice(k)(nComponents-1);
-                            }
-                            double yHat = adamWvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
-                                    arrayWt.slice(k).row(0), E, T, S,
-                                    nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-                            backcasts(i) = yHat;
-                            if(T=='A'){
-                                arrayProfilesRecent.slice(k)(1) = -arrayProfilesRecent.slice(k)(1);
-                            }
-                            else if(T=='M'){
-                                arrayProfilesRecent.slice(k)(1) = 1/arrayProfilesRecent.slice(k)(1);
-                            }
-                            if(constant && flipConstant){
-                                arrayProfilesRecent.slice(k)(nComponents-1) =
-                                    -arrayProfilesRecent.slice(k)(nComponents-1);
-                            }
-                        }
-                    }
+                    // Each state moves its lag (plus the filtered head) before the sample,
+                    // recording the backward predictions there as the head's backcasts
+                    profile = arrayProfilesRecent.slice(k);
+                    turnPerLag(profile, arrayF.slice(k), lags, 0, -1, useHeadFilter ? H : 0, wHead,
+                               E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents,
+                               constant, useHeadFilter ? &backcasts : nullptr, &headStates);
+                    unflipSlopes(headStates);
+                    arrayProfilesRecent.slice(k) = profile;
 
                     // Change the specific element in the state vector to negative
                     if(T=='A'){

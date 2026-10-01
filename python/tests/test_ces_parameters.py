@@ -6,6 +6,7 @@ whole; these check the Python API's own guards and need no R installation.
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -47,3 +48,31 @@ class TestCESProvidedB:
         partial = CES(seasonality="partial", lags=[12], b=0.3)
         partial.fit(self.y)
         assert partial.b_ == 0.3
+
+
+def test_ces_predict_keeps_the_seasonal_phase_past_one_cycle():
+    """predict() beyond one cycle reads the seasonal cells in phase, as the
+    forecast made at fit time does, when the sample ends mid-cycle."""
+    t = np.arange(138)
+    y = (
+        100
+        + t
+        + 10 * np.sin(2 * np.pi * t / 12)
+        + np.random.default_rng(3).normal(0, 2, t.size)
+    )
+    fitted_with_h = CES(seasonality="full", lags=[12], h=30).fit(y)
+    fitted_alone = CES(seasonality="full", lags=[12]).fit(y)
+    np.testing.assert_allclose(
+        np.asarray(fitted_alone.predict(h=30).mean), fitted_with_h.forecast_, rtol=1e-12
+    )
+
+
+def test_sum_r_adds_in_order_as_r():
+    """R's sum() accumulates sequentially in long double: each 1 is lost
+    against 2^64, so the total is 0 (R: sum(c(2^64, rep(1,7), -2^64, rep(0,7))))
+    where NumPy's pairwise long double sum gives 7."""
+    from smooth.adam_general.core.utils.utils import _sum_r
+
+    values = np.array([2.0**64] + [1.0] * 7 + [-(2.0**64)] + [0.0] * 7)
+    assert _sum_r(values) == 0.0
+    assert np.array_equal(_sum_r(np.vstack([values, values]), axis=1), [0.0, 0.0])

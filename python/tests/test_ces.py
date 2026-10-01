@@ -34,6 +34,7 @@ pytestmark = pytest.mark.r_parity
 # Load reference data
 # ---------------------------------------------------------------------------
 
+
 @functools.lru_cache(maxsize=1)
 def _ref_dir():
     """Run the R reference script once into a temporary directory."""

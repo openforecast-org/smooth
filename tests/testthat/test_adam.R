@@ -694,7 +694,7 @@ test_that("The backcasting seed follows the ARMA parameters", {
     # Near the unit root the two backcasting iterations do not forget the seed, so
     # it has to be built with the current ARI polynomial, not the differences only
     testModel <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, maxeval=1)
-    B <- setNames(c(-0.1322, 0.8075, 0.394, -0.5937, 0.1408), names(testModel$B))
+    B <- setNames(c(-0.0365, 0.7256, 0.2485, -0.4908, 0.1378), names(testModel$B))
     lossDefault <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1)$lossValue
     lossConverged <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1,
                           nIterations=20)$lossValue

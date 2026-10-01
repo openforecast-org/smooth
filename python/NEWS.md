@@ -3,7 +3,17 @@
 Release history of the Python implementation of the **smooth** forecasting package.
 
 
-## v1.1.0 (unreleased)
+## v1.1.1 (unreleased)
+
+Changes:
+* Backcasting moves each state across the two turns between its passes by its own lag: L zero-error steps past the end of the sample before the backward pass, and L before its start after it (plus the head when it is filtered), instead of nothing at the end and the largest lag at the start. Differenced ARIMA now reproduces a noise-free series it fits exactly, and `AutoMSARIMA` with backcasting improves on M1, M3 and Tourism. The change is in the shared `src/headers/adamCore.h`; see the R `NEWS`.
+* `CES.predict()` keeps the seasonal phase beyond one cycle. Past the columns of the in-sample lookup table it tiled the in-sample columns from the first one, so with a sample ending mid-cycle the seasonal cells were read out of phase from the second cycle on (Tourism M28, 306 monthly observations: the forecast for step 13 was 67936 instead of R's 34697). It now builds the table for the sample plus the horizon, as `ADAM.predict()`. With this, `AutoCES` with backcasting on M1, M3 and Tourism agrees with R's `auto.ces()` on all 5315 series (mean RMSSE 1.9607 in both; it was 2.0885).
+* `_sum_r` adds sequentially in long double, as R's `sum()`. `np.sum` with a long double accumulator still adds pairwise, which rounds differently now and then: one ulp in one of 154 CES likelihoods on Tourism Q375 sent the optimiser to a different optimum (-799.98 against R's -802.66).
+* `coefbootstrap()` starts each refit from the estimates, without bounds, as R's `coefbootstrap.adam` (`B=object$B`, infinite `lb` / `ub`), and moves the origin of the samples for `initial="gradient"` as for backcasting. The refits ran from scratch within the bounds, which inflated the variance of the AR parameter of a backcasted ARMA(1,1) to 3.11 times R's. To pass the start and bounds, `ADAM` reads `B`, `lb` and `ub` from `nlopt_kwargs`, as `OM` already did; they were ignored. The estimator copies a provided `B` before optimising in place, so the caller's vector is not modified.
+* ADAM's ARIMA flips the drift in the backcasting backward pass when the total number of differences d+D is odd, as `ssarima` and as R: time reversal multiplies the drift by (-1)^(d+D). 1.1.0 stopped flipping it, which left the first observation of ARIMA(0,1,0) with drift on a line off by a multiple of the drift. The cost function keeps a perfect fit (a log-likelihood of -inf) instead of turning it into the 1e300 penalty, as R, so that fit is now found exactly (drift 0.5, where the optimiser stopped at 0.5015), and the retry from safer starting values is skipped when `B` is provided, as R's `!BProvided`.
+
+
+## v1.1.0 (Release date: 2026-09-30)
 
 Changes:
 * The ARIMA initials of `ADAM` are the initial state of the companion form, as in `ssarima`: as many as the largest ARIMA lag, held by the last ARIMA state, and all of them enter the fit. They start from the decomposition of the ETS initials (the same `smoother`) extended backwards, the backcasting seed following the current ARMA parameters, and the reported `initial["arima"]` of a backcasted model reads the time-aligned heads of the fitted states, so `two-stage` hands the backcasted fit over exactly. Mirrors the R fix; see the R `NEWS`.

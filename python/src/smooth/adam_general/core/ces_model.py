@@ -23,8 +23,8 @@ from smooth.adam_general.core.ces.filler import ces_filler
 from smooth.adam_general.core.ces.initialiser import ces_initialiser
 from smooth.adam_general.core.creator.architector import (
     adam_head_length,
-    adam_profile_creator,
 )
+from smooth.adam_general.core.forecaster.forecaster import forecaster
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 
@@ -873,11 +873,27 @@ class CES:
         self,
         h: Optional[int] = None,
         X: Optional[NDArray] = None,
-        interval: Optional[str] = None,
+        interval: Literal[
+            "none",
+            "prediction",
+            "simulated",
+            "approximate",
+            "semiparametric",
+            "nonparametric",
+            "empirical",
+        ] = "none",
         level: Union[float, List[float]] = 0.95,
+        side: Literal["both", "upper", "lower"] = "both",
+        cumulative: bool = False,
+        nsim: int = 10000,
     ) -> ForecastResult:
         """
-        Generate point forecasts from the fitted CES model.
+        Generate point forecasts and prediction intervals from the fitted CES model.
+
+        CES is forecast by ADAM's forecaster, as R's ``ces()`` returns an ``adam``
+        object forecast by ``forecast.adam()``. CES is a pure additive model, so
+        ``interval="prediction"`` resolves to the analytical (``"approximate"``)
+        interval with Normal quantiles.
 
         Parameters
         ----------
@@ -885,15 +901,23 @@ class CES:
             Forecast horizon. If None, uses the h from fit.
         X : array-like or None
             Future exogenous regressors.
-        interval : str or None
-            Not yet implemented for CES. Use None or "none".
-        level : float or list of float
+        interval : str, default="none"
+            ``"none"``, ``"prediction"``, ``"approximate"``, ``"simulated"``,
+            ``"semiparametric"``, ``"nonparametric"`` or ``"empirical"``, as in
+            :meth:`ADAM.predict`.
+        level : float or list of float, default=0.95
             Confidence level(s) for intervals.
+        side : str, default="both"
+            ``"both"``, ``"upper"`` or ``"lower"``.
+        cumulative : bool, default=False
+            If True, forecast the sum over the horizon.
+        nsim : int, default=10000
+            Number of paths for ``interval="simulated"``.
 
         Returns
         -------
         ForecastResult
-            Forecast result with .mean attribute.
+            Forecast result with ``.mean``, ``.lower`` and ``.upper``.
         """
         if not hasattr(self, "_adam_cpp"):
             raise RuntimeError("Model has not been fitted yet. Call fit() first.")
@@ -901,53 +925,76 @@ class CES:
         if h is None:
             h = self._h if self._h > 0 else 1
 
-        mat_wt = self._mat_wt
-        mat_f = self._mat_f
-        profiles_recent = self._profiles_recent_table
-
-        # Prepare forecast measurement matrix
-        if h <= mat_wt.shape[0]:
-            mat_wt_forecast = mat_wt[-h:]
-        else:
-            mat_wt_forecast = np.tile(mat_wt[-1:], (h, 1))
-
-        # Handle xreg for forecast period
+        new_xreg = None
         if X is not None and self._xreg_number > 0:
-            X_future = np.asarray(X, dtype=np.float64)[:h]
-            mat_wt_forecast = mat_wt_forecast.copy()
-            mat_wt_forecast[
-                :, self._components_number : self._components_number + self._xreg_number
-            ] = X_future
+            new_xreg = np.asarray(X, dtype=np.float64)[:h].reshape(h, -1)
 
-        # Forecast index lookup: the table for obs + h, as ADAM's predict, so the
-        # seasonal cells keep their phase past the in-sample table
-        head = self._head_geometry
-        ilt_forecast = adam_profile_creator(
-            lags_model_all=self._lags_model_all,
-            lags_model_max=self._lags_model_max,
-            obs_all=self._obs_in_sample + h,
-            head_length=head,
-        )["index_lookup_table"][:, head + self._obs_in_sample :][:, :h]
+        lags_max = self._lags_model_max
+        seasonal_lags = [lag for lag in self._lags_model_all if lag != 1]
+        # R's sigma() drops the scale from the parameter count under likelihood
+        n_scale = int(self.loss == "likelihood")
+        n_param = int(self.n_param)
 
-        y_forecast = self._adam_cpp.forecast(
-            matrixWt=np.asfortranarray(mat_wt_forecast, dtype=np.float64),
-            matrixF=np.asfortranarray(mat_f, dtype=np.float64),
-            indexLookupTable=np.asfortranarray(ilt_forecast, dtype=np.uint64),
-            profilesRecent=np.asfortranarray(profiles_recent, dtype=np.float64),
-            horizon=int(h),
-        ).forecast
-        y_forecast = np.array(y_forecast).ravel()
-
-        forecast_index = pd.RangeIndex(start=1, stop=h + 1, name="h")
-        mean_series = pd.Series(y_forecast, index=forecast_index, name="forecast")
-
-        return ForecastResult(
-            mean=mean_series,
-            lower=None,
-            upper=None,
+        return forecaster(
+            model_prepared={
+                # States without the extra backcasting head, as R stores them
+                "states": self._mat_vt.T[:, -(self._obs_in_sample + lags_max) :],
+                "mat_vt": self._profiles_recent_initial,
+                "measurement": self._mat_wt,
+                "transition": self._mat_f,
+                "persistence": self._vec_g,
+                "profiles_recent_table": self._profiles_recent_table,
+                "residuals": pd.Series(np.asarray(self.residuals, dtype=float)),
+                "y_fitted": np.asarray(self.fitted, dtype=float).copy(),
+                "scale": self.scale_,
+            },
+            observations_dict={
+                "obs_in_sample": self._obs_in_sample,
+                "y_in_sample": np.asarray(self._y_in_sample, dtype=float),
+                "y_forecast_start": 1,
+                "frequency": self._y_frequency,
+            },
+            general_dict={
+                "h": int(h),
+                "cumulative": cumulative,
+                "nsim": nsim,
+                "scenarios": False,
+                "distribution": "dnorm",
+                "loss": self.loss,
+                "other": {},
+                "n_param": None,
+                "scale_forecast": None,
+            },
+            occurrence_dict={"occurrence_model": False, "occurrence": "none"},
+            lags_dict={
+                "lags_model_all": self._lags_model_all,
+                "lags_model_max": lags_max,
+                "lags_model_min": min(seasonal_lags) if seasonal_lags else np.inf,
+                "lags": self._lags_model_all,
+            },
+            model_type_dict={
+                "ets_model": False,
+                "error_type": "A",
+                "trend_type": "N",
+                "season_type": "N",
+                "damped": False,
+            },
+            explanatory_checked={
+                "xreg_model": self._xreg_number > 0,
+                "xreg_number": self._xreg_number,
+                "new_xreg": new_xreg,
+            },
+            components_dict={
+                "components_number_ets": 0,
+                "components_number_ets_seasonal": 0,
+                "components_number_arima": self._components_number,
+            },
+            constants_checked={"constant_required": False},
+            params_info=[[n_param - n_scale, n_scale, n_param]],
+            adam_cpp=self._adam_cpp,
+            interval=interval,
             level=level,
-            side="both",
-            interval=interval if interval else "none",
+            side=side,
         )
 
     def summary(self) -> Dict[str, Any]:

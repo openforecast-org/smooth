@@ -33,6 +33,14 @@ extract_ces <- function(m, h) {
     forecast_vals <- as.numeric(m$forecast)
     states_mat <- as.matrix(m$states)
 
+    # Bounds of the deterministic interval types, h x 2 for levels 0.8 and 0.95
+    intervals <- list()
+    for (interval in c("prediction", "semiparametric", "empirical")) {
+        f <- forecast(m, h = h, interval = interval, level = c(0.8, 0.95))
+        intervals[[interval]] <- list(lower = unname(as.matrix(f$lower)),
+                                      upper = unname(as.matrix(f$upper)))
+    }
+
     # ICs via logLik object
     ll <- m$logLik
     list(
@@ -58,7 +66,8 @@ extract_ces <- function(m, h) {
         states_nrow  = nrow(states_mat),
         states_ncol  = ncol(states_mat),
         states_first_row = as.numeric(states_mat[1, ]),
-        states_last_row  = as.numeric(states_mat[nrow(states_mat), ])
+        states_last_row  = as.numeric(states_mat[nrow(states_mat), ]),
+        intervals    = intervals
     )
 }
 

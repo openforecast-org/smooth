@@ -331,6 +331,17 @@ class CESCaseTests:
             f"Max forecast diff: {np.max(np.abs(p_fc - r_fc))}"
         )
 
+    @pytest.mark.parametrize("interval", ["prediction", "semiparametric", "empirical"])
+    def test_interval(self, interval):
+        h = self.ref["python_params"]["h"]
+        fc = self.m.predict(h=h, interval=interval, level=[0.8, 0.95])
+        r_bounds = self.ref["intervals"][interval]
+        for side, p_bound in (("lower", fc.lower), ("upper", fc.upper)):
+            r_bound = np.array(r_bounds[side])
+            assert np.allclose(
+                p_bound.values, r_bound, atol=self.atol_fitted, rtol=self.rtol_fitted
+            ), f"{interval} {side}: max diff {np.max(np.abs(p_bound.values - r_bound))}"
+
     def test_states_shape(self):
         r_nrow = self.ref["states_nrow"]
         r_ncol = self.ref["states_ncol"]

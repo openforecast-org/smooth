@@ -1869,9 +1869,11 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                            constantRequired, constantEstimate,
                            other, horizon, multisteps, adamCpp){
 
-        if(modelDo!="use"){
-            # Fill in the matrices
-            adamElements <- filler(B,
+        # Fill in the matrices. With nothing to estimate ("use") this is the call of the
+        # cost function, B=0: it still takes the backcasting ARIMA seed through the
+        # ARI polynomial, so the returned fit is the one the loss was computed on
+        if(modelDo!="use" || (arimaModel && initialArimaEstimate)){
+            adamElements <- filler(if(modelDo=="use") 0 else B,
                                    etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
                                    componentsNumberETS, componentsNumberETSNonSeasonal,
                                    componentsNumberETSSeasonal, componentsNumberARIMA,
@@ -2691,6 +2693,14 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 initialTypeFI <- "optimal";
             }
             initialEstimateFI <- FALSE;
+            # The other initial types refit with the flags of the fit itself: under
+            # backcasting the ARIMA seed is rebuilt with the current polynomial when
+            # initialArimaEstimate is TRUE, as in the fit, and the xreg initials stay in B
+            initialLevelEstimateFI <- initialLevelEstimate;
+            initialTrendEstimateFI <- initialTrendEstimate;
+            initialSeasonalEstimateFI <- initialSeasonalEstimate;
+            initialArimaEstimateFI <- initialArimaEstimate;
+            initialXregEstimateFI <- initialXregEstimate;
             # Define parameters just for FI calculation
             if(initialTypeFI=="provided"){
                 initialLevelEstimateFI <- any(names(B)=="level");

@@ -52,3 +52,20 @@ test_that("ssarima leaves no identity transition on pure MA models", {
     expect_equal(as.numeric(fMA$transition[1,1]), 0)
     expect_true(all(is.finite(residuals(fMA))))
 })
+
+# 6. Each state crosses a turn of the backcast by its own lag, so a series that a
+# time-symmetric model fits exactly is reproduced exactly by backcasting
+test_that("backcasting reproduces noise-free series of time-symmetric models", {
+    tt <- 1:120
+    line <- ts(100 + 0.5*tt)
+    seasonal <- ts(100 + 0.5*tt + rep(c(5,3,-2,-6,-4,0,2,6,4,-1,-3,-4), length.out=120),
+                   frequency=12)
+    # The trend is flipped and the level moves one step at each turn
+    expect_lt(max(abs(residuals(adam(line, "AAN", persistence=c(0,0))))), 1e-8)
+    # ARIMA states with lags 1 and 2 move one and two steps
+    expect_lt(max(abs(residuals(adam(line, "NNN", orders=list(i=2, ma=2), arma=list(ma=c(-1.2,0.4)),
+                                     constant=FALSE)))), 1e-8)
+    # The airline model, with states at lags 1, 12 and 13, converges to the exact fit
+    expect_lt(max(abs(residuals(adam(seasonal, "NNN", lags=c(1,12), orders=list(i=c(1,1), ma=c(1,1)),
+                                     arma=list(ma=c(-0.5,-0.5)), constant=FALSE, nIterations=5)))), 1e-8)
+})

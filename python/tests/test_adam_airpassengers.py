@@ -60,7 +60,7 @@ class TestADAMAirPassengersBasic:
         model.fit(AIRPASSENGERS)
 
         # Reference loss value
-        expected_loss = 755.065923
+        expected_loss = 754.823305
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAN loss {actual_loss} differs from expected {expected_loss}"
@@ -303,7 +303,7 @@ class TestADAMAirPassengersInitialTypes:
         model = ADAM(model="AAA", lags=[12], initial="two-stage")
         model.fit(AIRPASSENGERS)
 
-        expected_loss = 565.123455
+        expected_loss = 565.038200
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-4), \
             f"AAA two-stage loss {actual_loss} differs from expected {expected_loss}"

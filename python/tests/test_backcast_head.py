@@ -122,3 +122,30 @@ def test_ces_resolves_the_head_length(y):
 def test_adam_head_length_resolver(requested, geometry, flag):
     resolved = adam_head_length(requested, lags_model_max=12, obs_in_sample=100)
     assert resolved == {"geometry": geometry, "flag": flag}
+
+
+# 7. Each state crosses a turn of the backcast by its own lag, so a series that a
+# time-symmetric model fits exactly is reproduced exactly by backcasting
+def test_backcasting_reproduces_noise_free_series():
+    t = np.arange(1, 121)
+    line = pd.Series(100 + 0.5 * t)
+    seasonal = pd.Series(
+        100 + 0.5 * t + np.resize([5, 3, -2, -6, -4, 0, 2, 6, 4, -1, -3, -4], t.size)
+    )
+    # The trend is flipped and the level moves one step at each turn
+    ets = ADAM(model="AAN", persistence={"alpha": 0, "beta": 0}).fit(line)
+    # ARIMA states with lags 1 and 2 move one and two steps
+    arima = ADAM(
+        "NNN", i_order=2, ma_order=2, arma={"ma": [-1.2, 0.4]}, constant=False
+    ).fit(line)
+    # The airline model, with states at lags 1, 12 and 13, converges to the exact fit
+    airline = ADAM(
+        "NNN",
+        lags=[1, M],
+        orders={"ar": [0, 0], "i": [1, 1], "ma": [1, 1]},
+        arma={"ma": [-0.5, -0.5]},
+        constant=False,
+        n_iterations=5,
+    ).fit(seasonal)
+    for model in (ets, arima, airline):
+        assert np.max(np.abs(np.asarray(model.residuals, dtype=float))) < 1e-8

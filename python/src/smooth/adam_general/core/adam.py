@@ -3719,14 +3719,11 @@ class ADAM:
             "h": getattr(self, "h", 0),
             "holdout": getattr(self, "holdout", False),
         }
-        # ALM reports the standard deviation for dnorm and dlnorm; ADAM uses sigma^2
-        alm_scale = float(alm.scale)
         self._prepared = {
             "y_fitted": fitted,
             "residuals": y_in_sample - fitted,
-            "scale": (
-                alm_scale**2 if alm.distribution in ("dnorm", "dlnorm") else alm_scale
-            ),
+            # ALM stores the scale as ADAM does (sigma^2 for dnorm and dlnorm)
+            "scale": float(alm.scale),
         }
         self._adam_estimated = {
             "B": np.asarray(alm.coefficients),

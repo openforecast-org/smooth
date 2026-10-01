@@ -1504,7 +1504,7 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
 #' @keywords internal
 adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other){
     return(switch(distribution,
-                  "dnorm"=sqrt(sum(errors^2)/obsInSample),
+                  "dnorm"=sum(errors^2)/obsInSample,
                   "dlaplace"=sum(abs(errors))/obsInSample,
                   "ds"=sum(sqrt(abs(errors))) / (obsInSample*2),
                   "dgnorm"=(other*sum(abs(errors)^other)/obsInSample)^{1/other},
@@ -1515,10 +1515,10 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                   # Equivalent Python: abs(log((1+errors).astype(complex))). The
                   # outer abs() is the modulus of the complex log, replacing the
                   # earlier Re()/abs() of a real arg pattern.
-                  "dlnorm"=sqrt(2*abs(switch(Etype,
-                                             "A"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors/yFitted)))^2)/
-                                                                obsInSample)),
-                                             "M"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors)))^2)/obsInSample))))),
+                  "dlnorm"=2*abs(switch(Etype,
+                                        "A"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors/yFitted)))^2)/
+                                                           obsInSample)),
+                                        "M"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors)))^2)/obsInSample)))),
                   "dllaplace"=switch(Etype,
                                      "A"=sum(abs(log(as.complex(1+errors/yFitted))))/obsInSample,
                                      "M"=sum(abs(log(as.complex(1+errors))))/obsInSample),
@@ -1536,6 +1536,88 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                   "dgamma"=switch(Etype,
                                   "A"=sum((errors/yFitted)^2)/obsInSample,
                                   "M"=sum(errors^2)/obsInSample)))
+}
+
+# The scale is the parameter of the distribution as written in the ADAM monograph
+# (Tables 11.1-11.2): sigma^2 for dnorm, dlnorm, dinvgauss and dgamma, s for the
+# others. The variance of the error is proportional to scale^p, with p returned here.
+#' @keywords internal
+adam_scalePower <- function(distribution){
+    return(switch(distribution,
+                  "ds"=,"dls"=4,
+                  "dlaplace"=,"dalaplace"=,"dgnorm"=,"dllaplace"=,"dlgnorm"=,"dlogis"=2,
+                  1));
+}
+
+# De-bias the scale in the variance space: the variance is multiplied by obs/df,
+# so the scale is multiplied by (obs/df)^(1/p).
+#' @keywords internal
+adam_scaleDebias <- function(scale, distribution, obs, df){
+    return(scale*(obs/df)^(1/adam_scalePower(distribution)));
+}
+
+# Degrees of freedom for de-biasing the scale: the non-zero observations minus the
+# parameters, without the scale ones when they were estimated by likelihood.
+#' @keywords internal
+adam_dfScale <- function(object){
+    nParam <- nparam(object);
+    if(!is.null(object$loss) && object$loss=="likelihood"){
+        nParam[] <- nParam - object$nParam[1,4];
+    }
+    df <- nobs(object, all=FALSE) - nParam;
+    if(df<=0){
+        df[] <- nobs(object, all=FALSE);
+    }
+    return(df);
+}
+
+# The variance of the error term implied by the scale (see adam_scalePower)
+#' @keywords internal
+adam_scaleVariance <- function(scale, distribution, other){
+    return(switch(distribution,
+                  "dlaplace"=,"dllaplace"=2*scale^2,
+                  "ds"=,"dls"=120*scale^4,
+                  "dgnorm"=,"dlgnorm"=scale^2*gamma(3/other$shape)/gamma(1/other$shape),
+                  "dalaplace"=scale^2/(other$alpha^2*(1-other$alpha)^2/(other$alpha^2+(1-other$alpha)^2)),
+                  "dlogis"=scale^2*pi^2/3,
+                  scale));
+}
+
+# The de-biased variance from the scale model's forecasts
+#' @keywords internal
+adam_scaleModelVariance <- function(object, h, newdata){
+    scaleValue <- forecast(object$scale,h=h,newdata=newdata,interval="none")$mean;
+    scaleValue[] <- adam_scaleVariance(scaleValue, object$distribution, object$other)*
+        nobs(object)/adam_dfScale(object);
+    return(scaleValue);
+}
+
+# The scale for simulations, de-biased in the variance space with the df of the
+# location model. scaleValue is either the scale or the scale model's values.
+#' @keywords internal
+adam_scaleSimulation <- function(object, scaleValue){
+    return(adam_scaleDebias(scaleValue, object$distribution, nobs(object), adam_dfScale(object)));
+}
+
+# Random errors of the model for the provided scale (see adam_scalePower).
+# dnorm and dlnorm take the square root of their scale, sigma^2.
+#' @keywords internal
+adam_errorsSimulate <- function(n, distribution, scale, other, dfT){
+    return(switch(distribution,
+                  "plogis"=,
+                  "dnorm"=rnorm(n, 0, sqrt(scale)),
+                  "dlaplace"=rlaplace(n, 0, scale),
+                  "ds"=rs(n, 0, scale),
+                  "dgnorm"=rgnorm(n, 0, scale, other$shape),
+                  "dlogis"=rlogis(n, 0, scale),
+                  "dt"=rt(n, dfT),
+                  "dalaplace"=ralaplace(n, 0, scale, other$alpha),
+                  "dlnorm"=rlnorm(n, -scale/2, sqrt(scale))-1,
+                  "dinvgauss"=rinvgauss(n, 1, dispersion=scale)-1,
+                  "dgamma"=rgamma(n, shape=scale^{-1}, scale=scale)-1,
+                  "dllaplace"=exp(rlaplace(n, 0, scale))-1,
+                  "dls"=exp(rs(n, 0, scale))-1,
+                  "dlgnorm"=exp(rgnorm(n, 0, scale, other$shape))-1));
 }
 
 #### IC weights (Akaike weights) ####

@@ -209,8 +209,9 @@ def generate_errors(
     else:
         rng = np.random.default_rng()
 
+    # The scale is sigma^2 for dnorm and dlnorm (see utils.scale_power)
     if distribution == "dnorm":
-        return rng.normal(0, scale, n)
+        return rng.normal(0, np.sqrt(scale), n)
 
     elif distribution == "dlaplace":
         return rng.laplace(0, scale, n)
@@ -227,8 +228,8 @@ def generate_errors(
     elif distribution == "dt":
         if obs_in_sample is None or n_param is None:
             raise ValueError("obs_in_sample and n_param required for dt distribution")
-        df = obs_in_sample - n_param
-        return rng.standard_t(df, n) * scale
+        # R draws rt(n, df) without a scale
+        return rng.standard_t(obs_in_sample - n_param, n)
 
     elif distribution == "dalaplace":
         if alpha is None:
@@ -236,9 +237,8 @@ def generate_errors(
         return ralaplace(n, 0, scale, alpha, random_state=rng)
 
     elif distribution == "dlnorm":
-        # rlnorm(n, -scale^2/2, scale) - 1
-        meanlog = -(scale**2) / 2
-        return rng.lognormal(meanlog, scale, n) - 1
+        # rlnorm(n, -scale/2, sqrt(scale)) - 1
+        return rng.lognormal(-scale / 2, np.sqrt(scale), n) - 1
 
     elif distribution == "dinvgauss":
         # rinvgauss(n, 1, dispersion=scale) - 1

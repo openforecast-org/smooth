@@ -232,8 +232,8 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
                                   TRUE, 2, "n");
 
         # Get scale, cf, logLik and IC
-        scale <- sqrt(sum(adamFitted$errors^2)/obsInSample);
-        cfObjective <- sum(dnorm(x=yInSample, mean=adamFitted$fitted, sd=scale, log=TRUE));
+        scale <- sum(adamFitted$errors^2)/obsInSample;
+        cfObjective <- sum(dnorm(x=yInSample, mean=adamFitted$fitted, sd=sqrt(scale), log=TRUE));
 
         # SMA is AR(order) with fixed coefficients 1/order. They sum to 1 (a unit
         # root), so the model is non-stationary and all `order` initial states

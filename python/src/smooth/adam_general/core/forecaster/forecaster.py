@@ -969,10 +969,12 @@ def forecaster_combined(
         n_param_sub.update_totals()
         general_dict_copy["n_param"] = n_param_sub
 
-        # Build per-sub-model params_info for sigma() in approximate intervals.
-        # Combined model stores [[0],[0]] which would cause IndexError in sigma().
-        n_scale = 1 if general_dict_copy.get("loss") == "likelihood" else 0
-        sub_params_info = [[n_est_i, n_scale, n_est_i + n_scale], [0]]
+        # Build per-sub-model params_info for sigma() and the scale's df, which
+        # drop the scale only under likelihood. Combined model stores [[0],[0]]
+        # which would cause IndexError in sigma(). The combination's own df does
+        # not apply to the members.
+        sub_params_info = [[n_est_i, 1, n_est_i + 1], [0]]
+        general_dict_copy["df_scale"] = None
 
         model_forecast = forecaster(
             model_prepared=prepared,

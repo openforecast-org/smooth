@@ -293,7 +293,7 @@
 #' \item \code{lossValue} - the value of that loss function,
 #' \item \code{logLik} - the value of the log-likelihood,
 #' \item \code{distribution} - the distribution function used in the calculation of the likelihood,
-#' \item \code{scale} - the value of the scale parameter,
+#' \item \code{scale} - the value of the scale parameter of the distribution, as in the ADAM monograph: sigma^2 for \code{dnorm}, \code{dlnorm}, \code{dinvgauss} and \code{dgamma}, and s for the others (the MLE, not de-biased), or the scale model from \link[smooth]{sm} after \code{implant()},
 #' \item \code{lambda} - the value of the parameter used in LASSO / dalaplace / dt,
 #' \item \code{B} - the vector of all estimated parameters,
 #' \item \code{lags} - the vector of lags used in the model construction,
@@ -811,9 +811,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 CFValue <- -sum(switch(distribution,
                                        "dnorm"=switch(Etype,
                                                       "A"=dnorm(x=yInSample[otLogical], mean=adamFitted$fitted[otLogical],
-                                                                sd=scale, log=TRUE),
+                                                                sd=sqrt(scale), log=TRUE),
                                                       "M"=dnorm(x=yInSample[otLogical], mean=adamFitted$fitted[otLogical],
-                                                                sd=scale*adamFitted$fitted[otLogical], log=TRUE)),
+                                                                sd=sqrt(scale)*adamFitted$fitted[otLogical], log=TRUE)),
                                        "dlaplace"=switch(Etype,
                                                          "A"=dlaplace(q=yInSample[otLogical], mu=adamFitted$fitted[otLogical],
                                                                       scale=scale, log=TRUE),
@@ -852,8 +852,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                                         scale=scale*adamFitted$fitted[otLogical],
                                                                         alpha=other, log=TRUE)),
                                        "dlnorm"=dlnorm(x=yInSample[otLogical],
-                                                       meanlog=Re(log(as.complex(adamFitted$fitted[otLogical])))-scale^2/2,
-                                                       sdlog=scale, log=TRUE),
+                                                       meanlog=Re(log(as.complex(adamFitted$fitted[otLogical])))-scale/2,
+                                                       sdlog=sqrt(scale), log=TRUE),
                                        "dllaplace"=dlaplace(q=log(yInSample[otLogical]),
                                                             mu=Re(log(as.complex(adamFitted$fitted[otLogical]))),
                                                             scale=scale, log=TRUE) -log(yInSample[otLogical]),
@@ -874,8 +874,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 # Differential entropy for the logLik of occurrence model
                 if(occurrenceModel || any(!otLogical)){
                     CFValueEntropy <- switch(distribution,
-                                             "dnorm" = obsZero*(log(sqrt(2*pi)*scale)+0.5),
-                                             "dlnorm" = obsZero*(log(sqrt(2*pi)*scale)+0.5)-scale^2/2,
+                                             "dnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5),
+                                             "dlnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5)-scale/2,
                                              "dlogis" = obsZero*2,
                                              "dlaplace" =,
                                              "dllaplace" =,
@@ -3049,7 +3049,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$ICw <- adamSelected$icWeights;
         # These two are needed just to make basic methods work
         modelReturned$distribution <- distribution;
-        modelReturned$scale <- sqrt(mean(modelReturned$residuals^2,na.rm=TRUE));
+        modelReturned$scale <- mean(modelReturned$residuals^2,na.rm=TRUE);
         class(modelReturned) <- c("adamCombined","adam","smooth");
     }
     modelReturned$ICs <- icSelection;
@@ -3539,10 +3539,10 @@ plot.adam <- function(x, which=c(1,2,4,6), level=0.95, legend=FALSE,
             if(!any(names(ellipsis)=="main")){
                 ellipsis$main <- "QQ plot of Log-Normal distribution";
             }
-            ellipsis$x <- qlnorm(ppoints(500), meanlog=-extractScale(x)^2/2, sdlog=extractScale(x));
+            ellipsis$x <- qlnorm(ppoints(500), meanlog=-extractScale(x)/2, sdlog=sqrt(extractScale(x)));
 
             do.call(qqplot, ellipsis);
-            qqline(ellipsis$y, distribution=function(p) qlnorm(p, meanlog=-extractScale(x)^2/2, sdlog=extractScale(x)));
+            qqline(ellipsis$y, distribution=function(p) qlnorm(p, meanlog=-extractScale(x)/2, sdlog=sqrt(extractScale(x))));
         }
         else if(x$distribution=="dlaplace"){
             if(!any(names(ellipsis)=="main")){
@@ -5282,7 +5282,7 @@ residuals.adam <- function(object, ...){
 #' @export
 rstandard.adam <- function(model, ...){
     obs <- nobs(model);
-    df <- obs - nparam(model);
+    distribution <- model$distribution;
     errors <- residuals(model);
     # If this is an occurrence model, then only modify the non-zero obs
     # Also, if there are NAs in actuals, consider them as occurrence
@@ -5293,38 +5293,33 @@ rstandard.adam <- function(model, ...){
         residsToGo <- c(1:obs);
     }
 
-    if(any(model$distribution==c("dt","dnorm"))){
-        return((errors - mean(errors[residsToGo])) / sqrt(extractScale(model)^2 * obs / df));
-    }
-    else if(model$distribution=="ds"){
-        return((errors - mean(errors[residsToGo])) / (extractScale(model) * obs / df)^2);
-    }
-    else if(model$distribution=="dls"){
-        errors[] <- log(errors);
-        return(exp((errors - mean(errors[residsToGo])) / (extractScale(model) * obs / df)^2));
-    }
-    else if(model$distribution=="dgnorm"){
-        return((errors - mean(errors[residsToGo])) / (extractScale(model)^model$other$shape * obs / df)^{1/model$other$shape});
-    }
-    else if(model$distribution=="dlgnorm"){
-        errors[] <- log(errors);
-        return(exp((errors - mean(errors[residsToGo])) / (extractScale(model)^model$other$shape * obs / df)^{1/model$other$shape}));
-    }
-    else if(any(model$distribution==c("dinvgauss","dgamma"))){
+    if(any(distribution==c("dinvgauss","dgamma"))){
         return(errors / mean(errors[residsToGo]));
     }
-    else if(model$distribution=="dlnorm"){
-        # Debias the residuals
-        errors[] <- log(errors) + extractScale(model)^2/2;
-        return(exp((errors - mean(errors[residsToGo])) / sqrt(extractScale(model)^2 * obs / df)));
-    }
-    else if(model$distribution=="dllaplace"){
+
+    # The scale, de-biased in the variance space
+    scale <- adam_scaleDebias(extractScale(model), distribution, obs, adam_dfScale(model));
+    logDistribution <- any(distribution==c("dlnorm","dllaplace","dls","dlgnorm"));
+    if(logDistribution){
         errors[] <- log(errors);
-        return(exp((errors - mean(errors[residsToGo])) / extractScale(model) * obs / df));
     }
-    else{
-        return(errors / extractScale(model) * obs / df);
+    if(distribution=="dlnorm"){
+        # Debias the residuals
+        errors[] <- errors + extractScale(model)/2;
     }
+    # The conventional residuals of Laplace, ALaplace and Logistic are not centred
+    if(all(distribution!=c("dlaplace","dalaplace","dlogis"))){
+        errors[] <- errors - mean(errors[residsToGo]);
+    }
+    # sigma for dnorm and dlnorm, s^2 for S, s for the rest
+    errors[] <- errors / switch(distribution,
+                                "dt"=,"dnorm"=,"dlnorm"=sqrt(scale),
+                                "ds"=,"dls"=scale^2,
+                                scale);
+    if(logDistribution){
+        errors[] <- exp(errors);
+    }
+    return(errors);
 }
 
 #' @importFrom stats rstudent
@@ -5354,7 +5349,7 @@ rstudent.adam <- function(model, ...){
         }
     }
     else if(model$distribution=="dlnorm"){
-        errors[] <- log(errors) - mean(log(errors)) - extractScale(model)^2/2;
+        errors[] <- log(errors) - mean(log(errors)) - extractScale(model)/2;
         for(i in residsToGo){
             rstudentised[i] <- exp(errors[i] / sqrt(sum(errors[-i]^2,na.rm=TRUE) / df));
         }
@@ -5432,8 +5427,8 @@ outlierdummy.adam <- function(object, level=0.999, type=c("rstandard","rstudent"
                         "dls"=qs(c((1-level)/2, (1+level)/2), 0, 1),
                         # In the next one, the scale is debiased, taking n-k into account
                         "dinvgauss"=qinvgauss(c((1-level)/2, (1+level)/2), mean=1,
-                                              dispersion=mean(extractScale(object)) * nobs(object) /
-                                                  (nobs(object)-nparam(object))),
+                                              dispersion=adam_scaleDebias(mean(extractScale(object)), "dinvgauss",
+                                                                          nobs(object), adam_dfScale(object))),
                         "dgamma"=qgamma(c((1-level)/2, (1+level)/2), shape=1/extractScale(object), scale=extractScale(object)),
                         qnorm(c((1-level)/2, (1+level)/2), 0, 1));
     # Fix for IG in case of scale - it should be chi-squared
@@ -6248,52 +6243,18 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         arrVt <- array(NA, c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired, h+lagsModelMax, nsim));
         arrVt[,1:lagsModelMax,] <- rep(matVt,nsim);
 
-        #### This is scale, not sigma, which is why we use the one from the model!
-        # Number of degrees of freedom to de-bias scales.
-        # Scale parameter is not needed for de-bias itself.
-        nParam <- nparam(object);
-        if(!is.null(object$loss) && object$loss=="likelihood"){
-            nParam <- nParam - object$nParam[1,4];
-        }
-        df <- nobs(object, all=FALSE) - nParam;
-        # If the sample is too small, then use biased estimator
-        if(df<=0){
-            df[] <- nobs(object, all=FALSE);
-        }
-
-        # If scale model is included, produce forecasts
+        # The scale, or the scale model's forecasts, de-biased for the simulations
         if(is.scale(object$scale)){
             # as.vector is needed to declass the mean.
             scaleValue <- as.vector(forecast(object$scale,h=h,newdata=newdata,interval="none")$mean);
-            # De-bias the scales and transform to the appropriate scale
-            # dnorm, dlnorm fit model on square residuals
-            # dgnorm needs to be done with ^beta to get to 1/T part
-            # The rest do not require transformations, only de-bias
-            scaleValue[] <- switch(object$distribution,
-                                   "dlnorm"=,
-                                   "dnorm"=(scaleValue*obsInSample/df)^0.5,
-                                   "dgnorm"=((scaleValue^object$other$shape)*obsInSample/df)^{1/object$other$shape},
-                                   scaleValue*obsInSample/df);
         }
         else{
-            scaleValue <- object$scale*obsInSample/df;
+            scaleValue <- object$scale;
         }
-        matErrors <- matrix(switch(object$distribution,
-                                   "dnorm"=rnorm(h*nsim, 0, scaleValue),
-                                   "dlaplace"=rlaplace(h*nsim, 0, scaleValue),
-                                   "ds"=rs(h*nsim, 0, scaleValue),
-                                   "dgnorm"=rgnorm(h*nsim, 0, scaleValue, object$other$shape),
-                                   "dlogis"=rlogis(h*nsim, 0, scaleValue),
-                                   "dt"=rt(h*nsim, obsInSample-nparam(object)),
-                                   "dalaplace"=ralaplace(h*nsim, 0, scaleValue, object$other$alpha),
-                                   "dlnorm"=rlnorm(h*nsim, -scaleValue^2/2, scaleValue)-1,
-                                   "dinvgauss"=rinvgauss(h*nsim, 1, dispersion=scaleValue)-1,
-                                   "dgamma"=rgamma(h*nsim, shape=scaleValue^{-1}, scale=scaleValue)-1,
-                                   "dllaplace"=exp(rlaplace(h*nsim, 0, scaleValue))-1,
-                                   "dls"=exp(rs(h*nsim, 0, scaleValue))-1,
-                                   "dlgnorm"=exp(rgnorm(h*nsim, 0, scaleValue, object$other$shape))-1
-        ),
-        h,nsim);
+        scaleValue <- adam_scaleSimulation(object, scaleValue);
+        matErrors <- matrix(adam_errorsSimulate(h*nsim, object$distribution, scaleValue, object$other,
+                                                obsInSample-nparam(object)),
+                            h,nsim);
         # Normalise errors in order not to get ridiculous things on small nsim
         if(nsim<=500){
             if(Etype=="A"){
@@ -6360,22 +6321,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             s2 <- sigma(object)^2;
             # If scale model is included, produce forecasts
             if(is.scale(object$scale)){
-                # Number of degrees of freedom to de-bias the variance
-                df <- (nobs(object, all=FALSE)-nparam(object));
-                # If the sample is too small, then use biased estimator
-                if(df<=0){
-                    df[] <- nobs(object, all=FALSE);
-                }
-                s2Forecast <- forecast(object$scale,h=h,newdata=newdata,interval="none")$mean;
-                # Transform scales into the variances
-                # dnorm, dlnorm, dgamma and dinvgauss return scales that are equal to variances
-                s2Forecast[] <- switch(object$distribution,
-                                       "dlaplace"=2*s2Forecast^2,
-                                       "ds"=120*s2Forecast^4,
-                                       "dgnorm"=s2Forecast^2*gamma(3/object$other$shape)/gamma(1/object$other$shape),
-                                       "dalaplace"=s2Forecast^2/(object$other$alpha^2*(1-object$other$alpha)^2/
-                                                                     (object$other$alpha^2+(1-object$other$alpha)^2)),
-                                       s2Forecast)*obsInSample/df;
+                s2Forecast <- adam_scaleModelVariance(object, h, newdata);
             }
             # IG and Lnorm can use approximations from the multiplications
             if(etsModel && any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) && Etype=="M"){
@@ -6446,22 +6392,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             else{
                 # If scale model is included, produce forecasts
                 if(is.scale(object$scale)){
-                    # Number of degrees of freedom to de-bias the variance
-                    df <- (nobs(object, all=FALSE)-nparam(object));
-                    # If the sample is too small, then use biased estimator
-                    if(df<=0){
-                        df[] <- nobs(object, all=FALSE);
-                    }
-                    vcovMulti <- forecast(object$scale,h=h,newdata=newdata,interval="none")$mean;
-                    # Transform scales into the variances
-                    # dnorm, dlnorm, dgamma and dinvgauss return scales that are equal to variances
-                    vcovMulti[] <- switch(object$distribution,
-                                          "dlaplace"=2*vcovMulti^2,
-                                          "ds"=120*vcovMulti^4,
-                                          "dgnorm"=vcovMulti^2*gamma(3/object$other$shape)/gamma(1/object$other$shape),
-                                          "dalaplace"=vcovMulti^2/(object$other$alpha^2*(1-object$other$alpha)^2/
-                                                                       (object$other$alpha^2+(1-object$other$alpha)^2)),
-                                          vcovMulti)*obsInSample/df;
+                    vcovMulti <- adam_scaleModelVariance(object, h, newdata);
                 }
                 else{
                     vcovMulti <- sigma(object)^2;
@@ -7163,45 +7094,18 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
 
         arrVt <- array(NA, c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired, h+lagsModelMax, nsim));
         arrVt[,1:lagsModelMax,] <- rep(matVt,nsim);
-        # Number of degrees of freedom to de-bias scales
-        df <- obsInSample-nparam(object);
-        # If the sample is too small, then use biased estimator
-        if(df<=0){
-            df[] <- obsInSample;
-        }
-        # If scale model is included, produce forecasts
+        # The scale, or the scale model's forecasts, de-biased for the simulations
         if(is.scale(object$scale)){
             # as.vector is needed to declass the mean.
             scaleValue <- as.vector(forecast(object$scale,h=h,interval="none")$mean);
-            # De-bias the scales and transform to the appropriate scale
-            # dnorm, dlnorm fit model on square residuals
-            # dgnorm needs to be done with ^beta to get to 1/T part
-            # The rest do not require transformations, only de-bias
-            scaleValue[] <- switch(object$distribution,
-                                   "dlnorm"=,
-                                   "dnorm"=(scaleValue*obsInSample/df)^0.5,
-                                   "dgnorm"=((scaleValue^object$other$shape)*obsInSample/df)^{1/object$other$shape},
-                                   scaleValue*obsInSample/df);
         }
         else{
-            scaleValue <- object$scale*obsInSample/df;
+            scaleValue <- object$scale;
         }
-        matErrors <- matrix(switch(object$distribution,
-                                   "dnorm"=rnorm(h*nsim, 0, scaleValue),
-                                   "dlaplace"=rlaplace(h*nsim, 0, scaleValue),
-                                   "ds"=rs(h*nsim, 0, scaleValue),
-                                   "dgnorm"=rgnorm(h*nsim, 0, scaleValue, object$other$shape),
-                                   "dlogis"=rlogis(h*nsim, 0, scaleValue),
-                                   "dt"=rt(h*nsim, obsInSample-nparam(object)),
-                                   "dalaplace"=ralaplace(h*nsim, 0, scaleValue, object$other$alpha),
-                                   "dlnorm"=rlnorm(h*nsim, -scaleValue^2/2, scaleValue)-1,
-                                   "dinvgauss"=rinvgauss(h*nsim, 1, dispersion=scaleValue)-1,
-                                   "dgamma"=rgamma(h*nsim, shape=scaleValue^{-1}, scale=scaleValue)-1,
-                                   "dllaplace"=exp(rlaplace(h*nsim, 0, scaleValue))-1,
-                                   "dls"=exp(rs(h*nsim, 0, scaleValue))-1,
-                                   "dlgnorm"=exp(rgnorm(h*nsim, 0, scaleValue, object$other$shape))-1
-        ),
-        h,nsim);
+        scaleValue <- adam_scaleSimulation(object, scaleValue);
+        matErrors <- matrix(adam_errorsSimulate(h*nsim, object$distribution, scaleValue, object$other,
+                                                obsInSample-nparam(object)),
+                            h,nsim);
         # Normalise errors in order not to get ridiculous things on small nsim
         if(nsim<=500){
             if(Etype=="A"){
@@ -7277,9 +7181,9 @@ pointLik.adam <- function(object, log=TRUE, ...){
     likValues[otLogical] <- switch(distribution,
                                    "dnorm"=switch(Etype,
                                                   "A"=dnorm(x=yInSample[otLogical], mean=yFitted[otLogical],
-                                                            sd=scale, log=TRUE),
+                                                            sd=sqrt(scale), log=TRUE),
                                                   "M"=dnorm(x=yInSample[otLogical], mean=yFitted[otLogical],
-                                                            sd=scale*yFitted[otLogical], log=TRUE)),
+                                                            sd=sqrt(scale)*yFitted[otLogical], log=TRUE)),
                                    "dlaplace"=switch(Etype,
                                                      "A"=dlaplace(q=yInSample[otLogical], mu=yFitted[otLogical],
                                                                   scale=scale, log=TRUE),
@@ -7311,8 +7215,8 @@ pointLik.adam <- function(object, log=TRUE, ...){
                                                       "M"=dalaplace(q=yInSample[otLogical], mu=yFitted[otLogical],
                                                                     scale=scale*yFitted[otLogical], alpha=other, log=TRUE)),
                                    "dlnorm"=dlnorm(x=yInSample[otLogical],
-                                                   meanlog=log(yFitted[otLogical]) -scale^2/2,
-                                                   sdlog=scale, log=TRUE),
+                                                   meanlog=log(yFitted[otLogical]) -scale/2,
+                                                   sdlog=sqrt(scale), log=TRUE),
                                    "dllaplace"=dlaplace(q=log(yInSample[otLogical]), mu=log(yFitted[otLogical]),
                                                         scale=scale, log=TRUE),
                                    "dls"=ds(q=log(yInSample[otLogical]), mu=log(yFitted[otLogical]),
@@ -7331,8 +7235,8 @@ pointLik.adam <- function(object, log=TRUE, ...){
     # If this is a mixture model, take the respective probabilities into account (differential entropy)
     if(is.occurrence(object$occurrence)){
         likValues[!otLogical] <- -switch(distribution,
-                                         "dnorm" = (log(sqrt(2*pi)*scale)+0.5),
-                                         "dlnorm" = (log(sqrt(2*pi)*scale)+0.5) -scale^2/2,
+                                         "dnorm" = (log(sqrt(2*pi*scale))+0.5),
+                                         "dlnorm" = (log(sqrt(2*pi*scale))+0.5) -scale/2,
                                          "dlogis" = 2,
                                          "dlaplace" =,
                                          "dllaplace" =,
@@ -7446,30 +7350,20 @@ simulateADAMCore <- function(object, nsim=1, obs=nobs(object), ...){
         pt <- fitted(object$occurrence);
     }
 
-    # Number of degrees of freedom to de-bias scales
-    df <- obsInSample-nparam(object);
-    if(df<=0){
-        df[] <- obsInSample;
-    }
-
-    # If scale model is included, produce forecasts
+    # The scale, or the scale model's fitted values, de-biased for the simulations
     if(is.scale(object$scale)){
         scaleValue <- as.vector(fitted(object$scale));
-        scaleValue[] <- switch(object$distribution,
-                               "dlnorm"=,
-                               "dnorm"=(scaleValue*obsInSample/df)^0.5,
-                               "dgnorm"=((scaleValue^object$other$shape)*obsInSample/df)^{1/object$other$shape},
-                               scaleValue*obsInSample/df);
     }
     else{
-        scaleValue <- object$scale*obsInSample/df;
+        scaleValue <- object$scale;
     }
+    scaleValue <- adam_scaleSimulation(object, scaleValue);
     # Fallback when ``object$scale`` is NA — happens for ``om`` /
     # ``omg`` objects which use ``distribution="plogis"`` and don't
-    # store a closed-form scale. Use the empirical residual std-dev
+    # store a closed-form scale. Use the empirical residual variance
     # instead, or 1 if that's also unavailable.
     if(any(is.na(scaleValue)) || any(!is.finite(scaleValue))){
-        fallback <- suppressWarnings(sqrt(mean(object$residuals^2, na.rm=TRUE)));
+        fallback <- suppressWarnings(mean(object$residuals^2, na.rm=TRUE));
         if(!is.finite(fallback) || fallback==0){
             fallback <- 1;
         }
@@ -7486,22 +7380,9 @@ simulateADAMCore <- function(object, nsim=1, obs=nobs(object), ...){
                             obsInSample, nsim);
     }
     else{
-        matErrors <- matrix(switch(object$distribution,
-                                   "dnorm"=rnorm(obsInSample*nsim, 0, scaleValue),
-                                   "dlaplace"=rlaplace(obsInSample*nsim, 0, scaleValue),
-                                   "ds"=rs(obsInSample*nsim, 0, scaleValue),
-                                   "dgnorm"=rgnorm(obsInSample*nsim, 0, scaleValue, object$other$shape),
-                                   "dlogis"=rlogis(obsInSample*nsim, 0, scaleValue),
-                                   "dt"=rt(obsInSample*nsim, obsInSample-nparam(object)),
-                                   "dalaplace"=ralaplace(obsInSample*nsim, 0, scaleValue, object$other$alpha),
-                                   "dlnorm"=rlnorm(obsInSample*nsim, -scaleValue^2/2, scaleValue)-1,
-                                   "dinvgauss"=rinvgauss(obsInSample*nsim, 1, dispersion=scaleValue)-1,
-                                   "dgamma"=rgamma(obsInSample*nsim, shape=scaleValue^{-1}, scale=scaleValue)-1,
-                                   "dllaplace"=exp(rlaplace(obsInSample*nsim, 0, scaleValue))-1,
-                                   "dls"=exp(rs(obsInSample*nsim, 0, scaleValue))-1,
-                                   "dlgnorm"=exp(rgnorm(obsInSample*nsim, 0, scaleValue, object$other$shape))-1,
-                                   "plogis"=rnorm(obsInSample*nsim, 0, scaleValue)
-        ), obsInSample, nsim);
+        matErrors <- matrix(adam_errorsSimulate(obsInSample*nsim, object$distribution, scaleValue,
+                                                object$other, obsInSample-nparam(object)),
+                            obsInSample, nsim);
     }
 
     # This stuff is needed in order to produce adequate values for weird models

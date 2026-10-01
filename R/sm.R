@@ -356,29 +356,15 @@ sm.adam <- function(object, model="YYY", lags=NULL,
 
 #' @export
 extractScale.smooth <- function(object, ...){
+    # The scale model returns the scale itself (sigma^2 for dnorm, s for dlaplace etc)
     if(is.scale(object$scale)){
-        return(switch(object$distribution,
-                      "dnorm"=,
-                      "dlnorm"=sqrt(fitted(object$scale)),
-                      "ds"=fitted(object$scale)^2,
-                      # $other is a list (list(shape=...)), so the shape has to
-                      # be named -- extractSigma.smooth below already does.
-                      "dgnorm"=fitted(object$scale)^{1/object$scale$other$shape},
-                      fitted(object$scale)));
+        return(fitted(object$scale));
+    }
+    else if(is.scale(object)){
+        return(1);
     }
     else{
-        if(is.scale(object)){
-            return(1);
-            # return(switch(object$distribution,
-            #           "dnorm"=,
-            #           "dlnorm"=sqrt(fitted(object)),
-            #           "ds"=fitted(object)^2,
-            #           "dgnorm"=fitted(object)^{1/object$other},
-            #           fitted(object)));
-        }
-        else{
-            return(object$scale);
-        }
+        return(object$scale);
     }
 }
 
@@ -386,25 +372,10 @@ extractScale.smooth <- function(object, ...){
 extractSigma.smooth <- function(object, ...){
     if(is.scale(object$scale)){
         return(switch(object$distribution,
-                      "dnorm"=,
-                      "dlnorm"=,
-                      "dlogitnorm"=,
-                      "dbcnorm"=,
-                      "dfnorm"=,
-                      "dinvgauss"=,
-                      "dgamma"=extractScale(object),
-                      "dlaplace"=,
-                      "dllaplace"=sqrt(2*extractScale(object)),
-                      "ds"=,
-                      "dls"=sqrt(120*(extractScale(object)^4)),
-                      "dgnorm"=,
-                      "dlgnorm"=sqrt(extractScale(object)^2*gamma(3/object$other$shape) / gamma(1/object$other$shape)),
-                      "dlogis"=extractScale(object)*pi/sqrt(3),
                       "dt"=1/sqrt(1-2/extractScale(object)),
-                      "dalaplace"=extractScale(object)/sqrt((object$other$alpha^2*(1-object$other$alpha)^2)*
-                                                                (object$other$alpha^2+(1-object$other$alpha)^2)),
                       # For now sigma is returned for: dpois, dnbinom, dchisq, dbeta and plogis, pnorm.
-                      sigma(object)
+                      "dpois"=,"dnbinom"=,"dchisq"=,"dbeta"=,"plogis"=,"pnorm"=sigma(object),
+                      sqrt(adam_scaleVariance(extractScale(object), object$distribution, object$other))
         ));
     }
     else{

@@ -300,7 +300,7 @@ def _qqplot_quantiles(model):
         return (lambda p: gb.qnorm(p, 0.0, 1.0)), "QQ plot of Normal distribution"
     if dist == "dlnorm":
         return (
-            lambda p: gb.qlnorm(p, -(scale**2) / 2, scale),
+            lambda p: gb.qlnorm(p, -scale / 2, np.sqrt(scale)),
             "QQ plot of Log-Normal distribution",
         )
     if dist == "dlaplace":

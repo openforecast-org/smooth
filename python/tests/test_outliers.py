@@ -467,19 +467,19 @@ class TestRComparisonWithR:
         """
         rstandard() reference values for ANN on AirPassengers.
 
-        R's ``rstandard.adam`` divides by ``extractScale(model) * sqrt(n/df)``
-        with ``df = nobs - nparam`` — the estimated distribution scale, not the
-        df-unbiased ``sigma()``. R reports nparam=3, scale=33.59315406 and a
-        factor of 33.94864708 for this model.
+        R's ``rstandard.adam`` divides by the square root of the scale (sigma^2
+        for dnorm) de-biased by ``n/df``, with ``df = nobs - (nparam - 1)``: the
+        scale itself is not counted under likelihood. R reports nparam=3,
+        scale=1128.5 and a divisor of 33.82889839 for this model.
         """
         std_res = ann_model.rstandard()
         obs = ann_model.nobs         # 144
-        df = obs - ann_model.nparam
+        df = obs - (ann_model.nparam - 1)
 
         errors = ann_model.residuals.copy()
         errors -= errors.mean()
-        expected_scale = ann_model.scale * np.sqrt(obs / df)
+        expected_scale = np.sqrt(ann_model.scale * obs / df)
         np.testing.assert_allclose(
             np.std(errors) / np.std(std_res), expected_scale, rtol=1e-6
         )
-        np.testing.assert_allclose(expected_scale, 33.94864708, rtol=1e-6)
+        np.testing.assert_allclose(expected_scale, 33.82889839, rtol=1e-6)

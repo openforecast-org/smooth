@@ -19,7 +19,7 @@ test_that("Test on BJsales, predefined ETS", {
 test_that("Test ETS(CCC) with BIC on AirPassengers", {
     skip_on_cran
     testModel <- es(AirPassengers, "CCC", silent=TRUE, ic="BIC");
-    expect_equal(testModel$scale^2, mean(residuals(testModel)^2));
+    expect_equal(testModel$scale, mean(residuals(testModel)^2));
 })
 
 # Test model selection of non-multiplicative trend ETS

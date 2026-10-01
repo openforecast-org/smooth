@@ -505,7 +505,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
 
     ##### Function returns scale parameter for the provided parameters #####
     scaler <- function(errors, obsInSample){
-        return(sqrt(sum(errors^2)/obsInSample));
+        return(sum(errors^2)/obsInSample);
     }
 
     ##### Cost function for CES #####
@@ -550,7 +550,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
                                       mean=adamFitted$fitted[otLogical],
-                                      sd=scale, log=TRUE));
+                                      sd=sqrt(scale), log=TRUE));
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsInSample;

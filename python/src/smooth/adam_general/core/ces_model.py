@@ -704,8 +704,8 @@ class CES:
         profiles_recent_table = np.array(adam_fitted.profile)
         mat_vt = np.array(adam_fitted.states).T  # C++ returns (components, time)
 
-        # Scale — R line 1001
-        scale = np.sqrt(np.sum(errors[ot_logical] ** 2) / obs_in_sample)
+        # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces()
+        scale = np.sum(errors[ot_logical] ** 2) / obs_in_sample
 
         # Reconstruct complex a and b from B — R lines 1048-1093
         n_coefficients = 0

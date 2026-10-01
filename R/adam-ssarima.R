@@ -322,7 +322,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
 
     ##### Function returns scale parameter for the provided parameters #####
     scaler <- function(errors, obsInSample){
-        return(sqrt(sum(errors^2)/obsInSample));
+        return(sum(errors^2)/obsInSample);
     }
 
     ##### Cost function #####
@@ -420,7 +420,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
                                       mean=adamFitted$fitted[otLogical],
-                                      sd=scale, log=TRUE));
+                                      sd=sqrt(scale), log=TRUE));
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsInSample;

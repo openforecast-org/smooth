@@ -7,6 +7,7 @@ from smooth.adam_general.core.utils.distributions import (
     generate_errors,
     normalize_errors,
 )
+from smooth.adam_general.core.utils.utils import scale_debias, scale_variance
 from smooth.adam_general.core.utils.var_covar import (
     covar_anal,
     sigma,
@@ -51,46 +52,39 @@ def ensure_level_format(level, side):
     return np.round(level_low, 5), np.round(level_up, 5)
 
 
+def _df_scale(general, observations_dict, params_info):
+    """Degrees of freedom for de-biasing the scale (R: ``adam_dfScale``).
+
+    The model passes its own as ``general["df_scale"]``. Otherwise: the non-zero
+    observations minus the parameters, without the scale ones under likelihood,
+    with ``params_info[0]`` holding ``[..., n_scale, n_all]`` as ``sigma()`` reads it.
+    """
+    if general.get("df_scale") is not None:
+        return general["df_scale"]
+    obs_df = observations_dict.get("obs_nonzero") or observations_dict["obs_in_sample"]
+    info = params_info[0]
+    n_param = info[-1]
+    if general.get("loss") == "likelihood" and len(info) > 1:
+        n_param = n_param - info[1]
+    df = obs_df - n_param
+    return df if df > 0 else obs_df
+
+
 def _scale_model_variance(general, observations_dict, params_info):
     """Per-horizon variance implied by an implanted scale model, or ``None``.
 
     R replaces the constant ``s2`` with the scale model's forecast when one is
-    implanted (``R/adam.R:6485-6530``). The forecast is on that distribution's
-    *scale*, so it is first mapped onto a variance -- ``dnorm``, ``dlnorm``,
-    ``dgamma`` and ``dinvgauss`` already return one -- and then de-biased by
-    ``obsInSample / df``.
+    implanted (``R/adam.R:6485-6530``). The forecast is the scale itself, so it
+    is mapped onto a variance and de-biased by ``obsInSample / df``.
     """
     scale_forecast = general.get("scale_forecast")
     if scale_forecast is None:
         return None
 
     sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
-    other = general.get("other") or {}
-    distribution = general["distribution"]
-
-    if distribution == "dlaplace":
-        variance = 2 * sf**2
-    elif distribution == "ds":
-        variance = 120 * sf**4
-    elif distribution == "dgnorm":
-        shape = other["shape"]
-        variance = sf**2 * gamma(3 / shape) / gamma(1 / shape)
-    elif distribution == "dalaplace":
-        alpha = other["alpha"]
-        variance = sf**2 / (alpha**2 * (1 - alpha) ** 2 / (alpha**2 + (1 - alpha) ** 2))
-    else:
-        variance = sf
-
+    variance = scale_variance(sf, general["distribution"], general.get("other"))
     obs = observations_dict["obs_in_sample"]
-    # R measures df over the non-zero sample, as nobs(object, all=FALSE) does.
-    obs_df = observations_dict.get("obs_nonzero", obs) or obs
-    n_param = general.get("scale_nparam")
-    if n_param is None:
-        n_param = params_info[0][-1]
-    df = obs_df - n_param
-    if df <= 0:
-        df = obs_df
-    return variance * obs / df
+    return variance * obs / _df_scale(general, observations_dict, params_info)
 
 
 def generate_prediction_interval(
@@ -427,52 +421,21 @@ def generate_simulation_interval(
     for i in range(nsim):
         arr_vt[:, :lags_model_max, i] = mat_vt[:, :lags_model_max]
 
-    # 2. Calculate degrees of freedom for de-biasing
-    # For variance calculation, use n_param_all - n_param_scale
-    # Check if we have the new n_param table structure
-    n_param = None
-    if "n_param" in general_dict and general_dict["n_param"] is not None:
-        n_param = general_dict["n_param"].n_param_for_variance
-    elif params_info and params_info[0]:
-        # Legacy: params_info[0][-1] is n_param_all, params_info[0][3] is n_param_scale
-        n_param_all = (
-            params_info[0][-1] if len(params_info[0]) > 4 else params_info[0][0]
-        )
-        n_param_scale = params_info[0][3] if len(params_info[0]) > 3 else 0
-        n_param = n_param_all - n_param_scale
-    else:
-        n_param = 0
-
-    # R measures df over the non-zero sample, as nobs(object, all=FALSE) does
-    obs_df = observations_dict.get("obs_nonzero", observations_dict["obs_in_sample"])
-    df = obs_df - n_param
-    if df <= 0:
-        df = obs_df
-
-    # 3. Get and de-bias scale
+    # 2. The scale, or the scale model's forecasts, de-biased in the variance space
     obs_in_sample = observations_dict["obs_in_sample"]
+    df = _df_scale(general_dict, observations_dict, params_info)
     scale_forecast = general_dict.get("scale_forecast")
     if scale_forecast is None:
-        scale_value = prepared_model["scale"] * obs_in_sample / df
+        scale_value = prepared_model["scale"]
     else:
-        # An implanted scale model makes the scale time-varying. R de-biases it
-        # and maps it back out of the space sm() fitted it in
-        # (R/adam.R:6388-6400): sm() fits squared residuals for dnorm/dlnorm and
-        # the beta-th power for dgnorm, so those are rooted here. This is a
-        # *scale*, unlike the analytical path's variance, which is why the
-        # transformation differs from `_scale_model_variance`.
-        sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
-        distribution_sim = general_dict["distribution"]
-        shape_sim = (general_dict.get("other") or {}).get("shape")
-        if distribution_sim in ("dnorm", "dlnorm"):
-            scale_value = (sf * obs_in_sample / df) ** 0.5
-        elif distribution_sim == "dgnorm":
-            scale_value = ((sf**shape_sim) * obs_in_sample / df) ** (1 / shape_sim)
-        else:
-            scale_value = sf * obs_in_sample / df
         # One draw per (horizon, replication); the h scales tile across nsim so
         # that reshaping column-major puts the right scale on the right horizon.
-        scale_value = np.tile(scale_value, nsim)
+        scale_value = np.tile(
+            np.asarray(scale_forecast, dtype=np.float64).ravel(), nsim
+        )
+    scale_value = scale_debias(
+        scale_value, general_dict["distribution"], obs_in_sample, df
+    )
 
     # 4. Generate random errors or use external errors
     if external_errors is not None:
@@ -493,8 +456,8 @@ def generate_simulation_interval(
             distribution=distribution,
             n=h * nsim,
             scale=scale_value,
-            obs_in_sample=observations_dict["obs_in_sample"],
-            n_param=n_param,
+            obs_in_sample=obs_in_sample,
+            n_param=obs_in_sample - df,
             shape=other_params.get("shape"),
             alpha=other_params.get("alpha"),
         )

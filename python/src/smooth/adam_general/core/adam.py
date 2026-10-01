@@ -1316,6 +1316,15 @@ class ADAM:
 
         return self
 
+    def _gnorm_shape(self) -> Optional[float]:
+        """The dgnorm shape, provided or estimated.
+
+        ``fit()`` clears the ``gnorm_shape`` argument from the instance, so a
+        fitted model carries the shape on ``other`` instead.
+        """
+        other = getattr(self, "other", None) or {}
+        return other.get("shape", getattr(self, "gnorm_shape", None))
+
     def _set_fitted_attributes(self):
         """
         Set fitted parameters as attributes with trailing underscores.
@@ -2351,7 +2360,7 @@ class ADAM:
             mean_e = np.mean(errors)
             return (errors - mean_e) / (scale * obs / df) ** 2
         elif dist == "dgnorm":
-            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            beta = self._gnorm_shape() or 2.0
             mean_e = np.mean(errors)
             return (errors - mean_e) / (scale**beta * obs / df) ** (1.0 / beta)
         elif dist in ("dinvgauss", "dgamma"):
@@ -2435,7 +2444,7 @@ class ADAM:
             return errors / denom
 
         elif dist == "dgnorm":
-            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            beta = self._gnorm_shape() or 2.0
             errors -= np.mean(errors)
             total_pow = np.sum(np.abs(errors) ** beta)
             denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
@@ -2546,7 +2555,7 @@ class ADAM:
         elif dist == "ds":
             stat = scipy_stats.gennorm.ppf(p, beta=0.5)
         elif dist == "dgnorm":
-            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            beta = self._gnorm_shape() or 2.0
             stat = scipy_stats.gennorm.ppf(p, beta=beta)
         elif dist == "dlnorm":
             errors = np.log(errors)
@@ -4508,7 +4517,7 @@ class ADAM:
             bounds="usual",
             # The current dgnorm shape, so the gradient initial-state solve in
             # preparator() profiles the same loss the estimation used
-            other=getattr(self, "gnorm_shape", None),
+            other=self._gnorm_shape(),
         )
 
     def _auto_predict(self):
@@ -4629,7 +4638,7 @@ class ADAM:
             bounds="usual",
             # The current dgnorm shape, so the gradient initial-state solve in
             # preparator() profiles the same loss the estimation used
-            other=getattr(self, "gnorm_shape", None),
+            other=self._gnorm_shape(),
         )
 
     def _execute_prediction(
@@ -6227,7 +6236,7 @@ class ADAM:
             n_obs=n_obs,
             n_param=int(self.nparam),
             opt_scale=float(self.scale),
-            shape=other_dict.get("shape", getattr(self, "gnorm_shape", None)),
+            shape=other_dict.get("shape", self._gnorm_shape()),
             alpha=other_dict.get("alpha"),
             rng=rng,
         )

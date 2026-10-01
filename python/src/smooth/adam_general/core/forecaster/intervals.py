@@ -443,9 +443,11 @@ def generate_simulation_interval(
     else:
         n_param = 0
 
-    df = observations_dict["obs_in_sample"] - n_param
+    # R measures df over the non-zero sample, as nobs(object, all=FALSE) does
+    obs_df = observations_dict.get("obs_nonzero", observations_dict["obs_in_sample"])
+    df = obs_df - n_param
     if df <= 0:
-        df = observations_dict["obs_in_sample"]
+        df = obs_df
 
     # 3. Get and de-bias scale
     obs_in_sample = observations_dict["obs_in_sample"]

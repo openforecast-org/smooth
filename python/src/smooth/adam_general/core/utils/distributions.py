@@ -73,11 +73,11 @@ def rs(n, mu=0, scale=1, random_state=None):
     else:
         rng = np.random.default_rng()
 
-    # S-distribution can be generated as the difference of two Gamma(2, scale) variables
-    # X = Gamma(2, scale) - Gamma(2, scale) + mu
-    g1 = rng.gamma(2, scale, n)
-    g2 = rng.gamma(2, scale, n)
-    return g1 - g2 + mu
+    # |X - mu| = scale^2 * U^2 with U ~ Gamma(2, 1), and a symmetric sign, which
+    # gives the density exp(-sqrt|x - mu| / scale) / (4 scale^2) and V(X) = 120 scale^4
+    u = rng.gamma(2, 1, n)
+    sign = 2 * rng.integers(0, 2, n) - 1
+    return mu + sign * scale**2 * u**2
 
 
 def rgnorm(n, mu=0, scale=1, shape=2, random_state=None):
@@ -157,8 +157,8 @@ def ralaplace(n, mu=0, scale=1, alpha=0.5, random_state=None):
     e1 = rng.exponential(1, n)
     e2 = rng.exponential(1, n)
 
-    # Asymmetric Laplace as mixture
-    result = np.where(u < alpha, mu + scale * e1 / alpha, mu - scale * e2 / (1 - alpha))
+    # Asymmetric Laplace as mixture: below mu with probability alpha, as greybox
+    result = np.where(u < alpha, mu - scale * e2 / (1 - alpha), mu + scale * e1 / alpha)
     return result
 
 

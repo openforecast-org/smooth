@@ -1,0 +1,111 @@
+context("Tests for tbats()")
+
+orders0 <- list(ar=0, ma=0, select=FALSE)
+
+# De Livera's rotation form with ADAM's ARMA(1,1), from the states at t=0
+rotationForm <- function(eps, frequency, gammas, level, trend, phi, alpha, beta, s, sStar,
+                         arPhi=0, maTheta=0, arma=0){
+    y <- numeric(length(eps));
+    for(t in seq_along(eps)){
+        y[t] <- level + phi*trend + sum(s) + arma + eps[t];
+        sNew <- cos(frequency)*s + sin(frequency)*sStar + gammas[,1]*eps[t];
+        sStar <- -sin(frequency)*s + cos(frequency)*sStar + gammas[,2]*eps[t];
+        s <- sNew;
+        level <- level + phi*trend + alpha*eps[t];
+        trend <- phi*trend + beta*eps[t];
+        arma <- arPhi*arma + (arPhi+maTheta)*eps[t];
+    }
+    return(y);
+}
+
+test_that("the errors are those of De Livera's rotation form at the same parameters", {
+    set.seed(11);
+    tt <- 1:300;
+    y <- ts(200 + 0.2*tt + 5*sin(2*pi*tt/7) + 3*cos(2*pi*tt/30.4375) + cumsum(rnorm(300, 0, 0.5)) +
+                rnorm(300), frequency=7);
+    fit <- tbats(y, lags=c(1, 7, 30.4375), harmonics=c(2, 1), trend="additive", lambda=1,
+                 orders=list(ar=1, ma=1, select=FALSE), initial="optimal");
+    B <- fit$B;
+    seasonal <- fit$initial$seasonal;
+    frequency <- 2*pi*seasonal$j/seasonal$period;
+    gammas <- cbind(B[paste0("gamma1[", round(seasonal$period, 4), "]")],
+                    B[paste0("gamma2[", round(seasonal$period, 4), "]")]);
+    # The harmonic contributes s(t) = a sin(lambda t) + b cos(lambda t) to y_t at t=1,
+    # so the rotation state before y_1 is s(1) and its pair s*(1)
+    s1 <- seasonal$sin*sin(frequency) + seasonal$cos*cos(frequency);
+    sStar1 <- seasonal$sin*cos(frequency) - seasonal$cos*sin(frequency);
+    e <- as.numeric(residuals(fit));
+    yRotation <- rotationForm(e, frequency, gammas, fit$initial$level, fit$initial$trend, 1,
+                              B[["alpha"]], B[["beta"]], s1, sStar1,
+                              B[["phi1[1]"]], B[["theta1[1]"]], fit$initial$arma);
+    # lambda=1 transforms y into y-1
+    expect_lt(max(abs(yRotation - (as.numeric(y)-1))), 1e-8);
+});
+
+test_that("backcasting reproduces a noise-free series with a fractional period", {
+    tt <- 1:200;
+    y <- ts(100 + 0.5*tt + 10*sin(2*pi*tt/7.3) + 4*cos(2*pi*tt/7.3) + 2*sin(4*pi*tt/7.3));
+    fit <- tbats(y, lags=c(1, 7.3), harmonics=2, trend="additive", lambda=1, orders=orders0,
+                 B=c(alpha=0.1, beta=0.01, `gamma1[7.3]`=0.01, `gamma2[7.3]`=0.01), maxeval=1);
+    expect_lt(max(abs(residuals(fit))), 1e-8);
+});
+
+test_that("lambda=0 is the model of the logarithms", {
+    y <- AirPassengers;
+    fitLog <- tbats(y, harmonics=5, trend="additive", lambda=0, orders=orders0);
+    fitLevel <- tbats(log(y), harmonics=5, trend="additive", lambda=1, orders=orders0,
+                      B=fitLog$B, maxeval=1);
+    expect_equal(as.numeric(logLik(fitLog)), as.numeric(logLik(fitLevel)) - sum(log(y)), tolerance=1e-8);
+});
+
+test_that("lambda is estimated in [0, 1] and falls back to 1 when it cannot be", {
+    fit <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0);
+    expect_true(fit$lambda>=0 && fit$lambda<=1);
+    expect_true(any(names(fit$B)=="lambda"));
+    expect_warning(fitNegative <- tbats(AirPassengers-200, harmonics=5, trend="additive", orders=orders0),
+                   "positive data");
+    expect_equal(fitNegative$lambda, 1);
+    expect_message(fitMSE <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, loss="MSE"),
+                   "likelihood");
+    expect_equal(fitMSE$lambda, 1);
+});
+
+test_that("all the distributions are fitted and the dgnorm shape is estimated", {
+    for(distribution in c("dnorm","dlaplace","ds","dgnorm")){
+        fit <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0,
+                     distribution=distribution);
+        expect_true(is.finite(logLik(fit)));
+    }
+    expect_true(any(names(fit$B)=="shape"));
+    fitShape <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0,
+                      distribution="dgnorm", shape=1.5);
+    expect_false(any(names(fitShape$B)=="shape"));
+});
+
+test_that("the usual bounds keep the response to an error in [0, 1] over the cycle", {
+    fit <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0);
+    seasonal <- fit$initial$seasonal;
+    frequency <- 2*pi*seasonal$j/seasonal$period;
+    horizons <- 0:11;
+    response <- fit$B[["alpha"]] + cos(outer(horizons, frequency)) %*% rep(fit$B[["gamma1[12]"]], 5) +
+        sin(outer(horizons, frequency)) %*% rep(fit$B[["gamma2[12]"]], 5);
+    expect_true(all(response>=0 & response<=1));
+    expect_true(fit$B[["beta"]]<=fit$B[["alpha"]]);
+});
+
+test_that("coinciding harmonics are dropped and the ARMA lags are truncated and merged", {
+    harmonics <- tbats_harmonics(c(24, 168), c(2, 8));
+    expect_equal(nrow(harmonics), 2 + 7);
+    expect_false(any(harmonics$period==168 & harmonics$j==7));
+    armaSpec <- tbats_armaSpec(list(ar=c(1, 1, 2), ma=0), c(1, 7, 7.02));
+    expect_equal(armaSpec$lags, c(1, 7));
+    expect_equal(armaSpec$arOrders, c(1, 2));
+});
+
+test_that("a refit with model= reproduces the fit", {
+    fit <- tbats(AirPassengers, harmonics=5, trend="damped", orders=list(ar=1, ma=1, select=FALSE),
+                 distribution="dgnorm");
+    refit <- tbats(AirPassengers, model=fit);
+    expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)), tolerance=1e-10);
+    expect_equal(as.numeric(fitted(refit)), as.numeric(fitted(fit)), tolerance=1e-10);
+});

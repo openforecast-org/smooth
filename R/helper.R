@@ -133,6 +133,10 @@ ssarimaChecker <- function(object){
     return(smoothType(object)=="SSARIMA");
 }
 
+tbatsChecker <- function(object){
+    return(smoothType(object)=="TBATS");
+}
+
 cesChecker <- function(object){
     return(smoothType(object)=="CES");
 }

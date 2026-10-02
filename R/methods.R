@@ -2295,7 +2295,10 @@ simulate.smooth <- function(object, nsim=1, seed=NULL, obs=NULL, ...){
 #### Type of smooth model. Internal function ####
 smoothType <- function(object, ...){
     if(!is.list(object$model)){
-        if(gregexpr("ETS",object$model)!=-1){
+        if(gregexpr("TBATS",object$model)!=-1){
+            smoothType <- "TBATS";
+        }
+        else if(gregexpr("ETS",object$model)!=-1){
             smoothType <- "ETS";
         }
         else if(gregexpr("CES",object$model)!=-1){

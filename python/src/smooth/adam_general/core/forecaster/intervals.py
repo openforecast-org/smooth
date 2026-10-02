@@ -1,15 +1,15 @@
 import greybox as gb
+import nlopt
 import numpy as np
-from scipy.optimize import minimize
 from scipy.special import gamma
 
 from smooth.adam_general.core.utils.distributions import (
     generate_errors,
     normalize_errors,
 )
+from smooth.adam_general.core.utils.utils import _sum_r, scale_debias, scale_variance
 from smooth.adam_general.core.utils.var_covar import (
     covar_anal,
-    sigma,
     var_anal,
 )
 
@@ -51,46 +51,39 @@ def ensure_level_format(level, side):
     return np.round(level_low, 5), np.round(level_up, 5)
 
 
+def _df_scale(general, observations_dict, params_info):
+    """Degrees of freedom for de-biasing the scale (R: ``adam_dfScale``).
+
+    The model passes its own as ``general["df_scale"]``. Otherwise: the non-zero
+    observations minus the parameters, without the scale ones under likelihood,
+    with ``params_info[0]`` holding ``[..., n_scale, n_all]`` as ``sigma()`` reads it.
+    """
+    if general.get("df_scale") is not None:
+        return general["df_scale"]
+    obs_df = observations_dict.get("obs_nonzero") or observations_dict["obs_in_sample"]
+    info = params_info[0]
+    n_param = info[-1]
+    if general.get("loss") == "likelihood" and len(info) > 1:
+        n_param = n_param - info[1]
+    df = obs_df - n_param
+    return df if df > 0 else obs_df
+
+
 def _scale_model_variance(general, observations_dict, params_info):
     """Per-horizon variance implied by an implanted scale model, or ``None``.
 
     R replaces the constant ``s2`` with the scale model's forecast when one is
-    implanted (``R/adam.R:6485-6530``). The forecast is on that distribution's
-    *scale*, so it is first mapped onto a variance -- ``dnorm``, ``dlnorm``,
-    ``dgamma`` and ``dinvgauss`` already return one -- and then de-biased by
-    ``obsInSample / df``.
+    implanted (``R/adam.R:6485-6530``). The forecast is the scale itself, so it
+    is mapped onto a variance and de-biased by ``obsInSample / df``.
     """
     scale_forecast = general.get("scale_forecast")
     if scale_forecast is None:
         return None
 
     sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
-    other = general.get("other") or {}
-    distribution = general["distribution"]
-
-    if distribution == "dlaplace":
-        variance = 2 * sf**2
-    elif distribution == "ds":
-        variance = 120 * sf**4
-    elif distribution == "dgnorm":
-        shape = other["shape"]
-        variance = sf**2 * gamma(3 / shape) / gamma(1 / shape)
-    elif distribution == "dalaplace":
-        alpha = other["alpha"]
-        variance = sf**2 / (alpha**2 * (1 - alpha) ** 2 / (alpha**2 + (1 - alpha) ** 2))
-    else:
-        variance = sf
-
+    variance = scale_variance(sf, general["distribution"], general.get("other"))
     obs = observations_dict["obs_in_sample"]
-    # R measures df over the non-zero sample, as nobs(object, all=FALSE) does.
-    obs_df = observations_dict.get("obs_nonzero", obs) or obs
-    n_param = general.get("scale_nparam")
-    if n_param is None:
-        n_param = params_info[0][-1]
-    df = obs_df - n_param
-    if df <= 0:
-        df = obs_df
-    return variance * obs / df
+    return variance * obs / _df_scale(general, observations_dict, params_info)
 
 
 def generate_prediction_interval(
@@ -113,7 +106,15 @@ def generate_prediction_interval(
     # Estimate sigma. The error type decides how residuals(object) is
     # reconstructed for the ratio-domain distributions.
     e_type = model_type_dict["error_type"]  # "A" or "M"
-    s2 = sigma(observations_dict, params_info, general, prepared_model, e_type) ** 2
+    # The variance implied by the scale, de-biased (R: adam_varianceDebiased), so the
+    # analytical intervals use the same estimate as the likelihood and simulations
+    s2 = (
+        scale_variance(
+            prepared_model["scale"], general["distribution"], general.get("other")
+        )
+        * observations_dict["obs_in_sample"]
+        / _df_scale(general, observations_dict, params_info)
+    )
     s2_forecast = _scale_model_variance(general, observations_dict, params_info)
 
     # lines 8015 to 8022
@@ -427,50 +428,21 @@ def generate_simulation_interval(
     for i in range(nsim):
         arr_vt[:, :lags_model_max, i] = mat_vt[:, :lags_model_max]
 
-    # 2. Calculate degrees of freedom for de-biasing
-    # For variance calculation, use n_param_all - n_param_scale
-    # Check if we have the new n_param table structure
-    n_param = None
-    if "n_param" in general_dict and general_dict["n_param"] is not None:
-        n_param = general_dict["n_param"].n_param_for_variance
-    elif params_info and params_info[0]:
-        # Legacy: params_info[0][-1] is n_param_all, params_info[0][3] is n_param_scale
-        n_param_all = (
-            params_info[0][-1] if len(params_info[0]) > 4 else params_info[0][0]
-        )
-        n_param_scale = params_info[0][3] if len(params_info[0]) > 3 else 0
-        n_param = n_param_all - n_param_scale
-    else:
-        n_param = 0
-
-    df = observations_dict["obs_in_sample"] - n_param
-    if df <= 0:
-        df = observations_dict["obs_in_sample"]
-
-    # 3. Get and de-bias scale
+    # 2. The scale, or the scale model's forecasts, de-biased in the variance space
     obs_in_sample = observations_dict["obs_in_sample"]
+    df = _df_scale(general_dict, observations_dict, params_info)
     scale_forecast = general_dict.get("scale_forecast")
     if scale_forecast is None:
-        scale_value = prepared_model["scale"] * obs_in_sample / df
+        scale_value = prepared_model["scale"]
     else:
-        # An implanted scale model makes the scale time-varying. R de-biases it
-        # and maps it back out of the space sm() fitted it in
-        # (R/adam.R:6388-6400): sm() fits squared residuals for dnorm/dlnorm and
-        # the beta-th power for dgnorm, so those are rooted here. This is a
-        # *scale*, unlike the analytical path's variance, which is why the
-        # transformation differs from `_scale_model_variance`.
-        sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
-        distribution_sim = general_dict["distribution"]
-        shape_sim = (general_dict.get("other") or {}).get("shape")
-        if distribution_sim in ("dnorm", "dlnorm"):
-            scale_value = (sf * obs_in_sample / df) ** 0.5
-        elif distribution_sim == "dgnorm":
-            scale_value = ((sf**shape_sim) * obs_in_sample / df) ** (1 / shape_sim)
-        else:
-            scale_value = sf * obs_in_sample / df
         # One draw per (horizon, replication); the h scales tile across nsim so
         # that reshaping column-major puts the right scale on the right horizon.
-        scale_value = np.tile(scale_value, nsim)
+        scale_value = np.tile(
+            np.asarray(scale_forecast, dtype=np.float64).ravel(), nsim
+        )
+    scale_value = scale_debias(
+        scale_value, general_dict["distribution"], obs_in_sample, df
+    )
 
     # 4. Generate random errors or use external errors
     if external_errors is not None:
@@ -491,8 +463,8 @@ def generate_simulation_interval(
             distribution=distribution,
             n=h * nsim,
             scale=scale_value,
-            obs_in_sample=observations_dict["obs_in_sample"],
-            n_param=n_param,
+            obs_in_sample=obs_in_sample,
+            n_param=obs_in_sample - df,
             shape=other_params.get("shape"),
             alpha=other_params.get("alpha"),
         )
@@ -638,17 +610,16 @@ def generate_simulation_interval(
 _LOG_DISTS = frozenset({"dinvgauss", "dgamma", "dlnorm", "dls", "dllaplace", "dlgnorm"})
 
 
-def _fit_power_quantile(errors, horizons, level):
-    """Fit a power-law quantile ``q_k = A0 * k^A1`` by minimising the pinball loss.
+def _fit_power_quantile(errors, level):
+    """Power-law quantile ``A1 * j^A2``, ``j = 1..h``, of the multistep errors.
 
-    Used for nonparametric prediction intervals: ``A0`` and ``A1`` are
-    chosen so the quantile across horizons matches the empirical multistep
-    residual distribution at the requested level.
+    Mirrors R's ``adam_quantilePower`` (Taylor & Bunn): for a given ``A2`` the
+    pinball loss is minimised by the weighted quantile of ``e / j^A2`` with
+    weights ``j^A2``, so only ``A2`` is optimised, with NLopt's Nelder-Mead.
 
     Parameters
     ----------
     errors : np.ndarray, shape (T-h, h)
-    horizons : np.ndarray, shape (h,)
     level : float
         Quantile level in [0, 1].
 
@@ -656,24 +627,41 @@ def _fit_power_quantile(errors, horizons, level):
     -------
     np.ndarray, shape (h,)
     """
+    errors = np.asarray(errors, dtype=np.float64)
+    h = errors.shape[1]
+    # Column-major, as R's errors[!is.na(errors)] and col(errors)
+    values = errors.ravel(order="F")
+    horizons = np.repeat(np.arange(1, h + 1, dtype=np.float64), errors.shape[0])
+    keep = ~np.isnan(values)
+    values, horizons = values[keep], horizons[keep]
 
-    def pinball_total(params):
-        a0, a1 = params
-        total = 0.0
-        for i, k in enumerate(horizons):
-            q_k = a0 * (k**a1)
-            diff = errors[:, i] - q_k
-            total += np.sum(np.where(diff >= 0, level * diff, (level - 1) * diff))
-        return total
+    def quantile_a1(power):
+        weights = horizons**power
+        ratios = values / weights
+        ordering = np.argsort(ratios, kind="stable")
+        # R's cumsum() accumulates in long double and stores doubles
+        cumulative = np.cumsum(weights[ordering].astype(np.longdouble)).astype(
+            np.float64
+        )
+        return ratios[ordering][np.argmax(cumulative >= level * cumulative[-1])]
 
-    result = minimize(
-        pinball_total,
-        x0=[1.0, 1.0],
-        method="Nelder-Mead",
-        options={"xatol": 1e-6, "fatol": 1e-6, "maxiter": 5000},
-    )
-    a0, a1 = result.x
-    return np.array([a0 * (k**a1) for k in horizons])
+    def pinball(x, grad):
+        residuals = values - quantile_a1(x[0]) * horizons ** x[0]
+        return float(
+            (1 - level) * _sum_r(np.abs(residuals[residuals < 0]))
+            + level * _sum_r(np.abs(residuals[residuals >= 0]))
+        )
+
+    opt = nlopt.opt(nlopt.LN_NELDERMEAD, 1)
+    opt.set_min_objective(pinball)
+    opt.set_lower_bounds([-2.0])
+    opt.set_upper_bounds([4.0])
+    # Explicitly, as R's nloptr would otherwise default xtol_rel to 1e-4
+    opt.set_xtol_rel(1e-8)
+    opt.set_xtol_abs(1e-6)
+    opt.set_maxeval(500)
+    power = opt.optimize([0.5])[0]
+    return quantile_a1(power) * np.arange(1, h + 1, dtype=np.float64) ** power
 
 
 def generate_multistep_interval(
@@ -747,7 +735,8 @@ def generate_multistep_interval(
             params_info,
             level_low,
             level_up,
-            scale_2d_override=np.atleast_1d(vcov).reshape(-1, 1),
+            # At h=1, R uses the variance of the model, as the approximate interval
+            scale_2d_override=np.atleast_1d(vcov).reshape(-1, 1) if h > 1 else None,
         )
 
     n_levels = len(level_low)
@@ -765,12 +754,11 @@ def generate_multistep_interval(
             y_lower[i] = [np.quantile(col, q) for q in level_low]
             y_upper[i] = [np.quantile(col, q) for q in level_up]
     else:  # nonparametric, h > 1
-        horizons = np.arange(1, h + 1, dtype=float)
         y_lower = np.column_stack(
-            [_fit_power_quantile(adam_errors, horizons, q) for q in level_low]
+            [_fit_power_quantile(adam_errors, q) for q in level_low]
         )
         y_upper = np.column_stack(
-            [_fit_power_quantile(adam_errors, horizons, q) for q in level_up]
+            [_fit_power_quantile(adam_errors, q) for q in level_up]
         )
 
     pred_col = yf.reshape(-1, 1)

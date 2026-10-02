@@ -32,7 +32,7 @@ requirements:
     - {{ posix }}zip               # [win]
   host:
     - r-base
-    - r-greybox >=2.0.2
+    - r-greybox >=2.0.9
     - r-rcpp >=0.12.3
     - r-rcpparmadillo >=0.8.100.0.0
     - r-generics >=0.1.2
@@ -47,7 +47,7 @@ requirements:
     - liblapack
   run:
     - r-base
-    - r-greybox >=2.0.2
+    - r-greybox >=2.0.9
     - r-rcpp >=0.12.3
     - r-rcpparmadillo >=0.8.100.0.0
     - r-generics >=0.1.2

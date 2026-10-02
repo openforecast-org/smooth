@@ -694,7 +694,7 @@ test_that("The backcasting seed follows the ARMA parameters", {
     # Near the unit root the two backcasting iterations do not forget the seed, so
     # it has to be built with the current ARI polynomial, not the differences only
     testModel <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, maxeval=1)
-    B <- setNames(c(-0.1322, 0.8075, 0.394, -0.5937, 0.1408), names(testModel$B))
+    B <- setNames(c(-0.0365, 0.7256, 0.2485, -0.4908, 0.1378), names(testModel$B))
     lossDefault <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1)$lossValue
     lossConverged <- adam(BJsales, "NNN", orders=list(ar=2,i=1,ma=2), constant=TRUE, B=B, maxeval=1,
                           nIterations=20)$lossValue
@@ -790,4 +790,26 @@ test_that("LASSO / RIDGE shrink the estimated parameters wherever they are in B"
     testModel <- adam(log(AirPassengers), "NNN", orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)),
                       lags=c(1,12), arma=list(ar=c(0.2,0.3)), loss="LASSO", lambda=0.1)
     expect_equal(unname(coef(testModel)), c(0, 0), tolerance=1e-3)
+})
+
+test_that("Pure regression stores sigma^2 as the scale, as the other ADAM models", {
+    testModel <- adam(cbind(y=BJsales, x=BJsales.lead), "NNN", silent=TRUE);
+    expect_equal(testModel$scale, mean(residuals(testModel)^2));
+})
+
+test_that("Pure regression is forecasted and predicted by forecast.alm() / predict.alm()", {
+    xreg <- data.frame(y=as.vector(BJsales), x=as.vector(BJsales.lead));
+    testModel <- adam(xreg, "NNN", h=10, holdout=TRUE, silent=TRUE);
+    almModel <- alm(y~x, head(xreg, 140));
+    for(interval in c("none", "prediction", "confidence")){
+        testForecast <- forecast(testModel, h=10, interval=interval);
+        almForecast <- forecast(almModel, h=10, newdata=tail(xreg, 10), interval=interval);
+        expect_equal(as.vector(testForecast$mean), as.vector(almForecast$mean));
+        expect_equal(start(testForecast$mean)[1], 141);
+        if(interval!="none"){
+            expect_equal(as.vector(testForecast$lower), as.vector(almForecast$lower));
+            expect_equal(as.vector(predict(testModel, interval=interval)$upper),
+                         as.vector(predict(almModel, interval=interval)$upper));
+        }
+    }
 })

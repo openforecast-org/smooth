@@ -280,9 +280,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                    componentsNumberETS, componentsNumberARIMA,
                    xregNumber, length(lagsModelAll),
                    constantRequired, adamETS);
-    # ADAM's ARIMA keeps the constant in the measurement vector, so the drift is not
-    # flipped in the backward pass (see the note in adam())
-    adamCpp$flipConstant <- FALSE;
+    # The drift is flipped with the trend when d+D is odd (see the note in adam())
+    adamCpp$flipConstant <- constantRequired && arimaModel &&
+        (sum(if(is.list(object$orders)) object$orders$i else object$orders[2]) %% 2 == 1);
     adamCpp$headLength <- headLength;
 
     # Generate the data from the multivariate normal
@@ -1222,39 +1222,22 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                    constantRequired, adamETS);
 
     #### Simulate the data ####
-    # If scale model is included, produce forecasts
+    # The scale, or the scale model's forecasts, de-biased for the simulations
     if(is.scale(object$scale)){
-        sigmaValue <- forecast(object$scale,h=h,newdata=newdata,interval="none")$mean;
+        scaleValue <- as.vector(forecast(object$scale,h=h,newdata=newdata,interval="none")$mean);
     }
     else{
-        sigmaValue <- sigma(object);
+        scaleValue <- object$scale;
     }
+    scaleValue <- adam_scaleSimulation(object, scaleValue);
     # This stuff is needed in order to produce adequate values for weird models
     EtypeModified <- Etype;
     if(Etype=="A" && any(object$distribution==c("dlnorm","dinvgauss","dgamma","dls","dllaplace"))){
         EtypeModified[] <- "M";
     }
     # Matrix for the errors
-    arrErrors <- array(switch(object$distribution,
-                              "dnorm"=rnorm(h*nsim^2, 0, sigmaValue),
-                              "dlaplace"=rlaplace(h*nsim^2, 0, sigmaValue/2),
-                              "ds"=rs(h*nsim^2, 0, (sigmaValue^2/120)^0.25),
-                              "dgnorm"=rgnorm(h*nsim^2, 0,
-                                              sigmaValue*sqrt(gamma(1/object$other$shape)/gamma(3/object$other$shape)),
-                                              object$other$shape),
-                              "dlogis"=rlogis(h*nsim^2, 0, sigmaValue*sqrt(3)/pi),
-                              "dt"=rt(h*nsim^2, obsInSample-nparam(object)),
-                              "dalaplace"=ralaplace(h*nsim^2, 0,
-                                                    sqrt(sigmaValue^2*object$other$alpha^2*(1-object$other$alpha)^2/
-                                                             (object$other$alpha^2+(1-object$other$alpha)^2)),
-                                                    object$other$alpha),
-                              "dlnorm"=rlnorm(h*nsim^2, -extractScale(object)^2/2, extractScale(object))-1,
-                              "dinvgauss"=rinvgauss(h*nsim^2, 1, dispersion=sigmaValue^2)-1,
-                              "dgamma"=rgamma(h*nsim^2, shape=sigmaValue^{-2}, scale=sigmaValue^2)-1,
-                              "dllaplace"=exp(rlaplace(h*nsim^2, 0, sigmaValue/2))-1,
-                              "dls"=exp(rs(h*nsim^2, 0, (sigmaValue^2/120)^0.25))-1,
-                              "dlgnorm"=exp(rgnorm(h*nsim^2, 0,
-                                                   sigmaValue*sqrt(gamma(1/object$other$shape)/gamma(3/object$other$shape))))-1),
+    arrErrors <- array(adam_errorsSimulate(h*nsim^2, object$distribution, scaleValue, object$other,
+                                           obsInSample-nparam(object)),
                        c(h,nsim,nsim));
     # Normalise errors in order not to get ridiculous things on small nsim
     if(nsim<=500){

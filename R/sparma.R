@@ -406,7 +406,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
 
     ##### Function returns scale parameter for the provided parameters #####
     scaler <- function(errors, obsInSample){
-        return(sqrt(sum(errors^2)/obsInSample));
+        return(sum(errors^2)/obsInSample);
     }
 
     # Cost function using C++ fitter
@@ -443,7 +443,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
                                       mean=adamFitted$fitted[otLogical],
-                                      sd=scale, log=TRUE));
+                                      sd=sqrt(scale), log=TRUE));
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsInSample;

@@ -119,18 +119,16 @@ def _standardise_residuals(
     f = np.asarray(scale_fitted, dtype=np.float64)
     if distribution == "dnorm":
         return e / np.sqrt(f)
-    if distribution == "dlaplace":
+    if distribution in ("dlaplace", "dgnorm"):
         return e / f
     if distribution == "ds":
         return e / f**2
-    if distribution == "dgnorm":
-        if other is None:
-            raise ValueError("dgnorm needs a shape; the model carries none.")
-        return e / f ** (1.0 / other)
     if distribution == "dlnorm":
-        return np.exp((np.log(e) + f**2 / 2.0 - 0.5) / f) - 1.0
+        # (log(1+e) + sigma^2/2) / sigma ~ N(0, 1); residuals add the 1 back
+        return np.exp((np.log(e) + f / 2.0) / np.sqrt(f) - 0.5) - 1.0
     if distribution == "dgamma":
-        return e / np.sqrt(f) - 1.0
+        # (1+e) = sigma^2 eta with eta ~ Gamma(sigma^-2, 1); residuals add the 1 back
+        return e / f - 1.0
     # dinvgauss is handled by the caller (it keeps the scale model's residuals)
     return e / f
 
@@ -165,14 +163,12 @@ def _log_density(
     if distribution == "dgnorm":
         if other is None:
             raise ValueError("dgnorm needs a shape; the model carries none.")
-        b = scale * (mu**other if error_type == "M" else 1.0)
+        b = scale * (mu if error_type == "M" else 1.0)
         return gb.dgnorm(y, mu, b, other, log=True)
 
     if distribution == "dlnorm":
-        # R uses sdlog=sqrt(f) but meanlog=log(mu)-f^2/2 -- f plays the role of
-        # a variance in one and a standard deviation in the other. Reproduced as
-        # written; changing it would move every dlnorm scale model off R.
-        meanlog = np.log(np.abs(mu)) - scale**2 / 2.0
+        # The scale is sigma^2 of the log-normal
+        meanlog = np.log(np.abs(mu)) - scale / 2.0
         return gb.dlnorm(y, meanlog, np.sqrt(scale), log=True)
 
     if distribution == "dinvgauss":
@@ -196,8 +192,11 @@ def _differential_entropy(
     s = np.asarray(scale_zero, dtype=np.float64)
     if s.size == 0:
         return 0.0
-    if distribution in ("dnorm", "dlnorm"):
-        return float(_sum_r(np.log(np.sqrt(2.0 * np.pi) * s) + 0.5))
+    # The scale is sigma^2 for dnorm and dlnorm
+    if distribution == "dnorm":
+        return float(_sum_r(np.log(np.sqrt(2.0 * np.pi * s)) + 0.5))
+    if distribution == "dlnorm":
+        return float(_sum_r(np.log(np.sqrt(2.0 * np.pi * s)) + 0.5 - s / 2.0))
     if distribution == "dgnorm":
         if other is None:
             raise ValueError("dgnorm needs a shape; the model carries none.")

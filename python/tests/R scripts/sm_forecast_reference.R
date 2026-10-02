@@ -4,7 +4,7 @@
 ##
 ##   Rscript "python/tests/R scripts/sm_forecast_reference.R"
 
-library(smooth); library(jsonlite)
+suppressMessages(pkgload::load_all(".", quiet=TRUE)); library(jsonlite)
 OUT_DIR <- "python/tests/data"
 y <- read.csv(file.path(OUT_DIR, "sm_positive.csv"))$y
 results <- list()
@@ -49,12 +49,24 @@ for (d in c("dnorm", "dlaplace", "ds", "dgnorm")) {
     obs <- nobs(loc2)
     sim[[d]] <- list(
         scale_forecast = sf,
-        sim_scale = as.numeric(switch(d,
-            "dlnorm" = , "dnorm" = (sf * obs / df)^0.5,
-            "dgnorm" = ((sf^loc2$other$shape) * obs / df)^(1 / loc2$other$shape),
-            sf * obs / df)),
+        sim_scale = as.numeric(smooth:::adam_scaleDebias(sf, d, obs, df)),
         nparam_for_variance = as.integer(nP), df = as.integer(df), obs = as.integer(obs))
     cat(sprintf("  sim %-9s scale[1]=%.6f\n", d, sim[[d]]$sim_scale[1]))
 }
 write(toJSON(sim, auto_unbox = TRUE, digits = NA),
       file.path(OUT_DIR, "sm_simulated_reference.json"))
+
+## implant(): the location model's scale, sigma, logLik and nparam with a scale model
+imp <- list()
+for (d in c("dnorm", "dlaplace", "ds", "dgnorm", "dlnorm", "dgamma", "dinvgauss")) {
+    loc <- adam(y, "ANN", lags = 1, distribution = d, silent = TRUE)
+    s   <- suppressWarnings(sm(loc))
+    loc2 <- implant(loc, s)
+    imp[[d]] <- list(scale_head = head(as.numeric(extractScale(loc2)), 5),
+                     sigma_head = head(as.numeric(extractSigma(loc2)), 5),
+                     logLik = as.numeric(logLik(loc2)), nparam = nparam(loc2),
+                     sm_scale_own = extractScale(s))
+}
+write(toJSON(imp, auto_unbox = TRUE, digits = NA),
+      file.path(OUT_DIR, "sm_implant_reference.json"))
+cat("wrote sm_implant_reference.json -", length(imp), "cases\n")

@@ -7,7 +7,7 @@
 #   coef.csv     — estimated coefficients (name,value)
 #   vcov.csv     — vcov(m) covariance matrix
 #   confint.csv  — confint(m, level=0.95): S.E. + lower/upper bounds (with row names)
-library(smooth)
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 
 outRoot <- file.path("python", "tests", "data", "summary")
 

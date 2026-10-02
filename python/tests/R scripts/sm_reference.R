@@ -7,7 +7,7 @@
 ## Outputs:  python/tests/data/sm_reference.json
 ##           python/tests/data/sm_*.csv
 
-library(smooth)
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 library(jsonlite)
 
 OUT_DIR <- "python/tests/data"

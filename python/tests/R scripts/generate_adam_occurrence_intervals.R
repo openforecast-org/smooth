@@ -8,7 +8,7 @@
 #   simulated_ann_or_upper.csv     upper bounds, 95 % CI, nsim=100000
 #   simulated_ann_or_lower.csv     lower bounds, 95 % CI, nsim=100000
 
-library(smooth)
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 set.seed(42)
 
 out_dir <- "python/tests/data/adam_occ_intervals"

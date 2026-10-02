@@ -2,7 +2,7 @@
 ``smooth::om()`` / ``omg()``.
 
 R outputs are fetched live via :mod:`tests._r_bridge` (which loads the local
-R source through ``devtools::load_all``), so the comparison is always against
+R source through ``pkgload::load_all``), so the comparison is always against
 the current checkout — no pre-generated CSV reference data.
 
 Scenarios:

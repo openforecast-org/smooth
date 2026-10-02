@@ -12,13 +12,8 @@
 ##
 ## All outputs land under python/tests/data/omg/.
 
-library(smooth)
-# Load dev package if omg() is not in the installed version.
-# In a docker container with pkgload available, run via:
-#   LD_PRELOAD=/opt/conda/lib/libstdc++.so.6 R -e \
-#     ".libPaths(c('/tmp/Rlib',.libPaths())); pkgload::load_all('.'); \
-#      source('python/tests/R scripts/generate_omg_reference.R')"
-# Or simply ensure pkgload::load_all('.') was called before sourcing this file.
+# The working copy, not the installed smooth
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 
 OUT_DIR <- "python/tests/data/omg"
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)

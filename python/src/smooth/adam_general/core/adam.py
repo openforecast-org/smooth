@@ -6,23 +6,27 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from scipy import special
 from scipy import stats as scipy_stats
 
 from smooth.adam_general._adam_general import adam_simulator
 from smooth.adam_general.core.checker import parameters_checker
+from smooth.adam_general.core.checker.parameters_checker import _validate_x
 from smooth.adam_general.core.creator import architector, creator
 from smooth.adam_general.core.estimator import (
     estimator,
     selector,
 )
 from smooth.adam_general.core.forecaster import forecaster, preparator
+from smooth.adam_general.core.forecaster.intervals import ensure_level_format
+from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
     resolve_smoother,
+    scale_debias,
+    scale_variance,
 )
 
 # Note: adam_cpp instance is stored in self and passed to forecasting functions
@@ -838,6 +842,9 @@ class ADAM:
               "NLOPT_LN_SBPLX" (Subplex), "NLOPT_LN_COBYLA" (COBYLA),
               "NLOPT_LN_BOBYQA" (BOBYQA). Use "LN_" prefix for derivative-free
               algorithms.
+            - ``B``, ``lb``, ``ub`` (array-like): starting values and bounds of
+              the parameter vector, as R's ``adam(B=, lb=, ub=)``. They apply to
+              the estimated model only and are ignored during model selection.
 
             Example::
 
@@ -1312,6 +1319,15 @@ class ADAM:
                 pass
 
         return self
+
+    def _gnorm_shape(self) -> Optional[float]:
+        """The dgnorm shape, provided or estimated.
+
+        ``fit()`` clears the ``gnorm_shape`` argument from the instance, so a
+        fitted model carries the shape on ``other`` instead.
+        """
+        other = getattr(self, "other", None) or {}
+        return other.get("shape", getattr(self, "gnorm_shape", None))
 
     def _set_fitted_attributes(self):
         """
@@ -1833,21 +1849,18 @@ class ADAM:
 
     @property
     def scale(self) -> float:
-        """Internal optimisation scale of the error distribution
-        (R: ``adam_obj$scale``).
+        """Scale of the error distribution (R: ``adam_obj$scale``).
 
-        This is the scale parameter the cost function uses inside the
-        density (e.g. for ``dgnorm`` it's the ``α`` in
-        ``f(x; β, σ) = β/(2σ Γ(1/β)) exp(-(|x|/σ)^β)``). It coincides
-        with the empirical residual std (:attr:`sigma`) only for the
-        Normal distribution; for non-normal distributions the two differ
-        — :attr:`sigma` is then the variance-adjusted residual std-dev
-        (matches R's ``sigma()`` generic), while ``scale`` is the
-        density-parameterising scalar used by the cost function.
+        The parameter of the distribution as written in the ADAM monograph
+        (Tables 11.1-11.2): sigma^2 for ``dnorm``, ``dlnorm``, ``dinvgauss`` and
+        ``dgamma``, and s for the others (e.g. ``b`` of the Laplace, ``s`` of the
+        Generalised Normal). It is the maximum likelihood estimate, divided by
+        the sample size; :attr:`sigma` is the de-biased standard deviation of
+        the residuals.
 
-        Use :attr:`sigma` for reporting "error standard deviation" /
-        constructing intervals; use ``scale`` for re-evaluating the
-        likelihood or other quantities defined in terms of the density.
+        Use :attr:`sigma` for reporting the "error standard deviation"; use
+        ``scale`` for re-evaluating the likelihood or other quantities defined
+        in terms of the density.
         """
         self._check_is_fitted()
         return float(self._prepared.get("scale", float("nan")))
@@ -2287,15 +2300,16 @@ class ADAM:
         """
         Return standardised residuals.
 
-        Residuals are scaled by distribution-specific estimates of their
-        scale, corrected for degrees of freedom ``df = nobs - nparam``.
-        The standardisation formula depends on the fitted distribution:
+        Residuals are divided by the distribution's scale (:meth:`extract_scale`),
+        de-biased in the variance space with ``df = nobs - nparam`` (without the
+        scale parameters under likelihood), so ``s_df = s (n/df)^(1/p)`` with
+        ``p`` the power of the scale in the variance:
 
-        - **dnorm**: ``(e - ē) / (σ √(n/df))``
-        - **dlaplace**: ``e / σ · n/df``
-        - **ds**: ``(e - ē) / (σ · n/df)²``
-        - **dgnorm**: ``(e - ē) / (σ^β · n/df)^(1/β)``, β = shape
-        - **dlnorm**: ``exp((log(e) + σ²/2 - mean(·)) / (σ √(n/df)))``
+        - **dnorm**: ``(e - ē) / sqrt(s_df)``, as the scale is σ²
+        - **dlaplace**: ``e / s_df``
+        - **ds**: ``(e - ē) / s_df²``
+        - **dgnorm**: ``(e - ē) / s_df``
+        - **dlnorm**: ``exp((log(e) + s/2 - mean(·)) / sqrt(s_df))``
         - **dinvgauss / dgamma**: ``e / ē``
 
         For a correctly specified model the result should be approximately
@@ -2327,37 +2341,33 @@ class ADAM:
         """
         self._check_is_fitted()
         obs = self.nobs
-        df = obs - self.nparam
         errors = self.residuals.copy().astype(float)
         dist = self.distribution_
-        # R's rstandard.adam standardises by extractScale(), the estimated
-        # distribution scale -- not by the df-unbiased sigma() (R/adam.R:5406).
-        # extract_scale() is *not* self.scale for a scale model: it returns 1,
-        # because such a model is the scale, and its residuals are already the
-        # location model's standardised ones. Dividing by self.scale instead
-        # shrank them by that factor, so none of them reached +-1.96 and the
-        # residual panels looked far tighter than they are. When a scale model
-        # is attached to a location model it returns a vector, which is the
-        # point: each residual is standardised by its own scale.
-        scale = self.extract_scale()
-
-        if dist in ("dnorm", "dt"):
-            mean_e = np.mean(errors)
-            return (errors - mean_e) / (scale * np.sqrt(obs / df))
-        elif dist == "ds":
-            mean_e = np.mean(errors)
-            return (errors - mean_e) / (scale * obs / df) ** 2
-        elif dist == "dgnorm":
-            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
-            mean_e = np.mean(errors)
-            return (errors - mean_e) / (scale**beta * obs / df) ** (1.0 / beta)
-        elif dist in ("dinvgauss", "dgamma"):
+        if dist in ("dinvgauss", "dgamma"):
             return errors / np.mean(errors)
-        elif dist == "dlnorm":
-            log_e = np.log(errors) + scale**2 / 2
-            return np.exp((log_e - np.mean(log_e)) / (scale * np.sqrt(obs / df)))
-        else:  # dlaplace and other additive distributions
-            return errors / scale * obs / df
+
+        # R's rstandard.adam standardises by extractScale(), de-biased in the
+        # variance space. extract_scale() is a vector when a scale model is
+        # attached, so each residual gets its own scale; a scale model itself
+        # returns 1, because its residuals are already standardised.
+        raw_scale = self.extract_scale()
+        scale = scale_debias(raw_scale, dist, obs, self._df_scale)
+        log_dist = dist in ("dlnorm", "dllaplace", "dls", "dlgnorm")
+        if log_dist:
+            errors = np.log(errors)
+        if dist == "dlnorm":
+            errors = errors + raw_scale / 2
+        # The conventional residuals of Laplace, ALaplace and Logistic are not centred
+        if dist not in ("dlaplace", "dalaplace", "dlogis"):
+            errors = errors - np.mean(errors)
+        # sigma for dnorm and dlnorm, s^2 for S, s for the rest
+        if dist in ("dt", "dnorm", "dlnorm"):
+            errors = errors / np.sqrt(scale)
+        elif dist in ("ds", "dls"):
+            errors = errors / scale**2
+        else:
+            errors = errors / scale
+        return np.exp(errors) if log_dist else errors
 
     def rstudent(self) -> NDArray:
         """
@@ -2432,7 +2442,7 @@ class ADAM:
             return errors / denom
 
         elif dist == "dgnorm":
-            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            beta = self._gnorm_shape() or 2.0
             errors -= np.mean(errors)
             total_pow = np.sum(np.abs(errors) ** beta)
             denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
@@ -2445,7 +2455,7 @@ class ADAM:
 
         elif dist == "dlnorm":
             scale = self.extract_scale()
-            log_e = np.log(errors) - np.mean(np.log(errors)) - scale**2 / 2
+            log_e = np.log(errors) - np.mean(np.log(errors)) - scale / 2
             total_sq = np.sum(log_e**2)
             denom = np.sqrt((total_sq - log_e**2) / df)
             return np.exp(log_e / denom)
@@ -2543,7 +2553,7 @@ class ADAM:
         elif dist == "ds":
             stat = scipy_stats.gennorm.ppf(p, beta=0.5)
         elif dist == "dgnorm":
-            beta = self.gnorm_shape if self.gnorm_shape is not None else 2.0
+            beta = self._gnorm_shape() or 2.0
             stat = scipy_stats.gennorm.ppf(p, beta=beta)
         elif dist == "dlnorm":
             errors = np.log(errors)
@@ -2672,6 +2682,25 @@ class ADAM:
         return base
 
     @property
+    def _df_scale(self) -> float:
+        """Degrees of freedom for de-biasing the scale (R: ``adam_dfScale``).
+
+        The non-zero observations minus the parameters, without the scale ones
+        when they were estimated by likelihood -- the scale model's parameters
+        when one is attached, as ``implant()`` puts them in the scale column.
+        """
+        n_param = float(self.nparam)
+        if (self._general or {}).get("loss") == "likelihood":
+            if self.scale_model is not None:
+                n_param -= float(self.scale_model.nparam)
+            elif getattr(self, "_n_param", None) is not None:
+                n_param -= float(self._n_param.estimated["scale"])
+            else:
+                n_param -= 1.0
+        df = self._nobs_nonzero - n_param
+        return df if df > 0 else float(self._nobs_nonzero)
+
+    @property
     def _nobs_nonzero(self) -> int:
         """In-sample observations excluding zeroes (R: ``nobs(object, all=FALSE)``).
 
@@ -2741,18 +2770,8 @@ class ADAM:
         if scale_model is None:
             return 1.0 if getattr(self, "is_scale_", False) else self.scale
 
-        fitted = np.asarray(scale_model.fitted, dtype=np.float64).ravel()
-        dist = self.distribution_
-        if dist in ("dnorm", "dlnorm"):
-            return np.sqrt(fitted)
-        if dist == "ds":
-            return fitted**2
-        if dist == "dgnorm":
-            other = (getattr(scale_model, "other", None) or {}).get("shape")
-            if other is None:
-                raise ValueError("dgnorm scale model carries no shape.")
-            return fitted ** (1.0 / other)
-        return fitted
+        # The scale model fits the scale itself: sigma^2 for dnorm, s for dlaplace...
+        return np.asarray(scale_model.fitted, dtype=np.float64).ravel()
 
     def extract_sigma(self):
         """Standard deviation implied by the scale (R: ``extractSigma``).
@@ -2764,41 +2783,12 @@ class ADAM:
         if self.scale_model is None:
             return self.sigma
 
-        scale = self.extract_scale()
         dist = self.distribution_
-        if dist in (
-            "dnorm",
-            "dlnorm",
-            "dlogitnorm",
-            "dbcnorm",
-            "dfnorm",
-            "dinvgauss",
-            "dgamma",
-        ):
-            return scale
-        if dist in ("dlaplace", "dllaplace"):
-            return np.sqrt(2.0 * scale)
-        if dist in ("ds", "dls"):
-            return np.sqrt(120.0 * scale**4)
-        if dist in ("dgnorm", "dlgnorm"):
-            shape = (getattr(self, "other", None) or {}).get("shape")
-            if shape is None:
-                raise ValueError("dgnorm model carries no shape.")
-            return np.sqrt(
-                scale**2 * special.gamma(3.0 / shape) / special.gamma(1.0 / shape)
-            )
-        if dist == "dlogis":
-            return scale * np.pi / np.sqrt(3.0)
         if dist == "dt":
-            return 1.0 / np.sqrt(1.0 - 2.0 / scale)
-        if dist == "dalaplace":
-            alpha = (getattr(self, "other", None) or {}).get("alpha")
-            if alpha is None:
-                raise ValueError("dalaplace model carries no alpha.")
-            return scale / np.sqrt(
-                (alpha**2 * (1.0 - alpha) ** 2) * (alpha**2 + (1.0 - alpha) ** 2)
-            )
-        return self.sigma
+            return 1.0 / np.sqrt(1.0 - 2.0 / self.extract_scale())
+        return np.sqrt(
+            scale_variance(self.extract_scale(), dist, getattr(self, "other", None))
+        )
 
     def _forecast_scale_model(self, h=None):
         """The scale model's point forecast over ``self.h``, or ``None``.
@@ -2903,18 +2893,9 @@ class ADAM:
 
         residuals = np.asarray(self.residuals, dtype=float)
         residuals = residuals[np.isfinite(residuals)]
-        # R divides by nobs(object, all=FALSE) -- the non-zero sample.
-        n_obs = self._nobs_nonzero
-        # R's ``sigma.adam`` (R/adam.R:4687) drops the scale from nparam for
-        # likelihood loss, since sigma is that scale and must not unbias
-        # itself; other losses use nparam as it stands.
-        n_param = float(self.nparam)
-        loss = self._general.get("loss") if self._general else None
-        if loss == "likelihood":
-            n_param -= 1
-        df = n_obs - n_param
-        if df <= 0:
-            df = n_obs
+        # R's ``sigma.adam`` (R/adam.R:4687) divides by the non-zero sample minus
+        # the parameters, without the scale ones under likelihood loss.
+        df = self._df_scale
 
         distribution = (
             (
@@ -3401,7 +3382,7 @@ class ADAM:
         occurrence: Optional[NDArray] = None,
         scenarios: bool = False,
         seed: Optional[int] = None,
-    ) -> NDArray:
+    ) -> ForecastResult:
         """
         Generate forecasts using the fitted ADAM model.
 
@@ -3485,6 +3466,11 @@ class ADAM:
 
         if occurrence is not None:
             self._occurrence["occurrence"] = occurrence
+
+        # A pure regression is a greybox ALM, forecasted by ALM.predict()
+        # (R: forecast.alm())
+        if getattr(self, "_alm_model", None) is not None:
+            return self._predict_regression(X, interval, level, side)
 
         # ``interval="complete"`` / ``"confidence"`` delegate to
         # :meth:`reforecast` — they need per-parameter-draw refitting of
@@ -3735,7 +3721,12 @@ class ADAM:
             "xreg_model": True,
         }
         self._arima = {"ar_orders": [0], "i_orders": [0], "ma_orders": [0]}
-        self._explanatory = {"xreg_model": True}
+        # The names of the regressors, as the parameter checker gives them to ALM
+        names = _validate_x(X, n)[3]
+        self._explanatory = {
+            "xreg_model": True,
+            "xreg_names": names or [f"x{i + 1}" for i in range(np.shape(X)[-1])],
+        }
         self._general = {
             "loss": "likelihood",
             "h": getattr(self, "h", 0),
@@ -3744,6 +3735,8 @@ class ADAM:
         self._prepared = {
             "y_fitted": fitted,
             "residuals": y_in_sample - fitted,
+            # ALM stores the scale as ADAM does (sigma^2 for dnorm and dlnorm)
+            "scale": float(alm.scale),
         }
         self._adam_estimated = {
             "B": np.asarray(alm.coefficients),
@@ -3756,6 +3749,53 @@ class ADAM:
         }
         self.model = "Regression"
         self.time_elapsed_ = time.time() - self._start_time
+
+    def _predict_regression(self, X, interval, level, side) -> ForecastResult:
+        """Forecasts of a pure regression from ALM.predict(), as R's forecast.alm().
+
+        All the prediction intervals of ADAM are the parametric ones there.
+        """
+        if X is None:
+            raise ValueError("X for the forecast horizon is needed for a regression.")
+        h = int(self._general["h"])
+        _, X_new, _, names = _validate_x(X, h)
+        names = names or self._explanatory["xreg_names"]
+        alm = self._alm_model
+        # A stepwise() model uses only the selected regressors
+        if alm._feature_names is not None:
+            X_new = X_new[:, [list(names).index(nm) for nm in alm._feature_names]]
+
+        alm_interval = interval if interval in ("none", "confidence") else "prediction"
+        level = 0.95 if level is None else level
+        bound_low, bound_up = ensure_level_format(level, side)
+        levels = bound_up - bound_low
+        result = alm.predict(
+            np.column_stack([np.ones(h), X_new]),
+            interval=alm_interval,
+            level=list(levels),
+            side=side,
+        )
+
+        n = int(alm.nobs)
+        index = pd.RangeIndex(n, n + h)
+        lower = upper = None
+        if interval != "none":
+            if side != "upper":
+                lower = pd.DataFrame(
+                    np.reshape(result.lower, (h, -1)), index=index, columns=bound_low
+                )
+            if side != "lower":
+                upper = pd.DataFrame(
+                    np.reshape(result.upper, (h, -1)), index=index, columns=bound_up
+                )
+        return ForecastResult(
+            mean=pd.Series(np.ravel(result.mean), index=index, name="mean"),
+            lower=lower,
+            upper=upper,
+            level=level,
+            side=side,
+            interval=interval,
+        )
 
     def _fit_occurrence_model(self, y):
         """Fit an occurrence model on ``y`` and return it.
@@ -3787,6 +3827,14 @@ class ADAM:
         m.fit(y)
         return m
 
+    def _nlopt_params(self) -> Dict[str, Any]:
+        """The optimiser settings without B, lb and ub, which fit one model only."""
+        return {
+            key: value
+            for key, value in (self.nlopt_kwargs or {}).items()
+            if key not in ("B", "lb", "ub")
+        }
+
     def _execute_estimation(self, estimation=True):
         """
         Execute model estimation when model_do is 'estimate'.
@@ -3809,7 +3857,10 @@ class ADAM:
             else:
                 other_value = float(self.gnorm_shape)
 
-            nlopt_params = self.nlopt_kwargs if self.nlopt_kwargs else {}
+            nlopt_params = self._nlopt_params()
+            for key, name in (("B", "B_initial"), ("lb", "lb"), ("ub", "ub")):
+                if (self.nlopt_kwargs or {}).get(key) is not None:
+                    nlopt_params[name] = self.nlopt_kwargs[key]
             self._adam_estimated = estimator(
                 general_dict=self._general,
                 model_type_dict=self._model_type,
@@ -3982,7 +4033,7 @@ class ADAM:
             initials_results=self._initials,
             criterion=self._general["ic"],
             silent=self.verbose == 0,
-            nlopt_kwargs=self.nlopt_kwargs,
+            nlopt_kwargs=self._nlopt_params(),
             smoother=self._resolve_smoother(),
         )
         # print(self._adam_selected)
@@ -4494,7 +4545,7 @@ class ADAM:
             bounds="usual",
             # The current dgnorm shape, so the gradient initial-state solve in
             # preparator() profiles the same loss the estimation used
-            other=getattr(self, "gnorm_shape", None),
+            other=self._gnorm_shape(),
         )
 
     def _auto_predict(self):
@@ -4615,7 +4666,7 @@ class ADAM:
             bounds="usual",
             # The current dgnorm shape, so the gradient initial-state solve in
             # preparator() profiles the same loss the estimation used
-            other=getattr(self, "gnorm_shape", None),
+            other=self._gnorm_shape(),
         )
 
     def _execute_prediction(
@@ -4647,12 +4698,9 @@ class ADAM:
         # over the same horizon and hand it to the interval code, which is what
         # R does with forecast(object$scale, h)$mean (R/adam.R:6485-6530).
         self._general["scale_forecast"] = self._forecast_scale_model()
-        # R de-biases the scale forecast with nparam(object) *after* implanting,
-        # which counts the scale model's parameters. `params_info` is a snapshot
-        # taken at estimation time and still holds the pre-implant count.
-        self._general["scale_nparam"] = (
-            float(self.nparam) if self.scale_model is not None else None
-        )
+        # The df for de-biasing the scale, after implanting: `params_info` is a
+        # snapshot taken at estimation time and holds the pre-implant count.
+        self._general["df_scale"] = self._df_scale
 
         # Standard single-model prediction
         self._forecast_results = forecaster(
@@ -5347,7 +5395,7 @@ class ADAM:
                 f"(obs_minimum={obs_minimum}, nobs={nobs}). R warns and "
                 "falls back to method='dsr' here, which is not yet ported."
             )
-        change_origin = initial_type in ("backcasting", "complete")
+        change_origin = initial_type in ("backcasting", "complete", "gradient")
         if replace or prob is not None:
             # User explicitly asked for iid-style sampling; honour it.
             idx_list = list(case_resample_indices(nobs, size, nsim, replace, prob, rng))
@@ -5373,6 +5421,14 @@ class ADAM:
             include_model_kwarg = True
         refit_kwargs["holdout"] = False
         refit_kwargs.setdefault("verbose", 0)
+        # As R, each refit starts from the estimates and is not bounded
+        start = np.asarray(self.coef, dtype=float)
+        refit_kwargs["nlopt_kwargs"] = {
+            **(getattr(self, "nlopt_kwargs", None) or {}),
+            "B": start,
+            "lb": np.full(start.shape, -np.inf),
+            "ub": np.full(start.shape, np.inf),
+        }
 
         actuals = np.asarray(self.actuals, dtype=float)
 
@@ -6195,17 +6251,21 @@ class ADAM:
             distribution=distribution,
             h=h,
             nsim=nsim,
-            # R substitutes the scale model's forecast for sigma(object) here
-            # (R/reapply.R:1281-1286), untransformed and un-de-biased.
-            sigma=(
-                self._forecast_scale_model(h)
-                if self.scale_model is not None
-                else float(self.sigma)
+            # The scale, or the scale model's forecasts, de-biased in the
+            # variance space, as in the simulated intervals (R/reapply.R).
+            scale=scale_debias(
+                (
+                    self._forecast_scale_model(h)
+                    if self.scale_model is not None
+                    else float(self.scale)
+                ),
+                distribution,
+                self.nobs,
+                self._df_scale,
             ),
             n_obs=n_obs,
             n_param=int(self.nparam),
-            opt_scale=float(self.scale),
-            shape=other_dict.get("shape", getattr(self, "gnorm_shape", None)),
+            shape=other_dict.get("shape", self._gnorm_shape()),
             alpha=other_dict.get("alpha"),
             rng=rng,
         )
@@ -6519,12 +6579,19 @@ class ADAM:
         rng = np.random.default_rng(seed)
         n_errors = obs * nsim
         if randomizer is None:
-            # R's distribution-aware default. ``self.scale`` is the
-            # optimisation-scale parameter that ``generate_errors`` consumes.
+            # R's distribution-aware default: the scale, or the scale model's
+            # fitted values, de-biased in the variance space.
             distribution = self._general.get("distribution", "dnorm") or "dnorm"
-            n_param = int(self.df_used) if hasattr(self, "df_used") else 0
-            df = max(obs_in_sample - n_param, 1)
-            scale_val = float(self.scale) * obs_in_sample / df
+            n_param = int(self.nparam)
+            scale_base: Any
+            if self.scale_model is not None:
+                scale_fitted = np.asarray(self.extract_scale(), dtype=np.float64)
+                scale_base = np.tile(np.resize(scale_fitted, obs), nsim)
+            else:
+                scale_base = float(self.scale)
+            scale_val = scale_debias(
+                scale_base, distribution, obs_in_sample, self._df_scale
+            )
             shape = (self.other or {}).get("shape") if hasattr(self, "other") else None
             alpha = (self.other or {}).get("alpha") if hasattr(self, "other") else None
             errors_flat = generate_errors(
@@ -6808,6 +6875,13 @@ class ADAM:
         df = max(n_obs - h, 1)
         return (errors.T @ errors) / df
 
+    def _variance_debiased(self) -> float:
+        """The variance implied by the scale, de-biased (R: adam_varianceDebiased)."""
+        variance = scale_variance(
+            self.extract_scale(), self.distribution_, getattr(self, "other", None)
+        )
+        return float(np.mean(variance) * self.nobs / self._df_scale)
+
     def _multicov_analytical(self, h: int, covar_anal_fn, var_anal_fn) -> NDArray:
         """Closed-form covariance — mirrors R/adam.R:7087-7088."""
         # Pull the matrices the same way intervals.generate_prediction_interval
@@ -6827,8 +6901,7 @@ class ADAM:
         else:
             mat_wt = meas_raw[-h:]
         lags_all = np.asarray(self._lags_model["lags_model_all"]).flatten()
-        sigma_val = float(self.sigma) if self.sigma is not None else float("nan")
-        s2 = sigma_val * sigma_val
+        s2 = self._variance_debiased()
 
         # Dispatch on error_type / distribution to mirror the
         # intervals.py branch (line 81-104). Multiplicative-error models on

@@ -4,7 +4,7 @@
 ##
 ##   Rscript "python/tests/R scripts/interval_distributions_reference.R"
 
-library(smooth); library(jsonlite)
+suppressMessages(pkgload::load_all(".", quiet=TRUE)); library(jsonlite)
 OUT <- "python/tests/data"
 y <- read.csv(file.path(OUT, "sm_positive.csv"))$y
 res <- list()

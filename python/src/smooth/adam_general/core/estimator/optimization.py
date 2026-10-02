@@ -281,7 +281,8 @@ def _create_objective_function(
             param_str = ", ".join([f"{val:.4f}" for val in x])
             print(f"Iter {iteration_count[0]:3d}: B=[{param_str}] -> CF={cf_value:.6f}")
 
-        if not np.isfinite(cf_value):
+        # A perfect fit (-inf) is kept, as in R
+        if np.isnan(cf_value) or cf_value == np.inf:
             return 1e300
         return cf_value
 

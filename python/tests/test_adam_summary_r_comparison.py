@@ -2,7 +2,7 @@
 ``smooth::adam``.
 
 R outputs are fetched live via :mod:`tests._r_bridge` (which loads the local
-R source through ``devtools::load_all``), so the comparison is always
+R source through ``pkgload::load_all``), so the comparison is always
 against the current checkout.
 
 Scenarios exercise every CI-clamping path: ``ANN`` / ``AAN`` (usual ETS),

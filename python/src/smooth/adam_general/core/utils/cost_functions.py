@@ -740,7 +740,8 @@ def CF(  # noqa: N802
         loss = general["loss"]
         CFValue = calculate_multistep_loss(loss, adam_errors, obs_in_sample, h)
 
-    if np.isnan(CFValue) or np.isinf(CFValue):
+    # A perfect fit (-inf) is kept, as in R
+    if np.isnan(CFValue) or CFValue == np.inf:
         CFValue = 1e300
 
     return CFValue

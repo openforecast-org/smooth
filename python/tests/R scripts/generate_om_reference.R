@@ -11,7 +11,7 @@
 ##
 ## All outputs land under python/tests/data/om/.
 
-library(smooth)
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 
 OUT_DIR <- "python/tests/data/om"
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)

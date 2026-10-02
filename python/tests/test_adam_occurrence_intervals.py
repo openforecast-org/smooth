@@ -95,14 +95,14 @@ class TestApproximateFormula:
             _prepare_matrices_for_forecast,
         )
         from smooth.adam_general.core.utils.var_covar import covar_anal
-        from smooth.adam_general.core.utils.var_covar import sigma as sigma_fn
 
         gen = m._general.copy()
         gen["h"] = 10
         mat_vt, mat_wt, vec_g, mat_f = _prepare_matrices_for_forecast(
             m._prepared, m._observations, m._lags_model, gen
         )
-        s2 = sigma_fn(m._observations, m._params_info, m._general, m._prepared) ** 2
+        # The de-biased variance of the model: for dnorm, sigma^2 over the non-zero df
+        s2 = m.sigma**2
         v_voc = covar_anal(
             m._lags_model["lags_model_all"], 10, mat_wt, mat_f, vec_g, s2
         )

@@ -15,7 +15,7 @@
 ## Load the *local* R source, exactly as python/tests/_r_bridge.py does, so the
 ## fixtures always track the working tree rather than whatever version happens to
 ## be installed in the user's R library.
-suppressMessages(suppressWarnings(devtools::load_all(".", quiet = TRUE)))
+suppressMessages(suppressWarnings(pkgload::load_all(".", quiet = TRUE)))
 library(jsonlite)
 
 OUT_DIR <- commandArgs(trailingOnly = TRUE)[1]
@@ -32,6 +32,14 @@ extract_ces <- function(m, h) {
     residual_vals <- as.numeric(m$residuals)
     forecast_vals <- as.numeric(m$forecast)
     states_mat <- as.matrix(m$states)
+
+    # Bounds of the deterministic interval types, h x 2 for levels 0.8 and 0.95
+    intervals <- list()
+    for (interval in c("prediction", "semiparametric", "nonparametric", "empirical")) {
+        f <- forecast(m, h = h, interval = interval, level = c(0.8, 0.95))
+        intervals[[interval]] <- list(lower = unname(as.matrix(f$lower)),
+                                      upper = unname(as.matrix(f$upper)))
+    }
 
     # ICs via logLik object
     ll <- m$logLik
@@ -58,7 +66,8 @@ extract_ces <- function(m, h) {
         states_nrow  = nrow(states_mat),
         states_ncol  = ncol(states_mat),
         states_first_row = as.numeric(states_mat[1, ]),
-        states_last_row  = as.numeric(states_mat[nrow(states_mat), ])
+        states_last_row  = as.numeric(states_mat[nrow(states_mat), ]),
+        intervals    = intervals
     )
 }
 

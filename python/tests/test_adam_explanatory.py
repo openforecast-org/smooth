@@ -358,3 +358,44 @@ def test_initial_xreg_combined_with_level(etsx_data):
                  initial={"level": 10.0, "xreg": [2.0, -1.5]})
     model.fit(y, X)
     assert model._explanatory["xreg_model"] is True
+
+
+def test_pure_regression_scale_is_sigma_squared():
+    """A pure regression stores sigma^2 as its scale, as the other ADAM models."""
+    rng = np.random.default_rng(1)
+    x = rng.normal(size=(100, 1))
+    y = 10 + 2 * x[:, 0] + rng.normal(0, 10, 100)
+    model = ADAM(model="NNN", lags=[1]).fit(y, X=x)
+    residuals = np.asarray(model.residuals, dtype=float)
+    assert model.scale == pytest.approx(np.mean(residuals**2), rel=1e-10)
+
+
+@pytest.mark.parametrize("interval", ["none", "prediction", "confidence"])
+@pytest.mark.parametrize("side", ["both", "upper"])
+def test_pure_regression_predict_is_alm_predict(interval, side):
+    """A pure regression is forecasted by ALM.predict(), as R's forecast.alm()."""
+    rng = np.random.default_rng(1)
+    x = rng.normal(100, 10, (100, 2))
+    y = x[:, 0] + rng.normal(size=100)
+    model = ADAM(model="NNN").fit(y[:90], X=x[:90])
+    forecast = model.predict(h=5, X=x[90:95], interval=interval, side=side)
+    expected = model._alm_model.predict(
+        np.column_stack([np.ones(5), x[90:95]]),
+        interval=interval,
+        level=0.95,
+        side=side,
+    )
+    assert np.allclose(forecast.mean.values, np.ravel(expected.mean))
+    assert list(forecast.mean.index) == list(range(90, 95))
+    if interval != "none":
+        assert np.allclose(forecast.upper.values.ravel(), np.ravel(expected.upper))
+
+
+def test_pure_regression_predict_with_selected_regressors():
+    rng = np.random.default_rng(1)
+    x = rng.normal(100, 10, (100, 3))
+    y = x[:, 0] + rng.normal(size=100)
+    model = ADAM(model="NNN", regressors="select").fit(y[:90], X=x[:90])
+    forecast = model.predict(h=3, X=x[90:93], interval="prediction")
+    assert np.all(np.isfinite(forecast.lower.values))
+    assert np.allclose(forecast.mean.values, x[90:93, 0], atol=3)

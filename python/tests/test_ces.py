@@ -34,6 +34,7 @@ pytestmark = pytest.mark.r_parity
 # Load reference data
 # ---------------------------------------------------------------------------
 
+
 @functools.lru_cache(maxsize=1)
 def _ref_dir():
     """Run the R reference script once into a temporary directory."""
@@ -233,6 +234,13 @@ class CESCaseTests:
     def test_model_name(self):
         assert self.m.model_name == self.ref["model_name"]
 
+    def test_point_lik_sums_to_loglik(self):
+        # R's pointLik() of a ces() model: the Normal densities with sd=sqrt(scale)
+        point_lik = self.m.point_lik()
+        assert len(point_lik) == len(self.m.fitted)
+        assert np.isclose(point_lik.sum(), self.m.loglik, rtol=1e-10)
+        assert np.allclose(self.m.point_lik(log=False), np.exp(point_lik))
+
     def test_a_real(self):
         assert np.isclose(
             self.m.a_.real,
@@ -329,6 +337,19 @@ class CESCaseTests:
         assert np.allclose(p_fc, r_fc, atol=self.atol_fitted, rtol=self.rtol_fitted), (
             f"Max forecast diff: {np.max(np.abs(p_fc - r_fc))}"
         )
+
+    @pytest.mark.parametrize(
+        "interval", ["prediction", "semiparametric", "nonparametric", "empirical"]
+    )
+    def test_interval(self, interval):
+        h = self.ref["python_params"]["h"]
+        fc = self.m.predict(h=h, interval=interval, level=[0.8, 0.95])
+        r_bounds = self.ref["intervals"][interval]
+        for side, p_bound in (("lower", fc.lower), ("upper", fc.upper)):
+            r_bound = np.array(r_bounds[side])
+            assert np.allclose(
+                p_bound.values, r_bound, atol=self.atol_fitted, rtol=self.rtol_fitted
+            ), f"{interval} {side}: max diff {np.max(np.abs(p_bound.values - r_bound))}"
 
     def test_states_shape(self):
         r_nrow = self.ref["states_nrow"]

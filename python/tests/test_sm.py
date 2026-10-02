@@ -223,20 +223,25 @@ def test_analytical_interval_uses_the_scale_model(distribution):
 
 @pytest.mark.parametrize("distribution", sorted(FORECAST_REFERENCE))
 def test_scale_model_widens_or_narrows_against_the_constant_scale(distribution):
-    """The interval must actually change once a scale model is attached.
+    """The interval must change once a time-varying scale model is attached.
 
     Without this the previous two assertions would still pass if the scale
-    forecast were computed and then quietly dropped.
+    forecast were computed and then quietly dropped. A flat scale model sitting
+    on the estimated scale must instead reproduce the constant-scale interval,
+    as both are then the same model.
     """
     plain = ADAM(model="ANN", lags=[1], distribution=distribution)
     plain.fit(_series("positive"))
     flat = plain.predict(h=12, interval="prediction", level=0.95)
-    varying = _with_scale_model(distribution).predict(
-        h=12, interval="prediction", level=0.95
-    )
+    location = _with_scale_model(distribution)
+    varying = location.predict(h=12, interval="prediction", level=0.95)
     flat_width = np.asarray(flat.upper, float) - np.asarray(flat.lower, float)
     varying_width = np.asarray(varying.upper, float) - np.asarray(varying.lower, float)
-    assert not np.allclose(flat_width, varying_width)
+    scale_fitted = np.asarray(location.scale_model.fitted, float)
+    if np.allclose(scale_fitted, plain.scale, rtol=1e-10):
+        np.testing.assert_allclose(flat_width, varying_width, rtol=1e-10)
+    else:
+        assert not np.allclose(flat_width, varying_width)
 
 
 @pytest.mark.parametrize("distribution", sorted(SIMULATED_REFERENCE))

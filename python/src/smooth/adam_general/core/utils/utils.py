@@ -695,7 +695,7 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
     mult = y_fitted if Etype == "M" else 1.0
 
     if distribution == "dnorm":
-        return gb.dnorm(y, y_fitted, scale * mult, log=True)
+        return gb.dnorm(y, y_fitted, np.sqrt(scale) * mult, log=True)
     if distribution == "dlaplace":
         return gb.dlaplace(y, y_fitted, scale * mult, log=True)
     if distribution == "ds":
@@ -719,7 +719,7 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
 
     # Log-domain: the density on the log scale plus the Jacobian -log(y).
     if distribution == "dlnorm":
-        return gb.dlnorm(y, _real_log(y_fitted) - scale**2 / 2, scale, log=True)
+        return gb.dlnorm(y, _real_log(y_fitted) - scale / 2, np.sqrt(scale), log=True)
     if distribution == "dllaplace":
         return gb.dlaplace(np.log(y), _real_log(y_fitted), scale, log=True) - np.log(y)
     if distribution == "dls":
@@ -739,9 +739,9 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
 
 def calculate_entropy(distribution, scale, other, obsZero, y_fitted):
     if distribution == "dnorm":
-        return obsZero * (np.log(np.sqrt(2 * np.pi) * scale) + 0.5)
+        return obsZero * (np.log(np.sqrt(2 * np.pi * scale)) + 0.5)
     elif distribution == "dlnorm":
-        return obsZero * (np.log(np.sqrt(2 * np.pi) * scale) + 0.5) - scale**2 / 2
+        return obsZero * (np.log(np.sqrt(2 * np.pi * scale)) + 0.5) - scale / 2
     elif distribution == "dlogis":
         return obsZero * 2
     elif distribution in ["dlaplace", "dllaplace", "dalaplace"]:
@@ -818,16 +818,27 @@ def _sum_r(values, axis=None):
     constant level -- into a 1-ulp difference, which then flips the selected
     model. Squaring still happens in double, as in R.
 
+    The accumulation is sequential, as R's: ``np.sum`` adds pairwise even in
+    long double, which rounds differently often enough to send the optimiser
+    elsewhere (one ulp in 154 CES likelihoods on Tourism Q375 moved the fit
+    from -802.66 to -799.98). ``np.cumsum`` adds in order.
+
     ``np.longdouble`` is 80-bit on x86-64 Linux; where the platform makes it an
-    alias of double this degrades to the plain pairwise sum.
+    alias of double this degrades to the plain sequential sum.
 
     ``axis`` gives R's ``colSums()`` / ``rowSums()``, which use the same long
     double accumulator and also round back to double.
     """
-    total = np.sum(np.asarray(values, dtype=float), axis=axis, dtype=np.longdouble)
+    values = np.asarray(values, dtype=float)
     if axis is None:
-        return float(total)
-    return np.asarray(total, dtype=float)
+        values = values.ravel()
+        axis = 0
+    if values.shape[axis] == 0:
+        total = np.sum(values, axis=axis)
+    else:
+        running = np.cumsum(values, axis=axis, dtype=np.longdouble)
+        total = np.take(running, -1, axis=axis)
+    return float(total) if np.ndim(total) == 0 else np.asarray(total, dtype=float)
 
 
 # Overflow here is the infeasibility signal, not a defect. During optimisation
@@ -863,13 +874,13 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         return np.log(np.asarray(x, dtype=np.complex128))
 
     if distribution == "dnorm":
-        # sqrt(sum(e^2)/n), not norm(e)/sqrt(n): the second form rounds twice
-        # (once in the irrational sqrt(n), once in the divide) and lands on a
-        # different double. That is enough to break an exact likelihood tie
+        # sigma^2 = sum(e^2)/n; the likelihood takes sqrt() of it, which is the
+        # same double as sqrt(sum(e^2)/n). Not norm(e)^2/n: that rounds twice and
+        # lands on a different double, enough to break an exact likelihood tie
         # between two parameterisations of the same fit -- ANN and MNN coincide
         # when alpha = 0 -- and flip the selected model. Mirrors R's
         # ``adam_scaler`` (R/utils-adam.R).
-        return np.sqrt(_sum_r(errors**2) / obs_in_sample)
+        return _sum_r(errors**2) / obs_in_sample
 
     elif distribution == "dlaplace":
         return _sum_r(np.abs(errors)) / obs_in_sample
@@ -893,7 +904,7 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         else:  # "M"
             log_term = np.abs(complex_log(1 + errors))
         temp = 1 - np.sqrt(np.abs(1 - _sum_r(log_term**2) / obs_in_sample))
-        return np.sqrt(2 * np.abs(temp))
+        return 2 * np.abs(temp)
 
     elif distribution == "dllaplace":
         if Etype == "A":
@@ -939,3 +950,45 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
 
     else:
         raise ValueError(f"Unknown distribution: {distribution}")
+
+
+# The scale is the parameter of the distribution as written in the ADAM monograph
+# (Tables 11.1-11.2): sigma^2 for dnorm, dlnorm, dinvgauss and dgamma, s for the
+# others. The variance of the error is proportional to scale^p.
+def scale_power(distribution):
+    """The power p of the scale in the variance of the error term."""
+    if distribution in ("ds", "dls"):
+        return 4
+    if distribution in (
+        "dlaplace",
+        "dalaplace",
+        "dgnorm",
+        "dllaplace",
+        "dlgnorm",
+        "dlogis",
+    ):
+        return 2
+    return 1
+
+
+def scale_debias(scale, distribution, obs, df):
+    """De-bias the scale in the variance space: the variance times obs / df."""
+    return scale * (obs / df) ** (1 / scale_power(distribution))
+
+
+def scale_variance(scale, distribution, other=None):
+    """The variance of the error term implied by the scale."""
+    other = other or {}
+    if distribution in ("dlaplace", "dllaplace"):
+        return 2 * scale**2
+    if distribution in ("ds", "dls"):
+        return 120 * scale**4
+    if distribution in ("dgnorm", "dlgnorm"):
+        shape = other["shape"]
+        return scale**2 * gamma(3 / shape) / gamma(1 / shape)
+    if distribution == "dalaplace":
+        alpha = other["alpha"]
+        return scale**2 / (alpha**2 * (1 - alpha) ** 2 / (alpha**2 + (1 - alpha) ** 2))
+    if distribution == "dlogis":
+        return scale**2 * np.pi**2 / 3
+    return scale

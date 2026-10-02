@@ -4,6 +4,9 @@ Issue: openforecast-org/smooth#396. `tbats()` in R and `TBATS` in Python, built 
 native linear single-source-of-error model on the shared `adamCore` (the generic path,
 `adamETS=FALSE`, as CES and GUM use it). The fitter itself needs no C++ changes.
 
+Updated after openforecast-org/smooth#413 (per-lag backcasting turns) and the scale
+convention of master (October 2026).
+
 ## A. The model
 
 The whole model lives in the Box-Cox space `y⁽λ⁾`.
@@ -29,6 +32,47 @@ palindromic, so the time-reversed recursion is the same recursion: the cells sto
 state reversal (the rotation form would need `s*` negated, which the lookup table cannot do).
 Rules: `k_i < m_i/2`; a harmonic of a longer period whose frequency coincides with a
 harmonic of a shorter one is dropped (the 7th harmonic of 168 is the 1st of 24).
+
+**Where the harmonics live.** In the `nArima` slot of `adamCore`, which for `E='A'` is a
+plain linear block: `w'v` in the measurement, `F v` in the transition, `g ε` in the
+update (`adamGeneral.h`), with no ARIMA-specific logic in C++. Only the C++ slot is
+shared. None of `adam()`'s ARIMA machinery is used for the harmonics: the polynomialiser
+and the factor-by-factor stationarity bounds would reject `1 − 2cos λ B + B²` (its roots
+are on the unit circle), and the companion-form ARIMA initials, the `phi` / `theta` names
+and `arimaChecker()` (which keys on "ARIMA" in the model name) do not apply. The state
+order in the slot is the harmonics first, then the ARMA states, so the ARMA initials stay
+in the last state as in `adam()`. Checked on the current master: a noise-free harmonic of
+period 7.3 in this slot, with lags (1, 2), is fitted with errors below 2e-13 under
+backcasting.
+
+The alternatives do not fit the framework:
+- the rotation form with two lag-1 states, `F = [[cos λ, sin λ], [−sin λ, cos λ]]`: the
+  backward pass applies the same `F`, but time reversal needs `F⁻¹ = F'`, i.e. `s*`
+  negated at both turns, which would be a special case in C++;
+- the ETS seasonal slot: one state per season, so integer periods only and `m` states
+  (168, 365) instead of `2k`.
+
+**The matrices.** With the ETS part `l, b`, harmonics `i = 1..K` (all periods and
+harmonics numbered together) and an ADAM ARMA with `r = max(p, q)` states, the model is
+`y⁽λ⁾_t = w' v_{t−l} + ε_t`, `v_t = F v_{t−l} + g ε_t`, where `v_{t−l}` takes each state
+at its own lag:
+
+```
+v_t = (l_t, b_t, v¹_{1,t}, v¹_{2,t}, …, vᴷ_{1,t}, vᴷ_{2,t}, a_{1,t}, …, a_{r,t})'
+l   = (1,   1,   1,        2,        …, 1,        2,        1,       …, r)'
+w   = (1,   φ,   1,        1,        …, 1,        1,        1,       …, 1)'
+F   = diag( [1 φ; 0 φ],  H₁, …, H_K,  A ),   H_i = η_i 1' = [2cos λ_i  2cos λ_i; −1  −1],
+                                            A   = η_A 1',  η_A = (φ₁, …, φ_r)'
+g   = (α, β,  γ₁₁, sin λ₁ γ₂₁ − cos λ₁ γ₁₁, …,  η_A + θ_A)'
+```
+
+with `η_A`, `θ_A` padded with zeros to length `r`; no trend drops `b` (and the first
+block is `1`), no damping sets `φ = 1`. A harmonic adds
+`u_{i,t} = v^i_{1,t−1} + v^i_{2,t−2}` to the measurement, and its rows of the transition
+give `v^i_{j,t} = η_{ij} u_{i,t} + g_{ij} ε_t`, so
+`(1 − 2cos λ_i B + B²) u_{i,t} = (g_{i1} B + g_{i2} B²) ε_t`: De Livera's harmonic. The
+same block with `g = η + θ` is `adam()`'s ARMA(2,2) with `φ = (2cos λ, −1)`, which is what
+the check above fits.
 
 **ARMA.** ADAM's additive form (the ARIMA block of `adam()` with no differencing), not
 TBATS's ARMA errors. Multiplicative seasonal ARMA is allowed through `lags` aligned with
@@ -95,11 +139,21 @@ matrix-vector product. It provides:
 
 ## D. Initialisation
 
-- `backcasting` (default): the forward pass starts from the global-model states (section C).
+- `backcasting` (default): the first forward pass starts from the global-model states
+  (section C). Each state crosses the turns of the backcast by its own lag (#413), so the
+  lag-2 harmonic states make two zero-error steps and the lag-1 ones one, and the
+  palindromic harmonic polynomial is reversed exactly; the trend is flipped as in ETS and
+  there is no constant. With states in the `nArima` slot the head filter is always on
+  (`headFlipIsExact` is false); it is cheap, as the default head is `lagsModelMax` (2, or
+  the largest ARMA lag). The head of a backcasted fit is the recorded zero-error
+  trajectory, so the initials keep their meaning for `two-stage`.
 - `optimal`: only the identified initials: level, trend, 2 per harmonic (its Fourier
   coefficients (a, b), mapped to `s₀`, `s₋₁` and then to the cells, the third cell pinned),
   and for ARMA as many initials as the largest ARMA lag, held in the last ARMA state (the
-  companion form of the ARIMA initialisation work). B holds deviations from the global
+  companion form of the ARIMA initialisation work). Notation: `s_t` is the harmonic's
+  contribution to `y_t`, so the cells are `v_{1,0} = 2cos λ·s₀`, `v_{2,0} = −s₀`,
+  `v_{2,−1} = −s₋₁` and `u_1 = 2cos λ·s₀ − s₋₁ = s₁`. `refineHeadFwd` walks only the level
+  and trend across the head, so the harmonic cells are not touched. B holds deviations from the global
   model at the current λ, so λ and the level do not fight. The collector reads the
   identified initials back, so `initial` of a backcasted model reproduces its fit and
   two-stage hands it over without loss. The degrees of freedom count exactly these.
@@ -118,7 +172,11 @@ matrix-vector product. It provides:
   - ARMA stationarity / invertibility factor by factor (`arimaBounds.h`);
   - λ ∈ [0, 1], dgnorm shape > 0.
 - `admissible`: eigenvalues of `F − g w'` for the ETS and harmonic block on the
-  lag-expanded matrix (3 states per harmonic), plus the factor-by-factor ARMA checks.
+  lag-expanded matrix, plus the factor-by-factor ARMA checks. `smoothEigens()` cannot be
+  reused: it splits the states by unique lag (`eigenCalc.h`), which separates the two
+  coupled states of a harmonic. Lag-expanded, a harmonic is
+  `x_t = (v_{1,t}, v_{2,t}, v_{2,t−1})'` with
+  `F̃ = [η₁ 0 η₁; η₂ 0 η₂; 0 1 0]`, `w̃ = (1, 0, 1)'`, `g̃ = (g₁, g₂, 0)'`, all lag 1.
 - `none`.
 
 ## F. Selection (about 4 full fits by default)
@@ -150,12 +208,22 @@ greybox densities.
 
 ## H. Forecasts and methods
 
+- Scale, as master's convention (the ADAM monograph): the scaler returns `σ²` for
+  `dnorm` and the scale `s` for `dlaplace`, `ds` and `dgnorm`; the likelihood takes the
+  square root for `dnorm`. Everything that needs the variance goes through
+  `adam_varianceDebiased()` / `adam_dfScale()`: the df are the observations minus every
+  estimated parameter but the scale, so λ and the dgnorm shape count.
 - Point forecast: inverse Box-Cox of the Box-Cox-scale point, which is the exact median
   (all four distributions are symmetric and the transform is monotone).
-- Intervals: Box-Cox-scale quantiles from the linear variance, inverse-transformed.
+- Intervals: Box-Cox-scale quantiles from the linear variance (via `forecast.adam()` and
+  the de-biased variance), inverse-transformed. Python hands its matrices to ADAM's
+  `forecaster()`, as `CES.predict()` now does, rather than having its own forecast code.
 - Fitted values are back-transformed; residuals stay on the Box-Cox scale.
-- Class `c("adam","smooth")`, `smoothType()` "TBATS", `tbatsChecker()`. Printed name
-  `TBATS(λ, {p,q}, φ, <m₁,k₁>, …)`.
+- Class `c("adam","smooth")`, `smoothType()` "TBATS", `tbatsChecker()`, added wherever
+  `cesChecker()` / `gumChecker()` already branch (`coefbootstrap`, the OPG `vcov`,
+  `reapply`, `print`, `plot`). Printed name `TBATS(λ, {p,q}, φ, <m₁,k₁>, …)`, without
+  "ARIMA", so `arimaChecker()` stays false. `pointLik()` / Python `point_lik()` as CES has
+  it, for the OPG covariance.
 - `vcov`: `covarOPGtbats` (OPG) and the Hessian via a refit with `model=object`;
   `confint` and `summary` through the existing adam methods, with λ and shape listed.
 - The components plot sums the harmonics of each period into one seasonal series.
@@ -190,9 +258,10 @@ forecasts on AirPassengers and the two-period `taylor` data.
 ## K. Order of work (branch `tbats`)
 
 1. Prototype checks of the assumptions behind "no fitter changes": the generic path with the
-   ETS level / trend and the harmonics / ARMA in the `nArima` slot; the head refinement with
-   `lagsModelMax = 2`; the linear forecast variance. Any failure is discussed before C++
-   changes.
+   ETS level / trend and the harmonics / ARMA together in the `nArima` slot (the harmonic
+   alone is checked, see section A); `refineHeadFwd` with `lagsModelMax = 2` under
+   `initial="optimal"`; the linear forecast variance against a simulation. Any failure is
+   discussed before C++ changes.
 2. R core: fixed-structure fit, global model, initialisation, Box-Cox, distributions, bounds.
 3. R forecasting and methods.
 4. C++ `arimaHRSelectCore` (both bindings in one commit) and the R selection.

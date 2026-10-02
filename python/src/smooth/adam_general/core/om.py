@@ -1534,15 +1534,11 @@ class OM(ADAM):
 
     @property
     def scale(self) -> float:
-        """Link-scale residual std-dev — alias for :attr:`sigma`.
+        """``NaN``: the occurrence model is Bernoulli and has no scale, as R's ``om()``.
 
-        Mirrors :attr:`ADAM.scale`, which is an alias for ``sigma`` (the
-        Python convention is that ``scale`` and ``sigma`` both report the
-        std-dev, not the variance — even though R calls the variance
-        ``s2`` and ``sigma`` the std-dev). See :attr:`sigma` for the
-        underlying formula and R reference.
+        The link-scale residual std-dev is :attr:`sigma`.
         """
-        return self.sigma
+        return float("nan")
 
     @property
     def sigma(self) -> float:
@@ -1560,6 +1556,13 @@ class OM(ADAM):
         if residuals is None:
             return float("nan")
         return float(np.sqrt(np.mean(np.asarray(residuals, dtype=float) ** 2)))
+
+    def _variance_debiased(self) -> float:
+        """An occurrence model has no scale: its errors are on the link scale.
+
+        R's ``adam_varianceDebiased`` returns ``sigma(object)^2`` for it.
+        """
+        return self.sigma**2
 
     @property
     def distribution_(self) -> str:

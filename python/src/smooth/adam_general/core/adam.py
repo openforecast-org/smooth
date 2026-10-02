@@ -6875,6 +6875,13 @@ class ADAM:
         df = max(n_obs - h, 1)
         return (errors.T @ errors) / df
 
+    def _variance_debiased(self) -> float:
+        """The variance implied by the scale, de-biased (R: adam_varianceDebiased)."""
+        variance = scale_variance(
+            self.extract_scale(), self.distribution_, getattr(self, "other", None)
+        )
+        return float(np.mean(variance) * self.nobs / self._df_scale)
+
     def _multicov_analytical(self, h: int, covar_anal_fn, var_anal_fn) -> NDArray:
         """Closed-form covariance — mirrors R/adam.R:7087-7088."""
         # Pull the matrices the same way intervals.generate_prediction_interval
@@ -6894,18 +6901,7 @@ class ADAM:
         else:
             mat_wt = meas_raw[-h:]
         lags_all = np.asarray(self._lags_model["lags_model_all"]).flatten()
-        # The variance implied by the scale, de-biased (R: adam_varianceDebiased)
-        s2 = float(
-            np.mean(
-                scale_variance(
-                    self.extract_scale(),
-                    self.distribution_,
-                    getattr(self, "other", None),
-                )
-            )
-            * self.nobs
-            / self._df_scale
-        )
+        s2 = self._variance_debiased()
 
         # Dispatch on error_type / distribution to mirror the
         # intervals.py branch (line 81-104). Multiplicative-error models on

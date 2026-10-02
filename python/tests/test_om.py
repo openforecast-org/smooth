@@ -176,14 +176,11 @@ class TestProperties:
     def test_distribution_is_plogis(self, fitted_model):
         assert fitted_model.distribution_ == "plogis"
 
-    def test_scale_matches_link_residual_std(self, fitted_model):
-        """OM.scale / sigma == sqrt(mean(residuals²)) — mirrors R's
-        ``sigma.om`` (R/om.R) so multi-step covariances on the link
-        scale are well-defined."""
+    def test_no_scale_and_link_residual_sigma(self, fitted_model):
+        """OM has no scale (NA in R's ``om()``); sigma == sqrt(mean(residuals²))
+        as R's ``sigma.om``, which multicov uses on the link scale."""
         expected = float(np.sqrt(np.mean(np.asarray(fitted_model.residuals) ** 2)))
-        assert np.isfinite(fitted_model.scale)
-        assert np.isfinite(fitted_model.sigma)
-        np.testing.assert_allclose(fitted_model.scale, expected)
+        assert np.isnan(fitted_model.scale)
         np.testing.assert_allclose(fitted_model.sigma, expected)
 
     def test_loss_is_likelihood(self, fitted_model):

@@ -26,6 +26,7 @@ Bugfixes:
 * The scale model's likelihood, entropy and standardised residuals are fixed as in R: the log-normal location, the multiplicative Generalised Normal, the `dnorm` / `dlnorm` entropy of the zero observations, and the standardised residuals of `dgnorm`, `dlnorm` and `dgamma` (see the R `NEWS`).
 * A pure regression (`ADAM(model="NNN")` with `X` only) had no scale (`model.scale` was `nan`); it is now the scale of greybox's `ALM`, which from greybox 1.0.8 is sigma^2 for `dnorm` and `dlnorm`, as in R. smooth now requires greybox 1.0.8.
 * `ADAM.predict()` of a pure regression failed with `KeyError: 'model_do'`; it is now done by greybox's `ALM.predict()`, as R's `forecast.alm()`, with the regressors selected by `regressors="select"`. `ADAM.predict()` is annotated as returning a `ForecastResult`, which it does.
+* `OM.scale` is `NaN`, as `OMG.scale` and the scale of R's `om()`: the occurrence model is Bernoulli and has no scale. It returned `sigma`, which the analytical `multicov()` then took for a variance de-biased by the non-zero observations (1.07 instead of R's 0.25 on a Bernoulli series); OM's `multicov()` uses `sigma**2` on the link scale, as R.
 
 ## v1.1.0 (Release date: 2026-09-30)
 

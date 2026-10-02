@@ -1588,6 +1588,10 @@ adam_scaleVariance <- function(scale, distribution, other){
 # from the same estimate of the distribution as the likelihood and the simulations.
 #' @keywords internal
 adam_varianceDebiased <- function(object, scaleValue=extractScale(object)){
+    # An occurrence model has no scale: its errors are on the link scale
+    if(is.occurrence(object)){
+        return(sigma(object)^2);
+    }
     return(adam_scaleVariance(scaleValue, object$distribution, object$other)*
                nobs(object)/adam_dfScale(object));
 }

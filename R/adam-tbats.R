@@ -65,11 +65,13 @@
 #' @param initial The initialisation: \code{"backcasting"} (default),
 #' \code{"optimal"}, \code{"two-stage"} or \code{"complete"} (the same as
 #' backcasting here).
-#' @param bounds The bounds of the parameters: \code{"usual"} keeps the smoothing
-#' parameters in their usual region (the response of the level and seasonality
-#' to the error stays in [0, 1] over the seasonal cycle), \code{"admissible"}
-#' guarantees the stability of the model, \code{"none"} only keeps
-#' \eqn{\lambda} in [0, 1].
+#' @param bounds The bounds of the parameters: \code{"admissible"} (default)
+#' guarantees the stability of the model (the eigenvalues of the discount matrix
+#' of the level, trend and harmonics lie in the unit circle and the ARMA is
+#' stationary and invertible), \code{"usual"} keeps the smoothing parameters in
+#' their usual region (the response of the level and seasonality to the error
+#' stays in [0, 1] over the seasonal cycle), which does not guarantee the
+#' stability, \code{"none"} only keeps \eqn{\lambda} in [0, 1].
 #' @param silent If \code{TRUE}, nothing is printed.
 #' @param model A previously estimated TBATS model, if provided, the function
 #' will not estimate anything and will use all its parameters.
@@ -97,7 +99,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                   loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                   ic=c("AICc","AIC","BIC","BICc"), h=0, holdout=FALSE,
                   initial=c("backcasting","optimal","two-stage","complete"),
-                  bounds=c("usual","admissible","none"), silent=TRUE, model=NULL, ...){
+                  bounds=c("admissible","usual","none"), silent=TRUE, model=NULL, ...){
     startTime <- Sys.time();
     cl <- match.call();
     ellipsis <- list(...);
@@ -420,16 +422,18 @@ tbats_globalStates <- function(beta, struct){
 }
 
 # The recent profile from the initial states. The level and trend sit lagsModelMax-1
-# steps before t=0 (the head refinement walks them to t=0); a harmonic with
+# steps before t=0 (the head refinement walks them to t=0 with the damping); a harmonic with
 # s(t) = a sin(lambda t) + b cos(lambda t) holds 2cos(lambda) s(0) in its lag-1 state
 # and -s(-1), -s(0) in the two cells of its lag-2 state; the ARMA initials sit in the
 # last ARMA state
 #' @keywords internal
-tbats_profile <- function(states, armaInitial, struct){
+tbats_profile <- function(states, armaInitial, struct, phi=1){
     profile <- matrix(0, struct$nComponents, struct$lagsModelMax);
-    profile[1, 1] <- states$level - (struct$lagsModelMax-1)*states$trend;
+    # One step back from (l_t, b_t) is (l_t - b_t, b_t / phi)
+    trends <- states$trend/phi^(seq_len(struct$lagsModelMax)-1);
+    profile[1, 1] <- states$level - sum(trends[-struct$lagsModelMax]);
     if(struct$trendIn){
-        profile[2, 1] <- states$trend;
+        profile[2, 1] <- trends[struct$lagsModelMax];
     }
     if(struct$nHarmonics>0){
         frequency <- struct$harmonicTable$frequency;
@@ -483,7 +487,9 @@ tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distri
     B <- c(alpha=0.1,
            beta=if(struct$trendIn) 0.05,
            phi=if(struct$damped) 0.95,
-           setNames(rep(0.001, 2*nPeriods),
+           # No seasonal smoothing: on the boundary of the admissible region, which any
+           # small value can cross
+           setNames(rep(0, 2*nPeriods),
                     paste0(rep(c("gamma1[","gamma2["), nPeriods), rep(round(periodsUsed, 4), each=2), "]")[seq_len(2*nPeriods)]),
            setNames(armaStart, armaSpec$names));
     if(initialEstimate){
@@ -592,8 +598,31 @@ tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate
                            cosCoef=B[paste0("cos", tbats_harmonicLabels(struct))[seq_len(nH)]],
                            arma=if(struct$armaLagMax>0) B[paste0("ARMAState", seq_len(struct$armaLagMax))] else numeric(0));
     }
-    return(list(matF=matF, vecG=vecG, w=w, lambda=lambda, shape=shape,
+    return(list(matF=matF, vecG=vecG, w=w, phi=phi, lambda=lambda, shape=shape,
                 deviations=deviations, penalty=penalty));
+}
+
+# The starting seasonal smoothing parameters for the admissible bounds: no smoothing
+# sits on the boundary of the region, so the optimiser would start half in the
+# penalty. The point of a small grid, shared by the periods, that is the furthest
+# inside the region
+#' @keywords internal
+tbats_gammaStart <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate, adamCpp){
+    gammas <- grepl("^gamma", names(B));
+    grid <- expand.grid(gamma1=c(-0.01, -0.001, 0, 0.001, 0.01), gamma2=c(-0.01, -0.001, 0, 0.001, 0.01));
+    eigenMax <- apply(grid, 1, function(gamma){
+        BTest <- B;
+        BTest[grepl("^gamma1", names(B))] <- gamma[1];
+        BTest[grepl("^gamma2", names(B))] <- gamma[2];
+        elements <- tbats_filler(BTest, struct, armaSpec, lambdaSpec, other, initialEstimate, "none", adamCpp);
+        return(max(tbats_eigens(elements$matF, elements$vecG, elements$w, struct)));
+    });
+    best <- which.min(eigenMax);
+    if(eigenMax[best]<1){
+        B[grepl("^gamma1", names(B))] <- grid$gamma1[best];
+        B[grepl("^gamma2", names(B))] <- grid$gamma2[best];
+    }
+    return(B);
 }
 
 # The moduli of the eigenvalues of the discount matrix of the level, trend and
@@ -663,6 +692,9 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     otherEstimate <- distribution=="dgnorm" && isTRUE(checked$otherParameterEstimate);
     BList <- tbats_B(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distribution,
                      otherEstimate, initialEstimate, checked$bounds);
+    if(checked$bounds=="admissible" && struct$nHarmonics>0){
+        BList$B <- tbats_gammaStart(BList$B, struct, armaSpec, lambdaSpec, other, initialEstimate, adamCpp);
+    }
 
     #### The cost function ####
     fitStates <- function(elements){
@@ -676,7 +708,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             states$cosCoef <- states$cosCoef + elements$deviations$cosCoef;
             armaInitial <- elements$deviations$arma;
         }
-        profile <- tbats_profile(states, armaInitial, struct);
+        profile <- tbats_profile(states, armaInitial, struct, elements$phi);
         fitted <- adamCpp$fit(matVt, matrix(elements$w, obs, struct$nComponents, byrow=TRUE),
                               elements$matF, elements$vecG, lookup, profile,
                               yBC, ot, backcast, checked$nIterations, "n");
@@ -744,7 +776,9 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     ub <- if(is.null(checked$ub)) BList$ub else checked$ub;
     res <- NULL;
     if(checked$modelDo=="estimate" && length(B)>0){
-        maxevalUsed <- if(is.null(checked$maxeval)) length(B)*40 else checked$maxeval;
+        # The harmonics make the surface flat: 40 evaluations per parameter, as in
+        # adam(), stopped well short of the optimum on AirPassengers
+        maxevalUsed <- if(is.null(checked$maxeval)) length(B)*200 else checked$maxeval;
         printLevel <- checked$print_level;
         if(printLevel==41){
             cat("Initial parameters:", B, "\n");

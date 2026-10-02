@@ -83,7 +83,7 @@ test_that("all the distributions are fitted and the dgnorm shape is estimated", 
 });
 
 test_that("the usual bounds keep the response to an error in [0, 1] over the cycle", {
-    fit <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0);
+    fit <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, bounds="usual");
     seasonal <- fit$initial$seasonal;
     frequency <- 2*pi*seasonal$j/seasonal$period;
     horizons <- 0:11;
@@ -108,4 +108,22 @@ test_that("a refit with model= reproduces the fit", {
     refit <- tbats(AirPassengers, model=fit);
     expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)), tolerance=1e-10);
     expect_equal(as.numeric(fitted(refit)), as.numeric(fitted(fit)), tolerance=1e-10);
+});
+
+test_that("the admissible bounds (the default) keep the discount matrix stable", {
+    for(initial in c("backcasting","optimal","two-stage")){
+        fit <- tbats(AirPassengers, harmonics=5, trend="damped", orders=list(ar=1, ma=1, select=FALSE),
+                     initial=initial);
+        struct <- list(nETS=2, nHarmonics=5, harmonicRows=2+2*(1:5)-1);
+        eigenValues <- tbats_eigens(fit$transition, matrix(fit$persistence), fit$measurement[1,], struct);
+        expect_lte(max(eigenValues), 1+1e-10);
+    }
+});
+
+test_that("two-stage starts from the backcasted fit and cannot end below it", {
+    for(y in list(AirPassengers, BJsales)){
+        fitBackcast <- tbats(y, trend="damped", orders=list(ar=1, ma=1, select=FALSE), initial="complete");
+        fitTwoStage <- tbats(y, trend="damped", orders=list(ar=1, ma=1, select=FALSE), initial="two-stage");
+        expect_gte(as.numeric(logLik(fitTwoStage)), as.numeric(logLik(fitBackcast)) - 1e-8);
+    }
 });

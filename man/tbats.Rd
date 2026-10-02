@@ -10,7 +10,7 @@ tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
   "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
   holdout = FALSE, initial = c("backcasting", "optimal", "two-stage",
-  "complete"), bounds = c("usual", "admissible", "none"), silent = TRUE,
+  "complete"), bounds = c("admissible", "usual", "none"), silent = TRUE,
   model = NULL, ...)
 }
 \arguments{
@@ -55,11 +55,13 @@ the data.}
 \code{"optimal"}, \code{"two-stage"} or \code{"complete"} (the same as
 backcasting here).}
 
-\item{bounds}{The bounds of the parameters: \code{"usual"} keeps the smoothing
-parameters in their usual region (the response of the level and seasonality
-to the error stays in [0, 1] over the seasonal cycle), \code{"admissible"}
-guarantees the stability of the model, \code{"none"} only keeps
-\eqn{\lambda} in [0, 1].}
+\item{bounds}{The bounds of the parameters: \code{"admissible"} (default)
+guarantees the stability of the model (the eigenvalues of the discount matrix
+of the level, trend and harmonics lie in the unit circle and the ARMA is
+stationary and invertible), \code{"usual"} keeps the smoothing parameters in
+their usual region (the response of the level and seasonality to the error
+stays in [0, 1] over the seasonal cycle), which does not guarantee the
+stability, \code{"none"} only keeps \eqn{\lambda} in [0, 1].}
 
 \item{silent}{If \code{TRUE}, nothing is printed.}
 

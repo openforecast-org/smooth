@@ -18,6 +18,7 @@ Changes:
 * `CES.point_lik()`, as R's `pointLik()` of a `ces()` model: the Normal log-densities of the in-sample observations, which sum to the log-likelihood.
 
 Bugfixes:
+* With backcasting and the largest lag 1, the head of `states` and the initials were the seed of the backcast rather than the states it ended with, as in R (see the R `NEWS`); fixed in the shared `src/headers/adamCore.h`.
 * The S distribution sampler drew Gamma(2,s) - Gamma(2,s), with variance 4s^2 instead of 120s^4, so the simulated intervals of `ds` were about a third of the width of R's.
 * The Asymmetric Laplace sampler put the probability alpha above the location; greybox puts it below.
 * A provided `gnorm_shape` was lost after `fit()`: `predict()` recomputed the scale with beta=2 (5.15 became 6.48) and `rstandard()` failed.

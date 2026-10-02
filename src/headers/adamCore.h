@@ -436,10 +436,9 @@ private:
         for (unsigned int j=1; j<=nIterations; j=j+1) {
             if(j == 1 || !useHeadFilter) {
                 // Refine the head so the initial level/trend land at position -H+1
-                // and walk forward across the head cycle. Skip when H=1 (nothing to fill).
-                if(H > 1) {
-                    headFillFwd();
-                }
+                // and walk forward across the head cycle. With H=1 this only writes
+                // the head column, which after a backcast holds the backcasted states.
+                headFillFwd();
             } else {
                 headForwardStep();
             }

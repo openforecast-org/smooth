@@ -195,7 +195,8 @@ class TestADAMAirPassengersForecasting:
         # Reference forecast values (first 3 periods)
         expected_forecasts = [444.20935371, 419.61956321, 458.90904404]
 
-        for i, (actual, expected) in enumerate(zip(forecast_mean[:3], expected_forecasts)):
+        pairs = zip(forecast_mean[:3], expected_forecasts)
+        for i, (actual, expected) in enumerate(pairs):
             assert np.isclose(actual, expected, rtol=1e-4), \
                 f"Forecast[{i}] = {actual} differs from expected {expected}"
 
@@ -381,7 +382,8 @@ class TestADAMAirPassengersAAAPersistence:
         expected_loss = 654.328174
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
-            f"AAA alpha=0.5, beta=0.1 loss {actual_loss} differs from expected {expected_loss}"
+            f"AAA alpha=0.5, beta=0.1 loss {actual_loss} differs from expected " \
+            f"{expected_loss}"
 
     def test_aaa_persistence_bounds(self):
         """Test that AAA estimated persistence is within valid bounds."""
@@ -443,7 +445,8 @@ class TestADAMAirPassengersAAAPersistence:
 
         # Fixing more parameters with suboptimal values should increase loss
         assert loss2 > loss1, \
-            f"Loss with alpha+beta fixed {loss2} should be > loss with only alpha fixed {loss1}"
+            f"Loss with alpha+beta fixed {loss2} should be > loss with only alpha " \
+            f"fixed {loss1}"
 
 
 class TestADAMAirPassengersModelComparison:
@@ -587,7 +590,7 @@ class TestADAMMultipleSeasonalPersistence:
         B = model.coef
         # With backcasting, should estimate exactly 3 persistence params:
         # alpha, gamma1, gamma2
-        assert len(B) == 3, f"Expected 3 parameters (alpha, gamma1, gamma2), got {len(B)}"
+        assert len(B) == 3, f"Expected alpha, gamma1, gamma2, got {len(B)} parameters"
 
     def test_double_seasonal_ana_estimates_three_params(self):
         """Test that ETS(A,N,A) with lags=[3,12] estimates alpha, gamma1, gamma2."""
@@ -601,7 +604,7 @@ class TestADAMMultipleSeasonalPersistence:
         assert model.coef is not None
         B = model.coef
         # With backcasting, should estimate exactly 3 persistence params
-        assert len(B) == 3, f"Expected 3 parameters (alpha, gamma1, gamma2), got {len(B)}"
+        assert len(B) == 3, f"Expected alpha, gamma1, gamma2, got {len(B)} parameters"
 
     def test_double_seasonal_partial_gamma(self):
         """Test double seasonal with only gamma1 provided."""

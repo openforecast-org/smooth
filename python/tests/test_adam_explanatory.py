@@ -5,7 +5,8 @@ Data generated in R:
     n <- 120
     x1 <- rnorm(n); x2 <- rnorm(n)
     y <- 10 + 2*x1 - 1.5*x2 + rnorm(n)
-    write.csv(data.frame(y=y, x1=x1, x2=x2), "tests/data/etsx_data.csv", row.names=FALSE)
+    write.csv(data.frame(y=y, x1=x1, x2=x2), "tests/data/etsx_data.csv",
+              row.names=FALSE)
 
 R reference (adam(df, model="AAN", regressors="use", formula=y~x1+x2)):
     smoother="global" (default since smooth v4.4.1 / Python v1.0.1)

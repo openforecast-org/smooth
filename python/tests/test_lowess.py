@@ -91,7 +91,8 @@ class TestLowessParameters:
 
         # With more iterations, outlier influence should be reduced
         # Check values near the outlier
-        assert abs(result_iter3['y'][15] - np.sin(x[15])) < abs(result_iter0['y'][15] - np.sin(x[15]))
+        error_iter3 = abs(result_iter3['y'][15] - np.sin(x[15]))
+        assert error_iter3 < abs(result_iter0['y'][15] - np.sin(x[15]))
 
     def test_delta_parameter(self):
         """Test that delta parameter works."""

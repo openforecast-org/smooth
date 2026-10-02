@@ -57,7 +57,7 @@ class TestInit:
         assert m.occurrence == occ
         assert m.occurrence_char in ("f", "o", "i", "d")
 
-    def test_init_auto_returns_autoOM_instance(self):
+    def test_init_auto_returns_auto_om_instance(self):
         from smooth import AutoOM
 
         m = OM(occurrence="auto")
@@ -499,7 +499,12 @@ class TestOMvcovType:
         ),
         # A mixed model starts from no smoothing, as in R
         (
-            {"model": "MAN", "loss": "LASSO", "lambda_param": 0.2, "initial": "optimal"},
+            {
+                "model": "MAN",
+                "loss": "LASSO",
+                "lambda_param": 0.2,
+                "initial": "optimal",
+            },
             "om(y, 'MAN', occurrence='odds-ratio', loss='LASSO', lambda=0.2,"
             " initial='optimal')",
             False,

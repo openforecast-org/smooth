@@ -234,6 +234,13 @@ class CESCaseTests:
     def test_model_name(self):
         assert self.m.model_name == self.ref["model_name"]
 
+    def test_point_lik_sums_to_loglik(self):
+        # R's pointLik() of a ces() model: the Normal densities with sd=sqrt(scale)
+        point_lik = self.m.point_lik()
+        assert len(point_lik) == len(self.m.fitted)
+        assert np.isclose(point_lik.sum(), self.m.loglik, rtol=1e-10)
+        assert np.allclose(self.m.point_lik(log=False), np.exp(point_lik))
+
     def test_a_real(self):
         assert np.isclose(
             self.m.a_.real,

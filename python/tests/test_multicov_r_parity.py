@@ -132,7 +132,7 @@ def _scenarios() -> List[_Scenario]:
 
 @pytest.fixture(scope="module")
 def r_results() -> Dict[str, Dict[str, Any]]:
-    """One Rscript subprocess for the whole suite (devtools::load_all is
+    """One Rscript subprocess for the whole suite (pkgload::load_all is
     the slow part — call it once)."""
     blocks = [f"{s.name}={s.r_expr}" for s in _scenarios()]
     expr = "list(" + ", ".join(blocks) + ")"

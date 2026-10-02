@@ -9,7 +9,7 @@
 #                 covariance via vcov() (= FI^-1, built by inverting the
 #                 observed FI in vcov.adam), so the FI is recovered as
 #                 solve(vcov(m)) at the fitted optimum.
-library(smooth)
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 
 outRoot <- file.path("python", "tests", "data", "fi")
 

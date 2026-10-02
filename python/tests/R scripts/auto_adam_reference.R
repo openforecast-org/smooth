@@ -8,7 +8,7 @@
 ## Outputs written to:  python/tests/data/auto_adam_reference.json
 ##                      python/tests/data/ref_*.csv
 
-library(smooth)
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 library(jsonlite)
 
 OUT_DIR <- "python/tests/data"

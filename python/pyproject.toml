@@ -118,7 +118,7 @@ filterwarnings = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "r_comparison: tests that compare Python output against R reference data (skipped by default; run with -m r_comparison)",
-    "r_parity: cross-language numerical-equivalence tests requiring R+smooth+devtools (run with -m r_parity)",
+    "r_parity: cross-language numerical-equivalence tests requiring R+smooth+pkgload (run with -m r_parity)",
 ]
 
 [tool.coverage.run]

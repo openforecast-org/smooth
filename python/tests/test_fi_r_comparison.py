@@ -1,7 +1,7 @@
 """Parity tests of the Python Fisher Information against R's ``smooth::adam``.
 
 R outputs are fetched live via :mod:`tests._r_bridge` (which loads the local
-R source through ``devtools::load_all``), so the comparison is always against
+R source through ``pkgload::load_all``), so the comparison is always against
 the current checkout.
 
 The decisive check evaluates the **Python FI at R's converged coefficients**

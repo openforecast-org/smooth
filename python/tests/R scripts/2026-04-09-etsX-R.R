@@ -1,4 +1,4 @@
-devtools::load_all(".")
+pkgload::load_all(".")
 
 xreg <- read.csv("python/tests/data/etsx_data.csv")
 

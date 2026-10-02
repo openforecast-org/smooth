@@ -15,7 +15,7 @@
 ## Load the *local* R source, exactly as python/tests/_r_bridge.py does, so the
 ## fixtures always track the working tree rather than whatever version happens to
 ## be installed in the user's R library.
-suppressMessages(suppressWarnings(devtools::load_all(".", quiet = TRUE)))
+suppressMessages(suppressWarnings(pkgload::load_all(".", quiet = TRUE)))
 library(jsonlite)
 
 OUT_DIR <- commandArgs(trailingOnly = TRUE)[1]

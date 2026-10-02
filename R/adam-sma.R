@@ -32,50 +32,9 @@
 #' @param ...  Other non-documented parameters.  For example parameter
 #' \code{model} can accept a previously estimated SMA model and use its
 #' parameters.
-#' @return Object of class "smooth" is returned. It contains the list of the
-#' following values:
-#'
-#' \itemize{
-#' \item \code{model} - the name of the estimated model.
-#' \item \code{timeElapsed} - time elapsed for the construction of the model.
-#' \item \code{states} - the matrix of the fuzzy components of ssarima, where
-#' \code{rows} correspond to time and \code{cols} to states.
-#' \item \code{transition} - matrix F.
-#' \item \code{persistence} - the persistence vector. This is the place, where
-#' smoothing parameters live.
-#' \item \code{measurement} - measurement vector of the model.
-#' \item \code{order} - order of moving average.
-#' \item \code{initial} - Initial state vector values.
-#' \item \code{initialType} - Type of initial values used.
-#' \item \code{nParam} - table with the number of estimated / provided parameters.
-#' If a previous model was reused, then its initials are reused and the number of
-#' provided parameters will take this into account.
-#' \item \code{fitted} - the fitted values.
-#' \item \code{forecast} - the point forecast.
-#' \item \code{lower} - the lower bound of prediction interval. When
-#' \code{interval=FALSE} then NA is returned.
-#' \item \code{upper} - the higher bound of prediction interval. When
-#' \code{interval=FALSE} then NA is returned.
-#' \item \code{residuals} - the residuals of the estimated model.
-#' \item \code{errors} - The matrix of 1 to h steps ahead errors. Only returned when the
-#' multistep losses are used and semiparametric interval is needed.
-#' \item \code{s2} - variance of the residuals (taking degrees of freedom into
-#' account).
-#' \item \code{interval} - type of interval asked by user.
-#' \item \code{level} - confidence level for interval.
-#' \item \code{cumulative} - whether the produced forecast was cumulative or not.
-#' \item \code{y} - the original data.
-#' \item \code{holdout} - the holdout part of the original data.
-#' \item \code{ICs} - values of information criteria of the model. Includes AIC,
-#' AICc, BIC and BICc.
-#' \item \code{logLik} - log-likelihood of the function.
-#' \item \code{lossValue} - Cost function value.
-#' \item \code{loss} - Type of loss function used in the estimation.
-#' \item \code{accuracy} - vector of accuracy measures for the
-#' holdout sample. Includes: MPE, MAPE, SMAPE, MASE, sMAE, RelMAE, sMSE and
-#' Bias coefficient (based on complex numbers). This is available only when
-#' \code{holdout=TRUE}.
-#' }
+#' @return Object of class "adam" is returned with similar elements to the
+#' \link[smooth]{adam} function. SMA(n) is the AR(n) model with all the
+#' parameters equal to 1/n, so its order is the AR one in \code{orders}.
 #'
 #' @references \itemize{
 #' \item Svetunkov, I., & Petropoulos, F. (2017). Old dog, new tricks: a

@@ -8,7 +8,7 @@
 ## Run from the repository root:
 ##   Rscript "python/tests/notebooks/run_parity_sweep.R" <output.csv> [limit]
 
-suppressMessages(library(smooth))
+suppressMessages(pkgload::load_all(".", quiet=TRUE))
 suppressMessages(library(doMC))
 suppressMessages(library(foreach))
 

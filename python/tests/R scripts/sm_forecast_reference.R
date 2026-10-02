@@ -4,7 +4,7 @@
 ##
 ##   Rscript "python/tests/R scripts/sm_forecast_reference.R"
 
-library(smooth); library(jsonlite)
+suppressMessages(pkgload::load_all(".", quiet=TRUE)); library(jsonlite)
 OUT_DIR <- "python/tests/data"
 y <- read.csv(file.path(OUT_DIR, "sm_positive.csv"))$y
 results <- list()

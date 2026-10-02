@@ -180,7 +180,7 @@ deselected by default; see below).
   errors from them, which is why the linting commands target `src/` only.
 
 **Deselected markers**: `pyproject.toml` deselects `r_comparison` and `r_parity` by
-default, because they need R with `smooth`'s dependencies, `devtools` and `jsonlite`
+default, because they need R with `smooth`'s dependencies, `pkgload` and `jsonlite`
 installed. Where that is available they run as-is:
 
 ```bash
@@ -188,7 +188,7 @@ installed. Where that is available they run as-is:
 ```
 
 They shell out to R through `tests/_r_bridge.py`, which loads the *local* R source
-with `devtools::load_all()` — so they always compare against the working tree, and an
+with `pkgload::load_all()` — so they always compare against the working tree, and an
 R-side edit is picked up without reinstalling. The repo root is derived from the
 module's own location, so the bridge follows the checkout. Current baseline: **460
 passed**, no xfails. Any failure is yours.

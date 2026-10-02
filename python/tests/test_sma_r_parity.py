@@ -1,7 +1,7 @@
 """R parity tests for SMA: Python vs R smooth::sma().
 
 Run locally with:  pytest tests/test_sma_r_parity.py -m r_parity -v
-Skipped in CI by default (requires R + smooth + devtools).
+Skipped in CI by default (requires R + smooth + pkgload).
 """
 
 from __future__ import annotations

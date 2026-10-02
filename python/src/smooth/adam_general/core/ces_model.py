@@ -997,6 +997,25 @@ class CES:
             side=side,
         )
 
+    def point_lik(self, log: bool = True) -> NDArray:
+        """Per-observation log-likelihood of the fitted model.
+
+        R's ``pointLik.adam`` for a ``ces()`` model: the Normal log-density of
+        each in-sample observation around its fitted value with the variance
+        ``scale_``. With ``log=False`` the densities themselves are returned.
+        """
+        from smooth.adam_general.core.utils.utils import calculate_likelihood
+
+        if not hasattr(self, "model_name"):
+            raise RuntimeError("Model has not been fitted yet.")
+        y = self.fitted + self.residuals
+        lik_values = np.ravel(
+            calculate_likelihood(
+                "dnorm", "A", y, self.fitted.reshape(-1, 1), self.scale_, None
+            )
+        )
+        return lik_values if log else np.exp(lik_values)
+
     def summary(self) -> Dict[str, Any]:
         """Return a summary of the fitted model."""
         if not hasattr(self, "model_name"):

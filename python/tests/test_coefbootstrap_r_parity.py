@@ -194,7 +194,7 @@ def _scenarios() -> List[_Scenario]:
 @pytest.fixture(scope="module")
 def r_results() -> Dict[str, Dict[str, Any]]:
     """Fetch every scenario's R result in one go (one Rscript invocation
-    keeps the test suite snappier — devtools::load_all is expensive)."""
+    keeps the test suite snappier — pkgload::load_all is expensive)."""
     blocks = []
     for s in _scenarios():
         blocks.append(f"{s.name}={s.r_expr}")

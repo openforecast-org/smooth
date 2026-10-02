@@ -1,6 +1,6 @@
 """Shared helpers for parity tests that compare Python output against R.
 
-The R side is always loaded with ``devtools::load_all('.')`` so the tests
+The R side is always loaded with ``pkgload::load_all('.')`` so the tests
 exercise the *local* R source (matching the development checkout), not a
 potentially stale CRAN install. Outputs flow back over stdout as JSON
 (via ``jsonlite::toJSON``).
@@ -27,7 +27,7 @@ REPO_ROOT = str(pathlib.Path(__file__).resolve().parents[2])
 
 _PRELUDE = (
     "suppressMessages(suppressWarnings({"
-    "devtools::load_all('.', quiet=TRUE);"
+    "pkgload::load_all('.', quiet=TRUE);"
     "library(jsonlite)"
     "}));"
 )

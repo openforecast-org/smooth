@@ -396,7 +396,7 @@ class TestRComparisonWithR:
     Tests comparing Python rstandard/outlierdummy results against R reference values.
 
     Reference values were computed in R using:
-        library(smooth)
+        pkgload::load_all(".")
         y <- AirPassengers
         m <- adam(y, "ANN", lags=1)
         sr <- rstandard(m)

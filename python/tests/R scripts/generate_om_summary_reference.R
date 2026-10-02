@@ -13,11 +13,11 @@
 # to the omg class. Joint vcov / confint coefficient rows are prefixed `A:` /
 # `B:` to identify the sub-model — Python OMG mirrors that convention.
 #
-# Uses devtools::load_all(".") to run the *local* R source — the installed
+# Uses pkgload::load_all(".") to run the *local* R source — the installed
 # (CRAN/library) version may lag the current branch (vcov.om in particular is
 # only registered in the local source as of v4.5.0.41006). Run from the repo
 # root so the load_all path resolves correctly.
-devtools::load_all(".")
+pkgload::load_all(".")
 
 outRoot <- file.path("python", "tests", "data", "om_summary")
 

@@ -229,7 +229,7 @@ class TestRComparisonWithR:
     Tests verifying Python AutoMSARIMA matches R's auto.msarima() behaviour.
 
     R reference (auto.msarima on AirPassengers with reduced orders):
-        library(smooth)
+        pkgload::load_all(".")
         m <- auto.msarima(AirPassengers,
                           orders=list(ar=c(2,1), i=c(2,1), ma=c(2,1)),
                           lags=c(1,12))

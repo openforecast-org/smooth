@@ -262,6 +262,20 @@ forecasts on AirPassengers and the two-period `taylor` data.
    alone is checked, see section A); `refineHeadFwd` with `lagsModelMax = 2` under
    `initial="optimal"`; the linear forecast variance against a simulation. Any failure is
    discussed before C++ changes.
+   **Done, no C++ changes needed.** Damped trend, harmonics of 7 (k=2) and 30.4375 (k=3)
+   and an ADAM ARMA(1,1), built as in section A and run through `adamCore`:
+   - at fixed parameters and initials the errors equal the innovations of De Livera's
+     rotation form to 1e-13; `refineHeadFwd` walks only the level and trend (one step,
+     H = 2) and leaves the harmonic cells as given;
+   - a noise-free series with an undamped trend is reproduced by backcasting from a crude
+     seed: max error 0.11 at 2 iterations, 1.3e-3 at 3, 2.7e-7 at 5, 1.4e-13 at 10. With
+     a damped trend it stalls at 0.07 after the first 30 observations: the trend flip is
+     exact only for φ = 1 (ETS(A,Ad,N) alone stalls at 0.006), and the slowly forgetting
+     harmonics carry the junction error further. On the noisy series at the true
+     parameters the loss settles by 3 iterations (SSE 1623.06 at 2, 1622.43 from 3);
+   - `adamCore$forecast` equals the rotation form to 3.4e-13 over 70 steps; `covarAnal()`
+     equals the variance from the rotation form's impulse responses to 7e-16, and a
+     Monte Carlo of 20000 paths agrees within 1.5%.
 2. R core: fixed-structure fit, global model, initialisation, Box-Cox, distributions, bounds.
 3. R forecasting and methods.
 4. C++ `arimaHRSelectCore` (both bindings in one commit) and the R selection.

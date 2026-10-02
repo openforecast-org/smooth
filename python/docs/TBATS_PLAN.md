@@ -179,27 +179,29 @@ matrix-vector product. It provides:
   `F̃ = [η₁ 0 η₁; η₂ 0 η₂; 0 1 0]`, `w̃ = (1, 0, 1)'`, `g̃ = (g₁, g₂, 0)'`, all lag 1.
 - `none`.
 
-## F. Selection (3 to 5 full fits by default)
+## F. Selection (3 or 4 full fits by default)
 
 1. Harmonics: from the global OLS model only (no full fits).
 2. Trend: the requested candidates, fitted without ARMA, chosen by IC (`parallel` allowed).
 3. ARMA (`orders$select=TRUE`; the orders are the maxima):
-   - two residual series in the Box-Cox space: the errors of the chosen model without
-     ARMA, and the residuals of the global model at its λ. The first alone is not enough:
-     the adaptive level turns an AR into an ARMA with a near-unit MA root, on which
-     Hannan-Rissanen screens badly (harmonics + AR(1) with φ=0.7: the local level takes
-     α=0.75, the screen picks ARMA(1,2), AICc 1477.8, against 1472.6 for AR(1), which the
-     global residuals pick);
-   - on each, screen all candidate orders with Hannan-Rissanen and filter to get each
-     candidate's innovations (C++, section G). Lags are screened one at a time, largest
-     first, the others at the orders chosen so far, so the cost adds over the lags;
+   - the residuals of the global model at the λ of the chosen model without ARMA. Not the
+     errors of that model: its adaptive level turns an AR into an ARMA with a near-unit MA
+     root, on which Hannan-Rissanen screens badly. On 17 series (12 R datasets and 5
+     simulated), wherever both screens were fitted the global one was at least as good, and
+     it found the gains the other missed (harmonics + AR(1) with φ=0.7: AR(1), AICc
+     1470.0, against ARMA(1,2), 1476.9);
+   - screen all candidate orders with Hannan-Rissanen and filter to get each candidate's
+     innovations (C++, section G). Lags are screened one at a time, largest first, the
+     others at the orders chosen so far, so the cost adds over the lags (about 5 ms);
    - approximate IC from the log-likelihood of the innovations under the chosen
      distribution (dgnorm shape from the no-ARMA fit), on a common sample (the first
      `min(sum(p_max s), T/4)` observations dropped). Everything but the `p + q` penalty is
      common to the candidates;
-   - fit the distinct non-empty winners (at most two fits), from the same cold start a
-     direct call with those orders would use;
-   - the ARMA is kept only if its true IC beats every model fitted before it.
+   - fit the winner (one fit), from the same cold start a direct call with those orders
+     would use, and keep it only if its true IC beats the models without ARMA. Gating this
+     fit on the approximate IC of the global model with the ARMA does not work: it is
+     optimistic (AirPassengers: 1074.7 against 1091.2 without ARMA, while the fit gives
+     1105.5).
 4. All the ICs are stored in `object$ICs`.
 
 ## G. C++ (shared)

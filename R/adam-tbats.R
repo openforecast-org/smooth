@@ -55,9 +55,9 @@
 #' lags of the ARMA are truncated to integers (365.25 becomes 365). With
 #' \code{select=TRUE}, the orders are the maxima: the trend is chosen without ARMA,
 #' the orders up to them are screened with Hannan-Rissanen (the lags one at a time,
-#' from the largest) on the errors of that model and on the residuals of the global
-#' model, the winners are fitted, and the ARMA is kept only if it improves the
-#' information criterion. All the values are returned in \code{ICs}.
+#' from the largest) on the residuals of the global model, the winner is fitted, and
+#' the ARMA is kept only if it improves the information criterion. All the values are
+#' returned in \code{ICs}.
 #' @param distribution The distribution of the error term in the space of the
 #' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 #' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
@@ -199,25 +199,23 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     names(ICs) <- trendTypes;
     best <- candidates[[which.min(ICs)]];
 
-    # The ARMA orders, screened on the errors of the best model and on the residuals of
-    # the global model at its lambda: the adaptive level of the first can hide an AR in a
-    # unit MA root. The winners are fitted and kept only if they beat the model without
+    # The ARMA orders, screened on the residuals of the global model at the lambda of the
+    # best one: on its errors, the adaptive level hides an AR in a near-unit MA root.
+    # The winner is fitted and kept only if it beats the models without ARMA
     if(armaSpec$select && armaSpec$nParam>0){
         X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable);
-        residualsGlobal <- qr.resid(qr(X), tbats_boxCox(yInSample, best$elements$lambda));
-        armaSpecs <- lapply(list(best$fitted$errors, residualsGlobal), tbats_armaSelect, armaSpec=armaSpec,
-                            distribution=distribution, shape=best$elements$shape,
-                            nParamBase=best$nParamEstimated, ic=ic);
-        armaSpecs <- unique(Filter(function(spec) spec$nParam>0, armaSpecs));
-        for(armaSpecCandidate in armaSpecs){
-            candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecCandidate, lambdaSpec,
+        armaSpecBest <- tbats_armaSelect(qr.resid(qr(X), tbats_boxCox(yInSample, best$elements$lambda)),
+                                         armaSpec, distribution, best$elements$shape,
+                                         best$nParamEstimated, ic);
+        if(armaSpecBest$nParam>0){
+            candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecBest, lambdaSpec,
                                    distribution, initial, checked);
             icCandidate <- tbats_IC(candidate$logLik, ic);
             if(icCandidate<min(ICs)){
                 best <- candidate;
             }
-            ICs[paste0(candidate$trendType, "+ARMA(", paste(armaSpecCandidate$arOrders, collapse=","), ";",
-                       paste(armaSpecCandidate$maOrders, collapse=","), ")")] <- icCandidate;
+            ICs[paste0(candidate$trendType, "+ARMA(", paste(armaSpecBest$arOrders, collapse=","), ";",
+                       paste(armaSpecBest$maOrders, collapse=","), ")")] <- icCandidate;
         }
     }
 
@@ -401,7 +399,7 @@ tbats_armaBuild <- function(ar, ma, armaLags, select=FALSE){
                 stateLags=stateLags, nParam=sum(arOrders+maOrders), names=names));
 }
 
-# The ARMA orders screened with Hannan-Rissanen on the errors of the model without ARMA,
+# The ARMA orders screened with Hannan-Rissanen on the residuals of a model without ARMA,
 # one lag at a time from the largest. The IC of a candidate comes from the likelihood of
 # its innovations on a common sample: the rest of the model is common to all of them
 #' @keywords internal

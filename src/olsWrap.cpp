@@ -20,6 +20,14 @@ arma::vec arimaHRCpp(const arma::vec& y, const arma::uvec& arOrders, const arma:
 }
 
 // [[Rcpp::export]]
+List arimaHRSelectCpp(const arma::vec& y, const arma::uvec& arOrders, const arma::uvec& maOrders,
+                      const arma::uvec& lags, int screen, int arMax, int maMax, bool bounded) {
+    HRSelectResult result = arimaHRSelectCore(y, arOrders, maOrders, lags, screen, arMax, maMax, bounded);
+    return List::create(Named("orders") = result.orders, Named("parameters") = result.parameters,
+                        Named("innovations") = result.innovations);
+}
+
+// [[Rcpp::export]]
 arma::vec arimaParameterBoundsCpp(const arma::vec& values, int j, double sign) {
     return arimaParameterBounds(values, j, sign);
 }

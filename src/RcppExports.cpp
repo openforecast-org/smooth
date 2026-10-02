@@ -87,6 +87,24 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// arimaHRSelectCpp
+List arimaHRSelectCpp(const arma::vec& y, const arma::uvec& arOrders, const arma::uvec& maOrders, const arma::uvec& lags, int screen, int arMax, int maMax, bool bounded);
+RcppExport SEXP _smooth_arimaHRSelectCpp(SEXP ySEXP, SEXP arOrdersSEXP, SEXP maOrdersSEXP, SEXP lagsSEXP, SEXP screenSEXP, SEXP arMaxSEXP, SEXP maMaxSEXP, SEXP boundedSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type arOrders(arOrdersSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type maOrders(maOrdersSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type lags(lagsSEXP);
+    Rcpp::traits::input_parameter< int >::type screen(screenSEXP);
+    Rcpp::traits::input_parameter< int >::type arMax(arMaxSEXP);
+    Rcpp::traits::input_parameter< int >::type maMax(maMaxSEXP);
+    Rcpp::traits::input_parameter< bool >::type bounded(boundedSEXP);
+    rcpp_result_gen = Rcpp::wrap(arimaHRSelectCpp(y, arOrders, maOrders, lags, screen, arMax, maMax, bounded));
+    return rcpp_result_gen;
+END_RCPP
+}
 // arimaParameterBoundsCpp
 arma::vec arimaParameterBoundsCpp(const arma::vec& values, int j, double sign);
 RcppExport SEXP _smooth_arimaParameterBoundsCpp(SEXP valuesSEXP, SEXP jSEXP, SEXP signSEXP) {

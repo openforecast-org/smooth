@@ -199,15 +199,11 @@ inline arma::vec hrFilterLevels(arma::vec w, const std::vector<HRLevel> &levels,
     return w;
 }
 
-// Returns the estimated AR / MA parameters in the order of B in ADAM:
-// for each lag, the AR parameters (if arEstimate) and then the MA ones (if maEstimate).
-// armaParameters holds the provided values in the same traversal for the parts
-// that are not estimated. useLevel switches the estimation of a level off.
-// bounded switches the stationarity / invertibility checks of the cost function on.
-inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma::uvec &maOrders,
-                             const arma::uvec &lags, bool arEstimate, bool maEstimate,
-                             const arma::vec &armaParameters, const arma::uvec &useLevel,
-                             bool bounded) {
+// The levels with their estimates, behind arimaHRCore and arimaHRSelectCore
+inline std::vector<HRLevel> arimaHRLevels(arma::vec w, const arma::uvec &arOrders, const arma::uvec &maOrders,
+                                          const arma::uvec &lags, bool arEstimate, bool maEstimate,
+                                          const arma::vec &armaParameters, const arma::uvec &useLevel,
+                                          bool bounded) {
     arma::uword nLevels = lags.n_elem, nProvided = 0;
     std::vector<HRLevel> levels(nLevels);
     for(arma::uword i = 0; i < nLevels; ++i) {
@@ -271,7 +267,11 @@ inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma
             hrFeasible(levels, -1);
         }
     }
+    return levels;
+}
 
+// The parameters of the levels in the order of B in ADAM
+inline arma::vec hrParameters(const std::vector<HRLevel> &levels, bool arEstimate, bool maEstimate) {
     std::vector<double> result;
     for(const HRLevel &level : levels) {
         if(arEstimate) {
@@ -282,4 +282,62 @@ inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma
         }
     }
     return arma::vec(result);
+}
+
+// Returns the estimated AR / MA parameters in the order of B in ADAM:
+// for each lag, the AR parameters (if arEstimate) and then the MA ones (if maEstimate).
+// armaParameters holds the provided values in the same traversal for the parts
+// that are not estimated. useLevel switches the estimation of a level off.
+// bounded switches the stationarity / invertibility checks of the cost function on.
+inline arma::vec arimaHRCore(arma::vec w, const arma::uvec &arOrders, const arma::uvec &maOrders,
+                             const arma::uvec &lags, bool arEstimate, bool maEstimate,
+                             const arma::vec &armaParameters, const arma::uvec &useLevel,
+                             bool bounded) {
+    return hrParameters(arimaHRLevels(w, arOrders, maOrders, lags, arEstimate, maEstimate,
+                                      armaParameters, useLevel, bounded),
+                        arEstimate, maEstimate);
+}
+
+struct HRSelectResult {
+    arma::umat orders;
+    arma::mat parameters, innovations;
+};
+
+// Hannan-Rissanen screen of the orders of the level with index screen, the other
+// levels at the orders given: for every AR order up to arMax and MA order up to maMax,
+// the parameters (a row padded with NaN, in the order of B in ADAM) and the
+// innovations, w with all the levels filtered out
+inline HRSelectResult arimaHRSelectCore(arma::vec w, arma::uvec arOrders, arma::uvec maOrders,
+                                        const arma::uvec &lags, arma::uword screen,
+                                        arma::uword arMax, arma::uword maMax, bool bounded) {
+    arma::uword nCandidates = (arMax + 1) * (maMax + 1), nLevels = lags.n_elem;
+    arOrders(screen) = arMax;
+    maOrders(screen) = maMax;
+    HRSelectResult result;
+    result.orders.set_size(nCandidates, 2);
+    result.parameters.set_size(nCandidates, arma::accu(arOrders + maOrders));
+    result.parameters.fill(arma::datum::nan);
+    result.innovations.set_size(w.n_elem, nCandidates);
+
+    w -= arma::mean(w);
+    arma::uvec order = arma::sort_index(lags, "descend");
+    std::vector<arma::uword> indices(order.begin(), order.end());
+    arma::uword i = 0;
+    for(arma::uword p = 0; p <= arMax; ++p) {
+        for(arma::uword q = 0; q <= maMax; ++q, ++i) {
+            arOrders(screen) = p;
+            maOrders(screen) = q;
+            std::vector<HRLevel> levels = arimaHRLevels(w, arOrders, maOrders, lags, true, true,
+                                                        arma::vec(), arma::ones<arma::uvec>(nLevels),
+                                                        bounded);
+            arma::vec parameters = hrParameters(levels, true, true);
+            result.orders(i, 0) = p;
+            result.orders(i, 1) = q;
+            if(parameters.n_elem > 0) {
+                result.parameters.row(i).head(parameters.n_elem) = parameters.t();
+            }
+            result.innovations.col(i) = hrFilterLevels(w, levels, indices, -1);
+        }
+    }
+    return result;
 }

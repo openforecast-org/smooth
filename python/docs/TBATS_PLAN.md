@@ -179,29 +179,36 @@ matrix-vector product. It provides:
   `F̃ = [η₁ 0 η₁; η₂ 0 η₂; 0 1 0]`, `w̃ = (1, 0, 1)'`, `g̃ = (g₁, g₂, 0)'`, all lag 1.
 - `none`.
 
-## F. Selection (about 4 full fits by default)
+## F. Selection (3 to 5 full fits by default)
 
 1. Harmonics: from the global OLS model only (no full fits).
 2. Trend: the requested candidates, fitted without ARMA, chosen by IC (`parallel` allowed).
-3. ARMA (`orders$select=TRUE`):
-   - residuals of the chosen model without ARMA (Box-Cox scale);
-   - screen all candidate orders on them with Hannan-Rissanen and filter to get each
-     candidate's innovations (C++, section G). Seasonal lags are screened one at a time,
-     largest first, so the cost adds over the lags rather than multiplying;
+3. ARMA (`orders$select=TRUE`; the orders are the maxima):
+   - two residual series in the Box-Cox space: the errors of the chosen model without
+     ARMA, and the residuals of the global model at its λ. The first alone is not enough:
+     the adaptive level turns an AR into an ARMA with a near-unit MA root, on which
+     Hannan-Rissanen screens badly (harmonics + AR(1) with φ=0.7: the local level takes
+     α=0.75, the screen picks ARMA(1,2), AICc 1477.8, against 1472.6 for AR(1), which the
+     global residuals pick);
+   - on each, screen all candidate orders with Hannan-Rissanen and filter to get each
+     candidate's innovations (C++, section G). Lags are screened one at a time, largest
+     first, the others at the orders chosen so far, so the cost adds over the lags;
    - approximate IC from the log-likelihood of the innovations under the chosen
-     distribution (greybox densities; dgnorm shape from the no-ARMA fit), on a common
-     effective sample. The Jacobian and the ETS / harmonic parameters are common to all
-     candidates and cancel, so only the `p + q` penalty differs;
-   - fit only the winner, from the same cold start a direct call with those orders would
-     use (reproducible, as in `auto.msarima`);
-   - if its true IC does not beat the no-ARMA model, return the no-ARMA model.
+     distribution (dgnorm shape from the no-ARMA fit), on a common sample (the first
+     `min(sum(p_max s), T/4)` observations dropped). Everything but the `p + q` penalty is
+     common to the candidates;
+   - fit the distinct non-empty winners (at most two fits), from the same cold start a
+     direct call with those orders would use;
+   - the ARMA is kept only if its true IC beats every model fitted before it.
 4. All the ICs are stored in `object$ICs`.
 
 ## G. C++ (shared)
 
-`arimaHRSelectCore` in `src/headers/arimaInitCore.h`: takes a series, the maximum orders
-per lag, the lags and the bounds flag; returns, for each candidate, the coefficients and the
-innovations (via `hrFilterLevels`). Bindings: `arimaHRSelectCpp` (Rcpp, `src/olsWrap.cpp`)
+`arimaHRSelectCore` in `src/headers/arimaInitCore.h`: takes a series, the orders per lag,
+the index of the lag to screen with its maximum AR and MA orders, and the bounds flag;
+returns, for each candidate, the orders, the coefficients (a row padded with NaN, in the
+order of B) and the innovations (via `hrFilterLevels`). `arimaHRCore` and it share
+`arimaHRLevels`. Bindings: `arimaHRSelectCpp` (Rcpp, `src/olsWrap.cpp`)
 and `_ols.arima_hr_select` (pybind, `src/python/olsWrap.cpp`), next to the existing
 Hannan-Rissanen bindings. The log-likelihoods are computed on the R / Python side with
 greybox densities.

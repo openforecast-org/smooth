@@ -882,6 +882,23 @@ class TestADAMARIMAInitialiser:
         np.testing.assert_array_equal(off[2:], [0.1, -0.1])
         assert len(self._hr(y, [1], [1], [1], ar_est=False, arma=[0.6])) == 1
 
+    def test_screen_matches_single_estimates(self):
+        """The screen of one level gives the estimates and innovations of each order."""
+        from smooth.adam_general import _ols
+
+        y = self._arma(300, 0.6, 0.3, 41)
+        lags = np.array([1, 12], dtype=np.uint64)
+        fixed = np.array([0, 1], dtype=np.uint64)
+        orders, parameters, innovations = _ols.arima_hr_select(
+            y, fixed, np.zeros(2, dtype=np.uint64), lags, 0, 2, 1, True
+        )
+        assert orders.shape == (6, 2)
+        assert innovations.shape == (300, 6)
+        for (p, q), row in zip(orders.astype(int), parameters):
+            b = self._hr(y, [p, 1], [q, 0], [1, 12])
+            np.testing.assert_allclose(row[: len(b)], b, rtol=1e-12)
+            assert np.isnan(row[len(b) :]).all()
+
     def test_regression_residuals(self):
         """HR runs on the residuals of the regression, not on the series."""
         from scipy.signal import lfilter

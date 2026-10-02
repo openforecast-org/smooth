@@ -52,7 +52,12 @@
 #' otherwise it is set to 1).
 #' @param orders The orders of the ARMA, \code{list(ar, ma, select)}, aligned with
 #' \code{lags} as in \link[smooth]{adam}. A single value refers to the lag 1. The
-#' lags of the ARMA are truncated to integers (365.25 becomes 365).
+#' lags of the ARMA are truncated to integers (365.25 becomes 365). With
+#' \code{select=TRUE}, the orders are the maxima: the trend is chosen without ARMA,
+#' the orders up to them are screened with Hannan-Rissanen (the lags one at a time,
+#' from the largest) on the errors of that model and on the residuals of the global
+#' model, the winners are fitted, and the ARMA is kept only if it improves the
+#' information criterion. All the values are returned in \code{ICs}.
 #' @param distribution The distribution of the error term in the space of the
 #' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 #' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
@@ -161,10 +166,8 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     periods <- sort(unique(lags[lags>1]));
     lambdaSpec <- tbats_lambdaSpec(lambdaProvided, yInSample, loss);
     armaSpec <- if(is.null(armaSpecProvided)) tbats_armaSpec(orders, lags) else armaSpecProvided;
-    if(armaSpec$select){
-        stop("The selection of the ARMA orders is not implemented yet; ",
-             "provide the orders with select=FALSE.", call.=FALSE);
-    }
+    # With the selection, the trend is chosen without ARMA
+    armaSpecFit <- if(armaSpec$select) tbats_armaBuild(0, 0, 1) else armaSpec;
     trendTypes <- if(trend=="auto") c("none","additive","damped") else trend;
 
     # Harmonics from the global model, at the starting value of lambda
@@ -187,15 +190,36 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
 
     #### Fit the candidates and select ####
     candidates <- lapply(trendTypes, function(trendType){
-        return(tbats_fit(yInSample, trendType, harmonicTable, armaSpec, lambdaSpec,
+        return(tbats_fit(yInSample, trendType, harmonicTable, armaSpecFit, lambdaSpec,
                          distribution, initial, checked));
     });
     ICs <- sapply(candidates, function(candidate){
-        return(switch(ic, "AIC"=AIC(candidate$logLik), "AICc"=AICc(candidate$logLik),
-                      "BIC"=BIC(candidate$logLik), "BICc"=BICc(candidate$logLik)));
+        return(tbats_IC(candidate$logLik, ic));
     });
     names(ICs) <- trendTypes;
     best <- candidates[[which.min(ICs)]];
+
+    # The ARMA orders, screened on the errors of the best model and on the residuals of
+    # the global model at its lambda: the adaptive level of the first can hide an AR in a
+    # unit MA root. The winners are fitted and kept only if they beat the model without
+    if(armaSpec$select && armaSpec$nParam>0){
+        X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable);
+        residualsGlobal <- qr.resid(qr(X), tbats_boxCox(yInSample, best$elements$lambda));
+        armaSpecs <- lapply(list(best$fitted$errors, residualsGlobal), tbats_armaSelect, armaSpec=armaSpec,
+                            distribution=distribution, shape=best$elements$shape,
+                            nParamBase=best$nParamEstimated, ic=ic);
+        armaSpecs <- unique(Filter(function(spec) spec$nParam>0, armaSpecs));
+        for(armaSpecCandidate in armaSpecs){
+            candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecCandidate, lambdaSpec,
+                                   distribution, initial, checked);
+            icCandidate <- tbats_IC(candidate$logLik, ic);
+            if(icCandidate<min(ICs)){
+                best <- candidate;
+            }
+            ICs[paste0(candidate$trendType, "+ARMA(", paste(armaSpecCandidate$arOrders, collapse=","), ";",
+                       paste(armaSpecCandidate$maOrders, collapse=","), ")")] <- icCandidate;
+        }
+    }
 
     return(tbats_return(best, checked, cl, startTime, periods, harmonics, ICs, silent));
 }
@@ -315,8 +339,7 @@ tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, i
         }
         rss <- sum(qr.resid(qr(X), yBC)^2);
         logLikValue <- structure(-obs/2*(log(2*pi*rss/obs)+1), nobs=obs, df=ncol(X)+1, class="logLik");
-        return(switch(ic, "AIC"=AIC(logLikValue), "AICc"=AICc(logLikValue),
-                      "BIC"=BIC(logLikValue), "BICc"=BICc(logLikValue)));
+        return(tbats_IC(logLikValue, ic));
     }
     icBest <- icValue(harmonics);
     for(i in seq_along(periods)){
@@ -348,6 +371,12 @@ tbats_armaSpec <- function(orders, lags){
     armaLags <- if(length(ar)==1 && length(ma)==1) 1 else trunc(lags);
     ar <- rep(ar, length.out=length(armaLags));
     ma <- rep(ma, length.out=length(armaLags));
+    return(tbats_armaBuild(ar, ma, armaLags, select));
+}
+
+# The specification of the ARMA from its orders per lag
+#' @keywords internal
+tbats_armaBuild <- function(ar, ma, armaLags, select=FALSE){
     lagsUnique <- sort(unique(armaLags));
     arOrders <- sapply(lagsUnique, function(lag) max(ar[armaLags==lag]));
     maOrders <- sapply(lagsUnique, function(lag) max(ma[armaLags==lag]));
@@ -370,6 +399,40 @@ tbats_armaSpec <- function(orders, lags){
     }));
     return(list(select=select, arOrders=arOrders, maOrders=maOrders, lags=lagsUnique,
                 stateLags=stateLags, nParam=sum(arOrders+maOrders), names=names));
+}
+
+# The ARMA orders screened with Hannan-Rissanen on the errors of the model without ARMA,
+# one lag at a time from the largest. The IC of a candidate comes from the likelihood of
+# its innovations on a common sample: the rest of the model is common to all of them
+#' @keywords internal
+tbats_armaSelect <- function(errors, armaSpec, distribution, shape, nParamBase, ic){
+    lags <- armaSpec$lags;
+    arOrders <- maOrders <- rep(0, length(lags));
+    obs <- length(errors);
+    nDrop <- min(sum(armaSpec$arOrders*lags), floor(obs/4));
+    obsUsed <- obs-nDrop;
+    for(i in order(lags, decreasing=TRUE)){
+        screen <- arimaHRSelectCpp(errors, arOrders, maOrders, lags, i-1,
+                                   armaSpec$arOrders[i], armaSpec$maOrders[i], TRUE);
+        nParam <- nParamBase + sum(arOrders[-i]+maOrders[-i]) + rowSums(screen$orders);
+        ICs <- sapply(seq_len(nrow(screen$orders)), function(j){
+            innovations <- screen$innovations[nDrop+seq_len(obsUsed), j];
+            logLikValue <- structure(tbats_logLik(innovations, distribution, shape, obsUsed),
+                                     nobs=obsUsed, df=nParam[j], class="logLik");
+            return(tbats_IC(logLikValue, ic));
+        });
+        winner <- which.min(ICs);
+        arOrders[i] <- screen$orders[winner,1];
+        maOrders[i] <- screen$orders[winner,2];
+    }
+    return(tbats_armaBuild(arOrders, maOrders, lags));
+}
+
+# The information criterion of a log-likelihood
+#' @keywords internal
+tbats_IC <- function(logLikValue, ic){
+    return(switch(ic, "AIC"=AIC(logLikValue), "AICc"=AICc(logLikValue),
+                  "BIC"=BIC(logLikValue), "BICc"=BICc(logLikValue)));
 }
 
 #### Structure ####

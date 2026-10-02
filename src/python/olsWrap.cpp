@@ -38,6 +38,18 @@ py::array_t<double> arima_hr_wrapper(const arma::vec& y, const arma::uvec& ar_or
     return arr;
 }
 
+py::tuple arima_hr_select_wrapper(const arma::vec& y, const arma::uvec& ar_orders,
+                                  const arma::uvec& ma_orders, const arma::uvec& lags,
+                                  arma::uword screen, arma::uword ar_max, arma::uword ma_max,
+                                  bool bounded) {
+    HRSelectResult result = arimaHRSelectCore(y, ar_orders, ma_orders, lags, screen, ar_max,
+                                              ma_max, bounded);
+    arma::mat orders = arma::conv_to<arma::mat>::from(result.orders);
+    return py::make_tuple(carma::to_numpy(orders),
+                          carma::to_numpy(result.parameters),
+                          carma::to_numpy(result.innovations));
+}
+
 py::array_t<double> arima_parameter_bounds_wrapper(const arma::vec& values, arma::uword j,
                                                    double sign) {
     arma::vec b = arimaParameterBounds(values, j, sign);
@@ -71,6 +83,20 @@ PYBIND11_MODULE(_ols, m) {
         py::arg("ma_estimate"),
         py::arg("arma_parameters"),
         py::arg("use_level"),
+        py::arg("bounded")
+    );
+    m.def(
+        "arima_hr_select",
+        &arima_hr_select_wrapper,
+        "Hannan-Rissanen screen of the ARMA orders of one level (see arimaInitCore.h): "
+        "the orders, the parameters and the innovations of every candidate.",
+        py::arg("y"),
+        py::arg("ar_orders"),
+        py::arg("ma_orders"),
+        py::arg("lags"),
+        py::arg("screen"),
+        py::arg("ar_max"),
+        py::arg("ma_max"),
         py::arg("bounded")
     );
     m.def(

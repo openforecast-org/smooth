@@ -35,7 +35,12 @@ otherwise it is set to 1).}
 
 \item{orders}{The orders of the ARMA, \code{list(ar, ma, select)}, aligned with
 \code{lags} as in \link[smooth]{adam}. A single value refers to the lag 1. The
-lags of the ARMA are truncated to integers (365.25 becomes 365).}
+lags of the ARMA are truncated to integers (365.25 becomes 365). With
+\code{select=TRUE}, the orders are the maxima: the trend is chosen without ARMA,
+the orders up to them are screened with Hannan-Rissanen (the lags one at a time,
+from the largest) on the errors of that model and on the residuals of the global
+model, the winners are fitted, and the ARMA is kept only if it improves the
+information criterion. All the values are returned in \code{ICs}.}
 
 \item{distribution}{The distribution of the error term in the space of the
 Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or

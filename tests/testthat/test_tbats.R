@@ -169,3 +169,29 @@ test_that("reapply refits the model and reforecast produces the intervals", {
     simulated <- simulate(fit, nsim=3, seed=41);
     expect_equal(dim(simulated$data), c(length(actuals(fit)), 3));
 });
+
+test_that("the Hannan-Rissanen screen gives the estimates of each order", {
+    set.seed(41);
+    y <- as.numeric(arima.sim(list(ar=0.6, ma=0.3), 300));
+    screen <- arimaHRSelectCpp(y, c(0, 1), c(0, 0), c(1, 12), 0, 2, 1, TRUE);
+    expect_equal(dim(screen$innovations), c(300, 6));
+    for(i in 1:nrow(screen$orders)){
+        parameters <- arimaHRCpp(y, c(screen$orders[i,1], 1), c(screen$orders[i,2], 0), c(1, 12),
+                                 TRUE, TRUE, numeric(0), c(1, 1), TRUE);
+        expect_equal(screen$parameters[i, seq_along(parameters)], as.vector(parameters), tolerance=1e-12);
+    }
+});
+
+test_that("the ARMA selection finds an AR(1) and falls back to no ARMA", {
+    set.seed(41);
+    tt <- 1:240;
+    y <- ts(500 + 20*sin(2*pi*tt/12) + 10*cos(2*pi*tt/12) + arima.sim(list(ar=0.7), 240, sd=5), frequency=12);
+    fit <- tbats(y, harmonics=1, trend="none");
+    expect_equal(fit$orders$ar, 1);
+    expect_equal(fit$orders$ma, 0);
+    expect_equal(min(fit$ICs), as.numeric(AICc(fit)));
+    refit <- tbats(y, model=fit);
+    expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)), tolerance=1e-10);
+    fitAir <- tbats(AirPassengers, harmonics=5, trend="additive");
+    expect_equal(sum(fitAir$orders$ar+fitAir$orders$ma), 0);
+});

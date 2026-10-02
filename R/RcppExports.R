@@ -21,6 +21,10 @@ arimaHRCpp <- function(y, arOrders, maOrders, lags, arEstimate, maEstimate, arma
     .Call('_smooth_arimaHRCpp', PACKAGE = 'smooth', y, arOrders, maOrders, lags, arEstimate, maEstimate, armaParameters, useLevel, bounded)
 }
 
+arimaHRSelectCpp <- function(y, arOrders, maOrders, lags, screen, arMax, maMax, bounded) {
+    .Call('_smooth_arimaHRSelectCpp', PACKAGE = 'smooth', y, arOrders, maOrders, lags, screen, arMax, maMax, bounded)
+}
+
 arimaParameterBoundsCpp <- function(values, j, sign) {
     .Call('_smooth_arimaParameterBoundsCpp', PACKAGE = 'smooth', values, j, sign)
 }

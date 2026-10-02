@@ -10,12 +10,15 @@ from scipy import stats as scipy_stats
 
 from smooth.adam_general._adam_general import adam_simulator
 from smooth.adam_general.core.checker import parameters_checker
+from smooth.adam_general.core.checker.parameters_checker import _validate_x
 from smooth.adam_general.core.creator import architector, creator
 from smooth.adam_general.core.estimator import (
     estimator,
     selector,
 )
 from smooth.adam_general.core.forecaster import forecaster, preparator
+from smooth.adam_general.core.forecaster.intervals import ensure_level_format
+from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import (
@@ -3379,7 +3382,7 @@ class ADAM:
         occurrence: Optional[NDArray] = None,
         scenarios: bool = False,
         seed: Optional[int] = None,
-    ) -> NDArray:
+    ) -> ForecastResult:
         """
         Generate forecasts using the fitted ADAM model.
 
@@ -3463,6 +3466,11 @@ class ADAM:
 
         if occurrence is not None:
             self._occurrence["occurrence"] = occurrence
+
+        # A pure regression is a greybox ALM, forecasted by ALM.predict()
+        # (R: forecast.alm())
+        if getattr(self, "_alm_model", None) is not None:
+            return self._predict_regression(X, interval, level, side)
 
         # ``interval="complete"`` / ``"confidence"`` delegate to
         # :meth:`reforecast` — they need per-parameter-draw refitting of
@@ -3713,7 +3721,12 @@ class ADAM:
             "xreg_model": True,
         }
         self._arima = {"ar_orders": [0], "i_orders": [0], "ma_orders": [0]}
-        self._explanatory = {"xreg_model": True}
+        # The names of the regressors, as the parameter checker gives them to ALM
+        names = _validate_x(X, n)[3]
+        self._explanatory = {
+            "xreg_model": True,
+            "xreg_names": names or [f"x{i + 1}" for i in range(np.shape(X)[-1])],
+        }
         self._general = {
             "loss": "likelihood",
             "h": getattr(self, "h", 0),
@@ -3736,6 +3749,53 @@ class ADAM:
         }
         self.model = "Regression"
         self.time_elapsed_ = time.time() - self._start_time
+
+    def _predict_regression(self, X, interval, level, side) -> ForecastResult:
+        """Forecasts of a pure regression from ALM.predict(), as R's forecast.alm().
+
+        All the prediction intervals of ADAM are the parametric ones there.
+        """
+        if X is None:
+            raise ValueError("X for the forecast horizon is needed for a regression.")
+        h = int(self._general["h"])
+        _, X_new, _, names = _validate_x(X, h)
+        names = names or self._explanatory["xreg_names"]
+        alm = self._alm_model
+        # A stepwise() model uses only the selected regressors
+        if alm._feature_names is not None:
+            X_new = X_new[:, [list(names).index(nm) for nm in alm._feature_names]]
+
+        alm_interval = interval if interval in ("none", "confidence") else "prediction"
+        level = 0.95 if level is None else level
+        bound_low, bound_up = ensure_level_format(level, side)
+        levels = bound_up - bound_low
+        result = alm.predict(
+            np.column_stack([np.ones(h), X_new]),
+            interval=alm_interval,
+            level=list(levels),
+            side=side,
+        )
+
+        n = int(alm.nobs)
+        index = pd.RangeIndex(n, n + h)
+        lower = upper = None
+        if interval != "none":
+            if side != "upper":
+                lower = pd.DataFrame(
+                    np.reshape(result.lower, (h, -1)), index=index, columns=bound_low
+                )
+            if side != "lower":
+                upper = pd.DataFrame(
+                    np.reshape(result.upper, (h, -1)), index=index, columns=bound_up
+                )
+        return ForecastResult(
+            mean=pd.Series(np.ravel(result.mean), index=index, name="mean"),
+            lower=lower,
+            upper=upper,
+            level=level,
+            side=side,
+            interval=interval,
+        )
 
     def _fit_occurrence_model(self, y):
         """Fit an occurrence model on ``y`` and return it.

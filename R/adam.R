@@ -641,6 +641,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$lagsAll <- rep(1,nParam);
         modelReturned$FI <- checkerReturn$FI;
         modelReturned$occurrence <- checkerReturn$occurrence;
+        # The alm() model itself, used by forecast()
+        modelReturned$alm <- checkerReturn;
         if(holdout){
             # This won't work if transformations of the response variable are done...
             modelReturned$accuracy <- measures(modelReturned$holdout[,responseName],modelReturned$forecast,
@@ -5518,6 +5520,18 @@ predict.adam <- function(object, newdata=NULL, interval=c("none", "confidence", 
         level[] <- level / 100;
     }
 
+    # A pure regression is an alm() model, its intervals come from predict.alm()
+    if(!is.null(object$alm)){
+        almPredict <- predict(object$alm, interval=interval, level=level, side=side);
+        yLower <- yForecast;
+        yUpper <- yForecast;
+        yLower[] <- almPredict$lower;
+        yUpper[] <- almPredict$upper;
+        return(structure(list(mean=yForecast, lower=yLower, upper=yUpper, model=object,
+                              level=level, interval=interval, side=side),
+                         class=c("adam.predict","adam.forecast")));
+    }
+
     # Basic parameters
     model <- modelType(object);
     Etype <- errorType(object);
@@ -5748,6 +5762,49 @@ plot.adam.predict <- function(x, ...){
     }
 }
 
+# Forecasts of a pure regression, done by forecast.alm() on the alm() model
+# that adam() returned. All the prediction intervals of adam are parametric there.
+#' @keywords internal
+adam_forecastRegression <- function(object, h, newdata, occurrence, interval, level, side,
+                                    cumulative, ...){
+    side <- match.arg(side[1], c("both","upper","lower"));
+    if(is.null(newdata) && !is.null(object$holdout) && nrow(object$holdout)>=h){
+        newdata <- head(object$holdout, h);
+    }
+    if(cumulative){
+        warning("Cumulative forecasts are not available for a regression. Ignoring the parameter.",
+                call.=FALSE);
+    }
+    almInterval <- switch(interval, "none"=, "confidence"=interval, "prediction");
+    almForecast <- forecast(object$alm, h=h, newdata=newdata, interval=almInterval,
+                            level=level, side=side, occurrence=occurrence, ...);
+    h <- length(almForecast$mean);
+
+    # Put the values in the time structure of the data
+    yIndex <- time(actuals(object));
+    yForecastStart <- yIndex[nobs(object)]+deltat(yIndex);
+    toTS <- function(x){
+        return(ts(x, start=yForecastStart, frequency=frequency(actuals(object))));
+    }
+    if(!inherits(actuals(object), "ts")){
+        yForecastIndex <- yIndex[nobs(object)]+diff(tail(yIndex,2))*c(1:h);
+        toTS <- function(x){
+            return(zoo(x, order.by=yForecastIndex));
+        }
+    }
+    yLower <- yUpper <- NA;
+    if(interval!="none"){
+        yLower <- toTS(almForecast$lower);
+        yUpper <- toTS(almForecast$upper);
+    }
+
+    return(structure(list(mean=toTS(as.vector(almForecast$mean)), lower=yLower, upper=yUpper,
+                          model=object, level=level, interval=interval, side=side,
+                          cumulative=FALSE, h=h, scenarios=FALSE),
+                     class=c("adam.forecast","smooth.forecast","forecast")));
+}
+
+
 #' Forecasting time series using smooth functions
 #'
 #' Function produces conditional expectation (point forecasts) and prediction
@@ -5846,6 +5903,12 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     interval <- match.arg(interval[1],c("none", "simulated", "approximate", "semiparametric",
                                         "nonparametric", "confidence", "parametric","prediction",
                                         "empirical","complete"));
+    # A pure regression is an alm() model, forecasted by forecast.alm()
+    if(!is.null(object$alm) && h>0){
+        return(adam_forecastRegression(object, h, newdata, occurrence, interval, level, side,
+                                       cumulative, ...));
+    }
+
     # If the horizon is zero, just construct fitted and potentially confidence interval thingy
     if(h<=0){
         if(all(interval!=c("none","confidence"))){

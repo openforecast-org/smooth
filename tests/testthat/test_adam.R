@@ -796,3 +796,20 @@ test_that("Pure regression stores sigma^2 as the scale, as the other ADAM models
     testModel <- adam(cbind(y=BJsales, x=BJsales.lead), "NNN", silent=TRUE);
     expect_equal(testModel$scale, mean(residuals(testModel)^2));
 })
+
+test_that("Pure regression is forecasted and predicted by forecast.alm() / predict.alm()", {
+    xreg <- data.frame(y=as.vector(BJsales), x=as.vector(BJsales.lead));
+    testModel <- adam(xreg, "NNN", h=10, holdout=TRUE, silent=TRUE);
+    almModel <- alm(y~x, head(xreg, 140));
+    for(interval in c("none", "prediction", "confidence")){
+        testForecast <- forecast(testModel, h=10, interval=interval);
+        almForecast <- forecast(almModel, h=10, newdata=tail(xreg, 10), interval=interval);
+        expect_equal(as.vector(testForecast$mean), as.vector(almForecast$mean));
+        expect_equal(start(testForecast$mean)[1], 141);
+        if(interval!="none"){
+            expect_equal(as.vector(testForecast$lower), as.vector(almForecast$lower));
+            expect_equal(as.vector(predict(testModel, interval=interval)$upper),
+                         as.vector(predict(almModel, interval=interval)$upper));
+        }
+    }
+})

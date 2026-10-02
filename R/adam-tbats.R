@@ -1216,7 +1216,7 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
             simulated <- object$adamCpp$reforecast(errors, array(1, c(h, nsim, 1)),
                                                    array(matWt, c(h, nComponents, 1)),
                                                    array(matF, c(nComponents, nComponents, 1)),
-                                                   matrix(objectRefitted$persistence[,j], nComponents, nsim),
+                                                   matrix(objectRefitted$persistence[,j], nComponents, 1),
                                                    lookup, array(profile, c(nComponents, lagsModelMax, 1)),
                                                    "A")$data;
             paths[[j]] <- matrix(tbats_boxCoxInverse(simulated, lambda), h, nsim);

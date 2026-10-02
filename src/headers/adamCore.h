@@ -2136,7 +2136,7 @@ public:
                                     adamGvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                                arrayF.slice(j), arrayWt.slice(j).row(i-lagsModelMax),
                                                E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
-                                               nComponents, constant, matrixG.col(k),
+                                               nComponents, constant, matrixG.col(j),
                                                arrayErrors.slice(j)(i-lagsModelMax,k), yFitted, adamETS));
                 }
             }

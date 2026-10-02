@@ -813,3 +813,14 @@ test_that("Pure regression is forecasted and predicted by forecast.alm() / predi
         }
     }
 })
+
+# Every path of a draw starts from the profile and uses the persistence of that draw
+test_that("reforecast keeps the paths of a draw on its own profile and persistence", {
+    fit <- adam(BJsales, "ANN");
+    h <- 3;
+    paths <- fit$adamCpp$reforecast(array(1, c(h, 2, 2)), array(1, c(h, 2, 2)), array(1, c(h, 1, 2)),
+                                     array(1, c(1, 1, 2)), matrix(c(0, 1), 1, 2),
+                                     matrix(0L, 1, h), array(200, c(1, 1, 2)), "A")$data;
+    expect_equal(paths[,,1], matrix(201, h, 2));
+    expect_equal(paths[,,2], matrix(201:203, h, 2));
+});

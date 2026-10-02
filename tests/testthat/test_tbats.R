@@ -127,3 +127,45 @@ test_that("two-stage starts from the backcasted fit and cannot end below it", {
         expect_gte(as.numeric(logLik(fitTwoStage)), as.numeric(logLik(fitBackcast)) - 1e-8);
     }
 });
+
+test_that("the forecasts are those of adam in the Box-Cox space transformed back", {
+    fit <- tbats(AirPassengers, harmonics=5, trend="damped", orders=list(ar=1, ma=0, select=FALSE),
+                 h=12, holdout=TRUE);
+    expect_equal(as.numeric(forecast(fit, h=12)$mean), as.numeric(fit$forecast), tolerance=1e-8);
+    for(interval in c("prediction","simulated")){
+        set.seed(41);
+        forecastBC <- forecast(tbats_boxCoxObject(fit), h=12, interval=interval);
+        set.seed(41);
+        forecastTBATS <- forecast(fit, h=12, interval=interval);
+        expect_equal(as.numeric(forecastTBATS$lower),
+                     tbats_boxCoxInverse(forecastBC$lower, fit$lambda), tolerance=1e-8);
+        expect_true(all(forecastTBATS$lower<forecastTBATS$mean & forecastTBATS$mean<forecastTBATS$upper));
+    }
+    expect_error(forecast(fit, h=12, cumulative=TRUE), "Cumulative");
+    predicted <- predict(fit, interval="prediction");
+    expect_true(all(predicted$lower<predicted$upper));
+});
+
+test_that("the point likelihoods sum to the log-likelihood with the Jacobian", {
+    fit <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0);
+    expect_equal(sum(pointLik(fit)), as.numeric(logLik(fit)), tolerance=1e-8);
+});
+
+test_that("reapply refits the model and reforecast produces the intervals", {
+    fit <- tbats(AirPassengers, harmonics=5, trend="damped", orders=list(ar=1, ma=0, select=FALSE));
+    # The tiny covariance returns the fitted values
+    refitted <- reapply(fit, nsim=5, heuristics=1e-12);
+    expect_lt(max(abs(refitted$refitted - as.numeric(fitted(fit)))), 1e-2);
+    set.seed(41);
+    refitted <- reapply(fit, nsim=20);
+    expect_true(all(refitted$lambda>=0 & refitted$lambda<=1));
+    for(interval in c("confidence","complete")){
+        set.seed(41);
+        forecasted <- forecast(fit, h=12, interval=interval, nsim=20);
+        expect_true(all(forecasted$lower<=forecasted$upper));
+    }
+    expect_true(all(is.finite(vcov(fit))));
+    expect_equal(nrow(confint(fit)), length(fit$B));
+    simulated <- simulate(fit, nsim=3, seed=41);
+    expect_equal(dim(simulated$data), c(length(actuals(fit)), 3));
+});

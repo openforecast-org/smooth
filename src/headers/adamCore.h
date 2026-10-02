@@ -2095,7 +2095,7 @@ public:
     ReforecastResult reforecast(arma::cube const &arrayErrors, arma::cube const &arrayOt,
                                 arma::cube const &arrayWt,
                                 arma::cube const &arrayF, arma::mat const &matrixG,
-                                arma::umat const &indexLookupTable, arma::cube arrayProfileRecent,
+                                arma::umat const &indexLookupTable, arma::cube const &arrayProfileRecent,
                                 char const &E){
 
         unsigned int obs = arrayErrors.n_rows;
@@ -2110,14 +2110,16 @@ public:
 
         for(unsigned int j=0; j<nsim; j=j+1){
             for(unsigned int k=0; k<nSeries; k=k+1){
+                // Every path starts from the profile at the end of the sample
+                arma::mat profile = arrayProfileRecent.slice(j);
                 for(unsigned int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
                     /* # Measurement equation and the error term */
-                    yFitted = adamWvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                    yFitted = adamWvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                          arrayWt.slice(j).row(i-lagsModelMax), E, T, S,
                                          nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
 
                     arrY(i-lagsModelMax,k,j) = arrayOt(i-lagsModelMax,k,j) *
-                        (yFitted + adamRvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                        (yFitted + adamRvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                               arrayWt.slice(j).row(i-lagsModelMax), E, T, S,
                                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant) *
                                                   arrayErrors.slice(j)(i-lagsModelMax,k));
@@ -2128,10 +2130,10 @@ public:
                     }
 
                     /* # Transition equation */
-                    arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)) =
-                    (adamFvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                    profile.elem(indexLookupTable.col(i-lagsModelMax)) =
+                    (adamFvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                 arrayF.slice(j), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
-                                    adamGvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                                    adamGvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                                arrayF.slice(j), arrayWt.slice(j).row(i-lagsModelMax),
                                                E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
                                                nComponents, constant, matrixG.col(k),

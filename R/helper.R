@@ -61,7 +61,13 @@ componentsDefiner <- function(object){
     ssarimaModel <- ssarimaChecker(object);
     sparmaModel <- sparmaChecker(object);
 
-    if(cesModel){
+    if(tbatsChecker(object)){
+        # The level and trend in the ETS slot, the harmonics and the ARMA in the ARIMA one
+        componentsNumberETS <- componentsNumberETSNonSeasonal <- 1 + (object$trendType!="none");
+        componentsNumberETSSeasonal <- 0;
+        componentsNumberARIMA <- ncol(object$states) - componentsNumberETS;
+    }
+    else if(cesModel){
         componentsNumberETS <- componentsNumberETSSeasonal <- componentsNumberETSNonSeasonal <- 0;
         componentsNumberARIMA <- length(object$initial$nonseasonal);
         # If seasonal is formed via a matrix, this must be "simple" or a "full" model

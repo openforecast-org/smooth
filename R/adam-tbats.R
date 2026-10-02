@@ -212,6 +212,7 @@ tbats_boxCox <- function(y, lambda){
 
 #' @keywords internal
 tbats_boxCoxInverse <- function(z, lambda){
+    z <- as.numeric(z);
     if(lambda==0){
         return(exp(z));
     }
@@ -754,6 +755,18 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     CF <- function(B){
         return(lossValue(B, checked$loss));
     }
+    # The fit at any parameters, for reapply(): NULL where they violate the bounds
+    fitter <- function(B){
+        names(B) <- names(BList$B);
+        elements <- tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
+                                 checked$bounds, adamCpp);
+        if(elements$penalty>0){
+            return(NULL);
+        }
+        fitted <- fitStates(elements);
+        return(list(fitted=fitted$fitted, states=fitted$states, profile=fitted$profile,
+                    matF=elements$matF, vecG=elements$vecG, w=elements$w, lambda=elements$lambda));
+    }
 
     #### Estimation ####
     B <- BList$B;
@@ -838,7 +851,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                 struct=struct, armaSpec=armaSpec, elements=elements, fitted=fitted, states=states,
                 initialRead=initialRead, scale=scale, forecastBC=forecastBC, FI=FI,
                 trendType=trendType, initialType=initialType, distribution=distribution,
-                adamCpp=adamCpp, lookup=lookup, headLength=headLength,
+                adamCpp=adamCpp, lookup=lookup, headLength=headLength, fitter=fitter,
                 y=y, lambdaSpec=lambdaSpec, checked=checked));
 }
 
@@ -944,6 +957,13 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
 
     yInSample <- checked$yInSample;
     yHoldout <- checked$yHoldout;
+    # Keep the ts class of the data, as adam() does
+    if(is.ts(yFitted)){
+        yInSample <- ts(yInSample, start=start(yFitted), frequency=frequency(yFitted));
+        if(!is.null(yHoldout) && is.ts(yForecast)){
+            yHoldout <- ts(yHoldout, start=start(yForecast), frequency=frequency(yForecast));
+        }
+    }
     errormeasures <- NULL;
     if(checked$holdout && checked$h>0){
         errormeasures <- measures(yHoldout, yForecast, yInSample);
@@ -958,7 +978,9 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     orders <- list(ar=armaSpec$arOrders, i=rep(0, length(armaSpec$lags)), ma=armaSpec$maOrders);
     arma <- NULL;
     if(armaSpec$nParam>0){
-        arma <- list(ar=best$B[grepl("^phi[0-9]", names(best$B))], ma=best$B[grepl("^theta", names(best$B))]);
+        arPart <- best$B[grepl("^phi[0-9]", names(best$B))];
+        maPart <- best$B[grepl("^theta", names(best$B))];
+        arma <- list(ar=if(length(arPart)>0) arPart, ma=if(length(maPart)>0) maPart);
     }
     other <- if(best$distribution=="dgnorm") list(shape=best$elements$shape) else list();
 
@@ -970,7 +992,8 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     persistence=persistence, phi=if(struct$damped) best$B[["phi"]] else 1,
                                     transition=matF, measurement=matWt,
                                     initial=initialValue, initialType=best$initialType,
-                                    orders=orders, arma=arma, armaSpec=armaSpec, lambda=lambda,
+                                    orders=orders, arma=arma, armaSpec=armaSpec, armaLags=armaSpec$lags,
+                                    lambda=lambda,
                                     harmonics=harmonics, periods=periods, trendType=best$trendType,
                                     nParam=parametersNumber,
                                     formula=checked$formula,
@@ -980,10 +1003,269 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     distribution=best$distribution, other=other, bounds=checked$bounds,
                                     scale=best$scale, B=best$B, lags=c(1, periods),
                                     lagsAll=struct$lagsModelAll, res=best$res, FI=best$FI,
-                                    adamCpp=best$adamCpp),
-                               class=c("adam","smooth"));
+                                    adamCpp=best$adamCpp, fitter=best$fitter),
+                               class=c("tbats","adam","smooth"));
     if(!silent){
         plot(modelReturned, 7);
     }
     return(modelReturned);
+}
+
+#### Methods ####
+# The model in the space of the Box-Cox transform, as an adam object: the adam
+# methods work there, and the tbats ones transform their results back
+#' @keywords internal
+tbats_boxCoxObject <- function(object){
+    lambda <- object$lambda;
+    objectBC <- object;
+    class(objectBC) <- c("adam","smooth");
+    yBC <- tbats_boxCox(actuals(object), lambda);
+    objectBC$data[] <- yBC;
+    objectBC$fitted[] <- yBC - residuals(object);
+    objectBC$forecast[] <- tbats_boxCox(object$forecast, lambda);
+    if(!is.null(object$holdout)){
+        objectBC$holdout[] <- suppressWarnings(tbats_boxCox(object$holdout, lambda));
+    }
+    return(objectBC);
+}
+
+# The quantiles of the transformed data map onto those of the data, so the
+# forecasts and the bounds are transformed back; the point forecast is the median
+#' @keywords internal
+tbats_boxCoxForecast <- function(result, object){
+    lambda <- object$lambda;
+    for(element in c("mean","lower","upper")){
+        if(!is.null(result[[element]])){
+            result[[element]][] <- tbats_boxCoxInverse(result[[element]], lambda);
+        }
+    }
+    if(is.matrix(result$scenarios)){
+        result$scenarios[] <- tbats_boxCoxInverse(result$scenarios, lambda);
+    }
+    result$model <- object;
+    return(result);
+}
+
+# The refits at parameters drawn from their distribution. Each draw has its own
+# lambda, so its states are in the space of its own transform; the refitted values
+# are transformed back. A draw outside the bounds is pulled towards the estimate,
+# to the last point of the segment between them that satisfies the bounds: the
+# estimate often lies on the boundary of the admissible region, where most draws
+# would otherwise be rejected.
+#' @export
+reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+                          bootstrap=FALSE, heuristics=NULL, ...){
+    startTime <- Sys.time();
+    type <- covarTypeResolver(type, bootstrap);
+    parameters <- coef(object);
+    vcovMatrix <- vcov(object, type=type, heuristics=heuristics, ...);
+    eigenMin <- min(eigen(vcovMatrix, symmetric=TRUE, only.values=TRUE)$values);
+    if(eigenMin<0){
+        vcovMatrix <- vcovMatrix + diag(abs(eigenMin)+1e-10, nrow(vcovMatrix));
+    }
+    draws <- matrix(MASS::mvrnorm(nsim, parameters, vcovMatrix), ncol=length(parameters),
+                    dimnames=list(NULL, names(parameters)));
+    refits <- vector("list", nsim);
+    for(i in 1:nsim){
+        refit <- object$fitter(draws[i,]);
+        if(is.null(refit)){
+            # Bisect the share of the deviation from the estimate that keeps the bounds
+            inside <- 0;
+            outside <- 1;
+            for(iteration in 1:20){
+                share <- (inside+outside)/2;
+                if(is.null(object$fitter(parameters + share*(draws[i,]-parameters)))){
+                    outside <- share;
+                }
+                else{
+                    inside <- share;
+                }
+            }
+            draws[i,] <- parameters + inside*(draws[i,]-parameters);
+            refit <- object$fitter(draws[i,]);
+        }
+        refits[[i]] <- refit;
+    }
+    obs <- nobs(object);
+    nComponents <- ncol(object$states);
+    lagsModelMax <- max(object$lagsAll);
+    lambdas <- sapply(refits, function(refit) refit$lambda);
+    refitted <- matrix(sapply(1:nsim, function(i) tbats_boxCoxInverse(refits[[i]]$fitted, lambdas[i])),
+                       obs, nsim, dimnames=list(NULL, paste0("nsim",1:nsim)));
+    if(any(class(actuals(object))=="ts")){
+        refitted <- ts(refitted, start=start(actuals(object)), frequency=frequency(actuals(object)));
+    }
+    states <- array(sapply(refits, function(refit){
+        return(refit$states[, ncol(refit$states)-(obs+lagsModelMax)+1:(obs+lagsModelMax), drop=FALSE]);
+    }), c(nComponents, obs+lagsModelMax, nsim));
+    return(structure(list(timeElapsed=Sys.time()-startTime,
+                          y=actuals(object), states=states, refitted=refitted,
+                          fitted=fitted(object), model=object$model,
+                          transition=array(sapply(refits, function(refit) refit$matF),
+                                           c(nComponents, nComponents, nsim)),
+                          measurement=array(sapply(refits, function(refit) rep(refit$w, each=obs)),
+                                            c(obs, nComponents, nsim)),
+                          persistence=matrix(sapply(refits, function(refit) refit$vecG[,1]), nComponents, nsim),
+                          profile=array(sapply(refits, function(refit) refit$profile),
+                                        c(nComponents, lagsModelMax, nsim)),
+                          randomParameters=draws, lambda=lambdas,
+                          errors=sapply(1:nsim, function(i){
+                              return(tbats_boxCox(as.numeric(actuals(object)), lambdas[i]) - refits[[i]]$fitted);
+                          })),
+                     class="reapply"));
+}
+
+# The forecasts with the uncertainty of the parameters: for each draw of reapply(),
+# its point forecasts ("confidence") or its simulated paths with the scale of its
+# own residuals ("prediction"), in the space of its own transform and transformed
+# back. The point forecast stays the median of the model.
+#' @export
+reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
+                             interval=c("prediction", "confidence", "none"),
+                             level=0.95, side=c("both","upper","lower"), cumulative=FALSE,
+                             nsim=100, type=c("opg","hessian","bootstrap"),
+                             bootstrap=FALSE, heuristics=NULL, ...){
+    interval <- match.arg(interval);
+    side <- match.arg(side);
+    if(cumulative && object$lambda!=1){
+        stop("Cumulative forecasts of tbats() are only available for lambda=1.", call.=FALSE);
+    }
+    objectRefitted <- reapply(object, nsim=nsim, type=type, bootstrap=bootstrap, heuristics=heuristics, ...);
+    obs <- nobs(object);
+    lagsModelAll <- object$lagsAll;
+    lagsModelMax <- max(lagsModelAll);
+    nComponents <- length(lagsModelAll);
+    lookup <- adamProfileCreator(lagsModelAll, lagsModelMax, obs+h)$lookup[,-c(1:(obs+lagsModelMax)),drop=FALSE];
+    draws <- objectRefitted$randomParameters;
+    dfScale <- adam_dfScale(object);
+    paths <- vector("list", nsim);
+    for(j in 1:nsim){
+        matWt <- matrix(objectRefitted$measurement[1,,j], h, nComponents, byrow=TRUE);
+        matF <- objectRefitted$transition[,,j];
+        profile <- matrix(objectRefitted$profile[,,j], nComponents, lagsModelMax);
+        lambda <- objectRefitted$lambda[j];
+        if(interval=="prediction"){
+            shape <- if(any(colnames(draws)=="shape")) draws[j,"shape"] else object$other$shape;
+            scale <- adam_scaleDebias(tbats_scale(objectRefitted$errors[,j], object$distribution, shape, obs),
+                                      object$distribution, obs, dfScale);
+            errors <- array(adam_errorsSimulate(h*nsim, object$distribution, scale, list(shape=shape), dfScale),
+                            c(h, nsim, 1));
+            simulated <- object$adamCpp$reforecast(errors, array(1, c(h, nsim, 1)),
+                                                   array(matWt, c(h, nComponents, 1)),
+                                                   array(matF, c(nComponents, nComponents, 1)),
+                                                   matrix(objectRefitted$persistence[,j], nComponents, nsim),
+                                                   lookup, array(profile, c(nComponents, lagsModelMax, 1)),
+                                                   "A")$data;
+            paths[[j]] <- matrix(tbats_boxCoxInverse(simulated, lambda), h, nsim);
+        }
+        else{
+            paths[[j]] <- matrix(tbats_boxCoxInverse(object$adamCpp$forecast(matWt, matF, lookup, profile, h)$forecast,
+                                                     lambda), h, 1);
+        }
+    }
+    paths <- do.call(cbind, paths);
+    if(cumulative){
+        paths <- matrix(colSums(paths), 1);
+    }
+    levelLow <- switch(side, "both"=(1-level)/2, "upper"=rep(0, length(level)), "lower"=1-level);
+    levelUp <- switch(side, "both"=(1+level)/2, "upper"=level, "lower"=rep(1, length(level)));
+    yLower <- t(apply(paths, 1, quantile, probs=levelLow, na.rm=TRUE, names=FALSE));
+    yUpper <- t(apply(paths, 1, quantile, probs=levelUp, na.rm=TRUE, names=FALSE));
+    if(length(level)==1){
+        yLower <- matrix(yLower, ncol=1);
+        yUpper <- matrix(yUpper, ncol=1);
+    }
+    yLower[, levelLow==0] <- 0;
+    yUpper[, levelUp==1] <- Inf;
+    pointForecast <- forecast(tbats_boxCoxObject(object), h=h, interval="none")$mean;
+    yForecast <- pointForecast;
+    yForecast[] <- tbats_boxCoxInverse(pointForecast, object$lambda);
+    if(cumulative){
+        yForecast <- sum(yForecast);
+    }
+    makeLike <- function(values){
+        values <- ts(values, start=start(pointForecast), frequency=frequency(pointForecast));
+        return(values);
+    }
+    yLower <- makeLike(yLower);
+    yUpper <- makeLike(yUpper);
+    colnames(yLower) <- paste0("Lower bound (", levelLow*100, "%)");
+    colnames(yUpper) <- paste0("Upper bound (", levelUp*100, "%)");
+    return(structure(list(mean=yForecast, lower=yLower, upper=yUpper, model=object,
+                          level=level, interval=interval, side=side, cumulative=cumulative, h=h,
+                          scenarios=FALSE),
+                     class=c("adam.forecast","smooth.forecast","forecast")));
+}
+
+#' @export
+forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
+                           interval=c("none", "prediction", "confidence", "simulated",
+                                      "approximate", "semiparametric", "nonparametric",
+                                      "empirical","complete"),
+                           level=0.95, side=c("both","upper","lower"), cumulative=FALSE, nsim=NULL,
+                           scenarios=FALSE, ...){
+    if(cumulative && object$lambda!=1){
+        stop("Cumulative forecasts of tbats() are only available for lambda=1: ",
+             "the sums of the transformed values do not transform back.", call.=FALSE);
+    }
+    objectBC <- tbats_boxCoxObject(object);
+    # The parameter uncertainty comes from reforecast(), which reapplies the model
+    # with the lambda of each draw and returns the bounds of the data
+    if(h>0 && any(interval[1]==c("confidence","complete"))){
+        return(reforecast(object, h=h, newdata=newdata, occurrence=occurrence,
+                          interval=switch(interval[1], "confidence"="confidence", "prediction"),
+                          level=level, side=match.arg(side), cumulative=cumulative,
+                          nsim=if(is.null(nsim)) 100 else nsim, ...));
+    }
+    result <- forecast(objectBC, h=h, newdata=newdata, occurrence=occurrence,
+                       interval=interval, level=level, side=side, cumulative=cumulative, nsim=nsim,
+                       scenarios=scenarios, ...);
+    return(tbats_boxCoxForecast(result, object));
+}
+
+#' @export
+predict.tbats <- function(object, newdata=NULL, interval=c("none", "confidence", "prediction"),
+                          level=0.95, side=c("both","upper","lower"), ...){
+    result <- predict(tbats_boxCoxObject(object), newdata=newdata, interval=interval,
+                      level=level, side=side, ...);
+    return(tbats_boxCoxForecast(result, object));
+}
+
+# The log-densities of the data: those of the transformed data and the Jacobian
+#' @export
+pointLik.tbats <- function(object, log=TRUE, ...){
+    likValues <- pointLik(tbats_boxCoxObject(object), log=TRUE) +
+        (object$lambda-1)*log(as.numeric(actuals(object)));
+    if(!log){
+        likValues <- exp(likValues);
+    }
+    return(likValues);
+}
+
+# The OPG covariance of the parameters: the scores of the log-densities, refitting
+# the model at each perturbed parameter
+#' @keywords internal
+covarOPGtbats <- function(object, stepSize=.Machine$double.eps^(1/4)){
+    parameterValues <- coef(object);
+    y <- actuals(object);
+    perturbedPointLik <- function(j, delta){
+        clone <- object;
+        if(!is.null(j)){
+            clone$B[j] <- clone$B[j]+delta;
+        }
+        modelLocal <- try(suppressWarnings(tbats(y, model=clone, h=0)), silent=TRUE);
+        if(inherits(modelLocal, "try-error")){
+            return(NULL);
+        }
+        return(as.numeric(pointLik(modelLocal)));
+    }
+    return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
+}
+
+#' @export
+simulate.tbats <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
+    result <- simulate(tbats_boxCoxObject(object), nsim=nsim, seed=seed, obs=obs, ...);
+    result$data[] <- tbats_boxCoxInverse(result$data, object$lambda);
+    result$model <- object$model;
+    return(result);
 }

@@ -3203,7 +3203,11 @@ adamETSChecker <- function(object){
 #' @export
 modelType.adam <- function(object, ...){
     etsModel <- etsChecker(object);
-    if(etsModel){
+    if(tbatsChecker(object)){
+        # The ETS part of TBATS: the level and the trend
+        modelType <- switch(object$trendType, "none"="ANN", "additive"="AAN", "damped"="AAdN");
+    }
+    else if(etsModel){
         modelType <- substring(object$model,
                                unlist(gregexpr("\\(",object$model))+1,
                                unlist(gregexpr("\\)",object$model))-1)[1];
@@ -4193,6 +4197,15 @@ print.adam <- function(x, digits=4, ...){
         }
     }
 
+    if(tbatsChecker(x)){
+        cat("\nSmoothing parameters:\n");
+        print(round(x$B[grepl("^(alpha|beta|gamma)", names(x$B))], digits));
+        if(x$trendType=="damped"){
+            cat("Damping parameter:", round(x$phi, digits), "\n");
+        }
+        cat("Box-Cox lambda:", round(x$lambda, digits));
+    }
+
     # If this is ARIMA model
     if(!sparmaModel &&
        (!is.null(x$arma) && (!is.null(x$arma$ar) || !is.null(x$arma$ma)))){
@@ -4201,7 +4214,8 @@ print.adam <- function(x, digits=4, ...){
         if(!is.list(ordersModel)){
             ordersModel <- list(ar=ordersModel[1], i=ordersModel[2], ma=ordersModel[3]);
         }
-        lagsModel <- lags(x);
+        # The ARMA of tbats() has its own (integer) lags
+        lagsModel <- if(!is.null(x$armaLags)) x$armaLags else lags(x);
         cat("\nARMA parameters of the model:\n");
         if(!is.null(x$arma$ar)){
             # cat("AR:\n")
@@ -5100,7 +5114,9 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
         opgStepSize <- if(is.null(ellipsis$stepSize)){
                            .Machine$double.eps^(1/4);
                        } else { ellipsis$stepSize; };
-        vcovOPG <- if(cesChecker(object)){
+        vcovOPG <- if(tbatsChecker(object)){
+                       covarOPGtbats(object, stepSize=opgStepSize);
+                   } else if(cesChecker(object)){
                        covarOPGces(object, stepSize=opgStepSize);
                    } else if(gumChecker(object)){
                        covarOPGgum(object, stepSize=opgStepSize);
@@ -5165,6 +5181,10 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
                 modelReturn <- suppressWarnings(ces(object$data, h=0, model=object, formula=formula(object),
                                                     FI=TRUE, stepSize=ellipsis$stepSize));
             }
+            else if(tbatsChecker(object)){
+                modelReturn <- suppressWarnings(tbats(actuals(object), h=0, model=object,
+                                                      FI=TRUE, stepSize=ellipsis$stepSize));
+            }
             else if(gumModel){
                 modelReturn <- suppressWarnings(gum(object$data, h=0, model=object, formula=formula(object),
                                                     FI=TRUE, stepSize=ellipsis$stepSize));
@@ -5184,6 +5204,10 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
                 if(cesModel){
                     modelReturn <- suppressWarnings(ces(object$data, h=0, model=object, formula=formula(object),
                                                         FI=TRUE, stepSize=.Machine$double.eps^(1/6)));
+                }
+                else if(tbatsChecker(object)){
+                    modelReturn <- suppressWarnings(tbats(actuals(object), h=0, model=object,
+                                                          FI=TRUE, stepSize=.Machine$double.eps^(1/6)));
                 }
                 else if(gumModel){
                     modelReturn <- suppressWarnings(gum(object$data, h=0, model=object, formula=formula(object),

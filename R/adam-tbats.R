@@ -65,7 +65,9 @@
 #' \link[smooth]{adam}. Factors should be converted into dummy variables. The future
 #' values for \code{forecast()} are taken from its \code{newdata}.
 #' @param regressors How to treat the explanatory variables: \code{"use"} them as
-#' they are (constant coefficients).
+#' they are (constant coefficients), or \code{"adapt"} their coefficients over time
+#' (one smoothing parameter per regressor, \code{delta1}, ..., as in
+#' \link[smooth]{adam}).
 #' @param distribution The distribution of the error term in the space of the
 #' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 #' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
@@ -134,8 +136,8 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     initial <- match.arg(initial);
     bounds <- match.arg(bounds);
     regressors <- match.arg(regressors);
-    if(regressors!="use"){
-        stop("regressors=\"select\" and \"adapt\" are not implemented yet.", call.=FALSE);
+    if(regressors=="select"){
+        stop("regressors=\"select\" is not implemented yet.", call.=FALSE);
     }
     # The Box-Cox parameter is kept apart: the checker returns LASSO's lambda
     lambdaProvided <- lambda;
@@ -157,7 +159,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         bounds <- model$bounds;
         # The regressors of the model, selected or not, are used as they are
         if(!is.null(model$xregNames)){
-            regressors <- if(any(names(model$persistence)=="delta1")) "adapt" else "use";
+            regressors <- if(model$regressors=="adapt") "adapt" else "use";
             if(is.null(xreg)){
                 xreg <- rbind(model$data[, model$xregNames, drop=FALSE],
                               model$holdout[, model$xregNames, drop=FALSE]);
@@ -547,7 +549,7 @@ tbats_structure <- function(trendType, harmonicTable, armaSpec, periods, xregSpe
                 nETS=nETS, nHarmonics=nHarmonics, nArma=nArma, nXreg=nXreg, nComponents=nComponents,
                 lagsModelAll=lagsModelAll, lagsModelMax=max(lagsModelAll),
                 harmonicRows=harmonicRows, armaRows=armaRows, xregRows=xregRows, matF=matF,
-                xreg=xregSpec,
+                xreg=xregSpec, xregAdapt=nXreg>0 && xregSpec$regressors=="adapt",
                 harmonicTable=harmonicTable, periods=periods, periodIndex=periodIndex,
                 responseCos=cos(angles), responseSin=sin(angles),
                 armaLagMax=if(nArma>0) max(armaSpec$stateLags) else 0,
@@ -640,6 +642,8 @@ tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distri
            # small value can cross
            setNames(rep(0, 2*nPeriods),
                     paste0(rep(c("gamma1[","gamma2["), nPeriods), rep(round(periodsUsed, 4), each=2), "]")[seq_len(2*nPeriods)]),
+           setNames(rep(0.01, struct$nXreg*struct$xregAdapt),
+                    if(struct$xregAdapt) paste0("delta", seq_len(struct$nXreg))),
            setNames(armaStart, armaSpec$names));
     if(initialEstimate){
         nH <- struct$nHarmonics;
@@ -662,7 +666,7 @@ tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distri
     lb <- rep(-Inf, length(B));
     ub <- rep(Inf, length(B));
     if(bounds=="usual"){
-        persistence <- names(B) %in% c("alpha","beta","phi");
+        persistence <- names(B) %in% c("alpha","beta","phi") | grepl("^delta", names(B));
         lb[persistence] <- 0;
         ub[persistence] <- 1;
     }
@@ -720,6 +724,23 @@ tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate
                               polynomials$maReflection*(sum(armaSpec$maOrders)>0));
             if(reflection>=1){
                 penalty <- penalty + 1E+100*reflection;
+            }
+        }
+    }
+
+    if(struct$xregAdapt){
+        deltas <- B[paste0("delta", seq_len(struct$nXreg))];
+        vecG[struct$xregRows] <- deltas;
+        if(bounds=="usual" && (any(deltas<0) || any(deltas>1))){
+            penalty <- penalty + 1E+100;
+        }
+        # The averaged condition of adam() for the regressors, separately from the rest
+        else if(bounds=="admissible"){
+            xregEigens <- abs(smoothEigensR(matrix(deltas), diag(struct$nXreg), struct$xreg$data,
+                                            rep(1L, struct$nXreg), TRUE, nrow(struct$xreg$data),
+                                            TRUE, struct$nXreg, FALSE));
+            if(any(xregEigens>1+1E-10)){
+                penalty <- penalty + 1E+100*max(xregEigens);
             }
         }
     }
@@ -1098,7 +1119,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     } else "";
     phiValue <- if(struct$damped) round(best$B[["phi"]], 3) else "-";
     modelName <- paste0("TBATS", if(struct$nXreg>0) "X", "(", round(lambda, 3), ", {", sum(armaSpec$arOrders), ",",
-                        sum(armaSpec$maOrders), "}, ", phiValue, seasonalPart, ")");
+                        sum(armaSpec$maOrders), "}, ", phiValue, seasonalPart, ")", if(struct$xregAdapt) "{D}");
 
     initialValue <- list(level=best$initialRead$states$level);
     if(struct$trendIn){

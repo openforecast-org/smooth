@@ -51,7 +51,9 @@ They enter the model in the space of the Box-Cox transformed data, as in the ETS
 values for \code{forecast()} are taken from its \code{newdata}.}
 
 \item{regressors}{How to treat the explanatory variables: \code{"use"} them as
-they are (constant coefficients).}
+they are (constant coefficients), or \code{"adapt"} their coefficients over time
+(one smoothing parameter per regressor, \code{delta1}, ..., as in
+\link[smooth]{adam}).}
 
 \item{distribution}{The distribution of the error term in the space of the
 Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or

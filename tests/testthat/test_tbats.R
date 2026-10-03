@@ -276,3 +276,27 @@ test_that("the regressors are estimated and their future values used in the fore
     expect_false(any(names(coef(fitComplete)) %in% c("x1","x2")));
     expect_equal(nparam(fitComplete), nparam(fit));
 });
+
+test_that("adaptive regressors are ADAM's ETSX{D} and stay within the bounds", {
+    set.seed(41);
+    xreg <- cbind(x1=rnorm(150, 10, 2), x2=rnorm(150));
+    y <- 200 + (5+cumsum(rnorm(150, 0, 0.05)))*xreg[,"x1"] - 2*xreg[,"x2"] + cumsum(rnorm(150)) + rnorm(150);
+    fitADAM <- adam(cbind(y=y, xreg), "ANN", formula=y~x1+x2, initial="optimal", regressors="adapt");
+    beta <- qr.coef(qr(tbats_design(150, FALSE, tbats_harmonics(numeric(0), numeric(0)), xreg)), y-1);
+    parameters <- coef(fitADAM);
+    B <- c(parameters[c("alpha","delta1","delta2")], level=parameters[["level"]]-1-beta[[1]],
+           x1=parameters[["x1"]]-beta[[2]], x2=parameters[["x2"]]-beta[[3]]);
+    fit <- tbats(y, lags=1, xreg=xreg, regressors="adapt", trend="none", lambda=1, orders=orders0,
+                 initial="optimal", B=B, maxeval=1);
+    expect_equal(as.numeric(logLik(fit)), as.numeric(logLik(fitADAM)), tolerance=1e-10);
+    for(bounds in c("usual","admissible")){
+        fit <- tbats(y, lags=1, xreg=xreg, regressors="adapt", trend="none", orders=orders0, bounds=bounds);
+        deltas <- coef(fit)[c("delta1","delta2")];
+        expect_match(fit$model, "\\{D\\}$");
+        expect_true(all(deltas>=0 & deltas<=1));
+    }
+    refit <- tbats(y, lags=1, model=fit);
+    expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)), tolerance=1e-10);
+    # The averaged condition of adam() rejects a coefficient that explodes
+    expect_null(fit$fitter(replace(coef(fit), "delta1", 3)));
+});

@@ -19,6 +19,7 @@ Changes:
 * `CES.point_lik()`, as R's `pointLik()` of a `ces()` model: the Normal log-densities of the in-sample observations, which sum to the log-likelihood.
 
 Bugfixes:
+* `OMG` handed its state matrices to the C++ fitter without copying them, so the fitter wrote its states into the arrays the next evaluation of the loss started from. This was harmless while the fitter left the head of lag-1 models alone; once it writes the backcast head there (see below), each evaluation started from the previous one's states, and OMG with lag-1 models ended at other optima than R's (ANN/ANN on Poisson data: alphas 0 and 0 with logLik -129.77, against R's 0 and 0.0059 with -129.07). The arrays are copied now, as `OM` already did.
 * `interval="complete"` and `"confidence"` exploded, as in R (see the R `NEWS`): the simulation in `reforecast()` started every path of a parameter draw where the previous one had ended, rather than from the states at the end of the sample, and took the persistence vector of another draw; fixed in the shared `src/headers/adamCore.h`.
 * With backcasting and the largest lag 1, the head of `states` and the initials were the seed of the backcast rather than the states it ended with, as in R (see the R `NEWS`); fixed in the shared `src/headers/adamCore.h`.
 * The S distribution sampler drew Gamma(2,s) - Gamma(2,s), with variance 4s^2 instead of 120s^4, so the simulated intervals of `ds` were about a third of the width of R's.

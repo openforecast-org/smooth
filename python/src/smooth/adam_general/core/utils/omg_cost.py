@@ -72,7 +72,10 @@ def _omg_gradient_profiles(side_a, side_b, elem_a, elem_b, ot, loss, adam_ets=Fa
         return None
 
     def _f(x, dtype=np.float64):
-        return np.asfortranarray(x, dtype=dtype)
+        # A copy: the C++ writes into its arguments, and np.asfortranarray hands
+        # it this array when it is already Fortran-ordered, so the fit would leave
+        # its states in the seed of the next evaluation (R copies on every call)
+        return np.array(x, dtype=dtype, order="F", copy=True)
 
     n_a = int(elem_a["mat_vt"].shape[0])
     n_b = int(elem_b["mat_vt"].shape[0])
@@ -238,7 +241,10 @@ def omg_cf(  # noqa: N802
 
     # Build Fortran-ordered copies for the C++ call
     def _f(x, dtype=np.float64):
-        return np.asfortranarray(x, dtype=dtype)
+        # A copy: the C++ writes into its arguments, and np.asfortranarray hands
+        # it this array when it is already Fortran-ordered, so the fit would leave
+        # its states in the seed of the next evaluation (R copies on every call)
+        return np.array(x, dtype=dtype, order="F", copy=True)
 
     initials_a = side_a["initials"]
     init_type_a = initials_a["initial_type"]

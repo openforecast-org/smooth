@@ -296,7 +296,8 @@ tbats_design <- function(obs, trendIn, harmonicTable){
     return(X);
 }
 
-# The profile log-likelihood of the global model in lambda, with the Jacobian
+# The maximum of the profile log-likelihood of the global model in lambda, with the
+# Jacobian
 #' @keywords internal
 tbats_lambdaProfile <- function(y, qrX){
     obs <- length(y);
@@ -305,7 +306,9 @@ tbats_lambdaProfile <- function(y, qrX){
         rss <- sum(qr.resid(qrX, tbats_boxCox(y, lambda))^2);
         return(-obs/2*log(rss/obs) + (lambda-1)*logY);
     }
-    return(optimize(profile, c(0, 1), maximum=TRUE)$maximum);
+    # Rounded: Brent's search finds it to about 1e-4, and the last bits of the
+    # least squares differ between linear algebra libraries (the Python port)
+    return(round(optimize(profile, c(0, 1), maximum=TRUE)$maximum, 8));
 }
 
 # The starting value of lambda (or its fixed value) for a design

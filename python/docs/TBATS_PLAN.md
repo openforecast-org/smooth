@@ -126,7 +126,11 @@ OLS of `y⁽λ⁾` on an intercept, a time trend (if the model has one) and the 
 the harmonics. The projection matrix is computed once, so re-evaluating it at a new λ is one
 matrix-vector product. It provides:
 
-1. λ₀, from its profile likelihood with the Jacobian (1-D search over [0, 1]);
+1. λ₀, from its profile likelihood with the Jacobian (1-D search over [0, 1], R's
+   `optimize()`, ported as Brent's `fmin`), rounded to 1e-8: the search finds it to
+   about 1e-4, and the last bits of the least squares differ between R's LINPACK QR and
+   NumPy's LAPACK one (3e-15 on AirPassengers), which was the only difference between
+   the two fits;
 2. the preselection of `k_i` by IC, one period at a time;
 3. the initial states, recomputed at the current λ on every evaluation: level and trend;
    the pre-sample values `s₀`, `s₋₁` of each harmonic in its cells

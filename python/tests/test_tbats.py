@@ -1,0 +1,263 @@
+"""Tests of TBATS, mirroring tests/testthat/test_tbats.R."""
+
+import pathlib
+import warnings
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from smooth import TBATS
+from smooth.adam_general.core.tbats import fitter as ft
+from smooth.adam_general.core.tbats import structure as st
+
+ORDERS0 = {"ar": 0, "ma": 0, "select": False}
+ARMA11 = {"ar": 1, "ma": 1, "select": False}
+
+
+@pytest.fixture(scope="module")
+def air():
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    return pd.read_csv(path)["y"].to_numpy(dtype=float)
+
+
+def _rotation_form(
+    eps, frequency, gammas, level, trend, alpha, beta, s, s_star, ar, ma, arma
+):
+    """De Livera's rotation form with ADAM's ARMA(1,1), from the states at t=0."""
+    y = np.zeros(len(eps))
+    for t, e in enumerate(eps):
+        y[t] = level + trend + s.sum() + arma + e
+        s_new = np.cos(frequency) * s + np.sin(frequency) * s_star + gammas[:, 0] * e
+        s_star = -np.sin(frequency) * s + np.cos(frequency) * s_star + gammas[:, 1] * e
+        s = s_new
+        level = level + trend + alpha * e
+        trend = trend + beta * e
+        arma = ar * arma + (ar + ma) * e
+    return y
+
+
+def test_errors_are_those_of_the_rotation_form():
+    rng = np.random.default_rng(11)
+    tt = np.arange(1, 301)
+    y = (
+        200
+        + 0.2 * tt
+        + 5 * np.sin(2 * np.pi * tt / 7)
+        + 3 * np.cos(2 * np.pi * tt / 30.4375)
+        + np.cumsum(rng.normal(0, 0.5, 300))
+        + rng.normal(size=300)
+    )
+    fit = TBATS(
+        lags=[1, 7, 30.4375],
+        harmonics=[2, 1],
+        trend="additive",
+        lambda_bc=1,
+        orders=ARMA11,
+        initial="optimal",
+    ).fit(y)
+    B = dict(zip(fit.coef_names, fit.coef))
+    initial = fit.initial_value
+    seasonal = initial["seasonal"]
+    frequency = 2 * np.pi * seasonal["j"].to_numpy() / seasonal["period"].to_numpy()
+    labels = [st._period_label(p) for p in seasonal["period"]]
+    gammas = np.column_stack(
+        [[B[f"gamma1[{x}]"] for x in labels], [B[f"gamma2[{x}]"] for x in labels]]
+    )
+    a, b = seasonal["sin"].to_numpy(), seasonal["cos"].to_numpy()
+    s1 = a * np.sin(frequency) + b * np.cos(frequency)
+    s_star1 = a * np.cos(frequency) - b * np.sin(frequency)
+    rotation = _rotation_form(
+        fit.residuals,
+        frequency,
+        gammas,
+        initial["level"],
+        initial["trend"],
+        B["alpha"],
+        B["beta"],
+        s1,
+        s_star1,
+        B["phi1[1]"],
+        B["theta1[1]"],
+        initial["arma"][0],
+    )
+    # lambda=1 transforms y into y-1
+    assert np.max(np.abs(rotation - (y - 1))) < 1e-8
+
+
+def test_backcasting_reproduces_a_noise_free_fractional_period():
+    tt = np.arange(1, 201)
+    y = (
+        100
+        + 0.5 * tt
+        + 10 * np.sin(2 * np.pi * tt / 7.3)
+        + 4 * np.cos(2 * np.pi * tt / 7.3)
+        + 2 * np.sin(4 * np.pi * tt / 7.3)
+    )
+    fit = TBATS(
+        lags=[1, 7.3],
+        harmonics=[2],
+        trend="additive",
+        lambda_bc=1,
+        orders=ORDERS0,
+        B=np.array([0.1, 0.01, 0.01, 0.01]),
+        maxeval=1,
+    ).fit(y)
+    assert np.max(np.abs(fit.residuals)) < 1e-8
+
+
+def test_lambda_zero_is_the_model_of_the_logarithms(air):
+    fit_log = TBATS(
+        lags=[1, 12], harmonics=[5], trend="additive", lambda_bc=0, orders=ORDERS0
+    ).fit(air)
+    fit_level = TBATS(
+        lags=[1, 12],
+        harmonics=[5],
+        trend="additive",
+        lambda_bc=1,
+        orders=ORDERS0,
+        B=fit_log.coef,
+        maxeval=1,
+    ).fit(np.log(air))
+    assert fit_log.loglik == pytest.approx(
+        fit_level.loglik - np.log(air).sum(), rel=1e-10
+    )
+
+
+def test_lambda_is_estimated_in_the_unit_interval_or_falls_back(air):
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(air)
+    assert 0 <= fit.lambda_ <= 1
+    assert "lambda" in fit.coef_names
+    with pytest.warns(UserWarning, match="positive data"):
+        negative = TBATS(
+            lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0
+        ).fit(air - 200)
+    assert negative.lambda_ == 1
+    with pytest.warns(UserWarning, match="likelihood"):
+        mse = TBATS(
+            lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0, loss="MSE"
+        ).fit(air)
+    assert mse.lambda_ == 1
+
+
+@pytest.mark.parametrize("distribution", ["dnorm", "dlaplace", "ds", "dgnorm"])
+def test_the_distributions_are_fitted(air, distribution):
+    fit = TBATS(
+        lags=[1, 12],
+        harmonics=[5],
+        trend="additive",
+        orders=ORDERS0,
+        distribution=distribution,
+    ).fit(air)
+    assert np.isfinite(fit.loglik)
+    assert ("shape" in fit.coef_names) == (distribution == "dgnorm")
+
+
+def test_a_provided_shape_is_not_estimated(air):
+    fit = TBATS(
+        lags=[1, 12],
+        harmonics=[5],
+        trend="additive",
+        orders=ORDERS0,
+        distribution="dgnorm",
+        shape=1.5,
+    ).fit(air)
+    assert "shape" not in fit.coef_names
+
+
+def test_usual_bounds_keep_the_response_in_the_unit_interval(air):
+    fit = TBATS(
+        lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0, bounds="usual"
+    ).fit(air)
+    B = dict(zip(fit.coef_names, fit.coef))
+    seasonal = fit.initial_value["seasonal"]
+    frequency = 2 * np.pi * seasonal["j"].to_numpy() / seasonal["period"].to_numpy()
+    horizons = np.arange(12)
+    response = (
+        B["alpha"]
+        + np.cos(np.outer(horizons, frequency)) @ np.full(5, B["gamma1[12]"])
+        + np.sin(np.outer(horizons, frequency)) @ np.full(5, B["gamma2[12]"])
+    )
+    assert np.all((response >= 0) & (response <= 1))
+    assert B["beta"] <= B["alpha"]
+
+
+def test_coinciding_harmonics_are_dropped_and_arma_lags_merged():
+    table = st.harmonics_table([24, 168], [2, 8])
+    assert len(table["frequency"]) == 2 + 7
+    assert not np.any((table["period"] == 168) & (table["j"] == 7))
+    spec = st.arma_spec({"ar": [1, 1, 2], "ma": 0}, [1, 7, 7.02])
+    assert spec["lags"].tolist() == [1, 7]
+    assert spec["ar_orders"].tolist() == [1, 2]
+
+
+@pytest.mark.parametrize("initial", ["backcasting", "optimal", "two-stage"])
+def test_admissible_bounds_keep_the_discount_matrix_stable(air, initial):
+    fit = TBATS(
+        lags=[1, 12], harmonics=[5], trend="damped", orders=ARMA11, initial=initial
+    ).fit(air)
+    best = fit._best
+    values = ft.eigens(
+        best["elements"]["mat_f"],
+        best["elements"]["vec_g"],
+        best["elements"]["w"],
+        best["struct"],
+    )
+    assert values.max() <= 1 + 1e-10
+
+
+def test_two_stage_cannot_end_below_the_backcasted_fit(air):
+    complete = TBATS(
+        lags=[1, 12], trend="damped", orders=ARMA11, initial="complete"
+    ).fit(air)
+    two_stage = TBATS(
+        lags=[1, 12], trend="damped", orders=ARMA11, initial="two-stage"
+    ).fit(air)
+    assert two_stage.loglik >= complete.loglik - 1e-8
+
+
+def test_the_arma_falls_back_to_none_when_it_does_not_help(air):
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive").fit(air)
+    assert sum(fit.orders_["ar"]) + sum(fit.orders_["ma"]) == 0
+    assert any("+ARMA" in name for name in fit.ics)
+    assert min(fit.ics.values()) == pytest.approx(fit.aicc)
+
+
+def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
+    fit = TBATS(
+        lags=[1, 12],
+        harmonics=[5],
+        trend="damped",
+        orders={"ar": 1, "ma": 0},
+        h=12,
+        holdout=True,
+    ).fit(air)
+    forecast = fit.predict(h=12, interval="prediction")
+    np.testing.assert_allclose(np.asarray(forecast.mean), fit.forecast_, rtol=1e-10)
+    lower = np.asarray(forecast.lower).ravel()
+    upper = np.asarray(forecast.upper).ravel()
+    mean = np.asarray(forecast.mean)
+    assert np.all((lower < mean) & (mean < upper))
+    with pytest.raises(ValueError, match="Cumulative"):
+        fit.predict(h=12, cumulative=True)
+
+
+def test_point_likelihoods_sum_to_the_log_likelihood(air):
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(air)
+    assert fit.point_lik().sum() == pytest.approx(fit.loglik, rel=1e-12)
+
+
+def test_the_covariance_is_finite(air):
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(air)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        covariance = fit.vcov()
+    assert np.all(np.isfinite(covariance.to_numpy()))
+    assert list(covariance.index) == fit.coef_names
+
+
+def test_bad_arguments_raise():
+    with pytest.raises(ValueError, match="trend"):
+        TBATS(trend="multiplicative")
+    with pytest.raises(ValueError, match="lambda"):
+        TBATS(lambda_bc=2).fit(np.arange(1.0, 30.0))

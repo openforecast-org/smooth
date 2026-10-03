@@ -6940,7 +6940,7 @@ class ADAM:
 
             3  — Studentised Residuals vs Fitted
 
-            4  — |Residuals| vs Fitted
+            4  — ``|Residuals|`` vs Fitted
 
             5  — Residuals² vs Fitted
 
@@ -6958,7 +6958,7 @@ class ADAM:
 
             12 — Model states over time
 
-            13 — |Standardised Residuals| vs Fitted
+            13 — ``|Standardised Residuals|`` vs Fitted
 
             14 — Standardised Residuals² vs Fitted
 

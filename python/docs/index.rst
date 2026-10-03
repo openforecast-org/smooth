@@ -146,7 +146,6 @@ Utility Functions
 
 - :doc:`sm` - Scale model: a time-varying error scale for a fitted ADAM
 - :doc:`msdecompose` - Multiple seasonal decomposition for time series
-- :doc:`lowess` - LOWESS (Locally Weighted Scatterplot Smoothing)
 
 Optimization Settings
 ---------------------
@@ -205,4 +204,3 @@ customize the optimization behavior via the ``nlopt_kwargs`` parameter:
    om
    sm
    msdecompose
-   lowess

@@ -27,4 +27,3 @@ Functions
    :toctree: _autosummary
 
    msdecompose
-   lowess

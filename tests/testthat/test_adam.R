@@ -824,3 +824,18 @@ test_that("reforecast keeps the paths of a draw on its own profile and persisten
     expect_equal(paths[,,1], matrix(201, h, 2));
     expect_equal(paths[,,2], matrix(201:203, h, 2));
 });
+
+# Without newdata, each regressor is forecast by adam() into its own column
+test_that("the regressors forecast without newdata land in their own columns", {
+    set.seed(41);
+    x1 <- rnorm(120, 10, 2);
+    x2 <- 50+cumsum(rnorm(120));
+    data <- cbind(y=100+3*x1+cumsum(rnorm(120)), x1=x1, x2=x2);
+    fit <- adam(data, "ANN", formula=y~x1+x2);
+    forecasted <- suppressWarnings(forecast(fit, h=5));
+    x1Forecast <- adam(data[,"x1"], h=5, silent=TRUE)$forecast;
+    x2Forecast <- adam(data[,"x2"], h=5, silent=TRUE)$forecast;
+    expect_equal(as.numeric(forecasted$mean),
+                 as.numeric(fit$states[nrow(fit$states),"level"] + fit$initial$xreg[["x1"]]*x1Forecast +
+                                fit$initial$xreg[["x2"]]*x2Forecast), tolerance=1e-10);
+});

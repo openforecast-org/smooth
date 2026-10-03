@@ -220,3 +220,59 @@ test_that("the simulations start from the initials of the model", {
                      tolerance=1e-10);
     }
 });
+
+# A series with two regressors, of which the second is noise, and their future values
+set.seed(41);
+xregTest <- cbind(x1=rnorm(132, 10, 2), x2=rnorm(132));
+yXreg <- ts(200 + 20*sin(2*pi*(1:132)/12) + 5*xregTest[,"x1"] + cumsum(rnorm(132)) + rnorm(132),
+            frequency=12);
+
+test_that("with regressors, TBATS is ADAM's ETSX at the same parameters", {
+    y <- as.numeric(yXreg[1:120]);
+    xreg <- xregTest[1:120,];
+    fitADAM <- adam(cbind(y=y, xreg), "ANN", formula=y~x1+x2, initial="optimal");
+    # TBATS keeps the deviations of the level and coefficients from the global model,
+    # and lambda=1 transforms y into y-1
+    beta <- qr.coef(qr(tbats_design(120, FALSE, tbats_harmonics(numeric(0), numeric(0)), xreg)), y-1);
+    B <- c(alpha=coef(fitADAM)[["alpha"]], level=coef(fitADAM)[["level"]]-1-beta[[1]],
+           x1=coef(fitADAM)[["x1"]]-beta[[2]], x2=coef(fitADAM)[["x2"]]-beta[[3]]);
+    fit <- tbats(y, lags=1, xreg=xreg, trend="none", lambda=1, orders=orders0, initial="optimal",
+                 B=B, maxeval=1);
+    expect_equal(as.numeric(logLik(fit)), as.numeric(logLik(fitADAM)), tolerance=1e-10);
+    expect_equal(as.numeric(fitted(fit)), as.numeric(fitted(fitADAM)), tolerance=1e-10);
+});
+
+test_that("lambda=0 with a regressor is the model of the logarithms with it", {
+    fitLog <- tbats(yXreg[1:120], lags=c(1,12), xreg=xregTest[1:120,], harmonics=1, trend="none",
+                    lambda=0, orders=orders0);
+    fitLevel <- tbats(log(yXreg[1:120]), lags=c(1,12), xreg=xregTest[1:120,], harmonics=1, trend="none",
+                      lambda=1, orders=orders0, B=coef(fitLog), maxeval=1);
+    expect_equal(as.numeric(logLik(fitLog)), as.numeric(logLik(fitLevel)) - sum(log(yXreg[1:120])),
+                 tolerance=1e-8);
+});
+
+test_that("the regressors are estimated and their future values used in the forecasts", {
+    fit <- tbats(yXreg, xreg=xregTest, harmonics=1, trend="none", orders=orders0, lambda=1,
+                 h=12, holdout=TRUE);
+    expect_equal(names(fit$initial$xreg), c("x1","x2"));
+    expect_equal(fit$initial$xreg[["x1"]], 5, tolerance=0.1);
+    expect_match(fit$model, "^TBATSX");
+    expect_equal(as.numeric(forecast(fit, h=12)$mean), as.numeric(fit$forecast), tolerance=1e-10);
+    expect_equal(as.numeric(forecast(fit, h=12, newdata=unname(xregTest[121:132,]))$mean),
+                 as.numeric(fit$forecast), tolerance=1e-10);
+    expect_warning(forecast(fit, h=24), "newdata");
+    expect_equal(sum(pointLik(fit)), as.numeric(logLik(fit)), tolerance=1e-8);
+    refit <- tbats(yXreg, model=fit, h=12, holdout=TRUE);
+    expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)), tolerance=1e-10);
+    expect_true(all(is.finite(vcov(fit))));
+    set.seed(41);
+    expect_equal(dim(coefbootstrap(fit, nsim=3)$coefficients), c(3, length(coef(fit))));
+    set.seed(41);
+    forecasted <- forecast(fit, h=12, interval="complete", nsim=20);
+    expect_true(all(forecasted$lower<fit$forecast & fit$forecast<forecasted$upper));
+    expect_equal(dim(simulate(fit, nsim=2, seed=41)$data), c(120, 2));
+    fitComplete <- tbats(yXreg, xreg=xregTest, harmonics=1, trend="none", orders=orders0, lambda=1,
+                         initial="complete", h=12, holdout=TRUE);
+    expect_false(any(names(coef(fitComplete)) %in% c("x1","x2")));
+    expect_equal(nparam(fitComplete), nparam(fit));
+});

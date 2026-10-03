@@ -65,7 +65,7 @@ componentsDefiner <- function(object){
         # The level and trend in the ETS slot, the harmonics and the ARMA in the ARIMA one
         componentsNumberETS <- componentsNumberETSNonSeasonal <- 1 + (object$trendType!="none");
         componentsNumberETSSeasonal <- 0;
-        componentsNumberARIMA <- ncol(object$states) - componentsNumberETS;
+        componentsNumberARIMA <- ncol(object$states) - componentsNumberETS - length(object$initial$xreg);
     }
     else if(cesModel){
         componentsNumberETS <- componentsNumberETSSeasonal <- componentsNumberETSNonSeasonal <- 0;

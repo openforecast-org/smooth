@@ -58,6 +58,14 @@
 #' from the largest) on the residuals of the global model, the winner is fitted, and
 #' the ARMA is kept only if it improves the information criterion. All the values are
 #' returned in \code{ICs}.
+#' @param xreg The explanatory variables: a numeric matrix or data frame with a
+#' column per variable and a row per observation of \code{y}, holdout included; the
+#' rows beyond it give the future values for the forecast stored in the model (\code{h}).
+#' They enter the model in the space of the Box-Cox transformed data, as in the ETSX of
+#' \link[smooth]{adam}. Factors should be converted into dummy variables. The future
+#' values for \code{forecast()} are taken from its \code{newdata}.
+#' @param regressors How to treat the explanatory variables: \code{"use"} them as
+#' they are (constant coefficients).
 #' @param distribution The distribution of the error term in the space of the
 #' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 #' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
@@ -108,6 +116,7 @@
 tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                   trend=c("auto","none","additive","damped"),
                   lambda=NULL, orders=list(ar=3, ma=3, select=TRUE),
+                  xreg=NULL, regressors=c("use","select","adapt"),
                   distribution=c("dnorm","dlaplace","ds","dgnorm"),
                   loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                   ic=c("AICc","AIC","BIC","BICc"), h=0, holdout=FALSE,
@@ -124,6 +133,10 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     ic <- match.arg(ic);
     initial <- match.arg(initial);
     bounds <- match.arg(bounds);
+    regressors <- match.arg(regressors);
+    if(regressors!="use"){
+        stop("regressors=\"select\" and \"adapt\" are not implemented yet.", call.=FALSE);
+    }
     # The Box-Cox parameter is kept apart: the checker returns LASSO's lambda
     lambdaProvided <- lambda;
     modelDo <- "estimate";
@@ -142,6 +155,14 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         loss <- model$loss;
         initial <- model$initialType;
         bounds <- model$bounds;
+        # The regressors of the model, selected or not, are used as they are
+        if(!is.null(model$xregNames)){
+            regressors <- if(any(names(model$persistence)=="delta1")) "adapt" else "use";
+            if(is.null(xreg)){
+                xreg <- rbind(model$data[, model$xregNames, drop=FALSE],
+                              model$holdout[, model$xregNames, drop=FALSE]);
+            }
+        }
         lambdaProvided <- if(is.null(model$B) || !any(names(model$B)=="lambda")) model$lambda else NULL;
         if(any(names(model$B)=="shape")){
             ellipsis$shape <- NULL;
@@ -169,6 +190,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     if(any(!is.finite(yInSample))){
         stop("tbats() does not support missing values yet.", call.=FALSE);
     }
+    xregSpec <- tbats_xreg(xreg, length(yInSample), checked$h, regressors);
 
     #### The structure ####
     periods <- sort(unique(lags[lags>1]));
@@ -181,7 +203,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     # Harmonics from the global model, at the starting value of lambda
     if(is.null(harmonics)){
         harmonics <- tbats_harmonicsSelect(yInSample, periods, any(trendTypes!="none"),
-                                           lambdaSpec, checked$icFunction, ic);
+                                           lambdaSpec, checked$icFunction, ic, xregSpec$data);
     }
     else{
         if(length(harmonics)!=length(periods)){
@@ -199,7 +221,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     #### Fit the candidates and select ####
     candidates <- lapply(trendTypes, function(trendType){
         return(tbats_fit(yInSample, trendType, harmonicTable, armaSpecFit, lambdaSpec,
-                         distribution, initial, checked));
+                         distribution, initial, checked, xregSpec));
     });
     ICs <- sapply(candidates, function(candidate){
         return(tbats_IC(candidate$logLik, ic));
@@ -211,13 +233,13 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     # best one: on its errors, the adaptive level hides an AR in a near-unit MA root.
     # The winner is fitted and kept only if it beats the models without ARMA
     if(armaSpec$select && armaSpec$nParam>0){
-        X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable);
+        X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable, xregSpec$data);
         armaSpecBest <- tbats_armaSelect(qr.resid(qr(X), tbats_boxCox(yInSample, best$elements$lambda)),
                                          armaSpec, distribution, best$elements$shape,
                                          best$nParamEstimated, ic);
         if(armaSpecBest$nParam>0){
             candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecBest, lambdaSpec,
-                                   distribution, initial, checked);
+                                   distribution, initial, checked, xregSpec);
             icCandidate <- tbats_IC(candidate$logLik, ic);
             if(icCandidate<min(ICs)){
                 best <- candidate;
@@ -228,6 +250,50 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     }
 
     return(tbats_return(best, checked, cl, startTime, periods, harmonics, ICs, silent));
+}
+
+#### Explanatory variables ####
+# The explanatory variables: numeric, one column per variable, named; the in-sample
+# rows and those of the horizon (the holdout or the future), the last row repeated
+# when they do not reach it
+#' @keywords internal
+tbats_xreg <- function(xreg, obsInSample, h, regressors){
+    if(is.null(xreg)){
+        return(NULL);
+    }
+    xreg <- as.data.frame(xreg);
+    if(!all(sapply(xreg, is.numeric))){
+        stop("xreg should contain numeric variables only: convert the factors into dummy variables.",
+             call.=FALSE);
+    }
+    xreg <- as.matrix(xreg);
+    if(is.null(colnames(xreg))){
+        colnames(xreg) <- paste0("x", seq_len(ncol(xreg)));
+    }
+    colnames(xreg) <- make.names(colnames(xreg), unique=TRUE);
+    if(nrow(xreg)<obsInSample){
+        stop("xreg has fewer rows than the in-sample data.", call.=FALSE);
+    }
+    if(any(!is.finite(xreg[1:obsInSample,]))){
+        stop("tbats() does not support missing values in xreg yet.", call.=FALSE);
+    }
+    if(nrow(xreg)<obsInSample+h){
+        warning("xreg does not cover the horizon h. Repeating its last row.", call.=FALSE);
+        xreg <- xreg[c(1:nrow(xreg), rep(nrow(xreg), obsInSample+h-nrow(xreg))),,drop=FALSE];
+    }
+    return(list(data=xreg[1:obsInSample,,drop=FALSE],
+                future=if(h>0) xreg[obsInSample+1:h,,drop=FALSE],
+                names=colnames(xreg), number=ncol(xreg), regressors=regressors));
+}
+
+# The measurement matrix for the rows of the regressors (or a number of rows)
+#' @keywords internal
+tbats_matWt <- function(w, struct, rows, xregData=NULL){
+    matWt <- matrix(w, rows, struct$nComponents, byrow=TRUE);
+    if(struct$nXreg>0){
+        matWt[, struct$xregRows] <- xregData;
+    }
+    return(matWt);
 }
 
 #### Box-Cox ####
@@ -289,9 +355,10 @@ tbats_harmonics <- function(periods, harmonics){
     return(table[!duplicated(round(table$frequency, 10)),,drop=FALSE]);
 }
 
-# The design of the global model: an intercept, a trend and the Fourier terms
+# The design of the global model: an intercept, a trend, the Fourier terms and the
+# regressors
 #' @keywords internal
-tbats_design <- function(obs, trendIn, harmonicTable){
+tbats_design <- function(obs, trendIn, harmonicTable, xregData=NULL){
     times <- 1:obs;
     X <- matrix(1, obs, 1);
     if(trendIn){
@@ -301,7 +368,7 @@ tbats_design <- function(obs, trendIn, harmonicTable){
         angles <- outer(times, harmonicTable$frequency);
         X <- cbind(X, sin(angles), cos(angles));
     }
-    return(X);
+    return(cbind(X, xregData));
 }
 
 # The maximum of the profile log-likelihood of the global model in lambda, with the
@@ -331,18 +398,18 @@ tbats_lambdaStart <- function(y, X, lambdaSpec){
 # The number of harmonics of each period by the information criterion of the global
 # model, one period at a time, stopping after two harmonics without improvement
 #' @keywords internal
-tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, ic){
+tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, ic, xregData=NULL){
     harmonics <- rep(0, length(periods));
     if(length(periods)==0){
         return(harmonics);
     }
     kMax <- pmax(ceiling(periods/2)-1, 0);
     obs <- length(y);
-    lambda <- tbats_lambdaStart(y, tbats_design(obs, trendIn, tbats_harmonics(periods, pmin(kMax, 3))),
-                                lambdaSpec);
+    lambda <- tbats_lambdaStart(y, tbats_design(obs, trendIn, tbats_harmonics(periods, pmin(kMax, 3)),
+                                             xregData), lambdaSpec);
     yBC <- tbats_boxCox(y, lambda);
     icValue <- function(harmonicsTest){
-        X <- tbats_design(obs, trendIn, tbats_harmonics(periods, harmonicsTest));
+        X <- tbats_design(obs, trendIn, tbats_harmonics(periods, harmonicsTest), xregData);
         if(ncol(X)>=obs-1){
             return(Inf);
         }
@@ -449,17 +516,20 @@ tbats_IC <- function(logLikValue, ic){
 # the components, the fixed transition blocks of the harmonics and the matrices of
 # the usual bounds
 #' @keywords internal
-tbats_structure <- function(trendType, harmonicTable, armaSpec, periods){
+tbats_structure <- function(trendType, harmonicTable, armaSpec, periods, xregSpec=NULL){
     trendIn <- trendType!="none";
     nETS <- 1+trendIn;
     nHarmonics <- nrow(harmonicTable);
     nArma <- length(armaSpec$stateLags);
-    lagsModelAll <- c(rep(1, nETS), rep(c(1, 2), nHarmonics), armaSpec$stateLags);
+    nXreg <- if(is.null(xregSpec)) 0 else xregSpec$number;
+    lagsModelAll <- c(rep(1, nETS), rep(c(1, 2), nHarmonics), armaSpec$stateLags, rep(1, nXreg));
     nComponents <- length(lagsModelAll);
     harmonicRows <- nETS + 2*seq_len(nHarmonics) - 1;
     armaRows <- nETS + 2*nHarmonics + seq_len(nArma);
+    xregRows <- nETS + 2*nHarmonics + nArma + seq_len(nXreg);
     matF <- diag(0, nComponents);
     matF[1, 1] <- 1;
+    matF[cbind(xregRows, xregRows)] <- 1;
     for(i in seq_len(nHarmonics)){
         rows <- harmonicRows[i]+0:1;
         matF[rows, rows] <- c(2*cos(harmonicTable$frequency[i]), -1) %o% c(1, 1);
@@ -471,11 +541,13 @@ tbats_structure <- function(trendType, harmonicTable, armaSpec, periods){
     componentNames <- c("level", if(trendIn) "trend",
                         if(nHarmonics>0) paste0(rep(c("s","s*"), nHarmonics), rep(harmonicTable$j, each=2),
                                                 "[", rep(round(harmonicTable$period, 4), each=2), "]"),
-                        if(nArma>0) paste0("ARMAState", seq_len(nArma)));
+                        if(nArma>0) paste0("ARMAState", seq_len(nArma)),
+                        xregSpec$names);
     return(list(trendType=trendType, trendIn=trendIn, damped=trendType=="damped",
-                nETS=nETS, nHarmonics=nHarmonics, nArma=nArma, nComponents=nComponents,
+                nETS=nETS, nHarmonics=nHarmonics, nArma=nArma, nXreg=nXreg, nComponents=nComponents,
                 lagsModelAll=lagsModelAll, lagsModelMax=max(lagsModelAll),
-                harmonicRows=harmonicRows, armaRows=armaRows, matF=matF,
+                harmonicRows=harmonicRows, armaRows=armaRows, xregRows=xregRows, matF=matF,
+                xreg=xregSpec,
                 harmonicTable=harmonicTable, periods=periods, periodIndex=periodIndex,
                 responseCos=cos(angles), responseSin=sin(angles),
                 armaLagMax=if(nArma>0) max(armaSpec$stateLags) else 0,
@@ -491,7 +563,8 @@ tbats_globalStates <- function(beta, struct){
     nH <- struct$nHarmonics;
     k <- 1+struct$trendIn;
     return(list(level=beta[1], trend=if(struct$trendIn) beta[2] else 0,
-                sinCoef=beta[k+seq_len(nH)], cosCoef=beta[k+nH+seq_len(nH)]));
+                sinCoef=beta[k+seq_len(nH)], cosCoef=beta[k+nH+seq_len(nH)],
+                xreg=beta[k+2*nH+seq_len(struct$nXreg)]));
 }
 
 # The recent profile from the initial states. The level and trend sit lagsModelMax-1
@@ -517,7 +590,10 @@ tbats_profile <- function(states, armaInitial, struct, phi=1){
         profile[struct$harmonicRows+1, 2] <- -s0;
     }
     if(struct$nArma>0){
-        profile[struct$nComponents, 1:struct$armaLagMax] <- armaInitial;
+        profile[struct$armaRows[struct$nArma], 1:struct$armaLagMax] <- armaInitial;
+    }
+    if(struct$nXreg>0){
+        profile[struct$xregRows, 1] <- states$xreg;
     }
     return(profile);
 }
@@ -527,7 +603,7 @@ tbats_profile <- function(states, armaInitial, struct, phi=1){
 tbats_initialsRead <- function(matVt, struct){
     L <- struct$lagsModelMax;
     states <- list(level=matVt[1, L], trend=if(struct$trendIn) matVt[2, L] else 0,
-                   sinCoef=numeric(0), cosCoef=numeric(0));
+                   sinCoef=numeric(0), cosCoef=numeric(0), xreg=matVt[struct$xregRows, L]);
     if(struct$nHarmonics>0){
         frequency <- struct$harmonicTable$frequency;
         rows <- struct$harmonicRows;
@@ -537,7 +613,7 @@ tbats_initialsRead <- function(matVt, struct){
         states$cosCoef <- s0;
         states$sinCoef <- (s0*cos(frequency) - sm1)/sin(frequency);
     }
-    armaInitial <- if(struct$nArma>0) matVt[struct$nComponents, L-struct$armaLagMax+1:struct$armaLagMax] else numeric(0);
+    armaInitial <- if(struct$nArma>0) matVt[struct$armaRows[struct$nArma], L-struct$armaLagMax+1:struct$armaLagMax] else numeric(0);
     return(list(states=states, arma=armaInitial));
 }
 
@@ -554,7 +630,7 @@ tbats_harmonicLabels <- function(struct){
 # The names, starting values and bounds of the parameter vector
 #' @keywords internal
 tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distribution,
-                    otherParameterEstimate, initialEstimate, bounds){
+                    otherParameterEstimate, initialEstimate, xregEstimate, bounds){
     nPeriods <- length(unique(struct$harmonicTable$period));
     periodsUsed <- struct$periods[sort(unique(struct$periodIndex))];
     B <- c(alpha=0.1,
@@ -572,6 +648,10 @@ tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distri
         B <- c(B, level=0, trend=if(struct$trendIn) 0,
                setNames(rep(0, 2*nH), harmonicNames),
                setNames(rep(0, struct$armaLagMax), if(struct$armaLagMax>0) paste0("ARMAState", seq_len(struct$armaLagMax))));
+    }
+    # The regressors: deviations from the global model
+    if(xregEstimate){
+        B <- c(B, setNames(rep(0, struct$nXreg), struct$xreg$names));
     }
     if(lambdaSpec$estimate){
         B <- c(B, lambda=lambdaStart);
@@ -595,7 +675,8 @@ tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distri
 # The elements of the model for the parameter vector: the matrices, the initial
 # deviations, lambda and the shape, and a penalty when the bounds are violated
 #' @keywords internal
-tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate, bounds, adamCpp){
+tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate, bounds, adamCpp,
+                         xregEstimate=FALSE){
     get <- function(name, default){
         return(if(any(names(B)==name)) B[[name]] else default);
     }
@@ -671,8 +752,9 @@ tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate
                            cosCoef=B[paste0("cos", tbats_harmonicLabels(struct))[seq_len(nH)]],
                            arma=if(struct$armaLagMax>0) B[paste0("ARMAState", seq_len(struct$armaLagMax))] else numeric(0));
     }
+    xregDeviations <- if(xregEstimate) B[struct$xreg$names] else rep(0, struct$nXreg);
     return(list(matF=matF, vecG=vecG, w=w, phi=phi, lambda=lambda, shape=shape,
-                deviations=deviations, penalty=penalty));
+                deviations=deviations, xregDeviations=xregDeviations, penalty=penalty));
 }
 
 # The starting seasonal smoothing parameters for the admissible bounds: no smoothing
@@ -727,20 +809,21 @@ tbats_eigens <- function(matF, vecG, w, struct){
 # the forecasts, all in the space of the Box-Cox transformed data
 #' @keywords internal
 tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distribution,
-                      initial, checked){
+                      initial, checked, xregSpec=NULL){
     obs <- length(y);
-    struct <- tbats_structure(trendType, harmonicTable, armaSpec, sort(unique(harmonicTable$period)));
+    struct <- tbats_structure(trendType, harmonicTable, armaSpec, sort(unique(harmonicTable$period)),
+                              xregSpec);
     if(nrow(harmonicTable)==0){
         struct$periods <- numeric(0);
     }
-    X <- tbats_design(obs, struct$trendIn, harmonicTable);
+    X <- tbats_design(obs, struct$trendIn, harmonicTable, xregSpec$data);
     qrX <- qr(X);
     lambdaStart <- tbats_lambdaStart(y, X, lambdaSpec);
     yBCStart <- tbats_boxCox(y, lambdaStart);
     logY <- if(lambdaSpec$estimate || lambdaStart!=1) sum(log(y)) else 0;
 
     adamCpp <- new(adamCore, struct$lagsModelAll, "A", if(struct$trendIn) "A" else "N", "N",
-                   struct$nETS, 0, struct$nETS, struct$nComponents-struct$nETS, 0,
+                   struct$nETS, 0, struct$nETS, struct$nComponents-struct$nETS-struct$nXreg, struct$nXreg,
                    struct$nComponents, FALSE, FALSE);
     headLength <- adam_headLength(checked$headLengthUser, struct$lagsModelMax, obs);
     adamCpp$headLength <- headLength$flag;
@@ -752,6 +835,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     initialType <- initial;
     backcast <- any(initialType==c("backcasting","complete"));
     initialEstimate <- any(initialType==c("optimal","two-stage"));
+    # The coefficients of the regressors are estimated unless all is backcast, as in adam()
+    xregEstimate <- struct$nXreg>0 && initialType!="complete";
 
     # The starting values of the ARMA from Hannan-Rissanen on the global residuals
     armaStart <- numeric(0);
@@ -764,7 +849,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     other <- checked$other;
     otherEstimate <- distribution=="dgnorm" && isTRUE(checked$otherParameterEstimate);
     BList <- tbats_B(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distribution,
-                     otherEstimate, initialEstimate, checked$bounds);
+                     otherEstimate, initialEstimate, xregEstimate, checked$bounds);
     if(checked$bounds=="admissible" && struct$nHarmonics>0){
         BList$B <- tbats_gammaStart(BList$B, struct, armaSpec, lambdaSpec, other, initialEstimate, adamCpp);
     }
@@ -781,10 +866,12 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             states$cosCoef <- states$cosCoef + elements$deviations$cosCoef;
             armaInitial <- elements$deviations$arma;
         }
+        states$xreg <- states$xreg + elements$xregDeviations;
         profile <- tbats_profile(states, armaInitial, struct, elements$phi);
-        fitted <- adamCpp$fit(matVt, matrix(elements$w, obs, struct$nComponents, byrow=TRUE),
-                              elements$matF, elements$vecG, lookup, profile,
+        matWt <- tbats_matWt(elements$w, struct, obs, xregSpec$data);
+        fitted <- adamCpp$fit(matVt, matWt, elements$matF, elements$vecG, lookup, profile,
                               yBC, ot, backcast, checked$nIterations, "n");
+        fitted$matWt <- matWt;
         fitted$yBC <- yBC;
         fitted$profileInitial <- profile;
         return(fitted);
@@ -793,7 +880,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         # nloptr drops the names
         names(B) <- names(BList$B);
         elements <- tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
-                                 checked$bounds, adamCpp);
+                                 checked$bounds, adamCpp, xregEstimate);
         if(elements$penalty>0){
             return(elements$penalty);
         }
@@ -810,7 +897,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         }
         else{
             hor <- checked$h;
-            adamErrors <- adamCpp$ferrors(fitted$states, matrix(elements$w, obs, struct$nComponents, byrow=TRUE),
+            adamErrors <- adamCpp$ferrors(fitted$states, fitted$matWt,
                                           elements$matF, lookup, fitted$profileInitial, hor, fitted$yBC)$errors;
             value <- switch(lossUsed,
                             "MSEh"=sum(adamErrors[,hor]^2)/(obs-hor),
@@ -831,13 +918,14 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     fitter <- function(B){
         names(B) <- names(BList$B);
         elements <- tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
-                                 checked$bounds, adamCpp);
+                                 checked$bounds, adamCpp, xregEstimate);
         if(elements$penalty>0){
             return(NULL);
         }
         fitted <- fitStates(elements);
         return(list(fitted=fitted$fitted, states=fitted$states, profile=fitted$profile,
-                    matF=elements$matF, vecG=elements$vecG, w=elements$w, lambda=elements$lambda));
+                    matF=elements$matF, vecG=elements$vecG, w=elements$w, matWt=fitted$matWt,
+                    lambda=elements$lambda));
     }
 
     #### Estimation ####
@@ -845,7 +933,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     if(initialType=="two-stage"){
         # Backcast first, then optimise all from its parameters and initials
         backcastFit <- tbats_fit(y, trendType, harmonicTable, armaSpec, lambdaSpec, distribution,
-                                 "complete", checked);
+                                 "complete", checked, xregSpec);
         common <- intersect(names(B), names(backcastFit$B));
         B[common] <- backcastFit$B[common];
         B <- tbats_deviations(B, backcastFit, struct, qrX, y, lambdaSpec);
@@ -887,7 +975,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 
     #### The final fit ####
     elements <- tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
-                             checked$bounds, adamCpp);
+                             checked$bounds, adamCpp, xregEstimate);
     fitted <- fitStates(elements);
     states <- fitted$states;
     if(headLength$geometry>struct$lagsModelMax){
@@ -901,7 +989,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 
     # The identified initials are counted whether they are optimised or backcast
     nInitials <- 1 + struct$trendIn + 2*struct$nHarmonics + struct$armaLagMax;
-    nParamEstimated <- length(B)*(checked$modelDo=="estimate") + 1 + nInitials*backcast;
+    nParamEstimated <- length(B)*(checked$modelDo=="estimate") + 1 + nInitials*backcast +
+        struct$nXreg*!xregEstimate;
     logLikValue <- -lossValue(B, "likelihood");
 
     # The Hessian of the log-likelihood
@@ -914,7 +1003,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     scale <- tbats_scale(fitted$errors, distribution, elements$shape, obs);
     forecastBC <- NULL;
     if(checked$h>0){
-        forecastBC <- adamCpp$forecast(matrix(elements$w, checked$h, struct$nComponents, byrow=TRUE),
+        forecastBC <- adamCpp$forecast(tbats_matWt(elements$w, struct, checked$h, xregSpec$future),
                                        elements$matF,
                                        lookup[, headLength$geometry+obs+1:checked$h, drop=FALSE],
                                        fitted$profile, checked$h)$forecast;
@@ -927,7 +1016,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                 initialRead=initialRead, scale=scale, forecastBC=forecastBC, FI=FI,
                 trendType=trendType, initialType=initialType, distribution=distribution,
                 adamCpp=adamCpp, lookup=lookup, headLength=headLength, fitter=fitter,
-                y=y, lambdaSpec=lambdaSpec, checked=checked));
+                y=y, lambdaSpec=lambdaSpec, checked=checked, xregEstimate=xregEstimate));
 }
 
 # The initial deviations from the global model that reproduce the initials of a fit
@@ -947,6 +1036,9 @@ tbats_deviations <- function(B, backcastFit, struct, qrX, y, lambdaSpec){
     }
     if(struct$armaLagMax>0){
         B[paste0("ARMAState", seq_len(struct$armaLagMax))] <- read$arma;
+    }
+    if(struct$nXreg>0){
+        B[struct$xreg$names] <- read$states$xreg - states$xreg;
     }
     return(B);
 }
@@ -1005,7 +1097,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
         paste0(", ", paste0("<", round(periods, 4), ",", as.vector(counts), ">")[counts>0], collapse="")
     } else "";
     phiValue <- if(struct$damped) round(best$B[["phi"]], 3) else "-";
-    modelName <- paste0("TBATS(", round(lambda, 3), ", {", sum(armaSpec$arOrders), ",",
+    modelName <- paste0("TBATS", if(struct$nXreg>0) "X", "(", round(lambda, 3), ", {", sum(armaSpec$arOrders), ",",
                         sum(armaSpec$maOrders), "}, ", phiValue, seasonalPart, ")");
 
     initialValue <- list(level=best$initialRead$states$level);
@@ -1019,6 +1111,9 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     }
     if(struct$nArma>0){
         initialValue$arma <- best$initialRead$arma;
+    }
+    if(struct$nXreg>0){
+        initialValue$xreg <- setNames(best$initialRead$states$xreg, struct$xreg$names);
     }
 
     parametersNumber <- matrix(0, 2, 5, dimnames=list(c("Estimated","Provided"),
@@ -1043,13 +1138,26 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     if(checked$holdout && checked$h>0){
         errormeasures <- measures(yHoldout, yForecast, yInSample);
     }
+    # The regressors sit next to the response in the data, as in adam()
+    formula <- checked$formula;
+    if(struct$nXreg>0){
+        responseName <- all.vars(formula)[1];
+        yInSample <- cbind(yInSample, struct$xreg$data);
+        colnames(yInSample) <- c(responseName, struct$xreg$names);
+        if(!is.null(yHoldout)){
+            yHoldout <- cbind(yHoldout, struct$xreg$future);
+            colnames(yHoldout) <- colnames(yInSample);
+        }
+        formula <- as.formula(paste0("`", responseName, "`~",
+                                     paste0("`", struct$xreg$names, "`", collapse="+")));
+    }
 
     persistence <- best$elements$vecG[,1];
     names(persistence) <- struct$componentNames;
     matF <- best$elements$matF;
     dimnames(matF) <- list(struct$componentNames, struct$componentNames);
-    matWt <- matrix(best$elements$w, obs, struct$nComponents, byrow=TRUE,
-                    dimnames=list(NULL, struct$componentNames));
+    matWt <- best$fitted$matWt;
+    dimnames(matWt) <- list(NULL, struct$componentNames);
     orders <- list(ar=armaSpec$arOrders, i=rep(0, length(armaSpec$lags)), ma=armaSpec$maOrders);
     arma <- NULL;
     if(armaSpec$nParam>0){
@@ -1071,7 +1179,8 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     lambda=lambda,
                                     harmonics=harmonics, periods=periods, trendType=best$trendType,
                                     nParam=parametersNumber,
-                                    formula=checked$formula,
+                                    formula=formula, xregNames=struct$xreg$names,
+                                    regressors=struct$xreg$regressors,
                                     loss=checked$loss, lossValue=best$lossValue, lossFunction=checked$lossFunction,
                                     logLik=best$logLik,
                                     ICs=ICs,
@@ -1095,11 +1204,12 @@ tbats_boxCoxObject <- function(object){
     objectBC <- object;
     class(objectBC) <- c("adam","smooth");
     yBC <- tbats_boxCox(actuals(object), lambda);
-    objectBC$data[] <- yBC;
+    # The response only: the regressors stay as they are
+    objectBC$data[,1] <- yBC;
     objectBC$fitted[] <- yBC - residuals(object);
     objectBC$forecast[] <- tbats_boxCox(object$forecast, lambda);
     if(!is.null(object$holdout)){
-        objectBC$holdout[] <- suppressWarnings(tbats_boxCox(object$holdout, lambda));
+        objectBC$holdout[,1] <- suppressWarnings(tbats_boxCox(object$holdout[,1], lambda));
     }
     return(objectBC);
 }
@@ -1158,7 +1268,7 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
                           fitted=fitted(object), model=object$model,
                           transition=array(sapply(refits, function(refit) refit$matF),
                                            c(nComponents, nComponents, nsim)),
-                          measurement=array(sapply(refits, function(refit) rep(refit$w, each=obs)),
+                          measurement=array(sapply(refits, function(refit) refit$matWt),
                                             c(obs, nComponents, nsim)),
                           persistence=matrix(sapply(refits, function(refit) refit$vecG[,1]), nComponents, nsim),
                           profile=array(sapply(refits, function(refit) refit$profile),
@@ -1184,6 +1294,9 @@ tbats_refitCall <- function(object){
                       initial=object$initialType, bounds=object$bounds,
                       B=object$B, lb=rep(-Inf, length(object$B)), ub=rep(Inf, length(object$B)),
                       silent=TRUE);
+    if(!is.null(object$xregNames)){
+        arguments$regressors <- if(object$regressors=="adapt") "adapt" else "use";
+    }
     if(object$distribution=="dgnorm" && !any(names(object$B)=="shape")){
         arguments$shape <- object$other$shape;
     }
@@ -1249,9 +1362,13 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     lookup <- adamProfileCreator(lagsModelAll, lagsModelMax, obs+h)$lookup[,-c(1:(obs+lagsModelMax)),drop=FALSE];
     draws <- objectRefitted$randomParameters;
     dfScale <- adam_dfScale(object);
+    # The future values of the regressors, as forecast.adam() takes them
+    xregRows <- which(colnames(object$states) %in% object$xregNames);
+    xregFuture <- if(length(xregRows)>0) adam_xregNewdata(object, h, tbats_newdata(object, newdata));
     paths <- vector("list", nsim);
     for(j in 1:nsim){
         matWt <- matrix(objectRefitted$measurement[1,,j], h, nComponents, byrow=TRUE);
+        matWt[, xregRows] <- xregFuture;
         matF <- objectRefitted$transition[,,j];
         profile <- matrix(objectRefitted$profile[,,j], nComponents, lagsModelMax);
         lambda <- objectRefitted$lambda[j];
@@ -1288,7 +1405,8 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     }
     yLower[, levelLow==0] <- 0;
     yUpper[, levelUp==1] <- Inf;
-    pointForecast <- forecast(tbats_boxCoxObject(object), h=h, interval="none")$mean;
+    pointForecast <- forecast(tbats_boxCoxObject(object), h=h, newdata=tbats_newdata(object, newdata),
+                              interval="none")$mean;
     yForecast <- pointForecast;
     yForecast[] <- tbats_boxCoxInverse(pointForecast, object$lambda);
     if(cumulative){
@@ -1320,6 +1438,7 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
              "the sums of the transformed values do not transform back.", call.=FALSE);
     }
     objectBC <- tbats_boxCoxObject(object);
+    newdata <- tbats_newdata(object, newdata);
     # The parameter uncertainty comes from reforecast(), which reapplies the model
     # with the lambda of each draw and returns the bounds of the data
     if(h>0 && any(interval[1]==c("confidence","complete"))){
@@ -1334,10 +1453,21 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     return(tbats_boxCoxForecast(result, object));
 }
 
+# The future values of the regressors with their names, when given without them
+#' @keywords internal
+tbats_newdata <- function(object, newdata){
+    if(!is.null(newdata) && !is.null(object$xregNames) && is.null(colnames(newdata)) &&
+       NCOL(newdata)==length(object$xregNames)){
+        newdata <- matrix(newdata, ncol=length(object$xregNames),
+                          dimnames=list(NULL, object$xregNames));
+    }
+    return(newdata);
+}
+
 #' @export
 predict.tbats <- function(object, newdata=NULL, interval=c("none", "confidence", "prediction"),
                           level=0.95, side=c("both","upper","lower"), ...){
-    result <- predict(tbats_boxCoxObject(object), newdata=newdata, interval=interval,
+    result <- predict(tbats_boxCoxObject(object), newdata=tbats_newdata(object, newdata), interval=interval,
                       level=level, side=side, ...);
     return(tbats_boxCoxForecast(result, object));
 }

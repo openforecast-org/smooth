@@ -6,7 +6,8 @@
 \usage{
 tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   "none", "additive", "damped"), lambda = NULL, orders = list(ar = 3, ma =
-  3, select = TRUE), distribution = c("dnorm", "dlaplace", "ds", "dgnorm"),
+  3, select = TRUE), xreg = NULL, regressors = c("use", "select", "adapt"),
+  distribution = c("dnorm", "dlaplace", "ds", "dgnorm"),
   loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
   "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
   holdout = FALSE, initial = c("backcasting", "optimal", "two-stage",
@@ -41,6 +42,16 @@ the orders up to them are screened with Hannan-Rissanen (the lags one at a time,
 from the largest) on the residuals of the global model, the winner is fitted, and
 the ARMA is kept only if it improves the information criterion. All the values are
 returned in \code{ICs}.}
+
+\item{xreg}{The explanatory variables: a numeric matrix or data frame with a
+column per variable and a row per observation of \code{y}, holdout included; the
+rows beyond it give the future values for the forecast stored in the model (\code{h}).
+They enter the model in the space of the Box-Cox transformed data, as in the ETSX of
+\link[smooth]{adam}. Factors should be converted into dummy variables. The future
+values for \code{forecast()} are taken from its \code{newdata}.}
+
+\item{regressors}{How to treat the explanatory variables: \code{"use"} them as
+they are (constant coefficients).}
 
 \item{distribution}{The distribution of the error term in the space of the
 Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or

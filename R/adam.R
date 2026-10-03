@@ -4917,8 +4917,8 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
     if(!any(c(cesModel,gumModel,ssarimaModel)) && any(object$call!=modelType(object))){
         newCall$model <- modelType(object);
     }
-    # If ARIMA was selected
-    if(!is.null(object$call$orders$select)){
+    # If ARIMA was selected (tbats builds its own call below)
+    if(!tbatsChecker(object) && !is.null(object$call$orders$select)){
         newCall$orders <- orders(object);
         newCall$orders$select <- FALSE;
     }
@@ -5030,7 +5030,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         # Do the bootstrap
         if(!parallel){
             for(i in 1:nsim){
-                newCall[[dataArgument]] <- newData[[i]];
+                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]]);
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5038,7 +5038,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         else{
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
-                newCall[[dataArgument]] <- newData[[i]];
+                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]]);
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })
@@ -5053,7 +5053,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         if(!parallel){
             for(i in 1:nsim){
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall[[dataArgument]] <- object$data[subsetValues,,drop=FALSE];
+                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE]);
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5062,7 +5062,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall[[dataArgument]] <- object$data[subsetValues,,drop=FALSE];
+                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE]);
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })
@@ -5087,6 +5087,20 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
                           nsim=nsim, size=NA, replace=NA, prob=NA,
                           parallel=parallel, model=object$call[[1]], timeElapsed=Sys.time()-startTime),
                      class="bootstrap"));
+}
+
+# The data of a refit in coefbootstrap(): tbats() takes the response and the regressors
+# in separate arguments
+#' @keywords internal
+adam_bootstrapData <- function(newCall, dataArgument, data){
+    if(dataArgument=="y" && NCOL(data)>1){
+        newCall$y <- data[,1];
+        newCall$xreg <- data[,-1,drop=FALSE];
+    }
+    else{
+        newCall[[dataArgument]] <- data;
+    }
+    return(newCall);
 }
 
 #' @export
@@ -5840,6 +5854,132 @@ adam_forecastRegression <- function(object, h, newdata, occurrence, interval, le
 }
 
 
+# The future values of the explanatory variables of an adam model for h steps ahead,
+# as a matrix with a column per variable: newdata, else the holdout, else the
+# variables forecast by adam() (adam_xregForecast) with a warning
+#' @keywords internal
+adam_xregNewdata <- function(object, h, newdata){
+    xregNumber <- length(object$initial$xreg);
+    xregNames <- names(object$initial$xreg);
+    # The newdata is not provided
+    if(is.null(newdata) && ((!is.null(object$holdout) && nrow(object$holdout)<h) ||
+                            is.null(object$holdout))){
+        # Salvage what data we can (if there is something)
+        if(!is.null(object$holdout)){
+            hNeeded <- h-nrow(object$holdout);
+            xreg <- tail(object$data,h);
+            xreg[1:nrow(object$holdout),] <- object$holdout;
+        }
+        else{
+            hNeeded <- h;
+            xreg <- tail(object$data,h);
+        }
+
+        if(is.matrix(xreg)){
+            warning("The newdata is not provided.",
+                    "Predicting the explanatory variables based on what I have in-sample.",
+                    call.=FALSE);
+            xreg <- adam_xregForecast(object, xreg, hNeeded);
+        }
+        else{
+            warning("The newdata is not provided. Using last h in-sample observations instead.",
+                    call.=FALSE);
+        }
+    }
+    # The newdata is not provided, but we have holdout
+    else if(is.null(newdata) && !is.null(object$holdout) && nrow(object$holdout)>=h){
+        xreg <- object$holdout[1:h,,drop=FALSE];
+    }
+    # The newdata is provided
+    else{
+        # If this is not a matrix / data.frame, then convert to one
+        if(!is.data.frame(newdata) && !is.matrix(newdata)){
+            newdata <- as.data.frame(newdata);
+            colnames(newdata) <- "xreg";
+        }
+        if(nrow(newdata)<h){
+            warning(paste0("The newdata has ",nrow(newdata)," observations, while ",h," are needed. ",
+                           "Using the last available values as future ones."),
+                    call.=FALSE);
+            newnRows <- h-nrow(newdata);
+            xreg <- newdata[c(1:nrow(newdata),rep(nrow(newdata),each=newnRows)),];
+            # xreg <- rbind(newdata,
+            #               data.frame(matrix(rep(tail(newdata,1),each=newnRows),
+            #                                 newnRows,ncol(newdata),
+            #                                 dimnames=list(NULL,colnames(newdata))))
+            #               );
+        }
+        else if(nrow(newdata)>h){
+            warning(paste0("The newdata has ",nrow(newdata)," observations, while only ",h," are needed. ",
+                           "Using the last ",h," of them."),
+                    call.=FALSE);
+            xreg <- tail(newdata,h);
+        }
+        else{
+            xreg <- newdata;
+        }
+
+        if(any(is.na(xreg))){
+            warning("The newdata has NAs. This might cause some issues.",
+                    call.=FALSE);
+        }
+    }
+
+    # If the user asked for trend, but it's not in the data, add it
+    if(any(all.vars(formula(object))=="trend") && all(colnames(object$data)!="trend")){
+        xreg <- cbind(xreg,trend=nobs(object)+c(1:h));
+    }
+
+    # If the names are wrong, transform to data frame and expand
+    if(!all(xregNames %in% colnames(xreg)) && !is.data.frame(xreg)){
+        xreg <- as.data.frame(xreg);
+    }
+
+    # Expand the xreg if it is data frame to get the proper matrix
+    if(is.data.frame(xreg)){
+        testFormula <- formula(object);
+        # Remove response variable
+        testFormula[[2]] <- NULL;
+        colnames(xreg) <- make.names(colnames(xreg));
+        # Expand the variables. We cannot use alm, because it is based on obsInSample
+        xregData <- model.frame(testFormula,data=xreg);
+        # Binary, flagging factors in the data
+        # Expanded stuff with all levels for factors
+
+        if(any((attr(terms(xregData),"dataClasses")=="factor"))){
+            xregModelMatrix <- model.matrix(xregData,xregData,
+                                            contrasts.arg=lapply(xregData[attr(terms(xregData),"dataClasses")=="factor"],
+                                                                 contrasts, contrasts=FALSE));
+        }
+        else{
+            xregModelMatrix <- model.matrix(xregData,data=xregData);
+        }
+        xregNames[] <- make.names(xregNames, unique=TRUE);
+        colnames(xregModelMatrix) <- make.names(colnames(xregModelMatrix), unique=TRUE);
+        newdata <- as.matrix(xregModelMatrix)[,xregNames,drop=FALSE];
+        rm(xregData,xregModelMatrix);
+    }
+    else{
+        colnames(xreg) <- make.names(colnames(xreg));
+        newdata <- xreg[,xregNames,drop=FALSE];
+    }
+    rm(xreg);
+    return(newdata);
+}
+
+# The future values of the explanatory variables in a matrix xreg (the columns of the
+# data), when newdata is missing: each variable but the response forecast by adam() into
+# the last hNeeded rows
+#' @keywords internal
+adam_xregForecast <- function(object, xreg, hNeeded){
+    responseName <- all.vars(formula(object))[1];
+    rows <- nrow(xreg)-hNeeded+seq_len(hNeeded);
+    for(variable in setdiff(colnames(xreg), responseName)){
+        xreg[rows,variable] <- adam(object$data[,variable], h=hNeeded, silent=TRUE)$forecast;
+    }
+    return(xreg);
+}
+
 #' Forecasting time series using smooth functions
 #'
 #' Function produces conditional expectation (point forecasts) and prediction
@@ -6050,114 +6190,8 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     # Deal with explanatory variables
     if(ncol(object$data)>1){
-        xregNumber <- length(object$initial$xreg);
-        xregNames <- names(object$initial$xreg);
-        # The newdata is not provided
-        if(is.null(newdata) && ((!is.null(object$holdout) && nrow(object$holdout)<h) ||
-                                is.null(object$holdout))){
-            # Salvage what data we can (if there is something)
-            if(!is.null(object$holdout)){
-                hNeeded <- h-nrow(object$holdout);
-                xreg <- tail(object$data,h);
-                xreg[1:nrow(object$holdout),] <- object$holdout;
-            }
-            else{
-                hNeeded <- h;
-                xreg <- tail(object$data,h);
-            }
-
-            if(is.matrix(xreg)){
-                warning("The newdata is not provided.",
-                        "Predicting the explanatory variables based on what I have in-sample.",
-                        call.=FALSE);
-                for(i in 1:xregNumber){
-                    xreg[,i] <- adam(object$data[,i+1],h=hNeeded,silent=TRUE)$forecast;
-                }
-            }
-            else{
-                warning("The newdata is not provided. Using last h in-sample observations instead.",
-                        call.=FALSE);
-            }
-        }
-        # The newdata is not provided, but we have holdout
-        else if(is.null(newdata) && !is.null(object$holdout) && nrow(object$holdout)>=h){
-            xreg <- object$holdout[1:h,,drop=FALSE];
-        }
-        # The newdata is provided
-        else{
-            # If this is not a matrix / data.frame, then convert to one
-            if(!is.data.frame(newdata) && !is.matrix(newdata)){
-                newdata <- as.data.frame(newdata);
-                colnames(newdata) <- "xreg";
-            }
-            if(nrow(newdata)<h){
-                warning(paste0("The newdata has ",nrow(newdata)," observations, while ",h," are needed. ",
-                               "Using the last available values as future ones."),
-                        call.=FALSE);
-                newnRows <- h-nrow(newdata);
-                xreg <- newdata[c(1:nrow(newdata),rep(nrow(newdata),each=newnRows)),];
-                # xreg <- rbind(newdata,
-                #               data.frame(matrix(rep(tail(newdata,1),each=newnRows),
-                #                                 newnRows,ncol(newdata),
-                #                                 dimnames=list(NULL,colnames(newdata))))
-                #               );
-            }
-            else if(nrow(newdata)>h){
-                warning(paste0("The newdata has ",nrow(newdata)," observations, while only ",h," are needed. ",
-                               "Using the last ",h," of them."),
-                        call.=FALSE);
-                xreg <- tail(newdata,h);
-            }
-            else{
-                xreg <- newdata;
-            }
-
-            if(any(is.na(xreg))){
-                warning("The newdata has NAs. This might cause some issues.",
-                        call.=FALSE);
-            }
-        }
-
-        # If the user asked for trend, but it's not in the data, add it
-        if(any(all.vars(formula(object))=="trend") && all(colnames(object$data)!="trend")){
-            xreg <- cbind(xreg,trend=nobs(object)+c(1:h));
-        }
-
-        # If the names are wrong, transform to data frame and expand
-        if(!all(xregNames %in% colnames(xreg)) && !is.data.frame(xreg)){
-            xreg <- as.data.frame(xreg);
-        }
-
-        # Expand the xreg if it is data frame to get the proper matrix
-        if(is.data.frame(xreg)){
-            testFormula <- formula(object);
-            # Remove response variable
-            testFormula[[2]] <- NULL;
-            colnames(xreg) <- make.names(colnames(xreg));
-            # Expand the variables. We cannot use alm, because it is based on obsInSample
-            xregData <- model.frame(testFormula,data=xreg);
-            # Binary, flagging factors in the data
-            # Expanded stuff with all levels for factors
-
-            if(any((attr(terms(xregData),"dataClasses")=="factor"))){
-                xregModelMatrix <- model.matrix(xregData,xregData,
-                                                contrasts.arg=lapply(xregData[attr(terms(xregData),"dataClasses")=="factor"],
-                                                                     contrasts, contrasts=FALSE));
-            }
-            else{
-                xregModelMatrix <- model.matrix(xregData,data=xregData);
-            }
-            xregNames[] <- make.names(xregNames, unique=TRUE);
-            colnames(xregModelMatrix) <- make.names(colnames(xregModelMatrix), unique=TRUE);
-            newdata <- as.matrix(xregModelMatrix)[,xregNames,drop=FALSE];
-            rm(xregData,xregModelMatrix);
-        }
-        else{
-            colnames(xreg) <- make.names(colnames(xreg));
-            newdata <- xreg[,xregNames,drop=FALSE];
-        }
-        rm(xreg);
-
+        newdata <- adam_xregNewdata(object, h, newdata);
+        xregNumber <- ncol(newdata);
         # From 1 to nrow to address potential missing values
         matWt[1:nrow(newdata),componentsNumberETS+componentsNumberARIMA+c(1:xregNumber)] <- newdata;
     }

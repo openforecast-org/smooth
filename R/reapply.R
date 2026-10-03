@@ -97,18 +97,12 @@ reapply.default <- function(object, nsim=1000, type=c("opg","hessian","bootstrap
                      class="reapply"));
 }
 
-#' @importFrom MASS mvrnorm
-#' @export
-reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
-                         bootstrap=FALSE, heuristics=NULL, ...){
-    type <- covarTypeResolver(type, bootstrap);
-    # Start measuring the time of calculations
-    startTime <- Sys.time();
+# The covariance of the parameters for the draws of reapply(): a parameter with a
+# non-finite variance (not identified by the data) is held at its estimate, and a
+# matrix that is not positive semi-definite is repaired
+#' @keywords internal
+reapply_vcov <- function(object, type, heuristics, nsim, ...){
     parametersNames <- names(coef(object));
-
-    # Check whether we deal with adam ETS or the conventional
-    adamETS <- adamETSChecker(object);
-
     vcovAdam <- suppressWarnings(vcov(object, type=type, heuristics=heuristics, nsim=nsim, ...));
     # The OPG covariance (the default) returns an infinite variance for a
     # parameter the data does not identify (e.g. an initial that washes out when
@@ -145,6 +139,22 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
             vcovAdam[] <- diag(diag(vcovAdam));
         }
     }
+    return(vcovAdam);
+}
+
+#' @importFrom MASS mvrnorm
+#' @export
+reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+                         bootstrap=FALSE, heuristics=NULL, ...){
+    type <- covarTypeResolver(type, bootstrap);
+    # Start measuring the time of calculations
+    startTime <- Sys.time();
+    parametersNames <- names(coef(object));
+
+    # Check whether we deal with adam ETS or the conventional
+    adamETS <- adamETSChecker(object);
+
+    vcovAdam <- reapply_vcov(object, type, heuristics, nsim, ...);
 
     # All the variables needed in the refitter
     yInSample <- actuals(object);

@@ -261,3 +261,67 @@ def test_bad_arguments_raise():
         TBATS(trend="multiplicative")
     with pytest.raises(ValueError, match="lambda"):
         TBATS(lambda_bc=2).fit(np.arange(1.0, 30.0))
+
+
+@pytest.fixture(scope="module")
+def damped_arma(air):
+    return TBATS(lags=[1, 12], harmonics=[5], trend="damped", orders=ARMA11).fit(air)
+
+
+def test_reapply_reproduces_the_fit_with_a_tiny_covariance(air):
+    fit = TBATS(
+        lags=[1, 12], harmonics=[4], trend="additive", lambda_bc=1, orders=ORDERS0
+    ).fit(air)
+    refitted = fit.reapply(nsim=5, heuristics=1e-12, seed=41)
+    assert np.max(np.abs(refitted.refitted.to_numpy() - fit.fitted[:, None])) < 1e-3
+    assert refitted.states.shape[2] == 5
+    assert np.all(refitted.lambdas == 1)
+
+
+def test_the_intervals_with_the_uncertainty_of_the_parameters(damped_arma):
+    point = np.asarray(damped_arma.predict(h=12).mean)
+    for interval in ("confidence", "complete"):
+        forecast = damped_arma.predict(h=12, interval=interval, nsim=20, seed=41)
+        np.testing.assert_allclose(np.asarray(forecast.mean), point)
+        lower = np.ravel(forecast.lower)
+        upper = np.ravel(forecast.upper)
+        assert np.all(lower <= upper)
+    assert np.all(lower < point) and np.all(point < upper)
+
+
+@pytest.mark.parametrize("initial", ["backcasting", "optimal"])
+def test_the_simulations_start_from_the_initials_of_the_model(air, initial):
+    fit = TBATS(
+        lags=[1, 12],
+        harmonics=[3],
+        trend="damped",
+        orders={"ar": 1, "ma": 0},
+        initial=initial,
+    ).fit(air)
+    simulated = fit.simulate(nsim=2, seed=41)
+    assert simulated.data.shape == (len(air), 2)
+    first = (
+        st.box_cox(simulated.data.iloc[0].to_numpy(), fit.lambda_)
+        - simulated.residuals.iloc[0]
+    )
+    np.testing.assert_allclose(
+        first, st.box_cox(fit.fitted[0], fit.lambda_), rtol=1e-10
+    )
+
+
+def test_confint_stays_inside_the_bounds_of_the_model(damped_arma):
+    intervals = damped_arma.confint()
+    assert intervals.loc["lambda"].iloc[1] >= 0 and intervals.loc["lambda"].iloc[2] <= 1
+    coef = damped_arma.coef
+    assert np.all((intervals.iloc[:, 1] <= coef) & (coef <= intervals.iloc[:, 2]))
+
+
+def test_the_bootstrap_refits_the_model(damped_arma):
+    bootstrap = damped_arma.coefbootstrap(nsim=5, seed=41)
+    assert bootstrap.coefficients.shape == (
+        bootstrap.nsim_effective,
+        len(damped_arma.coef),
+    )
+    assert bootstrap.nsim_effective > 0
+    covariance = damped_arma.vcov(type="bootstrap", nsim=5, seed=41)
+    assert list(covariance.index) == damped_arma.coef_names

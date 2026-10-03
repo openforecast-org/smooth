@@ -546,6 +546,11 @@ def fit(
     if head["geometry"] > struct["lags_model_max"]:
         states = states[:, head["geometry"] - struct["lags_model_max"] :]
     initial_read = st.initials_read(states, struct)
+    # The profile of the identified initials (the backcast ones with backcasting),
+    # where the simulations start
+    fitted["profile_initial"] = st.profile(
+        initial_read["states"], initial_read["arma"], struct, elements["phi"]
+    )
 
     # The identified initials are counted whether they are optimised or backcast
     n_initials = (

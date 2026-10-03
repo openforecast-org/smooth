@@ -4548,6 +4548,11 @@ confint.adam <- function(object, parm, level=0.95,
             }
         }
 
+        # TBATS: inside the bounds of the model, which its fitter checks
+        if(tbatsChecker(object)){
+            adamCoefBounds[] <- tbats_confintBounds(object, parameters, adamCoefBounds);
+        }
+
         # Correct the bounds for the ARIMA model: stationarity and invertibility
         if(arimaModel && object$bounds!="none"){
             armaBounds <- arimaParameterBounds(object$arma, parametersNames);
@@ -4971,6 +4976,12 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
     newCall$lb <- rep(-Inf, length(object$B));
     newCall$ub <- rep(Inf, length(object$B));
     newCall$data <- object$data;
+    dataArgument <- "data";
+    # TBATS is refitted with its structure, and the data go in y
+    if(tbatsChecker(object)){
+        newCall <- tbats_refitCall(object);
+        dataArgument <- "y";
+    }
 
     # Function creates a random sample. Needed for dynamic models
     sampler <- function(indices,size,replace,prob,regressionPure=FALSE,changeOrigin=FALSE){
@@ -4993,7 +5004,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         #### Data Shape Replication bootstrap
         responseName <- all.vars(formula(object))[1];
         # Create a new dataset
-        newData <- replicate(nsim, newCall$data, simplify=FALSE);
+        newData <- replicate(nsim, object$data, simplify=FALSE);
         newCall$formula <- as.formula(paste0(responseName,"~."));
         type <- "multiplicative";
         if(any(yInSample<0)){
@@ -5019,7 +5030,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         # Do the bootstrap
         if(!parallel){
             for(i in 1:nsim){
-                newCall$data[] <- newData[[i]];
+                newCall[[dataArgument]] <- newData[[i]];
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5027,7 +5038,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         else{
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
-                newCall$data[] <- newData[[i]];
+                newCall[[dataArgument]] <- newData[[i]];
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })
@@ -5042,7 +5053,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         if(!parallel){
             for(i in 1:nsim){
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall$data <- object$data[subsetValues,,drop=FALSE];
+                newCall[[dataArgument]] <- object$data[subsetValues,,drop=FALSE];
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5051,7 +5062,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall$data <- object$data[subsetValues,,drop=FALSE];
+                newCall[[dataArgument]] <- object$data[subsetValues,,drop=FALSE];
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })

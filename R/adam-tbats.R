@@ -887,6 +887,9 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     }
     rownames(states) <- struct$componentNames;
     initialRead <- tbats_initialsRead(states, struct);
+    # The profile of the identified initials (the backcast ones with backcasting),
+    # where the simulations start
+    fitted$profileInitial <- tbats_profile(initialRead$states, initialRead$arma, struct, elements$phi);
 
     # The identified initials are counted whether they are optimised or backcast
     nInitials <- 1 + struct$trendIn + 2*struct$nHarmonics + struct$armaLagMax;
@@ -1122,33 +1125,13 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
     startTime <- Sys.time();
     type <- covarTypeResolver(type, bootstrap);
     parameters <- coef(object);
-    vcovMatrix <- vcov(object, type=type, heuristics=heuristics, ...);
-    eigenMin <- min(eigen(vcovMatrix, symmetric=TRUE, only.values=TRUE)$values);
-    if(eigenMin<0){
-        vcovMatrix <- vcovMatrix + diag(abs(eigenMin)+1e-10, nrow(vcovMatrix));
-    }
+    vcovMatrix <- reapply_vcov(object, type, heuristics, nsim, ...);
     draws <- matrix(MASS::mvrnorm(nsim, parameters, vcovMatrix), ncol=length(parameters),
                     dimnames=list(NULL, names(parameters)));
     refits <- vector("list", nsim);
     for(i in 1:nsim){
-        refit <- object$fitter(draws[i,]);
-        if(is.null(refit)){
-            # Bisect the share of the deviation from the estimate that keeps the bounds
-            inside <- 0;
-            outside <- 1;
-            for(iteration in 1:20){
-                share <- (inside+outside)/2;
-                if(is.null(object$fitter(parameters + share*(draws[i,]-parameters)))){
-                    outside <- share;
-                }
-                else{
-                    inside <- share;
-                }
-            }
-            draws[i,] <- parameters + inside*(draws[i,]-parameters);
-            refit <- object$fitter(draws[i,]);
-        }
-        refits[[i]] <- refit;
+        draws[i,] <- tbats_pullBack(object, parameters, draws[i,]);
+        refits[[i]] <- object$fitter(draws[i,]);
     }
     obs <- nobs(object);
     nComponents <- ncol(object$states);
@@ -1177,6 +1160,62 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
                               return(tbats_boxCox(as.numeric(actuals(object)), lambdas[i]) - refits[[i]]$fitted);
                           })),
                      class="reapply"));
+}
+
+# The call refitting the model with its structure, starting from its parameters
+# without bounds, as coefbootstrap() does for adam()
+#' @keywords internal
+tbats_refitCall <- function(object){
+    armaSpec <- object$armaSpec;
+    position <- match(trunc(object$lags), armaSpec$lags);
+    orders <- list(ar=ifelse(is.na(position), 0, armaSpec$arOrders[position]),
+                   ma=ifelse(is.na(position), 0, armaSpec$maOrders[position]), select=FALSE);
+    arguments <- list(y=NULL, lags=object$lags, harmonics=object$harmonics, trend=object$trendType,
+                      lambda=if(any(names(object$B)=="lambda")) NULL else object$lambda,
+                      orders=orders, distribution=object$distribution, loss=object$loss,
+                      initial=object$initialType, bounds=object$bounds,
+                      B=object$B, lb=rep(-Inf, length(object$B)), ub=rep(Inf, length(object$B)),
+                      silent=TRUE);
+    if(object$distribution=="dgnorm" && !any(names(object$B)=="shape")){
+        arguments$shape <- object$other$shape;
+    }
+    return(as.call(c(as.name("tbats"), arguments)));
+}
+
+# The point of the segment from the estimate to a point that is the furthest from
+# the estimate and satisfies the bounds, by bisection: the estimate often lies on the
+# boundary of the admissible region
+#' @keywords internal
+tbats_pullBack <- function(object, parameters, point){
+    if(!is.null(object$fitter(point))){
+        return(point);
+    }
+    inside <- 0;
+    outside <- 1;
+    for(iteration in 1:20){
+        share <- (inside+outside)/2;
+        if(is.null(object$fitter(parameters + share*(point-parameters)))){
+            outside <- share;
+        }
+        else{
+            inside <- share;
+        }
+    }
+    return(parameters + inside*(point-parameters));
+}
+
+# The bounds of the confidence intervals of the parameters (as deviations from the
+# estimates) moved inside the bounds of the model, one parameter at a time
+#' @keywords internal
+tbats_confintBounds <- function(object, parameters, bounds){
+    for(j in seq_along(parameters)){
+        for(side in 1:2){
+            point <- parameters;
+            point[j] <- parameters[j] + bounds[j,side];
+            bounds[j,side] <- tbats_pullBack(object, parameters, point)[j] - parameters[j];
+        }
+    }
+    return(bounds);
 }
 
 # The forecasts with the uncertainty of the parameters: for each draw of reapply(),

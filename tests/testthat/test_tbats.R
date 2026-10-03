@@ -195,3 +195,28 @@ test_that("the ARMA selection finds an AR(1) and falls back to no ARMA", {
     fitAir <- tbats(AirPassengers, harmonics=5, trend="additive");
     expect_equal(sum(fitAir$orders$ar+fitAir$orders$ma), 0);
 });
+
+test_that("confint stays inside the bounds of the model and the bootstrap refits it", {
+    fit <- tbats(AirPassengers, harmonics=5, trend="damped", orders=list(ar=1, ma=1, select=FALSE));
+    intervals <- confint(fit);
+    expect_true(intervals["lambda",2]>=0 && intervals["lambda",3]<=1);
+    expect_true(all(intervals[,2]<=coef(fit) & coef(fit)<=intervals[,3]));
+    fitUsual <- tbats(AirPassengers, harmonics=4, trend="additive", orders=orders0, bounds="usual");
+    intervalsUsual <- confint(fitUsual);
+    expect_true(intervalsUsual["alpha",2]>=0 && intervalsUsual["alpha",3]<=1);
+    set.seed(41);
+    bootstrap <- coefbootstrap(fit, nsim=5);
+    expect_equal(dim(bootstrap$coefficients), c(5, length(coef(fit))));
+    expect_true(all(is.finite(bootstrap$vcov)));
+});
+
+test_that("the simulations start from the initials of the model", {
+    for(initial in c("backcasting","optimal")){
+        fit <- tbats(AirPassengers, harmonics=3, trend="damped", orders=list(ar=1, ma=0, select=FALSE),
+                     initial=initial);
+        simulated <- simulate(fit, nsim=1, seed=41);
+        fittedFirst <- tbats_boxCox(simulated$data[1], fit$lambda) - simulated$residuals[1];
+        expect_equal(as.numeric(fittedFirst), tbats_boxCox(as.numeric(fitted(fit)[1]), fit$lambda),
+                     tolerance=1e-10);
+    }
+});

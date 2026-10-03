@@ -116,3 +116,17 @@ def test_the_forecasts_and_the_covariance_agree():
     np.testing.assert_allclose(np.ravel(forecast.upper), r["f"]["upper"], rtol=1e-9)
     np.testing.assert_allclose(fit.point_lik(), r["pointLik"], rtol=1e-9)
     np.testing.assert_allclose(np.sqrt(np.diag(fit.vcov())), r["se"], rtol=1e-6)
+
+
+def test_confint_agrees():
+    r = _r_fit(
+        "AirPassengers",
+        CASES["damped-arma"][0],
+        ", ci=unname(confint(m)[,2:3])",
+    )
+    fit = TBATS(lags=[1, 12], **CASES["damped-arma"][1]).fit(
+        np.asarray(r["y"], dtype=float)
+    )
+    np.testing.assert_allclose(
+        fit.confint().iloc[:, 1:].to_numpy(), r["ci"], rtol=1e-5, atol=1e-9
+    )

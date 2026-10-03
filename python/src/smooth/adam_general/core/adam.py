@@ -124,54 +124,6 @@ def _adam_refit_one_replicate(
     return boot_coef
 
 
-def _psd_correct(vcov: NDArray) -> NDArray:
-    """Ensure ``vcov`` is positive semi-definite for the MVN sampler.
-
-    Mirrors R's ``reapply.adam`` lines 96-115: if the smallest eigenvalue
-    is negative, shift the diagonal by ``|min_eig| + 1e-10`` when the
-    shift is small (PSD repair). When the eigenvalue is below ``-1`` the
-    repair is too aggressive — fall back to the diagonal-only matrix
-    which is always PSD.
-    """
-    vcov = np.asarray(vcov, dtype=float)
-    if vcov.size == 0:
-        return vcov
-    try:
-        eig_min = float(np.min(np.linalg.eigvalsh(vcov)))
-    except np.linalg.LinAlgError:
-        # ``Eigenvalues did not converge`` can fire on platform-specific
-        # LAPACK iteration noise (seen on Windows wheels under
-        # ``bounds="admissible"`` reapply) even when the input is a
-        # well-formed covariance matrix. The diagonal-only matrix is
-        # PSD by construction, so use it as the safe fallback for the
-        # MVN sampler — same response as the very-negative-eigenvalue
-        # branch below.
-        warnings.warn(
-            "Eigendecomposition of the covariance matrix did not converge; "
-            "falling back to the diagonal-only matrix for MVN sampling.",
-            stacklevel=3,
-        )
-        return np.diag(np.diag(vcov))
-    if eig_min < 0:
-        if eig_min > -1:
-            warnings.warn(
-                "The covariance matrix of parameters is not positive "
-                "semi-definite; shifting the diagonal to repair it. "
-                "Consider re-estimating the model with a different "
-                "optimiser configuration.",
-                stacklevel=3,
-            )
-            return vcov + (-eig_min + 1e-10) * np.eye(vcov.shape[0])
-        warnings.warn(
-            "The covariance matrix of parameters has a large negative "
-            "eigenvalue; falling back to the diagonal-only matrix for "
-            "MVN sampling. It is worth re-estimating the model.",
-            stacklevel=3,
-        )
-        return np.diag(np.diag(vcov))
-    return vcov
-
-
 def _clip_ets_usual_smoothing(random_parameters: NDArray, idx: dict) -> None:
     """Closed-form ETS smoothing-parameter clipping (R/reapply.R:254-282).
 
@@ -5522,7 +5474,10 @@ class ADAM:
         """
         import time as _time
 
-        from smooth.adam_general.core.utils.reapply import ReapplyResult
+        from smooth.adam_general.core.utils.reapply import (
+            ReapplyResult,
+            sampling_vcov,
+        )
 
         self._check_is_fitted()
         t0 = _time.time()
@@ -5540,19 +5495,7 @@ class ADAM:
         vcov_df = self.vcov(type=cov_type, heuristics=heuristics, **vcov_call_kwargs)
         coef = np.asarray(self.coef, dtype=float)
         coef_names = list(self.coef_names)
-        # ``np.asarray`` can return a read-only view into the DataFrame's block;
-        # copy so the non-finite row/column zeroing below can write in place.
-        vcov_arr = np.array(vcov_df, dtype=float)
-        # The OPG covariance (the default) returns an infinite variance for a
-        # parameter the data does not identify (e.g. an initial that washes out
-        # when its smoothing parameter is at a bound). Such parameters cannot be
-        # resampled, so hold them at their point estimate (zero their row/column)
-        # before the multivariate-normal draw. Mirrors R's reapply.adam.
-        non_finite = ~np.isfinite(np.diag(vcov_arr))
-        if np.any(non_finite):
-            vcov_arr[non_finite, :] = 0.0
-            vcov_arr[:, non_finite] = 0.0
-        vcov_arr = _psd_correct(vcov_arr)
+        vcov_arr = sampling_vcov(vcov_df)
 
         # 2. MVN sample (R/reapply.R:251)
         rng = np.random.default_rng(seed)

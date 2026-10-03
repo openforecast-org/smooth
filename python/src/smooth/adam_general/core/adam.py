@@ -718,7 +718,12 @@ class ADAM:
 
             The fitted value is accessible via ``model.constant_value``.
         regressors : Literal["use", "select", "adapt"], default="use"
-            How to handle external regressors.
+            How to handle external regressors: ``"use"`` them with constant
+            coefficients, ``"select"`` them as R's ``adam()`` (``stepwise()`` on the
+            errors of the model estimated without them, which is then estimated
+            with the selected ones), or ``"adapt"`` their coefficients over time.
+            With ``"select"``, ``predict()`` takes either the selected columns of X
+            or all those given to ``fit()``.
         distribution : Optional[DISTRIBUTION_OPTIONS], default=None
             Error distribution. If None, it is selected automatically based
             on the loss function.
@@ -3449,7 +3454,8 @@ class ADAM:
             return reforecast_result.to_forecast_result()
 
         # Store new_xreg for forecast period (used in _generate_point_forecasts)
-        if X is not None and self._explanatory.get("xreg_model"):
+        new_xreg = None
+        if X is not None:
             new_xreg = np.asarray(X)
             if new_xreg.dtype.names is not None:
                 new_xreg = np.column_stack(
@@ -3459,9 +3465,7 @@ class ADAM:
                 new_xreg = new_xreg.astype(float)
             if new_xreg.ndim == 1:
                 new_xreg = new_xreg.reshape(-1, 1)
-            self._explanatory["new_xreg"] = new_xreg
-        else:
-            self._explanatory.pop("new_xreg", None)
+        self._set_new_xreg(new_xreg)
 
         # Validate prediction inputs and prepare data for forecasting
         self._validate_prediction_inputs()
@@ -3839,6 +3843,9 @@ class ADAM:
             )
             # Extract adam_cpp from estimation results
             self._adam_cpp = self._adam_estimated["adam_cpp"]
+            # regressors="select": the regressors the estimator selected
+            if "explanatory_dict" in self._adam_estimated:
+                self._apply_selected_regressors(self._adam_estimated)
 
             # Store back estimated gnorm shape
             if other_parameter_estimate and "B" in self._adam_estimated:
@@ -3889,6 +3896,53 @@ class ADAM:
 
         # Update parameters number
         self._update_parameters_number(self._adam_estimated["n_param_estimated"])
+
+    def _set_new_xreg(self, new_xreg):
+        """The future values of the regressors for the forecaster, in the dict of the
+        model and of each combined one: the columns of its regressors when X holds
+        all those given to ``fit()`` (``regressors="select"``)."""
+        models = getattr(self, "_prepared_models", None) or []
+        for explanatory in [self._explanatory] + [
+            m["explanatory_dict"] for m in models
+        ]:
+            explanatory.pop("new_xreg", None)
+            if new_xreg is None or not explanatory.get("xreg_model"):
+                continue
+            columns = explanatory.get("xreg_columns")
+            if columns is not None and new_xreg.shape[1] != explanatory["xreg_number"]:
+                explanatory["new_xreg"] = new_xreg[:, columns]
+            else:
+                explanatory["new_xreg"] = new_xreg
+
+    def _xreg_dicts(self, estimated):
+        """The explanatory, persistence and initials dicts of an estimated model:
+        with ``regressors="select"``, those of the regressors the estimator
+        selected (R's estimator returns them with the model)."""
+        explanatory = estimated.get("explanatory_dict")
+        if explanatory is None:
+            return self._explanatory, self._persistence, self._initials
+        return (
+            explanatory,
+            {**self._persistence, "persistence_xreg_estimate": False},
+            {**self._initials, "initial_xreg_estimate": explanatory["xreg_model"]},
+        )
+
+    def _apply_selected_regressors(self, estimated):
+        """Make the regressors selected by the estimator those of the model, and
+        count them in the parameters."""
+        from smooth.adam_general.core.utils.n_param import count_xreg_params
+
+        self._explanatory, self._persistence, self._initials = self._xreg_dicts(
+            estimated
+        )
+        self._model_type["xreg_model"] = bool(self._explanatory["xreg_model"])
+        n_param = self._general.get("n_param")
+        if n_param is not None:
+            n_estimated, n_provided = count_xreg_params(self._explanatory)
+            if self._initials.get("initial_type") == "complete":
+                n_estimated, n_provided = 0, n_provided + n_estimated
+            n_param.estimated["xreg"] = n_estimated
+            n_param.provided["xreg"] = n_provided
 
     def _update_parameters_number(self, n_param_estimated):
         """
@@ -4073,6 +4127,11 @@ class ADAM:
             observations_dict_copy = copy.deepcopy(self._observations)
             model_type_dict = result["model_type_dict"].copy()
             phi_dict = result["phi_dict"].copy()
+            # The regressors of this model (selected per model with "select")
+            explanatory, persistence, initials = self._xreg_dicts(
+                result["adam_estimated"]
+            )
+            model_type_dict["xreg_model"] = bool(explanatory["xreg_model"])
 
             # Call architector to get components for this model
             (
@@ -4088,7 +4147,7 @@ class ADAM:
                 observations_dict=observations_dict_copy,
                 arima_checked=self._arima,
                 constants_checked=self._constant,
-                explanatory_checked=self._explanatory,
+                explanatory_checked=explanatory,
                 profiles_recent_table=self.profiles_recent_table,
                 profiles_recent_provided=self.profiles_recent_provided,
                 adam_ets=(self.ets == "adam"),
@@ -4100,13 +4159,13 @@ class ADAM:
                 lags_dict=lags_dict_copy,
                 profiles_dict=profile_dict,
                 observations_dict=observations_dict_copy,
-                persistence_checked=self._persistence,
-                initials_checked=self._initials,
+                persistence_checked=persistence,
+                initials_checked=initials,
                 arima_checked=self._arima,
                 constants_checked=self._constant,
                 phi_dict=phi_dict,
                 components_dict=components_dict,
-                explanatory_checked=self._explanatory,
+                explanatory_checked=explanatory,
                 smoother=self._resolve_smoother(),
             )
 
@@ -4134,10 +4193,10 @@ class ADAM:
                 components_dict=components_dict,
                 lags_dict=lags_dict_copy,
                 matrices_dict=adam_created,
-                persistence_checked=self._persistence,
-                initials_checked=self._initials,
+                persistence_checked=persistence,
+                initials_checked=initials,
                 arima_checked=self._arima,
-                explanatory_checked=self._explanatory,
+                explanatory_checked=explanatory,
                 phi_dict=phi_dict,
                 constants_checked=self._constant,
                 observations_dict=observations_dict_copy,
@@ -4176,7 +4235,7 @@ class ADAM:
                     "phi_dict": phi_dict,
                     "adam_created": adam_created,
                     "prepared": prepared,
-                    "explanatory_dict": self._explanatory,
+                    "explanatory_dict": explanatory,
                     "constants_dict": self._constant,
                     "n_param_estimated": result["adam_estimated"]["n_param_estimated"],
                 }
@@ -6163,6 +6222,9 @@ class ADAM:
                     )
                 if new_xreg.ndim == 1:
                     new_xreg = new_xreg.reshape(-1, 1)
+                columns = self._explanatory.get("xreg_columns")
+                if columns is not None and new_xreg.shape[1] != xreg_number:
+                    new_xreg = new_xreg[:, columns]
                 if new_xreg.shape[0] < h:
                     pad = np.tile(new_xreg[-1:], (h - new_xreg.shape[0], 1))
                     new_xreg = np.vstack([new_xreg, pad])

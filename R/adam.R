@@ -1233,8 +1233,11 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         BProvided <- !is.null(B);
         if(!is.null(B)){
             if(!is.null(names(B))){
+                # By name: the order of a named B may differ from the model's (the
+                # regressors of "select" are appended after the shape)
                 B <- B[names(B) %in% names(BValues$B)];
-                BValues$B[] <- B;
+                BValues$B[names(B)] <- B;
+                B <- BValues$B;
             }
             else{
                 BValues$B[] <- B;

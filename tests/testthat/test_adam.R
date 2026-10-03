@@ -839,3 +839,9 @@ test_that("the regressors forecast without newdata land in their own columns", {
                  as.numeric(fit$states[nrow(fit$states),"level"] + fit$initial$xreg[["x1"]]*x1Forecast +
                                 fit$initial$xreg[["x2"]]*x2Forecast), tolerance=1e-10);
 });
+
+test_that("a named B is matched by name, not by position", {
+    testModel <- adam(BJsales, "AAN", distribution="dgnorm");
+    refit <- adam(BJsales, "AAN", distribution="dgnorm", B=rev(testModel$B), maxeval=1);
+    expect_equal(refit$B, testModel$B);
+});

@@ -1150,8 +1150,9 @@ def log_Lik_ADAM(  # noqa: N802
 
         # Handle multiplicative model
         if model_type_dict["ets_model"] and model_type_dict["error_type"] == "M":
-            # Fill in the matrices
-            adam_elements = filler(
+            # This refit only runs for the multistep losses, whose codes do not
+            # use the distribution parameter
+            adam_fitted = fit_at_parameters(
                 B,
                 model_type_dict,
                 components_dict,
@@ -1163,77 +1164,84 @@ def log_Lik_ADAM(  # noqa: N802
                 explanatory_dict,
                 phi_dict,
                 constant_dict,
+                observations_dict,
+                general_dict,
+                profile_dict,
                 adam_cpp,
-            )
-
-            # Write down the initials in the recent profile
-            profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
-                :, : lags_dict["lags_model_max"]
-            ]
-
-            # Fit the model again to extract the fitted values.
-            # Check if initial_type is a list or string and compute backcast correctly
-            if isinstance(initials_dict["initial_type"], list):
-                backcast_value_log = any(
-                    [
-                        t == "complete" or t == "backcasting"
-                        for t in initials_dict["initial_type"]
-                    ]
-                )
-            else:
-                backcast_value_log = initials_dict["initial_type"] in [
-                    "complete",
-                    "backcasting",
-                ]
-
-            # Convert stuff to numpy arrays with float64 - C++ requires that
-            y_in_sample = np.asarray(observations_dict["y_in_sample"], dtype=np.float64)
-            ot = np.asarray(observations_dict["ot"], dtype=np.float64)
-            # Explicit copy -- see the matching comment in CF()
-            mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
-            mat_wt = np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64)
-            mat_f = np.asfortranarray(
-                adam_elements["mat_f"], dtype=np.float64
-            )  # Also copy mat_f since it's passed by reference
-            vec_g = np.asfortranarray(
-                adam_elements["vec_g"], dtype=np.float64
-            )  # Make sure it's a 1D array
-            index_lookup_table = np.asfortranarray(
-                profile_dict["index_lookup_table"], dtype=np.uint64
-            )
-            profiles_recent_table = np.asfortranarray(
-                profile_dict["profiles_recent_table"], dtype=np.float64
-            )
-
-            adam_fitted = adam_fit_or_gradient(
-                adam_cpp=adam_cpp,
-                mat_vt=mat_vt,
-                mat_wt=mat_wt,
-                mat_f=mat_f,
-                vec_g=vec_g,
-                index_lookup_table=index_lookup_table,
-                profiles_recent_table=profiles_recent_table,
-                y_in_sample=y_in_sample,
-                ot=ot,
-                initial_type=initials_dict["initial_type"],
-                n_iterations=initials_dict["n_iterations"],
-                backcast_value=backcast_value_log,
-                model_type_dict=model_type_dict,
-                components_dict=components_dict,
-                lags_dict=lags_dict,
-                obs_in_sample=observations_dict["obs_in_sample"],
-                loss=general_dict["loss"],
-                distribution=general_dict.get(
-                    "distribution_new", general_dict.get("distribution", "default")
-                ),
-                # This refit only runs for the multistep losses, whose codes do
-                # not use the distribution parameter
-                other=None,
-                horizon=general_dict.get("h", 0),
-                multisteps=general_dict["multisteps"],
-                xreg_number=int(explanatory_dict.get("xreg_number", 0) or 0),
             )
 
             logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))
 
         return logLikReturn
+
+
+def fit_at_parameters(
+    B,
+    model_type_dict,
+    components_dict,
+    lags_dict,
+    adam_created,
+    persistence_dict,
+    initials_dict,
+    arima_dict,
+    explanatory_dict,
+    phi_dict,
+    constant_dict,
+    observations_dict,
+    general_dict,
+    profile_dict,
+    adam_cpp,
+    other=None,
+):
+    """The fit of the model at the parameters B, as R's ``filler()`` followed by
+    ``adam_fitOrGradient()``: the initials are written into the recent profile."""
+    adam_elements = filler(
+        B,
+        model_type_dict,
+        components_dict,
+        lags_dict,
+        adam_created,
+        persistence_dict,
+        initials_dict,
+        arima_dict,
+        explanatory_dict,
+        phi_dict,
+        constant_dict,
+        adam_cpp,
+    )
+    profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
+        :, : lags_dict["lags_model_max"]
+    ]
+    initial_type = initials_dict["initial_type"]
+    types = initial_type if isinstance(initial_type, list) else [initial_type]
+    # Explicit copies: the C++ fitter writes into its arguments
+    return adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=np.array(adam_elements["mat_vt"], dtype=np.float64, order="F"),
+        mat_wt=np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64),
+        mat_f=np.asfortranarray(adam_elements["mat_f"], dtype=np.float64),
+        vec_g=np.asfortranarray(adam_elements["vec_g"], dtype=np.float64),
+        index_lookup_table=np.asfortranarray(
+            profile_dict["index_lookup_table"], dtype=np.uint64
+        ),
+        profiles_recent_table=np.asfortranarray(
+            profile_dict["profiles_recent_table"], dtype=np.float64
+        ),
+        y_in_sample=np.asarray(observations_dict["y_in_sample"], dtype=np.float64),
+        ot=np.asarray(observations_dict["ot"], dtype=np.float64),
+        initial_type=initial_type,
+        n_iterations=initials_dict["n_iterations"],
+        backcast_value=any(t in ("complete", "backcasting") for t in types),
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
+        loss=general_dict["loss"],
+        distribution=general_dict.get(
+            "distribution_new", general_dict.get("distribution", "default")
+        ),
+        other=other,
+        horizon=general_dict.get("h", 0),
+        multisteps=general_dict["multisteps"],
+        xreg_number=int(explanatory_dict.get("xreg_number", 0) or 0),
+    )

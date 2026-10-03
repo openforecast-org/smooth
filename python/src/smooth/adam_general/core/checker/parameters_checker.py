@@ -1,4 +1,5 @@
 import warnings
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -1059,20 +1060,38 @@ def parameters_checker(
         return alm
 
     # Build explanatory variables dictionary
-    if has_xreg:
-        xreg_dict = _process_xreg(
+    xreg_builder = partial(
+        _process_xreg,
+        regressors="use" if regressors == "select" else regressors,
+        y_in_sample=observations_dict["y_in_sample"],
+        obs_in_sample=observations_dict["obs_in_sample"],
+        distribution=distribution,
+        e_type=ets_info["error_type"],
+        ic=ic,
+        ot_logical=observations_dict["ot_logical"] if occurrence_model else None,
+    )
+    if has_xreg and regressors == "select":
+        # As R, the model is estimated without the regressors, and the estimator
+        # selects them on its errors
+        xreg_dict = {
+            **_xreg_dict_none("select"),
+            "select": {
+                "X": X,
+                "names": xreg_names_from_input
+                or [f"x{i + 1}" for i in range(xreg_number)],
+                "build": xreg_builder,
+            },
+        }
+        has_xreg = False
+        model_type_dict["xreg_model"] = False
+        persistence_dict["persistence_xreg_estimate"] = False
+        initials_dict["initial_xreg_estimate"] = False
+    elif has_xreg:
+        xreg_dict = xreg_builder(
             X=X,
-            regressors=regressors,
-            y_in_sample=observations_dict["y_in_sample"],
-            obs_in_sample=observations_dict["obs_in_sample"],
-            distribution=distribution,
-            e_type=ets_info["error_type"],
-            ic=ic,
             xreg_names_from_input=xreg_names_from_input,
             initial_xreg=initials_dict.get("initial_xreg"),
-            ot_logical=observations_dict["ot_logical"] if occurrence_model else None,
         )
-        # For "select": if no variables survived selection, disable xreg
         if not xreg_dict["xreg_model"]:
             has_xreg = False
             model_type_dict["xreg_model"] = False
@@ -1085,20 +1104,7 @@ def parameters_checker(
                 persistence_dict["persistence_xreg_estimate"] = False
                 initials_dict["initial_xreg_estimate"] = True
     else:
-        xreg_dict = {
-            "xreg_model": False,
-            "regressors": None,
-            "xreg_model_initials": None,
-            "xreg_data": None,
-            "xreg_number": 0,
-            "xreg_names": None,
-            "response_name": None,
-            "formula": None,
-            "xreg_parameters_missing": None,
-            "xreg_parameters_included": None,
-            "xreg_parameters_estimated": None,
-            "xreg_parameters_persistence": None,
-        }
+        xreg_dict = _xreg_dict_none(None)
 
     # LASSO / RIDGE with lambda=1 is the penalty alone, which is zero with the
     # parameters at their shrinkage targets: no smoothing, phi=1, AR=1 and MA=0. They
@@ -1238,6 +1244,24 @@ def _map_distribution_for_greybox(distribution):
     return _map.get(distribution, "dnorm")
 
 
+def _xreg_dict_none(regressors):
+    """The explanatory dict of a model without regressors."""
+    return {
+        "xreg_model": False,
+        "regressors": regressors,
+        "xreg_model_initials": None,
+        "xreg_data": None,
+        "xreg_number": 0,
+        "xreg_names": None,
+        "response_name": None,
+        "formula": None,
+        "xreg_parameters_missing": None,
+        "xreg_parameters_included": None,
+        "xreg_parameters_estimated": None,
+        "xreg_parameters_persistence": None,
+    }
+
+
 def _process_xreg(
     X,
     regressors,
@@ -1255,11 +1279,11 @@ def _process_xreg(
     Parameters
     ----------
     X : np.ndarray, shape (obs_all, p)
-    regressors : {"use", "select", "adapt"}
+    regressors : {"use", "adapt"} (the selection is done by the estimator)
     y_in_sample : array-like, shape (obs_in_sample,)
     obs_in_sample : int
     distribution : str  smooth distribution name
-    ic : str  information criterion for stepwise selection
+    ic : str  information criterion (unused: the estimator selects)
     xreg_names_from_input : list[str] or None
     initial_xreg : np.ndarray or None
         User-supplied initial coefficient values, shape (p, 1). If provided,
@@ -1270,12 +1294,11 @@ def _process_xreg(
 
     Returns
     -------
-    dict  populated xreg_dict (xreg_model may be False if selection drops all vars)
+    dict  populated xreg_dict
     """
     from greybox import ALM
 
     n_cols = X.shape[1]
-    X_in_sample = X[:obs_in_sample]
     y_is = np.asarray(y_in_sample, dtype=float)
 
     # Default names
@@ -1285,38 +1308,7 @@ def _process_xreg(
         else [f"x{i + 1}" for i in range(n_cols)]
     )
 
-    # ---------- variable selection ----------
     selected_mask = np.ones(n_cols, dtype=bool)
-    if regressors == "select":
-        import pandas as pd
-        from greybox import stepwise
-
-        df_sw = pd.DataFrame(X_in_sample, columns=xreg_names)
-        df_sw.insert(0, "y", y_is)
-        sw_dist = _map_distribution_for_greybox(distribution)
-        try:
-            sw_model = stepwise(df_sw, ic=ic, distribution=sw_dist, silent=True)
-            sel_names = sw_model._feature_names or []
-            selected_mask = np.array([n in sel_names for n in xreg_names])
-        except Exception:
-            pass  # keep all variables on failure
-
-        if not selected_mask.any():
-            # No variables selected — return disabled xreg_dict
-            return {
-                "xreg_model": False,
-                "regressors": regressors,
-                "xreg_model_initials": None,
-                "xreg_data": None,
-                "xreg_number": 0,
-                "xreg_names": None,
-                "response_name": None,
-                "formula": None,
-                "xreg_parameters_missing": None,
-                "xreg_parameters_included": None,
-                "xreg_parameters_estimated": None,
-                "xreg_parameters_persistence": None,
-            }
 
     # Apply selection mask
     X_selected = X[:, selected_mask]

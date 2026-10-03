@@ -445,9 +445,13 @@ From reading the code, not yet reproduced:
   (`R/reapply.R:1175`, `each=` inside `c()`): fixed with step 1;
 - with a multiplicative error, a constant and regressors, the C++ measurement treats
   the constant as a regressor (`exp(c)` rather than `c`, `adamGeneral.h:91-115`);
-- Python ADAM's "select" runs `stepwise` on the raw y rather than on the errors of the
-  model without regressors, so its selections differ from R's; Python `coefbootstrap`
-  does not support regressors;
+- Python ADAM's "select" ran `stepwise` on the raw y rather than on the errors of the
+  model without regressors: fixed, per model as R, with R's named-B bug and Python's
+  two-stage start found on the way; Python `coefbootstrap` does not support regressors;
+- Python combinations ("CCN") with regressors are named ETS(CCN) where R says
+  ETSX(CCN), and their prediction intervals differ from R's by up to 0.04 on
+  etsx_data (the point forecasts agree to 1e-13), with "use" as with "select": to be
+  investigated;
 - Python's forecaster wrote the new X into a view of the in-sample measurement, so
   `ADAM.predict(h, X)` altered the model and the intervals ignored X: fixed with step 4.
 

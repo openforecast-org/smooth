@@ -2,6 +2,7 @@
 
 import math
 import time
+import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Union
 
@@ -16,6 +17,7 @@ from smooth.adam_general.core.tbats import fitter as ft
 from smooth.adam_general.core.tbats import structure as st
 from smooth.adam_general.core.utils.reapply import ReapplyResult
 from smooth.adam_general.core.utils.reforecast import ReforecastResult
+from smooth.adam_general.core.utils.utils import xreg_selector
 
 TREND_OPTIONS = ("auto", "none", "additive", "damped")
 DISTRIBUTION_OPTIONS = ("dnorm", "dlaplace", "ds", "dgnorm")
@@ -33,6 +35,7 @@ LOSS_OPTIONS = (
 IC_OPTIONS = ("AICc", "AIC", "BIC", "BICc")
 INITIAL_OPTIONS = ("backcasting", "optimal", "two-stage", "complete")
 BOUNDS_OPTIONS = ("admissible", "usual", "none")
+REGRESSORS_OPTIONS = ("use", "select", "adapt")
 
 
 @dataclass
@@ -45,12 +48,18 @@ class TBATSReapplyResult(ReapplyResult):
 
 
 def _refit_one_replicate(
-    actuals: NDArray, indices: List[NDArray], kwargs: Dict[str, Any], k: int, i: int
+    actuals: NDArray,
+    X: Optional[NDArray],
+    indices: List[NDArray],
+    kwargs: Dict[str, Any],
+    k: int,
+    i: int,
 ) -> Optional[NDArray]:
     """One bootstrap replicate: the parameters of the refit, or None. Module-level,
     so that joblib can pickle it."""
     try:
-        coef = TBATS(**kwargs).fit(actuals[indices[i]]).coef
+        X_i = None if X is None else X[indices[i]]
+        coef = TBATS(**kwargs).fit(actuals[indices[i]], X_i).coef
     except Exception:
         return None
     if coef.shape[0] != k or not np.all(np.isfinite(coef)):
@@ -96,6 +105,12 @@ class TBATS:
         value refers to the lag 1. None means ``{"ar": 3, "ma": 3, "select": True}``:
         the orders up to these are screened with Hannan-Rissanen on the residuals of
         the global model and the winner is kept if it improves the IC.
+    regressors : str, default="use"
+        How to treat the explanatory variables ``X`` of :meth:`fit`: ``"use"`` them
+        as they are (constant coefficients), ``"select"`` them as ADAM does
+        (``stepwise()`` on the errors of the model chosen without them, which is
+        refitted with the selected ones and kept if it improves the IC), or
+        ``"adapt"`` their coefficients over time (``delta1``, ...).
     distribution : str, default="dnorm"
         ``"dnorm"``, ``"dlaplace"``, ``"ds"`` or ``"dgnorm"``, in the space of the
         transformed data.
@@ -119,6 +134,7 @@ class TBATS:
         trend: str = "auto",
         lambda_bc: Optional[float] = None,
         orders: Optional[Dict[str, Any]] = None,
+        regressors: str = "use",
         distribution: str = "dnorm",
         loss: str = "likelihood",
         ic: str = "AICc",
@@ -149,6 +165,7 @@ class TBATS:
         self.trend = _match(trend, TREND_OPTIONS, "trend")
         self.lambda_bc = lambda_bc
         self.orders = {"ar": 3, "ma": 3, "select": True} if orders is None else orders
+        self.regressors = _match(regressors, REGRESSORS_OPTIONS, "regressors")
         self.distribution = _match(distribution, DISTRIBUTION_OPTIONS, "distribution")
         self.loss = _match(loss, LOSS_OPTIONS, "loss")
         self.ic = _match(ic, IC_OPTIONS, "ic")
@@ -210,8 +227,10 @@ class TBATS:
             "shape_estimate": self.shape is None,
         }
 
-    def fit(self, y: Union[NDArray, pd.Series]) -> "TBATS":
-        """Fit the model to the series ``y``."""
+    def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "TBATS":
+        """Fit the model to the series ``y``, with the explanatory variables ``X``
+        (a numeric array or data frame with the rows of ``y``, and of the horizon
+        ``h`` for its forecasts) in the space of the transformed data."""
         start_time = time.time()
         index = y.index if isinstance(y, pd.Series) else None
         values = np.asarray(y, dtype=float).ravel()
@@ -231,6 +250,9 @@ class TBATS:
         spec_fit = st.arma_build([0], [0], [1]) if spec["select"] else spec
         trend_types = ["none", "additive", "damped"] if trend == "auto" else [trend]
         settings = self._settings()
+        xreg = st.xreg_spec(X, obs_in_sample, h, self.regressors)
+        # The regressors are selected on the errors of the model without them
+        xreg_fit = None if self.regressors == "select" else xreg
 
         if harmonics is None:
             harmonics = st.harmonics_select(
@@ -239,6 +261,7 @@ class TBATS:
                 any(t != "none" for t in trend_types),
                 lam_spec,
                 self.ic,
+                None if xreg_fit is None else xreg_fit["data"],
             )
         else:
             if len(harmonics) != len(periods):
@@ -266,6 +289,7 @@ class TBATS:
                 self.distribution,
                 self.initial,
                 settings,
+                xreg_fit,
             )
             for t in trend_types
         ]
@@ -274,10 +298,20 @@ class TBATS:
         }
         best = candidates[int(np.argmin(list(ics.values())))]
 
+        if self.regressors == "select" and xreg is not None:
+            best, xreg_fit = self._select_xreg(
+                best, xreg, ics, y_in_sample, table, spec_fit, lam_spec, settings
+            )
+
         # The ARMA orders, screened on the residuals of the global model
         if spec["select"] and spec["n_param"] > 0:
-            X = st.design(len(y_in_sample), best["trend_type"] != "none", table)
-            residuals = st.QR(X).resid(
+            design = st.design(
+                len(y_in_sample),
+                best["trend_type"] != "none",
+                table,
+                None if xreg_fit is None else xreg_fit["data"],
+            )
+            residuals = st.QR(design).resid(
                 st.box_cox(y_in_sample, best["elements"]["lambda"])
             )
             spec_best = st.arma_select(
@@ -298,6 +332,7 @@ class TBATS:
                     self.distribution,
                     self.initial,
                     settings,
+                    xreg_fit,
                 )
                 ic_candidate = self._ic(candidate)
                 if ic_candidate < min(ics.values()):
@@ -316,6 +351,49 @@ class TBATS:
         self._y_in_sample = y_in_sample
         self.time_elapsed = time.time() - start_time
         return self
+
+    def _select_xreg(
+        self,
+        best: Dict[str, Any],
+        xreg: Dict[str, Any],
+        ics: Dict[str, float],
+        y: NDArray,
+        table: Dict[str, NDArray],
+        spec: Dict[str, Any],
+        lam_spec: Dict[str, Any],
+        settings: Dict[str, Any],
+    ) -> Any:
+        """The regressors selected by ``stepwise()`` on the errors of the best model
+        without them, as R's ``adam_xreg_selector``: the model refitted with them is
+        kept if it improves the IC."""
+        shape_estimated = int("shape" in best["names"])
+        selected = xreg_selector(
+            best["fitted"]["errors"],
+            xreg["data"],
+            xreg["names"],
+            self.ic,
+            len(best["B"]) + 1 - shape_estimated,
+            self.distribution,
+            best["elements"]["shape"],
+        )
+        subset = st.xreg_subset(xreg, selected)
+        if subset is None:
+            return best, None
+        candidate = ft.fit(
+            y,
+            best["trend_type"],
+            table,
+            spec,
+            lam_spec,
+            self.distribution,
+            self.initial,
+            settings,
+            subset,
+        )
+        ic_candidate = self._ic(candidate)
+        improves = ic_candidate < min(ics.values())
+        ics[f"{candidate['trend_type']}+X({','.join(subset['names'])})"] = ic_candidate
+        return (candidate, subset) if improves else (best, None)
 
     def _ic(self, fitted: Dict[str, Any]) -> float:
         return st.ic_value(
@@ -413,8 +491,16 @@ class TBATS:
 
     @property
     def measurement(self) -> NDArray:
+        """The measurement matrix, with the regressors in their columns."""
         self._check_fitted()
-        return np.tile(self._best["elements"]["w"], (self.nobs, 1))
+        return self._best["fitted"]["mat_wt"].copy()
+
+    @property
+    def xreg_names_(self) -> List[str]:
+        """The names of the regressors in the model (after the selection)."""
+        self._check_fitted()
+        xreg = self._best["struct"]["xreg"]
+        return [] if xreg is None else list(xreg["names"])
 
     @property
     def phi_(self) -> float:
@@ -476,11 +562,16 @@ class TBATS:
             )
         if struct["n_arma"] > 0:
             result["arma"] = np.asarray(read["arma"])
+        if struct["n_xreg"] > 0:
+            result["xreg"] = dict(
+                zip(self.xreg_names_, np.asarray(read["states"]["xreg"], dtype=float))
+            )
         return result
 
     @property
     def model_name(self) -> str:
-        """TBATS(lambda, {p,q}, phi, <m1,k1>, ...)."""
+        """TBATS(lambda, {p,q}, phi, <m1,k1>, ...), TBATSX with the regressors and
+        {D} when they adapt."""
         self._check_fitted()
         struct = self._best["struct"]
         spec = self._best["spec"]
@@ -496,8 +587,10 @@ class TBATS:
             )
         phi = _r_round(self.phi_, 3) if struct["damped"] else "-"
         return (
-            f"TBATS({_r_round(self.lambda_, 3)}, {{{int(spec['ar_orders'].sum())},"
+            f"TBATS{'X' if struct['n_xreg'] > 0 else ''}("
+            f"{_r_round(self.lambda_, 3)}, {{{int(spec['ar_orders'].sum())},"
             f"{int(spec['ma_orders'].sum())}}}, {phi}{seasonal})"
+            f"{'{D}' if struct['xreg_adapt'] else ''}"
         )
 
     @property
@@ -586,6 +679,7 @@ class TBATS:
     def predict(
         self,
         h: Optional[int] = None,
+        X: Optional[Any] = None,
         interval: Literal[
             "none",
             "prediction",
@@ -605,9 +699,11 @@ class TBATS:
     ) -> ForecastResult:
         """The forecasts of ADAM's forecaster in the space of the transformed data,
         transformed back: the point forecasts are the medians and the quantiles map
-        onto those of the data. ``"confidence"`` and ``"complete"`` take the
-        uncertainty of the parameters from :meth:`reforecast` (``nsim`` draws, 100
-        by default; ``"simulated"`` uses 10000 paths by default)."""
+        onto those of the data. ``X`` holds the future values of the regressors
+        (the holdout, else their forecasts, when it is None). ``"confidence"`` and
+        ``"complete"`` take the uncertainty of the parameters from :meth:`reforecast`
+        (``nsim`` draws, 100 by default; ``"simulated"`` uses 10000 paths by
+        default)."""
         self._check_fitted()
         if cumulative and self.lambda_ != 1:
             raise ValueError(
@@ -619,6 +715,7 @@ class TBATS:
         if interval in ("confidence", "complete"):
             return self.reforecast(
                 h=h,
+                X=X,
                 interval="confidence" if interval == "confidence" else "prediction",
                 level=level,
                 side=side,
@@ -631,6 +728,8 @@ class TBATS:
         best = self._best
         struct = best["struct"]
         n_ets = struct["n_ets"]
+        n_xreg = struct["n_xreg"]
+        future = self._future_x(h, X)
         n_param = self.nparam
         n_scale = int(self.loss == "likelihood")
         y_bc = st.box_cox(self._y_in_sample, self.lambda_)
@@ -678,14 +777,14 @@ class TBATS:
                 "damped": struct["damped"],
             },
             explanatory_checked={
-                "xreg_model": False,
-                "xreg_number": 0,
-                "new_xreg": None,
+                "xreg_model": n_xreg > 0,
+                "xreg_number": n_xreg,
+                "new_xreg": future,
             },
             components_dict={
                 "components_number_ets": n_ets,
                 "components_number_ets_seasonal": 0,
-                "components_number_arima": struct["n_components"] - n_ets,
+                "components_number_arima": struct["n_components"] - n_ets - n_xreg,
             },
             constants_checked={"constant_required": False},
             params_info=[[n_param - n_scale, n_scale, n_param]],
@@ -700,6 +799,55 @@ class TBATS:
         if result.upper is not None:
             result.upper = _inverse_like(result.upper, self.lambda_)
         return result
+
+    def _future_x(self, h: int, X: Optional[Any]) -> Optional[NDArray]:
+        """The future values of the regressors (R's ``adam_xregNewdata``): ``X``,
+        else the holdout, else the regressors forecast by ADAM with a warning."""
+        xreg = self._best["struct"]["xreg"]
+        if xreg is None or h <= 0:
+            return None
+        names = xreg["names"]
+        if X is not None:
+            if isinstance(X, pd.DataFrame):
+                values = X.set_axis(st._make_names([str(c) for c in X.columns]), axis=1)
+                values = values[names].to_numpy(dtype=float)
+            else:
+                values = np.asarray(X, dtype=float).reshape(-1, len(names))
+            if values.shape[0] < h:
+                warnings.warn(
+                    f"X has {values.shape[0]} observations, while {h} are needed. "
+                    "Using the last available values as future ones.",
+                    stacklevel=3,
+                )
+                pad = np.repeat(values[-1:], h - values.shape[0], axis=0)
+                values = np.vstack([values, pad])
+            elif values.shape[0] > h:
+                warnings.warn(
+                    f"X has {values.shape[0]} observations, while only {h} are "
+                    f"needed. Using the last {h} of them.",
+                    stacklevel=3,
+                )
+                values = values[-h:]
+            return values
+        holdout = xreg["future"] if self.holdout else None
+        if holdout is not None and holdout.shape[0] >= h:
+            return holdout[:h].copy()
+        from smooth.adam_general.core.adam import ADAM
+
+        warnings.warn(
+            "X is not provided. Predicting the explanatory variables based on what "
+            "I have in-sample.",
+            stacklevel=3,
+        )
+        known = np.zeros((0, len(names))) if holdout is None else holdout
+        h_needed = h - known.shape[0]
+        forecasts = np.column_stack(
+            [
+                np.asarray(ADAM().fit(column).predict(h=h_needed).mean, dtype=float)
+                for column in xreg["data"].T
+            ]
+        )
+        return np.vstack([known, forecasts])
 
     def _pull_back(self, parameters: NDArray, point: NDArray) -> NDArray:
         """The point of the segment from the estimates to ``point`` that is the
@@ -764,7 +912,7 @@ class TBATS:
             fitted=pd.Series(self.fitted),
             model=self.model_name,
             transition=np.stack([r["mat_f"] for r in refits], axis=2),
-            measurement=np.stack([np.tile(r["w"], (obs, 1)) for r in refits], axis=2),
+            measurement=np.stack([r["mat_wt"] for r in refits], axis=2),
             persistence=pd.DataFrame(
                 np.column_stack([r["vec_g"] for r in refits]),
                 index=names,
@@ -785,6 +933,7 @@ class TBATS:
     def reforecast(
         self,
         h: int = 10,
+        X: Optional[Any] = None,
         interval: Literal["prediction", "confidence", "none"] = "prediction",
         level: Union[float, List[float]] = 0.95,
         side: Literal["both", "upper", "lower"] = "both",
@@ -837,9 +986,14 @@ class TBATS:
             df_scale = obs
         draws = refitted.random_parameters
         adam_cpp = best["adam_cpp"]
+        # The future values of the regressors, as predict() takes them
+        future = self._future_x(h, X)
         paths = []
         for j in range(nsim):
-            mat_wt = np.asfortranarray(np.tile(refitted.measurement[0, :, j], (h, 1)))
+            mat_wt = np.tile(refitted.measurement[0, :, j], (h, 1))
+            if future is not None:
+                mat_wt[:, struct["xreg_rows"]] = future
+            mat_wt = np.asfortranarray(mat_wt)
             mat_f = np.asfortranarray(refitted.transition[:, :, j])
             profile = np.array(refitted.profile[:, :, j], order="F")
             lam = refitted.lambdas[j]
@@ -882,7 +1036,7 @@ class TBATS:
         if cumulative:
             path_matrix = path_matrix.sum(axis=0, keepdims=True)
 
-        point_forecast = self.predict(h=h).mean
+        point_forecast = self.predict(h=h, X=future).mean
         mean = point_forecast
         if cumulative:
             mean = pd.Series([point_forecast.sum()], index=point_forecast.index[:1])
@@ -953,11 +1107,17 @@ class TBATS:
         lookup = adam_profile_creator(struct["lags_model_all"], lag_max, obs)[
             "index_lookup_table"
         ]
+        # The in-sample measurement, its last row repeated beyond the sample
+        measurement = self.measurement
+        if measurement.shape[0] < obs:
+            pad = np.repeat(measurement[-1:], obs - measurement.shape[0], axis=0)
+            measurement = np.vstack([measurement, pad])
+        measurement = measurement[:obs]
         result = adam_simulator(
             matrixErrors=errors,
             matrixOt=np.ones((obs, nsim)),
             arrayVt=array_vt,
-            matrixWt=np.tile(best["elements"]["w"], (obs, 1)),
+            matrixWt=np.asfortranarray(measurement),
             arrayF=np.repeat(best["elements"]["mat_f"][:, :, None], nsim, axis=2),
             matrixG=np.repeat(best["elements"]["vec_g"][:, None], nsim, axis=1),
             lags=np.asarray(struct["lags_model_all"], dtype=np.uint64),
@@ -968,8 +1128,8 @@ class TBATS:
             S="N",
             nNonSeasonal=n_ets,
             nSeasonal=0,
-            nArima=struct["n_components"] - n_ets,
-            nXreg=0,
+            nArima=struct["n_components"] - n_ets - struct["n_xreg"],
+            nXreg=struct["n_xreg"],
             constant=False,
         )
         data = st.box_cox_inverse(np.asarray(result["matrixYt"]), self.lambda_)
@@ -980,7 +1140,7 @@ class TBATS:
             states=np.asarray(result["arrayVt"]).reshape(array_vt.shape, order="F"),
             residuals=pd.Series(errors[:, 0]) if nsim == 1 else pd.DataFrame(errors),
             persistence=best["elements"]["vec_g"].reshape(-1, 1),
-            measurement=np.tile(best["elements"]["w"], (obs, 1)),
+            measurement=measurement,
             transition=best["elements"]["mat_f"].copy(),
             initial=profile.copy(),
             probability=np.ones(obs),
@@ -1073,6 +1233,10 @@ class TBATS:
             "lb": np.full(len(B), -np.inf),
             "ub": np.full(len(B), np.inf),
         }
+        if self._best["struct"]["n_xreg"] > 0:
+            kwargs["regressors"] = (
+                "adapt" if self._best["struct"]["xreg_adapt"] else "use"
+            )
         if self.distribution == "dgnorm" and "shape" not in self.coef_names:
             kwargs["shape"] = self._best["elements"]["shape"]
         return kwargs
@@ -1105,9 +1269,11 @@ class TBATS:
             self.initial in ("backcasting", "complete"),
             np.random.default_rng(seed),
         )
+        xreg = self._best["struct"]["xreg"]
         worker = partial(
             _refit_one_replicate,
             self.actuals,
+            None if xreg is None else xreg["data"],
             indices,
             self._refit_kwargs(),
             len(names),

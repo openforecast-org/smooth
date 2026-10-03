@@ -64,4 +64,5 @@
    ~TBATS.harmonics_
    ~TBATS.trend_type_
    ~TBATS.lambda_
+   ~TBATS.xreg_names_
 

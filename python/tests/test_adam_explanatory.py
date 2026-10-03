@@ -96,6 +96,22 @@ def test_etsx_use_forecast_shape(etsx_data):
     assert not np.any(np.isnan(fc.mean.values))
 
 
+@pytest.mark.parametrize("regressors", ["use", "adapt"])
+def test_etsx_simulated_interval_uses_the_new_x(etsx_data, regressors):
+    # The simulated paths take the new values of the regressors, as the point
+    # forecasts do, and predict() leaves the in-sample measurement as it is
+    y, X = etsx_data
+    model = ADAM(model="ANN", regressors=regressors).fit(y[:108], X[:108])
+    measurement = model.measurement.copy()
+    X_new = X[108:] + np.array([5.0, 0.0])
+    point = model.predict(h=12, X=X_new).mean.values
+    np.testing.assert_array_equal(model.measurement, measurement)
+    fc = model.predict(h=12, X=X_new, interval="simulated", nsim=2000)
+    np.testing.assert_allclose(fc.mean.values, point, rtol=1e-12)
+    centre = (np.ravel(fc.lower) + np.ravel(fc.upper)) / 2
+    np.testing.assert_allclose(centre, point, atol=1.0)
+
+
 def test_etsx_use_states_shape(etsx_data):
     y, X = etsx_data
     model = ADAM(model="AAN", regressors="use")

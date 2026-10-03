@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from smooth.adam_general import _adamCore, _ols  # type: ignore[attr-defined]
+from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general._numDeriv import hessian as _hessian_cpp
 from smooth.adam_general.core.creator.architector import (
     adam_head_length,
@@ -38,6 +39,7 @@ def parameters(
     other_estimate: bool,
     initial_estimate: bool,
     bounds: str,
+    xreg_estimate: bool = False,
 ) -> Dict[str, Any]:
     """The names, starting values and bounds of the parameter vector."""
     names: List[str] = ["alpha"]
@@ -53,6 +55,9 @@ def parameters(
         label = st._period_label(period)
         names += [f"gamma1[{label}]", f"gamma2[{label}]"]
         values += [0.0, 0.0]
+    if struct["xreg_adapt"]:
+        names += [f"delta{k}" for k in range(1, struct["n_xreg"] + 1)]
+        values += [0.01] * struct["n_xreg"]
     names += spec["names"]
     values += list(arma_start)
     if initial_estimate:
@@ -68,6 +73,10 @@ def parameters(
         values += [0.0] * (2 * len(labels))
         names += [f"ARMAState{k}" for k in range(1, struct["arma_lag_max"] + 1)]
         values += [0.0] * struct["arma_lag_max"]
+    # The regressors: deviations from the global model
+    if xreg_estimate:
+        names += list(struct["xreg"]["names"])
+        values += [0.0] * struct["n_xreg"]
     if lam_spec["estimate"]:
         names.append("lambda")
         values.append(lam_start)
@@ -77,7 +86,8 @@ def parameters(
     lb = np.full(len(names), -np.inf)
     ub = np.full(len(names), np.inf)
     for i, name in enumerate(names):
-        if bounds == "usual" and name in ("alpha", "beta", "phi"):
+        persistence = name in ("alpha", "beta", "phi") or name.startswith("delta")
+        if bounds == "usual" and persistence:
             lb[i], ub[i] = 0.0, 1.0
         if name == "lambda":
             lb[i], ub[i] = 0.0, 1.0
@@ -123,6 +133,7 @@ class Filler:
         other: Optional[float],
         initial_estimate: bool,
         adam_cpp: Any,
+        xreg_estimate: bool = False,
     ):
         self.index = {name: i for i, name in enumerate(names)}
         self.struct = struct
@@ -131,6 +142,18 @@ class Filler:
         self.other = other
         self.initial_estimate = initial_estimate
         self.adam_cpp = adam_cpp
+        self.xreg_estimate = xreg_estimate
+        n_xreg = struct["n_xreg"]
+        self.deltas = np.asarray(
+            [self.index[f"delta{k}"] for k in range(1, n_xreg + 1)]
+            if struct["xreg_adapt"]
+            else [],
+            dtype=int,
+        )
+        self.xreg = np.asarray(
+            [self.index[n] for n in struct["xreg"]["names"]] if xreg_estimate else [],
+            dtype=int,
+        )
         used = _periods_used(struct)
         gamma1 = [self.index[f"gamma1[{st._period_label(p)}]"] for p in used]
         gamma2 = [self.index[f"gamma2[{st._period_label(p)}]"] for p in used]
@@ -209,6 +232,9 @@ class Filler:
                 if reflection >= 1:
                     penalty += PENALTY * reflection
 
+        if struct["xreg_adapt"]:
+            penalty += self._deltas(B[self.deltas], vec_g, bounds)
+
         if lam < 0 or lam > 1 or shape <= 0:
             penalty += PENALTY
         if bounds == "usual":
@@ -242,6 +268,9 @@ class Filler:
                 "cos": B[self.cos],
                 "arma": B[self.arma_states],
             }
+        xreg_deviations = (
+            B[self.xreg] if self.xreg_estimate else np.zeros(struct["n_xreg"])
+        )
         return {
             "mat_f": mat_f,
             "vec_g": vec_g,
@@ -250,8 +279,36 @@ class Filler:
             "lambda": float(lam),
             "shape": shape,
             "deviations": deviations,
+            "xreg_deviations": xreg_deviations,
             "penalty": penalty,
         }
+
+    def _deltas(self, deltas: NDArray, vec_g: NDArray, bounds: str) -> float:
+        """The smoothing parameters of the regressors into the persistence vector,
+        and the penalty of their bounds: the averaged condition of ADAM for the
+        regressors, separately from the rest."""
+        struct = self.struct
+        vec_g[struct["xreg_rows"]] = deltas
+        if bounds == "usual" and (np.any(deltas < 0) or np.any(deltas > 1)):
+            return PENALTY
+        if bounds != "admissible":
+            return 0.0
+        n_xreg = struct["n_xreg"]
+        data = struct["xreg"]["data"]
+        values = np.abs(
+            smooth_eigens(
+                persistence=np.asfortranarray(deltas.reshape(-1, 1), dtype=float),
+                transition=np.asfortranarray(np.eye(n_xreg)),
+                measurement=np.asfortranarray(data, dtype=float),
+                lags_model_all=np.ones(n_xreg, dtype=np.int32),
+                xreg_model=True,
+                obs_in_sample=data.shape[0],
+                has_delta=True,
+                xreg_number=n_xreg,
+                constant_required=False,
+            )
+        )
+        return PENALTY * values.max() if np.any(values > 1 + 1e-10) else 0.0
 
 
 def gamma_start(B: NDArray, names: List[str], filler: Filler) -> NDArray:
@@ -326,12 +383,14 @@ def fit(
     distribution: str,
     initial: str,
     s: Dict[str, Any],
+    xreg: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """One fit of a fixed structure in the space of the Box-Cox transformed data."""
     obs = len(y)
     periods = sorted(set(table["period"].tolist()))
-    struct = st.structure(trend_type, table, spec, periods)
-    X = st.design(obs, struct["trend_in"], table)
+    struct = st.structure(trend_type, table, spec, periods, xreg)
+    xreg_data = None if xreg is None else xreg["data"]
+    X = st.design(obs, struct["trend_in"], table, xreg_data)
     qr_x = st.QR(X)
     lam_start = st.lambda_start(y, X, lam_spec)
     y_bc_start = st.box_cox(y, lam_start)
@@ -347,8 +406,8 @@ def fit(
         nNonSeasonal=n_ets,
         nSeasonal=0,
         nETS=n_ets,
-        nArima=struct["n_components"] - n_ets,
-        nXreg=0,
+        nArima=struct["n_components"] - n_ets - struct["n_xreg"],
+        nXreg=struct["n_xreg"],
         nComponents=struct["n_components"],
         constant=False,
         adamETS=False,
@@ -369,6 +428,8 @@ def fit(
 
     backcast = initial in ("backcasting", "complete")
     initial_estimate = initial in ("optimal", "two-stage")
+    # The coefficients of the regressors are estimated unless all is backcast
+    xreg_estimate = struct["n_xreg"] > 0 and initial != "complete"
 
     # The starting values of the ARMA from Hannan-Rissanen on the global residuals
     arma_start = np.zeros(0)
@@ -400,9 +461,12 @@ def fit(
         other_estimate,
         initial_estimate,
         s["bounds"],
+        xreg_estimate,
     )
     names = b_list["names"]
-    filler = Filler(names, struct, spec, lam_spec, other, initial_estimate, adam_cpp)
+    filler = Filler(
+        names, struct, spec, lam_spec, other, initial_estimate, adam_cpp, xreg_estimate
+    )
     if s["bounds"] == "admissible" and struct["n_harmonics"] > 0:
         b_list["B"] = gamma_start(b_list["B"], names, filler)
 
@@ -416,10 +480,12 @@ def fit(
             for key in ("level", "trend", "sin", "cos"):
                 states[key] = states[key] + deviations[key]
             arma_initial = deviations["arma"]
+        states["xreg"] = states["xreg"] + elements["xreg_deviations"]
         profile = st.profile(states, arma_initial, struct, elements["phi"])
+        w_t = st.mat_wt(elements["w"], struct, obs, xreg_data)
         fitted = adam_cpp.fit(
             mat_vt.copy(order="F"),
-            np.asfortranarray(np.tile(elements["w"], (obs, 1))),
+            w_t.copy(order="F"),
             np.asfortranarray(elements["mat_f"]),
             np.asarray(elements["vec_g"], dtype=float),
             lookup,
@@ -437,6 +503,7 @@ def fit(
             "profile": np.asarray(fitted.profile),
             "y_bc": y_bc,
             "profile_initial": profile,
+            "mat_wt": w_t,
         }
 
     def loss_value(B: NDArray, loss: str) -> float:
@@ -450,7 +517,7 @@ def fit(
             adam_errors = np.asarray(
                 adam_cpp.ferrors(
                     np.asfortranarray(fitted["states"]),
-                    np.asfortranarray(np.tile(elements["w"], (obs, 1))),
+                    fitted["mat_wt"].copy(order="F"),
                     np.asfortranarray(elements["mat_f"]),
                     lookup,
                     np.array(fitted["profile_initial"], order="F"),
@@ -509,7 +576,7 @@ def fit(
     B = b_list["B"].copy()
     if initial == "two-stage":
         backcast_fit = fit(
-            y, trend_type, table, spec, lam_spec, distribution, "complete", s
+            y, trend_type, table, spec, lam_spec, distribution, "complete", s, xreg
         )
         common = [n for n in names if n in backcast_fit["names"]]
         for name in common:
@@ -557,7 +624,10 @@ def fit(
         1 + int(struct["trend_in"]) + 2 * struct["n_harmonics"] + struct["arma_lag_max"]
     )
     n_param_estimated = (
-        len(B) * (s["model_do"] == "estimate") + 1 + n_initials * backcast
+        len(B) * (s["model_do"] == "estimate")
+        + 1
+        + n_initials * backcast
+        + struct["n_xreg"] * (not xreg_estimate)
     )
     loglik = -loss_value(B, "likelihood")
 
@@ -575,7 +645,12 @@ def fit(
         columns = head["geometry"] + obs + np.arange(s["h"])
         forecast_bc = np.ravel(
             adam_cpp.forecast(
-                np.asfortranarray(np.tile(elements["w"], (s["h"], 1))),
+                st.mat_wt(
+                    elements["w"],
+                    struct,
+                    s["h"],
+                    None if xreg is None else xreg["future"],
+                ),
                 np.asfortranarray(elements["mat_f"]),
                 np.asfortranarray(lookup[:, columns]),
                 np.array(fitted["profile"], order="F"),
@@ -610,6 +685,7 @@ def fit(
         "loss_function": loss_value,
         "point_lik": point_lik,
         "y": y,
+        "xreg_estimate": xreg_estimate,
     }
 
 
@@ -637,4 +713,6 @@ def deviations_from(
         B[index[f"cos{label}"]] = read["states"]["cos"][k] - states["cos"][k]
     for k in range(struct["arma_lag_max"]):
         B[index[f"ARMAState{k + 1}"]] = read["arma"][k]
+    for k, name in enumerate(struct["xreg"]["names"] if struct["n_xreg"] else []):
+        B[index[name]] = read["states"]["xreg"][k] - states["xreg"][k]
     return B

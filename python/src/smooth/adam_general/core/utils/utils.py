@@ -992,3 +992,20 @@ def scale_variance(scale, distribution, other=None):
     if distribution == "dlogis":
         return scale**2 * np.pi**2 / 3
     return scale
+
+
+def xreg_selector(errors, xreg_data, names, ic, df, distribution, other=None):
+    """R's ``adam_xreg_selector``: ``stepwise()`` on the errors of the model without
+    the regressors, with its degrees of freedom added. The names of the selected
+    regressors."""
+    import warnings
+
+    data = pd.DataFrame(np.asarray(xreg_data, dtype=float), columns=list(names))
+    data.insert(0, "errorsIvan41", np.asarray(errors, dtype=float))
+    kwargs = {"shape": other} if distribution in ("dgnorm", "dlgnorm") else {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = gb.stepwise(
+            data, ic=ic, df=df, distribution=distribution, silent=True, **kwargs
+        )
+    return list(model._feature_names or [])

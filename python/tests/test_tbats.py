@@ -325,3 +325,117 @@ def test_the_bootstrap_refits_the_model(damped_arma):
     assert bootstrap.nsim_effective > 0
     covariance = damped_arma.vcov(type="bootstrap", nsim=5, seed=41)
     assert list(covariance.index) == damped_arma.coef_names
+
+
+# A series with two regressors, of which the second is noise, and their future values
+@pytest.fixture(scope="module")
+def xreg_data():
+    rng = np.random.default_rng(41)
+    times = np.arange(1, 133)
+    X = np.column_stack([rng.normal(10, 2, 132), rng.normal(size=132)])
+    noise = np.cumsum(rng.normal(size=132)) + rng.normal(size=132)
+    y = 200 + 20 * np.sin(2 * np.pi * times / 12) + 5 * X[:, 0] + noise
+    return y, pd.DataFrame(X, columns=["x1", "x2"])
+
+
+@pytest.fixture(scope="module")
+def xreg_fit(xreg_data):
+    y, X = xreg_data
+    return TBATS(
+        lags=[1, 12],
+        harmonics=[1],
+        trend="none",
+        orders=ORDERS0,
+        lambda_bc=1,
+        h=12,
+        holdout=True,
+    ).fit(y, X)
+
+
+def test_lambda_zero_with_a_regressor_is_the_model_of_the_logarithms(xreg_data):
+    y, X = xreg_data
+    arguments = dict(lags=[1, 12], harmonics=[1], trend="none", orders=ORDERS0)
+    fit_log = TBATS(lambda_bc=0, **arguments).fit(y[:120], X[:120])
+    fit_level = TBATS(lambda_bc=1, B=fit_log.coef, maxeval=1, **arguments).fit(
+        np.log(y[:120]), X[:120]
+    )
+    assert fit_log.loglik == pytest.approx(
+        fit_level.loglik - np.sum(np.log(y[:120])), rel=1e-8
+    )
+
+
+def test_the_regressors_are_estimated_and_used_in_the_forecasts(xreg_fit, xreg_data):
+    _, X = xreg_data
+    assert xreg_fit.model_name.startswith("TBATSX")
+    assert list(xreg_fit.initial_value["xreg"]) == ["x1", "x2"]
+    assert xreg_fit.initial_value["xreg"]["x1"] == pytest.approx(5, abs=0.5)
+    forecast = xreg_fit.forecast_
+    np.testing.assert_allclose(np.asarray(xreg_fit.predict(h=12).mean), forecast)
+    future = X.to_numpy()[120:]
+    np.testing.assert_allclose(
+        np.asarray(xreg_fit.predict(h=12, X=future).mean), forecast, rtol=1e-12
+    )
+    with pytest.warns(UserWarning, match="X is not provided"):
+        xreg_fit.predict(h=24)
+    assert np.sum(xreg_fit.point_lik()) == pytest.approx(xreg_fit.loglik, rel=1e-8)
+    assert np.all(np.isfinite(xreg_fit.vcov().to_numpy()))
+    bootstrap = xreg_fit.coefbootstrap(nsim=3, seed=41)
+    assert bootstrap.coefficients.shape[1] == len(xreg_fit.coef)
+    assert xreg_fit.simulate(nsim=2, seed=41).data.shape == (120, 2)
+
+
+def test_the_intervals_follow_the_future_regressors(xreg_fit, xreg_data):
+    # The simulated paths take the new values of the regressors, as the point
+    # forecasts do: the bounds move with them
+    _, X = xreg_data
+    future = X.to_numpy()[120:] + np.array([10.0, 0.0])
+    for interval in ("approximate", "simulated", "complete"):
+        forecast = xreg_fit.predict(h=12, X=future, interval=interval, nsim=200)
+        mean = np.asarray(forecast.mean)
+        assert np.all(mean > xreg_fit.forecast_ + 40)
+        lower, upper = np.ravel(forecast.lower), np.ravel(forecast.upper)
+        assert np.all((lower < mean) & (mean < upper))
+
+
+def test_all_backcast_regressors_are_counted_in_the_parameters(xreg_fit, xreg_data):
+    y, X = xreg_data
+    fit = TBATS(
+        lags=[1, 12],
+        harmonics=[1],
+        trend="none",
+        orders=ORDERS0,
+        lambda_bc=1,
+        initial="complete",
+        h=12,
+        holdout=True,
+    ).fit(y, X)
+    assert not {"x1", "x2"} & set(fit.coef_names)
+    assert fit.nparam == xreg_fit.nparam
+
+
+@pytest.mark.parametrize("bounds", ["usual", "admissible"])
+def test_adaptive_regressors_stay_within_the_bounds(bounds):
+    rng = np.random.default_rng(41)
+    X = np.column_stack([rng.normal(10, 2, 150), rng.normal(size=150)])
+    beta = 5 + np.cumsum(rng.normal(0, 0.05, 150))
+    noise = np.cumsum(rng.normal(size=150)) + rng.normal(size=150)
+    y = 200 + beta * X[:, 0] - 2 * X[:, 1] + noise
+    fit = TBATS(regressors="adapt", trend="none", orders=ORDERS0, bounds=bounds).fit(
+        y, X
+    )
+    assert fit.model_name.endswith("{D}")
+    deltas = fit.coef[[fit.coef_names.index(n) for n in ("delta1", "delta2")]]
+    assert np.all((deltas >= 0) & (deltas <= 1))
+    # The averaged condition of ADAM rejects a coefficient that explodes
+    exploding = fit.coef.copy()
+    exploding[fit.coef_names.index("delta1")] = 3
+    assert fit._best["fitter"](exploding) is None
+
+
+def test_the_selection_keeps_the_relevant_regressor(xreg_data):
+    y, X = xreg_data
+    X = X.assign(noise=np.random.default_rng(7).normal(size=len(y)))
+    fit = TBATS(lags=[1, 12], regressors="select", h=12, holdout=True).fit(y, X)
+    assert fit.xreg_names_ == ["x1"]
+    assert any("+X(x1)" in name for name in fit.ics)
+    np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit.forecast_)

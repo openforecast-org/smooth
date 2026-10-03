@@ -233,23 +233,6 @@ def _generate_point_forecasts(
         model_prepared, observations_dict, lags_dict, general_dict
     )
 
-    # Inject new_xreg values into the forecast measurement matrix.
-    # The xreg columns of mat_wt must contain X values for the *forecast* period,
-    # not the last h rows of the in-sample X (which _prepare_matrices_for_forecast
-    # would have copied).  If the caller passed new_xreg, overwrite those columns.
-    new_xreg = explanatory_checked.get("new_xreg") if explanatory_checked else None
-    if (
-        explanatory_checked
-        and explanatory_checked.get("xreg_model")
-        and new_xreg is not None
-    ):
-        xreg_start = (
-            components_dict["components_number_ets"]
-            + components_dict["components_number_arima"]
-        )
-        xreg_end = xreg_start + explanatory_checked["xreg_number"]
-        mat_wt[:, xreg_start:xreg_end] = new_xreg
-
     # Prepare data for adam_forecaster
     # Must copy: adam_cpp.forecast() modifies profilesRecent in-place via carma memory
     # sharing, advancing the profile from T to T+h. Copy prevents corruption.
@@ -277,6 +260,29 @@ def _generate_point_forecasts(
     y_forecast = forecast_result.forecast.flatten()
 
     return y_forecast
+
+
+def _forecast_measurement(model_prepared, explanatory_checked, components_dict, h):
+    """The measurement matrix of the horizon, with the new values of the regressors
+    in their columns, shared by the point forecasts and the intervals (the in-sample
+    one would carry the last h values of the in-sample X)."""
+    new_xreg = explanatory_checked.get("new_xreg") if explanatory_checked else None
+    if not explanatory_checked or not explanatory_checked.get("xreg_model"):
+        return model_prepared
+    if new_xreg is None:
+        return model_prepared
+    measurement = model_prepared["measurement"]
+    if measurement.shape[0] < h:
+        mat_wt = np.tile(measurement[-1], (h, 1))
+    else:
+        mat_wt = measurement[-h:].copy()
+    xreg_start = (
+        components_dict["components_number_ets"]
+        + components_dict["components_number_arima"]
+    )
+    xreg_end = xreg_start + explanatory_checked["xreg_number"]
+    mat_wt[:, xreg_start:xreg_end] = new_xreg
+    return {**model_prepared, "measurement_forecast": mat_wt}
 
 
 def _handle_forecast_safety_checks(
@@ -685,6 +691,9 @@ def forecaster(
 
     # 5. Prepare lookup table for forecasting
     lookup = _prepare_lookup_table(lags_dict, observations_dict, general_dict)
+    model_prepared = _forecast_measurement(
+        model_prepared, explanatory_checked, components_dict, general_dict["h"]
+    )
 
     # 6. Set interval from caller and resolve "prediction" → "simulated"/"approximate"
     general_dict["interval"] = interval

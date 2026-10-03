@@ -155,8 +155,10 @@ def _prepare_matrices_for_forecast(
     # is what R does too (nrow(object$states)) — the head may have been trimmed.
     mat_vt = model_prepared["states"][:, -lags_dict["lags_model_max"] :]
 
-    # Get measurement matrix
-    if model_prepared["measurement"].shape[0] < general_dict["h"]:
+    # Get measurement matrix: that of the horizon when the new regressors are known
+    if model_prepared.get("measurement_forecast") is not None:
+        mat_wt = model_prepared["measurement_forecast"].copy()
+    elif model_prepared["measurement"].shape[0] < general_dict["h"]:
         mat_wt = np.tile(model_prepared["measurement"][-1], (general_dict["h"], 1))
     else:
         mat_wt = model_prepared["measurement"][-general_dict["h"] :]

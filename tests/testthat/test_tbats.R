@@ -300,3 +300,12 @@ test_that("adaptive regressors are ADAM's ETSX{D} and stay within the bounds", {
     # The averaged condition of adam() rejects a coefficient that explodes
     expect_null(fit$fitter(replace(coef(fit), "delta1", 3)));
 });
+
+test_that("the selection keeps the relevant regressor and drops the noise", {
+    set.seed(7);
+    fit <- tbats(yXreg, xreg=cbind(xregTest, noise=rnorm(132)), regressors="select", h=12, holdout=TRUE);
+    expect_equal(names(fit$initial$xreg), "x1");
+    expect_equal(colnames(fit$data)[-1], "x1");
+    expect_true(any(grepl("\\+X\\(x1\\)", names(fit$ICs))));
+    expect_equal(as.numeric(forecast(fit, h=12)$mean), as.numeric(fit$forecast), tolerance=1e-10);
+});

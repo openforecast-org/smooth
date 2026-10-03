@@ -65,9 +65,11 @@
 #' \link[smooth]{adam}. Factors should be converted into dummy variables. The future
 #' values for \code{forecast()} are taken from its \code{newdata}.
 #' @param regressors How to treat the explanatory variables: \code{"use"} them as
-#' they are (constant coefficients), or \code{"adapt"} their coefficients over time
-#' (one smoothing parameter per regressor, \code{delta1}, ..., as in
-#' \link[smooth]{adam}).
+#' they are (constant coefficients), \code{"select"} them as \link[smooth]{adam}
+#' does (\code{stepwise()} on the errors of the model chosen without them, which is
+#' refitted with the selected ones and kept if it improves the information criterion),
+#' or \code{"adapt"} their coefficients over time (one smoothing parameter per
+#' regressor, \code{delta1}, ..., as in \link[smooth]{adam}).
 #' @param distribution The distribution of the error term in the space of the
 #' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 #' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
@@ -136,9 +138,6 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     initial <- match.arg(initial);
     bounds <- match.arg(bounds);
     regressors <- match.arg(regressors);
-    if(regressors=="select"){
-        stop("regressors=\"select\" is not implemented yet.", call.=FALSE);
-    }
     # The Box-Cox parameter is kept apart: the checker returns LASSO's lambda
     lambdaProvided <- lambda;
     modelDo <- "estimate";
@@ -198,14 +197,15 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     periods <- sort(unique(lags[lags>1]));
     lambdaSpec <- tbats_lambdaSpec(lambdaProvided, yInSample, loss);
     armaSpec <- if(is.null(armaSpecProvided)) tbats_armaSpec(orders, lags) else armaSpecProvided;
-    # With the selection, the trend is chosen without ARMA
+    # With the selection, the trend is chosen without ARMA, and without the regressors
     armaSpecFit <- if(armaSpec$select) tbats_armaBuild(0, 0, 1) else armaSpec;
+    xregSpecFit <- if(regressors=="select") NULL else xregSpec;
     trendTypes <- if(trend=="auto") c("none","additive","damped") else trend;
 
     # Harmonics from the global model, at the starting value of lambda
     if(is.null(harmonics)){
         harmonics <- tbats_harmonicsSelect(yInSample, periods, any(trendTypes!="none"),
-                                           lambdaSpec, checked$icFunction, ic, xregSpec$data);
+                                           lambdaSpec, checked$icFunction, ic, xregSpecFit$data);
     }
     else{
         if(length(harmonics)!=length(periods)){
@@ -223,7 +223,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     #### Fit the candidates and select ####
     candidates <- lapply(trendTypes, function(trendType){
         return(tbats_fit(yInSample, trendType, harmonicTable, armaSpecFit, lambdaSpec,
-                         distribution, initial, checked, xregSpec));
+                         distribution, initial, checked, xregSpecFit));
     });
     ICs <- sapply(candidates, function(candidate){
         return(tbats_IC(candidate$logLik, ic));
@@ -231,17 +231,37 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     names(ICs) <- trendTypes;
     best <- candidates[[which.min(ICs)]];
 
+    # The regressors selected by stepwise() on the errors of the best model, as in adam();
+    # the model with them is kept only if it beats the one without
+    if(regressors=="select" && !is.null(xregSpec)){
+        shapeEstimated <- any(names(best$B)=="shape");
+        selected <- names(adam_xreg_selector(best$fitted$errors, xregSpec$data, length(yInSample), ic,
+                                             length(best$B)+1-shapeEstimated, distribution, "none",
+                                             best$elements$shape)$initialXreg);
+        xregSpecSelected <- tbats_xregSubset(xregSpec, make.names(selected));
+        if(!is.null(xregSpecSelected)){
+            candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecFit, lambdaSpec,
+                                   distribution, initial, checked, xregSpecSelected);
+            icCandidate <- tbats_IC(candidate$logLik, ic);
+            if(icCandidate<min(ICs)){
+                best <- candidate;
+                xregSpecFit <- xregSpecSelected;
+            }
+            ICs[paste0(candidate$trendType, "+X(", paste(xregSpecSelected$names, collapse=","), ")")] <- icCandidate;
+        }
+    }
+
     # The ARMA orders, screened on the residuals of the global model at the lambda of the
     # best one: on its errors, the adaptive level hides an AR in a near-unit MA root.
     # The winner is fitted and kept only if it beats the models without ARMA
     if(armaSpec$select && armaSpec$nParam>0){
-        X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable, xregSpec$data);
+        X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable, xregSpecFit$data);
         armaSpecBest <- tbats_armaSelect(qr.resid(qr(X), tbats_boxCox(yInSample, best$elements$lambda)),
                                          armaSpec, distribution, best$elements$shape,
                                          best$nParamEstimated, ic);
         if(armaSpecBest$nParam>0){
             candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecBest, lambdaSpec,
-                                   distribution, initial, checked, xregSpec);
+                                   distribution, initial, checked, xregSpecFit);
             icCandidate <- tbats_IC(candidate$logLik, ic);
             if(icCandidate<min(ICs)){
                 best <- candidate;
@@ -286,6 +306,17 @@ tbats_xreg <- function(xreg, obsInSample, h, regressors){
     return(list(data=xreg[1:obsInSample,,drop=FALSE],
                 future=if(h>0) xreg[obsInSample+1:h,,drop=FALSE],
                 names=colnames(xreg), number=ncol(xreg), regressors=regressors));
+}
+
+# Some of the regressors, used as they are (NULL if none)
+#' @keywords internal
+tbats_xregSubset <- function(xregSpec, names){
+    if(length(names)==0){
+        return(NULL);
+    }
+    return(list(data=xregSpec$data[, names, drop=FALSE],
+                future=if(!is.null(xregSpec$future)) xregSpec$future[, names, drop=FALSE],
+                names=names, number=length(names), regressors="use"));
 }
 
 # The measurement matrix for the rows of the regressors (or a number of rows)

@@ -86,14 +86,22 @@
 #' \code{ftol_abs}, \code{print_level}, \code{nIterations}, \code{headLength},
 #' \code{FI}, \code{stepSize} and \code{shape}.
 #'
-#' @return Object of class "adam" is returned with similar elements to the
-#' \link[smooth]{adam} function, together with \code{lambda}, \code{harmonics}
-#' and \code{periods}.
+#' @return Object of class \code{c("tbats","adam","smooth")} is returned with
+#' similar elements to the \link[smooth]{adam} function, together with
+#' \code{lambda}, \code{harmonics}, \code{periods} and the information criteria of
+#' the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:
+#' \code{forecast()} and \code{predict()} work in the space of the transformed data
+#' and transform the results back (the point forecasts are the medians; the
+#' cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
+#' \code{"complete"} come from \code{reforecast()}, which refits the model at each
+#' draw of the parameters with its own \eqn{\lambda}, and \code{confint()} keeps
+#' the intervals inside the bounds of the model.
 #'
 #' @seealso \code{\link[smooth]{adam}, \link[smooth]{ces}, \link[smooth]{msarima}}
 #'
 #' @examples
-#' tbats(AirPassengers, orders=list(ar=0, ma=0, select=FALSE), h=12, holdout=TRUE)
+#' ourModel <- tbats(AirPassengers, orders=list(ar=0, ma=0, select=FALSE), h=12, holdout=TRUE)
+#' forecast(ourModel, h=12, interval="prediction")
 #'
 #' @rdname tbats
 #' @export

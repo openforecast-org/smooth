@@ -103,9 +103,13 @@ class TBATS:
         As in R's ``tbats()``; ``bounds="admissible"`` keeps the model stable.
     verbose : int, default=0
         Not used yet (R's ``silent``).
-    B, lb, ub, maxeval, maxtime, algorithm, xtol_rel, xtol_abs, ftol_rel, ftol_abs,
-    print_level, n_iterations, head_length, fi, step_size, shape
-        The optimiser settings and other parameters of R's ellipsis.
+    B, lb, ub, maxeval, maxtime, algorithm : optional
+        The starting values, bounds and NLopt settings, as in R's ellipsis.
+    xtol_rel, xtol_abs, ftol_rel, ftol_abs, print_level : optional
+        The tolerances and the print level of NLopt.
+    n_iterations, head_length, fi, step_size, shape : optional
+        The iterations and head of backcasting, the Fisher Information with its
+        step, and the shape of ``dgnorm`` (estimated if None).
     """
 
     def __init__(

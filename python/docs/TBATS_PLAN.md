@@ -290,9 +290,14 @@ forecasts on AirPassengers and the two-period `taylor` data.
      equals the variance from the rotation form's impulse responses to 7e-16, and a
      Monte Carlo of 20000 paths agrees within 1.5%.
 2. R core: fixed-structure fit, global model, initialisation, Box-Cox, distributions, bounds.
-3. R forecasting and methods.
-4. C++ `arimaHRSelectCore` (both bindings in one commit) and the R selection.
+   **Done** (admissible bounds by default).
+3. R forecasting and methods. **Done**: the adam methods on the model in the Box-Cox space;
+   `reapply` / `reforecast` per draw with its own λ; `confint` pulled inside the bounds
+   along each parameter; `coefbootstrap` refitting the structure.
+4. C++ `arimaHRSelectCore` (both bindings in one commit) and the R selection. **Done**.
 5. Python port and parity tests (`ruff check`, `ruff format`, `mypy` after every edit).
+   **Done**: the fits, forecasts, covariance and confidence intervals agree with R
+   (`tests/test_tbats_r_parity.py`).
 6. NEWS, docs, `R CMD check`, full testthat and pytest suites with zero failures.
 
 Later phases:

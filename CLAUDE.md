@@ -76,7 +76,8 @@ Test files are in `tests/testthat/`: `test_adam.R`, `test_autoadam.R`,
 `test_es.R`, `test_ces.R`, `test_ssarima.R`, `test_sparma.R`, `test_gum.R`,
 `test_sma.R`, `test_om.R`, `test_omg.R`, `test_oes.R`, `test_simulate.R`,
 `test_df.R` (degrees of freedom), `test_gradient.R` (`initial="gradient"`),
-`test_vcov_opg.R` (OPG covariance).
+`test_vcov_opg.R` (OPG covariance), `test_backcastHead.R` (the head of backcasting),
+`test_tbats.R`.
 
 Run all tests with: `R -e "devtools::test()"`
 
@@ -144,6 +145,8 @@ Where:
 6. **Occurrence models** (`R/om.R`, `R/omg.R`, `R/om-oes.R`) - For intermittent demand
 
 7. **Scale model** (`R/sm.R`) - Dynamic model for the scale of the error term
+
+8. **TBATS** (`R/adam-tbats.R`) - ETS level and trend, trigonometric seasonality and ARMA in the Box-Cox space; the harmonics sit in the C++ `nArima` slot (see `python/docs/TBATS_PLAN.md`)
 
 ### R and C++ Integration
 

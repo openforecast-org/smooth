@@ -80,9 +80,16 @@ will not estimate anything and will use all its parameters.}
 \code{FI}, \code{stepSize} and \code{shape}.}
 }
 \value{
-Object of class "adam" is returned with similar elements to the
-\link[smooth]{adam} function, together with \code{lambda}, \code{harmonics}
-and \code{periods}.
+Object of class \code{c("tbats","adam","smooth")} is returned with
+similar elements to the \link[smooth]{adam} function, together with
+\code{lambda}, \code{harmonics}, \code{periods} and the information criteria of
+the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:
+\code{forecast()} and \code{predict()} work in the space of the transformed data
+and transform the results back (the point forecasts are the medians; the
+cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
+\code{"complete"} come from \code{reforecast()}, which refits the model at each
+draw of the parameters with its own \eqn{\lambda}, and \code{confint()} keeps
+the intervals inside the bounds of the model.
 }
 \description{
 Function constructs the TBATS model of De Livera et al. (2011) in the Single
@@ -112,7 +119,8 @@ The point forecasts are the medians, the inverse Box-Cox transform of the
 point forecasts of the transformed data.
 }
 \examples{
-tbats(AirPassengers, orders=list(ar=0, ma=0, select=FALSE), h=12, holdout=TRUE)
+ourModel <- tbats(AirPassengers, orders=list(ar=0, ma=0, select=FALSE), h=12, holdout=TRUE)
+forecast(ourModel, h=12, interval="prediction")
 
 }
 \references{

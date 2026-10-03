@@ -247,6 +247,7 @@ python/src/smooth/adam_general/
     ├── es.py, sma.py, msarima.py, auto_msarima.py, auto_adam.py
     ├── om.py, omg.py, auto_om.py      # occurrence models
     ├── ces/, ces_model.py             # complex exponential smoothing
+    ├── tbats/, tbats_model.py         # TBATS (R's tbats())
     ├── sm.py                          # scale model (R's sm(); see docs/sm.rst)
     │                                  # exported as smooth.sm; also ADAM.sm()
     ├── plotting.py

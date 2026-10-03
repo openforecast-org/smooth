@@ -300,7 +300,156 @@ forecasts on AirPassengers and the two-period `taylor` data.
    (`tests/test_tbats_r_parity.py`).
 6. NEWS, docs, `R CMD check`, full testthat and pytest suites with zero failures.
 
-Later phases:
-- `xreg` with `regressors` use / select / adapt / integrate, after the Python port;
+## L. Explanatory variables (next phase)
+
+Scope: `regressors` "use", "select" and "adapt" ("integrate" is not planned). The
+variables come in a separate argument, no formula: R `tbats(y, xreg=NULL,
+regressors=c("use","select","adapt"), ...)`, `forecast(object, h, newdata=)`; Python
+`TBATS(regressors=...)`, `.fit(y, X=None)`, `.predict(h, X=None)`. A numeric matrix or
+data frame (Python: array or DataFrame) with one row per observation, holdout and
+horizon rows included when available; the names come from the columns (`x1`, `x2`, ...
+otherwise). Factors are not expanded (an error with numeric conversion advice); missing
+values stop, as for `y`.
+
+### L.1 The model
+
+In the space of the transformed data, as in ADAM's ETSX:
+
+    y⁽λ⁾_t = w'v_{t-l} + x_t'a_{t-1} + ε_t,   a_t = a_{t-1} + diag(δ) x_t⁻¹ ε_t
+
+- the regressors are the last states, after the ARMA ones: lag 1, an identity block in
+  F, their values in the rows of the measurement matrix (time-varying `w`), and the
+  C++ handles them already through `nXreg` (`g = δ e / x`, with 1/0 taken as 0), so
+  `adamCore` gets `nXreg = ncol(xreg)` and no C++ changes are expected;
+- "use": δ = 0; "adapt": δ estimated, one per regressor (`delta1`, ...);
+- the coefficients are in the space of the transformed data (λ = 1: the usual
+  ones, λ = 0: semi-elasticities).
+
+### L.2 The global model and the initial coefficients
+
+The regressors join the design of the global model (intercept, trend, Fourier terms,
+regressors). This gives, with no extra machinery:
+- λ₀ and the harmonics selected given the regressors (with "select", without them);
+- the initial level net of x₁'a (ADAM corrects the level by hand, seasonal branch
+  only);
+- the ARMA screen on residuals that are free of the regressors;
+- the initial coefficients a₀ recomputed at the current λ on every evaluation, like the
+  level, trend and harmonics.
+
+In B: the deviations of a₀ from the global model, named after the regressors, under
+"backcasting", "optimal" and "two-stage" (ADAM keeps the coefficients in B under
+backcasting as well), not under "complete" (the global values, still counted in the
+degrees of freedom, as ADAM does). Deviations rather than the values themselves keep B
+on the same scale while λ moves the scale of y⁽λ⁾. With "use" the states do not move
+in the backward pass, so a₀ is exactly the parameter; with "adapt" it is the seed of
+the backcast, as in ADAM. Order of B: smoothing parameters, δ, φ, ARMA, initials, the
+xreg deviations, λ, shape. Two-stage: the backcast fit's coefficients become the
+starting deviations, as for the other initials.
+
+### L.3 Bounds
+
+- usual: δ ∈ [0, 1] (ADAM's check);
+- admissible: the TBATS lag-expanded eigenvalues for the level, trend and harmonics
+  (unchanged), plus the xreg block through ADAM's averaged condition, reusing the
+  shared `smoothEigensCpp` on the xreg rows only: the moduli of the eigenvalues of
+  `I − diag(δ) · Σ_t x_t⁻¹ x_t' / T` below 1. ADAM checks this block separately from the
+  rest, and so does TBATS;
+- "none": as now.
+- Starting δ = 0.01, as ADAM (additive error).
+
+### L.4 Selection order with "select"
+
+Mirrors ADAM's `regressors="select"` (R's algorithm, not the current Python ADAM one,
+which runs `stepwise` on the raw y before any fit):
+1. harmonics on the global model without the regressors;
+2. the trend candidates without the regressors, the best by IC;
+3. `greybox::stepwise` (both languages) on the errors of the best model in the space
+   of the transformed data, against the candidate regressors, with the IC, the
+   distribution (and shape) and `df` = the parameters of the model;
+4. if any survive, one fit of the best trend with them as "use"; it is kept only if it
+   beats the IC of the model without them;
+5. the ARMA screen and fit as now, on the global residuals with the chosen regressors.
+
+"use" and "adapt" fit the trend candidates with all the regressors. The cost of
+"select": one stepwise and at most one extra fit.
+
+### L.5 Forecasts and methods
+
+- R `forecast.tbats` / `predict.tbats` keep delegating to `forecast.adam` on the model
+  in the Box-Cox space: the object carries `data = cbind(y, xreg)` with an internal
+  formula built from the names, so `newdata` (a matrix or data frame with the same
+  columns) goes through ADAM's own code. Without `newdata` (and no holdout to cover
+  the horizon) ADAM forecasts each regressor with `adam()` and warns. That path has an
+  off-by-one (`xreg` from `tail(object$data, h)` holds the response in column 1, so
+  regressor i+1's forecast lands in column i, `R/adam.R:6069-6075`): fixed in the same
+  step, with a test, since TBATS relies on it.
+- Python `predict(h, X=None)`: X required when the model has regressors and the
+  holdout does not cover h; otherwise each regressor is forecast with `ADAM()` with a
+  warning, as R. The shared forecaster leaves X out of the simulated intervals
+  (`forecaster/intervals.py` rebuilds the measurement without `new_xreg`), so it is
+  fixed there, as ADAM's simulated intervals with regressors have the same defect.
+- holdout: `xreg` covers it, its rows go into the measurement for the forecast stored in
+  the object and the error measures.
+- reapply / reforecast: the fitter already carries the measurement; reforecast takes
+  `newdata` / X for the horizon rows of each draw.
+- coefbootstrap: the refit call passes the rows of `xreg` with the rows of `y`
+  ("select" becomes "use", as ADAM).
+- vcov (OPG, Hessian), confint, simulate (in-sample regressors), pointLik: through the
+  fitter, nothing specific beyond carrying xreg.
+- print / summary: the coefficients of the regressors and δ.
+
+### L.6 Tests
+
+R (`test_tbats.R`) and Python mirrors:
+- λ=1, no trend, harmonics or ARMA: TBATS with regressors equals ADAM ETSX(A,N,N) with
+  the same regressors at the same parameters (the likelihood and the fitted values),
+  for "use" and for "adapt" with given δ;
+- "use" recovers the coefficients of a simulated ETSX series; λ=0 with a regressor
+  equals the log model with it;
+- "select" keeps the relevant regressor and drops a noise one; with only noise
+  regressors the model has none;
+- "adapt": δ estimated within the usual / admissible bounds; the averaged condition
+  rejects an explosive δ;
+- forecasts with `newdata` / X equal the C++ forecast with those rows; without them a
+  warning and the regressors forecast by `adam()`; holdout error measures;
+- the forecast.adam off-by-one fix: the forecast of each regressor lands in its own
+  column;
+- reapply / reforecast / coefbootstrap / vcov / confint run and stay finite.
+Python: `test_tbats_r_parity.py` with the same data from R: the structure, B, the
+likelihood, the selected regressors, forecasts with X, and confint.
+
+### L.7 Order of work
+
+1. R "use": the argument, the global design, B, filler, structure, return object,
+   forecast with newdata (and the forecast.adam fix), methods; tests.
+2. R "adapt": δ, bounds; tests.
+3. R "select"; tests.
+4. Python port of 1-3 (with the forecaster fix), parity tests, `ruff` / `mypy`.
+5. NEWS, Rd / docstrings, full suites (R, Python default, R comparisons), `R CMD check`.
+One commit per step, R and Python of the same feature together where practical.
+
+### L.8 Found on the way (ADAM, outside TBATS; to be verified and fixed separately)
+
+From reading the code, not yet reproduced:
+- R filler places δ by the count of estimated smoothing parameters, so with a provided
+  α and "adapt" they land in the wrong rows (`R/utils-adam.R:926-932`); Python indexes
+  correctly;
+- `reapply.adam` writes the xreg draws into the trend row under backcasting with a
+  trend, and offsets them wrongly under "optimal" with seasonality
+  (`R/reapply.R:716-725`); `reforecast.adam` mis-pads a short `newdata`
+  (`R/reapply.R:1175`, `each=` inside `c()`);
+- with a multiplicative error, a constant and regressors, the C++ measurement treats
+  the constant as a regressor (`exp(c)` rather than `c`, `adamGeneral.h:91-115`);
+- Python ADAM's "select" runs `stepwise` on the raw y rather than on the errors of the
+  model without regressors, so its selections differ from R's; Python `coefbootstrap`
+  does not support regressors.
+
+## M. Later phases
+
 - `occurrence` accepting a provided or estimated `om` / `omg` model, with the Box-Cox
-  transform and its Jacobian on the non-zero observations only.
+  transform and its Jacobian on the non-zero observations only;
+- missing values (the fitter's `ot`, as ADAM, with the global model on the observed
+  rows);
+- the trend candidates fitted in parallel (most of the time on long series: 43 of the
+  68 s on Taylor);
+- a vignette.

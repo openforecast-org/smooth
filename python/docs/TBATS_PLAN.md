@@ -448,10 +448,9 @@ From reading the code, not yet reproduced:
 - Python ADAM's "select" ran `stepwise` on the raw y rather than on the errors of the
   model without regressors: fixed, per model as R, with R's named-B bug and Python's
   two-stage start found on the way; Python `coefbootstrap` does not support regressors;
-- Python combinations ("CCN") with regressors are named ETS(CCN) where R says
-  ETSX(CCN), and their prediction intervals differ from R's by up to 0.04 on
-  etsx_data (the point forecasts agree to 1e-13), with "use" as with "select": to be
-  investigated;
+- Python combinations ("CCN") with regressors were named ETS(CCN) where R says
+  ETSX(CCN), and their intervals differed from R's by up to 0.04: R counted the
+  regressors of each model of a combination twice. Both fixed;
 - Python's forecaster wrote the new X into a view of the in-sample measurement, so
   `ADAM.predict(h, X)` altered the model and the intervals ignored X: fixed with step 4.
 

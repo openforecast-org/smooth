@@ -62,3 +62,29 @@ def test_the_selection_agrees(case):
     assert model.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
     np.testing.assert_allclose(np.asarray(forecast.mean), r["mean"], rtol=1e-10)
     np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-9)
+
+
+@pytest.mark.parametrize("regressors", ["use", "select"])
+def test_the_combination_with_regressors_agrees(regressors):
+    # The additive pool, whose intervals are analytical
+    r = r_dict(
+        f"{{ {DATA} m <- suppressWarnings(adam(d[1:108,], 'CXN',"
+        f" regressors='{regressors}'));"
+        " f <- forecast(m, h=12, newdata=d[109:120,], interval='prediction');"
+        " list(y=d$y, X=as.matrix(d[,-1]), names=colnames(d)[-1], model=m$model,"
+        " w=unname(m$ICw), wnames=names(m$ICw), mean=as.numeric(f$mean),"
+        " lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    y = np.asarray(r["y"], dtype=float)
+    X = pd.DataFrame(np.asarray(r["X"], dtype=float), columns=r["names"])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model="CXN", regressors=regressors).fit(y[:108], X[:108])
+        forecast = model.predict(h=12, X=X[108:].to_numpy(), interval="prediction")
+    assert model.model == r["model"][0]
+    weights = dict(zip(r["wnames"], r["w"]))
+    for name, weight in model._ic_weights.items():
+        assert weight == pytest.approx(weights[name], rel=1e-8)
+    np.testing.assert_allclose(np.asarray(forecast.mean), r["mean"], rtol=1e-10)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-9)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-9)

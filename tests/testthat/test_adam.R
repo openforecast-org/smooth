@@ -845,3 +845,10 @@ test_that("a named B is matched by name, not by position", {
     refit <- adam(BJsales, "AAN", distribution="dgnorm", B=rev(testModel$B), maxeval=1);
     expect_equal(refit$B, testModel$B);
 });
+
+test_that("the models of a combination count their regressors once", {
+    xregData <- cbind(y=BJsales, x=BJsales.lead);
+    combined <- adam(xregData, "CXN");
+    expect_match(combined$model, "^ETSX");
+    expect_equal(nparam(combined$models$ANN), nparam(adam(xregData, "ANN")));
+});

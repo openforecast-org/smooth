@@ -2512,9 +2512,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             adamSelected$results[[i]]$vecG <- adamCreated$vecG;
             adamSelected$results[[i]]$arimaPolynomials <- adamCreated$arimaPolynomials;
 
+            # The regressors are in nParamEstimated: move them to their own column, and
+            # reset it for a model without them (regressors="select")
             parametersNumber[1,1] <- adamSelected$results[[i]]$nParamEstimated;
+            parametersNumber[1,2] <- 0;
             if(xregModel){
                 parametersNumber[1,2] <- xregNumber*initialXregEstimate + xregNumber*persistenceXregEstimate;
+                parametersNumber[1,1] <- parametersNumber[1,1] - parametersNumber[1,2];
             }
             # The distribution scale is always estimated (concentrated likelihood).
             parametersNumber[1,4] <- 1;
@@ -3001,8 +3005,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
         # Record the original name of the model.
         model[] <- modelOriginal;
-        # Prepare the name of the model
-        modelName <- adam_model_name(etsModel, model, xregModel, arimaModel,
+        # Prepare the name of the model: ETSX if any of the models has regressors, not
+        # whatever the last one of the loop above left (regressors="select")
+        modelName <- adam_model_name(etsModel, model,
+                                     any(sapply(adamSelected$results, "[[", "xregModel")), arimaModel,
                                      arOrders, iOrders, maOrders, lags,
                                      regressors, constantRequired, constantName,
                                      occurrence, componentsNumberETSSeasonal);

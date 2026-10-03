@@ -1320,9 +1320,14 @@ class ADAM:
             if "persistence_xreg" in self._persistence:
                 self.persistence_xreg_ = self._persistence["persistence_xreg"]
 
-        # For combined models, preserve original model specification with ETS prefix
+        # For combined models, preserve original model specification with ETS prefix;
+        # ETSX when any model of the pool has regressors, as R
         if getattr(self, "_is_combined", False):
-            self.model = f"ETS({self._original_model_spec})"
+            has_xreg = any(
+                m["explanatory_dict"].get("xreg_model", False)
+                for m in getattr(self, "_prepared_models", None) or []
+            )
+            self.model = f"ETS{'X' if has_xreg else ''}({self._original_model_spec})"
             return
 
         # Update self.model with the selected/estimated model name

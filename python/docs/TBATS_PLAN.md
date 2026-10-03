@@ -428,6 +428,11 @@ likelihood, the selected regressors, forecasts with X, and confint.
 5. NEWS, Rd / docstrings, full suites (R, Python default, R comparisons), `R CMD check`.
 One commit per step, R and Python of the same feature together where practical.
 
+Status: done. R and Python agree to machine precision on the use, selection,
+two-stage, complete, adapt (both bounds) and select fits and on the intervals with new
+X; the coefficients in `coef()` / `confint()` are the deviations from the global model,
+the coefficients themselves are in `initial$xreg`.
+
 ### L.8 Found on the way (ADAM, outside TBATS; to be verified and fixed separately)
 
 From reading the code, not yet reproduced:
@@ -436,13 +441,15 @@ From reading the code, not yet reproduced:
   correctly;
 - `reapply.adam` writes the xreg draws into the trend row under backcasting with a
   trend, and offsets them wrongly under "optimal" with seasonality
-  (`R/reapply.R:716-725`); `reforecast.adam` mis-pads a short `newdata`
-  (`R/reapply.R:1175`, `each=` inside `c()`);
+  (`R/reapply.R:716-725`); `reforecast.adam` mis-padded a short `newdata`
+  (`R/reapply.R:1175`, `each=` inside `c()`): fixed with step 1;
 - with a multiplicative error, a constant and regressors, the C++ measurement treats
   the constant as a regressor (`exp(c)` rather than `c`, `adamGeneral.h:91-115`);
 - Python ADAM's "select" runs `stepwise` on the raw y rather than on the errors of the
   model without regressors, so its selections differ from R's; Python `coefbootstrap`
-  does not support regressors.
+  does not support regressors;
+- Python's forecaster wrote the new X into a view of the in-sample measurement, so
+  `ADAM.predict(h, X)` altered the model and the intervals ignored X: fixed with step 4.
 
 ## M. Later phases
 

@@ -439,3 +439,24 @@ def test_the_selection_keeps_the_relevant_regressor(xreg_data):
     assert fit.xreg_names_ == ["x1"]
     assert any("+X(x1)" in name for name in fit.ics)
     np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit.forecast_)
+
+
+def test_the_point_forecasts(air):
+    fit = TBATS(lags=[1, 12], harmonics=[3], trend="additive", orders=ORDERS0).fit(air)
+    skeleton = fit.predict(h=24).mean.to_numpy()
+    np.testing.assert_allclose(fit.predict(h=24, point="median").mean, skeleton)
+    mean = fit.predict(h=24, point="mean").mean.to_numpy()
+    assert np.all(mean > skeleton)
+    # lambda=0 and the S distribution: the mean does not exist
+    fit = TBATS(
+        lags=[1, 12],
+        harmonics=[3],
+        trend="additive",
+        orders=ORDERS0,
+        lambda_bc=0,
+        distribution="ds",
+    ).fit(air)
+    with pytest.warns(UserWarning, match="does not exist"):
+        fit.predict(h=3, point="mean", seed=41)
+    with pytest.raises(ValueError, match="point"):
+        fit.predict(h=3, point="mode")

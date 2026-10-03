@@ -309,3 +309,29 @@ test_that("the selection keeps the relevant regressor and drops the noise", {
     expect_true(any(grepl("\\+X\\(x1\\)", names(fit$ICs))));
     expect_equal(as.numeric(forecast(fit, h=12)$mean), as.numeric(fit$forecast), tolerance=1e-10);
 });
+
+test_that("the point forecasts: the skeleton is the median, the mean by quadrature", {
+    fit <- tbats(AirPassengers, harmonics=3, trend="additive", orders=orders0);
+    skeleton <- forecast(fit, h=24)$mean;
+    expect_equal(forecast(fit, h=24, point="median")$mean, skeleton);
+    forecastedMean <- forecast(fit, h=24, point="mean")$mean;
+    expect_true(all(forecastedMean > skeleton));
+    # The quadrature is the mean of the simulated paths of the same distribution
+    set.seed(41);
+    paths <- forecast(tbats_boxCoxObject(fit), h=24, interval="simulated", nsim=100000,
+                      scenarios=TRUE)$scenarios;
+    expect_equal(as.numeric(forecastedMean), rowMeans(matrix(tbats_boxCoxInverse(paths, fit$lambda), 24)),
+                 tolerance=1e-3);
+    # lambda=0: the mean of the log-normal
+    fit <- tbats(AirPassengers, harmonics=3, trend="additive", orders=orders0, lambda=0);
+    bounds <- forecast(tbats_boxCoxObject(fit), h=12, interval="approximate", level=2*pnorm(1)-1);
+    expect_equal(as.numeric(forecast(fit, h=12, point="mean")$mean),
+                 as.numeric(exp(bounds$mean + (bounds$upper-bounds$mean)^2/2)));
+    # With lambda=0 and the S distribution, the mean does not exist
+    fit <- tbats(AirPassengers, harmonics=3, trend="additive", orders=orders0, lambda=0,
+                 distribution="ds");
+    set.seed(41);
+    expect_warning(forecast(fit, h=3, point="mean"), "does not exist");
+    set.seed(41);
+    expect_true(all(forecast(fit, h=6, point="median", interval="complete", nsim=10)$mean>0));
+});

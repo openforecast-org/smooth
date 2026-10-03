@@ -56,6 +56,11 @@ interval or only \code{"upper"}, or \code{"lower"}.}
 \item{cumulative}{If \code{TRUE}, then the cumulative forecast and prediction
 interval are produced instead of the normal ones. This is useful for
 inventory control systems.}
+
+\item{point}{What the point forecast is: \code{"skeleton"} (the default) is the one of
+the estimated model, as in \link[smooth]{forecast.adam}; \code{"mean"} and
+\code{"median"} are the (trimmed) mean and the median of the simulated paths, which
+include the uncertainty of the parameters.}
 }
 \value{
 \code{reapply()} returns object of the class "reapply", which contains:

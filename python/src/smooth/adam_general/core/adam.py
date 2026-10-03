@@ -3344,6 +3344,7 @@ class ADAM:
         occurrence: Optional[NDArray] = None,
         scenarios: bool = False,
         seed: Optional[int] = None,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
     ) -> ForecastResult:
         """
         Generate forecasts using the fitted ADAM model.
@@ -3395,10 +3396,23 @@ class ADAM:
             If True and ``interval="simulated"``, store the raw simulation
             matrix in ``self._general["_scenarios_matrix"]``.
         seed : int, optional
-            Seed forwarded to :meth:`reforecast` when ``interval`` is
-            ``"complete"`` or ``"confidence"``. Pins the Monte-Carlo
-            paths so the interval is reproducible across runs and
-            platforms. Ignored for the other ``interval`` modes.
+            Seed of the Monte-Carlo paths: those of :meth:`reforecast` when
+            ``interval`` is ``"complete"`` or ``"confidence"``, of the simulated
+            intervals and of the simulated mean or median, which are then
+            reproducible.
+        point : {"skeleton", "mean", "median"}, default="skeleton"
+            What the point forecast is (R's ``point``). ``"skeleton"`` is the model
+            run forward with all the future errors at their neutral values (zero
+            for the additive and one for the multiplicative ones), the "point
+            forecast" of Hyndman et al. (2008): the conditional mean of the additive
+            models and of those with a multiplicative error and additive
+            components, close to it otherwise; with an occurrence model it is
+            multiplied by the probability of occurrence. ``"mean"`` is the
+            conditional mean: the skeleton where they coincide, the mean of
+            ``nsim`` simulated paths otherwise. ``"median"`` is the 50% quantile of
+            the method of the interval (of ``"prediction"`` when
+            ``interval="none"``), from simulated paths for the occurrence models.
+            The fitted values do not change.
 
         Returns
         -------
@@ -3421,10 +3435,16 @@ class ADAM:
             if self._general["h"] is None:
                 raise ValueError("Forecast horizon is not set.")
 
+        if point not in ("skeleton", "mean", "median"):
+            raise ValueError(
+                f'point should be "skeleton", "mean" or "median", not {point!r}.'
+            )
         self._general["interval"] = interval
         self._general["nsim"] = nsim
         self._general["cumulative"] = cumulative
         self._general["scenarios"] = scenarios
+        self._general["point"] = point
+        self._general["seed"] = seed
 
         if occurrence is not None:
             self._occurrence["occurrence"] = occurrence
@@ -3455,6 +3475,7 @@ class ADAM:
                 cumulative=cumulative,
                 nsim=reforecast_nsim,
                 seed=seed,
+                point=point,
             )
             return reforecast_result.to_forecast_result()
 
@@ -3743,11 +3764,15 @@ class ADAM:
         if interval != "none":
             if side != "upper":
                 lower = pd.DataFrame(
-                    np.reshape(result.lower, (h, -1)), index=index, columns=bound_low
+                    np.reshape(result.lower, (h, -1)),
+                    index=index,
+                    columns=np.round(bound_low, 5),
                 )
             if side != "lower":
                 upper = pd.DataFrame(
-                    np.reshape(result.upper, (h, -1)), index=index, columns=bound_up
+                    np.reshape(result.upper, (h, -1)),
+                    index=index,
+                    columns=np.round(bound_up, 5),
                 )
         return ForecastResult(
             mean=pd.Series(np.ravel(result.mean), index=index, name="mean"),
@@ -6042,6 +6067,7 @@ class ADAM:
         heuristics: Optional[float] = None,
         seed: Optional[int] = None,
         trim: float = 0.01,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
         **vcov_kwargs,
     ):
         """Produce ``h``-step-ahead forecasts via Monte-Carlo reforecasting.
@@ -6094,6 +6120,10 @@ class ADAM:
         trim : float, default=0.01
             Trim proportion for the point-forecast mean (R uses 1% by
             default).
+        point : {"skeleton", "mean", "median"}, default="skeleton"
+            The point forecast: the skeleton of the model (see :meth:`predict`),
+            or the trimmed mean or the median of the paths, which include the
+            uncertainty of the parameters.
 
         Returns
         -------
@@ -6367,6 +6397,22 @@ class ADAM:
                 dtype=float,
             )
             mean_series = pd.Series(mean_arr, index=mean_index)
+
+        # The point forecast: the skeleton of the model, or the trimmed mean (above)
+        # or the median of the paths, which include the uncertainty of the parameters
+        if point == "skeleton":
+            skeleton = self.predict(
+                h=h, X=X, occurrence=occurrence, cumulative=cumulative
+            ).mean
+            mean_series = pd.Series(
+                np.asarray(skeleton, dtype=float), index=mean_series.index
+            )
+        elif point == "median":
+            totals = np.nansum(paths, axis=0)[None] if cumulative else paths
+            mean_series = pd.Series(
+                np.nanmedian(totals.reshape(totals.shape[0], -1), axis=1),
+                index=mean_series.index,
+            )
 
         if interval == "none":
             return ReforecastResult(

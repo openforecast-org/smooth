@@ -412,7 +412,9 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
     if type == "multiplicative":
         if np.any(y[~y_na_values] <= 0):
             y_na_values = y_na_values | (y <= 0)
-        y_insample = np.log(y)
+        # The non-positive values are imputed below, as the missing ones
+        with np.errstate(divide="ignore", invalid="ignore"):
+            y_insample = np.log(y)
     else:
         y_insample = y.copy()
 

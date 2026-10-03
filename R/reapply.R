@@ -41,6 +41,10 @@
 #' @param cumulative If \code{TRUE}, then the cumulative forecast and prediction
 #' interval are produced instead of the normal ones. This is useful for
 #' inventory control systems.
+#' @param point What the point forecast is: \code{"skeleton"} (the default) is the one of
+#' the estimated model, as in \link[smooth]{forecast.adam}; \code{"mean"} and
+#' \code{"median"} are the (trimmed) mean and the median of the simulated paths, which
+#' include the uncertainty of the parameters.
 #' @param ... Other parameters passed to \code{reapply()} and \code{mean()} functions in case of
 #' \code{reforecast} (\code{trim} parameter in \code{mean()} is set to
 #' 0.01 by default) and to \code{vcov} in case of \code{reapply}.
@@ -934,8 +938,9 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                             interval=c("prediction", "confidence", "none"),
                             level=0.95, side=c("both","upper","lower"), cumulative=FALSE,
                             nsim=100, type=c("opg","hessian","bootstrap"),
-                            bootstrap=FALSE, heuristics=NULL, ...){
+                            bootstrap=FALSE, heuristics=NULL, point=c("skeleton","mean","median"), ...){
     type <- covarTypeResolver(type, bootstrap);
+    point <- match.arg(point);
 
     objectRefitted <- reapply(object, nsim=nsim, type=type, heuristics=heuristics, ...);
     ellipsis <- list(...);
@@ -1183,10 +1188,11 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     #### Note that the cumulative doesn't work with oes at the moment!
     if(cumulative){
-        yForecast[] <- mean(apply(arrayYSimulated,1,sum,na.rm=TRUE,trim=trim));
+        # The totals of the paths
+        yForecast[] <- mean(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),trim=trim);
         if(interval!="none"){
-            yLower[] <- quantile(apply(arrayYSimulated,1,sum,na.rm=TRUE),levelLow,type=7);
-            yUpper[] <- quantile(apply(arrayYSimulated,1,sum,na.rm=TRUE),levelUp,type=7);
+            yLower[] <- quantile(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),levelLow,type=7);
+            yUpper[] <- quantile(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),levelUp,type=7);
         }
     }
     else{
@@ -1286,8 +1292,22 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         yUpper[] <- exp(yUpper);
     }
 
+    # The point forecast: the skeleton of the model, or the mean / median of the paths
+    paths <- arrayYSimulated;
+    if(adam_logModel(object)){
+        paths[] <- exp(paths);
+    }
+    if(cumulative){
+        paths <- array(apply(paths,c(2,3),sum,na.rm=TRUE), c(1,nsim,nsim));
+    }
+    yForecast[] <- switch(point,
+                          "skeleton"=forecast(object, h=h, newdata=newdata, occurrence=occurrence,
+                                              interval="none", cumulative=cumulative)$mean,
+                          "mean"=apply(paths,1,mean,na.rm=TRUE,trim=trim),
+                          "median"=apply(paths,1,median,na.rm=TRUE));
+
     structure(list(mean=yForecast, lower=yLower, upper=yUpper, model=object,
                    level=level, interval=interval, side=side, cumulative=cumulative,
-                   h=h, paths=arrayYSimulated),
+                   h=h, paths=arrayYSimulated, point=point),
               class=c("adam.forecast","smooth.forecast","forecast"));
 }

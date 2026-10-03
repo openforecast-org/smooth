@@ -257,3 +257,20 @@ def test_the_intervals_with_new_regressors_agree():
     np.testing.assert_allclose(np.asarray(forecast.mean), r["f"]["mean"], rtol=1e-10)
     np.testing.assert_allclose(np.ravel(forecast.lower), r["f"]["lower"], rtol=1e-9)
     np.testing.assert_allclose(np.ravel(forecast.upper), r["f"]["upper"], rtol=1e-9)
+
+
+@pytest.mark.parametrize("lam", ["NULL", "0"])
+def test_the_mean_by_quadrature_agrees(lam):
+    r = _r_fit(
+        "AirPassengers",
+        CASES["additive"][0] + f", lambda={lam}",
+        ", mean=as.numeric(forecast(m, h=24, point='mean')$mean)",
+    )
+    fit = TBATS(
+        lags=[1, 12],
+        lambda_bc=None if lam == "NULL" else 0.0,
+        **CASES["additive"][1],
+    ).fit(np.asarray(r["y"], dtype=float))
+    np.testing.assert_allclose(
+        fit.predict(h=24, point="mean").mean, r["mean"], rtol=1e-10
+    )

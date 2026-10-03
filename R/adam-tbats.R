@@ -22,8 +22,16 @@
 #' the same period. The ARMA is the one of \link[smooth]{adam}: a separate
 #' component, not a model of the error term.
 #'
-#' The point forecasts are the medians, the inverse Box-Cox transform of the
-#' point forecasts of the transformed data.
+#' The point forecasts are by default the skeleton (\code{point="skeleton"}, see
+#' \link[smooth]{forecast.adam}): the inverse Box-Cox transform of the point forecasts
+#' of the transformed data, the median of the forecast distribution.
+#' \code{point="median"} gives the same values, and \code{point="mean"} the mean:
+#' with \code{distribution="dnorm"} by Gauss-Hermite quadrature over the normal
+#' forecast distribution of the transformed data, with the variance of the
+#' approximate interval (exactly \eqn{\exp(\mu+\sigma^2/2)} for \eqn{\lambda=0}),
+#' otherwise from \code{nsim} simulated paths transformed back. With \eqn{\lambda=0},
+#' \code{ds} and \code{dgnorm} with a shape below one have no mean, so the
+#' simulated one is unstable (a warning).
 #'
 #' @template ssAuthor
 #' @template ssKeywords
@@ -103,8 +111,8 @@
 #' \code{lambda}, \code{harmonics}, \code{periods} and the information criteria of
 #' the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:
 #' \code{forecast()} and \code{predict()} work in the space of the transformed data
-#' and transform the results back (the point forecasts are the medians; the
-#' cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
+#' and transform the results back (the point forecasts are the skeleton, the
+#' medians, by default; the cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
 #' \code{"complete"} come from \code{reforecast()}, which refits the model at each
 #' draw of the parameters with its own \eqn{\lambda}, and \code{confint()} keeps
 #' the intervals inside the bounds of the model.
@@ -1394,14 +1402,16 @@ tbats_confintBounds <- function(object, parameters, bounds){
 # The forecasts with the uncertainty of the parameters: for each draw of reapply(),
 # its point forecasts ("confidence") or its simulated paths with the scale of its
 # own residuals ("prediction"), in the space of its own transform and transformed
-# back. The point forecast stays the median of the model.
+# back. The point forecast is the skeleton of the model, or the mean / median of the
+# paths.
 #' @export
 reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
                              interval=c("prediction", "confidence", "none"),
                              level=0.95, side=c("both","upper","lower"), cumulative=FALSE,
                              nsim=100, type=c("opg","hessian","bootstrap"),
-                             bootstrap=FALSE, heuristics=NULL, ...){
+                             bootstrap=FALSE, heuristics=NULL, point=c("skeleton","mean","median"), ...){
     interval <- match.arg(interval);
+    point <- match.arg(point);
     side <- match.arg(side);
     if(cumulative && object$lambda!=1){
         stop("Cumulative forecasts of tbats() are only available for lambda=1.", call.=FALSE);
@@ -1464,6 +1474,9 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     if(cumulative){
         yForecast <- sum(yForecast);
     }
+    if(point!="skeleton"){
+        yForecast[] <- apply(paths, 1, switch(point, "mean"=mean, "median"=median), na.rm=TRUE);
+    }
     makeLike <- function(values){
         values <- ts(values, start=start(pointForecast), frequency=frequency(pointForecast));
         return(values);
@@ -1484,7 +1497,8 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
                                       "approximate", "semiparametric", "nonparametric",
                                       "empirical","complete"),
                            level=0.95, side=c("both","upper","lower"), cumulative=FALSE, nsim=NULL,
-                           scenarios=FALSE, ...){
+                           scenarios=FALSE, point=c("skeleton","mean","median"), ...){
+    point <- match.arg(point);
     if(cumulative && object$lambda!=1){
         stop("Cumulative forecasts of tbats() are only available for lambda=1: ",
              "the sums of the transformed values do not transform back.", call.=FALSE);
@@ -1497,12 +1511,53 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
         return(reforecast(object, h=h, newdata=newdata, occurrence=occurrence,
                           interval=switch(interval[1], "confidence"="confidence", "prediction"),
                           level=level, side=match.arg(side), cumulative=cumulative,
-                          nsim=if(is.null(nsim)) 100 else nsim, ...));
+                          nsim=if(is.null(nsim)) 100 else nsim, point=point, ...));
     }
+    # The median of the transformed data is its skeleton, and transforms back into the
+    # median of the data
     result <- forecast(objectBC, h=h, newdata=newdata, occurrence=occurrence,
                        interval=interval, level=level, side=side, cumulative=cumulative, nsim=nsim,
                        scenarios=scenarios, ...);
-    return(tbats_boxCoxForecast(result, object));
+    result <- tbats_boxCoxForecast(result, object);
+    if(point=="mean" && object$lambda!=1 && h>0){
+        result$mean[] <- tbats_mean(object, objectBC, h, newdata, nsim, ...);
+    }
+    result$point <- point;
+    return(result);
+}
+
+# The mean of the forecast distribution of the data: Gauss-Hermite quadrature over the
+# normal forecast distribution of the transformed data, with the variance of the
+# approximate interval (the closed form for lambda=0); for the other distributions the
+# mean of the simulated paths transformed back
+#' @keywords internal
+#' @importFrom statmod gauss.quad
+tbats_mean <- function(object, objectBC, h, newdata, nsim, ...){
+    lambda <- object$lambda;
+    if(object$distribution=="dnorm"){
+        # The bound at the level 2*pnorm(1)-1 is one standard deviation away
+        bounds <- forecast(objectBC, h=h, newdata=newdata, interval="approximate",
+                           level=2*pnorm(1)-1, side="both");
+        mu <- as.vector(bounds$mean);
+        sigma <- as.vector(bounds$upper) - mu;
+        if(lambda==0){
+            return(exp(mu+sigma^2/2));
+        }
+        quadrature <- gauss.quad(50, kind="hermite");
+        return(sapply(seq_len(h), function(i){
+            return(sum(quadrature$weights *
+                           tbats_boxCoxInverse(mu[i]+sqrt(2)*sigma[i]*quadrature$nodes, lambda)) / sqrt(pi));
+        }));
+    }
+    if(lambda==0 && (object$distribution=="ds" ||
+                     (object$distribution=="dgnorm" && object$other$shape<1))){
+        warning("With lambda=0 and the ", object$distribution, " distribution, the mean of the ",
+                "forecast distribution does not exist: the simulated one is unstable and grows ",
+                "with nsim.", call.=FALSE);
+    }
+    paths <- forecast(objectBC, h=h, newdata=newdata, interval="simulated",
+                      nsim=if(is.null(nsim)) 10000 else nsim, scenarios=TRUE, ...)$scenarios;
+    return(rowMeans(matrix(tbats_boxCoxInverse(paths, lambda), h)));
 }
 
 # The future values of the regressors with their names, when given without them

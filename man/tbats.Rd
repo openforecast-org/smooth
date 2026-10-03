@@ -100,8 +100,8 @@ similar elements to the \link[smooth]{adam} function, together with
 \code{lambda}, \code{harmonics}, \code{periods} and the information criteria of
 the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:
 \code{forecast()} and \code{predict()} work in the space of the transformed data
-and transform the results back (the point forecasts are the medians; the
-cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
+and transform the results back (the point forecasts are the skeleton, the
+medians, by default; the cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
 \code{"complete"} come from \code{reforecast()}, which refits the model at each
 draw of the parameters with its own \eqn{\lambda}, and \code{confint()} keeps
 the intervals inside the bounds of the model.
@@ -130,8 +130,16 @@ parameters \eqn{\gamma_1} and \eqn{\gamma_2} being shared by the harmonics of
 the same period. The ARMA is the one of \link[smooth]{adam}: a separate
 component, not a model of the error term.
 
-The point forecasts are the medians, the inverse Box-Cox transform of the
-point forecasts of the transformed data.
+The point forecasts are by default the skeleton (\code{point="skeleton"}, see
+\link[smooth]{forecast.adam}): the inverse Box-Cox transform of the point forecasts
+of the transformed data, the median of the forecast distribution.
+\code{point="median"} gives the same values, and \code{point="mean"} the mean:
+with \code{distribution="dnorm"} by Gauss-Hermite quadrature over the normal
+forecast distribution of the transformed data, with the variance of the
+approximate interval (exactly \eqn{\exp(\mu+\sigma^2/2)} for \eqn{\lambda=0}),
+otherwise from \code{nsim} simulated paths transformed back. With \eqn{\lambda=0},
+\code{ds} and \code{dgnorm} with a shape below one have no mean, so the
+simulated one is unstable (a warning).
 }
 \examples{
 ourModel <- tbats(AirPassengers, orders=list(ar=0, ma=0, select=FALSE), h=12, holdout=TRUE)

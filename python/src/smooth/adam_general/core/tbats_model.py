@@ -696,15 +696,25 @@ class TBATS:
         cumulative: bool = False,
         nsim: Optional[int] = None,
         seed: Optional[int] = None,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
     ) -> ForecastResult:
         """The forecasts of ADAM's forecaster in the space of the transformed data,
-        transformed back: the point forecasts are the medians and the quantiles map
-        onto those of the data. ``X`` holds the future values of the regressors
-        (the holdout, else their forecasts, when it is None). ``"confidence"`` and
-        ``"complete"`` take the uncertainty of the parameters from :meth:`reforecast`
-        (``nsim`` draws, 100 by default; ``"simulated"`` uses 10000 paths by
-        default)."""
+        transformed back: the quantiles map onto those of the data. The point
+        forecast (``point``, see :meth:`ADAM.predict`) is by default the skeleton, the
+        inverse transform of the point forecast of the transformed data and the
+        median of the forecast distribution, as is ``"median"``; ``"mean"`` is the
+        mean, by Gauss-Hermite quadrature over the normal forecast distribution of
+        the transformed data with ``dnorm`` (exp(mu + sigma^2/2) for lambda=0), from
+        ``nsim`` simulated paths transformed back otherwise. ``X`` holds the future
+        values of the regressors (the holdout, else their forecasts, when it is
+        None). ``"confidence"`` and ``"complete"`` take the uncertainty of the
+        parameters from :meth:`reforecast` (``nsim`` draws, 100 by default;
+        ``"simulated"`` uses 10000 paths by default)."""
         self._check_fitted()
+        if point not in ("skeleton", "mean", "median"):
+            raise ValueError(
+                f'point should be "skeleton", "mean" or "median", not {point!r}.'
+            )
         if cumulative and self.lambda_ != 1:
             raise ValueError(
                 "Cumulative forecasts of TBATS are only available for lambda=1: the "
@@ -722,6 +732,7 @@ class TBATS:
                 cumulative=cumulative,
                 nsim=100 if nsim is None else nsim,
                 seed=seed,
+                point=point,
             ).to_forecast_result()
         if nsim is None:
             nsim = 10000
@@ -733,25 +744,10 @@ class TBATS:
         n_param = self.nparam
         n_scale = int(self.loss == "likelihood")
         y_bc = st.box_cox(self._y_in_sample, self.lambda_)
-        result = forecaster(
-            model_prepared={
-                "states": best["states"],
-                "mat_vt": best["fitted"]["profile_initial"],
-                "measurement": self.measurement,
-                "transition": best["elements"]["mat_f"],
-                "persistence": best["elements"]["vec_g"],
-                "profiles_recent_table": best["fitted"]["profile"],
-                "residuals": pd.Series(self.residuals),
-                "y_fitted": y_bc - self.residuals,
-                "scale": self.scale,
-            },
-            observations_dict={
-                "obs_in_sample": self.nobs,
-                "y_in_sample": y_bc,
-                "y_forecast_start": self._forecast_start(),
-                "frequency": self._frequency(),
-            },
-            general_dict={
+
+        def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
+            """ADAM's forecaster in the space of the transformed data."""
+            general_dict = {
                 "h": int(h),
                 "cumulative": cumulative,
                 "nsim": nsim,
@@ -761,44 +757,107 @@ class TBATS:
                 "other": {"shape": best["elements"]["shape"]},
                 "n_param": None,
                 "scale_forecast": None,
-            },
-            occurrence_dict={"occurrence_model": False, "occurrence": "none"},
-            lags_dict={
-                "lags_model_all": struct["lags_model_all"],
-                "lags_model_max": struct["lags_model_max"],
-                "lags_model_min": 2 if struct["lags_model_max"] > 1 else np.inf,
-                "lags": struct["lags_model_all"],
-            },
-            model_type_dict={
-                "ets_model": True,
-                "error_type": "A",
-                "trend_type": "A" if struct["trend_in"] else "N",
-                "season_type": "N",
-                "damped": struct["damped"],
-            },
-            explanatory_checked={
-                "xreg_model": n_xreg > 0,
-                "xreg_number": n_xreg,
-                "new_xreg": future,
-            },
-            components_dict={
-                "components_number_ets": n_ets,
-                "components_number_ets_seasonal": 0,
-                "components_number_arima": struct["n_components"] - n_ets - n_xreg,
-            },
-            constants_checked={"constant_required": False},
-            params_info=[[n_param - n_scale, n_scale, n_param]],
-            adam_cpp=best["adam_cpp"],
-            interval=interval,
-            level=level,
-            side=side,
-        )
+                "seed": seed,
+                **general,
+            }
+            result = forecaster(
+                model_prepared={
+                    "states": best["states"],
+                    "mat_vt": best["fitted"]["profile_initial"],
+                    "measurement": self.measurement,
+                    "transition": best["elements"]["mat_f"],
+                    "persistence": best["elements"]["vec_g"],
+                    "profiles_recent_table": best["fitted"]["profile"],
+                    "residuals": pd.Series(self.residuals),
+                    "y_fitted": y_bc - self.residuals,
+                    "scale": self.scale,
+                },
+                observations_dict={
+                    "obs_in_sample": self.nobs,
+                    "y_in_sample": y_bc,
+                    "y_forecast_start": self._forecast_start(),
+                    "frequency": self._frequency(),
+                },
+                general_dict=general_dict,
+                occurrence_dict={"occurrence_model": False, "occurrence": "none"},
+                lags_dict={
+                    "lags_model_all": struct["lags_model_all"],
+                    "lags_model_max": struct["lags_model_max"],
+                    "lags_model_min": 2 if struct["lags_model_max"] > 1 else np.inf,
+                    "lags": struct["lags_model_all"],
+                },
+                model_type_dict={
+                    "ets_model": True,
+                    "error_type": "A",
+                    "trend_type": "A" if struct["trend_in"] else "N",
+                    "season_type": "N",
+                    "damped": struct["damped"],
+                },
+                explanatory_checked={
+                    "xreg_model": n_xreg > 0,
+                    "xreg_number": n_xreg,
+                    "new_xreg": future,
+                },
+                components_dict={
+                    "components_number_ets": n_ets,
+                    "components_number_ets_seasonal": 0,
+                    "components_number_arima": struct["n_components"] - n_ets - n_xreg,
+                },
+                constants_checked={"constant_required": False},
+                params_info=[[n_param - n_scale, n_scale, n_param]],
+                adam_cpp=best["adam_cpp"],
+                interval=interval,
+                level=level,
+                side=side,
+            )
+            return result, general_dict
+
+        # The median of the transformed data is its skeleton, and transforms back into
+        # the median of the data
+        result, _ = run(interval, level, side)
         result.mean = _inverse_like(result.mean, self.lambda_)
+        if point == "mean" and self.lambda_ != 1:
+            result.mean[:] = self._mean(run, nsim)
         if result.lower is not None:
             result.lower = _inverse_like(result.lower, self.lambda_)
         if result.upper is not None:
             result.upper = _inverse_like(result.upper, self.lambda_)
         return result
+
+    def _mean(self, run: Any, nsim: int) -> NDArray:
+        """The mean of the forecast distribution of the data (R's ``tbats_mean``):
+        Gauss-Hermite quadrature over the normal forecast distribution of the
+        transformed data, with the variance of the approximate interval (the closed
+        form for lambda=0); for the other distributions the mean of the simulated
+        paths transformed back."""
+        from scipy.stats import norm
+
+        lam = self.lambda_
+        if self.distribution == "dnorm":
+            # The bound at the level 2*pnorm(1)-1 is one standard deviation away
+            bounds, _ = run("approximate", 2 * norm.cdf(1) - 1, "both")
+            mu = np.asarray(bounds.mean, dtype=float)
+            sigma = np.ravel(np.asarray(bounds.upper, dtype=float)) - mu
+            if lam == 0:
+                return np.asarray(np.exp(mu + sigma**2 / 2))
+            nodes, weights = np.polynomial.hermite.hermgauss(50)
+            values = st.box_cox_inverse(
+                mu[:, None] + np.sqrt(2) * sigma[:, None] * nodes, lam
+            )
+            return np.asarray(values @ weights / np.sqrt(np.pi))
+        shape = self._best["elements"]["shape"]
+        if lam == 0 and (
+            self.distribution == "ds" or (self.distribution == "dgnorm" and shape < 1)
+        ):
+            warnings.warn(
+                f"With lambda=0 and the {self.distribution} distribution, the mean of "
+                "the forecast distribution does not exist: the simulated one is "
+                "unstable and grows with nsim.",
+                stacklevel=3,
+            )
+        _, general = run("simulated", 0.95, "both", scenarios=True)
+        paths = np.asarray(general["_scenarios_matrix"], dtype=float)
+        return np.asarray(st.box_cox_inverse(paths, lam).mean(axis=1))
 
     def _future_x(self, h: int, X: Optional[Any]) -> Optional[NDArray]:
         """The future values of the regressors (R's ``adam_xregNewdata``): ``X``,
@@ -942,13 +1001,15 @@ class TBATS:
         type: Optional[str] = None,  # noqa: A002
         heuristics: Optional[float] = None,
         seed: Optional[int] = None,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
         **vcov_kwargs: Any,
     ) -> ReforecastResult:
         """The forecasts with the uncertainty of the parameters (R's
         ``reforecast.tbats``): for each draw of :meth:`reapply`, its point forecasts
         (``"confidence"``) or its paths simulated with the scale of its own errors
         (``"prediction"``), in the space of its own transform and transformed back.
-        The point forecast stays the median of the model."""
+        The point forecast is the skeleton of the model (its median), or the mean or
+        the median of the paths (``point``)."""
         from smooth.adam_general.core.adam import (
             _column_names_for_levels,
             _level_bounds,
@@ -1030,8 +1091,8 @@ class TBATS:
                 ).data
                 paths.append(st.box_cox_inverse(np.asarray(simulated)[:, :, 0], lam))
             else:
-                point = adam_cpp.forecast(mat_wt, mat_f, lookup, profile, h).forecast
-                paths.append(st.box_cox_inverse(np.ravel(point), lam).reshape(h, 1))
+                skeleton = adam_cpp.forecast(mat_wt, mat_f, lookup, profile, h).forecast
+                paths.append(st.box_cox_inverse(np.ravel(skeleton), lam).reshape(h, 1))
         path_matrix = np.column_stack(paths)
         if cumulative:
             path_matrix = path_matrix.sum(axis=0, keepdims=True)
@@ -1040,6 +1101,9 @@ class TBATS:
         mean = point_forecast
         if cumulative:
             mean = pd.Series([point_forecast.sum()], index=point_forecast.index[:1])
+        if point != "skeleton":
+            statistic = np.nanmean if point == "mean" else np.nanmedian
+            mean = pd.Series(statistic(path_matrix, axis=1), index=mean.index)
         if interval == "none":
             lower = upper = None
         else:

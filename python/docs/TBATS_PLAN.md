@@ -454,6 +454,35 @@ From reading the code, not yet reproduced:
 - Python's forecaster wrote the new X into a view of the in-sample measurement, so
   `ADAM.predict(h, X)` altered the model and the intervals ignored X: fixed with step 4.
 
+## N. The point forecast: `point = c("skeleton", "mean", "median")`
+
+One argument of `forecast.adam()` / `forecast.tbats()` / `reforecast()` / the
+combinations, and of `ADAM.predict()` / `TBATS.predict()` / `reforecast()` in Python,
+with `"skeleton"` the default everywhere.
+
+- `"skeleton"`: the model run forward with every future error at its neutral value
+  (0 for the additive, 1 for the multiplicative ones), the "point forecast" of
+  Hyndman et al. (2008, ch. 6) and the skeleton of a nonlinear model (Tong, 1990). It is
+  what `forecast.adam()` returned so far. It equals the mean for the additive models
+  and for the multiplicative error with additive components, and is close to it
+  otherwise; for TBATS it is the back-transformed point forecast, the median of the
+  forecast distribution. With an occurrence model it is p times the skeleton of the
+  sizes, as `adam()` did.
+- `"mean"`: the conditional expectation. The skeleton where it is the mean (additive
+  error with a symmetric distribution and no multiplicative components; multiplicative
+  error without multiplicative components or ARIMA); otherwise the mean of simulated
+  paths (`nsim`), with the occurrence drawn in them. TBATS with `dnorm`: Gauss-Hermite
+  quadrature over the normal forecast distribution in the Box-Cox space, with the
+  variance of the approximate intervals (exp(mu + sigma^2/2) for lambda=0); other
+  distributions: the simulated paths, back-transformed. With lambda=0, `ds` and
+  `dgnorm` with shape < 1 have no mean: a warning, and the simulated mean.
+  `reforecast()`: the trimmed mean of its paths (what it returned so far).
+- `"median"`: the 50% quantile of the method of the intervals (the "prediction" one
+  when `interval="none"`): the skeleton for the additive models with symmetric
+  distributions, analytical or simulated otherwise; TBATS: the back-transformed median
+  in the Box-Cox space. `reforecast()`: the median of its paths.
+- Fitted values are not affected.
+
 ## M. Later phases
 
 - `occurrence` accepting a provided or estimated `om` / `omg` model, with the Box-Cox

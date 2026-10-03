@@ -48,7 +48,8 @@ def ensure_level_format(level, side):
         level_low = 1 - level
         level_up = np.ones_like(level)
 
-    return np.round(level_low, 5), np.round(level_up, 5)
+    # Exact, as R: only the names of the columns are rounded
+    return level_low, level_up
 
 
 def _df_scale(general, observations_dict, params_info):
@@ -411,6 +412,8 @@ def generate_simulation_interval(
     """
     h = general_dict["h"]
     lags_model_max = lags_dict["lags_model_max"]
+    # The errors and the occurrence draws, reproducible with a seed
+    rng = np.random.default_rng(general_dict.get("seed"))
 
     # Get number of components
     n_components = (
@@ -467,6 +470,7 @@ def generate_simulation_interval(
             n_param=obs_in_sample - df,
             shape=other_params.get("shape"),
             alpha=other_params.get("alpha"),
+            random_state=rng,
         )
         mat_errors = errors_flat.reshape((h, nsim), order="F")
 
@@ -507,7 +511,6 @@ def generate_simulation_interval(
 
     # Occurrence matrix: Bernoulli draws when occurrence model is active
     if p_forecast is not None:
-        rng = np.random.default_rng()
         mat_ot = rng.binomial(
             1, np.asarray(p_forecast, dtype=float).reshape(-1, 1), (h, nsim)
         ).astype(float)

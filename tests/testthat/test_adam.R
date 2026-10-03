@@ -852,3 +852,42 @@ test_that("the models of a combination count their regressors once", {
     expect_match(combined$model, "^ETSX");
     expect_equal(nparam(combined$models$ANN), nparam(adam(xregData, "ANN")));
 });
+
+test_that("the point forecast is the skeleton, the mean or the median", {
+    testModel <- adam(BJsales, "ANN");
+    skeleton <- forecast(testModel, h=12)$mean;
+    expect_equal(forecast(testModel, h=12, point="mean")$mean, skeleton);
+    expect_equal(forecast(testModel, h=12, point="median")$mean, skeleton);
+    # A multiplicative error on additive components: the skeleton is the mean, and
+    # the median is lower, the distribution being skewed to the right
+    testModel <- adam(BJsales, "MNN");
+    skeleton <- forecast(testModel, h=12)$mean;
+    expect_equal(forecast(testModel, h=12, point="mean")$mean, skeleton);
+    expect_true(all(forecast(testModel, h=12, point="median")$mean < skeleton));
+    # A multiplicative trend: the mean is the skeleton at the first step only
+    testModel <- adam(BJsales, "MMdN");
+    set.seed(41);
+    forecasted <- forecast(testModel, h=12, point="mean")$mean;
+    skeleton <- forecast(testModel, h=12)$mean;
+    expect_equal(forecasted[1], skeleton[1]);
+    expect_equal(as.numeric(forecasted), as.numeric(skeleton), tolerance=1e-3);
+    # The median of an intermittent demand with a probability below 0.5 is zero
+    set.seed(3);
+    yIntermittent <- rpois(120, 0.6)*rep(c(5,1),60);
+    testModel <- adam(yIntermittent, "MNN", occurrence="odds-ratio");
+    set.seed(41);
+    expect_true(all(forecast(testModel, h=6, point="median")$mean==0));
+    expect_equal(forecast(testModel, h=6, point="mean")$mean, forecast(testModel, h=6)$mean);
+    expect_error(forecast(testModel, h=6, point="mode"));
+});
+
+test_that("reforecast() totals each path for the cumulative forecasts", {
+    testModel <- adam(BJsales, "AAN");
+    set.seed(41);
+    forecasted <- reforecast(testModel, h=5, cumulative=TRUE, nsim=50);
+    expect_equal(as.numeric(forecasted$mean), sum(forecast(testModel, h=5)$mean));
+    expect_true(forecasted$lower < forecasted$mean && forecasted$mean < forecasted$upper);
+    set.seed(41);
+    expect_equal(as.numeric(reforecast(testModel, h=5, cumulative=TRUE, nsim=50, point="mean")$mean),
+                 sum(forecast(testModel, h=5)$mean), tolerance=1e-2);
+});

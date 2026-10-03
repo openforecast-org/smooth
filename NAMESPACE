@@ -274,6 +274,7 @@ importFrom(methods,new)
 importFrom(nloptr,nloptr)
 importFrom(statmod,
   dinvgauss,
+  gauss.quad,
   qinvgauss,
   rinvgauss
 )

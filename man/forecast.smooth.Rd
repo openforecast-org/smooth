@@ -13,7 +13,8 @@
   occurrence = NULL, interval = c("none", "prediction", "confidence",
   "simulated", "approximate", "semiparametric", "nonparametric", "empirical",
   "complete"), level = 0.95, side = c("both", "upper", "lower"),
-  cumulative = FALSE, nsim = NULL, scenarios = FALSE, ...)
+  cumulative = FALSE, nsim = NULL, scenarios = FALSE,
+  point = c("skeleton", "mean", "median"), ...)
 
 \method{forecast}{msdecompose}(object, h = 10, interval = c("parametric",
   "semiparametric", "nonparametric", "none"), level = 0.95, model = NULL,
@@ -68,6 +69,22 @@ confidence or complete intervals, this is set to 100.}
 simulations or not. Only works if \code{interval="simulated"}. If \code{TRUE}
 the object will contain \code{scenarios} variable.}
 
+\item{point}{What the point forecast is. \code{"skeleton"} (the default) is the
+model run forward with all the future errors at their neutral values (zero for the
+additive and one for the multiplicative ones): the "point forecast" of Hyndman et al.
+(2008) and the skeleton of a nonlinear model. It is the conditional mean of the
+additive models and of those with a multiplicative error and additive components, and
+approximates it otherwise; for a model of transformed data, such as
+\link[smooth]{tbats}, it is the back-transformed point forecast, the median. With an
+occurrence model it is multiplied by the probability of occurrence.
+\code{"mean"} is the conditional mean: the skeleton where they coincide, the mean of
+\code{nsim} simulated paths otherwise. \code{"median"} is the 50\% quantile of the
+method of the prediction interval (of \code{interval="prediction"} if
+\code{interval="none"}), from the simulated paths for the occurrence models. For
+\code{interval="confidence"} and \code{"complete"}, \code{"mean"} and
+\code{"median"} are taken from the paths of \link[smooth]{reforecast}. The fitted
+values do not change.}
+
 \item{...}{Other arguments passed to \code{reforecast()}, or \code{predict()}
 functions.}
 
@@ -82,8 +99,8 @@ Returns object of class "smooth.forecast", which contains:
 \itemize{
 \item \code{model} - the estimated model (ES / CES / GUM / SSARIMA).
 \item \code{method} - the name of the estimated model (ES / CES / GUM / SSARIMA).
-\item \code{forecast} aka \code{mean} - point forecasts of the model
-(conditional mean).
+\item \code{forecast} aka \code{mean} - point forecasts of the model (see
+\code{point}).
 \item \code{lower} - lower bound of prediction interval.
 \item \code{upper} - upper bound of prediction interval.
 \item \code{level} - confidence level.

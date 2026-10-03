@@ -1498,13 +1498,20 @@ class OM(ADAM):
         occurrence: Optional[NDArray] = None,
         scenarios: bool = False,
         seed: Optional[int] = None,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
     ):
         """Probability forecast for the occurrence model.
 
-        Currently only ``interval="none"`` is supported; intervals on the
-        probability scale are not implemented yet.
+        Currently only ``interval="none"`` and ``point="skeleton"`` are supported;
+        intervals on the probability scale are not implemented yet.
         """
         self._check_is_fitted()
+        if point != "skeleton":
+            warnings.warn(
+                "Only the skeleton of the probability is available for OM. "
+                'Using point="skeleton".',
+                stacklevel=2,
+            )
         if interval != "none":
             warnings.warn(
                 "Intervals on the probability scale are not implemented for OM "

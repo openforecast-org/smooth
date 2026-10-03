@@ -6035,13 +6035,28 @@ adam_xregForecast <- function(object, xreg, hNeeded){
 #' @param scenarios Binary, defining whether to return scenarios produced via
 #' simulations or not. Only works if \code{interval="simulated"}. If \code{TRUE}
 #' the object will contain \code{scenarios} variable.
+#' @param point What the point forecast is. \code{"skeleton"} (the default) is the
+#' model run forward with all the future errors at their neutral values (zero for the
+#' additive and one for the multiplicative ones): the "point forecast" of Hyndman et al.
+#' (2008) and the skeleton of a nonlinear model. It is the conditional mean of the
+#' additive models and of those with a multiplicative error and additive components, and
+#' approximates it otherwise; for a model of transformed data, such as
+#' \link[smooth]{tbats}, it is the back-transformed point forecast, the median. With an
+#' occurrence model it is multiplied by the probability of occurrence.
+#' \code{"mean"} is the conditional mean: the skeleton where they coincide, the mean of
+#' \code{nsim} simulated paths otherwise. \code{"median"} is the 50\% quantile of the
+#' method of the prediction interval (of \code{interval="prediction"} if
+#' \code{interval="none"}), from the simulated paths for the occurrence models. For
+#' \code{interval="confidence"} and \code{"complete"}, \code{"mean"} and
+#' \code{"median"} are taken from the paths of \link[smooth]{reforecast}. The fitted
+#' values do not change.
 #' @return Returns object of class "smooth.forecast", which contains:
 #'
 #' \itemize{
 #' \item \code{model} - the estimated model (ES / CES / GUM / SSARIMA).
 #' \item \code{method} - the name of the estimated model (ES / CES / GUM / SSARIMA).
-#' \item \code{forecast} aka \code{mean} - point forecasts of the model
-#' (conditional mean).
+#' \item \code{forecast} aka \code{mean} - point forecasts of the model (see
+#' \code{point}).
 #' \item \code{lower} - lower bound of prediction interval.
 #' \item \code{upper} - upper bound of prediction interval.
 #' \item \code{level} - confidence level.
@@ -6077,9 +6092,10 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                                      "approximate", "semiparametric", "nonparametric",
                                      "empirical","complete"),
                           level=0.95, side=c("both","upper","lower"), cumulative=FALSE, nsim=NULL,
-                          scenarios=FALSE, ...){
+                          scenarios=FALSE, point=c("skeleton","mean","median"), ...){
 
     ellipsis <- list(...);
+    point <- match.arg(point);
 
     # Check whether we deal with adam ETS or the conventional
     adamETS <- adamETSChecker(object);
@@ -6109,7 +6125,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             }
             return(reforecast(object, h=h, newdata=newdata, occurrence=occurrence,
                               interval=interval, level=level, side=side, cumulative=cumulative,
-                              nsim=nsim, ...));
+                              nsim=nsim, point=point, ...));
         }
     }
 
@@ -6122,7 +6138,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
         return(reforecast(object, h=h, newdata=newdata, occurrence=occurrence,
                           interval="prediction", level=level, side=side, cumulative=cumulative,
-                          nsim=nsim, ...));
+                          nsim=nsim, point=point, ...));
     }
     side <- match.arg(side);
 
@@ -6857,10 +6873,81 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     }
 
 
+    # The mean or the median beyond the steps where the skeleton is it
+    if(point!="skeleton"){
+        stepsExact <- adam_skeletonSteps(object, point, Etype, Ttype, Stype, componentsNumberARIMA>0,
+                                         lagsModelMin, any(pForecast<1));
+        if(stepsExact<hFinal || (cumulative && stepsExact<h)){
+            yForecastSkeleton <- as.vector(yForecast);
+            yForecast[] <- adam_pointForecast(object, point, h, newdata, occurrence, interval, cumulative,
+                                              nsim, any(pForecast<1), ...);
+            if(!cumulative && stepsExact>0){
+                yForecast[1:stepsExact] <- yForecastSkeleton[1:stepsExact];
+            }
+        }
+    }
+
     return(structure(list(mean=yForecast, lower=yLower, upper=yUpper, model=object,
                           level=level, interval=interval, side=side, cumulative=cumulative, h=h,
-                          scenarios=ySimulated),
+                          scenarios=ySimulated, point=point),
                      class=c("adam.forecast","smooth.forecast","forecast")));
+}
+
+# Whether a model works in logarithms, with its forecasts exponentiated in forecast.adam()
+#' @keywords internal
+adam_logModel <- function(object){
+    return(any(unlist(gregexpr("in logs", object$model))!=-1) ||
+               (gumChecker(object) && identical(object$type, "multiplicative")));
+}
+
+# The number of the first steps where the skeleton is the mean (median) of the forecast
+# distribution. The mean: wherever the model is linear in the errors or they multiply
+# additive components, and the mean of the error is its neutral value; with a
+# multiplicative trend only at the first step, and with a multiplicative seasonality
+# until its first lag, as for the choice of the simulated interval. The median: an
+# additive model with a symmetric distribution. Neither with an intermittent median.
+#' @keywords internal
+adam_skeletonSteps <- function(object, point, Etype, Ttype, Stype, arimaModel, lagsModelMin,
+                               intermittent){
+    if(adam_logModel(object) || object$distribution=="dalaplace"){
+        return(0);
+    }
+    if(point=="median"){
+        symmetric <- any(object$distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt"));
+        return(if(Etype=="A" && Ttype!="M" && Stype!="M" && symmetric && !intermittent) Inf else 0);
+    }
+    if(Etype=="M" && arimaModel){
+        return(0);
+    }
+    if(Ttype=="M"){
+        return(1);
+    }
+    if(Stype=="M"){
+        return(lagsModelMin);
+    }
+    return(Inf);
+}
+
+# The mean of the simulated paths (the occurrence drawn in them), or the 50% quantile of
+# the method of the interval (simulated with an occurrence model)
+#' @keywords internal
+adam_pointForecast <- function(object, point, h, newdata, occurrence, interval, cumulative, nsim,
+                               intermittent, ...){
+    if(point=="mean"){
+        paths <- forecast.adam(object, h=h, newdata=newdata, occurrence=occurrence,
+                               interval="simulated", nsim=nsim, scenarios=TRUE, ...)$scenarios;
+        if(adam_logModel(object)){
+            paths[] <- exp(paths);
+        }
+        if(cumulative){
+            return(mean(colSums(paths)));
+        }
+        return(rowMeans(paths));
+    }
+    intervalMedian <- if(intermittent) "simulated" else if(interval=="none") "prediction" else interval;
+    return(as.vector(forecast.adam(object, h=h, newdata=newdata, occurrence=occurrence,
+                                   interval=intervalMedian, level=0.5, side="upper",
+                                   cumulative=cumulative, nsim=nsim, ...)$upper));
 }
 
 #' @export
@@ -6868,8 +6955,10 @@ forecast.adamCombined <- function(object, h=10, newdata=NULL,
                                   interval=c("none", "prediction", "confidence", "simulated",
                                              "approximate", "semiparametric", "nonparametric",
                                              "empirical","complete"),
-                                  level=0.95, side=c("both","upper","lower"), cumulative=FALSE, nsim=NULL, ...){
+                                  level=0.95, side=c("both","upper","lower"), cumulative=FALSE, nsim=NULL,
+                                  point=c("skeleton","mean","median"), ...){
 
+    point <- match.arg(point);
     interval <- match.arg(interval[1],c("none", "simulated", "approximate", "semiparametric",
                                         "nonparametric", "confidence", "parametric","prediction",
                                         "empirical","complete"));
@@ -6914,8 +7003,8 @@ forecast.adamCombined <- function(object, h=10, newdata=NULL,
     object$ICw[object$ICw<1e-2] <- 0;
     object$ICw[] <- object$ICw / sum(object$ICw);
 
-    # The list contains 10 elements
-    adamForecasts <- vector("list", 10);
+    # The list contains 11 elements
+    adamForecasts <- vector("list", 11);
     names(adamForecasts)[c(1:3)] <- c("mean","lower","upper");
     for(i in 1:length(object$models)){
         if(object$ICw[i]==0){
@@ -6923,7 +7012,8 @@ forecast.adamCombined <- function(object, h=10, newdata=NULL,
         }
         adamForecasts[] <- forecast.adam(object$models[[i]], h=h, newdata=newdata,
                                          interval=interval,
-                                         level=level, side=side, cumulative=cumulative, nsim=nsim, ...);
+                                         level=level, side=side, cumulative=cumulative, nsim=nsim,
+                                         point=point, ...);
         yForecast[] <- yForecast + adamForecasts$mean * object$ICw[i];
         yUpper[] <- yUpper + adamForecasts$upper * object$ICw[i];
         yLower[] <- yLower + adamForecasts$lower * object$ICw[i];

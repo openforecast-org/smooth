@@ -1229,7 +1229,7 @@ class TBATS:
         names = xreg["names"]
         if X is not None:
             if isinstance(X, pd.DataFrame):
-                values = X.set_axis(st._make_names([str(c) for c in X.columns]), axis=1)
+                values = X.set_axis(st.make_names([str(c) for c in X.columns]), axis=1)
                 values = values[names].to_numpy(dtype=float)
             else:
                 values = np.asarray(X, dtype=float).reshape(-1, len(names))

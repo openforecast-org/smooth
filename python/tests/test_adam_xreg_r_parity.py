@@ -38,7 +38,8 @@ def test_the_fits_agree(case):
     r_arguments, arguments = CASES[case]
     r = r_dict(
         f"{{ {DATA} m <- adam(d, {r_arguments});"
-        " list(y=d$y, x=d$x, B=unname(m$B), logLik=as.numeric(logLik(m)),"
+        " list(y=d$y, x=d$x, B=unname(m$B), names=names(m$B),"
+        " logLik=as.numeric(logLik(m)),"
         " persistence=unname(m$persistence), fitted=as.numeric(fitted(m)),"
         " forecast=as.numeric(forecast(m, h=5, newdata=data.frame(x=rep(0.5, 5)))$mean)) }"
     )
@@ -47,6 +48,8 @@ def test_the_fits_agree(case):
         fit = ADAM(**arguments).fit(
             np.asarray(r["y"], dtype=float), pd.DataFrame({"x": r["x"]})
         )
+    # The coefficients of the regressors are named after them, as in R
+    assert list(fit.coef_names) == list(r["names"])
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-8)
     np.testing.assert_allclose(fit.fitted, r["fitted"], rtol=1e-8)

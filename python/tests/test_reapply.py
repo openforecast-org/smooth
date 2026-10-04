@@ -344,7 +344,7 @@ def test_reapply_xreg_runs_and_returns_finite():
     r = m.reapply(nsim=15, seed=0)
     assert r.refitted.shape == (m.nobs, 15)
     assert np.all(np.isfinite(r.refitted.to_numpy()))
-    assert "xreg1" in r.random_parameters.columns
+    assert "x1" in r.random_parameters.columns
     assert any("x" in nm for nm in r.persistence.index)
 
 
@@ -431,6 +431,6 @@ def test_reapply_xreg_draws_are_the_states_of_the_regressors(model_str, initial)
     states = np.asarray(r.states)
     np.testing.assert_allclose(
         states[-1, 0, :],
-        r.random_parameters["xreg1"].to_numpy(),
+        r.random_parameters["x1"].to_numpy(),
         rtol=1e-12,
     )

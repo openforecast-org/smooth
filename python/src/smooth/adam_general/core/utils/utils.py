@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Literal
 
 import greybox as gb
@@ -1062,3 +1063,18 @@ def xreg_selector(errors, xreg_data, names, ic, df, distribution, other=None):
             data, ic=ic, df=df, distribution=distribution, silent=True, **kwargs
         )
     return list(model._feature_names or [])
+
+
+def make_names(names: list) -> list:
+    """R's ``make.names(unique=TRUE)``: the syntactic, unique names of the
+    regressors, as R gives them to the variables of the model."""
+    result: list = []
+    for name in names:
+        name = re.sub(r"[^0-9A-Za-z._]", ".", str(name))
+        if not re.match(r"^([A-Za-z]|\.(?![0-9]))", name):
+            name = "X" + name
+        candidate, k = name, 1
+        while candidate in result:
+            candidate, k = f"{name}.{k}", k + 1
+        result.append(candidate)
+    return result

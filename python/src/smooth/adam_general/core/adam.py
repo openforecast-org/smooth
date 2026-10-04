@@ -6005,7 +6005,7 @@ class ADAM:
             k += initial_arima_number
 
         # 6b. xreg profile fill (R/reapply.R:730-740).
-        # Each xreg parameter named ``xreg1, xreg2, …`` carries its
+        # Each xreg parameter, named after its variable, carries its
         # initial coefficient on the profile row that follows the ETS +
         # ARIMA blocks. For numeric xreg ``estimated`` is all-ones and
         # ``missing`` is all-zeros; factor levels with one missing
@@ -6027,13 +6027,13 @@ class ADAM:
                 missing = np.asarray(missing_raw, dtype=int)
             n_to_estimate = int(estimated.sum())
             estimated_idx = np.where(estimated == 1)[0]
-            xreg_coef_names = [nm for nm in coef_names if nm.startswith("xreg")]
-            for slot, comp_offset in enumerate(estimated_idx):
-                if slot >= len(xreg_coef_names):
-                    break
-                profiles_recent_array[j + int(comp_offset), 0, :] = random_parameters[
-                    :, idx[xreg_coef_names[slot]]
-                ]
+            xreg_names = list(self._explanatory.get("xreg_names") or [])
+            for comp_offset in estimated_idx:
+                name = xreg_names[comp_offset]
+                if name in idx:
+                    profiles_recent_array[j + int(comp_offset), 0, :] = (
+                        random_parameters[:, idx[name]]
+                    )
             absent_indices = np.where(missing != 0)[0]
             if absent_indices.size > 0:
                 est_sum = profiles_recent_array[
@@ -6920,7 +6920,7 @@ class ADAM:
             and self._constant.get("constant_required", False)
             and len(names) < n_total
         ):
-            names.append("constant")
+            names.append(self._constant.get("constant_name") or "constant")
         # Pad with generic component names if anything is left over.
         while len(names) < n_total:
             names.append(f"c{len(names) + 1}")

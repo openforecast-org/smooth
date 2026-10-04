@@ -851,7 +851,15 @@ def initialiser(
             B[j : j + xreg_number_to_estimate] = adam_created["mat_vt"][
                 xreg_start : xreg_start + xreg_number_to_estimate, 0
             ]
-            names.extend([f"xreg{idx + 1}" for idx in range(xreg_number_to_estimate)])
+            # The names of the estimated regressors, as R's
+            names.extend(
+                name
+                for name, estimated in zip(
+                    explanatory_checked["xreg_names"],
+                    explanatory_checked["xreg_parameters_estimated"],
+                )
+                if estimated == 1
+            )
             Bl[j : j + xreg_number_to_estimate] = -np.inf
             Bu[j : j + xreg_number_to_estimate] = np.inf
             j += xreg_number_to_estimate

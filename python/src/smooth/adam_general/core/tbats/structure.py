@@ -2,7 +2,6 @@
 the ARMA specification and the state-space layout (R/adam-tbats.R)."""
 
 import math
-import re
 import warnings
 from typing import Any, Callable, Dict, List, Optional
 
@@ -18,6 +17,7 @@ from smooth.adam_general.core.utils.utils import (
     _log_r,
     _pow_r,
     _sum_r,
+    make_names,
     scaler,
 )
 
@@ -96,7 +96,7 @@ def xreg_spec(
         if values.ndim == 1:
             values = values.reshape(-1, 1)
         names = [f"x{k}" for k in range(1, values.shape[1] + 1)]
-    names = _make_names(names)
+    names = make_names(names)
     if values.shape[0] < obs_in_sample:
         raise ValueError("X has fewer rows than the in-sample data.")
     # The observations with a missing regressor are dropped: they are gaps of the
@@ -140,20 +140,6 @@ def xreg_subset(spec: Dict[str, Any], names: List[str]) -> Optional[Dict[str, An
         "number": len(names),
         "regressors": "use",
     }
-
-
-def _make_names(names: List[str]) -> List[str]:
-    """R's ``make.names(unique=TRUE)`` for the names of the regressors."""
-    result: List[str] = []
-    for name in names:
-        name = re.sub(r"[^0-9A-Za-z._]", ".", name)
-        if not re.match(r"^([A-Za-z]|\.(?![0-9]))", name):
-            name = "X" + name
-        candidate, k = name, 1
-        while candidate in result:
-            candidate, k = f"{name}.{k}", k + 1
-        result.append(candidate)
-    return result
 
 
 def mat_wt(

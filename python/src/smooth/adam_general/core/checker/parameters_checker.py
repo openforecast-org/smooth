@@ -4,7 +4,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from smooth.adam_general.core.utils.utils import observed_mask
+from smooth.adam_general.core.utils.utils import make_names, observed_mask
 
 from ._utils import _warn
 from .arima_checks import _check_arima
@@ -1108,8 +1108,9 @@ def parameters_checker(
             **_xreg_dict_none("select"),
             "select": {
                 "X": X,
-                "names": xreg_names_from_input
-                or [f"x{i + 1}" for i in range(xreg_number)],
+                "names": make_names(
+                    xreg_names_from_input or [f"x{i + 1}" for i in range(xreg_number)]
+                ),
                 "build": xreg_builder,
             },
         }
@@ -1144,6 +1145,15 @@ def parameters_checker(
     if loss in ("LASSO", "RIDGE") and general_dict["lambda"] == 1:
         _lasso_ridge_targets(
             model_type_dict, persistence_dict, phi_dict, arima_dict, lags_dict
+        )
+
+    # The constant is a drift with ETS or differences, as R names it
+    if constant_dict["constant_required"]:
+        constant_dict["constant_name"] = (
+            "drift"
+            if model_type_dict["ets_model"]
+            or any(np.atleast_1d(arima_dict.get("i_orders") or 0))
+            else "constant"
         )
 
     # The persistence is estimated if any of its parameters is (R's parametersChecker):
@@ -1342,7 +1352,8 @@ def _process_xreg(
     y_is = np.asarray(y_in_sample, dtype=float)
 
     # Default names
-    xreg_names = (
+    # The names of the variables, syntactic and unique as R makes them
+    xreg_names = make_names(
         xreg_names_from_input
         if xreg_names_from_input is not None
         else [f"x{i + 1}" for i in range(n_cols)]

@@ -31,3 +31,22 @@ List arimaHRSelectCpp(const arma::vec& y, const arma::uvec& arOrders, const arma
 arma::vec arimaParameterBoundsCpp(const arma::vec& values, int j, double sign) {
     return arimaParameterBounds(values, j, sign);
 }
+
+// The Householder QR of a fixed design and its least squares (src/headers/olsCore.h)
+// [[Rcpp::export]]
+List householderQRCpp(const arma::mat& X) {
+    HouseholderQR d = householderQR(X);
+    return List::create(Named("qr") = d.qr, Named("qraux") = d.qraux, Named("rDiag") = d.rDiag);
+}
+
+// [[Rcpp::export]]
+arma::vec householderCoefCpp(const arma::mat& qr, const arma::vec& qraux, const arma::vec& rDiag,
+                             const arma::vec& y) {
+    return householderCoef(HouseholderQR{qr, qraux, rDiag}, y);
+}
+
+// [[Rcpp::export]]
+arma::vec householderResidCpp(const arma::mat& qr, const arma::vec& qraux, const arma::vec& rDiag,
+                              const arma::vec& y) {
+    return householderResid(HouseholderQR{qr, qraux, rDiag}, y);
+}

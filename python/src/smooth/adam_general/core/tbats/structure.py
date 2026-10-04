@@ -10,7 +10,6 @@ import greybox as gb
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from scipy.linalg import solve_triangular
 
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
@@ -194,16 +193,27 @@ def design(
 
 
 class QR:
-    """The least squares of a fixed design, as R's ``qr.coef`` / ``qr.resid``."""
+    """The least squares of a fixed design, as R's ``tbats_qrCoef`` /
+    ``tbats_qrResid``: the Householder QR shared with R (src/headers/olsCore.h,
+    BLAS-free), so that the two agree to the last bit."""
 
     def __init__(self, X: NDArray):
-        self.q, self.r = np.linalg.qr(X)
+        X = np.asarray(X, dtype=np.float64)
+        self.qr, self.qraux, self.r_diag = _ols.householder_qr(np.asfortranarray(X))
+
+    def _args(self, y: NDArray) -> tuple:
+        return (
+            np.asfortranarray(self.qr),
+            self.qraux,
+            self.r_diag,
+            np.asarray(y, dtype=np.float64).ravel(),
+        )
 
     def coef(self, y: NDArray) -> NDArray:
-        return solve_triangular(self.r, self.q.T @ y)
+        return np.asarray(_ols.householder_coef(*self._args(y)))
 
     def resid(self, y: NDArray) -> NDArray:
-        return y - self.q @ (self.q.T @ y)
+        return np.asarray(_ols.householder_resid(*self._args(y)))
 
 
 def r_optimize(f: Callable[[float], float], lower: float, upper: float) -> float:

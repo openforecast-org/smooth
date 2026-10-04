@@ -118,6 +118,45 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// householderQRCpp
+List householderQRCpp(const arma::mat& X);
+RcppExport SEXP _smooth_householderQRCpp(SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(householderQRCpp(X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// householderCoefCpp
+arma::vec householderCoefCpp(const arma::mat& qr, const arma::vec& qraux, const arma::vec& rDiag, const arma::vec& y);
+RcppExport SEXP _smooth_householderCoefCpp(SEXP qrSEXP, SEXP qrauxSEXP, SEXP rDiagSEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type qr(qrSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type qraux(qrauxSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type rDiag(rDiagSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    rcpp_result_gen = Rcpp::wrap(householderCoefCpp(qr, qraux, rDiag, y));
+    return rcpp_result_gen;
+END_RCPP
+}
+// householderResidCpp
+arma::vec householderResidCpp(const arma::mat& qr, const arma::vec& qraux, const arma::vec& rDiag, const arma::vec& y);
+RcppExport SEXP _smooth_householderResidCpp(SEXP qrSEXP, SEXP qrauxSEXP, SEXP rDiagSEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type qr(qrSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type qraux(qrauxSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type rDiag(rDiagSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    rcpp_result_gen = Rcpp::wrap(householderResidCpp(qr, qraux, rDiag, y));
+    return rcpp_result_gen;
+END_RCPP
+}
 // forecasterwrap
 RcppExport SEXP forecasterwrap(SEXP matvt, SEXP matF, SEXP matw, SEXP h, SEXP Etype, SEXP Ttype, SEXP Stype, SEXP lagsModel, SEXP matxt, SEXP matat, SEXP matFX);
 RcppExport SEXP _smooth_forecasterwrap(SEXP matvtSEXP, SEXP matFSEXP, SEXP matwSEXP, SEXP hSEXP, SEXP EtypeSEXP, SEXP TtypeSEXP, SEXP StypeSEXP, SEXP lagsModelSEXP, SEXP matxtSEXP, SEXP matatSEXP, SEXP matFXSEXP) {

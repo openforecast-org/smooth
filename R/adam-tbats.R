@@ -290,7 +290,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     if(armaSpec$select && armaSpec$nParam>0){
         X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable,
                           xregSpecFit$data)[otLogical,,drop=FALSE];
-        armaSpecBest <- tbats_armaSelect(qr.resid(qr(X), tbats_boxCox(yInSample[otLogical], best$elements$lambda)),
+        armaSpecBest <- tbats_armaSelect(tbats_qrResid(tbats_qr(X), tbats_boxCox(yInSample[otLogical], best$elements$lambda)),
                                          armaSpec, distribution, best$elements$shape,
                                          best$nParamEstimated, ic);
         if(armaSpecBest$nParam>0){
@@ -515,6 +515,24 @@ tbats_design <- function(obs, trendIn, harmonicTable, xregData=NULL){
     return(cbind(X, xregData));
 }
 
+# The least squares of the global model through the Householder QR shared with Python
+# (src/headers/olsCore.h, BLAS-free), so that the two agree to the last bit; R's qr()
+# is LINPACK's and numpy's LAPACK's, which round differently
+#' @keywords internal
+tbats_qr <- function(X){
+    return(householderQRCpp(X));
+}
+
+#' @keywords internal
+tbats_qrCoef <- function(qrX, y){
+    return(as.vector(householderCoefCpp(qrX$qr, qrX$qraux, qrX$rDiag, y)));
+}
+
+#' @keywords internal
+tbats_qrResid <- function(qrX, y){
+    return(as.vector(householderResidCpp(qrX$qr, qrX$qraux, qrX$rDiag, y)));
+}
+
 # The maximum of the profile log-likelihood of the global model in lambda, with the
 # Jacobian
 #' @keywords internal
@@ -522,7 +540,7 @@ tbats_lambdaProfile <- function(y, qrX){
     obs <- length(y);
     logY <- sum(log(y));
     profile <- function(lambda){
-        rss <- sum(qr.resid(qrX, tbats_boxCox(y, lambda))^2);
+        rss <- sum(tbats_qrResid(qrX, tbats_boxCox(y, lambda))^2);
         return(-obs/2*log(rss/obs) + (lambda-1)*logY);
     }
     # Rounded: Brent's search finds it to about 1e-4, and the last bits of the
@@ -536,7 +554,7 @@ tbats_lambdaStart <- function(y, X, lambdaSpec){
     if(!lambdaSpec$estimate){
         return(lambdaSpec$value);
     }
-    return(tbats_lambdaProfile(y, qr(X)));
+    return(tbats_lambdaProfile(y, tbats_qr(X)));
 }
 
 # The number of harmonics of each period by the information criterion of the global
@@ -564,7 +582,7 @@ tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, i
         if(ncol(X)>=obs-1){
             return(Inf);
         }
-        rss <- sum(qr.resid(qr(X), yBC)^2);
+        rss <- sum(tbats_qrResid(tbats_qr(X), yBC)^2);
         logLikValue <- structure(-obs/2*(log(2*pi*rss/obs)+1), nobs=obs, df=ncol(X)+1, class="logLik");
         return(tbats_IC(logLikValue, ic));
     }
@@ -992,7 +1010,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     otLogical <- occurrenceSpec$otLogical;
     obsNonzero <- sum(otLogical);
     X <- tbats_design(obs, struct$trendIn, harmonicTable, xregSpec$data)[otLogical,,drop=FALSE];
-    qrX <- qr(X);
+    qrX <- tbats_qr(X);
     lambdaStart <- tbats_lambdaStart(y[otLogical], X, lambdaSpec);
     yBCStart <- tbats_boxCoxSizes(y, lambdaStart, otLogical);
     logY <- if(lambdaSpec$estimate || lambdaStart!=1) sum(log(y[otLogical])) else 0;
@@ -1016,7 +1034,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     # The starting values of the ARMA from Hannan-Rissanen on the global residuals
     armaStart <- numeric(0);
     if(armaSpec$nParam>0){
-        armaStart <- as.vector(arimaHRCpp(qr.resid(qrX, yBCStart[otLogical]), armaSpec$arOrders, armaSpec$maOrders,
+        armaStart <- as.vector(arimaHRCpp(tbats_qrResid(qrX, yBCStart[otLogical]), armaSpec$arOrders, armaSpec$maOrders,
                                           armaSpec$lags, TRUE, TRUE, numeric(0),
                                           rep(1, length(armaSpec$lags)), checked$bounds!="none"));
     }
@@ -1032,7 +1050,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     #### The cost function ####
     fitStates <- function(elements){
         yBC <- if(lambdaSpec$estimate) tbats_boxCoxSizes(y, elements$lambda, otLogical) else yBCStart;
-        states <- tbats_globalStates(qr.coef(qrX, yBC[otLogical]), struct);
+        states <- tbats_globalStates(tbats_qrCoef(qrX, yBC[otLogical]), struct);
         armaInitial <- rep(0, struct$armaLagMax);
         if(!is.null(elements$deviations)){
             states$level <- states$level + elements$deviations$level;
@@ -1200,7 +1218,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 #' @keywords internal
 tbats_deviations <- function(B, backcastFit, struct, qrX, y, lambdaSpec){
     lambda <- backcastFit$elements$lambda;
-    states <- tbats_globalStates(qr.coef(qrX, tbats_boxCox(y, lambda)), struct);
+    states <- tbats_globalStates(tbats_qrCoef(qrX, tbats_boxCox(y, lambda)), struct);
     read <- backcastFit$initialRead;
     B[["level"]] <- read$states$level - states$level;
     if(struct$trendIn){

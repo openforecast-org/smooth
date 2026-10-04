@@ -29,6 +29,18 @@ arimaParameterBoundsCpp <- function(values, j, sign) {
     .Call('_smooth_arimaParameterBoundsCpp', PACKAGE = 'smooth', values, j, sign)
 }
 
+householderQRCpp <- function(X) {
+    .Call('_smooth_householderQRCpp', PACKAGE = 'smooth', X)
+}
+
+householderCoefCpp <- function(qr, qraux, rDiag, y) {
+    .Call('_smooth_householderCoefCpp', PACKAGE = 'smooth', qr, qraux, rDiag, y)
+}
+
+householderResidCpp <- function(qr, qraux, rDiag, y) {
+    .Call('_smooth_householderResidCpp', PACKAGE = 'smooth', qr, qraux, rDiag, y)
+}
+
 forecasterwrap <- function(matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX) {
     .Call('_smooth_forecasterwrap', PACKAGE = 'smooth', matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX)
 }

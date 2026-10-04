@@ -835,6 +835,13 @@ def _log_r(x):
     return _libm(math.log, np.log, x)
 
 
+def _pow_r(x, power):
+    """``x^power`` as R computes it, elementwise through libm's ``pow`` (NumPy's
+    power rounds differently on ~5% of the inputs)."""
+    p = float(power)
+    return _libm(lambda v: math.pow(v, p), lambda a: np.power(a, p), x)
+
+
 def _sum_r(values, axis=None):
     """``sum()`` with R's accumulator.
 

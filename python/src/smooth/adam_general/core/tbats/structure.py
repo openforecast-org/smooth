@@ -14,22 +14,29 @@ from scipy.linalg import solve_triangular
 
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
-from smooth.adam_general.core.utils.utils import _sum_r, scaler
+from smooth.adam_general.core.utils.utils import (
+    _exp_r,
+    _log_r,
+    _pow_r,
+    _sum_r,
+    scaler,
+)
 
 
 # The Box-Cox transform and its inverse
+# Through libm, as R's log(), exp() and ^: NumPy's kernels round differently
 def box_cox(y: NDArray, lam: float) -> NDArray:
     y = np.asarray(y, dtype=float)
     if lam == 0:
-        return np.log(y)
-    return (y**lam - 1) / lam
+        return _log_r(y)
+    return (_pow_r(y, lam) - 1) / lam
 
 
 def box_cox_inverse(z: NDArray, lam: float) -> NDArray:
     z = np.asarray(z, dtype=float)
     if lam == 0:
-        return np.exp(z)
-    return np.maximum(lam * z + 1, 0) ** (1 / lam)
+        return _exp_r(z)
+    return _pow_r(np.maximum(lam * z + 1, 0), 1 / lam)
 
 
 def box_cox_sizes(y: NDArray, lam: float, ot_logical: NDArray) -> NDArray:
@@ -267,7 +274,7 @@ def lambda_profile(y: NDArray, qr_x: QR) -> float:
     """The maximum of the profile log-likelihood of the global model in lambda,
     with the Jacobian."""
     obs = len(y)
-    log_y = _sum_r(np.log(y))
+    log_y = _sum_r(_log_r(y))
 
     def negative(lam: float) -> float:
         rss = _sum_r(qr_x.resid(box_cox(y, lam)) ** 2)

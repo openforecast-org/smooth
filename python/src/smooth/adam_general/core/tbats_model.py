@@ -17,7 +17,13 @@ from smooth.adam_general.core.tbats import fitter as ft
 from smooth.adam_general.core.tbats import structure as st
 from smooth.adam_general.core.utils.reapply import ReapplyResult
 from smooth.adam_general.core.utils.reforecast import ReforecastResult
-from smooth.adam_general.core.utils.utils import _sum_r, scale_debias, xreg_selector
+from smooth.adam_general.core.utils.utils import (
+    _exp_r,
+    _log_r,
+    _sum_r,
+    scale_debias,
+    xreg_selector,
+)
 
 TREND_OPTIONS = ("auto", "none", "additive", "damped")
 DISTRIBUTION_OPTIONS = ("dnorm", "dlaplace", "ds", "dgnorm")
@@ -113,8 +119,8 @@ def _occurrence_spec(occurrence: Any, y: NDArray, loss: str) -> Dict[str, Any]:
         p_fitted = probabilities[:obs]
         if np.any(p_fitted[ot_logical] == 0) or np.any(p_fitted[~ot_logical] == 1):
             raise ValueError("The provided occurrence contradicts the data.")
-        loglik = _sum_r(np.log(p_fitted[ot_logical])) + _sum_r(
-            np.log(1 - p_fitted[~ot_logical])
+        loglik = _sum_r(_log_r(p_fitted[ot_logical])) + _sum_r(
+            _log_r(1 - p_fitted[~ot_logical])
         )
         provided = {
             "occurrence": "provided",
@@ -746,7 +752,7 @@ class TBATS:
         Jacobian, which sum to the log-likelihood."""
         self._check_fitted()
         values = self._best["point_lik"](self._best["B"])
-        return values if log else np.exp(values)
+        return values if log else _exp_r(values)
 
     def vcov(
         self,
@@ -1055,7 +1061,7 @@ class TBATS:
             mu = np.asarray(bounds.mean, dtype=float)
             sigma = np.ravel(np.asarray(bounds.upper, dtype=float)) - mu
             if lam == 0:
-                return np.asarray(np.exp(mu + sigma**2 / 2))
+                return _exp_r(mu + sigma**2 / 2)
             nodes, weights = np.polynomial.hermite.hermgauss(50)
             values = st.box_cox_inverse(
                 mu[:, None] + np.sqrt(2) * sigma[:, None] * nodes, lam

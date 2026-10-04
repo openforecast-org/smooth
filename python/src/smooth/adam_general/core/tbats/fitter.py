@@ -17,7 +17,11 @@ from smooth.adam_general.core.creator.architector import (
     adam_profile_creator,
 )
 from smooth.adam_general.core.tbats import structure as st
-from smooth.adam_general.core.utils.utils import _sum_r, calculate_likelihood
+from smooth.adam_general.core.utils.utils import (
+    _log_r,
+    _sum_r,
+    calculate_likelihood,
+)
 
 PENALTY = 1e100
 MULTISTEP_LOSSES = ("MSEh", "TMSE", "GTMSE", "MSCE", "GPL")
@@ -414,7 +418,7 @@ def fit(
     lam_start = st.lambda_start(y[ot_logical], X, lam_spec)
     y_bc_start = st.box_cox_sizes(y, lam_start, ot_logical)
     log_y = (
-        _sum_r(np.log(y[ot_logical]))
+        _sum_r(_log_r(y[ot_logical]))
         if (lam_spec["estimate"] or lam_start != 1)
         else 0.0
     )
@@ -559,7 +563,7 @@ def fit(
             elif loss == "TMSE":
                 value = _sum_r(squares)
             elif loss == "GTMSE":
-                value = _sum_r(np.log(squares))
+                value = _sum_r(_log_r(squares))
             elif loss == "MSCE":
                 value = _sum_r(_sum_r(adam_errors, axis=1) ** 2) / n
             else:
@@ -594,13 +598,13 @@ def fit(
             scale,
             elements["shape"],
         )
-        sizes = np.ravel(values) + (elements["lambda"] - 1) * np.log(y[ot_logical])
+        sizes = np.ravel(values) + (elements["lambda"] - 1) * _log_r(y[ot_logical])
         if occurrence["model"] is None:
             return sizes
         # The occurrence, and the sizes where there is a demand
         p_fitted = occurrence["p_fitted"]
-        result = np.log(1 - p_fitted)
-        result[ot_logical] = np.log(p_fitted[ot_logical]) + sizes
+        result = _log_r(1 - p_fitted)
+        result[ot_logical] = _log_r(p_fitted[ot_logical]) + sizes
         return result
 
     def fitter(B: NDArray) -> Optional[Dict[str, Any]]:

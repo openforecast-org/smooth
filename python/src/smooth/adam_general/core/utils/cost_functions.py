@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 
 from smooth.adam_general._eigenCalc import smooth_eigens
@@ -5,6 +7,7 @@ from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
 from smooth.adam_general.core.utils.utils import (
+    _log_r,
     _sum_r,
     calculate_entropy,
     calculate_likelihood,
@@ -687,10 +690,9 @@ def CF(  # noqa: N802
                 y_denom = general.get("y_denominator", 1)
                 if y_denom is None or y_denom <= 0:
                     y_denom = 1  # Fallback to 1
-                error_term = (
-                    (1 - lambda_val)
-                    * np.linalg.norm(errors_flat / y_denom)
-                    / np.sqrt(obs_in_sample)
+                # R's sqrt(sum(x^2)/n): np.linalg.norm rounds differently
+                error_term = (1 - lambda_val) * np.sqrt(
+                    _sum_r((errors_flat / y_denom) ** 2) / obs_in_sample
                 )
                 CFValue = error_term
             else:  # "M"
@@ -699,18 +701,16 @@ def CF(  # noqa: N802
                 if np.any(log_arg <= 0):
                     CFValue = 1e100
                 else:
-                    error_term = (
-                        (1 - lambda_val)
-                        * np.linalg.norm(np.log(log_arg))
-                        / np.sqrt(obs_in_sample)
+                    error_term = (1 - lambda_val) * np.sqrt(
+                        _sum_r(_log_r(log_arg) ** 2) / obs_in_sample
                     )
                     CFValue = error_term
 
             # Add penalty term (LASSO = L1, RIDGE = L2)
             if general["loss"] == "LASSO":
-                CFValue += lambda_val * np.sum(np.abs(B_penalty))
+                CFValue += lambda_val * _sum_r(np.abs(B_penalty))
             else:  # "RIDGE"
-                CFValue += lambda_val * np.linalg.norm(B_penalty)
+                CFValue += lambda_val * np.sqrt(_sum_r(np.asarray(B_penalty) ** 2))
 
         elif general["loss"] == "custom":
             # Ensure arrays are 1D to avoid broadcasting issues
@@ -1061,21 +1061,21 @@ def log_Lik_ADAM(  # noqa: N802
                     else:
                         return (
                             logLikReturn
-                            + np.sum(np.log(pt_new[ot_new == 1]))
-                            + np.sum(np.log(1 - pt_new[ot_new == 0]))
+                            + _sum_r(_log_r(pt_new[ot_new == 1]))
+                            + _sum_r(_log_r(1 - pt_new[ot_new == 0]))
                         )
                 else:
                     return (
                         logLikReturn
-                        + np.sum(
-                            np.log(
+                        + _sum_r(
+                            _log_r(
                                 occurrence_dict["p_fitted"][
                                     observations_dict["ot_logical"]
                                 ]
                             )
                         )
-                        + np.sum(
-                            np.log(
+                        + _sum_r(
+                            _log_r(
                                 1
                                 - occurrence_dict["p_fitted"][
                                     ~observations_dict["ot_logical"]
@@ -1113,28 +1113,28 @@ def log_Lik_ADAM(  # noqa: N802
             logLikReturn = (
                 -(observations_dict["obs_in_sample"] - general_dict["h"])
                 / 2
-                * (np.log(2 * np.pi) + 1 + np.log(logLikReturn))
+                * (math.log(2 * math.pi) + 1 + float(_log_r(logLikReturn)))
             )
         elif general_dict["loss"] in ["GTMSE", "aGTMSE"]:
             logLikReturn = (
                 -(observations_dict["obs_in_sample"] - general_dict["h"])
                 / 2
-                * (np.log(2 * np.pi) + 1 + logLikReturn)
+                * (math.log(2 * math.pi) + 1 + logLikReturn)
             )
         elif general_dict["loss"] in ["MAEh", "TMAE", "GTMAE", "MACE"]:
             logLikReturn = -(observations_dict["obs_in_sample"] - general_dict["h"]) * (
-                np.log(2) + 1 + np.log(logLikReturn)
+                math.log(2) + 1 + float(_log_r(logLikReturn))
             )
         elif general_dict["loss"] in ["HAMh", "THAM", "GTHAM", "CHAM"]:
             logLikReturn = -(observations_dict["obs_in_sample"] - general_dict["h"]) * (
-                np.log(4) + 2 + 2 * np.log(logLikReturn)
+                math.log(4) + 2 + 2 * float(_log_r(logLikReturn))
             )
         elif general_dict["loss"] in ["GPL", "aGPL"]:
             logLikReturn = (
                 -(observations_dict["obs_in_sample"] - general_dict["h"])
                 / 2
                 * (
-                    general_dict["h"] * np.log(2 * np.pi)
+                    general_dict["h"] * math.log(2 * math.pi)
                     + general_dict["h"]
                     + logLikReturn
                 )
@@ -1170,7 +1170,7 @@ def log_Lik_ADAM(  # noqa: N802
                 adam_cpp,
             )
 
-            logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))
+            logLikReturn -= _sum_r(_log_r(np.abs(adam_fitted.fitted)))
 
         return logLikReturn
 

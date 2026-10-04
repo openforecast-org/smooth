@@ -54,7 +54,9 @@ column per variable and a row per observation of \code{y}, holdout included; the
 rows beyond it give the future values for the forecast stored in the model (\code{h}).
 They enter the model in the space of the Box-Cox transformed data, as in the ETSX of
 \link[smooth]{adam}. Factors should be converted into dummy variables. The future
-values for \code{forecast()} are taken from its \code{newdata}.}
+values for \code{forecast()} are taken from its \code{newdata}. The observations
+with a missing value of a regressor are dropped (gaps of \code{y}, with a
+warning), and their fitted values are \code{NA}; the future values cannot be missing.}
 
 \item{regressors}{How to treat the explanatory variables: \code{"use"} them as
 they are (constant coefficients), \code{"select"} them as \link[smooth]{adam}
@@ -122,7 +124,9 @@ similar elements to the \link[smooth]{adam} function, together with
 the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:
 \code{forecast()} and \code{predict()} work in the space of the transformed data
 and transform the results back (the point forecasts are the skeleton, the
-medians, by default; the cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
+medians, by default; the cumulative ones are the sums of the skeletons, or the
+mean or median of the sums of the paths simulated and transformed back, whose
+quantiles give the bounds), \code{interval="confidence"} and
 \code{"complete"} come from \code{reforecast()}, which refits the model at each
 draw of the parameters with its own \eqn{\lambda}, and \code{confint()} keeps
 the intervals inside the bounds of the model.

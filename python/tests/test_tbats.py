@@ -238,8 +238,16 @@ def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
     upper = np.asarray(forecast.upper).ravel()
     mean = np.asarray(forecast.mean)
     assert np.all((lower < mean) & (mean < upper))
-    with pytest.raises(ValueError, match="Cumulative"):
-        fit.predict(h=12, cumulative=True)
+    # The cumulative forecasts come from the paths in the space of the data
+    np.testing.assert_allclose(
+        fit.predict(h=12, cumulative=True).mean, fit.forecast_.sum(), rtol=1e-10
+    )
+    cumulative = fit.predict(
+        h=12, cumulative=True, interval="prediction", point="mean", seed=41
+    )
+    mean = float(cumulative.mean.iloc[0])
+    assert cumulative.lower.iloc[0, 0] < mean < cumulative.upper.iloc[0, 0]
+    assert mean == pytest.approx(fit.predict(h=12, point="mean").mean.sum(), rel=1e-2)
 
 
 def test_point_likelihoods_sum_to_the_log_likelihood(air):
@@ -501,11 +509,44 @@ def test_the_occurrence_mixture(intermittent):
     assert np.all(reapplied.errors[fit.actuals == 0] == 0)
 
 
+def test_the_cumulative_forecasts_of_the_mixture(intermittent):
+    # The sum of the skeletons times the probabilities, and the quantiles of the sums
+    # of the paths
+    fit = TBATS(lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0).fit(intermittent)
+    forecasted = fit.predict(h=14)
+    cumulative = fit.predict(h=14, cumulative=True, interval="prediction", seed=41)
+    mean = float(cumulative.mean.iloc[0])
+    assert mean == pytest.approx(forecasted.mean.sum(), rel=1e-10)
+    assert cumulative.lower.iloc[0, 0] < mean < cumulative.upper.iloc[0, 0]
+    reforecasted = fit.reforecast(
+        h=14, cumulative=True, interval="prediction", nsim=20, seed=41
+    )
+    assert reforecasted.lower.iloc[0, 0] < reforecasted.upper.iloc[0, 0]
+
+
+def test_the_observations_with_missing_regressors_are_dropped(xreg_data):
+    y, X = xreg_data
+    arguments = dict(lags=[1, 12], harmonics=[1], trend="none", orders=ORDERS0)
+    X_na = X.copy()
+    X_na.iloc[[14, 59], 0] = np.nan
+    with pytest.warns(UserWarning, match="missing values"):
+        fit = TBATS(**arguments).fit(y, X_na)
+    y_na = y.copy()
+    y_na[[14, 59]] = np.nan
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit_na = TBATS(**arguments).fit(y_na, X)
+    assert fit.loglik == pytest.approx(fit_na.loglik, rel=1e-12)
+    np.testing.assert_allclose(fit.coef, fit_na.coef, rtol=1e-10)
+    assert np.all(np.isnan(fit.fitted[[14, 59]]))
+    with pytest.raises(ValueError, match="horizon"), warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        X_future_na = X.to_numpy().copy()
+        X_future_na[-2:] = np.nan
+        TBATS(h=12, **arguments).fit(y[:120], X_future_na)
+
+
 def test_the_occurrence_errors(intermittent):
-    with pytest.raises(ValueError, match="occurrence"):
-        TBATS(lags=[1, 7], occurrence="fixed", lambda_bc=1, orders=ORDERS0).fit(
-            intermittent
-        ).predict(h=5, cumulative=True)
     with pytest.raises(ValueError, match="contradicts"):
         TBATS(lags=[1, 7], occurrence=np.where(intermittent > 0, 0.0, 0.5)).fit(
             intermittent
@@ -520,7 +561,9 @@ def test_the_occurrence_errors(intermittent):
 def test_tbats_takes_the_missing_values_for_gaps():
     rng = np.random.default_rng(1)
     t = np.arange(144)
-    y = np.exp(5 + 0.01 * t + 0.2 * np.sin(2 * np.pi * t / 12) + rng.normal(0, 0.05, 144))
+    y = np.exp(
+        5 + 0.01 * t + 0.2 * np.sin(2 * np.pi * t / 12) + rng.normal(0, 0.05, 144)
+    )
     y[[9, 49, 50, 89]] = np.nan
     model = TBATS(lags=[1, 12]).fit(y)
     assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-8)

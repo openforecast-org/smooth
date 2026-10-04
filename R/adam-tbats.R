@@ -76,7 +76,9 @@
 #' rows beyond it give the future values for the forecast stored in the model (\code{h}).
 #' They enter the model in the space of the Box-Cox transformed data, as in the ETSX of
 #' \link[smooth]{adam}. Factors should be converted into dummy variables. The future
-#' values for \code{forecast()} are taken from its \code{newdata}.
+#' values for \code{forecast()} are taken from its \code{newdata}. The observations
+#' with a missing value of a regressor are dropped (gaps of \code{y}, with a
+#' warning), and their fitted values are \code{NA}; the future values cannot be missing.
 #' @param regressors How to treat the explanatory variables: \code{"use"} them as
 #' they are (constant coefficients), \code{"select"} them as \link[smooth]{adam}
 #' does (\code{stepwise()} on the errors of the model chosen without them, which is
@@ -131,7 +133,9 @@
 #' the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:
 #' \code{forecast()} and \code{predict()} work in the space of the transformed data
 #' and transform the results back (the point forecasts are the skeleton, the
-#' medians, by default; the cumulative ones need \eqn{\lambda=1}), \code{interval="confidence"} and
+#' medians, by default; the cumulative ones are the sums of the skeletons, or the
+#' mean or median of the sums of the paths simulated and transformed back, whose
+#' quantiles give the bounds), \code{interval="confidence"} and
 #' \code{"complete"} come from \code{reforecast()}, which refits the model at each
 #' draw of the parameters with its own \eqn{\lambda}, and \code{confint()} keeps
 #' the intervals inside the bounds of the model.
@@ -224,6 +228,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     yInSample <- as.vector(checked$yInSample);
     yInSample[checked$yNAValues[seq_along(yInSample)]] <- NA;
     xregSpec <- tbats_xreg(xreg, length(yInSample), checked$h, regressors);
+    yInSample[xregSpec$missing] <- NA;
     occurrenceSpec <- tbats_occurrence(occurrence, yInSample, loss);
     # Under a name of its own: checked has occurrence elements of adam(), which $ matches
     # partially
@@ -335,16 +340,21 @@ tbats_xreg <- function(xreg, obsInSample, h, regressors){
     if(nrow(xreg)<obsInSample){
         stop("xreg has fewer rows than the in-sample data.", call.=FALSE);
     }
-    if(any(!is.finite(xreg[1:obsInSample,]))){
-        stop("tbats() does not support missing values in xreg yet.", call.=FALSE);
+    # The observations with a missing regressor are dropped: they are gaps of the response
+    missing <- rowSums(!is.finite(xreg[1:obsInSample,,drop=FALSE]))>0;
+    if(any(missing)){
+        warning("xreg has missing values: the observations of their rows are dropped.", call.=FALSE);
     }
     if(nrow(xreg)<obsInSample+h){
         warning("xreg does not cover the horizon h. Repeating its last row.", call.=FALSE);
         xreg <- xreg[c(1:nrow(xreg), rep(nrow(xreg), obsInSample+h-nrow(xreg))),,drop=FALSE];
     }
+    if(h>0 && any(!is.finite(xreg[obsInSample+1:h,]))){
+        stop("xreg has missing values in the horizon: the forecasts need them.", call.=FALSE);
+    }
     return(list(data=xreg[1:obsInSample,,drop=FALSE],
                 future=if(h>0) xreg[obsInSample+1:h,,drop=FALSE],
-                names=colnames(xreg), number=ncol(xreg), regressors=regressors));
+                names=colnames(xreg), number=ncol(xreg), regressors=regressors, missing=missing));
 }
 
 # Some of the regressors, used as they are (NULL if none)
@@ -358,12 +368,14 @@ tbats_xregSubset <- function(xregSpec, names){
                 names=names, number=length(names), regressors="use"));
 }
 
-# The measurement matrix for the rows of the regressors (or a number of rows)
+# The measurement matrix for the rows of the regressors (or a number of rows). Their
+# missing values are placeholders: the fit skips those observations
 #' @keywords internal
 tbats_matWt <- function(w, struct, rows, xregData=NULL){
     matWt <- matrix(w, rows, struct$nComponents, byrow=TRUE);
     if(struct$nXreg>0){
         matWt[, struct$xregRows] <- xregData;
+        matWt[is.na(matWt)] <- 0;
     }
     return(matWt);
 }
@@ -924,8 +936,10 @@ tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate
         }
         # The averaged condition of adam() for the regressors, separately from the rest
         else if(bounds=="admissible"){
-            xregEigens <- abs(smoothEigensR(matrix(deltas), diag(struct$nXreg), struct$xreg$data,
-                                            rep(1L, struct$nXreg), TRUE, nrow(struct$xreg$data),
+            # over the rows of the observations the fit takes
+            xregObserved <- struct$xreg$data[complete.cases(struct$xreg$data),,drop=FALSE];
+            xregEigens <- abs(smoothEigensR(matrix(deltas), diag(struct$nXreg), xregObserved,
+                                            rep(1L, struct$nXreg), TRUE, nrow(xregObserved),
                                             TRUE, struct$nXreg, FALSE));
             if(any(xregEigens>1+1E-10)){
                 penalty <- penalty + 1E+100*max(xregEigens);
@@ -1312,7 +1326,12 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     }
     # With an occurrence model, the probability times the sizes
     occurrenceSpec <- checked[["tbatsOccurrence"]];
-    yFitted <- makeSeries(tbats_boxCoxInverse(best$fitted$fitted, lambda) * occurrenceSpec$pFitted);
+    yFitted <- tbats_boxCoxInverse(best$fitted$fitted, lambda) * occurrenceSpec$pFitted;
+    # No fitted value without the regressors
+    if(struct$nXreg>0){
+        yFitted[rowSums(is.na(struct$xreg$data))>0] <- NA;
+    }
+    yFitted <- makeSeries(yFitted);
     # No errors at the missing values
     errors <- makeSeries(replace(best$fitted$errors, is.na(best$y), NA));
     if(checked$h>0){
@@ -1626,9 +1645,6 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     interval <- match.arg(interval);
     point <- match.arg(point);
     side <- match.arg(side);
-    if(cumulative && object$lambda!=1){
-        stop("Cumulative forecasts of tbats() are only available for lambda=1.", call.=FALSE);
-    }
     objectRefitted <- reapply(object, nsim=nsim, type=type, bootstrap=bootstrap, heuristics=heuristics, ...);
     obs <- nobs(object);
     lagsModelAll <- object$lagsAll;
@@ -1637,8 +1653,8 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     lookup <- adamProfileCreator(lagsModelAll, lagsModelMax, obs+h)$lookup[,-c(1:(obs+lagsModelMax)),drop=FALSE];
     draws <- objectRefitted$randomParameters;
     dfScale <- adam_dfScale(object);
-    # The sizes of an occurrence model are the non-zero observations
-    otLogical <- as.numeric(actuals(object))!=0 | is.null(object$occurrence);
+    # The sizes of an occurrence model are the non-zero observed values
+    otLogical <- tbats_sizes(as.numeric(actuals(object)), object);
     # The future values of the regressors, as forecast.adam() takes them
     xregRows <- which(colnames(object$states) %in% object$xregNames);
     xregFuture <- if(length(xregRows)>0) adam_xregNewdata(object, h, tbats_newdata(object, newdata));
@@ -1670,28 +1686,18 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
     }
     paths <- do.call(cbind, paths);
-    # The occurrence drawn with its probabilities
+    # The occurrence drawn with its probabilities; the cumulative values are the sums of
+    # the paths in the space of the data
     pForecast <- tbats_pForecast(object, h);
-    if(any(pForecast<1)){
-        if(cumulative){
-            stop("Cumulative forecasts of tbats() with an occurrence model are not available yet.",
-                 call.=FALSE);
-        }
-        paths[] <- paths * rbinom(length(paths), 1, pForecast);
-    }
+    paths <- tbats_occurrenceDraws(paths, pForecast);
     if(cumulative){
         paths <- matrix(colSums(paths), 1);
     }
-    levelLow <- switch(side, "both"=(1-level)/2, "upper"=rep(0, length(level)), "lower"=1-level);
-    levelUp <- switch(side, "both"=(1+level)/2, "upper"=level, "lower"=rep(1, length(level)));
-    yLower <- t(apply(paths, 1, quantile, probs=levelLow, na.rm=TRUE, names=FALSE));
-    yUpper <- t(apply(paths, 1, quantile, probs=levelUp, na.rm=TRUE, names=FALSE));
-    if(length(level)==1){
-        yLower <- matrix(yLower, ncol=1);
-        yUpper <- matrix(yUpper, ncol=1);
-    }
-    yLower[, levelLow==0] <- 0;
-    yUpper[, levelUp==1] <- Inf;
+    bounds <- tbats_pathsBounds(paths, level, side);
+    yLower <- bounds$lower;
+    yUpper <- bounds$upper;
+    levelLow <- bounds$levelLow;
+    levelUp <- bounds$levelUp;
     pointForecast <- forecast(tbats_boxCoxObject(object), h=h, newdata=tbats_newdata(object, newdata),
                               interval="none")$mean;
     yForecast <- pointForecast;
@@ -1724,10 +1730,6 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
                            level=0.95, side=c("both","upper","lower"), cumulative=FALSE, nsim=NULL,
                            scenarios=FALSE, point=c("skeleton","mean","median"), ...){
     point <- match.arg(point);
-    if(cumulative && object$lambda!=1){
-        stop("Cumulative forecasts of tbats() are only available for lambda=1: ",
-             "the sums of the transformed values do not transform back.", call.=FALSE);
-    }
     objectBC <- tbats_boxCoxObject(object);
     newdata <- tbats_newdata(object, newdata);
     # The parameter uncertainty comes from reforecast(), which reapplies the model
@@ -1742,9 +1744,11 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     pForecast <- if(is.null(occurrence)) tbats_pForecast(object, h) else
         rep(as.numeric(occurrence), length.out=max(h, 0));
     intermittent <- any(pForecast<1);
-    if(intermittent && cumulative){
-        stop("Cumulative forecasts of tbats() with an occurrence model are not available yet.",
-             call.=FALSE);
+    # The sums of the back-transformed values, with the occurrence: from simulated paths in
+    # the space of the data, as adam() does with an occurrence model
+    if(cumulative && h>0 && (object$lambda!=1 || intermittent)){
+        return(tbats_cumulative(object, objectBC, h, newdata, interval[1], level, match.arg(side),
+                                nsim, point, pForecast, ...));
     }
     # The sizes. The median of the transformed data is its skeleton, and transforms back
     # into the median of the data
@@ -1824,9 +1828,69 @@ tbats_mean <- function(object, objectBC, h, newdata, nsim, ...){
                 "forecast distribution does not exist: the simulated one is unstable and grows ",
                 "with nsim.", call.=FALSE);
     }
+    return(rowMeans(tbats_paths(object, objectBC, h, newdata, nsim, rep(1, h), ...)));
+}
+
+# The simulated paths of the data (h x nsim): those of the transformed data from the
+# forecaster, transformed back, with the occurrence drawn with its probabilities
+#' @keywords internal
+tbats_paths <- function(object, objectBC, h, newdata, nsim, pForecast, ...){
     paths <- forecast(objectBC, h=h, newdata=newdata, interval="simulated",
                       nsim=if(is.null(nsim)) 10000 else nsim, scenarios=TRUE, ...)$scenarios;
-    return(rowMeans(matrix(tbats_boxCoxInverse(paths, lambda), h)));
+    return(tbats_occurrenceDraws(matrix(tbats_boxCoxInverse(paths, object$lambda), h), pForecast));
+}
+
+# The paths with the occurrence drawn with its probabilities (unchanged without occurrence)
+#' @keywords internal
+tbats_occurrenceDraws <- function(paths, pForecast){
+    if(any(pForecast<1)){
+        paths[] <- paths * rbinom(length(paths), 1, pForecast);
+    }
+    return(paths);
+}
+
+# The bounds of the paths (a row per horizon): their quantiles at the levels of the side,
+# zero and Inf at the levels 0 and 1
+#' @keywords internal
+tbats_pathsBounds <- function(paths, level, side){
+    level[level>1] <- level[level>1]/100;
+    levelLow <- switch(side, "both"=(1-level)/2, "upper"=rep(0, length(level)), "lower"=1-level);
+    levelUp <- switch(side, "both"=(1+level)/2, "upper"=level, "lower"=rep(1, length(level)));
+    quantiles <- function(probs){
+        return(matrix(t(apply(paths, 1, quantile, probs=probs, na.rm=TRUE, names=FALSE)),
+                      nrow(paths), length(probs)));
+    }
+    yLower <- quantiles(levelLow);
+    yUpper <- quantiles(levelUp);
+    yLower[, levelLow==0] <- 0;
+    yUpper[, levelUp==1] <- Inf;
+    return(list(lower=yLower, upper=yUpper, levelLow=levelLow, levelUp=levelUp));
+}
+
+# The cumulative forecast from the paths of the data: the sum of the skeletons (times the
+# probabilities), or the mean or median of the sums of the paths, and their quantiles
+#' @keywords internal
+tbats_cumulative <- function(object, objectBC, h, newdata, interval, level, side, nsim, point,
+                             pForecast, ...){
+    totals <- matrix(colSums(tbats_paths(object, objectBC, h, newdata, nsim, pForecast, ...)), 1);
+    # The structure of the cumulative forecast of the transformed data
+    result <- forecast(objectBC, h=h, newdata=newdata,
+                       interval=if(interval=="none") "none" else "simulated",
+                       level=level, side=side, cumulative=TRUE, nsim=10, ...);
+    skeleton <- forecast(objectBC, h=h, newdata=newdata, interval="none")$mean;
+    result$mean[] <- switch(point,
+                            "skeleton"=sum(tbats_boxCoxInverse(skeleton, object$lambda) * pForecast),
+                            "mean"=mean(totals),
+                            "median"=median(totals));
+    if(interval!="none"){
+        bounds <- tbats_pathsBounds(totals, level, side);
+        result$lower[] <- bounds$lower;
+        result$upper[] <- bounds$upper;
+        result$interval <- interval;
+    }
+    result$model <- object;
+    result$point <- point;
+    return(result);
 }
 
 # The future values of the regressors with their names, when given without them

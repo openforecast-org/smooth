@@ -1,6 +1,8 @@
 """R-Python parity of TBATS: the same structure, parameters, likelihood, forecasts
 and covariance as R's tbats() on the same data."""
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -327,3 +329,72 @@ def test_the_occurrence_mixture_agrees(case):
     )
     upper = fit.predict(h=7, interval="prediction", side="upper").upper
     np.testing.assert_allclose(np.ravel(upper), r["side"], rtol=1e-10)
+
+
+MISSING_XREG_CASES = {
+    "estimated lambda": (
+        "y",
+        "xr",
+        f"harmonics=1, trend='none', {R_ORDERS0}, h=12, holdout=TRUE",
+        dict(
+            lags=[1, 12],
+            harmonics=[1],
+            trend="none",
+            orders=ORDERS0,
+            h=12,
+            holdout=True,
+        ),
+    ),
+    "adapt": (
+        "ya",
+        "xa",
+        f"lags=1, regressors='adapt', trend='none', {R_ORDERS0}",
+        dict(lags=[1], regressors="adapt", trend="none", orders=ORDERS0),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(MISSING_XREG_CASES))
+def test_the_fits_with_missing_regressors_agree(case):
+    y, X, r_arguments, arguments = MISSING_XREG_CASES[case]
+    r = r_dict(
+        f"{{ {XREG_DATA} X <- {X}; {X}[c(15, 60), 1] <- NA;"
+        f" m <- suppressWarnings(tbats({y}, xreg={X}, {r_arguments}));"
+        f" list(y=as.numeric({y}), X=X, B=unname(m$B), logLik=as.numeric(logLik(m)),"
+        " fitted=replace(as.numeric(fitted(m)), c(15, 60), 0),"
+        " forecast=as.numeric(m$forecast)) }"
+    )
+    X = np.asarray(r["X"], dtype=float)
+    X[[14, 59], 0] = np.nan
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = TBATS(**arguments).fit(np.asarray(r["y"], dtype=float), X)
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+    assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
+    # No fitted values without the regressors
+    assert np.all(np.isnan(fit.fitted[[14, 59]]))
+    np.testing.assert_allclose(np.nan_to_num(fit.fitted), r["fitted"], rtol=1e-8)
+    if fit.forecast_ is not None:
+        np.testing.assert_allclose(fit.forecast_, r["forecast"], rtol=1e-10)
+
+
+def test_the_cumulative_skeletons_agree():
+    r = r_dict(
+        f"{{ {INTERMITTENT} m <- tbats(y, occurrence='odds-ratio', {R_ORDERS0});"
+        " a <- tbats(AirPassengers, harmonics=5, trend='additive',"
+        f" {R_ORDERS0});"
+        " list(y=as.numeric(y), mixture=as.numeric(forecast(m, h=7,"
+        " cumulative=TRUE)$mean), air=as.numeric(forecast(a, h=12,"
+        " cumulative=TRUE)$mean)) }"
+    )
+    y = np.asarray(r["y"], dtype=float)
+    fit = TBATS(lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0).fit(y)
+    np.testing.assert_allclose(
+        fit.predict(h=7, cumulative=True).mean, r["mixture"], rtol=1e-10
+    )
+    air = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(
+        np.asarray(r_dict("list(y=as.numeric(AirPassengers))")["y"], dtype=float)
+    )
+    np.testing.assert_allclose(
+        air.predict(h=12, cumulative=True).mean, r["air"], rtol=1e-10
+    )

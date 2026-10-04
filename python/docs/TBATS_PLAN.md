@@ -308,8 +308,10 @@ regressors=c("use","select","adapt"), ...)`, `forecast(object, h, newdata=)`; Py
 `TBATS(regressors=...)`, `.fit(y, X=None)`, `.predict(h, X=None)`. A numeric matrix or
 data frame (Python: array or DataFrame) with one row per observation, holdout and
 horizon rows included when available; the names come from the columns (`x1`, `x2`, ...
-otherwise). Factors are not expanded (an error with numeric conversion advice); missing
-values stop, as for `y`.
+otherwise). Factors are not expanded (an error with numeric conversion advice). The
+observations with a missing regressor are dropped: gaps of `y` (with a warning), the
+regressors at 0 in their rows of `matWt` as placeholders, the fitted values `NA`, and
+the admissible check of "adapt" over the complete rows. Missing future values stop.
 
 ### L.1 The model
 
@@ -505,13 +507,15 @@ with `"skeleton"` the default everywhere.
 - Forecasts: the skeleton is p times the skeleton of the sizes, the mean p times their
   mean, the median and the bounds the quantiles of the mixture: zero below 1-p, the
   quantile (q-(1-p))/p of the sizes otherwise, from the method of the interval.
-  Fitted values: p times those of the sizes. The cumulative forecasts with occurrence
-  are not supported yet.
+  Fitted values: p times those of the sizes.
+- Cumulative forecasts (also with lambda other than 1): from the paths of the
+  forecaster's simulation in the transformed space, transformed back, with the
+  occurrence drawn (`rbinom(p)`): the sum of the skeletons times p, or the mean or
+  median of the sums of the paths, and their quantiles as the bounds (R
+  `tbats_cumulative`, Python `TBATS._cumulative`); `reforecast()` sums its own paths.
 
 ## M. Later phases
 
-- missing values (the fitter's `ot`, as ADAM, with the global model on the observed
-  rows);
 - the trend candidates fitted in parallel (most of the time on long series: 43 of the
   68 s on Taylor);
 - a vignette.

@@ -179,6 +179,32 @@ def _p_forecast(model: Any, h: int) -> NDArray:
     return np.concatenate([model["forecast"], np.repeat(known[-1], h)])[:h]
 
 
+def _occurrence_draws(paths: NDArray, p_forecast: NDArray, rng: Any) -> NDArray:
+    """The paths with the occurrence drawn with its probabilities (R's
+    ``tbats_occurrenceDraws``), unchanged without occurrence."""
+    if np.any(p_forecast < 1):
+        paths = paths * rng.binomial(
+            1, np.repeat(p_forecast[:, None], paths.shape[1], axis=1)
+        )
+    return paths
+
+
+def _paths_bounds(paths: NDArray, level: Any, side: str) -> Tuple[NDArray, NDArray]:
+    """The bounds of the paths, a row per horizon (R's ``tbats_pathsBounds``):
+    their quantiles at the levels of the side, zero and Inf at the levels 0 and
+    1."""
+    from smooth.adam_general.core.adam import _level_bounds
+
+    levels = np.atleast_1d(np.asarray(level, dtype=float))
+    levels = np.where(levels > 1, levels / 100, levels)
+    level_low, level_up = _level_bounds(levels, side, paths.shape[0])
+    lower = np.array([np.nanquantile(row, q) for row, q in zip(paths, level_low)])
+    upper = np.array([np.nanquantile(row, q) for row, q in zip(paths, level_up)])
+    lower[level_low == 0] = 0
+    upper[level_up == 1] = np.inf
+    return lower, upper
+
+
 def _match(value: str, options: tuple, name: str) -> str:
     """R's ``match.arg``: the value has to be one of the options."""
     if value not in options:
@@ -367,7 +393,9 @@ class TBATS:
         without an update at the gaps, the likelihood and the information criteria
         count the observed values only, and the ARMA screen takes zeros at the gaps
         of the residuals. The residuals are NaN there, and the fitted values are the
-        predictions of the model."""
+        predictions of the model. The observations with a missing value of a
+        regressor are dropped (gaps of ``y``, with a warning), and their fitted values
+        are NaN; the future values of the regressors cannot be missing."""
         start_time = time.time()
         index = y.index if isinstance(y, pd.Series) else None
         values = np.asarray(y, dtype=float).ravel()
@@ -382,6 +410,10 @@ class TBATS:
             _warn_missing(missing, obs_in_sample, stacklevel=3)
         self._index = index
 
+        xreg = st.xreg_spec(X, obs_in_sample, h, self.regressors)
+        if xreg is not None:
+            y_in_sample = np.where(xreg["missing"], np.nan, y_in_sample)
+
         lags, harmonics, trend = self.lags, self.harmonics, self.trend
         occurrence = _occurrence_spec(self.occurrence, y_in_sample, self.loss)
         ot = occurrence["ot_logical"]
@@ -394,7 +426,6 @@ class TBATS:
         spec_fit = st.arma_build([0], [0], [1]) if spec["select"] else spec
         trend_types = ["none", "additive", "damped"] if trend == "auto" else [trend]
         settings = {**self._settings(), "occurrence": occurrence}
-        xreg = st.xreg_spec(X, obs_in_sample, h, self.regressors)
         # The regressors are selected on the errors of the model without them
         xreg_fit = None if self.regressors == "select" else xreg
 
@@ -637,7 +668,12 @@ class TBATS:
         probabilities of occurrence."""
         self._check_fitted()
         sizes = st.box_cox_inverse(self._best["fitted"]["fitted"], self.lambda_)
-        return sizes * self._occurrence["p_fitted"]
+        fitted = sizes * self._occurrence["p_fitted"]
+        # No fitted value without the regressors
+        xreg = self._best["struct"]["xreg"]
+        if xreg is not None:
+            fitted = np.where(np.any(np.isnan(xreg["data"]), axis=1), np.nan, fitted)
+        return fitted
 
     @property
     def residuals(self) -> NDArray:
@@ -900,16 +936,15 @@ class TBATS:
         forecasts are those of the mixture of no demand and the sizes: the skeleton
         and the mean are multiplied by the probability of occurrence (``occurrence``
         provides it for the horizon, else the occurrence model forecasts it), and the
-        median and the bounds are the quantiles of the mixture."""
+        median and the bounds are the quantiles of the mixture. The cumulative
+        forecasts with lambda other than 1 or an occurrence model are the sum of the
+        skeletons (times the probabilities), or the mean or the median of the sums of
+        the ``nsim`` paths transformed back (``point``), whose quantiles give the
+        bounds."""
         self._check_fitted()
         if point not in ("skeleton", "mean", "median"):
             raise ValueError(
                 f'point should be "skeleton", "mean" or "median", not {point!r}.'
-            )
-        if cumulative and self.lambda_ != 1:
-            raise ValueError(
-                "Cumulative forecasts of TBATS are only available for lambda=1: the "
-                "sums of the transformed values do not transform back."
             )
         if h is None:
             h = self.h if self.h > 0 else 10
@@ -921,11 +956,6 @@ class TBATS:
             else np.resize(np.asarray(occurrence, dtype=float), max(h, 0))
         )
         intermittent = bool(np.any(p_forecast < 1))
-        if intermittent and cumulative:
-            raise ValueError(
-                "Cumulative forecasts of TBATS with an occurrence model are not "
-                "available yet."
-            )
         if interval in ("confidence", "complete"):
             return self.reforecast(
                 h=h,
@@ -1032,6 +1062,10 @@ class TBATS:
             )
             return result, general_dict
 
+        # The sums of the transformed values do not transform back: the cumulative
+        # forecasts come from the paths of the data
+        if cumulative and h > 0 and (self.lambda_ != 1 or intermittent):
+            return self._cumulative(run, interval, level, side, point, p_forecast, seed)
         # The median of the transformed data is its skeleton, and transforms back into
         # the median of the data
         result, _ = run(interval, level, side)
@@ -1134,9 +1168,57 @@ class TBATS:
                 "unstable and grows with nsim.",
                 stacklevel=3,
             )
-        _, general = run("simulated", 0.95, "both", scenarios=True)
+        return np.asarray(self._paths(run, None, None).mean(axis=1))
+
+    def _paths(self, run: Any, p_forecast: Optional[NDArray], rng: Any) -> NDArray:
+        """The simulated paths of the data (R's ``tbats_paths``, h x nsim): those of
+        the transformed data from the forecaster, transformed back, with the
+        occurrence drawn with its probabilities."""
+        _, general = run("simulated", 0.95, "both", scenarios=True, cumulative=False)
         paths = np.asarray(general["_scenarios_matrix"], dtype=float)
-        return np.asarray(st.box_cox_inverse(paths, lam).mean(axis=1))
+        paths = st.box_cox_inverse(paths, self.lambda_).reshape(paths.shape)
+        if p_forecast is None:
+            return paths
+        return _occurrence_draws(paths, p_forecast, rng)
+
+    def _cumulative(
+        self,
+        run: Any,
+        interval: str,
+        level: Any,
+        side: str,
+        point: str,
+        p_forecast: NDArray,
+        seed: Optional[int],
+    ) -> ForecastResult:
+        """The cumulative forecast from the paths of the data (R's
+        ``tbats_cumulative``): the sum of the skeletons (times the probabilities), or
+        the mean or the median of the sums of the paths, and their quantiles."""
+        rng = np.random.default_rng(seed)
+        totals = self._paths(run, p_forecast, rng).sum(axis=0, keepdims=True)
+        # The structure of the cumulative forecast of the transformed data
+        result, _ = run(
+            "none" if interval == "none" else "simulated",
+            level,
+            side,
+            cumulative=True,
+            nsim=10,
+        )
+        if point == "skeleton":
+            skeleton, _ = run("none", level, side, cumulative=False)
+            skeleton = np.asarray(skeleton.mean, dtype=float)
+            sizes = st.box_cox_inverse(skeleton, self.lambda_)
+            result.mean[:] = np.sum(sizes * p_forecast)
+        else:
+            result.mean[:] = (np.mean if point == "mean" else np.median)(totals)
+        if interval != "none":
+            lower, upper = _paths_bounds(totals, level, side)
+            if result.lower is not None:
+                result.lower.iloc[:, :] = lower
+            if result.upper is not None:
+                result.upper.iloc[:, :] = upper
+            result.interval = interval
+        return result
 
     def _future_x(self, h: int, X: Optional[Any]) -> Optional[NDArray]:
         """The future values of the regressors (R's ``adam_xregNewdata``): ``X``,
@@ -1303,19 +1385,12 @@ class TBATS:
         (``"prediction"``), in the space of its own transform and transformed back.
         The point forecast is the skeleton of the model (its median), or the mean or
         the median of the paths (``point``)."""
-        from smooth.adam_general.core.adam import (
-            _column_names_for_levels,
-            _level_bounds,
-        )
+        from smooth.adam_general.core.adam import _column_names_for_levels
         from smooth.adam_general.core.creator.architector import adam_profile_creator
         from smooth.adam_general.core.utils.distributions import generate_errors
         from smooth.adam_general.core.utils.utils import scale_debias
 
         self._check_fitted()
-        if cumulative and self.lambda_ != 1:
-            raise ValueError(
-                "Cumulative forecasts of TBATS are only available for lambda=1."
-            )
         levels = list(np.atleast_1d(level).astype(float))
         rng = np.random.default_rng(seed)
         refitted = self.reapply(
@@ -1391,17 +1466,10 @@ class TBATS:
                 skeleton = adam_cpp.forecast(mat_wt, mat_f, lookup, profile, h).forecast
                 paths.append(st.box_cox_inverse(np.ravel(skeleton), lam).reshape(h, 1))
         path_matrix = np.column_stack(paths)
-        # The occurrence drawn with its probabilities
+        # The occurrence drawn with its probabilities; the cumulative values are the
+        # sums of the paths in the space of the data
         p_forecast = _p_forecast(self._occurrence["model"], h)
-        if np.any(p_forecast < 1):
-            if cumulative:
-                raise ValueError(
-                    "Cumulative forecasts of TBATS with an occurrence model are not "
-                    "available yet."
-                )
-            path_matrix = path_matrix * rng.binomial(
-                1, np.repeat(p_forecast[:, None], path_matrix.shape[1], axis=1)
-            )
+        path_matrix = _occurrence_draws(path_matrix, p_forecast, rng)
         if cumulative:
             path_matrix = path_matrix.sum(axis=0, keepdims=True)
 
@@ -1416,16 +1484,8 @@ class TBATS:
         if interval == "none":
             lower = upper = None
         else:
-            level_low, level_up = _level_bounds(levels, side, path_matrix.shape[0])
             lower_cols, upper_cols = _column_names_for_levels(levels, side)
-            lower_values = np.array(
-                [np.nanquantile(row, q) for row, q in zip(path_matrix, level_low)]
-            )
-            upper_values = np.array(
-                [np.nanquantile(row, q) for row, q in zip(path_matrix, level_up)]
-            )
-            lower_values[level_low == 0] = 0
-            upper_values[level_up == 1] = np.inf
+            lower_values, upper_values = _paths_bounds(path_matrix, levels, side)
             lower = pd.DataFrame(lower_values, index=mean.index, columns=lower_cols)
             upper = pd.DataFrame(upper_values, index=mean.index, columns=upper_cols)
         return ReforecastResult(

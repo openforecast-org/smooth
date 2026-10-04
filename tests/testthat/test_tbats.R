@@ -141,7 +141,14 @@ test_that("the forecasts are those of adam in the Box-Cox space transformed back
                      tbats_boxCoxInverse(forecastBC$lower, fit$lambda), tolerance=1e-8);
         expect_true(all(forecastTBATS$lower<forecastTBATS$mean & forecastTBATS$mean<forecastTBATS$upper));
     }
-    expect_error(forecast(fit, h=12, cumulative=TRUE), "Cumulative");
+    # The cumulative forecasts come from the paths in the space of the data
+    expect_equal(as.numeric(forecast(fit, h=12, cumulative=TRUE)$mean), sum(fit$forecast),
+                 tolerance=1e-8);
+    set.seed(41);
+    cumulative <- forecast(fit, h=12, cumulative=TRUE, interval="prediction", point="mean");
+    expect_true(cumulative$lower<cumulative$mean && cumulative$mean<cumulative$upper);
+    expect_equal(as.numeric(cumulative$mean), sum(forecast(fit, h=12, point="mean")$mean),
+                 tolerance=1e-2);
     predicted <- predict(fit, interval="prediction");
     expect_true(all(predicted$lower<predicted$upper));
 });
@@ -366,9 +373,33 @@ test_that("the occurrence: the sizes on the non-zero observations, the forecasts
     expect_true(mean(simulate(fit, nsim=2)$data==0)>0.3);
     refit <- tbats(yIntermittent, model=fit, h=14, holdout=TRUE);
     expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)));
-    expect_error(forecast(tbats(yIntermittent, occurrence="fixed", orders=orders0, lambda=1), h=5,
-                          cumulative=TRUE), "occurrence");
+    # The cumulative forecasts of the mixture: the sum of the skeletons times the
+    # probabilities, and the quantiles of the sums of the paths
+    cumulative <- forecast(fit, h=14, cumulative=TRUE, interval="prediction");
+    expect_equal(as.numeric(cumulative$mean), sum(forecasted$mean), tolerance=1e-8);
+    expect_true(cumulative$lower<cumulative$mean && cumulative$mean<cumulative$upper);
+    set.seed(41);
+    reforecasted <- reforecast(fit, h=14, cumulative=TRUE, interval="prediction", nsim=20);
+    expect_true(reforecasted$lower<reforecasted$upper);
 });
+
+test_that("the observations with missing regressors are dropped", {
+    set.seed(41);
+    xreg <- cbind(x1=rnorm(132, 10, 2));
+    y <- ts(200 + 20*sin(2*pi*(1:132)/12) + 5*xreg[,1] + cumsum(rnorm(132)), frequency=12);
+    xregNA <- xreg;
+    xregNA[c(15, 60)] <- NA;
+    expect_warning(fit <- tbats(y, xreg=xregNA, harmonics=1, trend="none", orders=orders0),
+                   "missing values");
+    yNA <- y;
+    yNA[c(15, 60)] <- NA;
+    fitNA <- suppressWarnings(tbats(yNA, xreg=xreg, harmonics=1, trend="none", orders=orders0));
+    expect_equal(as.numeric(logLik(fit)), as.numeric(logLik(fitNA)));
+    expect_equal(coef(fit), coef(fitNA));
+    expect_true(all(is.na(fitted(fit)[c(15, 60)])));
+    expect_error(suppressWarnings(tbats(y[1:120], xreg=xregNA[c(1:130, NA, NA),,drop=FALSE],
+                                        h=12)), "horizon");
+})
 
 test_that("tbats takes the missing values for gaps", {
     y <- AirPassengers

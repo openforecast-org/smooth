@@ -308,7 +308,9 @@ class Filler:
         if bounds != "admissible":
             return 0.0
         n_xreg = struct["n_xreg"]
+        # over the rows of the observations the fit takes
         data = struct["xreg"]["data"]
+        data = data[np.all(np.isfinite(data), axis=1)]
         values = np.abs(
             smooth_eigens(
                 persistence=np.asfortranarray(deltas.reshape(-1, 1), dtype=float),

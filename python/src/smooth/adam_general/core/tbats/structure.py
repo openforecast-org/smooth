@@ -99,20 +99,31 @@ def xreg_spec(
     names = _make_names(names)
     if values.shape[0] < obs_in_sample:
         raise ValueError("X has fewer rows than the in-sample data.")
-    if not np.all(np.isfinite(values[:obs_in_sample])):
-        raise ValueError("TBATS does not support missing values in X yet.")
+    # The observations with a missing regressor are dropped: they are gaps of the
+    # response
+    missing = ~np.all(np.isfinite(values[:obs_in_sample]), axis=1)
+    if np.any(missing):
+        warnings.warn(
+            "X has missing values: the observations of their rows are dropped.",
+            stacklevel=3,
+        )
     if values.shape[0] < obs_in_sample + h:
         warnings.warn(
             "X does not cover the horizon h. Repeating its last row.", stacklevel=3
         )
         pad = np.repeat(values[-1:], obs_in_sample + h - values.shape[0], axis=0)
         values = np.vstack([values, pad])
+    if h > 0 and not np.all(np.isfinite(values[obs_in_sample : obs_in_sample + h])):
+        raise ValueError(
+            "X has missing values in the horizon: the forecasts need them."
+        )
     return {
         "data": values[:obs_in_sample],
         "future": values[obs_in_sample : obs_in_sample + h] if h > 0 else None,
         "names": names,
         "number": len(names),
         "regressors": regressors,
+        "missing": missing,
     }
 
 
@@ -148,10 +159,12 @@ def _make_names(names: List[str]) -> List[str]:
 def mat_wt(
     w: NDArray, struct: Dict[str, Any], rows: int, xreg: Optional[NDArray] = None
 ) -> NDArray:
-    """The measurement matrix for the rows of the regressors (or a number of rows)."""
+    """The measurement matrix for the rows of the regressors (or a number of rows).
+    Their missing values are placeholders: the fit skips those observations."""
     result = np.asfortranarray(np.tile(w, (rows, 1)))
     if struct["n_xreg"] > 0:
         result[:, struct["xreg_rows"]] = xreg
+        result[np.isnan(result)] = 0
     return result
 
 

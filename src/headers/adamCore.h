@@ -549,11 +549,18 @@ private:
         else if(T_ == 'M') { states.row(1) = 1/states.row(1); }
     }
 
+    // Private helper: the constant (drift) of the time-reversed series. It is additive
+    // with an additive error and a ratio with a multiplicative one, so time reversal
+    // takes minus it in the first case and its inverse in the second, as for the trend
+    void flipDrift(double &drift) const {
+        drift = (E == 'M') ? 1/drift : -drift;
+    }
+
     // Private helper: undo the backward-pass flips of the slope states in recorded states
     void unflipSlopes(arma::mat &states) const {
         unflipTrend(states, T);
         if(constant && flipConstant) {
-            states.row(nComponents-1) = -states.row(nComponents-1);
+            states.row(nComponents-1).transform([this](double drift){ flipDrift(drift); return drift; });
         }
     }
 
@@ -847,7 +854,7 @@ public:
             if(T == 'A')      { profilesRecent(1) = -profilesRecent(1); }
             else if(T == 'M') { profilesRecent(1) = 1/profilesRecent(1); }
             if(constant && flipConstant) {
-                profilesRecent(nComponents-1) = -profilesRecent(nComponents-1);
+                flipDrift(profilesRecent(nComponents-1));
             }
         };
 
@@ -1632,8 +1639,7 @@ public:
                     // The constant (drift) flips sign when the total order of
                     // differencing is odd — ARIMA analog of the trend reversal
                     if(constant && flipConstant){
-                        arrayProfilesRecent.slice(k)(nComponents-1) =
-                            -arrayProfilesRecent.slice(k)(nComponents-1);
+                        flipDrift(arrayProfilesRecent.slice(k)(nComponents-1));
                     }
 
                     for(int i=obs+H-1; i>=(int)H; i=i-1) {
@@ -1681,8 +1687,7 @@ public:
                     }
                     // Restore the constant sign after the backward pass
                     if(constant && flipConstant){
-                        arrayProfilesRecent.slice(k)(nComponents-1) =
-                            -arrayProfilesRecent.slice(k)(nComponents-1);
+                        flipDrift(arrayProfilesRecent.slice(k)(nComponents-1));
                     }
                 }
             }

@@ -823,10 +823,9 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
                         mean(yInSample[otLogical])
                 }
                 else{
+                    driftSeries <- adam_driftSeries(yInSample[otLogical], Etype, etsModel, lags, iOrders)
                     matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,] <-
-                        switch(Etype,
-                               "A"=mean(diff(yInSample[otLogical])),
-                               "M"=exp(mean(diff(log(yInSample[otLogical])))))
+                        switch(Etype, "A"=mean(driftSeries), "M"=exp(mean(driftSeries)))
                 }
             }
             else{
@@ -1067,6 +1066,27 @@ adam_arimaHeadInitials <- function(matVtARIMA, lagsModelARIMA, lagsModelMax, Ety
         return(sum(head[cbind(rows, lagsModelMax-lagsModelARIMA[rows]+k)]))
     }, numeric(1))
     return(switch(Etype, "M"=exp(initials), initials))
+}
+
+# The series on the scale of the constant, from which its starting value and bounds
+# come: differenced as the ARIMA part of the model differences it (in logs for a
+# multiplicative error), whose drift it is, or by one step for ETS, where it is the
+# drift of the level. With seasonal differencing, the drift is the change over a
+# season, not over one step.
+#' @keywords internal
+adam_driftSeries <- function(y, Etype, etsModel, lags, iOrders){
+    if(Etype=="M"){
+        y <- log(y)
+    }
+    if(etsModel || all(iOrders==0)){
+        return(diff(y))
+    }
+    for(i in seq_along(iOrders)){
+        if(iOrders[i]>0){
+            y <- diff(y, lag=lags[i], differences=iOrders[i])
+        }
+    }
+    return(y)
 }
 
 # Pre-sample values of the series for the ARIMA initials: the decomposition that
@@ -1460,13 +1480,14 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
         }
         names(B)[j] <- constantName
         if(etsModel || sum(iOrders)!=0){
+            driftSeries <- adam_driftSeries(yInSample[otLogical], Etype, etsModel, lags, iOrders)
             if(Etype=="A"){
-                Bu[j] <- quantile(diff(yInSample[otLogical]),0.6)
+                Bu[j] <- quantile(driftSeries,0.6)
                 Bl[j] <- -Bu[j]
             }
             else{
-                Bu[j] <- exp(quantile(diff(log(yInSample[otLogical])),0.6))
-                Bl[j] <- exp(quantile(diff(log(yInSample[otLogical])),0.4))
+                Bu[j] <- exp(quantile(driftSeries,0.6))
+                Bl[j] <- exp(quantile(driftSeries,0.4))
             }
 
             # Failsafe for weird cases, when upper bound is the same or lower than the lower one

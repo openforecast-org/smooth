@@ -151,5 +151,19 @@ def test_backcasting_reproduces_noise_free_series():
     ).fit(seasonal)
     # The drift of an odd number of differences is flipped with the trend
     drift = ADAM("NNN", i_order=1, constant=True).fit(line)
-    for model in (ets, arima, airline, drift):
+    # With seasonal differencing the drift is the change over a season, inside its
+    # bounds
+    seasonal_drift = ADAM(
+        "NNN",
+        lags=[1, M],
+        orders={"ar": [0, 0], "i": [0, 1], "ma": [0, 0]},
+        constant=True,
+    ).fit(seasonal)
+    assert seasonal_drift.coef[-1] == pytest.approx(6)
+    for model in (ets, arima, airline, drift, seasonal_drift):
         assert np.max(np.abs(np.asarray(model.residuals, dtype=float))) < 1e-8
+    # A multiplicative drift is a ratio: it is inverted in the backward pass and
+    # enters the ARIMA states in logs
+    geometric = pd.Series(100 * 1.02**t)
+    ratio = ADAM("NNN", i_order=1, constant=1.02, distribution="dlnorm").fit(geometric)
+    assert np.max(np.abs(np.asarray(ratio.fitted) / geometric.to_numpy() - 1)) < 1e-8

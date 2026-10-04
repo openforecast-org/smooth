@@ -163,11 +163,17 @@ inline arma::vec adamFvalue(arma::vec const &matrixVt, arma::mat const &matrixF,
         break;
     }
 
-    // If there is ARIMA, fix the states for E='M'
+    // If there is ARIMA, fix the states for E='M'. They are multiplicative, so F acts on
+    // their logarithms, and the constant (a ratio) enters through its column in logs, as
+    // it does in levels with E='A': without it, the drift was absorbed by the states
     if(nArima>0 && E=='M'){
-        matrixVtnew.rows(nETS,nETS+nArima-1) =
-            exp(matrixF.submat(nETS,nETS,nETS+nArima-1,nETS+nArima-1) *
-            log(matrixVt.rows(nETS,nETS+nArima-1)));
+        arma::vec logStatesNew = matrixF.submat(nETS,nETS,nETS+nArima-1,nETS+nArima-1) *
+            log(matrixVt.rows(nETS,nETS+nArima-1));
+        if(constant){
+            logStatesNew += matrixF.submat(nETS,nComponents-1,nETS+nArima-1,nComponents-1) *
+                std::log(matrixVt(nComponents-1));
+        }
+        matrixVtnew.rows(nETS,nETS+nArima-1) = exp(logStatesNew);
     }
 
     // If there is a constant, fix the first state of ETS(M,*,*)

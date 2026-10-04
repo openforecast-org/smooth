@@ -780,7 +780,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                 }
                 names(B)[j] <- constantName;
                 if(sum(iOrders)!=0){
-                    Bu[j] <- quantile(diff(yInSample[otLogical]),0.6);
+                    # The drift is the change of the series as the model differences it
+                    Bu[j] <- quantile(adam_driftSeries(yInSample[otLogical], "A", FALSE, lags, iOrders),0.6);
                     Bl[j] <- -Bu[j];
 
                     # Failsafe for weird cases, when upper bound is the same or lower than the lower one

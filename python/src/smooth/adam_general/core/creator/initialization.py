@@ -1,6 +1,7 @@
 import numpy as np
 
-from smooth.adam_general.core.utils.utils import msdecompose
+from smooth.adam_general.core.creator.initialiser import drift_series
+from smooth.adam_general.core.utils.utils import _mean_r, msdecompose
 
 
 def _initialize_states(
@@ -718,20 +719,21 @@ def _initialize_constant(
                 :,
             ] = np.mean(y_in_sample[ot_logical])
         else:
-            if e_type == "A":
-                mat_vt[
-                    components_number_ets
-                    + components_number_arima
-                    + explanatory_checked["xreg_number"],
-                    :,
-                ] = np.mean(np.diff(y_in_sample[ot_logical]))
-            else:
-                mat_vt[
-                    components_number_ets
-                    + components_number_arima
-                    + explanatory_checked["xreg_number"],
-                    :,
-                ] = np.exp(np.mean(np.diff(np.log(y_in_sample[ot_logical]))))
+            drift = _mean_r(
+                drift_series(
+                    y_in_sample[ot_logical],
+                    e_type,
+                    ets_model,
+                    model_params["lags"],
+                    arima_checked["i_orders"],
+                )
+            )
+            mat_vt[
+                components_number_ets
+                + components_number_arima
+                + explanatory_checked["xreg_number"],
+                :,
+            ] = drift if e_type == "A" else np.exp(drift)
     else:
         mat_vt[
             components_number_ets

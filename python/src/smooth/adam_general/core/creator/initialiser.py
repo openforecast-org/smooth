@@ -12,6 +12,24 @@ from smooth.adam_general.core.utils.utils import (
 )
 
 
+def drift_series(y, error_type, ets_model, lags, i_orders):
+    """The series on the scale of the constant, from which its starting value and
+    bounds come (R's ``adam_driftSeries``): differenced as the ARIMA part of the
+    model differences it (in logs for a multiplicative error), whose drift it is,
+    or by one step for ETS, where it is the drift of the level. With seasonal
+    differencing, the drift is the change over a season, not over one step."""
+    y = np.asarray(y, dtype=np.float64).ravel()
+    if error_type == "M":
+        y = np.log(y)
+    i_orders = list(i_orders or [])
+    if ets_model or sum(i_orders) == 0:
+        return np.diff(y)
+    for lag, order in zip(lags, i_orders):
+        for _ in range(int(order)):
+            y = y[int(lag) :] - y[: -int(lag)]
+    return y
+
+
 def _arima_initialiser(
     y_in_sample,
     ot_logical,
@@ -869,44 +887,19 @@ def initialiser(
             arima_checked["i_orders"] is not None
             and sum(arima_checked["i_orders"]) != 0
         ):
+            drift = drift_series(
+                observations_dict["y_in_sample"][observations_dict["ot_logical"]],
+                model_type_dict["error_type"],
+                model_type_dict["ets_model"],
+                lags_dict["lags"],
+                arima_checked["i_orders"],
+            )
             if model_type_dict["error_type"] == "A":
-                Bu[j - 1] = np.quantile(
-                    np.diff(
-                        observations_dict["y_in_sample"][
-                            observations_dict["ot_logical"]
-                        ],
-                        axis=0,
-                    ),
-                    0.6,
-                )
+                Bu[j - 1] = np.quantile(drift, 0.6)
                 Bl[j - 1] = -Bu[j - 1]
             else:
-                Bu[j - 1] = np.exp(
-                    np.quantile(
-                        np.diff(
-                            np.log(
-                                observations_dict["y_in_sample"][
-                                    observations_dict["ot_logical"]
-                                ]
-                            ),
-                            axis=0,
-                        ),
-                        0.6,
-                    )
-                )
-                Bl[j - 1] = np.exp(
-                    np.quantile(
-                        np.diff(
-                            np.log(
-                                observations_dict["y_in_sample"][
-                                    observations_dict["ot_logical"]
-                                ]
-                            ),
-                            axis=0,
-                        ),
-                        0.4,
-                    )
-                )
+                Bu[j - 1] = np.exp(np.quantile(drift, 0.6))
+                Bl[j - 1] = np.exp(np.quantile(drift, 0.4))
 
             if Bu[j - 1] <= Bl[j - 1]:
                 Bu[j - 1] = np.inf

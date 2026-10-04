@@ -56,3 +56,11 @@ test_that("ssarima() takes the missing values for gaps", {
     expect_true(all(is.na(residuals(testModel)[is.na(y)])));
     expect_true(all(is.finite(forecast(testModel, h=12, interval="prediction")$upper)));
 })
+
+test_that("ssarima() reports the likelihood at the fitted parameters, not the loss", {
+    for(loss in c("MSE", "MAE")){
+        testModel <- ssarima(AirPassengers, orders=list(ar=c(0,1),i=c(1,1),ma=c(1,1)), lags=c(1,12), loss=loss);
+        expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)));
+        expect_true(as.numeric(logLik(testModel)) < 0);
+    }
+})

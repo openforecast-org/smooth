@@ -1029,3 +1029,13 @@ test_that("sm() and pls() take the missing values for gaps", {
                  -as.vector(log(2*pi*det(covarMat))/2 + t(errors) %*% solve(covarMat) %*% errors/2) -
                      sum(log(holdout[-c(3, 5)])));
 })
+
+test_that("The point likelihoods of sm() sum to its log-likelihood", {
+    set.seed(41);
+    yIntermittent <- rbinom(200, 1, 0.6) * exp(rnorm(200, 2, 0.3));
+    for(testModel in list(adam(AirPassengers, "MAM"), adam(AirPassengers, "ANN", distribution="dlaplace"),
+                          adam(yIntermittent, "MNN", occurrence="odds-ratio"))){
+        scaleModel <- sm(testModel);
+        expect_equal(sum(pointLik(scaleModel)), as.numeric(logLik(scaleModel)));
+    }
+})

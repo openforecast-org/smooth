@@ -56,3 +56,11 @@ test_that("gum() takes the missing values for gaps", {
     expect_true(all(is.na(residuals(testModel)[is.na(y)])));
     expect_true(all(is.finite(forecast(testModel, h=12, interval="prediction")$upper)));
 })
+
+test_that("gum() reports the likelihood at the fitted parameters, not the loss", {
+    for(loss in c("MSE", "MAE")){
+        testModel <- gum(AirPassengers, orders=c(1,1), lags=c(1,12), loss=loss);
+        expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)));
+        expect_true(as.numeric(logLik(testModel)) < 0);
+    }
+})

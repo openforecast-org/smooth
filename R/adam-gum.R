@@ -329,7 +329,11 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     }
 
     ##### Cost function for GUM #####
-    CF <- function(B, matVt, matF, vecG, matWt){
+    # loss / bounds are formals here so that logLikFunction() can re-evaluate the
+    # very same fit under the likelihood, as ces() does. nloptr inspects its
+    # objective's formals and insists every one of them be supplied, so it gets the
+    # fixed-arity CF() wrapper below.
+    CFgeneric <- function(B, matVt, matF, vecG, matWt, loss, bounds){
         # Obtain the elements of GUM
         elements <- filler(B, matVt[,1:lagsModelMax,drop=FALSE], matF, vecG, matWt);
 
@@ -412,9 +416,22 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         return(CFValue);
     }
 
+    CF <- function(B, matVt, matF, vecG, matWt){
+        return(CFgeneric(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt,
+                         loss=loss, bounds=bounds));
+    }
+
     #### Likelihood function ####
+    # The reported logLik is a concentrated likelihood, never -loss: a fit-only loss
+    # reports the Normal likelihood at the fitted parameters, and a multistep loss the
+    # predictive likelihood of the GPL paper, as in ces() and adam()
     logLikFunction <- function(B, matVt, matF, vecG, matWt){
-        return(-CF(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt));
+        if(!multisteps){
+            return(-CFgeneric(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt,
+                              loss="likelihood", bounds="none"));
+        }
+        return(adam_multistepLogLik(CF(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt),
+                                    loss, h, !yNAValues[1:obsInSample]));
     }
 
     initialValue <- initialValueProvided;

@@ -16,7 +16,12 @@ tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   silent = TRUE, model = NULL, ...)
 }
 \arguments{
-\item{y}{Vector or ts object, containing the data needed to be forecasted.}
+\item{y}{Vector or ts object, containing the data needed to be forecasted. The
+missing values (\code{NA}) are gaps: the global model is fitted to the observed
+values, the states move through the transition without an update at the gaps, the
+likelihood and the information criteria count the observed values only, and the
+ARMA screen takes zeros at the gaps of the residuals. The residuals are \code{NA}
+there, and the fitted values are the predictions of the model.}
 
 \item{lags}{The lags of the model: 1 and the seasonal periods, which can be
 fractional (e.g. \code{c(1, 7, 365.25)}). The harmonics are fitted for every

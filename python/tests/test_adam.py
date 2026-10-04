@@ -1334,3 +1334,21 @@ def test_adam_warns_when_more_than_half_of_the_data_is_missing():
     y[:60] = np.nan
     with pytest.warns(UserWarning, match="More than half of the in-sample data"):
         ADAM(model="ANN").fit(y)
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+def test_adam_uses_the_filled_values_only_for_the_initialisation():
+    rng = np.random.default_rng(1)
+    t = np.arange(144)
+    y = np.exp(5 + 0.01 * t + 0.2 * np.sin(2 * np.pi * t / 12) + rng.normal(0, 0.05, 144))
+    y[[9, 49, 50, 89, 139]] = np.nan
+    model = ADAM(model="MAM", lags=[12], h=12, holdout=True).fit(y)
+    assert np.all(np.isfinite(np.asarray(model.fitted, dtype=float)))
+    # The holdout does not enter the fill of the in-sample gaps
+    changed = y.copy()
+    changed[143] = 1e4
+    other = ADAM(model="MAM", lags=[12], h=12, holdout=True).fit(changed)
+    np.testing.assert_allclose(other.coef, model.coef)
+    # The multistep loss is over the windows with all their targets observed
+    assert np.isfinite(ADAM(model="ANN", loss="TMSE", h=6).fit(y).loss_value)
+    assert not np.all(np.isnan(model.rstudent()))

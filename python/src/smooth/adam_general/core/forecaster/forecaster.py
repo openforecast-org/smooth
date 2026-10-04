@@ -6,6 +6,7 @@ import pandas as pd
 # Note: adam_cpp instance is passed to functions that need C++ integration
 # The adamCore object is created in architector() and passed through the pipeline
 from smooth.adam_general.core.utils.n_param import NParam
+from smooth.adam_general.core.utils.utils import observed_mask
 
 from ._helpers import (
     _prepare_lookup_table,
@@ -68,7 +69,7 @@ def _prepare_forecast_index(observations_dict, general_dict):
     return observations_dict["y_forecast_index"]
 
 
-def _check_fitted_values(model_prepared, occurrence_dict):
+def _check_fitted_values(model_prepared, occurrence_dict, observations_dict):
     """
     Check fitted values for NaNs and adjust for occurrence if needed.
 
@@ -100,11 +101,12 @@ def _check_fitted_values(model_prepared, occurrence_dict):
             model_prepared["y_fitted"] * occurrence_dict["p_fitted"]
         )
 
-    # Fix cases when we have zeroes in the provided occurrence
+    # Fix cases when we have zeroes in the provided occurrence. At the missing
+    # values the fitted is the prediction of the model
     if occurrence_dict["occurrence"] == "provided":
-        model_prepared["y_fitted"][~occurrence_dict["ot_logical"]] = (
-            model_prepared["y_fitted"][~occurrence_dict["ot_logical"]]
-            * occurrence_dict["p_fitted"][~occurrence_dict["ot_logical"]]
+        zero = ~occurrence_dict["ot_logical"] & observed_mask(observations_dict)
+        model_prepared["y_fitted"][zero] = (
+            model_prepared["y_fitted"][zero] * occurrence_dict["p_fitted"][zero]
         )
 
     return model_prepared
@@ -699,7 +701,9 @@ def forecaster(
     # 1. Prepare forecast index
     _prepare_forecast_index(observations_dict, general_dict)
     # 2. Check fitted values for issues and adjust for occurrence
-    model_prepared = _check_fitted_values(model_prepared, occurrence_dict)
+    model_prepared = _check_fitted_values(
+        model_prepared, occurrence_dict, observations_dict
+    )
 
     # 3. Return empty result if horizon is zero
     if general_dict["h"] <= 0:

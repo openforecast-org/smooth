@@ -90,6 +90,24 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
     }
 
 
+def _warn_missing(y_na_values, obs_in_sample, stacklevel=4):
+    """The warnings about the missing values, as R's ``adam_checkData``: that there
+    are some, and that the estimates rest on few observations when more than half of
+    the in-sample data is missing."""
+    warnings.warn(
+        "Data contains NAs. The values will be ignored during the model construction.",
+        stacklevel=stacklevel,
+    )
+    observed = int(np.sum(~np.asarray(y_na_values)[:obs_in_sample]))
+    if observed < obs_in_sample / 2:
+        warnings.warn(
+            f"More than half of the in-sample data is missing "
+            f"({obs_in_sample - observed} of {obs_in_sample}): the estimates rest on "
+            "few observations.",
+            stacklevel=stacklevel,
+        )
+
+
 def _fill_missing(data, data_values, lags, obs_in_sample):
     """The missing values, filled for the initialisation and skipped by the fit, as R's
     ``adam_checkData``: a polynomial of the time and harmonics fitted to the observed
@@ -101,21 +119,15 @@ def _fill_missing(data, data_values, lags, obs_in_sample):
     y_na_values = np.isnan(values)
     if not np.any(y_na_values):
         return data, data_values, y_na_values
-    warnings.warn(
-        "Data contains NAs. The values will be ignored during the model construction.",
-        stacklevel=4,
-    )
-    observed = int(np.sum(~y_na_values[:obs_in_sample]))
-    if observed < obs_in_sample / 2:
-        warnings.warn(
-            f"More than half of the in-sample data is missing "
-            f"({obs_in_sample - observed} of {obs_in_sample}): the estimates rest on "
-            "few observations.",
-            stacklevel=4,
-        )
+    _warn_missing(y_na_values, obs_in_sample, stacklevel=5)
     lag_max = max(int(max(np.atleast_1d(lags if lags is not None else [1]))), 10)
+    # Fitted to the observed in-sample values; the holdout keeps its missing values
     filled = values.copy()
-    filled[y_na_values] = np.asarray(_ols.na_fill(values, lag_max))[y_na_values]
+    in_sample = y_na_values.copy()
+    in_sample[obs_in_sample:] = False
+    filled[in_sample] = np.asarray(_ols.na_fill(values[:obs_in_sample], lag_max))[
+        in_sample[:obs_in_sample]
+    ]
     if hasattr(data, "index") and hasattr(data, "values"):
         import pandas as pd
 

@@ -163,3 +163,95 @@ def test_the_fit_over_gaps_agrees(case):
     assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
     np.testing.assert_allclose(fit.coef, r["B"], atol=1e-8)
     np.testing.assert_allclose(np.asarray(fit.predict(h=5).mean), r["fc"], atol=1e-8)
+
+
+# The missing values as gaps in ADAM and TBATS: the filled values seed the states
+# only, and everything else takes the observed values
+AIRPASSENGERS_GAPS = "y <- as.numeric(AirPassengers); y[c(10,50,51,90,140)] <- NA;"
+REGRESSION_GAPS = (
+    "set.seed(1); x1 <- rnorm(144); x2 <- as.numeric(AirPassengers)/10+rnorm(144);"
+    " y <- as.numeric(AirPassengers); y[c(10,50,51,90)] <- NA;"
+    " d <- data.frame(y=y, x1=x1, x2=x2);"
+)
+INTERMITTENT_GAPS = (
+    "set.seed(7); y <- ts(exp(2 + 0.4*sin(2*pi*(1:300)/7) + rnorm(300, 0, 0.3))*"
+    "rbinom(300, 1, 0.7), frequency=7); y[c(20:25, 150)] <- NA;"
+)
+GAPS_CASES = {
+    "adam MAM holdout": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'MAM', h=12, holdout=TRUE)",
+        lambda: ADAM(model="MAM", lags=[12], h=12, holdout=True),
+        False,
+    ),
+    "adam MSE": (
+        AIRPASSENGERS_GAPS,
+        "adam(y, 'ANN', loss='MSE')",
+        lambda: ADAM(model="ANN", loss="MSE"),
+        False,
+    ),
+    "adam TMSE": (
+        AIRPASSENGERS_GAPS,
+        "adam(y, 'ANN', loss='TMSE', h=6)",
+        lambda: ADAM(model="ANN", loss="TMSE", h=6),
+        False,
+    ),
+    "adam regressors": (REGRESSION_GAPS, "adam(d, 'MNN')", lambda: ADAM(model="MNN"), True),
+    "adam select": (
+        REGRESSION_GAPS,
+        "adam(d, 'MNN', regressors='select')",
+        lambda: ADAM(model="MNN", regressors="select"),
+        True,
+    ),
+    "adam regression": (REGRESSION_GAPS, "adam(d, 'NNN')", lambda: ADAM(model="NNN"), True),
+    "tbats": (
+        AIRPASSENGERS_GAPS,
+        "tbats(ts(y, frequency=12), lags=c(1,12))",
+        lambda: TBATS(lags=[1, 12]),
+        False,
+    ),
+    "tbats arma": (
+        AIRPASSENGERS_GAPS,
+        "tbats(ts(y, frequency=12), lags=c(1,12), orders=list(ar=1, ma=1, select=FALSE))",
+        lambda: TBATS(lags=[1, 12], orders={"ar": 1, "ma": 1, "select": False}),
+        False,
+    ),
+    "tbats occurrence": (
+        INTERMITTENT_GAPS,
+        "tbats(y, lags=c(1,7), occurrence='odds-ratio')",
+        lambda: TBATS(lags=[1, 7], occurrence="odds-ratio"),
+        False,
+    ),
+}
+
+
+def _values(values):
+    return np.array([np.nan if v is None or v == "NA" else v for v in values], float)
+
+
+@pytest.mark.parametrize("case", list(GAPS_CASES))
+def test_the_gaps_agree(case):
+    import pandas as pd
+
+    data, r_call, make, regressors = GAPS_CASES[case]
+    r = r_dict(
+        f"{{ {data} m <- suppressWarnings({r_call}); list(y=as.numeric(y),"
+        " x1=if(exists('x1')) x1 else NA, x2=if(exists('x2')) x2 else NA,"
+        " ll=as.numeric(logLik(m)), aicc=AICc(m), f=as.numeric(fitted(m)),"
+        " res=as.numeric(residuals(m)),"
+        " acc=if(is.null(m$accuracy)) NA else unname(m$accuracy[c('ME','MAE')])) }"
+    )
+    y = _values(r["y"])
+    X = pd.DataFrame({"x1": r["x1"], "x2": r["x2"]}) if regressors else None
+    fit = make().fit(y, X) if regressors else make().fit(y)
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    assert fit.aicc == pytest.approx(r["aicc"][0], abs=1e-6)
+    fitted = np.asarray(fit.fitted, dtype=float)
+    np.testing.assert_allclose(fitted, _values(r["f"])[: len(fitted)], atol=1e-6)
+    residuals = np.asarray(fit.residuals, dtype=float)
+    expected = _values(r["res"])[: len(residuals)]
+    np.testing.assert_array_equal(np.isnan(residuals), np.isnan(expected))
+    np.testing.assert_allclose(residuals, expected, atol=1e-6)
+    if r["acc"][0] not in (None, "NA"):
+        assert fit.accuracy["ME"] == pytest.approx(r["acc"][0], abs=1e-8)
+        assert fit.accuracy["MAE"] == pytest.approx(r["acc"][1], abs=1e-8)

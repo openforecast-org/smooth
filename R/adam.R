@@ -525,7 +525,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
     #### Return regression if it is pure ####
     if(is.alm(checkerReturn)){
-        obsInSample <- nobs(checkerReturn);
+        # The in-sample rows, the missing values included: alm() has the observed ones
+        obsInSample <- nrow(as.matrix(data)) - holdout*h;
         nParam <- length(checkerReturn$coefficient);
 
         modelReturned <- list(model="Regression");
@@ -559,11 +560,23 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
         }
 
+        # The fitted values and residuals at their rows: at the missing values, the
+        # prediction of the regression and no residual
+        observed <- !is.na(y[1:obsInSample]);
+        fittedValues <- residualValues <- rep(NA, obsInSample);
+        fittedValues[observed] <- fitted(checkerReturn);
+        residualValues[observed] <- residuals(checkerReturn);
+        if(any(!observed)){
+            fittedValues[!observed] <- forecast(checkerReturn, h=sum(!observed),
+                                                newdata=data[which(!observed),,drop=FALSE],
+                                                interval="none")$mean;
+        }
+
         # Prepare fitted, residuals and the forecasts
         if(inherits(y ,"zoo")){
             modelReturned$data <- data[1:obsInSample,,drop=FALSE];
-            modelReturned$fitted <- zoo(fitted(checkerReturn), order.by=yIndex[1:obsInSample]);
-            modelReturned$residuals <- zoo(residuals(checkerReturn), order.by=yIndex[1:obsInSample]);
+            modelReturned$fitted <- zoo(fittedValues, order.by=yIndex[1:obsInSample]);
+            modelReturned$residuals <- zoo(residualValues, order.by=yIndex[1:obsInSample]);
             # If we need to forecast and we had holdout=FALSE...
             if(h>0){
                 if(holdout){
@@ -585,8 +598,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         else{
             yFrequency <- frequency(y);
             modelReturned$data <- ts(data[1:obsInSample,,drop=FALSE], start=yIndex[1], frequency=yFrequency);
-            modelReturned$fitted <- ts(fitted(checkerReturn), start=yIndex[1], frequency=yFrequency);
-            modelReturned$residuals <- ts(residuals(checkerReturn), start=yIndex[1], frequency=yFrequency);
+            modelReturned$fitted <- ts(fittedValues, start=yIndex[1], frequency=yFrequency);
+            modelReturned$residuals <- ts(residualValues, start=yIndex[1], frequency=yFrequency);
             if(h>0){
                 if(holdout){
                     modelReturned$forecast <- ts(forecast(checkerReturn,h=h,newdata=tail(data,h),interval="none")$mean,
@@ -625,7 +638,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         if(is.occurrence(checkerReturn$occurrence)){
             parametersNumber[1,3] <- nParam;
         }
-        parametersNumber[1,5] <- sum(parametersNumber[1,1:3]);
+        # The scale, as alm() counts it
+        parametersNumber[1,4] <- nparam(checkerReturn) - nParam;
+        parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
         modelReturned$nParam <- parametersNumber;
         modelReturned$formula <- formula(checkerReturn);
         modelReturned$regressors <- "use";
@@ -645,8 +660,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$alm <- checkerReturn;
         if(holdout){
             # This won't work if transformations of the response variable are done...
-            modelReturned$accuracy <- measures(modelReturned$holdout[,responseName],modelReturned$forecast,
-                                               modelReturned$data[,responseName]);
+            modelReturned$accuracy <- adam_accuracy(modelReturned$holdout[,responseName],modelReturned$forecast,
+                                                    modelReturned$data[,responseName]);
         }
         else{
             modelReturned$accuracy <- NULL;
@@ -802,11 +817,15 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
                                          loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber);
 
+        # The missing values are not in the loss: the errors are zero there, and the
+        # losses are divided by the observed values
+        observed <- !yNAValues[1:obsInSample];
+        obsObserved <- sum(observed);
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
                 scale <- scaler(distribution, Etype, adamFitted$errors[otLogical],
-                                adamFitted$fitted[otLogical], obsInSample, other);
+                                adamFitted$fitted[otLogical], obsObserved, other);
 
                 # Calculate the likelihood
                 ## as.complex() is needed for failsafe in case of exotic models
@@ -912,13 +931,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 }
             }
             else if(loss=="MSE"){
-                CFValue <- sum(adamFitted$errors^2)/obsInSample;
+                CFValue <- sum(adamFitted$errors^2)/obsObserved;
             }
             else if(loss=="MAE"){
-                CFValue <- sum(abs(adamFitted$errors))/obsInSample;
+                CFValue <- sum(abs(adamFitted$errors))/obsObserved;
             }
             else if(loss=="HAM"){
-                CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsInSample;
+                CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsObserved;
             }
             else if(any(loss==c("LASSO","RIDGE"))){
                 BShrunk <- adam_penaltyParameters(B, Etype, etsModel, modelIsTrendy, modelIsSeasonal,
@@ -932,14 +951,14 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                   otherParameterEstimate, denominator);
 
                 CFValue <- (switch(Etype,
-                                   "A"=(1-lambda)* sqrt(sum((adamFitted$errors/yDenominator)^2)/obsInSample),
-                                   "M"=(1-lambda)* sqrt(sum(log(1+adamFitted$errors)^2)/obsInSample)) +
+                                   "A"=(1-lambda)* sqrt(sum((adamFitted$errors/yDenominator)^2)/obsObserved),
+                                   "M"=(1-lambda)* sqrt(sum(log(1+adamFitted$errors)^2)/obsObserved)) +
                                 switch(loss,
                                        "LASSO"=lambda * sum(abs(BShrunk)),
                                        "RIDGE"=lambda * sqrt(sum(BShrunk^2))));
             }
             else if(loss=="custom"){
-                CFValue <- lossFunction(actual=yInSample,fitted=adamFitted$fitted,B=B);
+                CFValue <- lossFunction(actual=yInSample[observed],fitted=adamFitted$fitted[observed],B=B);
             }
         }
         else{
@@ -948,22 +967,25 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                           adamElements$matF,
                                           indexLookupTable, profilesRecentTable,
                                           h, yInSample)$errors;
+            # The windows with all their targets observed
+            adamErrors <- adamErrors[adam_completeWindows(observed, h),,drop=FALSE];
+            nWindows <- nrow(adamErrors);
 
             # Not done yet: "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL"
             CFValue <- switch(loss,
-                              "MSEh"=sum(adamErrors[,h]^2)/(obsInSample-h),
-                              "TMSE"=sum(colSums(adamErrors^2)/(obsInSample-h)),
-                              "GTMSE"=sum(log(colSums(adamErrors^2)/(obsInSample-h))),
-                              "MSCE"=sum(rowSums(adamErrors)^2)/(obsInSample-h),
-                              "MAEh"=sum(abs(adamErrors[,h]))/(obsInSample-h),
-                              "TMAE"=sum(colSums(abs(adamErrors))/(obsInSample-h)),
-                              "GTMAE"=sum(log(colSums(abs(adamErrors))/(obsInSample-h))),
-                              "MACE"=sum(abs(rowSums(adamErrors)))/(obsInSample-h),
-                              "HAMh"=sum(sqrt(abs(adamErrors[,h])))/(obsInSample-h),
-                              "THAM"=sum(colSums(sqrt(abs(adamErrors)))/(obsInSample-h)),
-                              "GTHAM"=sum(log(colSums(sqrt(abs(adamErrors)))/(obsInSample-h))),
-                              "CHAM"=sum(sqrt(abs(rowSums(adamErrors))))/(obsInSample-h),
-                              "GPL"=log(det(t(adamErrors) %*% adamErrors/(obsInSample-h))),
+                              "MSEh"=sum(adamErrors[,h]^2)/nWindows,
+                              "TMSE"=sum(colSums(adamErrors^2)/nWindows),
+                              "GTMSE"=sum(log(colSums(adamErrors^2)/nWindows)),
+                              "MSCE"=sum(rowSums(adamErrors)^2)/nWindows,
+                              "MAEh"=sum(abs(adamErrors[,h]))/nWindows,
+                              "TMAE"=sum(colSums(abs(adamErrors))/nWindows),
+                              "GTMAE"=sum(log(colSums(abs(adamErrors))/nWindows)),
+                              "MACE"=sum(abs(rowSums(adamErrors)))/nWindows,
+                              "HAMh"=sum(sqrt(abs(adamErrors[,h])))/nWindows,
+                              "THAM"=sum(colSums(sqrt(abs(adamErrors)))/nWindows),
+                              "GTHAM"=sum(log(colSums(sqrt(abs(adamErrors)))/nWindows)),
+                              "CHAM"=sum(sqrt(abs(rowSums(adamErrors))))/nWindows,
+                              "GPL"=log(det(t(adamErrors) %*% adamErrors/nWindows)),
                               0);
 
         }
@@ -1050,10 +1072,12 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                     if(is.infinite(logLikReturn)){
                         logLikReturn[] <- 0;
                     }
-                    if(any(c(1-pFitted[!otLogical]==0,pFitted[otLogical]==0))){
+                    # The observed zeros: a missing value is not in the likelihood
+                    otZero <- !otLogical & !yNAValues[1:obsInSample];
+                    if(any(c(1-pFitted[otZero]==0,pFitted[otLogical]==0))){
                         # return(-Inf);
-                        ptNew <- pFitted[(pFitted!=0) & (pFitted!=1)];
-                        otNew <- ot[(pFitted!=0) & (pFitted!=1)];
+                        ptNew <- pFitted[(pFitted!=0) & (pFitted!=1) & !yNAValues[1:obsInSample]];
+                        otNew <- ot[(pFitted!=0) & (pFitted!=1) & !yNAValues[1:obsInSample]];
 
                         # Just return the original likelihood if the probability is weird
                         if(length(ptNew)==0){
@@ -1064,7 +1088,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                         }
                     }
                     else{
-                        return(logLikReturn + sum(log(pFitted[otLogical])) + sum(log(1-pFitted[!otLogical])));
+                        return(logLikReturn + sum(log(pFitted[otLogical])) + sum(log(1-pFitted[otZero])));
                     }
                 }
                 else{
@@ -1102,22 +1126,24 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                other, otherParameterEstimate, lambda,
                                adamCpp);
 
-            # Concentrated log-likelihoods for the multistep losses
+            # Concentrated log-likelihoods for the multistep losses, over the windows
+            # with all their targets observed
+            nWindows <- sum(adam_completeWindows(!yNAValues[1:obsInSample], h));
             logLikReturn[] <- -switch(loss,
                                       "MSEh"=, "aMSEh"=, "TMSE"=, "aTMSE"=, "MSCE"=, "aMSCE"=
-                                          (obsInSample-h)/2*(log(2*pi)+1+log(logLikReturn)),
+                                          nWindows/2*(log(2*pi)+1+log(logLikReturn)),
                                       "GTMSE"=, "aGTMSE"=
-                                          (obsInSample-h)/2*(log(2*pi)+1+logLikReturn),
+                                          nWindows/2*(log(2*pi)+1+logLikReturn),
                                       "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=
-                                          (obsInSample-h)*(log(2)+1+log(logLikReturn)),
+                                          nWindows*(log(2)+1+log(logLikReturn)),
                                       "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=
-                                          (obsInSample-h)*(log(4)+2+2*log(logLikReturn)),
+                                          nWindows*(log(4)+2+2*log(logLikReturn)),
                                       #### Divide GPL by 8 in order to make it comparable with the univariate ones
                                       "GPL"=, "aGPL"=
-                                          (obsInSample-h)/2*(h*log(2*pi)+h+logLikReturn)/h);
+                                          nWindows/2*(h*log(2*pi)+h+logLikReturn)/h);
 
             # This is not well motivated at the moment, but should make likelihood comparable, taking T instead of T-h
-            logLikReturn[] <- logLikReturn / (obsInSample-h) * obsInSample;
+            logLikReturn[] <- logLikReturn / nWindows * sum(!yNAValues[1:obsInSample]);
 
             # In case of multiplicative model, we assume a normal or similar distribution
             if(Etype=="M"){
@@ -1651,6 +1677,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                any(c(Etype,Ttype,Stype)=="A") && any(errors<=0)){
                 errors[errors<=0] <- 1e-100;
             }
+            # The missing values are zeros, which the occurrence model takes as a constant
+            errors[yNAValues[1:obsInSample]] <- 0;
 
             df <- length(B)+1;
             if(any(distributionNew==c("dalaplace","dgnorm","dlgnorm","dt")) && otherParameterEstimate){
@@ -1660,13 +1688,15 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
             # Call the xregSelector providing the original matrix with the data
             xregIndex[] <- switch(Etype,"A"=1,"M"=2);
+            # Without an occurrence model, on the observed values only
+            rowsSelected <- occurrenceModel | !yNAValues[1:obsInSample];
             xregModelInitials[[xregIndex]] <- adam_xreg_selector(
-                errors=errors,
+                errors=errors[rowsSelected],
                 xregData=xregDataOriginal[1:obsInSample,
                                           colnames(xregDataOriginal)!=responseName,
-                                          drop=FALSE],
-                obsInSample=obsInSample, ic=ic,
-                df=df, distribution=distributionNew, occurrence=omModel,
+                                          drop=FALSE][rowsSelected,,drop=FALSE],
+                obsInSample=sum(rowsSelected), ic=ic,
+                df=df, distribution=distributionNew, occurrence=if(occurrenceModel) omModel,
                 other=other);
             xregNumber <- length(xregModelInitials[[xregIndex]]$initialXreg);
             xregNames <- names(xregModelInitials[[xregIndex]]$initialXreg);
@@ -1715,9 +1745,12 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 }
 
                 # Estimate alm again in order to get proper initials
-                almModel <- do.call(alm,list(formula=formulaToUse,
-                                             data=data[1:obsInSample,,drop=FALSE],
-                                             distribution=distributionNew, loss=lossNew, occurrence=omModel));
+                # On the observed (non-zero) values only when some are missing
+                almModel <- do.call(alm,c(list(formula=formulaToUse,
+                                               data=data[1:obsInSample,,drop=FALSE],
+                                               distribution=distributionNew, loss=lossNew),
+                                          if(any(yNAValues)) list(subset=which(otLogical)) else
+                                              list(occurrence=omModel)));
 
                 # Remove trend
                 if(!trendIncluded){
@@ -1738,7 +1771,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 # The names of the original variables
                 xregNamesOriginal <- all.vars(formula)[-1];
                 # Expand the variables. We cannot use alm, because it is based on obsInSample
-                xregData <- model.frame(formula,data=as.data.frame(data));
+                # The rows with the missing response stay, aligned with the data
+                xregData <- model.frame(formula,data=as.data.frame(data),na.action=na.pass);
                 # Binary, flagging factors in the data
                 xregFactors <- (attr(terms(xregData),"dataClasses")=="factor")[-1];
                 # Expanded stuff with all levels for factors
@@ -1976,9 +2010,11 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             yFitted[] <- yFitted * as.numeric(pFitted);
         }
 
-        # Fix the cases, when we have zeroes in the provided occurrence
+        # Fix the cases, when we have zeroes in the provided occurrence. At the missing
+        # values the fitted is the prediction of the model
         if(occurrence=="provided"){
-            yFitted[!otLogical] <- yFitted[!otLogical] * pFitted[!otLogical];
+            zeroObserved <- !otLogical & !yNAValues[1:obsInSample];
+            yFitted[zeroObserved] <- yFitted[zeroObserved] * pFitted[zeroObserved];
         }
 
         # Produce forecasts if the horizon is non-zero
@@ -2086,7 +2122,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             other <- abs(tail(B,1));
         }
         # which() is needed in order to overcome weird behaviour of zoo
-        scale <- scaler(distribution, Etype, errors[which(otLogical)], yFitted[which(otLogical)], obsInSample, other);
+        scale <- scaler(distribution, Etype, errors[which(otLogical)], yFitted[which(otLogical)],
+                        sum(!yNAValues[1:obsInSample]), other);
 
         # Record constant if it was estimated
         if(constantEstimate){
@@ -2157,10 +2194,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         ic=ic, h=horizon,
                                         holdout=holdout, bounds=bounds, regressors=regressors,
                                         initial=initialType, ets=ets, silent=TRUE));
+        # At a missing observation, neither a demand nor its absence, the probability is
+        # the prediction of the occurrence model: the likelihoods leave the gap out
         pFitted[] <- fitted(omModel);
-        # A missing observation is neither a demand nor its absence: a probability of zero
-        # there keeps it out of the likelihood of the occurrence, as without an occurrence model
-        pFitted[yNAValues[1:obsInSample]] <- 0;
         parametersNumber[1,3] <- nparam(omModel);
         # print(omModel)
         # This should not happen, but just in case...
@@ -2874,7 +2910,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelName <- adam_model_name(etsModel, model, xregModel, arimaModel,
                                      arOrders, iOrders, maOrders, lags,
                                      regressors, constantRequired, constantName,
-                                     modelReturned$occurrence$occurrence, componentsNumberETSSeasonal);
+                                     # Missing values alone are not an occurrence model
+                                     if(occurrenceMissingOnly) "none" else modelReturned$occurrence$occurrence,
+                                     componentsNumberETSSeasonal);
 
         modelReturned$model <- modelName;
         modelReturned$timeElapsed <- Sys.time()-startTime;
@@ -2960,7 +2998,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             modelName <- adam_model_name(etsModel, model, xregModel, arimaModel,
                                          arOrders, iOrders, maOrders, lags,
                                          regressors, constantRequired, constantName,
-                                         occurrence, componentsNumberETSSeasonal);
+                                         if(occurrenceMissingOnly) "none" else occurrence, componentsNumberETSSeasonal);
 
             modelReturned$models[[i]]$model <- modelName;
             modelReturned$models[[i]]$timeElapsed <- Sys.time()-startTime;
@@ -3018,7 +3056,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                      any(sapply(adamSelected$results, "[[", "xregModel")), arimaModel,
                                      arOrders, iOrders, maOrders, lags,
                                      regressors, constantRequired, constantName,
-                                     occurrence, componentsNumberETSSeasonal);
+                                     if(occurrenceMissingOnly) "none" else occurrence, componentsNumberETSSeasonal);
         modelReturned$model <- modelName;
         modelReturned$formula <- as.formula(paste0(responseName,"~."));
         modelReturned$timeElapsed <- Sys.time()-startTime;
@@ -3077,7 +3115,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
     # Error measures if there is a holdout
     if(holdout){
-        modelReturned$accuracy <- measures(yHoldout,modelReturned$forecast,yInSample);
+        # The filled values are not data
+        modelReturned$accuracy <- adam_accuracy(replace(yHoldout, yNAValues[-c(1:obsInSample)], NA),
+                                                modelReturned$forecast,
+                                                replace(yInSample, yNAValues[1:obsInSample], NA));
     }
 
     if(!silent){
@@ -4979,7 +5020,14 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
             newCall$shape <- object$other$shape;
         }
     }
-    newCall$occurrence <- object$occurrence;
+    # With missing values only, the occurrence is internal (all ones): the refits make their own
+    if(is.occurrence(object$occurrence) && object$occurrence$occurrence=="provided" &&
+       all(fitted(object$occurrence)==1)){
+        newCall$occurrence <- "none";
+    }
+    else{
+        newCall$occurrence <- object$occurrence;
+    }
 
     # If this is backcasting, do sampling with moving origin
     changeOrigin <- FALSE;
@@ -5023,14 +5071,16 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         newData <- replicate(nsim, object$data, simplify=FALSE);
         newCall$formula <- as.formula(paste0(responseName,"~."));
         type <- "multiplicative";
-        if(any(yInSample<0)){
+        # The observed values are bootstrapped, the missing ones stay missing
+        observed <- !is.na(yInSample);
+        if(any(yInSample[observed]<0)){
             type[] <- "additive";
         }
         #
         # Only bootstrap the response variable
-        dataBoot <- dsrboot(yInSample, nsim=nsim, type=type, intermittent=FALSE);
+        dataBoot <- dsrboot(yInSample[observed], nsim=nsim, type=type, intermittent=FALSE);
         for(i in 1:nsim){
-            newData[[i]][,responseName] <- dataBoot$boot[,i];
+            newData[[i]][observed,responseName] <- dataBoot$boot[,i];
         }
         # This chunk of code does the bootstrap for explanatory variables as well
         # dataBoot <- suppressWarnings(apply(newCall$data, 2, dsrboot,
@@ -5367,7 +5417,7 @@ rstandard.adam <- function(model, ...){
     }
 
     # The scale, de-biased in the variance space
-    scale <- adam_scaleDebias(extractScale(model), distribution, obs, adam_dfScale(model));
+    scale <- adam_scaleDebias(extractScale(model), distribution, adam_nobsObserved(model), adam_dfScale(model));
     logDistribution <- any(distribution==c("dlnorm","dllaplace","dls","dlgnorm"));
     if(logDistribution){
         errors[] <- log(errors);
@@ -5395,7 +5445,8 @@ rstandard.adam <- function(model, ...){
 #' @export
 rstudent.adam <- function(model, ...){
     obs <- nobs(model);
-    df <- obs - nparam(model) - 1;
+    # The missing values are not observations
+    df <- adam_nobsObserved(model) - nparam(model) - 1;
     rstudentised <- errors <- residuals(model);
     # If this is an occurrence model, then only modify the non-zero obs
     # Also, if there are NAs in actuals, consider them as occurrence
@@ -5406,51 +5457,51 @@ rstudent.adam <- function(model, ...){
         residsToGo <- c(1:obs);
     }
     if(any(model$distribution==c("dt","dnorm"))){
-        errors[] <- errors - mean(errors);
+        errors[] <- errors - mean(errors, na.rm=TRUE);
         for(i in residsToGo){
             rstudentised[i] <- errors[i] / sqrt(sum(errors[-i]^2,na.rm=TRUE) / df);
         }
     }
     else if(model$distribution=="dlaplace"){
-        errors[] <- errors - mean(errors);
+        errors[] <- errors - mean(errors, na.rm=TRUE);
         for(i in residsToGo){
             rstudentised[i] <- errors[i] / (sum(abs(errors[-i]),na.rm=TRUE) / df);
         }
     }
     else if(model$distribution=="dlnorm"){
-        errors[] <- log(errors) - mean(log(errors)) - extractScale(model)/2;
+        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE) - extractScale(model)/2;
         for(i in residsToGo){
             rstudentised[i] <- exp(errors[i] / sqrt(sum(errors[-i]^2,na.rm=TRUE) / df));
         }
     }
     else if(model$distribution=="dllaplace"){
-        errors[] <- log(errors) - mean(log(errors));
+        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE);
         for(i in residsToGo){
             rstudentised[i] <- exp(errors[i] / (sum(abs(errors[-i]),na.rm=TRUE) / df));
         }
     }
     else if(model$distribution=="ds"){
-        errors[] <- errors - mean(errors);
+        errors[] <- errors - mean(errors, na.rm=TRUE);
         for(i in residsToGo){
             rstudentised[i] <- errors[i] / (sum(sqrt(abs(errors[-i])),na.rm=TRUE) / (2*df))^2;
         }
     }
     else if(model$distribution=="dls"){
-        errors[] <- log(errors) - mean(log(errors));
+        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE);
         for(i in residsToGo){
             rstudentised[i] <- exp(errors[i] / (sum(sqrt(abs(errors[-i])),na.rm=TRUE) / (2*df))^2);
         }
     }
     else if(model$distribution=="dgnorm"){
-        errors[] <- errors - mean(errors);
+        errors[] <- errors - mean(errors, na.rm=TRUE);
         for(i in residsToGo){
-            rstudentised[i] <- errors[i] /  (sum(abs(errors[-i])^model$other$shape) * (model$other$shape/df))^{1/model$other$shape};
+            rstudentised[i] <- errors[i] /  (sum(abs(errors[-i])^model$other$shape, na.rm=TRUE) * (model$other$shape/df))^{1/model$other$shape};
         }
     }
     else if(model$distribution=="dlgnorm"){
-        errors[] <- log(errors) - mean(log(errors));
+        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE);
         for(i in residsToGo){
-            rstudentised[i] <- errors[i] /  (sum(abs(errors[-i])^model$other$shape) * (model$other$shape/df))^{1/model$other$shape};
+            rstudentised[i] <- errors[i] /  (sum(abs(errors[-i])^model$other$shape, na.rm=TRUE) * (model$other$shape/df))^{1/model$other$shape};
         }
     }
     else if(model$distribution=="dalaplace"){
@@ -5459,14 +5510,15 @@ rstudent.adam <- function(model, ...){
         }
     }
     else if(model$distribution=="dlogis"){
-        errors[] <- errors - mean(errors);
+        errors[] <- errors - mean(errors, na.rm=TRUE);
         for(i in residsToGo){
             rstudentised[i] <- errors[i] / (sqrt(sum(errors[-i]^2,na.rm=TRUE) / df) * sqrt(3) / pi);
         }
     }
     else if(any(model$distribution==c("dinvgauss","dgamma"))){
         for(i in residsToGo){
-            rstudentised[i] <- errors[i] / mean(errors[residsToGo][-i],na.rm=TRUE);
+            # Leave the observation i out, not the i-th of residsToGo
+            rstudentised[i] <- errors[i] / mean(errors[residsToGo[residsToGo!=i]],na.rm=TRUE);
         }
     }
     else{
@@ -5489,7 +5541,7 @@ outlierdummy.adam <- function(object, level=0.999, type=c("rstandard","rstudent"
                         "dllaplace"=qlaplace(c((1-level)/2, (1+level)/2), 0, 1),
                         "dalaplace"=qalaplace(c((1-level)/2, (1+level)/2), 0, 1, object$other$alpha),
                         "dlogis"=qlogis(c((1-level)/2, (1+level)/2), 0, 1),
-                        "dt"=qt(c((1-level)/2, (1+level)/2), nobs(object)-nparam(object)),
+                        "dt"=qt(c((1-level)/2, (1+level)/2), adam_nobsObserved(object)-nparam(object)),
                         "dgnorm"=,
                         "dlgnorm"=qgnorm(c((1-level)/2, (1+level)/2), 0, 1, object$other$shape),
                         "ds"=,
@@ -5497,7 +5549,7 @@ outlierdummy.adam <- function(object, level=0.999, type=c("rstandard","rstudent"
                         # In the next one, the scale is debiased, taking n-k into account
                         "dinvgauss"=qinvgauss(c((1-level)/2, (1+level)/2), mean=1,
                                               dispersion=adam_scaleDebias(mean(extractScale(object)), "dinvgauss",
-                                                                          nobs(object), adam_dfScale(object))),
+                                                                          adam_nobsObserved(object), adam_dfScale(object))),
                         "dgamma"=qgamma(c((1-level)/2, (1+level)/2), shape=1/extractScale(object), scale=extractScale(object)),
                         qnorm(c((1-level)/2, (1+level)/2), 0, 1));
     # Fix for IG in case of scale - it should be chi-squared
@@ -6539,20 +6591,23 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                     }
                     adamErrors[] <- adamErrors/yFittedMatrix;
                 }
+                # The windows with all their targets observed
+                adamErrors <- adamErrors[complete.cases(adamErrors),,drop=FALSE];
+                nWindows <- nrow(adamErrors);
 
                 if(interval=="semiparametric"){
                     # Do either the variance of sum, or a diagonal
                     if(cumulative){
-                        vcovMulti <- sum(t(adamErrors) %*% adamErrors / (obsInSample-h));
+                        vcovMulti <- sum(t(adamErrors) %*% adamErrors / nWindows);
                     }
                     else{
-                        vcovMulti <- diag(t(adamErrors) %*% adamErrors / (obsInSample-h));
+                        vcovMulti <- diag(t(adamErrors) %*% adamErrors / nWindows);
                     }
                 }
                 # For nonparametric and cumulative...
                 else{
                     if(cumulative){
-                        adamErrors <- matrix(apply(adamErrors, 2, sum),obsInSample-h,1);
+                        adamErrors <- matrix(apply(adamErrors, 2, sum),nWindows,1);
                     }
                 }
             }
@@ -6564,7 +6619,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 else{
                     vcovMulti <- adam_varianceDebiased(object);
                 }
+                # The residuals of the observed values
                 adamErrors <- as.matrix(residuals(object));
+                adamErrors <- adamErrors[!is.na(adamErrors[,1]),,drop=FALSE];
             }
         }
 
@@ -7265,8 +7322,10 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
         }
     }
     else if(type=="empirical"){
+        # The windows with all their targets observed
         adamErrors <- rmultistep(object, h=h);
-        covarMat <- t(adamErrors) %*% adamErrors / (nobs(object) - h);
+        adamErrors <- adamErrors[complete.cases(adamErrors),,drop=FALSE];
+        covarMat <- t(adamErrors) %*% adamErrors / nrow(adamErrors);
     }
     else if(type=="simulated"){
         # This code is based on the forecast.adam() with simulations

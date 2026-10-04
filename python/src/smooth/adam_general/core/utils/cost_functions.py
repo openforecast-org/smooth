@@ -12,6 +12,8 @@ from smooth.adam_general.core.utils.utils import (
     calculate_entropy,
     calculate_likelihood,
     calculate_multistep_loss,
+    complete_windows,
+    observed_mask,
     scaler,
 )
 
@@ -602,10 +604,10 @@ def CF(  # noqa: N802
             np.asarray(adam_fitted.errors).ravel(),
         )
 
-    # adam_fitted.errors = np.repeat()
-
-    # print('adam_fitted')
-    # print(adam_fitted)
+    # The missing values are not in the loss: the errors are zero there, and the
+    # losses are divided by the observed values
+    observed = observed_mask(observations_dict)
+    obs_observed = int(np.sum(observed))
     if not general["multisteps"]:
         if general["loss"] == "likelihood":
             scale = scaler(
@@ -613,7 +615,7 @@ def CF(  # noqa: N802
                 model_type_dict["error_type"],
                 adam_fitted.errors[observations_dict["ot_logical"]],
                 adam_fitted.fitted[observations_dict["ot_logical"]],
-                observations_dict["obs_in_sample"],
+                obs_observed,
                 other,
             )
             # Aggregate through _sum_r: R accumulates sum() in a long double
@@ -654,16 +656,11 @@ def CF(  # noqa: N802
                 CFValue += CFValueEntropy
 
         elif general["loss"] == "MSE":
-            CFValue = _sum_r(adam_fitted.errors**2) / observations_dict["obs_in_sample"]
+            CFValue = _sum_r(adam_fitted.errors**2) / obs_observed
         elif general["loss"] == "MAE":
-            CFValue = (
-                _sum_r(np.abs(adam_fitted.errors)) / observations_dict["obs_in_sample"]
-            )
+            CFValue = _sum_r(np.abs(adam_fitted.errors)) / obs_observed
         elif general["loss"] == "HAM":
-            CFValue = (
-                _sum_r(np.sqrt(np.abs(adam_fitted.errors)))
-                / observations_dict["obs_in_sample"]
-            )
+            CFValue = _sum_r(np.sqrt(np.abs(adam_fitted.errors))) / obs_observed
         elif general["loss"] in ["LASSO", "RIDGE"]:
             # Trim B for penalty term (shared helper — also called by om_cf
             # and omg_cf so OM/OMG penalise the exact same parameter subset
@@ -688,7 +685,7 @@ def CF(  # noqa: N802
 
             # Calculate error term based on error type
             error_type = model_type_dict.get("error_type", "A")
-            obs_in_sample = observations_dict.get("obs_in_sample", len(errors_flat))
+            obs_in_sample = obs_observed
             lambda_val = general.get("lambda", 0)
 
             if error_type == "A":
@@ -723,7 +720,9 @@ def CF(  # noqa: N802
             # (armadillo vectors are column vectors that may become (n,1) shaped arrays)
             fitted_1d = np.asarray(adam_fitted.fitted).ravel()
             CFValue = general["loss_function"](
-                actual=y_in_sample, fitted=fitted_1d, B=B
+                actual=np.asarray(y_in_sample).ravel()[observed],
+                fitted=fitted_1d[observed],
+                B=B,
             )
     else:
         # Multistep loss functions (MSEh, TMSE, GTMSE, MSCE, etc.)
@@ -741,10 +740,12 @@ def CF(  # noqa: N802
             vectorYt=y_in_sample,
         )
         adam_errors = error_result.errors  # Matrix: (obs_in_sample - h) x h
+        # The windows with all their targets observed
+        adam_errors = adam_errors[complete_windows(observed, h)]
 
         # Calculate loss based on type
         loss = general["loss"]
-        CFValue = calculate_multistep_loss(loss, adam_errors, obs_in_sample, h)
+        CFValue = calculate_multistep_loss(loss, adam_errors, len(adam_errors) + h, h)
 
     # A perfect fit (-inf) is kept, as in R
     if np.isnan(CFValue) or CFValue == np.inf:
@@ -1044,24 +1045,19 @@ def log_Lik_ADAM(  # noqa: N802
                 otherParameterEstimate=otherParameterEstimate,
             )
 
-            # Handle occurrence model
+            # Handle occurrence model: the observed zeros, a missing value is not in
+            # the likelihood
             if occurrence_dict["occurrence_model"]:
                 if np.isinf(logLikReturn):
                     logLikReturn = 0
-                if any(
-                    1 - occurrence_dict["p_fitted"][~observations_dict["ot_logical"]]
-                    == 0
-                ) or any(
-                    occurrence_dict["p_fitted"][observations_dict["ot_logical"]] == 0
-                ):
-                    pt_new = occurrence_dict["p_fitted"][
-                        (occurrence_dict["p_fitted"] != 0)
-                        & (occurrence_dict["p_fitted"] != 1)
-                    ]
-                    ot_new = observations_dict["ot"][
-                        (occurrence_dict["p_fitted"] != 0)
-                        & (occurrence_dict["p_fitted"] != 1)
-                    ]
+                p_fitted = occurrence_dict["p_fitted"]
+                ot_logical = observations_dict["ot_logical"]
+                observed = observed_mask(observations_dict)
+                zero = ~ot_logical & observed
+                if any(1 - p_fitted[zero] == 0) or any(p_fitted[ot_logical] == 0):
+                    usable = (p_fitted != 0) & (p_fitted != 1) & observed
+                    pt_new = p_fitted[usable]
+                    ot_new = observations_dict["ot"][usable]
                     if len(pt_new) == 0:
                         return logLikReturn
                     else:
@@ -1073,21 +1069,8 @@ def log_Lik_ADAM(  # noqa: N802
                 else:
                     return (
                         logLikReturn
-                        + _sum_r(
-                            _log_r(
-                                occurrence_dict["p_fitted"][
-                                    observations_dict["ot_logical"]
-                                ]
-                            )
-                        )
-                        + _sum_r(
-                            _log_r(
-                                1
-                                - occurrence_dict["p_fitted"][
-                                    ~observations_dict["ot_logical"]
-                                ]
-                            )
-                        )
+                        + _sum_r(_log_r(p_fitted[ot_logical]))
+                        + _sum_r(_log_r(1 - p_fitted[zero]))
                     )
             else:
                 return logLikReturn
@@ -1113,31 +1096,28 @@ def log_Lik_ADAM(  # noqa: N802
             bounds=None,
         )
 
-        # Concentrated log-likelihoods for the multistep losses
+        # Concentrated log-likelihoods for the multistep losses, over the windows
+        # with all their targets observed
+        observed = observed_mask(observations_dict)
+        n_windows = int(np.sum(complete_windows(observed, general_dict["h"])))
         if general_dict["loss"] in ["MSEh", "aMSEh", "TMSE", "aTMSE", "MSCE", "aMSCE"]:
             # is horizon different than h?
             logLikReturn = (
-                -(observations_dict["obs_in_sample"] - general_dict["h"])
+                -n_windows
                 / 2
                 * (math.log(2 * math.pi) + 1 + float(_log_r(logLikReturn)))
             )
         elif general_dict["loss"] in ["GTMSE", "aGTMSE"]:
-            logLikReturn = (
-                -(observations_dict["obs_in_sample"] - general_dict["h"])
-                / 2
-                * (math.log(2 * math.pi) + 1 + logLikReturn)
-            )
+            logLikReturn = -n_windows / 2 * (math.log(2 * math.pi) + 1 + logLikReturn)
         elif general_dict["loss"] in ["MAEh", "TMAE", "GTMAE", "MACE"]:
-            logLikReturn = -(observations_dict["obs_in_sample"] - general_dict["h"]) * (
-                math.log(2) + 1 + float(_log_r(logLikReturn))
-            )
+            logLikReturn = -n_windows * (math.log(2) + 1 + float(_log_r(logLikReturn)))
         elif general_dict["loss"] in ["HAMh", "THAM", "GTHAM", "CHAM"]:
-            logLikReturn = -(observations_dict["obs_in_sample"] - general_dict["h"]) * (
+            logLikReturn = -n_windows * (
                 math.log(4) + 2 + 2 * float(_log_r(logLikReturn))
             )
         elif general_dict["loss"] in ["GPL", "aGPL"]:
             logLikReturn = (
-                -(observations_dict["obs_in_sample"] - general_dict["h"])
+                -n_windows
                 / 2
                 * (
                     general_dict["h"] * math.log(2 * math.pi)
@@ -1148,11 +1128,7 @@ def log_Lik_ADAM(  # noqa: N802
             )
 
         # Make likelihood comparable
-        logLikReturn = (
-            logLikReturn
-            / (observations_dict["obs_in_sample"] - general_dict["h"])
-            * observations_dict["obs_in_sample"]
-        )
+        logLikReturn = logLikReturn / n_windows * int(np.sum(observed))
 
         # Handle multiplicative model
         if model_type_dict["ets_model"] and model_type_dict["error_type"] == "M":

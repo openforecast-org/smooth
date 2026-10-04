@@ -24,6 +24,7 @@ from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
+    observed_mask,
     resolve_smoother,
     scale_debias,
     scale_variance,
@@ -1140,12 +1141,9 @@ class ADAM:
                 if not isinstance(occurrence, str)
                 else self._fit_occurrence_model(y, X)
             )
-            p_fitted = np.array(self._om_model.fitted, dtype=float)
-            # A missing observation: a probability of zero keeps it out of the
-            # likelihood of the occurrence, as R
-            if missing is not None:
-                p_fitted[missing] = 0.0
-            self._occurrence["p_fitted"] = p_fitted
+            # At a missing observation the probability is the prediction of the
+            # occurrence model: the likelihoods leave the gap out, as R
+            self._occurrence["p_fitted"] = np.array(self._om_model.fitted, dtype=float)
             self._occurrence["oes_model"] = occurrence
 
         # Execute model estimation or selection based on model_do
@@ -2261,7 +2259,17 @@ class ADAM:
         """
         self._check_is_fitted()
         if getattr(self, "_is_combined", False):
-            return self._combined_residuals
+            # No residual where the observation is missing
+            combined = self._combined_residuals
+            missing = ~observed_mask(self._observations)
+            if not np.any(missing):
+                return combined
+            combined = combined.copy().astype(float)
+            if isinstance(combined, pd.Series):
+                combined.iloc[missing] = np.nan
+            else:
+                combined[missing] = np.nan
+            return combined
 
         e = self._prepared["residuals"]
         if self.distribution_ in _RATIO_RESIDUAL_DISTRIBUTIONS:
@@ -2321,11 +2329,12 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        obs = self.nobs
+        # The missing values (NaN residuals) are not observations
+        obs = self._nobs_observed()
         errors = self.residuals.copy().astype(float)
         dist = self.distribution_
         if dist in ("dinvgauss", "dgamma"):
-            return errors / np.mean(errors)
+            return errors / np.nanmean(errors)
 
         # R's rstandard.adam standardises by extractScale(), de-biased in the
         # variance space. extract_scale() is a vector when a scale model is
@@ -2340,7 +2349,7 @@ class ADAM:
             errors = errors + raw_scale / 2
         # The conventional residuals of Laplace, ALaplace and Logistic are not centred
         if dist not in ("dlaplace", "dalaplace", "dlogis"):
-            errors = errors - np.mean(errors)
+            errors = errors - np.nanmean(errors)
         # sigma for dnorm and dlnorm, s^2 for S, s for the rest
         if dist in ("dt", "dnorm", "dlnorm"):
             errors = errors / np.sqrt(scale)
@@ -2399,51 +2408,59 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        obs = self.nobs
+        # The missing values (NaN residuals) are not observations
+        obs = self._nobs_observed()
         df = obs - self.nparam - 1
         errors = self.residuals.copy().astype(float)
         dist = self.distribution_
 
         if dist == "dnorm":
-            errors -= np.mean(errors)
-            total_sq = np.sum(errors**2)
+            errors -= np.nanmean(errors)
+            total_sq = np.nansum(errors**2)
             denom = np.sqrt((total_sq - errors**2) / df)
             return errors / denom
 
         elif dist == "dlaplace":
-            errors -= np.mean(errors)
-            total_abs = np.sum(np.abs(errors))
+            errors -= np.nanmean(errors)
+            total_abs = np.nansum(np.abs(errors))
             denom = (total_abs - np.abs(errors)) / df
             return errors / denom
 
         elif dist == "ds":
-            errors -= np.mean(errors)
-            total_sqrt_abs = np.sum(np.sqrt(np.abs(errors)))
+            errors -= np.nanmean(errors)
+            total_sqrt_abs = np.nansum(np.sqrt(np.abs(errors)))
             denom = ((total_sqrt_abs - np.sqrt(np.abs(errors))) / (2 * df)) ** 2
             return errors / denom
 
         elif dist == "dgnorm":
             beta = self._gnorm_shape() or 2.0
-            errors -= np.mean(errors)
-            total_pow = np.sum(np.abs(errors) ** beta)
+            errors -= np.nanmean(errors)
+            total_pow = np.nansum(np.abs(errors) ** beta)
             denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
             return errors / denom
 
         elif dist in ("dinvgauss", "dgamma"):
-            total = np.sum(errors)
-            mean_loo = (total - errors) / (obs - 1)
-            return errors / mean_loo
+            # The observed values, non-zero with an occurrence model, as R's
+            # residsToGo: each leaves itself out of their mean
+            used = observed_mask(self._observations)
+            if getattr(self, "_om_model", None) is not None:
+                used = used & np.asarray(self._observations["ot_logical"], dtype=bool)
+            total = np.sum(errors[used])
+            mean_loo = (total - np.where(used, errors, 0.0)) / (
+                np.sum(used) - used.astype(float)
+            )
+            return np.where(used, errors / mean_loo, errors)
 
         elif dist == "dlnorm":
             scale = self.extract_scale()
-            log_e = np.log(errors) - np.mean(np.log(errors)) - scale / 2
-            total_sq = np.sum(log_e**2)
+            log_e = np.log(errors) - np.nanmean(np.log(errors)) - scale / 2
+            total_sq = np.nansum(log_e**2)
             denom = np.sqrt((total_sq - log_e**2) / df)
             return np.exp(log_e / denom)
 
         else:  # default: treat like normal
-            errors -= np.mean(errors)
-            total_sq = np.sum(errors**2)
+            errors -= np.nanmean(errors)
+            total_sq = np.nansum(errors**2)
             denom = np.sqrt((total_sq - errors**2) / df)
             return errors / denom
 
@@ -2543,7 +2560,7 @@ class ADAM:
             scale = self.sigma
             stat = scipy_stats.gamma.ppf(p, a=1.0 / scale, scale=scale)
         elif dist == "dinvgauss":
-            nobs, npar = self.nobs, self.nparam
+            nobs, npar = self._nobs_observed(), self.nparam
             disp = float(self.sigma) * nobs / (nobs - npar)
             stat = scipy_stats.invgauss.ppf(p, mu=disp, scale=1.0 / disp)
         else:
@@ -2691,7 +2708,13 @@ class ADAM:
         sample contains no zeroes.
         """
         y = np.asarray(self._observations["y_in_sample"], dtype=np.float64).ravel()
-        return int(np.count_nonzero(y))
+        # The missing values were filled: they are not observations
+        return int(np.count_nonzero(y[observed_mask(self._observations)]))
+
+    def _nobs_observed(self) -> int:
+        """The observed in-sample values (R: ``adam_nobsObserved``): the missing
+        ones are not."""
+        return int(np.sum(observed_mask(self._observations)))
 
     def _ic_occurrence_terms(self):
         """``(n_param_all, n_param_sizes, obs)`` for AICc/BICc.
@@ -2703,11 +2726,16 @@ class ADAM:
         non-zero fitted values.
         """
         n_param_all = float(self.nparam)
+        observed = observed_mask(self._observations)
         if getattr(self, "_om_model", None) is None:
-            return n_param_all, n_param_all, int(self.nobs)
+            return n_param_all, n_param_all, int(np.sum(observed))
         n_occurrence = float(self._n_param.estimated.get("occurrence", 0))
         fitted = np.asarray(self.fitted, dtype=np.float64).ravel()
-        return n_param_all, n_param_all - n_occurrence, int(np.count_nonzero(fitted))
+        return (
+            n_param_all,
+            n_param_all - n_occurrence,
+            int(np.count_nonzero(fitted[observed])),
+        )
 
     @property
     def scale_model(self):
@@ -3599,6 +3627,7 @@ class ADAM:
                     fc_values[:n],
                     np.asarray(y_in_sample, dtype=float),
                     period,
+                    self._observations.get("y_na_values"),
                 )
 
         return predictions
@@ -3729,13 +3758,33 @@ class ADAM:
         outputs into the ADAM attribute surface.
         """
         alm = self._alm_model
-        n = int(alm.nobs)
-        y_in_sample = np.asarray(y[:n], dtype=float)
-        fitted = np.asarray(alm.fitted_values_, dtype=float)
+        # The in-sample rows, the missing values included: ALM has the observed ones
+        values = np.asarray(y, dtype=float).ravel()
+        n = len(values) - (int(self.h) if (self.holdout and self.h) else 0)
+        y_in_sample = values[:n]
+        observed = ~np.isnan(y_in_sample)
+        # The fitted values at their rows: the prediction of the regression at the
+        # missing values, where there is no residual
+        fitted = np.full(n, np.nan)
+        fitted[observed] = np.asarray(alm.fitted_values_, dtype=float)
+        if not np.all(observed):
+            X_gaps = _validate_x(X, n)[1][~observed]
+            if alm._feature_names is not None:
+                names_all = _validate_x(X, n)[3] or [
+                    f"x{i + 1}" for i in range(X_gaps.shape[1])
+                ]
+                X_gaps = X_gaps[:, [names_all.index(nm) for nm in alm._feature_names]]
+            fitted[~observed] = np.ravel(
+                alm.predict(
+                    np.column_stack([np.ones(len(X_gaps)), X_gaps]), interval="none"
+                ).mean
+            )
 
         self._observations = {
             "y_in_sample": y_in_sample,
             "ot": (y_in_sample != 0).astype(float),
+            "obs_in_sample": n,
+            "y_na_values": ~observed,
         }
         self._model_type = {
             "model": "NNN",
@@ -3766,7 +3815,7 @@ class ADAM:
             "n_param_estimated": int(alm.nparam),
             "log_lik_adam_value": {
                 "value": float(alm.loglik),
-                "nobs": n,
+                "nobs": int(np.sum(observed)),
                 "df": int(alm.nparam),
             },
         }
@@ -3799,7 +3848,7 @@ class ADAM:
             side=side,
         )
 
-        n = int(alm.nobs)
+        n = len(self._observations["y_in_sample"])
         index = pd.RangeIndex(n, n + h)
         lower = upper = None
         if interval != "none":
@@ -4697,6 +4746,7 @@ class ADAM:
             fc_values[:n],
             np.asarray(y_in_sample, dtype=float),
             period,
+            self._observations.get("y_na_values"),
         )
 
     def _validate_prediction_inputs(self):
@@ -6019,6 +6069,10 @@ class ADAM:
         else:
             ot = np.ones((n, 1), dtype=np.float64)
             pt = np.ones(n, dtype=np.float64)
+        # The missing values are skipped, as in the fit
+        missing = np.isnan(y_in_sample[:, 0])
+        ot[missing | np.isnan(ot[:, 0])] = 0.0
+        y_in_sample[missing] = 0.0
 
         # 8. Build the index lookup table and call C++ (R/reapply.R:239, 757-761)
         from smooth.adam_general.core.creator import adam_profile_creator
@@ -6989,11 +7043,12 @@ class ADAM:
         bit-equivalent between languages.
         """
         errors = self.rmultistep(h=h).to_numpy()
-        n_obs = int(self.nobs)
+        # The windows with all their targets observed
+        errors = errors[~np.any(np.isnan(errors), axis=1)]
         # Guard the denominator against pathological tiny samples
         # (matches the spirit of R/methods.R:215 — ``df[df<=0] <-
         # obs[df<=0]``).
-        df = max(n_obs - h, 1)
+        df = max(len(errors), 1)
         return (errors.T @ errors) / df
 
     def _variance_debiased(self) -> float:
@@ -7001,7 +7056,7 @@ class ADAM:
         variance = scale_variance(
             self.extract_scale(), self.distribution_, getattr(self, "other", None)
         )
-        return float(np.mean(variance) * self.nobs / self._df_scale)
+        return float(np.mean(variance) * self._nobs_observed() / self._df_scale)
 
     def _multicov_analytical(self, h: int, covar_anal_fn, var_anal_fn) -> NDArray:
         """Closed-form covariance — mirrors R/adam.R:7087-7088."""

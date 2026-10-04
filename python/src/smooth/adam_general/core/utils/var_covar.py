@@ -1,6 +1,7 @@
 import numpy as np
 
 from smooth.adam_general.core.utils.cost_functions import _sum_r
+from smooth.adam_general.core.utils.utils import observed_mask
 
 
 def sigma(observations_dict, params_info, general, prepared_model, error_type=None):
@@ -177,13 +178,18 @@ def sigma(observations_dict, params_info, general, prepared_model, error_type=No
     if general["loss"] == "likelihood" and len(params_info[0]) > 1:
         params_number = params_number - params_info[0][1]
 
-    vals = observations_dict["obs_in_sample"] - params_number
+    # The observed non-zero values, as R's nobs(object, all=FALSE)
+    vals = (
+        observations_dict.get("obs_nonzero", observations_dict["obs_in_sample"])
+        - params_number
+    )
     # If the sample is too small, then use biased estimator
     if vals <= 0:
         vals = observations_dict["obs_in_sample"]
 
+    # No residual at the missing values
     residuals = prepared_model["residuals"]
-    non_nan_mask = ~residuals.isna()
+    non_nan_mask = ~np.asarray(residuals.isna()) & observed_mask(observations_dict)
     r = np.asarray(residuals[non_nan_mask], dtype=np.float64)
 
     distribution = general["distribution"]

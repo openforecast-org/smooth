@@ -44,7 +44,12 @@
 #' the American Statistical Association, 106(496), 1513-1527.
 #' }
 #'
-#' @param y Vector or ts object, containing the data needed to be forecasted.
+#' @param y Vector or ts object, containing the data needed to be forecasted. The
+#' missing values (\code{NA}) are gaps: the global model is fitted to the observed
+#' values, the states move through the transition without an update at the gaps, the
+#' likelihood and the information criteria count the observed values only, and the
+#' ARMA screen takes zeros at the gaps of the residuals. The residuals are \code{NA}
+#' there, and the fitted values are the predictions of the model.
 #' @param lags The lags of the model: 1 and the seasonal periods, which can be
 #' fractional (e.g. \code{c(1, 7, 365.25)}). The harmonics are fitted for every
 #' lag above 1.
@@ -214,10 +219,10 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     checked$headLengthUser <- ellipsis$headLength;
     checked$modelDo <- modelDo;
     checked$bounds <- bounds;
+    # The missing values are gaps: the checker filled them, but the global model, the fit and
+    # the likelihood use the observed values only
     yInSample <- as.vector(checked$yInSample);
-    if(any(!is.finite(yInSample))){
-        stop("tbats() does not support missing values yet.", call.=FALSE);
-    }
+    yInSample[checked$yNAValues[seq_along(yInSample)]] <- NA;
     xregSpec <- tbats_xreg(xreg, length(yInSample), checked$h, regressors);
     occurrenceSpec <- tbats_occurrence(occurrence, yInSample, loss);
     # Under a name of its own: checked has occurrence elements of adam(), which $ matches
@@ -386,12 +391,15 @@ tbats_boxCoxInverse <- function(z, lambda){
 # provided probabilities (or 0/1), or an om() with the level only (and the trend
 # selected) for the occurrence type: its seasonal pattern is hard to find in zeros and
 # ones. The non-zero observations, and the log-likelihood and parameters of the
-# occurrence, which are added to those of the sizes
+# occurrence, which are added to those of the sizes. The missing values are neither:
+# otLogical marks the observed (and non-zero) values that the sizes are fitted to
 #' @keywords internal
 tbats_occurrence <- function(occurrence, y, loss){
     obs <- length(y);
-    otLogical <- y!=0;
-    none <- list(model=NULL, otLogical=rep(TRUE, obs), logLik=0, nParam=0, pFitted=rep(1, obs));
+    observed <- !is.na(y);
+    otLogical <- observed & (y!=0);
+    otLogical[!observed] <- FALSE;
+    none <- list(model=NULL, otLogical=observed, logLik=0, nParam=0, pFitted=rep(1, obs));
     if(is.occurrence(occurrence)){
         omModel <- occurrence;
         if(length(fitted(omModel))!=obs){
@@ -405,11 +413,11 @@ tbats_occurrence <- function(occurrence, y, loss){
                  "observations, and possibly of the horizon.", call.=FALSE);
         }
         pFitted <- probabilities[1:obs];
-        if(any(pFitted[otLogical]==0) || any(pFitted[!otLogical]==1)){
+        if(any(pFitted[otLogical]==0) || any(pFitted[!otLogical & observed]==1)){
             stop("The provided occurrence contradicts the data.", call.=FALSE);
         }
         omModel <- list(occurrence="provided", fitted=pFitted, forecast=probabilities[-(1:obs)],
-                        logLik=sum(log(pFitted[otLogical])) + sum(log(1-pFitted[!otLogical])));
+                        logLik=sum(log(pFitted[otLogical])) + sum(log(1-pFitted[!otLogical & observed])));
         return(list(model=omModel, otLogical=otLogical, logLik=omModel$logLik, nParam=0,
                     pFitted=pFitted));
     }
@@ -417,14 +425,14 @@ tbats_occurrence <- function(occurrence, y, loss){
         occurrence <- match.arg(occurrence[1], c("none","auto","fixed","general","odds-ratio",
                                                  "inverse-odds-ratio","direct"));
         if(occurrence=="none"){
-            if(any(y==0)){
+            if(any(y==0, na.rm=TRUE)){
                 warning("The data has zeros, which are fitted as values. For an intermittent demand, ",
                         "use the occurrence argument.", call.=FALSE);
             }
             return(none);
         }
         # No zeros: nothing to model
-        if(all(otLogical)){
+        if(all(otLogical[observed])){
             return(none);
         }
         omModel <- om(y, model="ZXN", lags=1, occurrence=occurrence, silent=TRUE);
@@ -1106,12 +1114,15 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             hor <- checked$h;
             adamErrors <- adamCpp$ferrors(fitted$states, fitted$matWt,
                                           elements$matF, lookup, fitted$profileInitial, hor, fitted$yBC)$errors;
+            # The windows with all their targets observed
+            adamErrors <- adamErrors[adam_completeWindows(!is.na(y), hor),,drop=FALSE];
+            nWindows <- nrow(adamErrors);
             value <- switch(lossUsed,
-                            "MSEh"=sum(adamErrors[,hor]^2)/(obs-hor),
-                            "TMSE"=sum(colSums(adamErrors^2)/(obs-hor)),
-                            "GTMSE"=sum(log(colSums(adamErrors^2)/(obs-hor))),
-                            "MSCE"=sum(rowSums(adamErrors)^2)/(obs-hor),
-                            "GPL"=log(det(t(adamErrors) %*% adamErrors/(obs-hor))));
+                            "MSEh"=sum(adamErrors[,hor]^2)/nWindows,
+                            "TMSE"=sum(colSums(adamErrors^2)/nWindows),
+                            "GTMSE"=sum(log(colSums(adamErrors^2)/nWindows)),
+                            "MSCE"=sum(rowSums(adamErrors)^2)/nWindows,
+                            "GPL"=log(det(t(adamErrors) %*% adamErrors/nWindows)));
         }
         if(!is.finite(value)){
             value <- 1E+300;
@@ -1218,7 +1229,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     }
 
     return(list(B=B, res=res, lossValue=lossFinal,
-                logLik=structure(logLikValue, nobs=obs, df=nParamEstimated+occurrenceSpec$nParam,
+                logLik=structure(logLikValue, nobs=sum(!is.na(y)), df=nParamEstimated+occurrenceSpec$nParam,
                                  class="logLik"),
                 nParamEstimated=nParamEstimated, nInitials=nInitials*backcast,
                 struct=struct, armaSpec=armaSpec, elements=elements, fitted=fitted, states=states,
@@ -1302,7 +1313,8 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     # With an occurrence model, the probability times the sizes
     occurrenceSpec <- checked[["tbatsOccurrence"]];
     yFitted <- makeSeries(tbats_boxCoxInverse(best$fitted$fitted, lambda) * occurrenceSpec$pFitted);
-    errors <- makeSeries(best$fitted$errors);
+    # No errors at the missing values
+    errors <- makeSeries(replace(best$fitted$errors, is.na(best$y), NA));
     if(checked$h>0){
         yForecast <- tbats_boxCoxInverse(best$forecastBC, lambda) *
             tbats_pForecast(list(occurrence=occurrenceSpec$model), checked$h);
@@ -1353,8 +1365,12 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     parametersNumber[2,1] <- length(best$B)*(checked$modelDo=="use");
     parametersNumber[2,5] <- sum(parametersNumber[2,1:4]);
 
-    yInSample <- checked$yInSample;
+    yInSample <- replace(checked$yInSample, is.na(best$y), NA);
+    # The holdout keeps its missing values, which the checker filled
     yHoldout <- checked$yHoldout;
+    if(!is.null(yHoldout)){
+        yHoldout <- replace(yHoldout, checked$yNAValues[-seq_along(best$y)], NA);
+    }
     # Keep the ts class of the data, as adam() does
     if(is.ts(yFitted)){
         yInSample <- ts(yInSample, start=start(yFitted), frequency=frequency(yFitted));
@@ -1364,7 +1380,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     }
     errormeasures <- NULL;
     if(checked$holdout && checked$h>0){
-        errormeasures <- measures(yHoldout, yForecast, yInSample);
+        errormeasures <- adam_accuracy(yHoldout, yForecast, yInSample);
     }
     # The regressors sit next to the response in the data, as in adam()
     formula <- checked$formula;
@@ -1434,13 +1450,15 @@ tbats_boxCoxObject <- function(object){
     class(objectBC) <- c("adam","smooth");
     # The sizes: the occurrence is taken into account in the space of the data. They are
     # zero where there is no demand, so that nobs(all=FALSE) and adam_dfScale() count the
-    # non-zero observations, and their scale is divided by all the observations, as
-    # adam()'s of an occurrence model, which adam_varianceDebiased() multiplies by T/df
+    # non-zero observations, and their scale is divided by all the observed values, as
+    # adam()'s of an occurrence model, which adam_varianceDebiased() multiplies by T/df.
+    # The missing values are NA, neither zeros nor observations
     objectBC$occurrence <- NULL;
     y <- as.numeric(actuals(object));
-    otLogical <- y!=0 | is.null(object$occurrence);
-    yBC <- tbats_boxCoxSizes(y, lambda, otLogical);
-    objectBC$scale <- adam_scaleDebias(object$scale, object$distribution, sum(otLogical), length(y));
+    otLogical <- tbats_sizes(y, object);
+    # The missing values stay missing
+    yBC <- replace(tbats_boxCoxSizes(y, lambda, otLogical), is.na(y), NA);
+    objectBC$scale <- adam_scaleDebias(object$scale, object$distribution, sum(otLogical), sum(!is.na(y)));
     # The response only: the regressors stay as they are
     objectBC$data[,1] <- yBC;
     objectBC$fitted[] <- yBC - residuals(object);
@@ -1449,6 +1467,12 @@ tbats_boxCoxObject <- function(object){
         objectBC$holdout[,1] <- suppressWarnings(tbats_boxCox(object$holdout[,1], lambda));
     }
     return(objectBC);
+}
+
+# The values the sizes are fitted to: the observed ones, non-zero with an occurrence model
+#' @keywords internal
+tbats_sizes <- function(y, object){
+    return(!is.na(y) & (y!=0 | is.null(object$occurrence)));
 }
 
 # The quantiles of the transformed data map onto those of the data, so the
@@ -1512,10 +1536,12 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
                                         c(nComponents, lagsModelMax, nsim)),
                           randomParameters=draws, lambda=lambdas,
                           errors=sapply(1:nsim, function(i){
-                              # The sizes: no error where there is no demand
-                              otLogical <- as.numeric(actuals(object))!=0 | is.null(object$occurrence);
-                              return((tbats_boxCoxSizes(as.numeric(actuals(object)), lambdas[i], otLogical) -
-                                          refits[[i]]$fitted) * otLogical);
+                              # The sizes: no error where there is no demand, NA where the
+                              # value is missing
+                              y <- as.numeric(actuals(object));
+                              otLogical <- tbats_sizes(y, object);
+                              errors <- (tbats_boxCoxSizes(y, lambdas[i], otLogical) - refits[[i]]$fitted) * otLogical;
+                              return(replace(errors, is.na(y), NA));
                           })),
                      class="reapply"));
 }
@@ -1826,18 +1852,21 @@ predict.tbats <- function(object, newdata=NULL, interval=c("none", "confidence",
 #' @export
 pointLik.tbats <- function(object, log=TRUE, ...){
     y <- as.numeric(actuals(object));
+    # The missing values are not in the likelihood: their values stay zero
+    observed <- !is.na(y);
     if(is.null(object$occurrence)){
         likValues <- pointLik(tbats_boxCoxObject(object), log=TRUE) + (object$lambda-1)*log(y);
     }
     # The occurrence, and the sizes with the Jacobian where there is a demand
     else{
-        otLogical <- y!=0;
+        otLogical <- tbats_sizes(y, object);
         pFitted <- tbats_pFitted(object);
         likValues <- log(1-pFitted);
         likValues[otLogical] <- log(pFitted[otLogical]) +
             tbats_logDensities(as.numeric(residuals(object))[otLogical], object$distribution,
                                object$other$shape, object$scale) + (object$lambda-1)*log(y[otLogical]);
     }
+    likValues[!observed] <- 0;
     if(!log){
         likValues <- exp(likValues);
     }

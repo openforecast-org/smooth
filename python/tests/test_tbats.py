@@ -514,3 +514,16 @@ def test_the_occurrence_errors(intermittent):
         TBATS(lags=[1, 7], occurrence="odds-ratio", loss="MSEh", h=3).fit(intermittent)
     with pytest.raises(ValueError, match="occurrence"):
         TBATS(occurrence="sometimes")
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+def test_tbats_takes_the_missing_values_for_gaps():
+    rng = np.random.default_rng(1)
+    t = np.arange(144)
+    y = np.exp(5 + 0.01 * t + 0.2 * np.sin(2 * np.pi * t / 12) + rng.normal(0, 0.05, 144))
+    y[[9, 49, 50, 89]] = np.nan
+    model = TBATS(lags=[1, 12]).fit(y)
+    assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-8)
+    assert np.all(np.isnan(model.residuals[np.isnan(y)]))
+    assert np.all(np.isfinite(model.fitted))
+    assert np.all(np.isfinite(model.predict(h=12, interval="prediction").upper))

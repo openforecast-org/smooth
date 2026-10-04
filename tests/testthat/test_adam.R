@@ -916,3 +916,47 @@ test_that("adam warns when more than half of the data is missing", {
     y[1:60] <- NA
     expect_warning(adam(y, "ANN"), "More than half of the in-sample data is missing")
 })
+
+test_that("adam uses the filled values only for the initialisation", {
+    y <- AirPassengers
+    y[c(10, 50, 51, 90, 140)] <- NA
+    testModel <- suppressWarnings(adam(y, "MAM", h=12, holdout=TRUE))
+    # Missing values alone are not an occurrence model
+    expect_equal(modelName(testModel), "ETS(MAM)")
+    expect_true(all(is.finite(fitted(testModel))))
+    expect_equal(AICc(testModel), AICc(logLik(testModel)))
+    # The holdout keeps its gap, and the accuracy is on its observed values
+    expect_true(is.na(testModel$holdout[8, 1]))
+    expect_equal(testModel$accuracy[["ME"]],
+                 mean(as.numeric(testModel$holdout[-8, 1]) - as.numeric(testModel$forecast)[-8]))
+    # The holdout does not enter the fill of the in-sample gaps
+    yChanged <- y
+    yChanged[144] <- 10000
+    expect_equal(coef(suppressWarnings(adam(yChanged, "MAM", h=12, holdout=TRUE))), coef(testModel))
+    # The multistep loss is over the windows with all their targets observed
+    expect_true(is.finite(suppressWarnings(adam(y, "ANN", loss="TMSE", h=6))$lossValue))
+    expect_true(all(is.finite(forecast(testModel, h=6, interval="semiparametric")$upper)))
+    expect_false(all(is.na(rstudent(testModel))))
+})
+
+test_that("A regression with missing values keeps its rows aligned", {
+    set.seed(1)
+    xreg <- data.frame(y=as.numeric(AirPassengers), x1=rnorm(144), x2=as.numeric(AirPassengers)/10+rnorm(144))
+    xreg$y[c(10, 50, 51)] <- NA
+    testModel <- suppressWarnings(adam(xreg, "NNN", h=6, holdout=TRUE))
+    reference <- adam(xreg[-c(10, 50, 51),], "NNN", h=6, holdout=TRUE)
+    expect_equal(coef(testModel), coef(reference))
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(reference)))
+    expect_true(is.na(residuals(testModel)[10]))
+    expect_true(is.finite(fitted(testModel)[10]))
+})
+
+test_that("rstudent of dgamma leaves its own observation out with an occurrence model", {
+    set.seed(3)
+    y <- rbinom(200, 1, 0.4) * exp(rnorm(200, 2, 0.3))
+    testModel <- adam(y, "MNN", occurrence="odds-ratio")
+    errors <- residuals(testModel)
+    used <- which(y!=0)
+    i <- used[5]
+    expect_equal(as.numeric(rstudent(testModel)[i]), as.numeric(errors[i] / mean(errors[used[used!=i]])))
+})

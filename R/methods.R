@@ -76,6 +76,27 @@ modelType <- function(object, ...) UseMethod("modelType")
 
 ##### Likelihood function and stuff #####
 
+# The observed in-sample values (TRUE where the lengths do not match): the missing
+# ones are not observations
+#' @keywords internal
+smooth_observed <- function(object){
+    observed <- !is.na(as.vector(actuals(object)));
+    if(length(observed)!=length(object$fitted)){
+        return(TRUE);
+    }
+    return(observed);
+}
+
+# The observations of the likelihood, its nobs attribute where it has one
+#' @keywords internal
+smooth_nobsLogLik <- function(object){
+    obs <- attr(logLik(object), "nobs");
+    if(is.null(obs)){
+        obs <- nobs(object);
+    }
+    return(obs);
+}
+
 #' @importFrom greybox AICc
 #' @export
 AICc.smooth <- function(object, ...){
@@ -84,13 +105,13 @@ AICc.smooth <- function(object, ...){
     llikelihood <- llikelihood[1:length(llikelihood)];
 
     if(!is.null(object$occurrence)){
-        obs <- sum(object$fitted!=0);
+        obs <- sum(object$fitted!=0 & smooth_observed(object));
         nParamSizes <- nParamAll - object$nParam[1,3];
         IC <- (2*nParamAll - 2*llikelihood +
                    2*nParamSizes*(nParamSizes + 1) / (obs - nParamSizes - 1));
     }
     else{
-        obs <- nobs(object);
+        obs <- smooth_nobsLogLik(object);
         IC <- 2*nParamAll - 2*llikelihood + 2 * nParamAll * (nParamAll + 1) / (obs - nParamAll - 1);
     }
 
@@ -105,12 +126,12 @@ BICc.smooth <- function(object, ...){
     llikelihood <- llikelihood[1:length(llikelihood)];
 
     if(!is.null(object$occurrence)){
-        obs <- sum(object$fitted!=0);
+        obs <- sum(object$fitted!=0 & smooth_observed(object));
         nParamSizes <- nParamAll - object$nParam[1,3];
         IC <- - 2*llikelihood + (nParamSizes * log(obs) * obs) / (obs - nParamSizes - 1);
     }
     else{
-        obs <- nobs(object);
+        obs <- smooth_nobsLogLik(object);
         IC <- - 2*llikelihood + (nParamAll * log(obs) * obs) / (obs - nParamAll - 1);
     }
 

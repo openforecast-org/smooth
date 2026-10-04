@@ -3,7 +3,7 @@ import pandas as pd
 
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
-from smooth.adam_general.core.utils.utils import scaler
+from smooth.adam_general.core.utils.utils import observed_mask, scaler
 
 from ._helpers import _safe_create_index
 
@@ -564,7 +564,8 @@ def _calculate_scale_parameter(
         model_type_dict["error_type"],
         errors[observations_dict["ot_logical"]],
         y_fitted[observations_dict["ot_logical"]],
-        observations_dict["obs_in_sample"],
+        # divided by the observed values: the missing ones are not
+        int(np.sum(observed_mask(observations_dict))),
         other,
     )
 

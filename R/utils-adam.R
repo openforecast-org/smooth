@@ -133,8 +133,12 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
                     " of ", obsInSample, "): the estimates rest on few observations.", call.=FALSE)
         }
         # The values for the initialisation only, as the fit skips them: a polynomial of the
-        # time and harmonics fitted to the observed values, shared with Python
-        y[yNAValues] <- naFillCpp(as.numeric(y), max(max(lags), 10))[yNAValues]
+        # time and harmonics fitted to the observed in-sample values, shared with Python.
+        # Those of the holdout are placeholders, which nothing takes for data
+        lagMax <- max(max(lags), 10);
+        yFilled <- naFillCpp(as.numeric(y), lagMax);
+        yFilled[1:obsInSample] <- naFillCpp(as.numeric(y[1:obsInSample]), lagMax);
+        y[yNAValues] <- yFilled[yNAValues]
         if(!is.null(xregData)){
             xregData[yNAValues,responseName] <- y[yNAValues]
         }
@@ -1605,7 +1609,35 @@ adam_varianceDebiased <- function(object, scaleValue=extractScale(object)){
         return(sigma(object)^2);
     }
     return(adam_scaleVariance(scaleValue, object$distribution, object$other)*
-               nobs(object)/adam_dfScale(object));
+               adam_nobsObserved(object)/adam_dfScale(object));
+}
+
+# The windows of the multistep errors (row i of ferrors() has the targets i..i+h-1)
+# whose targets are all observed: the losses over the missing values are not taken
+#' @keywords internal
+adam_completeWindows <- function(observed, h){
+    missingCount <- cumsum(c(0, !observed));
+    rows <- seq_len(max(length(observed)-h, 0));
+    return(missingCount[rows+h] - missingCount[rows] == 0);
+}
+
+# The accuracy on the observed values of the holdout, scaled by the observed in-sample
+# ones: the missing values (NA) are not compared with anything
+#' @keywords internal
+adam_accuracy <- function(holdout, forecast, inSample){
+    observed <- !is.na(as.vector(holdout));
+    if(!any(observed)){
+        return(NULL);
+    }
+    inSample <- as.vector(inSample);
+    return(measures(as.vector(holdout)[observed], as.vector(forecast)[observed],
+                    inSample[!is.na(inSample)]));
+}
+
+# The observed values, which the scale is divided by: the missing ones are not
+#' @keywords internal
+adam_nobsObserved <- function(object){
+    return(sum(!is.na(actuals(object))));
 }
 
 # The de-biased variance from the scale model's forecasts
@@ -1620,7 +1652,7 @@ adam_scaleModelVariance <- function(object, h, newdata){
 # location model. scaleValue is either the scale or the scale model's values.
 #' @keywords internal
 adam_scaleSimulation <- function(object, scaleValue){
-    return(adam_scaleDebias(scaleValue, object$distribution, nobs(object), adam_dfScale(object)));
+    return(adam_scaleDebias(scaleValue, object$distribution, adam_nobsObserved(object), adam_dfScale(object)));
 }
 
 # Random errors of the model for the provided scale (see adam_scalePower).

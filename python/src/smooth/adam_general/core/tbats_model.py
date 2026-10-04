@@ -4,12 +4,13 @@ import math
 import time
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from smooth.adam_general.core.checker.data_checks import _warn_missing
 from smooth.adam_general.core.forecaster.forecaster import forecaster
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.simulate.result import SimulateResult
@@ -93,10 +94,13 @@ def _occurrence_spec(occurrence: Any, y: NDArray, loss: str) -> Dict[str, Any]:
     from smooth.adam_general.core.omg import OMG
 
     obs = len(y)
-    ot_logical = y != 0
+    # The missing values are neither zeros nor demand: ot_logical marks the observed
+    # (and non-zero) values that the sizes are fitted to
+    observed = ~np.isnan(y)
+    ot_logical = observed & (y != 0)
     none = {
         "model": None,
-        "ot_logical": None,
+        "ot_logical": None if np.all(observed) else observed,
         "loglik": 0.0,
         "n_param": 0,
         "p_fitted": np.ones(obs),
@@ -117,10 +121,11 @@ def _occurrence_spec(occurrence: Any, y: NDArray, loss: str) -> Dict[str, Any]:
                 "the in-sample observations, and possibly of the horizon."
             )
         p_fitted = probabilities[:obs]
-        if np.any(p_fitted[ot_logical] == 0) or np.any(p_fitted[~ot_logical] == 1):
+        zero = ~ot_logical & observed
+        if np.any(p_fitted[ot_logical] == 0) or np.any(p_fitted[zero] == 1):
             raise ValueError("The provided occurrence contradicts the data.")
         loglik = _sum_r(_log_r(p_fitted[ot_logical])) + _sum_r(
-            _log_r(1 - p_fitted[~ot_logical])
+            _log_r(1 - p_fitted[zero])
         )
         provided = {
             "occurrence": "provided",
@@ -145,7 +150,7 @@ def _occurrence_spec(occurrence: Any, y: NDArray, loss: str) -> Dict[str, Any]:
                 )
             return none
         # No zeros: nothing to model
-        if np.all(ot_logical):
+        if np.all(ot_logical[observed]):
             return none
         # fit() returns the selected model for occurrence="auto"
         model = OM(model="ZXN", lags=[1], occurrence=occurrence).fit(y)
@@ -355,7 +360,14 @@ class TBATS:
     def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "TBATS":
         """Fit the model to the series ``y``, with the explanatory variables ``X``
         (a numeric array or data frame with the rows of ``y``, and of the horizon
-        ``h`` for its forecasts) in the space of the transformed data."""
+        ``h`` for its forecasts) in the space of the transformed data.
+
+        The missing values (NaN) of ``y`` are gaps, as in R: the global model is
+        fitted to the observed values, the states move through the transition
+        without an update at the gaps, the likelihood and the information criteria
+        count the observed values only, and the ARMA screen takes zeros at the gaps
+        of the residuals. The residuals are NaN there, and the fitted values are the
+        predictions of the model."""
         start_time = time.time()
         index = y.index if isinstance(y, pd.Series) else None
         values = np.asarray(y, dtype=float).ravel()
@@ -363,8 +375,11 @@ class TBATS:
         obs_in_sample = len(values) - h if (self.holdout and h > 0) else len(values)
         y_in_sample = values[:obs_in_sample]
         self._y_holdout = values[obs_in_sample:] if (self.holdout and h > 0) else None
-        if not np.all(np.isfinite(y_in_sample)):
-            raise ValueError("TBATS does not support missing values yet.")
+        # The missing values are gaps: the global model, the fit and the likelihood
+        # use the observed values only
+        missing = np.isnan(values)
+        if np.any(missing):
+            _warn_missing(missing, obs_in_sample, stacklevel=3)
         self._index = index
 
         lags, harmonics, trend = self.lags, self.harmonics, self.trend
@@ -566,6 +581,12 @@ class TBATS:
         return len(self._y_in_sample)
 
     @property
+    def _nobs_observed(self) -> int:
+        """The observed values, which the likelihood and the information criteria
+        count: the missing ones are not (R's nobs attribute of logLik)."""
+        return int(np.sum(~np.isnan(self._y_in_sample)))
+
+    @property
     def nparam(self) -> int:
         """The number of estimated parameters, the scale, the identified initials
         and the parameters of the occurrence model included."""
@@ -574,19 +595,41 @@ class TBATS:
 
     @property
     def aic(self) -> float:
-        return st.ic_value(self.loglik, self.nobs, self.nparam, "AIC")
+        return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "AIC")
+
+    def _ic_sizes(self) -> Optional[Tuple[float, float, int]]:
+        """``(n_param_all, n_param_sizes, obs)`` of a mixture, or None: R's
+        ``AICc.smooth`` / ``BICc.smooth`` correct the small sample over the
+        parameters of the sizes and the non-zero fitted observed values."""
+        if self._occurrence["model"] is None:
+            return None
+        observed = ~np.isnan(self._y_in_sample)
+        obs = int(np.count_nonzero(np.asarray(self.fitted, dtype=float)[observed]))
+        n_all = float(self.nparam)
+        return n_all, n_all - float(self._best["n_param_occurrence"]), obs
 
     @property
     def aicc(self) -> float:
-        return st.ic_value(self.loglik, self.nobs, self.nparam, "AICc")
+        terms = self._ic_sizes()
+        if terms is None:
+            return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "AICc")
+        n_all, n_sizes, obs = terms
+        correction = 2 * n_sizes * (n_sizes + 1) / (obs - n_sizes - 1)
+        return float(2 * n_all - 2 * self.loglik + correction)
 
     @property
     def bic(self) -> float:
-        return st.ic_value(self.loglik, self.nobs, self.nparam, "BIC")
+        return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "BIC")
 
     @property
     def bicc(self) -> float:
-        return st.ic_value(self.loglik, self.nobs, self.nparam, "BICc")
+        terms = self._ic_sizes()
+        if terms is None:
+            return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "BICc")
+        _, n_sizes, obs = terms
+        return float(
+            -2 * self.loglik + n_sizes * math.log(obs) * obs / (obs - n_sizes - 1)
+        )
 
     @property
     def fitted(self) -> NDArray:
@@ -598,9 +641,12 @@ class TBATS:
 
     @property
     def residuals(self) -> NDArray:
-        """The errors in the space of the transformed data."""
+        """The errors in the space of the transformed data, NaN at the missing
+        values."""
         self._check_fitted()
-        return self._best["fitted"]["errors"].copy()
+        errors = self._best["fitted"]["errors"].copy()
+        errors[np.isnan(self._y_in_sample)] = np.nan
+        return errors
 
     @property
     def actuals(self) -> NDArray:
@@ -905,8 +951,12 @@ class TBATS:
         # observations, as ADAM's of an occurrence model, which the forecaster
         # de-biases by the non-zero ones
         ot = self._ot
+        # The missing values stay missing, as in R's tbats_boxCoxObject
         y_bc = st.box_cox_sizes(self._y_in_sample, self.lambda_, ot)
-        scale = scale_debias(self.scale, self.distribution, int(ot.sum()), self.nobs)
+        y_bc[np.isnan(self._y_in_sample)] = np.nan
+        scale = scale_debias(
+            self.scale, self.distribution, int(ot.sum()), self._nobs_observed
+        )
 
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
             """ADAM's forecaster in the space of the transformed data."""
@@ -932,12 +982,18 @@ class TBATS:
                     "persistence": best["elements"]["vec_g"],
                     "profiles_recent_table": best["fitted"]["profile"],
                     "residuals": pd.Series(self.residuals),
-                    "y_fitted": y_bc - self.residuals,
+                    # The prediction of the model at the missing values
+                    "y_fitted": np.where(
+                        np.isnan(y_bc),
+                        np.ravel(best["fitted"]["fitted"]),
+                        y_bc - self.residuals,
+                    ),
                     "scale": scale,
                 },
                 observations_dict={
                     "obs_in_sample": self.nobs,
                     "obs_nonzero": int(ot.sum()),
+                    "y_na_values": np.isnan(self._y_in_sample),
                     "y_in_sample": y_bc,
                     "y_forecast_start": self._forecast_start(),
                     "frequency": self._frequency(),
@@ -1192,6 +1248,7 @@ class TBATS:
         )
         # The sizes: no error where there is no demand
         ot = self._ot
+        y = self._y_in_sample
         return TBATSReapplyResult(
             time_elapsed=time.time() - start_time,
             y=pd.Series(self.actuals),
@@ -1212,11 +1269,16 @@ class TBATS:
             random_parameters=pd.DataFrame(draws, columns=self.coef_names),
             nsim=nsim,
             lambdas=lambdas,
-            errors=np.column_stack(
-                [
-                    (st.box_cox_sizes(self._y_in_sample, lam, ot) - r["fitted"]) * ot
-                    for r, lam in zip(refits, lambdas)
-                ]
+            # No error where there is no demand, NaN where the value is missing
+            errors=np.where(
+                np.isnan(y)[:, None],
+                np.nan,
+                np.column_stack(
+                    [
+                        (st.box_cox_sizes(y, lam, ot) - r["fitted"]) * ot
+                        for r, lam in zip(refits, lambdas)
+                    ]
+                ),
             ),
         )
 
@@ -1275,7 +1337,7 @@ class TBATS:
         n_scale = int(self.loss == "likelihood")
         # The scale of the sizes, on the non-zero observations (R's adam_dfScale)
         ot = self._ot
-        obs_nonzero = int(np.sum(self._y_in_sample != 0))
+        obs_nonzero = int(self._ot.sum())
         df_scale = obs_nonzero - (self.nparam - n_scale)
         if df_scale <= 0:
             df_scale = obs_nonzero

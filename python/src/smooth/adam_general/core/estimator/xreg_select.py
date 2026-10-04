@@ -5,7 +5,7 @@ the selected ones is estimated from its parameters (R/adam.R, ``estimator()``)."
 import numpy as np
 
 from smooth.adam_general.core.utils.cost_functions import fit_at_parameters
-from smooth.adam_general.core.utils.utils import xreg_selector
+from smooth.adam_general.core.utils.utils import observed_mask, xreg_selector
 
 from .optimization import _set_distribution
 
@@ -39,16 +39,17 @@ def selection_errors(fitted, distribution, model_type_dict):
     return errors
 
 
-def selection_initials(y, X, names, general_dict, distribution, e_type):
-    """The initial coefficients of the selected regressors: ALM with a trend, which
-    is dropped, unless one of them is the trend."""
+def selection_initials(y, X, names, general_dict, distribution, e_type, time=None):
+    """The initial coefficients of the selected regressors: ALM with a trend (the
+    time of the observations, ``time``), which is dropped, unless one of them is the
+    trend."""
     from greybox import ALM
 
     obs = len(y)
     log_y = e_type == "M" and general_dict["distribution"] in LEVEL_DISTRIBUTIONS
     columns = [np.ones(obs), X]
     if "trend" not in names:
-        columns.append(np.arange(1.0, obs + 1))
+        columns.append(np.arange(1.0, obs + 1) if time is None else time)
     loss = ALM_LOSSES.get(general_dict["loss"], general_dict["loss"])
     alm = ALM(distribution=distribution, loss=loss)
     alm.fit(np.column_stack(columns), np.log(y) if log_y else y)
@@ -94,10 +95,12 @@ def estimate_and_select(estimator, arguments):
         other,
     )
     obs = arguments["observations_dict"]["obs_in_sample"]
+    # On the observed values only: the filled ones are not data
+    observed = observed_mask(arguments["observations_dict"])
     names = list(select["names"])
     selected = xreg_selector(
-        selection_errors(fitted, distribution, model_type),
-        select["X"][:obs],
+        selection_errors(fitted, distribution, model_type)[observed],
+        select["X"][:obs][observed],
         names,
         general["ic"],
         df,
@@ -110,12 +113,15 @@ def estimate_and_select(estimator, arguments):
     columns = [names.index(name) for name in selected]
     X = select["X"][:, columns]
     initials = selection_initials(
-        np.asarray(arguments["observations_dict"]["y_in_sample"], dtype=float),
-        X[:obs],
+        np.asarray(arguments["observations_dict"]["y_in_sample"], dtype=float)[
+            observed
+        ],
+        X[:obs][observed],
         selected,
         general,
         distribution,
         model_type["error_type"],
+        np.arange(1.0, obs + 1)[observed],
     )
     xreg = select["build"](
         X=X, xreg_names_from_input=selected, initial_xreg=initials.reshape(-1, 1)

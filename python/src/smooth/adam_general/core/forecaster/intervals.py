@@ -7,7 +7,12 @@ from smooth.adam_general.core.utils.distributions import (
     generate_errors,
     normalize_errors,
 )
-from smooth.adam_general.core.utils.utils import _sum_r, scale_debias, scale_variance
+from smooth.adam_general.core.utils.utils import (
+    _sum_r,
+    observed_mask,
+    scale_debias,
+    scale_variance,
+)
 from smooth.adam_general.core.utils.var_covar import (
     covar_anal,
     var_anal,
@@ -52,6 +57,14 @@ def ensure_level_format(level, side):
     return level_low, level_up
 
 
+def _obs_observed(observations_dict):
+    """The observed in-sample values, which the scale is divided by: the missing
+    ones are not (R: ``adam_nobsObserved``)."""
+    missing = observations_dict.get("y_na_values")
+    n_missing = 0 if missing is None else int(np.sum(missing))
+    return observations_dict["obs_in_sample"] - n_missing
+
+
 def _df_scale(general, observations_dict, params_info):
     """Degrees of freedom for de-biasing the scale (R: ``adam_dfScale``).
 
@@ -83,7 +96,7 @@ def _scale_model_variance(general, observations_dict, params_info):
 
     sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
     variance = scale_variance(sf, general["distribution"], general.get("other"))
-    obs = observations_dict["obs_in_sample"]
+    obs = _obs_observed(observations_dict)
     return variance * obs / _df_scale(general, observations_dict, params_info)
 
 
@@ -113,7 +126,7 @@ def generate_prediction_interval(
         scale_variance(
             prepared_model["scale"], general["distribution"], general.get("other")
         )
-        * observations_dict["obs_in_sample"]
+        * _obs_observed(observations_dict)
         / _df_scale(general, observations_dict, params_info)
     )
     s2_forecast = _scale_model_variance(general, observations_dict, params_info)
@@ -432,7 +445,7 @@ def generate_simulation_interval(
         arr_vt[:, :lags_model_max, i] = mat_vt[:, :lags_model_max]
 
     # 2. The scale, or the scale model's forecasts, de-biased in the variance space
-    obs_in_sample = observations_dict["obs_in_sample"]
+    obs_in_sample = _obs_observed(observations_dict)
     df = _df_scale(general_dict, observations_dict, params_info)
     scale_forecast = general_dict.get("scale_forecast")
     if scale_forecast is None:
@@ -709,12 +722,12 @@ def generate_multistep_interval(
             mat_wt,
             mat_f,
         )
-        n = obs - h
     else:
         adam_errors = np.asarray(prepared_model["residuals"], dtype=float).reshape(
             -1, 1
         )
-        n = obs
+        # No residual at the missing values
+        adam_errors[~observed_mask(observations_dict)] = np.nan
 
     if h > 1 and distribution in _LOG_DISTS and e_type == "A":
         y_fitted = np.asarray(prepared_model["y_fitted"], dtype=float)
@@ -722,6 +735,9 @@ def generate_multistep_interval(
             [y_fitted[i : obs - h + i] for i in range(1, h + 1)]
         )
         adam_errors = adam_errors / fitted_matrix
+    # The windows with all their targets observed
+    adam_errors = adam_errors[~np.any(np.isnan(adam_errors), axis=1)]
+    n = len(adam_errors)
 
     if interval_type == "semiparametric":
         if cumulative:

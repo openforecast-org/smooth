@@ -599,12 +599,15 @@ def fit(
             elements["shape"],
         )
         sizes = np.ravel(values) + (elements["lambda"] - 1) * _log_r(y[ot_logical])
-        if occurrence["model"] is None:
-            return sizes
-        # The occurrence, and the sizes where there is a demand
-        p_fitted = occurrence["p_fitted"]
-        result = _log_r(1 - p_fitted)
-        result[ot_logical] = _log_r(p_fitted[ot_logical]) + sizes
+        # The occurrence, and the sizes where there is a demand; the missing values
+        # are not in the likelihood, so theirs stay zero
+        result = np.zeros(obs)
+        if occurrence["model"] is not None:
+            p_fitted = occurrence["p_fitted"]
+            observed = ~np.isnan(y)
+            result[observed] = _log_r(1 - p_fitted[observed])
+            result[ot_logical] = _log_r(p_fitted[ot_logical])
+        result[ot_logical] += sizes
         return result
 
     def fitter(B: NDArray) -> Optional[Dict[str, Any]]:

@@ -767,6 +767,24 @@ def calculate_entropy(distribution, scale, other, obsZero, y_fitted):
         ) + np.sum(np.log(scale * y_fitted))
 
 
+def observed_mask(observations_dict):
+    """The observed in-sample values: the missing ones (``y_na_values``) are not."""
+    n = observations_dict["obs_in_sample"]
+    missing = observations_dict.get("y_na_values")
+    if missing is None:
+        return np.ones(n, dtype=bool)
+    return ~np.asarray(missing, dtype=bool)[:n]
+
+
+def complete_windows(observed, h):
+    """The windows of the multistep errors (row i of ferrors has the targets
+    i..i+h-1) whose targets are all observed: the losses over the missing values are
+    not taken (R's ``adam_completeWindows``)."""
+    missing_count = np.concatenate([[0], np.cumsum(~np.asarray(observed, dtype=bool))])
+    rows = np.arange(max(len(observed) - h, 0))
+    return missing_count[rows + h] - missing_count[rows] == 0
+
+
 def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
     """Multistep loss over the matrix of h-steps-ahead errors.
 

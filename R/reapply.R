@@ -741,6 +741,10 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     }
 
     yt <- matrix(actuals(object));
+    # The missing values are skipped, as in the fit
+    missingValues <- is.na(yt[,1]);
+    ot[missingValues | is.na(ot[,1])] <- 0;
+    yt[missingValues] <- 0;
 
     # Refit the model with the new parameter
     adamRefitted <- adamCpp$reapply(yt, ot,

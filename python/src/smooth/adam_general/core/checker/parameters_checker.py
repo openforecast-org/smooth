@@ -4,6 +4,8 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
+from smooth.adam_general.core.utils.utils import observed_mask
+
 from ._utils import _warn
 from .arima_checks import _check_arima
 from .data_checks import (
@@ -567,8 +569,12 @@ def parameters_checker(
     #####################
     # 3) Check ETS Model
     #####################
+    # On the observed in-sample values: the filled ones are not data
+    data_observed = np.asarray(data_values, dtype=float)[:obs_in_sample][
+        ~y_na_values[:obs_in_sample]
+    ]
     ets_info = _check_ets_model(
-        model, distribution, data, silent, max_lag, occurrence_model
+        model, distribution, data_observed, silent, max_lag, occurrence_model
     )
     ets_model = ets_info["ets_model"]
     model_do = ets_info.get("model_do", "estimate")
@@ -1064,17 +1070,21 @@ def parameters_checker(
         from greybox import ALM
 
         n = observations_dict["obs_in_sample"]
-        y_is = np.asarray(observations_dict["y_in_sample"], dtype=float)
+        # The observed values only: the filled ones are for the initialisation of
+        # the states, which a regression does not have
+        observed = observed_mask(observations_dict)
+        y_is = np.asarray(observations_dict["y_in_sample"], dtype=float)[observed]
+        X_is = X[:n][observed]
         dist = _map_distribution_for_greybox(distribution)
         if regressors == "select":
             names = xreg_names_from_input or [f"x{i + 1}" for i in range(xreg_number)]
-            X_df = pd.DataFrame(X[:n], columns=names)
+            X_df = pd.DataFrame(X_is, columns=names)
             X_df.insert(0, "y", y_is)
             from greybox import stepwise
 
             return stepwise(X_df, ic=ic, distribution=dist, silent=True)
         alm = ALM(distribution=dist)
-        alm.fit(np.column_stack([np.ones(n), X[:n]]), y_is)
+        alm.fit(np.column_stack([np.ones(len(y_is)), X_is]), y_is)
         return alm
 
     # Build explanatory variables dictionary
@@ -1086,7 +1096,10 @@ def parameters_checker(
         distribution=distribution,
         e_type=ets_info["error_type"],
         ic=ic,
-        ot_logical=observations_dict["ot_logical"] if occurrence_model else None,
+        # The observed (non-zero) values: the missing ones are not in the regression
+        ot_logical=observations_dict["ot_logical"]
+        if occurrence_model or not np.all(observed_mask(observations_dict))
+        else None,
     )
     if has_xreg and regressors == "select":
         # As R, the model is estimated without the regressors, and the estimator

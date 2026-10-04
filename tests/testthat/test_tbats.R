@@ -369,3 +369,23 @@ test_that("the occurrence: the sizes on the non-zero observations, the forecasts
     expect_error(forecast(tbats(yIntermittent, occurrence="fixed", orders=orders0, lambda=1), h=5,
                           cumulative=TRUE), "occurrence");
 });
+
+test_that("tbats takes the missing values for gaps", {
+    y <- AirPassengers
+    y[c(10, 50, 51, 90)] <- NA
+    testModel <- suppressWarnings(tbats(y, lags=c(1,12)))
+    expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)))
+    expect_true(all(is.na(residuals(testModel)[is.na(y)])))
+    expect_true(all(is.finite(fitted(testModel))))
+    expect_equal(AICc(testModel), AICc(logLik(testModel)))
+    expect_true(all(is.finite(sqrt(diag(vcov(testModel))))))
+    expect_true(all(is.finite(forecast(testModel, h=12, interval="prediction")$upper)))
+    # With an occurrence model, the missing values are neither zeros nor demand
+    set.seed(7)
+    y <- ts(exp(2 + rnorm(300, 0, 0.3))*rbinom(300, 1, 0.7), frequency=7)
+    y[c(20:25, 150)] <- NA
+    testModel <- suppressWarnings(tbats(y, occurrence="odds-ratio"))
+    expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)))
+})

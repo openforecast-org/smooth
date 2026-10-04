@@ -54,7 +54,15 @@ def _compute_multistep_errors(
         horizon=h,
         vectorYt=y_in_sample,
     )
-    return np.asarray(result.errors)
+    # No error where the target is missing, as R's rmultistep on its actuals: row i
+    # has the targets i..i+h-1
+    errors = np.array(result.errors, dtype=np.float64)
+    missing = observations_dict.get("y_na_values")
+    if missing is not None and np.any(missing):
+        missing = np.asarray(missing, dtype=bool)[:obs]
+        rows = np.arange(errors.shape[0])[:, None] + np.arange(errors.shape[1])
+        errors[missing[rows]] = np.nan
+    return errors
 
 
 def _safe_create_index(start, periods, freq):

@@ -397,9 +397,12 @@ def _compute_forecast_errors(
     y_fitted_holdout: np.ndarray,
     y_in_sample: np.ndarray,
     period: int = 1,
+    in_sample_missing: Optional[np.ndarray] = None,
 ) -> Dict[str, float]:
     """
-    Compute forecast error metrics using greybox.measures().
+    Compute forecast error metrics using greybox.measures(), on the observed values
+    of the holdout, scaled by the observed in-sample ones (``in_sample_missing``
+    marks the missing ones, which were filled), as R's ``adam_accuracy``.
 
     Parameters
     ----------
@@ -419,7 +422,16 @@ def _compute_forecast_errors(
     """
     from greybox.point_measures import measures
 
-    m = measures(y_holdout, y_fitted_holdout, y_in_sample)
+    y_holdout = np.asarray(y_holdout, dtype=float).ravel()
+    observed = ~np.isnan(y_holdout)
+    y_in_sample = np.asarray(y_in_sample, dtype=float).ravel()
+    if in_sample_missing is not None:
+        y_in_sample = y_in_sample[~np.asarray(in_sample_missing, dtype=bool)]
+    m = measures(
+        y_holdout[observed],
+        np.asarray(y_fitted_holdout, dtype=float).ravel()[observed],
+        y_in_sample[~np.isnan(y_in_sample)],
+    )
     m["RMSE"] = np.sqrt(m["MSE"])
     return m
 
@@ -990,7 +1002,13 @@ def _format_holdout_errors(model: Any, digits: int) -> str:
         lags = model._lags_model.get("lags", [1])
         period = max(lags) if lags else 1
 
-    errors = _compute_forecast_errors(y_holdout, y_forecast, y_in_sample, period)
+    errors = _compute_forecast_errors(
+        y_holdout,
+        y_forecast,
+        y_in_sample,
+        period,
+        model._observations.get("y_na_values"),
+    )
     return _format_forecast_errors(errors, digits)
 
 

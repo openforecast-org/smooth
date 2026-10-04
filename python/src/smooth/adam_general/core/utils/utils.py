@@ -809,6 +809,30 @@ def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
         return 0
 
 
+def _libm(fun, np_fun, x):
+    # Elementwise through the C library, as R's exp() / log() are. NumPy's SIMD
+    # kernels round differently in the last bit (exp on ~5% of inputs, log on
+    # ~0.4%), and one ulp in the OMG probability flipped a Nelder-Mead step.
+    # The non-finite results keep NumPy's value: math raises where R returns
+    # Inf / -Inf / NaN, and those are exact anyway.
+    arr = np.asarray(x, dtype=np.float64)
+    out = np.array(np_fun(arr), dtype=np.float64)
+    finite = np.isfinite(out)
+    values = arr[finite].tolist()
+    out[finite] = np.fromiter(map(fun, values), np.float64, len(values))
+    return out
+
+
+def _exp_r(x):
+    """``exp()`` as R computes it, elementwise through libm."""
+    return _libm(math.exp, np.exp, x)
+
+
+def _log_r(x):
+    """``log()`` as R computes it, elementwise through libm."""
+    return _libm(math.log, np.log, x)
+
+
 def _sum_r(values, axis=None):
     """``sum()`` with R's accumulator.
 

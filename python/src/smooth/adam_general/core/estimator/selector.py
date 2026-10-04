@@ -147,6 +147,7 @@ def _estimate_model(
     components_dict,
     nlopt_kwargs=None,
     smoother="global",
+    estimator_function=None,
 ):
     """
     Estimate a single model and calculate its information criterion.
@@ -188,7 +189,7 @@ def _estimate_model(
         Dictionary containing estimation results and model information
     """
     # Estimate the model
-    adam_estimated = estimator(
+    adam_estimated = (estimator_function or estimator)(
         general_dict=general_dict,
         model_type_dict=model_type_dict_temp,
         lags_dict=lags_dict,
@@ -242,6 +243,7 @@ def _run_branch_and_bound(
     check_trend,
     nlopt_kwargs=None,
     smoother="global",
+    estimator_function=None,
     silent=False,
 ):
     """
@@ -367,6 +369,7 @@ def _run_branch_and_bound(
             components_dict,
             nlopt_kwargs=nlopt_kwargs,
             smoother=smoother,
+            estimator_function=estimator_function,
         )
 
         result["Etype"] = e_type
@@ -553,6 +556,7 @@ def _estimate_all_models(
     precomputed_results=None,
     precomputed_models=None,
     smoother="global",
+    estimator_function=None,
 ):
     """
     Estimate all models in the provided pool.
@@ -653,7 +657,7 @@ def _estimate_all_models(
 
         # Estimate the model
         results[j] = {}
-        results[j]["adam_estimated"] = estimator(
+        results[j]["adam_estimated"] = (estimator_function or estimator)(
             general_dict=general_dict,
             model_type_dict=model_type_dict_temp,
             lags_dict=lags_dict,
@@ -703,6 +707,7 @@ def selector(
     silent=False,
     nlopt_kwargs=None,
     smoother="global",
+    estimator_function=None,
 ):
     """
     Automatic model selection for ADAM using information criteria and Branch & Bound.
@@ -857,6 +862,10 @@ def selector(
     silent : bool, default=False
         Whether to suppress progress messages during model estimation.
         If False, prints which models are being estimated.
+    estimator_function : callable, optional
+        Replaces :func:`estimator` for each candidate, called with the same
+        arguments and returning the same dict. ``OM`` passes its own, as R's
+        ``om()`` hands ``omEstimatorWrapper`` to the shared selector.
 
     Returns
     -------
@@ -1007,6 +1016,7 @@ def selector(
                     check_trend,
                     nlopt_kwargs=nlopt_kwargs,
                     smoother=smoother,
+                    estimator_function=estimator_function,
                     silent=silent,
                 )
             )
@@ -1057,6 +1067,7 @@ def selector(
         precomputed_results=bb_results,
         precomputed_models=bb_models_tested,
         smoother=smoother,
+        estimator_function=estimator_function,
     )
     # print(results)
 

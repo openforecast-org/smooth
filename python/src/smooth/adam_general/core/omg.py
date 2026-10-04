@@ -31,7 +31,12 @@ from smooth.adam_general.core.om import (
 )
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.omg_cost import omg_cf, omg_link_function
-from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT, SmootherType
+from smooth.adam_general.core.utils.utils import (
+    SMOOTHER_DEFAULT,
+    SmootherType,
+    _log_r,
+    _sum_r,
+)
 
 
 def _omg_refit_one_replicate(
@@ -204,6 +209,7 @@ class OMG:
             arma=self.arma_b,
             y=y,
             X=X,
+            lags_max_pad=side_a.get("lags_dict", {}).get("lags_model_max", 0),
         )
 
         self._side_a = side_a
@@ -262,12 +268,8 @@ class OMG:
         ).ravel()
         self._residuals_combined = ot - self._fitted_combined
         self._ot = ot
-        self._loglik = float(
-            np.sum(
-                ot * np.log(self._fitted_combined)
-                + (1.0 - ot) * np.log(1.0 - self._fitted_combined)
-            )
-        )
+        p_fit = self._fitted_combined
+        self._loglik = _sum_r(_log_r(np.where(ot == 1, p_fit, 1.0 - p_fit)))
 
         # Information-criterion bookkeeping mirrors OM (must be set before
         # building sub-models — _om_from_side reads _log_lik_dict and
@@ -963,15 +965,17 @@ class OMG:
         arma,
         y,
         X,
+        lags_max_pad: int = 0,
     ) -> Dict[str, Any]:
         """Assemble all the per-side artefacts the joint cost needs.
 
         Reuses :class:`OM` internals (parameters_checker, restore-user-spec,
         architector, creator, om_initial_transform) so the per-side state is
         produced exactly the same way as a standalone ``OM(...)`` would.
+        A wildcard ``spec`` is first resolved by a standalone ``OM`` selection
+        on the whole sample, as R's ``omg()`` does.
         """
-        scaffold = OM(
-            model=spec,
+        common = dict(
             occurrence=occurrence,
             lags=self.lags,
             orders=orders,
@@ -983,12 +987,19 @@ class OMG:
             arma=arma,
             ic=self.ic,
             bounds=self.bounds,
-            verbose=self.verbose,
-            holdout=self.holdout,
-            h=self.h,
             nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
             smoother=self.smoother,
+        )
+        if isinstance(spec, str) and any(c in spec for c in "ZXYFPS"):
+            loss = self.loss_function if self.loss == "custom" else self.loss
+            spec = (
+                OM(model=spec, loss=loss, lambda_param=self.lambda_param, **common)
+                .fit(y, X)
+                .model_type
+            )
+        scaffold = OM(
+            model=spec, verbose=self.verbose, holdout=self.holdout, h=self.h, **common
         )
         scaffold._start_time = time.time()
         requested = (
@@ -1014,7 +1025,9 @@ class OMG:
             np.sum(~scaffold._observations["ot_logical"])
         )
 
-        adam_cpp, adam_created, profile_dict = scaffold._build_om_artifacts()
+        adam_cpp, adam_created, profile_dict = scaffold._build_om_artifacts(
+            lags_max_pad
+        )
 
         return {
             "scaffold": scaffold,

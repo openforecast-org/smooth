@@ -375,6 +375,32 @@ class TestETSShapes:
         assert m.fitted.shape == intermittent_y.shape
 
 
+class TestSelection:
+    @pytest.mark.parametrize(
+        "model,lags,pool",
+        [
+            ("ZXN", [1], {"ANN", "AAN", "MNN"}),
+            ("ZZN", [1], {"ANN", "AAN", "AAdN", "MNN", "MAN", "MAdN"}),
+            ("XXN", [1], {"ANN", "AAN", "AAdN"}),
+        ],
+    )
+    def test_select_picks_min_ic(self, intermittent_y, model, lags, pool):
+        m = OM(model=model, occurrence="odds-ratio", lags=lags).fit(intermittent_y)
+        assert set(m.ics) <= pool
+        assert m.model_type == min(m.ics, key=m.ics.get)
+        refit = OM(model=m.model_type, occurrence="odds-ratio", lags=lags)
+        assert refit.fit(intermittent_y).loglik == pytest.approx(m.loglik)
+
+    def test_general_selects_both_sides(self, intermittent_y):
+        m = OM(model="ZXN", occurrence="general", lags=[1]).fit(intermittent_y)
+        assert m.model.startswith("oETS[G]")
+        assert np.isfinite(m.loglik)
+
+    def test_combine_not_available(self, intermittent_y):
+        with pytest.raises(NotImplementedError):
+            OM(model="CCN", occurrence="odds-ratio", lags=[1]).fit(intermittent_y)
+
+
 # --------------------------------------------------------------------------
 # Input variants
 # --------------------------------------------------------------------------

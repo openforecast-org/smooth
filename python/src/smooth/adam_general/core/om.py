@@ -743,6 +743,13 @@ class OM(ADAM):
 
         if self._om_occurrence == "fixed":
             self._fit_fixed()
+        elif self._model_type.get("model_do") == "select":
+            self._select_occurrence()
+        elif self._model_type.get("model_do") == "combine":
+            raise NotImplementedError(
+                "The combination of the occurrence models (model with C) is not "
+                "available in Python yet."
+            )
         else:
             self._fit_occurrence()
 
@@ -859,13 +866,17 @@ class OM(ADAM):
             return int(df_initials)
         return -int(ets_redundancy)
 
-    def _build_om_artifacts(self):
+    def _build_om_artifacts(self, lags_max_pad: int = 0):
         """Run architector → creator → om_initial_transform; return artifacts.
 
         Mirrors the in-place R block in om.R (lines ~317-375): the creator is
         called with ``Etype="A"`` to keep the state-space decomposition
-        well-defined for binary data.
+        well-defined for binary data. ``lags_max_pad`` is the other side's
+        ``lags_model_max`` in OMG, whose joint fit loops over this side's lookup
+        table and states up to it (R's obsAllB_opt / obsStatesB_opt).
         """
+        obs_in_sample = self._observations["obs_in_sample"]
+        obs_all = self._observations["obs_all"]
         (
             model_type_dict,
             components_dict,
@@ -876,7 +887,10 @@ class OM(ADAM):
         ) = architector(
             self._model_type,
             self._lags_model,
-            self._observations,
+            {
+                **self._observations,
+                "obs_all": max(obs_all, obs_in_sample + lags_max_pad),
+            },
             self._arima,
             self._explanatory,
             self._constant,
@@ -915,6 +929,10 @@ class OM(ADAM):
         # adam_creator() has no such guard and always decomposes.
         observations_dict_for_creator["obs_nonzero"] = int(
             observations_dict["obs_in_sample"]
+        )
+        observations_dict_for_creator["obs_all"] = obs_all
+        observations_dict_for_creator["obs_states"] = max(
+            observations_dict["obs_states"], obs_in_sample + lags_max_pad
         )
 
         adam_created = creator(
@@ -975,7 +993,7 @@ class OM(ADAM):
         self._model_type = model_type_dict
         self._components = components_dict
         self._lags_model = lags_dict
-        self._observations = observations_dict
+        self._observations = {**observations_dict, "obs_all": obs_all}
         self._profile = profile_dict
         self._adam_created = adam_created
         self._adam_cpp = adam_cpp
@@ -1053,6 +1071,48 @@ class OM(ADAM):
         )
 
         return adam_created
+
+    def _select_occurrence(self):
+        """The ETS model of the occurrence selected by the information criterion, as
+        R's om() does with adam_selector(): the pool and the branch and bound of ADAM,
+        with each candidate estimated by the occurrence model's own estimator. The
+        information criteria of the candidates are kept in ``ics``."""
+        from smooth.adam_general.core.estimator.selector import selector
+
+        selected = selector(
+            model_type_dict=self._model_type,
+            phi_dict=self._phi_internal,
+            general_dict=self._general,
+            lags_dict=self._lags_model,
+            observations_dict=self._observations,
+            arima_dict=self._arima,
+            constant_dict=self._constant,
+            explanatory_dict=self._explanatory,
+            occurrence_dict=self._occurrence,
+            components_dict=self._components,
+            profiles_recent_table=self.profiles_recent_table,
+            profiles_recent_provided=self.profiles_recent_provided,
+            persistence_results=self._persistence,
+            initials_results=self._initials,
+            criterion=self._general["ic"],
+            silent=True,
+            smoother=self._resolve_smoother(),
+            estimator_function=self._estimate_candidate,
+        )
+        results = selected["results"]
+        best = results[int(np.argmin([result["IC"] for result in results]))]
+        self._model_type = {**best["model_type_dict"], "model_do": "estimate"}
+        self._phi_internal = dict(best["phi_dict"])
+        self._fit_occurrence()
+        self.ics = dict(selected["ic_selection"])
+
+    def _estimate_candidate(self, model_type_dict, phi_dict, **_kwargs):
+        """One candidate of the selection (R's omEstimatorWrapper): the occurrence
+        model with these components, estimated."""
+        self._model_type = dict(model_type_dict)
+        self._phi_internal = dict(phi_dict)
+        self._fit_occurrence()
+        return dict(self._adam_estimated)
 
     def _fit_occurrence(self):
         """Estimate persistence + initials for non-fixed occurrence types."""

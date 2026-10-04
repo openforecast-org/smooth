@@ -18,6 +18,7 @@ import numpy as np
 
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
+from smooth.adam_general.core.utils.utils import _exp_r, _log_r, _mean_r, _sum_r
 
 
 def _side_probe_basis(side, elem, o_type="g"):
@@ -136,13 +137,13 @@ def omg_link_function(fitted_a, fitted_b, error_type_a, error_type_b):
     fa = np.asarray(fitted_a, dtype=np.float64)
     fb = np.asarray(fitted_b, dtype=np.float64)
     if error_type_a == "A" and error_type_b == "A":
-        return 1.0 / (1.0 + np.exp(fb - fa))
+        return 1.0 / (1.0 + _exp_r(fb - fa))
     if error_type_a == "M" and error_type_b == "M":
         return 1.0 / (1.0 + fb / fa)
     if error_type_a == "M" and error_type_b == "A":
-        return 1.0 / (1.0 + np.exp(fb - np.log(fa)))
+        return 1.0 / (1.0 + _exp_r(fb - _log_r(fa)))
     # error_type_a == "A", error_type_b == "M"
-    return 1.0 / (1.0 + np.exp(np.log(fb) - fa))
+    return 1.0 / (1.0 + _exp_r(_log_r(fb) - fa))
 
 
 def omg_cf(  # noqa: N802
@@ -341,16 +342,16 @@ def omg_cf(  # noqa: N802
     if loss == "likelihood":
         return float(
             -(
-                np.sum(np.log(p_combined[ot_logical]))
-                + np.sum(np.log(1.0 - p_combined[~ot_logical]))
+                _sum_r(_log_r(p_combined[ot_logical]))
+                + _sum_r(_log_r(1.0 - p_combined[~ot_logical]))
             )
         )
     if loss == "MSE":
-        return float(np.mean(residual**2))
+        return _mean_r(residual**2)
     if loss == "MAE":
-        return float(np.mean(np.abs(residual)))
+        return _mean_r(np.abs(residual))
     if loss == "HAM":
-        return float(np.mean(np.sqrt(np.abs(residual))))
+        return _mean_r(np.sqrt(np.abs(residual)))
     if loss in ("LASSO", "RIDGE"):
         from smooth.adam_general.core.utils.cost_functions import (
             lasso_denominators,
@@ -393,6 +394,6 @@ def omg_cf(  # noqa: N802
             / float(np.sqrt(obs_in_sample))
         )
         if loss == "LASSO":
-            return error_term + lam * float(np.sum(np.abs(B_penalty)))
+            return error_term + lam * _sum_r(np.abs(B_penalty))
         return error_term + lam * float(np.linalg.norm(B_penalty))
     raise ValueError(f"Unsupported OMG loss={loss!r}.")

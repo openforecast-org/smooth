@@ -13,7 +13,7 @@ import numpy as np
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
-from smooth.adam_general.core.utils.utils import _sum_r
+from smooth.adam_general.core.utils.utils import _exp_r, _log_r, _mean_r, _sum_r
 
 
 def om_link_function(x, error_type, occurrence):
@@ -26,12 +26,12 @@ def om_link_function(x, error_type, occurrence):
     x = np.asarray(x, dtype=np.float64)
     if occurrence == "odds-ratio":
         if error_type == "A":
-            ex = np.exp(x)
+            ex = _exp_r(x)
             return ex / (1.0 + ex)
         return x / (1.0 + x)
     if occurrence == "inverse-odds-ratio":
         if error_type == "A":
-            return 1.0 / (1.0 + np.exp(x))
+            return 1.0 / (1.0 + _exp_r(x))
         return 1.0 / (1.0 + x)
     if occurrence in ("fixed", "direct"):
         return np.clip(x, 0.0, 1.0)
@@ -211,13 +211,13 @@ def om_cf(  # noqa: N802
         # OM surfaces.  Vectorised, unlike math.fsum(...tolist()).
         p_on = p_fitted[ot_logical]
         p_off = p_fitted[~ot_logical]
-        cf_value = -(_sum_r(np.log(p_on)) + _sum_r(np.log(1.0 - p_off)))
+        cf_value = -(_sum_r(_log_r(p_on)) + _sum_r(_log_r(1.0 - p_off)))
     elif loss == "MSE":
-        cf_value = float(np.mean(residual**2))
+        cf_value = _mean_r(residual**2)
     elif loss == "MAE":
-        cf_value = float(np.mean(np.abs(residual)))
+        cf_value = _mean_r(np.abs(residual))
     elif loss == "HAM":
-        cf_value = float(np.mean(np.sqrt(np.abs(residual))))
+        cf_value = _mean_r(np.sqrt(np.abs(residual)))
     elif loss in ("LASSO", "RIDGE"):
         from smooth.adam_general.core.utils.cost_functions import (
             lasso_denominators,
@@ -255,7 +255,7 @@ def om_cf(  # noqa: N802
             / float(np.sqrt(obs_in_sample))
         )
         if loss == "LASSO":
-            cf_value = error_term + lam * float(np.sum(np.abs(B_penalty)))
+            cf_value = error_term + lam * _sum_r(np.abs(B_penalty))
         else:  # RIDGE
             cf_value = error_term + lam * float(np.linalg.norm(B_penalty))
     else:

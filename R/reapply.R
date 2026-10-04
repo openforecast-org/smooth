@@ -695,10 +695,11 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                            "M"=1/apply(profilesRecentArray[j+i,1:(lagsSeasonal[i]-1),,drop=FALSE],3,prod),
                            0);
             }
-            j <- j+max(initialSeasonalIndices);
-            k <- k+length(initialSeasonalIndices);
+            k <- k+sum(substr(parametersNames,1,8)=="seasonal");
         }
     }
+    # The rows after ETS, whichever of its initials were estimated
+    j <- componentsNumberETS;
     # CES states
     # if(cesModel){}
     # GUM states

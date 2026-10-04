@@ -435,21 +435,23 @@ two-stage, complete, adapt (both bounds) and select fits and on the intervals wi
 X; the coefficients in `coef()` / `confint()` are the deviations from the global model,
 the coefficients themselves are in `initial$xreg`.
 
-### L.8 Found on the way (ADAM, outside TBATS; to be verified and fixed separately)
+### L.8 Found on the way (ADAM, outside TBATS)
 
-From reading the code, not yet reproduced:
-- R filler places δ by the count of estimated smoothing parameters, so with a provided
-  α and "adapt" they land in the wrong rows (`R/utils-adam.R:926-932`); Python indexes
-  correctly;
-- `reapply.adam` writes the xreg draws into the trend row under backcasting with a
-  trend, and offsets them wrongly under "optimal" with seasonality
-  (`R/reapply.R:716-725`); `reforecast.adam` mis-padded a short `newdata`
-  (`R/reapply.R:1175`, `each=` inside `c()`): fixed with step 1;
-- with a multiplicative error, a constant and regressors, the C++ measurement treats
-  the constant as a regressor (`exp(c)` rather than `c`, `adamGeneral.h:91-115`);
+All reproduced and fixed:
+- R filler placed δ by the count of estimated smoothing parameters, so with a provided
+  α and "adapt" they landed over α; `ssarima()` read δ as the ARMA parameters and wrote
+  it past the persistence vector ("Not a matrix"). On the way: Python estimated none of
+  the persistence once any was provided, and R turned a single "adapt" regressor into
+  "use" for the bounds (δ unbounded under "usual");
+- `reapply.adam` wrote the xreg draws into the trend row under backcasting and offset
+  them under "optimal" with seasonality (R and Python); the C++ `reapply()` kept the
+  original states in the first column with a head of one; `reforecast.adam` mis-padded
+  a short `newdata` (`each=` inside `c()`): fixed with step 1;
+- with a multiplicative error, a constant and regressors, the C++ measurement treated
+  the constant as a regressor (`exp(c)` rather than `c`): fixed in `adamGeneral.h`;
 - Python ADAM's "select" ran `stepwise` on the raw y rather than on the errors of the
   model without regressors: fixed, per model as R, with R's named-B bug and Python's
-  two-stage start found on the way; Python `coefbootstrap` does not support regressors;
+  two-stage start found on the way; Python `coefbootstrap` now supports regressors;
 - Python combinations ("CCN") with regressors were named ETS(CCN) where R says
   ETSX(CCN), and their intervals differed from R's by up to 0.04: R counted the
   regressors of each model of a combination twice. Both fixed;

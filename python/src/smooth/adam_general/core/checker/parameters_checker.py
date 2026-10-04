@@ -1146,6 +1146,15 @@ def parameters_checker(
             model_type_dict, persistence_dict, phi_dict, arima_dict, lags_dict
         )
 
+    # The persistence is estimated if any of its parameters is (R's parametersChecker):
+    # a provided alpha leaves beta, gamma and delta to the estimation
+    persistence_dict["persistence_estimate"] = bool(
+        persistence_dict["persistence_level_estimate"]
+        or persistence_dict["persistence_trend_estimate"]
+        or any(persistence_dict["persistence_seasonal_estimate"] or [])
+        or persistence_dict["persistence_xreg_estimate"]
+    )
+
     # Calculate number of parameters using the new n_param table structure
     from smooth.adam_general.core.utils.n_param import build_n_param_table
 

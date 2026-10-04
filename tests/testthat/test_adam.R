@@ -968,3 +968,37 @@ test_that("The empirical interval at h=1 takes the errors, as the multistep ones
                  as.numeric(testModel$forecast[1]) * (1 + quantile(errors, 0.975, type=7)),
                  check.attributes=FALSE)
 })
+
+test_that("The smoothing parameters of the regressors with a provided alpha", {
+    set.seed(41)
+    x <- rnorm(120, 0, 1)
+    xregData <- data.frame(y=100*exp(0.002*(1:120) + 0.1*x + rnorm(120, 0, 0.02)), x=x)
+    testModel <- adam(xregData, "ANN", persistence=list(alpha=0.3), regressors="adapt")
+    expect_equal(testModel$persistence[["alpha"]], 0.3)
+    expect_equal(testModel$persistence[["delta1"]], testModel$B[["delta1"]])
+    # The usual bounds of delta hold with one regressor too
+    expect_true(testModel$B[["delta1"]]>=0 && testModel$B[["delta1"]]<=1)
+})
+
+test_that("The draws of reapply() start the states of the regressors", {
+    set.seed(41)
+    x <- rnorm(120, 10, 2)
+    xregData <- data.frame(y=100 + 0.5*(1:120) + 10*sin(2*pi*(1:120)/12) + 3*x + rnorm(120), x=x)
+    for(model in c("AAN","AAA")){
+        for(initial in c("backcasting","optimal")){
+            testModel <- adam(xregData, model, lags=c(1,12), initial=initial)
+            refitted <- reapply(testModel, nsim=5)
+            expect_equal(refitted$states["x",1,], refitted$randomParameters[,"x"], check.attributes=FALSE)
+        }
+    }
+})
+
+test_that("The constant is a ratio with a multiplicative error and regressors", {
+    set.seed(41)
+    x <- rnorm(120, 0, 1)
+    xregData <- data.frame(y=100*exp(0.002*(1:120) + 0.1*x + rnorm(120, 0, 0.02)), x=x)
+    testModel <- adam(xregData, "MNN", constant=TRUE, initial="optimal")
+    expect_equal(as.numeric(fitted(testModel)[2]),
+                 as.numeric(testModel$states[2,"level"] * testModel$B[["drift"]] *
+                                exp(testModel$B[["x"]] * x[2])))
+})

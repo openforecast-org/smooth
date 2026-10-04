@@ -295,3 +295,19 @@ def test_bootstrap_replace_path_size_validates(y_continuous):
     prob = np.ones(m.nobs) / m.nobs
     with pytest.raises(ValueError, match="size"):
         m.coefbootstrap(nsim=2, size=m.nobs + 50, replace=False, prob=prob, seed=0)
+
+
+@pytest.mark.parametrize("regressors", ["use", "select", "adapt"])
+def test_adam_coefbootstrap_with_regressors(regressors):
+    """Each replicate is refitted on its rows of y and of the regressors of the
+    model (the selected ones, used as they are, with "select")."""
+    rng = np.random.default_rng(41)
+    x = rng.normal(10, 2, 120)
+    y = 100 + 3 * x + np.cumsum(rng.normal(size=120))
+    X = pd.DataFrame({"x": x, "noise": rng.normal(size=120)})
+    with _silence_inner_warnings():
+        m = ADAM(model="ANN", regressors=regressors).fit(y, X)
+        b = m.coefbootstrap(nsim=10, seed=1)
+    assert list(b.coefficients.columns) == list(m.coef_names)
+    assert b.nsim_effective == 10
+    assert np.all(np.isfinite(np.asarray(b.vcov)))

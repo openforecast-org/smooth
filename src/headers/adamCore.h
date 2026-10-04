@@ -1576,20 +1576,20 @@ public:
                 else if(j == 1 || !useHeadFilter) {
                     // Refine the head via the shared helper so it is walked one step
                     // per column across the head cycle (or copied verbatim when T=='N').
-                    if(H > 1) {
-                        // Bind slice views so refineHeadFwd can mutate them via references.
-                        arma::mat sliceVt = arrayVt.slice(k);
-                        arma::mat sliceProfile = arrayProfilesRecent.slice(k);
-                        arma::mat sliceF = arrayF.slice(k);
-                        // Note: reapply's original branch used the full profile column,
-                        // not just the trend rows, so we call refineHeadFwd once here to
-                        // match — the helper writes the trend-walked value into the
-                        // level+trend rows and preserves the seasonal via the profile.
-                        refineHeadFwd(sliceVt, sliceProfile, sliceF,
-                                      indexLookupTable, lagsModelMax, H);
-                        arrayVt.slice(k) = sliceVt;
-                        arrayProfilesRecent.slice(k) = sliceProfile;
-                    }
+                    // As in fit(), this also writes the initial states of a head of one
+                    // column, which otherwise kept those of the original model.
+                    // Bind slice views so refineHeadFwd can mutate them via references.
+                    arma::mat sliceVt = arrayVt.slice(k);
+                    arma::mat sliceProfile = arrayProfilesRecent.slice(k);
+                    arma::mat sliceF = arrayF.slice(k);
+                    // Note: reapply's original branch used the full profile column,
+                    // not just the trend rows, so we call refineHeadFwd once here to
+                    // match — the helper writes the trend-walked value into the
+                    // level+trend rows and preserves the seasonal via the profile.
+                    refineHeadFwd(sliceVt, sliceProfile, sliceF,
+                                  indexLookupTable, lagsModelMax, H);
+                    arrayVt.slice(k) = sliceVt;
+                    arrayProfilesRecent.slice(k) = sliceProfile;
                 } else {
                     for(unsigned int i=0; i<H; i=i+1) {
                         // Gather the profile cells for this head step once and reuse them

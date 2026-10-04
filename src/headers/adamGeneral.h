@@ -87,30 +87,31 @@ inline double adamWvalue(arma::vec const &vecVt, arma::rowvec const &rowvecW,
         }
     }
 
-    // Explanatory variables
+    // Explanatory variables, without the constant that follows them
     if(nXreg > 0){
+        unsigned int xregLast = nETS+nArima+nXreg-1;
         // If error is additive, add explanatory variables. Otherwise multiply by exp(ax)
         switch(E){
         case 'A':
-            yfit += as_scalar(rowvecW.cols(nETS+nArima,nComponents-1) *
-                vecVt.rows(nETS+nArima,nComponents-1));
+            yfit += as_scalar(rowvecW.cols(nETS+nArima,xregLast) *
+                vecVt.rows(nETS+nArima,xregLast));
             break;
         case 'M':
-            yfit = yfit * as_scalar(exp(rowvecW.cols(nETS+nArima,nComponents-1) *
-                vecVt.rows(nETS+nArima,nComponents-1)));
+            yfit = yfit * as_scalar(exp(rowvecW.cols(nETS+nArima,xregLast) *
+                vecVt.rows(nETS+nArima,xregLast)));
             break;
         }
     }
-    else{
-        if(constant){
-            switch(E){
-            case 'A':
-                yfit += vecVt(nComponents-1);
-                break;
-            case 'M':
-                yfit = yfit * vecVt(nComponents-1);
-                break;
-            }
+
+    // The constant: a summand with the additive error, a ratio with the multiplicative one
+    if(constant){
+        switch(E){
+        case 'A':
+            yfit += vecVt(nComponents-1);
+            break;
+        case 'M':
+            yfit = yfit * vecVt(nComponents-1);
+            break;
         }
     }
 

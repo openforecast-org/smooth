@@ -921,7 +921,7 @@ adam_filler <- function(B,
         # Persistence of xreg
         if(xregModel && persistenceXregEstimate){
             xregPersistenceNumber <- max(xregParametersPersistence)
-            vecG[j+componentsNumberARIMA+1:length(xregParametersPersistence)] <-
+            vecG[componentsNumberETS+componentsNumberARIMA+1:length(xregParametersPersistence)] <-
                 B[j+1:xregPersistenceNumber][xregParametersPersistence]
             j[] <- j+xregPersistenceNumber
         }

@@ -2287,7 +2287,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             lagsModelAll <- matrix(c(lagsModelAll,rep(1,xregNumber)),ncol=1);
         }
         # If there's only one explanatory variable, then there's nothing to select
-        if(xregNumber==1){
+        if(xregNumber==1 && regressors=="select"){
             regressors[] <- "use";
         }
 

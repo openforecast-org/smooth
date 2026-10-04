@@ -246,7 +246,15 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     filler <- function(B, matVt, matF, vecG, matWt, arRequired=TRUE, maRequired=TRUE, arEstimate=TRUE, maEstimate=TRUE){
 
         j <- 0;
-        # ARMA parameters. This goes before xreg in persistence
+        # Persistence of xreg, first in B, as the initialiser puts it
+        if(xregModel && persistenceEstimate && persistenceXregEstimate){
+            xregPersistenceNumber <- max(xregParametersPersistence);
+            vecG[componentsNumberARIMA+1:length(xregParametersPersistence)] <-
+                B[j+1:xregPersistenceNumber][xregParametersPersistence];
+            j[] <- j+xregPersistenceNumber;
+        }
+
+        # ARMA parameters
         if(arimaModel){
             # This is a failsafe for cases, when model doesn't have any parameters (e.g. I(d) with backcasting)
             if(is.null(B)){
@@ -256,7 +264,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
             }
             else{
                 # Call the function returning ARI and MA polynomials
-                arimaPolynomials <- lapply(adamCpp$polynomialise(B[1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
+                arimaPolynomials <- lapply(adamCpp$polynomialise(B[j+1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
                                                                  arOrders, iOrders, maOrders,
                                                                  arEstimate, maEstimate, armaParameters, lags), as.vector);
             }
@@ -279,15 +287,6 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                 }
             }
             j[] <- j+sum(c(arOrders*arEstimate,maOrders*maEstimate));
-        }
-
-        # Fill in persistence
-        if(xregModel && persistenceEstimate && persistenceXregEstimate){
-            # Persistence of xreg
-            xregPersistenceNumber <- max(xregParametersPersistence);
-            vecG[j+componentsNumberARIMA+1:length(xregParametersPersistence)] <-
-                B[j+1:xregPersistenceNumber][xregParametersPersistence];
-            j[] <- j+xregPersistenceNumber;
         }
 
         # Initials of ARIMA

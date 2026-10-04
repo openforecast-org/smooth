@@ -37,3 +37,12 @@ test_that("SSARIMA starts from the Hannan-Rissanen values", {
     # The start is feasible under ssarima's bounds: no penalty
     expect_lt(testModel$lossValue, 1e+100)
 })
+
+test_that("ssarima() adapts the regressors: the deltas follow the ARMA in B", {
+    set.seed(41)
+    x <- rnorm(100, 10, 2)
+    xregData <- data.frame(y=100 + 3*x + cumsum(rnorm(100)), x=x)
+    testModel <- ssarima(xregData, orders=list(ar=0,i=1,ma=1), regressors="adapt")
+    expect_equal(testModel$persistence[["delta1"]], testModel$B[["delta1"]])
+    expect_equal(testModel$persistence[["psi1"]], 1 + testModel$B[["theta1[1]"]])
+})

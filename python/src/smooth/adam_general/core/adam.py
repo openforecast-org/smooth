@@ -91,6 +91,7 @@ class OutlierDummy:
 
 def _adam_refit_one_replicate(
     actuals: NDArray,
+    xreg: Optional[NDArray],
     idx_matrix: Union[NDArray, list[NDArray]],
     refit_cls_name: str,
     model_spec: Any,
@@ -118,7 +119,10 @@ def _adam_refit_one_replicate(
             boot_model = refit_cls(model=model_spec, **refit_kwargs)
         else:
             boot_model = refit_cls(**refit_kwargs)
-        boot_model.fit(y_boot)
+        if xreg is None:
+            boot_model.fit(y_boot)
+        else:
+            boot_model.fit(y_boot, xreg[idx_matrix[i]])
         boot_coef = np.asarray(boot_model.coef, dtype=float)
     except Exception:
         return None
@@ -5461,8 +5465,9 @@ class ADAM:
         count) are dropped silently; ``result.nsim_effective`` reports the
         count that contributed to the variance estimate.
 
-        Bootstrap on a model with external regressors (``X``) is not yet
-        supported and will raise.
+        With external regressors (``X``), each replicate is refitted on its rows of
+        ``y`` and of the regressors of the model (those selected with
+        ``regressors="select"``, used as they are), as R.
 
         Examples
         --------
@@ -5490,12 +5495,6 @@ class ADAM:
                 "method='dsr' requires greybox.dsrboot which is not yet "
                 "available in Python; use method='cr'."
             )
-        if self._explanatory.get("xreg_model", False):
-            raise NotImplementedError(
-                "coefbootstrap does not yet support models with external "
-                "regressors (X). File an issue if you need this."
-            )
-
         nobs = int(self.nobs)
         if size is None:
             size = max(int(np.floor(0.75 * nobs)), 1)
@@ -5558,6 +5557,15 @@ class ADAM:
             include_model_kwarg = True
         refit_kwargs["holdout"] = False
         refit_kwargs.setdefault("verbose", 0)
+        # The regressors of the model, used as they are; the outliers are not
+        # detected again, as in R
+        xreg = None
+        if self._explanatory.get("xreg_model", False):
+            xreg = np.asarray(self._explanatory["xreg_data"], dtype=float)[:nobs]
+            if refit_kwargs.get("regressors") == "select":
+                refit_kwargs["regressors"] = "use"
+        if "outliers" in refit_kwargs:
+            refit_kwargs["outliers"] = "ignore"
         # As R, each refit starts from the estimates and is not bounded
         start = np.asarray(self.coef, dtype=float)
         refit_kwargs["nlopt_kwargs"] = {
@@ -5574,6 +5582,7 @@ class ADAM:
         worker = partial(
             _adam_refit_one_replicate,
             actuals,
+            xreg,
             idx_list,
             refit_cls_name,
             model_spec,
@@ -5654,8 +5663,8 @@ class ADAM:
         Notes
         -----
         Covers ETS (with ``bounds="usual"``, ``"admissible"`` or
-        ``"none"``) and pure / mixed ARIMA models. External regressors
-        (``X``) are still rejected — that branch arrives in a follow-up.
+        ``"none"``), pure / mixed ARIMA models and external regressors
+        (``X``), whose drawn coefficients start their states.
         """
         import time as _time
 
@@ -5971,13 +5980,13 @@ class ADAM:
                     if stype == "A":
                         profiles_recent_array[j, lag_s - 1, :] = -arr.sum(axis=1)
                     elif stype == "M":
-                        prod = np.prod(arr, axis=1)
-                        # Guard against zero — fall back to 1 (R would emit NaN).
-                        profiles_recent_array[j, lag_s - 1, :] = np.where(
-                            prod != 0, 1.0 / prod, 1.0
+                        profiles_recent_array[j, lag_s - 1, :] = 1.0 / np.prod(
+                            arr, axis=1
                         )
                     j += 1
                 k += sum(len(v) for v in groups.values())
+        # The rows after ETS, whichever of its initials were estimated
+        j = self._components["components_number_ets"] if ets_model else 0
 
         # 6b. ARIMA profile fill (R/reapply.R). The estimated initials (none for
         # backcasting / complete) are held by the last ARIMA state.

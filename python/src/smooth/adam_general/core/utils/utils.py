@@ -816,7 +816,9 @@ def _libm(fun, np_fun, x):
     # The non-finite results keep NumPy's value: math raises where R returns
     # Inf / -Inf / NaN, and those are exact anyway.
     arr = np.asarray(x, dtype=np.float64)
-    out = np.array(np_fun(arr), dtype=np.float64)
+    # R returns these silently; the values flow on unchanged
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        out = np.array(np_fun(arr), dtype=np.float64)
     finite = np.isfinite(out)
     values = arr[finite].tolist()
     out[finite] = np.fromiter(map(fun, values), np.float64, len(values))

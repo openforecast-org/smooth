@@ -11,7 +11,8 @@ Supported ``occurrence`` values:
   handled by :class:`OM` itself (Stage 1).
 * ``"general"`` — :class:`OM`'s ``__new__`` transparently returns an
   :class:`OMG` instance (Stage 2).
-* ``"auto"`` — raises :class:`NotImplementedError`; coming in Stage 4.
+* ``"auto"``, the default, as R's ``om()`` — :class:`OM`'s ``__new__`` returns an
+  :class:`AutoOM`, whose ``fit()`` returns the model of the selected type.
 
 Design: ``OM(ADAM)`` reuses ADAM's architector → creator → forecaster
 machinery. It overrides exactly the surfaces that differ between regular ADAM
@@ -429,6 +430,23 @@ def draw_occurrence(probability, seed=None):
     return probability, occurrence
 
 
+def _check_om_loss(loss) -> None:
+    """The losses of an occurrence model, or a callable returning a scalar."""
+    if not callable(loss) and loss not in (
+        "likelihood",
+        "MSE",
+        "MAE",
+        "HAM",
+        "LASSO",
+        "RIDGE",
+    ):
+        raise ValueError(
+            f"Invalid loss={loss!r}; expected one of "
+            "'likelihood', 'MSE', 'MAE', 'HAM', 'LASSO', 'RIDGE', "
+            "or a callable returning a scalar."
+        )
+
+
 class OM(ADAM):
     """Occurrence model — state-space model for the probability of demand occurrence.
 
@@ -441,7 +459,8 @@ class OM(ADAM):
     _OM_DEFAULT_LOSS = "likelihood"
 
     def __new__(cls, *args, **kwargs):
-        occ = kwargs.get("occurrence")
+        # "auto" is the default, as R's om()
+        occ = kwargs.get("occurrence", "auto")
         if occ == "general":
             from smooth.adam_general.core.omg import _build_omg_from_om_kwargs
 
@@ -473,10 +492,17 @@ class OM(ADAM):
                         "bounds",
                         "verbose",
                         "nlopt_kwargs",
+                        "loss",
+                        "lambda_param",
                     )
                 }
             )
         return super().__new__(cls)
+
+    def __getnewargs_ex__(self):
+        # copy and pickle call __new__ with these: the fitted type, not the default
+        # "auto", which would redirect to AutoOM
+        return (), {"occurrence": self._om_occurrence}
 
     def __init__(
         self,
@@ -491,7 +517,7 @@ class OM(ADAM):
         regressors: Literal["use", "select", "adapt"] = "use",
         # ``str`` (not just the OM_OCCURRENCE_OPTIONS literals) because ``__new__``
         # also routes "general"/"auto", and wrappers pass runtime-validated strings.
-        occurrence: str = "odds-ratio",
+        occurrence: str = "auto",
         loss: Union[
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE", "custom"],
             Callable,
@@ -529,19 +555,7 @@ class OM(ADAM):
         # ADAM's ``parameter_checks._check_distribution_and_loss`` which
         # detects ``callable(loss)`` and sets the internal flag to
         # ``"custom"`` while populating ``_general["loss_function"]``.
-        if not callable(loss) and loss not in (
-            "likelihood",
-            "MSE",
-            "MAE",
-            "HAM",
-            "LASSO",
-            "RIDGE",
-        ):
-            raise ValueError(
-                f"Invalid loss={loss!r}; expected one of "
-                "'likelihood', 'MSE', 'MAE', 'HAM', 'LASSO', 'RIDGE', "
-                "or a callable returning a scalar."
-            )
+        _check_om_loss(loss)
 
         # For "fixed" occurrence the model is forced to ANN with persistence
         # disabled and an analytic initial level.

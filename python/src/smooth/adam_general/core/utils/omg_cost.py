@@ -136,14 +136,17 @@ def omg_link_function(fitted_a, fitted_b, error_type_a, error_type_b):
     """
     fa = np.asarray(fitted_a, dtype=np.float64)
     fb = np.asarray(fitted_b, dtype=np.float64)
-    if error_type_a == "A" and error_type_b == "A":
-        return 1.0 / (1.0 + _exp_r(fb - fa))
-    if error_type_a == "M" and error_type_b == "M":
-        return 1.0 / (1.0 + fb / fa)
-    if error_type_a == "M" and error_type_b == "A":
-        return 1.0 / (1.0 + _exp_r(fb - _log_r(fa)))
-    # error_type_a == "A", error_type_b == "M"
-    return 1.0 / (1.0 + _exp_r(_log_r(fb) - fa))
+    # A probe with a zero fitted value gives p of 0 or 1, as in R, which computes
+    # it silently; omg_cf's infeasibility guard turns it into the penalty
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        if error_type_a == "A" and error_type_b == "A":
+            return 1.0 / (1.0 + _exp_r(fb - fa))
+        if error_type_a == "M" and error_type_b == "M":
+            return 1.0 / (1.0 + fb / fa)
+        if error_type_a == "M" and error_type_b == "A":
+            return 1.0 / (1.0 + _exp_r(fb - _log_r(fa)))
+        # error_type_a == "A", error_type_b == "M"
+        return 1.0 / (1.0 + _exp_r(_log_r(fb) - fa))
 
 
 def omg_cf(  # noqa: N802

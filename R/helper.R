@@ -318,12 +318,22 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
     baseArma <- if(length(c(names(armaAr), names(armaMa)))>0){ object$arma; } else { list(); }
     baseInitialArg <- if(initialsEstimated){ initialList; } else { initialType; }
 
-    refit <- function(persistence, phi, arma, initialArg){
+    # The parameter of the distribution (shape of dgnorm, alpha of dalaplace) and the
+    # constant (or drift) of ARIMA, provided at their values in the refits
+    baseOther <- object$other[intersect(names(object$other), c("shape","alpha","nu"))];
+    baseConstant <- if(is.numeric(object$constant)){ object$constant; } else { NULL; }
+
+    refit <- function(persistence, phi, arma, initialArg, other, constant){
         if(engine=="adam"){
-            args <- list(data=object$data, model=modelString, lags=modelLags,
-                         persistence=persistence, phi=phi, initial=initialArg,
-                         h=0, FI=FALSE, silent=TRUE);
+            # The distribution and the ETS form are those of the model: the refit at the
+            # estimates has to reproduce its likelihood
+            args <- c(list(data=object$data, model=modelString, lags=modelLags,
+                           persistence=persistence, phi=phi, initial=initialArg,
+                           distribution=object$distribution, ets=object$ets,
+                           h=0, FI=FALSE, silent=TRUE),
+                      lapply(other, unname));
             if(!is.null(regressorsMode)){ args$regressors <- regressorsMode; }
+            if(!is.null(constant)){ args$constant <- unname(constant); }
         }
         else{
             # ssarima: data argument is named `y`.
@@ -345,10 +355,19 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
         phi <- object$phi;
         arma <- baseArma;
         initialArg <- baseInitialArg;
+        other <- baseOther;
+        constant <- baseConstant;
         if(!is.null(j)){
             nameJ <- parametersNames[j];
-            if(nameJ %in% persistenceNames){
+            # The constant first: the persistence of ARIMA has an element "drift" too
+            if(nameJ %in% c("constant","drift") && !is.null(constant) && engine=="adam"){
+                constant <- constant+delta;
+            }
+            else if(nameJ %in% persistenceNames){
                 persistence[nameJ] <- persistence[nameJ]+delta;
+            }
+            else if(nameJ=="other" && length(other)==1 && engine=="adam"){
+                other[[1]] <- other[[1]]+delta;
             }
             else if(nameJ=="phi"){
                 phi <- phi+delta;
@@ -408,7 +427,7 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
                 return(NULL);
             }
         }
-        return(refit(persistence, phi, arma, initialArg));
+        return(refit(persistence, phi, arma, initialArg, other, constant));
     }
 
     return(covarOPGCore(object, coef(object), perturbedPointLik, stepSize));

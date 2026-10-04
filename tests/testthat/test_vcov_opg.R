@@ -280,3 +280,16 @@ test_that("a fit with all parameters provided reports the likelihood of its resi
                       arma=list(ar=c(0.5739,0.2664,-0.1364), ma=c(-0.98,-0.5313)))
     expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)), tolerance=1e-8)
 })
+
+test_that("the OPG covariance refits with the distribution, its shape and the drift", {
+    # The refits used the default distribution of the error type, so the base fit did
+    # not reproduce the likelihood and vcov() fell back to the Hessian with a warning
+    testModel <- adam(AirPassengers, "MMM", lags=12, distribution="dlaplace")
+    expect_silent(vcovOPG <- vcov(testModel));
+    expect_true(all(is.finite(diag(vcovOPG))));
+    # The estimated shape and the drift were not perturbed
+    testModel <- adam(AirPassengers, "AAN", distribution="dgnorm");
+    expect_true(all(is.finite(diag(vcov(testModel)))));
+    testModel <- adam(BJsales, "NNN", orders=list(ar=1, i=1, ma=1), constant=TRUE);
+    expect_true(all(is.finite(diag(vcov(testModel)))));
+})

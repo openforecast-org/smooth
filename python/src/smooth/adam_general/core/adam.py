@@ -4959,8 +4959,15 @@ class ADAM:
             errors = np.asarray(errors, dtype=float).ravel()
             if not np.all(np.isfinite(fitted)):
                 return None
+            # An estimated shape is perturbed with the rest of b, as CF reads it
+            other_b = abs(float(b[-1])) if other_est else other
             scale = scaler(
-                distribution, e_type, errors[ot_logical], fitted[ot_logical], obs, other
+                distribution,
+                e_type,
+                errors[ot_logical],
+                fitted[ot_logical],
+                obs,
+                other_b,
             )
             lik = np.asarray(
                 calculate_likelihood(
@@ -4969,7 +4976,7 @@ class ADAM:
                     y[ot_logical],
                     fitted[ot_logical].reshape(-1, 1),
                     scale,
-                    other,
+                    other_b,
                 ),
                 dtype=float,
             ).ravel()

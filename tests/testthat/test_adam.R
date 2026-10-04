@@ -1002,3 +1002,12 @@ test_that("The constant is a ratio with a multiplicative error and regressors", 
                  as.numeric(testModel$states[2,"level"] * testModel$B[["drift"]] *
                                 exp(testModel$B[["x"]] * x[2])))
 })
+
+test_that("ets='adam' changes nothing without ETS components", {
+    for(orders in list(list(ar=1,i=1,ma=1), list(ar=1,i=1,ma=0))){
+        testModel <- adam(BJsales, "NNN", orders=orders, ets="conventional")
+        testModelADAM <- adam(BJsales, "NNN", orders=orders, ets="adam")
+        expect_equal(as.numeric(logLik(testModelADAM)), as.numeric(logLik(testModel)))
+        expect_equal(testModelADAM$B, testModel$B)
+    }
+})

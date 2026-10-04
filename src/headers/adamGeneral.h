@@ -436,7 +436,9 @@ inline arma::vec adamGvalue(arma::vec const &matrixVt, arma::mat const &matrixF,
         g.rows(find_nonfinite(g)).fill(0);
     }
 
-    if(!adamETS){
+    // Without ETS components there is nothing specific to ADAM ETS: the other rows of
+    // g are those of the conventional one (they stayed at 1 otherwise)
+    if(!adamETS || nETS==0){
         // Do the multiplication in order to get the correct g(v) value
         g = g % vectorG * error;
     }

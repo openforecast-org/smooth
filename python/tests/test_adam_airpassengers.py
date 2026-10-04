@@ -8,6 +8,7 @@ The reference loss values were recorded from the implementation to ensure consis
 """
 
 import numpy as np
+import pytest
 
 from smooth import ADAM
 
@@ -621,3 +622,13 @@ class TestADAMMultipleSeasonalPersistence:
         B = model.coef
         # Should estimate alpha and gamma2 (gamma1 is provided)
         assert len(B) == 2, f"Expected 2 parameters (alpha, gamma2), got {len(B)}"
+
+
+def test_ets_adam_changes_nothing_without_ets_components():
+    """Without ETS components, ets="adam" fits the conventional model: the ARIMA
+    rows of g are its persistence times the error."""
+    for orders in ({"ar": [1], "i": [1], "ma": [1]}, {"ar": [1], "i": [1], "ma": [0]}):
+        conventional = ADAM(model="NNN", orders=orders).fit(AIRPASSENGERS)
+        adam_ets = ADAM(model="NNN", orders=orders, ets="adam").fit(AIRPASSENGERS)
+        assert adam_ets.loglik == pytest.approx(conventional.loglik, rel=1e-12)
+        np.testing.assert_allclose(adam_ets.coef, conventional.coef, rtol=1e-10)

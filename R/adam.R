@@ -6619,8 +6619,13 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 else{
                     vcovMulti <- adam_varianceDebiased(object);
                 }
-                # The residuals of the observed values
-                adamErrors <- as.matrix(residuals(object));
+                # The errors of the observed values, as the multistep ones for h>1:
+                # residuals() gives the ratios 1+e for the ratio distributions
+                adamErrors <- as.matrix(as.vector(object$residuals));
+                if(any(object$distribution==c("dinvgauss","dgamma","dlnorm","dls","dllaplace","dlgnorm")) &&
+                   (Etype=="A")){
+                    adamErrors[] <- adamErrors/as.vector(fitted(object));
+                }
                 adamErrors <- adamErrors[!is.na(adamErrors[,1]),,drop=FALSE];
             }
         }

@@ -483,3 +483,39 @@ class TestRComparisonWithR:
             np.std(errors) / np.std(std_res), expected_scale, rtol=1e-6
         )
         np.testing.assert_allclose(expected_scale, 33.82889839, rtol=1e-6)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize(
+    "distribution", ["dnorm", "dlaplace", "ds", "dgnorm", "dlnorm", "dgamma", "dinvgauss"]
+)
+@pytest.mark.parametrize("kind", ["rstandard", "rstudent"])
+def test_outlierdummy_agrees_with_r(distribution, kind):
+    """The bounds are the quantiles of R's outlierdummy.adam, from greybox."""
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        "{ y <- as.numeric(AirPassengers); y[c(30,80)] <- y[c(30,80)]*1.5;"
+        f" m <- adam(ts(y, frequency=12), 'MAM', distribution='{distribution}');"
+        f" o <- outlierdummy(m, level=0.99, type='{kind}');"
+        " list(y=y, id=as.numeric(o$id), statistic=as.numeric(o$statistic)) }"
+    )
+    model = ADAM(model="MAM", lags=[12], distribution=distribution)
+    result = model.fit(np.asarray(r["y"], dtype=float)).outlierdummy(0.99, type=kind)
+    np.testing.assert_allclose(result.statistic, r["statistic"], rtol=1e-10)
+    assert list(np.asarray(result.id) + 1) == [int(i) for i in r["id"] or []]
+
+
+@pytest.mark.r_parity
+def test_outlierdummy_of_a_mixture_agrees_with_r():
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        "{ set.seed(3); y <- rbinom(200,1,0.4)*exp(rnorm(200,2,0.3));"
+        " o <- outlierdummy(adam(y, 'MNN', occurrence='odds-ratio'));"
+        " list(y=y, id=as.numeric(o$id), statistic=as.numeric(o$statistic)) }"
+    )
+    model = ADAM(model="MNN", occurrence="odds-ratio")
+    result = model.fit(np.asarray(r["y"], dtype=float)).outlierdummy()
+    np.testing.assert_allclose(result.statistic, r["statistic"], rtol=1e-10)
+    assert list(np.asarray(result.id) + 1) == [int(i) for i in r["id"]]

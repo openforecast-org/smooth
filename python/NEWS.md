@@ -30,6 +30,9 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* The empirical and nonparametric intervals of `ADAM` with a ratio distribution (`dgamma`, `dinvgauss`, `dlnorm`) and an additive error left the forecast out of the bounds (75.9 instead of R's 483.5), and at h=1 did not divide the errors by the fitted values.
+* `ADAM.outlierdummy()` took the bounds of `dgamma` from `sigma` instead of the scale, and of `dinvgauss` from a dispersion built on `sigma`, so the mixtures flagged other observations than R; the bounds are R's, from greybox (`qgamma`, `qinvgauss` with the de-biased scale, `qs`, `qgnorm`, `qlaplace`), and the logarithms are taken for all the log distributions.
+* The name of an `ADAM` with `occurrence="auto"` had no occurrence type: it takes the type of the selected model, as R (`iETS(MNN)[F]`).
 * `TBATS` with an occurrence model computed `aicc` and `bicc` without the small-sample correction over the parameters of the sizes that R's `AICc.smooth` applies (AICc 1315.31 against R's 1315.04).
 * `sigma` of `ADAM` divided by all the observations, while R divides by the non-zero ones (`nobs(object, all=FALSE)`); this mattered with an occurrence model.
 * `ADAM` as a pure regression fitted ALM to the filled values and misaligned its fitted values with the data when values were missing.

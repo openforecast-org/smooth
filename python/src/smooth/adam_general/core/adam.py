@@ -3,6 +3,7 @@ import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
+import greybox as gb
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
@@ -21,6 +22,7 @@ from smooth.adam_general.core.forecaster.intervals import ensure_level_format
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
+from smooth.adam_general.core.utils.printing import decorate_occurrence_name
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
@@ -307,35 +309,6 @@ _RATIO_RESIDUAL_DISTRIBUTIONS = (
     "dgamma",
     "dinvgauss",
 )
-
-
-_OCCURRENCE_NAME_SUFFIX = {
-    "f": "[F]",
-    "fixed": "[F]",
-    "d": "[D]",
-    "direct": "[D]",
-    "o": "[O]",
-    "odds-ratio": "[O]",
-    "i": "[I]",
-    "inverse-odds-ratio": "[I]",
-    "g": "[G]",
-    "general": "[G]",
-}
-
-
-def _decorate_occurrence_name(name, occurrence_dict):
-    """Prefix ``i`` and append the occurrence-type letter (R: adam_model_name)."""
-    occurrence = (occurrence_dict or {}).get("occurrence")
-    if not isinstance(occurrence, str):
-        # A provided (already fitted) occurrence model: read its own type.
-        occurrence = (
-            (getattr(occurrence, "_occurrence", None) or {}).get("occurrence")
-            if occurrence is not None
-            else None
-        )
-    if not isinstance(occurrence, str) or occurrence in ("n", "none"):
-        return name
-    return f"i{name}{_OCCURRENCE_NAME_SUFFIX.get(occurrence, '')}"
 
 
 class ADAM:
@@ -1412,7 +1385,9 @@ class ADAM:
         # Occurrence models carry an "i" prefix and a bracketed letter naming
         # the occurrence type, as R's adam_model_name does
         # (R/utils-adam.R:1688-1697).
-        self.model = _decorate_occurrence_name(self.model, self._occurrence)
+        self.model = decorate_occurrence_name(
+            self.model, self._occurrence, getattr(self, "_om_model", None)
+        )
 
     # =========================================================================
     # Extraction properties — convenience accessors over the fitted state.
@@ -2544,27 +2519,33 @@ class ADAM:
         dist = self.distribution_
         p = np.array([(1 - level) / 2, (1 + level) / 2])
 
-        if dist == "dnorm":
-            stat = scipy_stats.norm.ppf(p)
-        elif dist == "dlaplace":
-            stat = scipy_stats.laplace.ppf(p)
-        elif dist == "ds":
-            stat = scipy_stats.gennorm.ppf(p, beta=0.5)
-        elif dist == "dgnorm":
-            beta = self._gnorm_shape() or 2.0
-            stat = scipy_stats.gennorm.ppf(p, beta=beta)
-        elif dist == "dlnorm":
-            errors = np.log(errors)
-            stat = scipy_stats.norm.ppf(p)
-        elif dist == "dgamma":
-            scale = self.sigma
-            stat = scipy_stats.gamma.ppf(p, a=1.0 / scale, scale=scale)
+        # The quantiles of the standardised distribution, as R's outlierdummy.adam
+        other = getattr(self, "other", None) or {}
+        scale = float(np.mean(self.extract_scale()))
+        if dist in ("dlaplace", "dllaplace"):
+            stat = gb.qlaplace(p, 0, 1)
+        elif dist == "dalaplace":
+            stat = gb.qalaplace(p, 0, 1, other.get("alpha", 0.5))
+        elif dist == "dlogis":
+            stat = gb.qlogis(p, 0, 1)
+        elif dist == "dt":
+            stat = scipy_stats.t.ppf(p, self._nobs_observed() - self.nparam)
+        elif dist in ("dgnorm", "dlgnorm"):
+            stat = gb.qgnorm(p, 0, 1, self._gnorm_shape() or 2.0)
+        elif dist in ("ds", "dls"):
+            stat = gb.qs(p, 0, 1)
         elif dist == "dinvgauss":
-            nobs, npar = self._nobs_observed(), self.nparam
-            disp = float(self.sigma) * nobs / (nobs - npar)
-            stat = scipy_stats.invgauss.ppf(p, mu=disp, scale=1.0 / disp)
+            # The scale is de-biased, taking n-k into account
+            stat = gb.qinvgauss(
+                p, 1, scale_debias(scale, dist, self._nobs_observed(), self._df_scale)
+            )
+        elif dist == "dgamma":
+            stat = gb.qgamma(p, 1.0 / scale, scale)
         else:
-            stat = scipy_stats.norm.ppf(p)
+            stat = gb.qnorm(p, 0, 1)
+        stat = np.asarray(stat, dtype=float)
+        if dist in ("dlnorm", "dllaplace", "dls", "dlgnorm"):
+            errors = np.log(errors)
 
         outlier_ids = np.where((errors > stat[1]) | (errors < stat[0]))[0]
         n_out = len(outlier_ids)

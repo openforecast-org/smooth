@@ -960,3 +960,11 @@ test_that("rstudent of dgamma leaves its own observation out with an occurrence 
     i <- used[5]
     expect_equal(as.numeric(rstudent(testModel)[i]), as.numeric(errors[i] / mean(errors[used[used!=i]])))
 })
+
+test_that("The empirical interval at h=1 takes the errors, as the multistep ones", {
+    testModel <- adam(AirPassengers, "MAM", h=12, holdout=TRUE)
+    errors <- as.vector(testModel$residuals)
+    expect_equal(as.numeric(forecast(testModel, h=1, interval="empirical")$upper),
+                 as.numeric(testModel$forecast[1]) * (1 + quantile(errors, 0.975, type=7)),
+                 check.attributes=FALSE)
+})

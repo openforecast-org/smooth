@@ -60,3 +60,27 @@ def test_interval_is_not_degenerate(case_id):
     mean = np.array(ref["mean"], dtype=float)
     assert np.all(upper - lower > 1e-6)
     assert np.all(lower < mean) and np.all(mean < upper)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize(
+    "model, distribution",
+    [("MAM", "dgamma"), ("AAN", "dgamma"), ("ANN", "dlnorm"), ("MNN", "dinvgauss")],
+)
+@pytest.mark.parametrize("interval", ["empirical", "nonparametric"])
+@pytest.mark.parametrize("h", [1, 2])
+def test_the_error_based_intervals_agree_with_r(model, distribution, interval, h):
+    """At h=1 the intervals take the errors, as the multistep ones do: the ratios
+    of residuals() doubled them in R, and the forecast was left out in Python for
+    the ratio distributions with an additive error."""
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        f"{{ m <- adam(AirPassengers, '{model}', distribution='{distribution}',"
+        " h=12, holdout=TRUE); list(y=as.numeric(AirPassengers),"
+        f" upper=as.numeric(forecast(m, h={h}, interval='{interval}')$upper)) }}"
+    )
+    fit = ADAM(model=model, distribution=distribution, lags=[12], h=12, holdout=True)
+    fit.fit(np.asarray(r["y"], dtype=float))
+    upper = np.asarray(fit.predict(h=h, interval=interval).upper, dtype=float).ravel()
+    np.testing.assert_allclose(upper, r["upper"], rtol=1e-8)

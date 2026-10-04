@@ -729,11 +729,16 @@ def generate_multistep_interval(
         # No residual at the missing values
         adam_errors[~observed_mask(observations_dict)] = np.nan
 
-    if h > 1 and distribution in _LOG_DISTS and e_type == "A":
+    # The errors relative to the fitted values for the ratio distributions with an
+    # additive error, at h=1 as for the multistep ones
+    if distribution in _LOG_DISTS and e_type == "A":
         y_fitted = np.asarray(prepared_model["y_fitted"], dtype=float)
-        fitted_matrix = np.column_stack(
-            [y_fitted[i : obs - h + i] for i in range(1, h + 1)]
-        )
+        if h > 1:
+            fitted_matrix = np.column_stack(
+                [y_fitted[i : obs - h + i] for i in range(1, h + 1)]
+            )
+        else:
+            fitted_matrix = y_fitted.reshape(-1, 1)
         adam_errors = adam_errors / fitted_matrix
     # The windows with all their targets observed
     adam_errors = adam_errors[~np.any(np.isnan(adam_errors), axis=1)]
@@ -781,12 +786,12 @@ def generate_multistep_interval(
         )
 
     pred_col = yf.reshape(-1, 1)
-    if e_type == "M":
+    # The errors relative to the forecast: those of a multiplicative error, and of
+    # the ratio distributions with an additive one (R: the forecast plus the
+    # quantile times the forecast)
+    if e_type == "M" or distribution in _LOG_DISTS:
         y_lower = pred_col * (1.0 + y_lower)
         y_upper = pred_col * (1.0 + y_upper)
-    elif distribution in _LOG_DISTS:
-        y_lower = pred_col * y_lower
-        y_upper = pred_col * y_upper
     else:
         y_lower = pred_col + y_lower
         y_upper = pred_col + y_upper

@@ -560,6 +560,9 @@ test_that("ARIMA starting values with missing and intermittent data", {
     set.seed(44)
     y <- ts(rpois(120, 0.7) * (1 + rnorm(120)^2))
     expect_true(all(is.finite(adam(y, "MNN", orders=list(ar=1), occurrence="odds-ratio", maxeval=1)$B)))
+    # ETS with ARIMA and no differencing: the series is a ts without regressors
+    expect_true(all(is.finite(adam(AirPassengers, "ANA", orders=list(ar=c(1,1), ma=c(1,1)),
+                                   lags=c(1,12), initial="optimal", maxeval=1)$B)))
 })
 
 test_that("ARIMA with constant starts from the intercept consistent with AR", {

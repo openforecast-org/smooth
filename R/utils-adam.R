@@ -1141,7 +1141,7 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
     }
     # The series and the regressors, differenced alike: a difference that touches a
     # gap is a gap too
-    yDiffs <- cbind(y, xregInSample)
+    yDiffs <- cbind(as.vector(y), xregInSample)
     for(i in which(iOrders>0)){
         yDiffs <- diff(yDiffs, lag=lags[i], differences=iOrders[i])
     }

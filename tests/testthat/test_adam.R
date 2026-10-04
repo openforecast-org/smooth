@@ -1011,3 +1011,21 @@ test_that("ets='adam' changes nothing without ETS components", {
         expect_equal(testModelADAM$B, testModel$B)
     }
 })
+
+test_that("sm() and pls() take the missing values for gaps", {
+    y <- AirPassengers;
+    y[c(10, 50, 51, 90)] <- NA;
+    testModel <- suppressWarnings(adam(y, "MAM", h=12, holdout=TRUE));
+    # The gaps of the location model are not an occurrence of the scale
+    scaleModel <- suppressWarnings(sm(testModel));
+    expect_false(grepl("iETS", scaleModel$model));
+    expect_equal(attr(logLik(scaleModel), "nobs"), sum(!is.na(y[1:132])));
+    # pls() over the holdout of any length, and the observed values of it only
+    holdout <- as.vector(testModel$holdout);
+    holdout[c(3, 5)] <- NA;
+    covarMat <- multicov(testModel, h=12)[-c(3, 5), -c(3, 5)];
+    errors <- log(holdout[-c(3, 5)]) - log(as.vector(testModel$forecast)[-c(3, 5)]);
+    expect_equal(pls(testModel, holdout=holdout),
+                 -as.vector(log(2*pi*det(covarMat))/2 + t(errors) %*% solve(covarMat) %*% errors/2) -
+                     sum(log(holdout[-c(3, 5)])));
+})

@@ -967,26 +967,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                           adamElements$matF,
                                           indexLookupTable, profilesRecentTable,
                                           h, yInSample)$errors;
-            # The windows with all their targets observed
-            adamErrors <- adamErrors[adam_completeWindows(observed, h),,drop=FALSE];
-            nWindows <- nrow(adamErrors);
-
-            # Not done yet: "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL"
-            CFValue <- switch(loss,
-                              "MSEh"=sum(adamErrors[,h]^2)/nWindows,
-                              "TMSE"=sum(colSums(adamErrors^2)/nWindows),
-                              "GTMSE"=sum(log(colSums(adamErrors^2)/nWindows)),
-                              "MSCE"=sum(rowSums(adamErrors)^2)/nWindows,
-                              "MAEh"=sum(abs(adamErrors[,h]))/nWindows,
-                              "TMAE"=sum(colSums(abs(adamErrors))/nWindows),
-                              "GTMAE"=sum(log(colSums(abs(adamErrors))/nWindows)),
-                              "MACE"=sum(abs(rowSums(adamErrors)))/nWindows,
-                              "HAMh"=sum(sqrt(abs(adamErrors[,h])))/nWindows,
-                              "THAM"=sum(colSums(sqrt(abs(adamErrors)))/nWindows),
-                              "GTHAM"=sum(log(colSums(sqrt(abs(adamErrors)))/nWindows)),
-                              "CHAM"=sum(sqrt(abs(rowSums(adamErrors))))/nWindows,
-                              "GPL"=log(det(t(adamErrors) %*% adamErrors/nWindows)),
-                              0);
+            CFValue <- adam_multistepLoss(adamErrors, loss, h, observed);
 
         }
 
@@ -1128,22 +1109,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
             # Concentrated log-likelihoods for the multistep losses, over the windows
             # with all their targets observed
-            nWindows <- sum(adam_completeWindows(!yNAValues[1:obsInSample], h));
-            logLikReturn[] <- -switch(loss,
-                                      "MSEh"=, "aMSEh"=, "TMSE"=, "aTMSE"=, "MSCE"=, "aMSCE"=
-                                          nWindows/2*(log(2*pi)+1+log(logLikReturn)),
-                                      "GTMSE"=, "aGTMSE"=
-                                          nWindows/2*(log(2*pi)+1+logLikReturn),
-                                      "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=
-                                          nWindows*(log(2)+1+log(logLikReturn)),
-                                      "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=
-                                          nWindows*(log(4)+2+2*log(logLikReturn)),
-                                      #### Divide GPL by 8 in order to make it comparable with the univariate ones
-                                      "GPL"=, "aGPL"=
-                                          nWindows/2*(h*log(2*pi)+h+logLikReturn)/h);
-
-            # This is not well motivated at the moment, but should make likelihood comparable, taking T instead of T-h
-            logLikReturn[] <- logLikReturn / nWindows * sum(!yNAValues[1:obsInSample]);
+            logLikReturn[] <- adam_multistepLogLik(logLikReturn, loss, h, !yNAValues[1:obsInSample]);
 
             # In case of multiplicative model, we assume a normal or similar distribution
             if(Etype=="M"){

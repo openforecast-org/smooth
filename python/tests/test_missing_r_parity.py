@@ -9,7 +9,7 @@ default (``r_parity`` marker).
 import numpy as np
 import pytest
 
-from smooth import ADAM, MSARIMA, OM, OMG, TBATS
+from smooth import ADAM, CES, MSARIMA, OM, OMG, TBATS
 
 from ._r_bridge import r_dict
 
@@ -196,14 +196,36 @@ GAPS_CASES = {
         lambda: ADAM(model="ANN", loss="TMSE", h=6),
         False,
     ),
-    "adam regressors": (REGRESSION_GAPS, "adam(d, 'MNN')", lambda: ADAM(model="MNN"), True),
+    "adam regressors": (
+        REGRESSION_GAPS,
+        "adam(d, 'MNN')",
+        lambda: ADAM(model="MNN"),
+        True,
+    ),
     "adam select": (
         REGRESSION_GAPS,
         "adam(d, 'MNN', regressors='select')",
         lambda: ADAM(model="MNN", regressors="select"),
         True,
     ),
-    "adam regression": (REGRESSION_GAPS, "adam(d, 'NNN')", lambda: ADAM(model="NNN"), True),
+    "adam regression": (
+        REGRESSION_GAPS,
+        "adam(d, 'NNN')",
+        lambda: ADAM(model="NNN"),
+        True,
+    ),
+    "ces": (
+        AIRPASSENGERS_GAPS,
+        "ces(ts(y, frequency=12), seasonality='full')",
+        lambda: CES(seasonality="full", lags=[12]),
+        False,
+    ),
+    "ces TMSE": (
+        AIRPASSENGERS_GAPS,
+        "ces(ts(y, frequency=12), seasonality='partial', loss='TMSE', h=6)",
+        lambda: CES(seasonality="partial", lags=[12], loss="TMSE", h=6),
+        False,
+    ),
     "tbats": (
         AIRPASSENGERS_GAPS,
         "tbats(ts(y, frequency=12), lags=c(1,12))",
@@ -255,3 +277,18 @@ def test_the_gaps_agree(case):
     if r["acc"][0] not in (None, "NA"):
         assert fit.accuracy["ME"] == pytest.approx(r["acc"][0], abs=1e-8)
         assert fit.accuracy["MAE"] == pytest.approx(r["acc"][1], abs=1e-8)
+
+
+def test_the_scale_model_over_gaps_agrees():
+    """sm() of a model with missing values: the gaps are neither in the loss nor
+    an occurrence of the scale, as in R."""
+    from smooth import sm
+
+    r = r_dict(
+        f"{{ {AIRPASSENGERS_GAPS} m <- suppressWarnings(adam(ts(y, frequency=12),"
+        " 'MAM')); s <- suppressWarnings(sm(m)); list(y=as.numeric(y),"
+        " ll=as.numeric(logLik(s)), B=unname(s$B)) }"
+    )
+    fit = sm(ADAM(model="MAM", lags=[12]).fit(_values(r["y"])))
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    np.testing.assert_allclose(fit.coef, r["B"], atol=1e-8)

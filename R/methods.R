@@ -452,7 +452,6 @@ pls.smooth <- function(object, holdout=NULL, ...){
     }
     # If holdout is provided, check it and use it. Otherwise try extracting from the model
     yForecast <- object$forecast;
-    covarMat <- multicov(object, ...);
     if(!is.null(holdout)){
         if(length(yForecast)!=length(holdout)){
             if(is.null(object$holdout)){
@@ -472,6 +471,19 @@ pls.smooth <- function(object, holdout=NULL, ...){
         holdout <- object$holdout;
     }
     h <- length(holdout);
+    # The covariance of the errors over the horizon of the holdout (it was the default
+    # h=10 of multicov(), which failed for any other holdout)
+    covarMat <- multicov(object, h=h, ...);
+    # The missing values of the holdout are not scored: the density is the marginal one
+    # of the observed values (their rows and columns of the covariance)
+    observed <- !is.na(as.vector(holdout));
+    if(!any(observed)){
+        stop("No values for the holdout are available. Cannot proceed.",
+             call.=FALSE);
+    }
+    holdout <- as.vector(holdout)[observed];
+    yForecast <- as.vector(yForecast)[observed];
+    covarMat <- covarMat[observed, observed, drop=FALSE];
 
     Etype <- errorType(object);
     loss <- object$loss;
@@ -530,7 +542,7 @@ pls.smooth <- function(object, holdout=NULL, ...){
         # Intermittent data
         else{
             ot <- holdout!=0;
-            pForecast <- object$occurrence$forecast;
+            pForecast <- as.vector(object$occurrence$forecast)[observed];
             errors <- holdout - yForecast / pForecast;
             if(all(ot)){
                 plsValue <- densityFunction(loss, errors, covarMat) + sum(log(pForecast));
@@ -556,7 +568,7 @@ pls.smooth <- function(object, holdout=NULL, ...){
         # Intermittent data
         else{
             ot <- holdout!=0;
-            pForecast <- object$occurrence$forecast;
+            pForecast <- as.vector(object$occurrence$forecast)[observed];
             errors <- log(holdout) - log(yForecast / pForecast);
             if(all(ot)){
                 plsValue <- (densityFunction(loss, errors, covarMat) - sum(log(holdout)) +

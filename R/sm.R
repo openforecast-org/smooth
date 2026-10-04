@@ -68,8 +68,10 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         obsAll <- obsInSample + h;
     }
 
-    # Occurrence logical for intermittent model
-    if(is.occurrence(object$occurrence)){
+    # Occurrence logical for intermittent model. The occurrence of a model with
+    # missing values only (zero at the gaps, one elsewhere) is not one
+    if(is.occurrence(object$occurrence) &&
+       any(fitted(object$occurrence)[!is.na(yInSampleSM)]<1)){
         otLogical <- yInSampleSM!=0;
         occurrence <- object$occurrence;
         occurrenceModel <- TRUE;
@@ -79,6 +81,13 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         occurrence <- NULL;
         occurrenceModel <- FALSE;
     }
+    # The missing values are gaps, as in the location model: adam() hands the custom
+    # loss the observed values only, so the data of the loss are those too
+    observedSM <- !is.na(yInSampleSM);
+    otLogical[!observedSM] <- FALSE;
+    ySM <- yInSampleSM[observedSM];
+    fSM <- yFittedSM[observedSM];
+    otSM <- otLogical[observedSM];
 
     #### The custom loss function to estimate parameters of the model ####
     lossFunction <- function(actual,fitted,B,xreg=NULL){
@@ -87,94 +96,94 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         }
         CFValue <- -sum(switch(distribution,
                                "dnorm"=switch(EtypeSM,
-                                              "A"=dnorm(x=yInSampleSM[otLogical], mean=yFittedSM[otLogical],
-                                                        sd=sqrt(fitted[otLogical]), log=TRUE),
-                                              "M"=dnorm(x=yInSampleSM[otLogical], mean=yFittedSM[otLogical],
-                                                        sd=sqrt(fitted[otLogical])*yFittedSM[otLogical], log=TRUE)),
+                                              "A"=dnorm(x=ySM[otSM], mean=fSM[otSM],
+                                                        sd=sqrt(fitted[otSM]), log=TRUE),
+                                              "M"=dnorm(x=ySM[otSM], mean=fSM[otSM],
+                                                        sd=sqrt(fitted[otSM])*fSM[otSM], log=TRUE)),
                                "dlaplace"=switch(EtypeSM,
-                                                 "A"=dlaplace(q=yInSampleSM[otLogical], mu=yFittedSM[otLogical],
-                                                              scale=fitted[otLogical], log=TRUE),
-                                                 "M"=dlaplace(q=yInSampleSM[otLogical], mu=yFittedSM[otLogical],
-                                                              scale=fitted[otLogical]*yFittedSM[otLogical], log=TRUE)),
+                                                 "A"=dlaplace(q=ySM[otSM], mu=fSM[otSM],
+                                                              scale=fitted[otSM], log=TRUE),
+                                                 "M"=dlaplace(q=ySM[otSM], mu=fSM[otSM],
+                                                              scale=fitted[otSM]*fSM[otSM], log=TRUE)),
                                "ds"=switch(EtypeSM,
-                                           "A"=ds(q=yInSampleSM[otLogical], mu=yFittedSM[otLogical],
-                                                  scale=fitted[otLogical], log=TRUE),
-                                           "M"=ds(q=yInSampleSM[otLogical], mu=yFittedSM[otLogical],
-                                                  scale=fitted[otLogical]*sqrt(yFittedSM[otLogical]), log=TRUE)),
+                                           "A"=ds(q=ySM[otSM], mu=fSM[otSM],
+                                                  scale=fitted[otSM], log=TRUE),
+                                           "M"=ds(q=ySM[otSM], mu=fSM[otSM],
+                                                  scale=fitted[otSM]*sqrt(fSM[otSM]), log=TRUE)),
                                "dgnorm"=switch(EtypeSM,
-                                               "A"=dgnorm(q=yInSampleSM[otLogical],mu=yFittedSM[otLogical],
-                                                          scale=fitted[otLogical], shape=other, log=TRUE),
+                                               "A"=dgnorm(q=ySM[otSM],mu=fSM[otSM],
+                                                          scale=fitted[otSM], shape=other, log=TRUE),
                                                # suppressWarnings is needed, because the check is done for scalar alpha
-                                               "M"=suppressWarnings(dgnorm(q=yInSampleSM[otLogical],
-                                                                           mu=yFittedSM[otLogical],
-                                                                           scale=fitted[otLogical]*yFittedSM[otLogical],
+                                               "M"=suppressWarnings(dgnorm(q=ySM[otSM],
+                                                                           mu=fSM[otSM],
+                                                                           scale=fitted[otSM]*fSM[otSM],
                                                                            shape=other, log=TRUE))),
                                # "dlogis"=switch(EtypeSM,
-                               #                 "A"=dlogis(x=yInSampleSM[otLogical],
-                               #                            location=yFittedSM[otLogical],
-                               #                            scale=fitted[otLogical], log=TRUE),
-                               #                 "M"=dlogis(x=yInSampleSM[otLogical],
-                               #                            location=yFittedSM[otLogical],
-                               #                            scale=fitted[otLogical]*yFittedSM[otLogical], log=TRUE)),
+                               #                 "A"=dlogis(x=ySM[otSM],
+                               #                            location=fSM[otSM],
+                               #                            scale=fitted[otSM], log=TRUE),
+                               #                 "M"=dlogis(x=ySM[otSM],
+                               #                            location=fSM[otSM],
+                               #                            scale=fitted[otSM]*fSM[otSM], log=TRUE)),
                                "dalaplace"=switch(EtypeSM,
-                                                  "A"=dalaplace(q=yInSampleSM[otLogical],
-                                                                mu=yFittedSM[otLogical],
-                                                                scale=fitted[otLogical], alpha=other, log=TRUE),
-                                                  "M"=dalaplace(q=yInSampleSM[otLogical],
-                                                                mu=yFittedSM[otLogical],
-                                                                scale=fitted[otLogical]*yFittedSM[otLogical],
+                                                  "A"=dalaplace(q=ySM[otSM],
+                                                                mu=fSM[otSM],
+                                                                scale=fitted[otSM], alpha=other, log=TRUE),
+                                                  "M"=dalaplace(q=ySM[otSM],
+                                                                mu=fSM[otSM],
+                                                                scale=fitted[otSM]*fSM[otSM],
                                                                 alpha=other, log=TRUE)),
-                               # "dlnorm"=dlnorm(x=yInSampleSM[otLogical],
-                               #                 meanlog=Re(log(as.complex(yFittedSM[otLogical])))-scaleSM^2/2-log(fitted[otLogical]),
+                               # "dlnorm"=dlnorm(x=ySM[otSM],
+                               #                 meanlog=Re(log(as.complex(fSM[otSM])))-scaleSM^2/2-log(fitted[otSM]),
                                #                 sdlog=scaleSM, log=TRUE),
-                               # "dllaplace"=dlaplace(q=log(yInSampleSM[otLogical]),
-                               #                      mu=Re(log(as.complex(yFittedSM[otLogical]))),
-                               #                      scale=fitted[otLogical], log=TRUE) -log(yInSampleSM[otLogical]),
-                               # "dls"=ds(q=log(yInSampleSM[otLogical]),
-                               #          mu=Re(log(as.complex(yFittedSM[otLogical]))),
-                               #          scale=fitted[otLogical], log=TRUE) -log(yInSampleSM[otLogical]),
-                               # "dlgnorm"=dgnorm(q=log(yInSampleSM[otLogical]),
-                               #                  mu=Re(log(as.complex(yFittedSM[otLogical]))),
-                               #                  scale=fitted[otLogical], shape=other, log=TRUE) -log(yInSampleSM[otLogical]),
+                               # "dllaplace"=dlaplace(q=log(ySM[otSM]),
+                               #                      mu=Re(log(as.complex(fSM[otSM]))),
+                               #                      scale=fitted[otSM], log=TRUE) -log(ySM[otSM]),
+                               # "dls"=ds(q=log(ySM[otSM]),
+                               #          mu=Re(log(as.complex(fSM[otSM]))),
+                               #          scale=fitted[otSM], log=TRUE) -log(ySM[otSM]),
+                               # "dlgnorm"=dgnorm(q=log(ySM[otSM]),
+                               #                  mu=Re(log(as.complex(fSM[otSM]))),
+                               #                  scale=fitted[otSM], shape=other, log=TRUE) -log(ySM[otSM]),
                                # abs() is needed for rare cases, when negative values are produced for E="A" models
-                               "dlnorm"=dlnorm(x=yInSampleSM[otLogical],
-                                               meanlog=Re(log(as.complex(yFittedSM[otLogical])))-fitted[otLogical]/2,
-                                               sdlog=sqrt(fitted[otLogical]), log=TRUE),
-                               "dinvgauss"=dinvgauss(x=yInSampleSM[otLogical], mean=abs(yFittedSM[otLogical]),
-                                                     dispersion=abs(fitted[otLogical]/yFittedSM[otLogical]), log=TRUE),
-                               "dgamma"=dgamma(x=yInSampleSM[otLogical], shape=1/fitted[otLogical],
-                                               scale=fitted[otLogical]*yFittedSM[otLogical], log=TRUE)
+                               "dlnorm"=dlnorm(x=ySM[otSM],
+                                               meanlog=Re(log(as.complex(fSM[otSM])))-fitted[otSM]/2,
+                                               sdlog=sqrt(fitted[otSM]), log=TRUE),
+                               "dinvgauss"=dinvgauss(x=ySM[otSM], mean=abs(fSM[otSM]),
+                                                     dispersion=abs(fitted[otSM]/fSM[otSM]), log=TRUE),
+                               "dgamma"=dgamma(x=ySM[otSM], shape=1/fitted[otSM],
+                                               scale=fitted[otSM]*fSM[otSM], log=TRUE)
         ));
 
         # The differential entropy for the models with the missing data
         if(occurrenceModel){
             CFValue[] <- CFValue + sum(switch(distribution,
                                               # The scale is sigma^2 for dnorm and dlnorm
-                                              "dnorm" = (log(sqrt(2*pi*fitted[!otLogical]))+0.5),
+                                              "dnorm" = (log(sqrt(2*pi*fitted[!otSM]))+0.5),
                                               # "dfnorm" =,
                                               # "dbcnorm" =,
                                               # "dlogitnorm" =,
-                                              "dlnorm" = (log(sqrt(2*pi*fitted[!otLogical]))+0.5-fitted[!otLogical]/2),
+                                              "dlnorm" = (log(sqrt(2*pi*fitted[!otSM]))+0.5-fitted[!otSM]/2),
                                               # "dlgnorm" =,
                                               "dgnorm" =(1/other-
                                                                       log(other /
-                                                                              (2*fitted[!otLogical]*gamma(1/other)))),
-                                              "dinvgauss" = (0.5*(log(pi/2)+1+suppressWarnings(log(fitted[!otLogical])))),
-                                              "dgamma" = (1/fitted[!otLogical] + log(fitted[!otLogical]) +
-                                                                      log(gamma(1/fitted[!otLogical])) +
-                                                                      (1-1/fitted[!otLogical])*digamma(1/fitted[!otLogical])),
+                                                                              (2*fitted[!otSM]*gamma(1/other)))),
+                                              "dinvgauss" = (0.5*(log(pi/2)+1+suppressWarnings(log(fitted[!otSM])))),
+                                              "dgamma" = (1/fitted[!otSM] + log(fitted[!otSM]) +
+                                                                      log(gamma(1/fitted[!otSM])) +
+                                                                      (1-1/fitted[!otSM])*digamma(1/fitted[!otSM])),
                                               "dalaplace" =,
                                               # "dllaplace" =,
-                                              "dlaplace" = (1 + log(2*fitted[!otLogical])),
+                                              "dlaplace" = (1 + log(2*fitted[!otSM])),
                                               # "dls" =,
-                                              "ds" = (2 + 2*log(2*fitted[!otLogical])),
+                                              "ds" = (2 + 2*log(2*fitted[!otSM])),
                                               # "dlogis" = obsZero*2,
-                                              # "dt" = ((fitted[!otLogical]+1)/2 *
-                                              #                     (digamma((fitted[!otLogical]+1)/2)-digamma(fitted[!otLogical]/2)) +
-                                              #                     log(sqrt(fitted[!otLogical]) * beta(fitted[!otLogical]/2,0.5))),
-                                              # "dchisq" = (log(2)*gamma(fitted[!otLogical]/2)-
-                                              #                         (1-fitted[!otLogical]/2)*digamma(fitted[!otLogical]/2)+
-                                              #                         fitted[!otLogical]/2),
+                                              # "dt" = ((fitted[!otSM]+1)/2 *
+                                              #                     (digamma((fitted[!otSM]+1)/2)-digamma(fitted[!otSM]/2)) +
+                                              #                     log(sqrt(fitted[!otSM]) * beta(fitted[!otSM]/2,0.5))),
+                                              # "dchisq" = (log(2)*gamma(fitted[!otSM]/2)-
+                                              #                         (1-fitted[!otSM]/2)*digamma(fitted[!otSM]/2)+
+                                              #                         fitted[!otSM]/2),
                                               0
             ));
         }
@@ -289,7 +298,7 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     newCall$h <- h;
     newCall$holdout <- holdout;
     newCall$loss <- lossFunction;
-    newCall$occurrence <- object$occurrence;
+    newCall$occurrence <- occurrence;
     newCall$distribution <- object$distribution;
     newCall$outliers <- "ignore";
     newCall$silent <- TRUE;

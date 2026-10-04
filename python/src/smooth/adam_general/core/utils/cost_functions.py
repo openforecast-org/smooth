@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 
 from smooth.adam_general._eigenCalc import smooth_eigens
@@ -13,6 +11,7 @@ from smooth.adam_general.core.utils.utils import (
     calculate_likelihood,
     calculate_multistep_loss,
     complete_windows,
+    multistep_log_lik,
     observed_mask,
     scaler,
 )
@@ -1098,37 +1097,12 @@ def log_Lik_ADAM(  # noqa: N802
 
         # Concentrated log-likelihoods for the multistep losses, over the windows
         # with all their targets observed
-        observed = observed_mask(observations_dict)
-        n_windows = int(np.sum(complete_windows(observed, general_dict["h"])))
-        if general_dict["loss"] in ["MSEh", "aMSEh", "TMSE", "aTMSE", "MSCE", "aMSCE"]:
-            # is horizon different than h?
-            logLikReturn = (
-                -n_windows
-                / 2
-                * (math.log(2 * math.pi) + 1 + float(_log_r(logLikReturn)))
-            )
-        elif general_dict["loss"] in ["GTMSE", "aGTMSE"]:
-            logLikReturn = -n_windows / 2 * (math.log(2 * math.pi) + 1 + logLikReturn)
-        elif general_dict["loss"] in ["MAEh", "TMAE", "GTMAE", "MACE"]:
-            logLikReturn = -n_windows * (math.log(2) + 1 + float(_log_r(logLikReturn)))
-        elif general_dict["loss"] in ["HAMh", "THAM", "GTHAM", "CHAM"]:
-            logLikReturn = -n_windows * (
-                math.log(4) + 2 + 2 * float(_log_r(logLikReturn))
-            )
-        elif general_dict["loss"] in ["GPL", "aGPL"]:
-            logLikReturn = (
-                -n_windows
-                / 2
-                * (
-                    general_dict["h"] * math.log(2 * math.pi)
-                    + general_dict["h"]
-                    + logLikReturn
-                )
-                / general_dict["h"]
-            )
-
-        # Make likelihood comparable
-        logLikReturn = logLikReturn / n_windows * int(np.sum(observed))
+        logLikReturn = multistep_log_lik(
+            logLikReturn,
+            general_dict["loss"],
+            general_dict["h"],
+            observed_mask(observations_dict),
+        )
 
         # Handle multiplicative model
         if model_type_dict["ets_model"] and model_type_dict["error_type"] == "M":

@@ -786,6 +786,28 @@ def complete_windows(observed, h):
     return missing_count[rows + h] - missing_count[rows] == 0
 
 
+def multistep_log_lik(loss_value, loss, h, observed):
+    """The concentrated log-likelihood of a multistep loss over the windows with all
+    their targets observed, rescaled to the observed values to be comparable with
+    the one-step likelihoods (R's ``adam_multistepLogLik``)."""
+    n_windows = int(np.sum(complete_windows(observed, h)))
+    log_2pi = math.log(2 * math.pi)
+    if loss in ("MSEh", "aMSEh", "TMSE", "aTMSE", "MSCE", "aMSCE"):
+        value = -n_windows / 2 * (log_2pi + 1 + float(_log_r(loss_value)))
+    elif loss in ("GTMSE", "aGTMSE"):
+        value = -n_windows / 2 * (log_2pi + 1 + loss_value)
+    elif loss in ("MAEh", "TMAE", "GTMAE", "MACE"):
+        value = -n_windows * (math.log(2) + 1 + float(_log_r(loss_value)))
+    elif loss in ("HAMh", "THAM", "GTHAM", "CHAM"):
+        value = -n_windows * (math.log(4) + 2 + 2 * float(_log_r(loss_value)))
+    elif loss in ("GPL", "aGPL"):
+        # Divided by h to make it comparable with the univariate ones
+        value = -n_windows / 2 * (h * log_2pi + h + loss_value) / h
+    else:
+        value = loss_value
+    return value / n_windows * int(np.sum(observed))
+
+
 def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
     """Multistep loss over the matrix of h-steps-ahead errors.
 

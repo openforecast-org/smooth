@@ -262,7 +262,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     }
 
     if(constantRequired && constantEstimate) {
-        constantValue <- mean(yInSample);
+        constantValue <- mean(yInSample[!yNAValues[1:obsInSample]]);
         lagsModelAll <- matrix(c(lagsModelAll,1), ncol=1);
     }
     else{
@@ -435,10 +435,14 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                          obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
                                          componentsNumberARIMA, lagsModelAll);
 
+        # The missing values are not in the loss: the errors are zero there, and the
+        # losses are divided by the observed values, as in adam()
+        observed <- !yNAValues[1:obsInSample];
+        obsObserved <- sum(observed);
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                scale <- scaler(adamFitted$errors, obsInSample);
+                scale <- scaler(adamFitted$errors, obsObserved);
 
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
@@ -446,16 +450,16 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                       sd=sqrt(scale), log=TRUE));
             }
             else if(loss=="MSE"){
-                CFValue <- sum(adamFitted$errors^2)/obsInSample;
+                CFValue <- sum(adamFitted$errors^2)/obsObserved;
             }
             else if(loss=="MAE"){
-                CFValue <- sum(abs(adamFitted$errors))/obsInSample;
+                CFValue <- sum(abs(adamFitted$errors))/obsObserved;
             }
             else if(loss=="HAM"){
-                CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsInSample;
+                CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsObserved;
             }
             else if(loss=="custom"){
-                CFValue <- lossFunction(actual=yInSample,fitted=adamFitted$fitted,B=B);
+                CFValue <- lossFunction(actual=yInSample[observed],fitted=adamFitted$fitted[observed],B=B);
             }
         }
         else{
@@ -465,22 +469,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                           indexLookupTable, profilesRecentTable,
                                           h, yInSample)$errors;
 
-            # Not done yet: "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL"
-            CFValue <- switch(loss,
-                              "MSEh"=sum(adamErrors[,h]^2)/(obsInSample-h),
-                              "TMSE"=sum(colSums(adamErrors^2)/(obsInSample-h)),
-                              "GTMSE"=sum(log(colSums(adamErrors^2)/(obsInSample-h))),
-                              "MSCE"=sum(rowSums(adamErrors)^2)/(obsInSample-h),
-                              "MAEh"=sum(abs(adamErrors[,h]))/(obsInSample-h),
-                              "TMAE"=sum(colSums(abs(adamErrors))/(obsInSample-h)),
-                              "GTMAE"=sum(log(colSums(abs(adamErrors))/(obsInSample-h))),
-                              "MACE"=sum(abs(rowSums(adamErrors)))/(obsInSample-h),
-                              "HAMh"=sum(sqrt(abs(adamErrors[,h])))/(obsInSample-h),
-                              "THAM"=sum(colSums(sqrt(abs(adamErrors)))/(obsInSample-h)),
-                              "GTHAM"=sum(log(colSums(sqrt(abs(adamErrors)))/(obsInSample-h))),
-                              "CHAM"=sum(sqrt(abs(rowSums(adamErrors))))/(obsInSample-h),
-                              "GPL"=log(det(t(adamErrors) %*% adamErrors/(obsInSample-h))),
-                              0);
+            CFValue <- adam_multistepLoss(adamErrors, loss, h, observed);
         }
 
         if(is.na(CFValue) || is.nan(CFValue)){
@@ -507,15 +496,17 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                       constantEstimate)];
 
         idx <- 0
+        # The correlations of the observed values: the missing ones are gaps
+        yObservedNA <- replace(as.vector(yInSample), yNAValues[1:obsInSample], NA);
         if(arEstimate) {
             pacfValues <- rep(0.1, pLength);
-            pacfValues[] <- pacf(yInSample, lag.max=max(p), plot=FALSE)$acf[nonZeroARI[,2]];
+            pacfValues[] <- pacf(yObservedNA, lag.max=max(p), plot=FALSE, na.action=na.pass)$acf[nonZeroARI[,2]];
             B[idx+1:pLength] <- pacfValues;
             idx[] <- idx + pLength;
         }
         if(maEstimate) {
             acfValues <- rep(-0.1, qLength);
-            acfValues[] <- acf(yInSample, lag.max=max(q), plot=FALSE)$acf[1+nonZeroMA[,2]];
+            acfValues[] <- acf(yObservedNA, lag.max=max(q), plot=FALSE, na.action=na.pass)$acf[1+nonZeroMA[,2]];
             B[idx+1:qLength] <- acfValues;
             idx[] <- idx + qLength;
         }
@@ -615,12 +606,14 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;
+    # No errors at the missing values, where the fitted values are the predictions
+    errors[yNAValues[1:obsInSample]] <- NA;
     # Write down the recent profile for future use
     profilesRecentTable <- adamFitted$profile;
     matVt[] <- adamFitted$states;
 
     # Calculate final loss and logLik
-    scale <- scaler(adamFitted$errors, obsInSample);
+    scale <- scaler(adamFitted$errors, sum(!yNAValues[1:obsInSample]));
 
     logLikValue <- logLikFunction(B);
 
@@ -645,8 +638,13 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     }
 
     ##### Deal with the holdout sample #####
+    # The missing values stay missing in the data, as in adam()
+    yInSample[yNAValues[1:obsInSample]] <- NA;
+    if(holdout && length(yNAValues)==obsAll){
+        yHoldout[yNAValues[-c(1:obsInSample)]] <- NA;
+    }
     if(holdout && h>0){
-        errormeasures <- measures(yHoldout,yForecast,yInSample);
+        errormeasures <- adam_accuracy(yHoldout, yForecast, yInSample);
     }
     else{
         errormeasures <- NULL;

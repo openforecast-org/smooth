@@ -46,3 +46,13 @@ test_that("Use automatic GUM on BJsales", {
     skip_on_cran()
     expect_equal(auto.gum(BJsales, silent=TRUE)$loss, "likelihood")
 })
+
+test_that("gum() takes the missing values for gaps", {
+    y <- AirPassengers;
+    y[c(10, 50, 51, 90)] <- NA;
+    testModel <- suppressWarnings(gum(y, orders=c(1,1), lags=c(1,12)));
+    expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)));
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)));
+    expect_true(all(is.na(residuals(testModel)[is.na(y)])));
+    expect_true(all(is.finite(forecast(testModel, h=12, interval="prediction")$upper)));
+})

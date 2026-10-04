@@ -1621,6 +1621,51 @@ adam_completeWindows <- function(observed, h){
     return(missingCount[rows+h] - missingCount[rows] == 0);
 }
 
+# The multistep loss over the windows with all their targets observed (the multistep
+# losses of adam(), ces(), gum() and ssarima()): adamErrors are the errors of ferrors()
+#' @keywords internal
+adam_multistepLoss <- function(adamErrors, loss, h, observed){
+    adamErrors <- adamErrors[adam_completeWindows(observed, h),,drop=FALSE];
+    nWindows <- nrow(adamErrors);
+    # Not done yet: "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL"
+    return(switch(loss,
+                  "MSEh"=sum(adamErrors[,h]^2)/nWindows,
+                  "TMSE"=sum(colSums(adamErrors^2)/nWindows),
+                  "GTMSE"=sum(log(colSums(adamErrors^2)/nWindows)),
+                  "MSCE"=sum(rowSums(adamErrors)^2)/nWindows,
+                  "MAEh"=sum(abs(adamErrors[,h]))/nWindows,
+                  "TMAE"=sum(colSums(abs(adamErrors))/nWindows),
+                  "GTMAE"=sum(log(colSums(abs(adamErrors))/nWindows)),
+                  "MACE"=sum(abs(rowSums(adamErrors)))/nWindows,
+                  "HAMh"=sum(sqrt(abs(adamErrors[,h])))/nWindows,
+                  "THAM"=sum(colSums(sqrt(abs(adamErrors)))/nWindows),
+                  "GTHAM"=sum(log(colSums(sqrt(abs(adamErrors)))/nWindows)),
+                  "CHAM"=sum(sqrt(abs(rowSums(adamErrors))))/nWindows,
+                  "GPL"=log(det(t(adamErrors) %*% adamErrors/nWindows)),
+                  0));
+}
+
+# The concentrated log-likelihood of a multistep loss over the windows with all their
+# targets observed, rescaled to the observed values to be comparable with the
+# one-step likelihoods (taking T instead of T-h is not well motivated at the moment)
+#' @keywords internal
+adam_multistepLogLik <- function(lossValue, loss, h, observed){
+    nWindows <- sum(adam_completeWindows(observed, h));
+    logLikValue <- -switch(loss,
+                           "MSEh"=, "aMSEh"=, "TMSE"=, "aTMSE"=, "MSCE"=, "aMSCE"=
+                               nWindows/2*(log(2*pi)+1+log(lossValue)),
+                           "GTMSE"=, "aGTMSE"=
+                               nWindows/2*(log(2*pi)+1+lossValue),
+                           "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=
+                               nWindows*(log(2)+1+log(lossValue)),
+                           "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=
+                               nWindows*(log(4)+2+2*log(lossValue)),
+                           #### Divide GPL by h in order to make it comparable with the univariate ones
+                           "GPL"=, "aGPL"=
+                               nWindows/2*(h*log(2*pi)+h+lossValue)/h);
+    return(logLikValue / nWindows * sum(observed));
+}
+
 # The accuracy on the observed values of the holdout, scaled by the observed in-sample
 # ones: the missing values (NA) are not compared with anything
 #' @keywords internal

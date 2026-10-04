@@ -6,7 +6,6 @@ Self-contained module with its own fit pipeline, reusing adamCore C++ for
 state-space filtering and forecasting.
 """
 
-import math
 import re
 import warnings
 from typing import Any, Dict, List, Literal, Optional, Union, cast
@@ -21,12 +20,14 @@ from smooth.adam_general.core.ces.cost_function import ces_cf
 from smooth.adam_general.core.ces.creator import ces_creator
 from smooth.adam_general.core.ces.filler import ces_filler
 from smooth.adam_general.core.ces.initialiser import ces_initialiser
+from smooth.adam_general.core.checker.data_checks import _fill_missing
 from smooth.adam_general.core.creator.architector import (
     adam_head_length,
 )
 from smooth.adam_general.core.forecaster.forecaster import forecaster
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
+from smooth.adam_general.core.utils.utils import multistep_log_lik
 
 SEASONALITY_OPTIONS = Literal["none", "simple", "partial", "full"]
 LOSS_OPTIONS = Literal[
@@ -83,25 +84,6 @@ def _pristine(kwargs):
         else:
             out[key] = value
     return out
-
-
-def _ces_multistep_log_lik(cf_value, loss, obs_in_sample, h):
-    """Predictive log-likelihood of the GPL paper for a multistep loss.
-
-    Rescaled from ``T - h`` to ``T`` so it stays comparable with the single-step
-    likelihoods. Mirrors R/adam-ces.R, itself mirroring R/adam.R:1119-1135.
-    """
-    denom = obs_in_sample - h
-    if loss in ("MSEh", "TMSE", "MSCE"):
-        value = denom / 2 * (math.log(2 * math.pi) + 1 + math.log(cf_value))
-    elif loss == "GTMSE":
-        value = denom / 2 * (math.log(2 * math.pi) + 1 + cf_value)
-    elif loss == "GPL":
-        # Divided by h to make it comparable with the univariate ones
-        value = denom / 2 * (h * math.log(2 * math.pi) + h + cf_value) / h
-    else:
-        return -cf_value
-    return -value / denom * obs_in_sample
 
 
 def _validate_b(b, seasonality):
@@ -323,6 +305,13 @@ class CES:
             lags = list(self.lags)
         y_frequency = max(lags)
 
+        # The missing values are gaps: filled for the initialisation only, skipped by
+        # the fit and not in the loss, as in R's ces()
+        _, y_filled, y_na_values = _fill_missing(y, y, lags, obs_in_sample)
+        y_in_sample = np.asarray(y_filled, dtype=float)[:obs_in_sample]
+        observed = ~np.asarray(y_na_values, dtype=bool)[:obs_in_sample]
+        obs_observed = int(np.sum(observed))
+
         # Set up a and b parameter dicts — R lines 157-181
         a: Dict[str, Any] = {
             "value": self._a_provided,
@@ -395,8 +384,9 @@ class CES:
         obs_states = obs_in_sample + head_length
 
         # Occurrence (CES doesn't support occurrence — R line 618)
-        ot = np.ones(obs_in_sample, dtype=np.float64)
-        ot_logical = np.ones(obs_in_sample, dtype=bool)
+        # The fit skips the missing values
+        ot = observed.astype(np.float64)
+        ot_logical = observed.copy()
 
         # Determine initial type
         initial_type = self.initial
@@ -705,7 +695,9 @@ class CES:
         mat_vt = np.array(adam_fitted.states).T  # C++ returns (components, time)
 
         # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces()
-        scale = np.sum(errors[ot_logical] ** 2) / obs_in_sample
+        scale = np.sum(errors[ot_logical] ** 2) / obs_observed
+        # No errors at the missing values, where the fitted values are the predictions
+        errors[~observed] = np.nan
 
         # Reconstruct complex a and b from B — R lines 1048-1093
         n_coefficients = 0
@@ -798,9 +790,7 @@ class CES:
         # distribution argument to follow. A multistep loss instead reports the
         # predictive likelihood of the GPL paper. Mirrors R/adam-ces.R.
         if multisteps:
-            log_lik_value = _ces_multistep_log_lik(
-                cf_value, self.loss, obs_in_sample, h
-            )
+            log_lik_value = multistep_log_lik(cf_value, self.loss, h, observed)
         else:
             log_lik_value = -float(ces_cf(B=B, **_pristine(ll_kwargs)))
 
@@ -822,10 +812,10 @@ class CES:
         n_param_estimated = len(B) + 1 + n_states_backcasting
 
         # Information criteria (reuse existing utilities)
-        self.aic = AIC(log_lik_value, nobs=obs_in_sample, df=n_param_estimated)
-        self.aicc = AICc(log_lik_value, nobs=obs_in_sample, df=n_param_estimated)
-        self.bic = BIC(log_lik_value, nobs=obs_in_sample, df=n_param_estimated)
-        self.bicc = BICc(log_lik_value, nobs=obs_in_sample, df=n_param_estimated)
+        self.aic = AIC(log_lik_value, nobs=obs_observed, df=n_param_estimated)
+        self.aicc = AICc(log_lik_value, nobs=obs_observed, df=n_param_estimated)
+        self.bic = BIC(log_lik_value, nobs=obs_observed, df=n_param_estimated)
+        self.bicc = BICc(log_lik_value, nobs=obs_observed, df=n_param_estimated)
 
         # Store all results
         self.B = np.array(B)
@@ -863,6 +853,7 @@ class CES:
         self._xreg_number = xreg_number
         self._obs_in_sample = obs_in_sample
         self._y_in_sample = y_in_sample
+        self._y_na_values = y_na_values
         self._y_holdout = y_holdout
         self._y_frequency = y_frequency
         self._h = h
@@ -1002,7 +993,8 @@ class CES:
 
         R's ``pointLik.adam`` for a ``ces()`` model: the Normal log-density of
         each in-sample observation around its fitted value with the variance
-        ``scale_``. With ``log=False`` the densities themselves are returned.
+        ``scale_``, zero at the missing values. With ``log=False`` the densities
+        themselves are returned.
         """
         from smooth.adam_general.core.utils.utils import calculate_likelihood
 
@@ -1014,6 +1006,7 @@ class CES:
                 "dnorm", "A", y, self.fitted.reshape(-1, 1), self.scale_, None
             )
         )
+        lik_values[np.isnan(self.residuals)] = 0
         return lik_values if log else np.exp(lik_values)
 
     def summary(self) -> Dict[str, Any]:
@@ -1225,7 +1218,12 @@ class AutoCES:
             try:
                 model.fit(y, X=X)
                 models[s] = model
-                ics[s] = ic_func(model.loglik, nobs=obs_in_sample, df=model.n_param)
+                # Over the observed values, as the likelihood
+                ics[s] = ic_func(
+                    model.loglik,
+                    nobs=int(np.sum(~model._y_na_values[:obs_in_sample])),
+                    df=model.n_param,
+                )
             except Exception as e:
                 if self.verbose > 0:
                     print(f"[failed: {e}]")

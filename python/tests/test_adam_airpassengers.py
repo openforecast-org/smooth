@@ -147,9 +147,10 @@ class TestADAMAirPassengersPartialPersistence:
         assert model.coef is not None
         assert model.persistence_level_ == 0.4
 
-        # Loss should be higher than optimal since alpha is fixed
-        # Reference: optimal loss is ~586, with alpha=0.4 it's ~649
-        expected_loss = 649.145309
+        # Loss should be higher than optimal since alpha is fixed; gamma is still
+        # estimated. Reference: R's adam(AirPassengers, "ANA", lags=12,
+        # persistence=list(level=0.4))$lossValue
+        expected_loss = 587.905327
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"Loss with alpha=0.4: {actual_loss} differs from expected {expected_loss}"
@@ -363,8 +364,8 @@ class TestADAMAirPassengersAAAPersistence:
         # Verify alpha is fixed
         assert model.persistence_level_ == 0.5
 
-        # Reference loss with alpha=0.5
-        expected_loss = 636.965563
+        # Reference loss with alpha=0.5, beta and gamma estimated (R's lossValue)
+        expected_loss = 588.263289
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"AAA alpha=0.5 loss {actual_loss} differs from expected {expected_loss}"
@@ -378,8 +379,8 @@ class TestADAMAirPassengersAAAPersistence:
         assert model.persistence_level_ == 0.5
         assert model.persistence_trend_ == 0.1
 
-        # Reference loss
-        expected_loss = 654.328174
+        # Reference loss with gamma estimated (R's lossValue)
+        expected_loss = 624.288654
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"AAA alpha=0.5, beta=0.1 loss {actual_loss} differs from expected " \

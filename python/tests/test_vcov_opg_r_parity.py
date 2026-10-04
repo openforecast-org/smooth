@@ -58,9 +58,11 @@ def test_the_opg_covariance_agrees(case):
     )
 
 
-# At a boundary the OPG matrix is computationally singular, which R's solve() rejects
-# for the pseudo-inverse; a loss other than the likelihood has the Hessian instead
+# The perturbations of omg run without bounds, so a boundary estimate has central
+# differences; with both sides at a boundary the OPG matrix is singular and has the
+# pseudo-inverse; a loss other than the likelihood has the Hessian instead
 OMG_CASES = {
+    "boundary": ("", {}),
     "gradient at the bounds": ("initial='gradient'", {"initial": "gradient"}),
     "MSE": ("loss='MSE'", {"loss": "MSE"}),
 }

@@ -271,23 +271,19 @@ covarOPGCore <- function(object, parameterValues, perturbedPointLik,
     keep <- diagJ > max(diagJ)*1e-10 & is.finite(diagJ);
     vcovMatrix <- matrix(Inf, nParam, nParam, dimnames=list(parametersNames, parametersNames));
     if(any(keep)){
-        Jkeep <- J[keep,keep,drop=FALSE];
-        vcovKeep <- try(solve(Jkeep), silent=TRUE);
-        if(inherits(vcovKeep,"try-error")){
-            # Ill-conditioned (collinear parameters): the plain inverse fails, so
-            # use the Moore-Penrose pseudo-inverse via the symmetric eigen-
-            # decomposition, dropping the (near-)zero-eigenvalue directions. Still
-            # PSD; the parameters spanning the collinear null space get a pooled
-            # variance rather than a spurious solve() failure.
-            eigenJ <- eigen(Jkeep, symmetric=TRUE);
-            positive <- eigenJ$values > max(eigenJ$values)*1e-10;
-            if(!any(positive)){
-                return(NULL);
-            }
-            vectorsKeep <- eigenJ$vectors[,positive,drop=FALSE];
-            vcovKeep <- vectorsKeep %*% (t(vectorsKeep)/eigenJ$values[positive]);
+        # The Moore-Penrose pseudo-inverse via the symmetric eigen-decomposition,
+        # dropping the (near-)zero-eigenvalue directions: the inverse when J is
+        # well conditioned, and for collinear parameters (e.g. both sides of omg at
+        # a boundary) a pooled variance rather than a huge one. Still PSD. solve()
+        # decides on singularity at the machine epsilon, where the last bits of the
+        # LU decide, so it is not used
+        eigenJ <- eigen(J[keep,keep,drop=FALSE], symmetric=TRUE);
+        positive <- eigenJ$values > max(eigenJ$values)*1e-10;
+        if(!any(positive)){
+            return(NULL);
         }
-        vcovMatrix[keep,keep] <- vcovKeep;
+        vectorsKeep <- eigenJ$vectors[,positive,drop=FALSE];
+        vcovMatrix[keep,keep] <- vectorsKeep %*% (t(vectorsKeep)/eigenJ$values[positive]);
     }
     return(vcovMatrix);
 }
@@ -841,6 +837,9 @@ covarOPGomg <- function(object, stepSize=.Machine$double.eps^(1/4)){
 
     perturbedPointLik <- function(j, delta){
         clone <- object;
+        # The refit takes its bounds from the sub-models: switched off, so that a
+        # perturbation at a boundary is not a 1e+300 wall
+        clone$modelA$bounds <- clone$modelB$bounds <- "none";
         if(!is.null(j)){
             if(j<=nA){
                 clone$modelA$B[j] <- clone$modelA$B[j]+delta;

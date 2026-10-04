@@ -807,23 +807,6 @@ def resolve_covar_type(type_, bootstrap=False):
     return type_
 
 
-def _solve_r(a):
-    """The inverse of ``a`` as R's ``solve()``: an error (LinAlgError) when the
-    matrix is computationally singular, its reciprocal condition number (LAPACK
-    dgecon, in the 1-norm) below the machine epsilon. NumPy's solve inverts such a
-    matrix to huge values instead."""
-    from scipy.linalg import lapack
-
-    a = np.asarray(a, dtype=float)
-    lu, piv, info = lapack.dgetrf(a)
-    if info != 0:
-        raise np.linalg.LinAlgError("Exactly singular matrix")
-    rcond, _ = lapack.dgecon(lu, np.linalg.norm(a, 1), norm="1")
-    if rcond < np.finfo(float).eps:
-        raise np.linalg.LinAlgError("Computationally singular matrix")
-    return lapack.dgetrs(lu, piv, np.eye(a.shape[0]))[0]
-
-
 def covar_opg(parameter_values, point_lik_at, obs_in_sample, loglik, step_size=None):
     """OPG / BHHH covariance ``J^-1`` with ``J = sum_t s_t s_t'``.
 
@@ -904,18 +887,17 @@ def covar_opg(parameter_values, point_lik_at, obs_in_sample, loglik, step_size=N
     keep = (diag_j > np.max(diag_j) * 1e-10) & np.isfinite(diag_j)
     vcov = np.full((n_param, n_param), np.inf)
     if np.any(keep):
-        j_keep = j_matrix[np.ix_(keep, keep)]
-        try:
-            vcov_keep = _solve_r(j_keep)
-        except np.linalg.LinAlgError:
-            # Ill-conditioned: Moore-Penrose pseudo-inverse via symmetric eigen,
-            # dropping the (near-)zero-eigenvalue directions. Still PSD.
-            vals, vecs = np.linalg.eigh(j_keep)
-            positive = vals > np.max(vals) * 1e-10
-            if not np.any(positive):
-                return None
-            vecs_keep = vecs[:, positive]
-            vcov_keep = vecs_keep @ (vecs_keep.T / vals[positive][:, None])
+        # The Moore-Penrose pseudo-inverse via the symmetric eigen-decomposition,
+        # dropping the (near-)zero-eigenvalue directions: the inverse when J is
+        # well conditioned, a pooled variance for collinear parameters. As R, which
+        # does not use solve(): its singularity check at the machine epsilon is
+        # decided by the last bits of the LU.
+        vals, vecs = np.linalg.eigh(j_matrix[np.ix_(keep, keep)])
+        positive = vals > np.max(vals) * 1e-10
+        if not np.any(positive):
+            return None
+        vecs_keep = vecs[:, positive]
+        vcov_keep = vecs_keep @ (vecs_keep.T / vals[positive][:, None])
         vcov[np.ix_(keep, keep)] = vcov_keep
     return vcov
 

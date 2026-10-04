@@ -597,7 +597,7 @@ class OMG:
                 side_b=side_b,
                 n_params_a=n_params_a,
                 observations_dict=observations,
-                bounds=self.bounds,
+                bounds="none",
                 adam_ets=adam_ets,
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,

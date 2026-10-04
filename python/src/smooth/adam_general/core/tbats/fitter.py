@@ -23,6 +23,16 @@ PENALTY = 1e100
 MULTISTEP_LOSSES = ("MSEh", "TMSE", "GTMSE", "MSCE", "GPL")
 
 
+# No occurrence model: all the observations are sizes
+_NO_OCCURRENCE: Dict[str, Any] = {
+    "model": None,
+    "ot_logical": None,
+    "loglik": 0.0,
+    "n_param": 0,
+    "p_fitted": None,
+}
+
+
 def _periods_used(struct: Dict[str, Any]) -> List[float]:
     """The periods with at least one harmonic, in the order of the periods."""
     used = set(struct["table"]["period"].tolist())
@@ -390,11 +400,24 @@ def fit(
     periods = sorted(set(table["period"].tolist()))
     struct = st.structure(trend_type, table, spec, periods, xreg)
     xreg_data = None if xreg is None else xreg["data"]
-    X = st.design(obs, struct["trend_in"], table, xreg_data)
+    # With an occurrence model, the sizes: the global model, the transform and its
+    # Jacobian on the non-zero observations, which keep their time index
+    occurrence = s.get("occurrence") or _NO_OCCURRENCE
+    ot_logical = (
+        np.ones(obs, dtype=bool)
+        if occurrence["ot_logical"] is None
+        else occurrence["ot_logical"]
+    )
+    obs_nonzero = int(ot_logical.sum())
+    X = st.design(obs, struct["trend_in"], table, xreg_data)[ot_logical]
     qr_x = st.QR(X)
-    lam_start = st.lambda_start(y, X, lam_spec)
-    y_bc_start = st.box_cox(y, lam_start)
-    log_y = _sum_r(np.log(y)) if (lam_spec["estimate"] or lam_start != 1) else 0.0
+    lam_start = st.lambda_start(y[ot_logical], X, lam_spec)
+    y_bc_start = st.box_cox_sizes(y, lam_start, ot_logical)
+    log_y = (
+        _sum_r(np.log(y[ot_logical]))
+        if (lam_spec["estimate"] or lam_start != 1)
+        else 0.0
+    )
 
     lags_all = struct["lags_model_all"]
     n_ets = struct["n_ets"]
@@ -424,7 +447,7 @@ def fit(
         dtype=np.uint64,
     )
     mat_vt = np.zeros((struct["n_components"], obs + head["geometry"]), order="F")
-    ot = np.ones(obs)
+    ot = ot_logical * 1.0
 
     backcast = initial in ("backcasting", "complete")
     initial_estimate = initial in ("optimal", "two-stage")
@@ -436,7 +459,7 @@ def fit(
     if spec["n_param"] > 0:
         arma_start = np.asarray(
             _ols.arima_hr(
-                qr_x.resid(y_bc_start),
+                qr_x.resid(y_bc_start[ot_logical]),
                 spec["ar_orders"].astype(np.uint64),
                 spec["ma_orders"].astype(np.uint64),
                 spec["lags"].astype(np.uint64),
@@ -472,8 +495,12 @@ def fit(
 
     # The cost function
     def fit_states(elements: Dict[str, Any]) -> Dict[str, Any]:
-        y_bc = st.box_cox(y, elements["lambda"]) if lam_spec["estimate"] else y_bc_start
-        states = st.global_states(qr_x.coef(y_bc), struct)
+        y_bc = (
+            st.box_cox_sizes(y, elements["lambda"], ot_logical)
+            if lam_spec["estimate"]
+            else y_bc_start
+        )
+        states = st.global_states(qr_x.coef(y_bc[ot_logical]), struct)
         arma_initial = np.zeros(struct["arma_lag_max"])
         deviations = elements["deviations"]
         if deviations is not None:
@@ -511,7 +538,7 @@ def fit(
         if elements["penalty"] > 0:
             return float(elements["penalty"])
         fitted = fit_states(elements)
-        errors = fitted["errors"]
+        errors = fitted["errors"][ot_logical]
         if loss in MULTISTEP_LOSSES:
             horizon = s["h"]
             adam_errors = np.asarray(
@@ -543,11 +570,11 @@ def fit(
                 - (elements["lambda"] - 1) * log_y
             )
         elif loss == "MSE":
-            value = _sum_r(errors**2) / obs
+            value = _sum_r(errors**2) / obs_nonzero
         elif loss == "MAE":
-            value = _sum_r(np.abs(errors)) / obs
+            value = _sum_r(np.abs(errors)) / obs_nonzero
         else:
-            value = _sum_r(np.sqrt(np.abs(errors))) / obs
+            value = _sum_r(np.sqrt(np.abs(errors))) / obs_nonzero
         return float(value) if np.isfinite(value) else 1e300
 
     def cf(B: NDArray) -> float:
@@ -557,12 +584,24 @@ def fit(
         """The log-densities of the data at any parameters, as a refit with the
         model fixed: the final fit does not look at the bounds."""
         elements = filler(np.asarray(B, dtype=float), s["bounds"])
-        errors = fit_states(elements)["errors"]
+        errors = fit_states(elements)["errors"][ot_logical]
         scale = st.scale_value(errors, distribution, elements["shape"])
         values = calculate_likelihood(
-            distribution, "A", errors, np.zeros((obs, 1)), scale, elements["shape"]
+            distribution,
+            "A",
+            errors,
+            np.zeros((obs_nonzero, 1)),
+            scale,
+            elements["shape"],
         )
-        return np.ravel(values) + (elements["lambda"] - 1) * np.log(y)
+        sizes = np.ravel(values) + (elements["lambda"] - 1) * np.log(y[ot_logical])
+        if occurrence["model"] is None:
+            return sizes
+        # The occurrence, and the sizes where there is a demand
+        p_fitted = occurrence["p_fitted"]
+        result = np.log(1 - p_fitted)
+        result[ot_logical] = np.log(p_fitted[ot_logical]) + sizes
+        return result
 
     def fitter(B: NDArray) -> Optional[Dict[str, Any]]:
         """The fit at any parameters, for reapply: None outside the bounds."""
@@ -581,7 +620,7 @@ def fit(
         common = [n for n in names if n in backcast_fit["names"]]
         for name in common:
             B[names.index(name)] = backcast_fit["B"][backcast_fit["names"].index(name)]
-        B = deviations_from(B, names, backcast_fit, struct, qr_x, y)
+        B = deviations_from(B, names, backcast_fit, struct, qr_x, y[ot_logical])
     if s["B"] is not None:
         provided = np.asarray(s["B"], dtype=float)
         if len(provided) != len(B):
@@ -629,7 +668,8 @@ def fit(
         + n_initials * backcast
         + struct["n_xreg"] * (not xreg_estimate)
     )
-    loglik = -loss_value(B, "likelihood")
+    # The likelihood of the occurrence model is added, as its parameters are
+    loglik = -loss_value(B, "likelihood") + occurrence["loglik"]
 
     fi = None
     if s["fi"] and len(B) > 0:
@@ -639,7 +679,9 @@ def fit(
             )
         )
 
-    scale = st.scale_value(fitted["errors"], distribution, elements["shape"])
+    scale = st.scale_value(
+        fitted["errors"][ot_logical], distribution, elements["shape"]
+    )
     forecast_bc = None
     if s["h"] > 0:
         columns = head["geometry"] + obs + np.arange(s["h"])
@@ -665,6 +707,7 @@ def fit(
         "loss_value": loss_final,
         "loglik": loglik,
         "n_param_estimated": n_param_estimated,
+        "n_param_occurrence": occurrence["n_param"],
         "n_initials": n_initials * backcast,
         "struct": struct,
         "spec": spec,

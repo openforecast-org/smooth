@@ -7,12 +7,13 @@
 tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   "none", "additive", "damped"), lambda = NULL, orders = list(ar = 3, ma =
   3, select = TRUE), xreg = NULL, regressors = c("use", "select", "adapt"),
-  distribution = c("dnorm", "dlaplace", "ds", "dgnorm"),
-  loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh", "TMSE", "GTMSE",
-  "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
-  holdout = FALSE, initial = c("backcasting", "optimal", "two-stage",
-  "complete"), bounds = c("admissible", "usual", "none"), silent = TRUE,
-  model = NULL, ...)
+  occurrence = c("none", "auto", "fixed", "general", "odds-ratio",
+  "inverse-odds-ratio", "direct"), distribution = c("dnorm", "dlaplace",
+  "ds", "dgnorm"), loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh",
+  "TMSE", "GTMSE", "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC", "BICc"),
+  h = 0, holdout = FALSE, initial = c("backcasting", "optimal",
+  "two-stage", "complete"), bounds = c("admissible", "usual", "none"),
+  silent = TRUE, model = NULL, ...)
 }
 \arguments{
 \item{y}{Vector or ts object, containing the data needed to be forecasted.}
@@ -56,6 +57,21 @@ does (\code{stepwise()} on the errors of the model chosen without them, which is
 refitted with the selected ones and kept if it improves the information criterion),
 or \code{"adapt"} their coefficients over time (one smoothing parameter per
 regressor, \code{delta1}, ..., as in \link[smooth]{adam}).}
+
+\item{occurrence}{The occurrence of an intermittent demand. \code{"none"} (the
+default) fits the zeros as values, with a warning. A fitted \link[smooth]{om} (or
+\code{omg()}, \code{oes()}) model is used as it is, and a numeric vector gives the
+probabilities of occurrence (or 0/1) of the in-sample observations, and possibly of
+the horizon. \code{"fixed"}, \code{"auto"}, \code{"odds-ratio"},
+\code{"inverse-odds-ratio"}, \code{"direct"} and \code{"general"} fit
+\code{om(y, model="ZXN", lags=1)} of that type: a level-only occurrence with the
+trend selected, as the seasonal pattern of the probability is hard to find in zeros
+and ones (a seasonal one can be provided as a fitted \code{om()}). The sizes are then
+modelled on the non-zero observations: the Box-Cox transform, its Jacobian and the
+global model use them only, and the states evolve through the zeros. The
+log-likelihood and the number of parameters include those of the occurrence model, and
+the fitted values and forecasts are the probability times those of the sizes (see
+\code{point} in \link[smooth]{forecast.adam}).}
 
 \item{distribution}{The distribution of the error term in the space of the
 Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or

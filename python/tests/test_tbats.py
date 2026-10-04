@@ -460,3 +460,57 @@ def test_the_point_forecasts(air):
         fit.predict(h=3, point="mean", seed=41)
     with pytest.raises(ValueError, match="point"):
         fit.predict(h=3, point="mode")
+
+
+@pytest.fixture(scope="module")
+def intermittent():
+    """Log-normal sizes with a weekly pattern, on 45% of the days."""
+    rng = np.random.default_rng(41)
+    t = np.arange(1, 366)
+    sizes = np.exp(2 + 0.4 * np.sin(2 * np.pi * t / 7) + rng.normal(0, 0.3, 365))
+    return sizes * rng.binomial(1, 0.45, 365)
+
+
+def test_the_occurrence_mixture(intermittent):
+    # The zeros are fitted as values, and the Box-Cox transform falls back to 1
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        TBATS(lags=[1, 7], orders=ORDERS0).fit(intermittent)
+    messages = " ".join(str(w.message) for w in caught)
+    assert "occurrence" in messages and "lambda=1" in messages
+    fit = TBATS(
+        lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0, h=14, holdout=True
+    ).fit(intermittent)
+    occurrence = fit._occurrence["model"]
+    assert fit.nparam == fit._best["n_param_estimated"] + occurrence.nparam
+    np.testing.assert_allclose(fit.point_lik().sum(), fit.loglik, rtol=1e-10)
+    # The sizes are log-normal
+    assert abs(fit.lambda_) < 0.05
+    p_forecast = np.asarray(occurrence.predict(h=14).mean)
+    forecasted = fit.predict(h=14, interval="prediction")
+    sizes = st.box_cox_inverse(fit._best["forecast_bc"], fit.lambda_)
+    np.testing.assert_allclose(forecasted.mean, sizes * p_forecast)
+    np.testing.assert_allclose(forecasted.mean, fit.forecast_)
+    # The probability of no demand is above 0.5: the median and the lower bound are 0
+    assert np.all(fit.predict(h=14, point="median").mean == 0)
+    assert np.all(forecasted.lower.to_numpy() == 0)
+    assert np.all(forecasted.upper.to_numpy().ravel() > forecasted.mean.to_numpy())
+    assert np.mean(np.asarray(fit.simulate(nsim=2, seed=41).data) == 0) > 0.3
+    assert np.mean(fit.reforecast(h=14, nsim=20, seed=41).paths == 0) > 0.3
+    reapplied = fit.reapply(nsim=5, seed=41)
+    assert np.all(reapplied.errors[fit.actuals == 0] == 0)
+
+
+def test_the_occurrence_errors(intermittent):
+    with pytest.raises(ValueError, match="occurrence"):
+        TBATS(lags=[1, 7], occurrence="fixed", lambda_bc=1, orders=ORDERS0).fit(
+            intermittent
+        ).predict(h=5, cumulative=True)
+    with pytest.raises(ValueError, match="contradicts"):
+        TBATS(lags=[1, 7], occurrence=np.where(intermittent > 0, 0.0, 0.5)).fit(
+            intermittent
+        )
+    with pytest.raises(ValueError, match="multistep"):
+        TBATS(lags=[1, 7], occurrence="odds-ratio", loss="MSEh", h=3).fit(intermittent)
+    with pytest.raises(ValueError, match="occurrence"):
+        TBATS(occurrence="sometimes")

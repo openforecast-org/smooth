@@ -17,7 +17,7 @@ from smooth.adam_general.core.tbats import fitter as ft
 from smooth.adam_general.core.tbats import structure as st
 from smooth.adam_general.core.utils.reapply import ReapplyResult
 from smooth.adam_general.core.utils.reforecast import ReforecastResult
-from smooth.adam_general.core.utils.utils import xreg_selector
+from smooth.adam_general.core.utils.utils import _sum_r, scale_debias, xreg_selector
 
 TREND_OPTIONS = ("auto", "none", "additive", "damped")
 DISTRIBUTION_OPTIONS = ("dnorm", "dlaplace", "ds", "dgnorm")
@@ -36,6 +36,16 @@ IC_OPTIONS = ("AICc", "AIC", "BIC", "BICc")
 INITIAL_OPTIONS = ("backcasting", "optimal", "two-stage", "complete")
 BOUNDS_OPTIONS = ("admissible", "usual", "none")
 REGRESSORS_OPTIONS = ("use", "select", "adapt")
+OCCURRENCE_OPTIONS = (
+    "none",
+    "auto",
+    "fixed",
+    "general",
+    "odds-ratio",
+    "inverse-odds-ratio",
+    "direct",
+)
+MULTISTEP_LOSSES = ("MSEh", "TMSE", "GTMSE", "MSCE", "GPL")
 
 
 @dataclass
@@ -65,6 +75,97 @@ def _refit_one_replicate(
     if coef.shape[0] != k or not np.all(np.isfinite(coef)):
         return None
     return coef
+
+
+def _occurrence_spec(occurrence: Any, y: NDArray, loss: str) -> Dict[str, Any]:
+    """The occurrence of an intermittent demand (R's ``tbats_occurrence``): a fitted
+    ``OM`` / ``OMG``, the provided probabilities (or 0/1), or an ``OM`` with the level
+    only (and the trend selected) for the occurrence type, as its seasonal pattern is
+    hard to find in zeros and ones. The non-zero observations, and the log-likelihood
+    and the parameters of the occurrence, which are added to those of the sizes."""
+    from smooth.adam_general.core.om import OM
+    from smooth.adam_general.core.omg import OMG
+
+    obs = len(y)
+    ot_logical = y != 0
+    none = {
+        "model": None,
+        "ot_logical": None,
+        "loglik": 0.0,
+        "n_param": 0,
+        "p_fitted": np.ones(obs),
+    }
+    if isinstance(occurrence, (OM, OMG)):
+        model = occurrence
+        if len(np.ravel(model.fitted)) != obs:
+            raise ValueError(
+                "The occurrence model should be fitted to the in-sample data."
+            )
+    elif not isinstance(occurrence, str):
+        probabilities = np.asarray(occurrence, dtype=float).ravel()
+        if len(probabilities) < obs or np.any(
+            (probabilities < 0) | (probabilities > 1)
+        ):
+            raise ValueError(
+                "The provided occurrence should have the probabilities (in [0, 1]) of "
+                "the in-sample observations, and possibly of the horizon."
+            )
+        p_fitted = probabilities[:obs]
+        if np.any(p_fitted[ot_logical] == 0) or np.any(p_fitted[~ot_logical] == 1):
+            raise ValueError("The provided occurrence contradicts the data.")
+        loglik = _sum_r(np.log(p_fitted[ot_logical])) + _sum_r(
+            np.log(1 - p_fitted[~ot_logical])
+        )
+        provided = {
+            "occurrence": "provided",
+            "fitted": p_fitted,
+            "forecast": probabilities[obs:],
+        }
+        return {
+            "model": provided,
+            "ot_logical": ot_logical,
+            "loglik": loglik,
+            "n_param": 0,
+            "p_fitted": p_fitted,
+        }
+    else:
+        _match(occurrence, OCCURRENCE_OPTIONS, "occurrence")
+        if occurrence == "none":
+            if np.any(y == 0):
+                warnings.warn(
+                    "The data has zeros, which are fitted as values. For an "
+                    "intermittent demand, use the occurrence argument.",
+                    stacklevel=3,
+                )
+            return none
+        # No zeros: nothing to model
+        if np.all(ot_logical):
+            return none
+        # fit() returns the selected model for occurrence="auto"
+        model = OM(model="ZXN", lags=[1], occurrence=occurrence).fit(y)
+    if loss in MULTISTEP_LOSSES:
+        raise ValueError(
+            "The multistep losses are not available with an occurrence model."
+        )
+    return {
+        "model": model,
+        "ot_logical": ot_logical,
+        "loglik": float(model.loglik),
+        "n_param": model.nparam,
+        "p_fitted": np.asarray(model.fitted, dtype=float).ravel(),
+    }
+
+
+def _p_forecast(model: Any, h: int) -> NDArray:
+    """The probabilities of occurrence for the horizon (R's ``tbats_pForecast``):
+    forecasts of the occurrence model, or the provided ones (the last of them
+    repeated)."""
+    if model is None or h <= 0:
+        return np.ones(max(h, 0))
+    if not isinstance(model, dict):
+        return np.asarray(model.predict(h=h).mean, dtype=float)
+    known = np.concatenate([model["fitted"], model["forecast"]])
+    return np.concatenate([model["forecast"], np.repeat(known[-1], h)])[:h]
 
 
 def _match(value: str, options: tuple, name: str) -> str:
@@ -111,6 +212,20 @@ class TBATS:
         (``stepwise()`` on the errors of the model chosen without them, which is
         refitted with the selected ones and kept if it improves the IC), or
         ``"adapt"`` their coefficients over time (``delta1``, ...).
+    occurrence : str, OM, OMG or array, default="none"
+        The occurrence of an intermittent demand. ``"none"`` fits the zeros as values,
+        with a warning. A fitted ``OM`` / ``OMG`` is used as it is, and an array gives
+        the probabilities of occurrence (or 0/1) of the in-sample observations, and
+        possibly of the horizon. ``"fixed"``, ``"auto"``, ``"odds-ratio"``,
+        ``"inverse-odds-ratio"``, ``"direct"`` and ``"general"`` fit
+        ``OM(model="ZXN", lags=[1])`` of that type: a level-only occurrence with the
+        trend selected, as the seasonal pattern of the probability is hard to find in
+        zeros and ones (a seasonal one can be provided as a fitted ``OM``). The sizes
+        are then modelled on the non-zero observations: the Box-Cox transform, its
+        Jacobian and the global model use them only, and the states evolve through
+        the zeros. The log-likelihood and the number of parameters include those of
+        the occurrence model, and the fitted values and forecasts are the probability
+        times those of the sizes (see ``point`` in :meth:`predict`).
     distribution : str, default="dnorm"
         ``"dnorm"``, ``"dlaplace"``, ``"ds"`` or ``"dgnorm"``, in the space of the
         transformed data.
@@ -135,6 +250,7 @@ class TBATS:
         lambda_bc: Optional[float] = None,
         orders: Optional[Dict[str, Any]] = None,
         regressors: str = "use",
+        occurrence: Any = "none",
         distribution: str = "dnorm",
         loss: str = "likelihood",
         ic: str = "AICc",
@@ -166,6 +282,9 @@ class TBATS:
         self.lambda_bc = lambda_bc
         self.orders = {"ar": 3, "ma": 3, "select": True} if orders is None else orders
         self.regressors = _match(regressors, REGRESSORS_OPTIONS, "regressors")
+        if isinstance(occurrence, str):
+            _match(occurrence, OCCURRENCE_OPTIONS, "occurrence")
+        self.occurrence = occurrence
         self.distribution = _match(distribution, DISTRIBUTION_OPTIONS, "distribution")
         self.loss = _match(loss, LOSS_OPTIONS, "loss")
         self.ic = _match(ic, IC_OPTIONS, "ic")
@@ -243,13 +362,17 @@ class TBATS:
         self._index = index
 
         lags, harmonics, trend = self.lags, self.harmonics, self.trend
+        occurrence = _occurrence_spec(self.occurrence, y_in_sample, self.loss)
+        ot = occurrence["ot_logical"]
+        if ot is None:
+            ot = np.ones(obs_in_sample, dtype=bool)
 
         periods = sorted({lag for lag in lags if lag > 1})
-        lam_spec = st.lambda_spec(self.lambda_bc, y_in_sample, self.loss)
+        lam_spec = st.lambda_spec(self.lambda_bc, y_in_sample[ot], self.loss)
         spec = st.arma_spec(self.orders, lags)
         spec_fit = st.arma_build([0], [0], [1]) if spec["select"] else spec
         trend_types = ["none", "additive", "damped"] if trend == "auto" else [trend]
-        settings = self._settings()
+        settings = {**self._settings(), "occurrence": occurrence}
         xreg = st.xreg_spec(X, obs_in_sample, h, self.regressors)
         # The regressors are selected on the errors of the model without them
         xreg_fit = None if self.regressors == "select" else xreg
@@ -262,6 +385,7 @@ class TBATS:
                 lam_spec,
                 self.ic,
                 None if xreg_fit is None else xreg_fit["data"],
+                ot,
             )
         else:
             if len(harmonics) != len(periods):
@@ -300,7 +424,7 @@ class TBATS:
 
         if self.regressors == "select" and xreg is not None:
             best, xreg_fit = self._select_xreg(
-                best, xreg, ics, y_in_sample, table, spec_fit, lam_spec, settings
+                best, xreg, ics, y_in_sample, table, spec_fit, lam_spec, settings, ot
             )
 
         # The ARMA orders, screened on the residuals of the global model
@@ -310,9 +434,9 @@ class TBATS:
                 best["trend_type"] != "none",
                 table,
                 None if xreg_fit is None else xreg_fit["data"],
-            )
+            )[ot]
             residuals = st.QR(design).resid(
-                st.box_cox(y_in_sample, best["elements"]["lambda"])
+                st.box_cox(y_in_sample[ot], best["elements"]["lambda"])
             )
             spec_best = st.arma_select(
                 residuals,
@@ -349,6 +473,8 @@ class TBATS:
         self.trend_type_ = best["trend_type"]
         self.lambda_ = best["elements"]["lambda"]
         self._y_in_sample = y_in_sample
+        self._occurrence = occurrence
+        self._ot = ot
         self.time_elapsed = time.time() - start_time
         return self
 
@@ -362,14 +488,15 @@ class TBATS:
         spec: Dict[str, Any],
         lam_spec: Dict[str, Any],
         settings: Dict[str, Any],
+        ot: NDArray,
     ) -> Any:
         """The regressors selected by ``stepwise()`` on the errors of the best model
         without them, as R's ``adam_xreg_selector``: the model refitted with them is
         kept if it improves the IC."""
         shape_estimated = int("shape" in best["names"])
         selected = xreg_selector(
-            best["fitted"]["errors"],
-            xreg["data"],
+            best["fitted"]["errors"][ot],
+            xreg["data"][ot],
             xreg["names"],
             self.ic,
             len(best["B"]) + 1 - shape_estimated,
@@ -397,7 +524,10 @@ class TBATS:
 
     def _ic(self, fitted: Dict[str, Any]) -> float:
         return st.ic_value(
-            fitted["loglik"], len(fitted["y"]), fitted["n_param_estimated"], self.ic
+            fitted["loglik"],
+            len(fitted["y"]),
+            fitted["n_param_estimated"] + fitted["n_param_occurrence"],
+            self.ic,
         )
 
     # Fitted attributes
@@ -430,10 +560,10 @@ class TBATS:
 
     @property
     def nparam(self) -> int:
-        """The number of estimated parameters, the scale and the identified
-        initials included."""
+        """The number of estimated parameters, the scale, the identified initials
+        and the parameters of the occurrence model included."""
         self._check_fitted()
-        return int(self._best["n_param_estimated"])
+        return int(self._best["n_param_estimated"] + self._best["n_param_occurrence"])
 
     @property
     def aic(self) -> float:
@@ -453,9 +583,11 @@ class TBATS:
 
     @property
     def fitted(self) -> NDArray:
-        """The fitted values in the space of the data (the medians)."""
+        """The fitted values in the space of the data (the medians), times the
+        probabilities of occurrence."""
         self._check_fitted()
-        return st.box_cox_inverse(self._best["fitted"]["fitted"], self.lambda_)
+        sizes = st.box_cox_inverse(self._best["fitted"]["fitted"], self.lambda_)
+        return sizes * self._occurrence["p_fitted"]
 
     @property
     def residuals(self) -> NDArray:
@@ -605,7 +737,8 @@ class TBATS:
         self._check_fitted()
         if self._best["forecast_bc"] is None:
             return None
-        return st.box_cox_inverse(self._best["forecast_bc"], self.lambda_)
+        sizes = st.box_cox_inverse(self._best["forecast_bc"], self.lambda_)
+        return sizes * _p_forecast(self._occurrence["model"], len(sizes))
 
     # Methods
     def point_lik(self, log: bool = True) -> NDArray:
@@ -697,6 +830,7 @@ class TBATS:
         nsim: Optional[int] = None,
         seed: Optional[int] = None,
         point: Literal["skeleton", "mean", "median"] = "skeleton",
+        occurrence: Optional[Any] = None,
     ) -> ForecastResult:
         """The forecasts of ADAM's forecaster in the space of the transformed data,
         transformed back: the quantiles map onto those of the data. The point
@@ -709,7 +843,11 @@ class TBATS:
         values of the regressors (the holdout, else their forecasts, when it is
         None). ``"confidence"`` and ``"complete"`` take the uncertainty of the
         parameters from :meth:`reforecast` (``nsim`` draws, 100 by default;
-        ``"simulated"`` uses 10000 paths by default)."""
+        ``"simulated"`` uses 10000 paths by default). With an occurrence model, the
+        forecasts are those of the mixture of no demand and the sizes: the skeleton
+        and the mean are multiplied by the probability of occurrence (``occurrence``
+        provides it for the horizon, else the occurrence model forecasts it), and the
+        median and the bounds are the quantiles of the mixture."""
         self._check_fitted()
         if point not in ("skeleton", "mean", "median"):
             raise ValueError(
@@ -722,6 +860,19 @@ class TBATS:
             )
         if h is None:
             h = self.h if self.h > 0 else 10
+        # The probabilities of occurrence: provided, or forecast by the occurrence
+        # model
+        p_forecast = (
+            _p_forecast(self._occurrence["model"], h)
+            if occurrence is None
+            else np.resize(np.asarray(occurrence, dtype=float), max(h, 0))
+        )
+        intermittent = bool(np.any(p_forecast < 1))
+        if intermittent and cumulative:
+            raise ValueError(
+                "Cumulative forecasts of TBATS with an occurrence model are not "
+                "available yet."
+            )
         if interval in ("confidence", "complete"):
             return self.reforecast(
                 h=h,
@@ -743,7 +894,12 @@ class TBATS:
         future = self._future_x(h, X)
         n_param = self.nparam
         n_scale = int(self.loss == "likelihood")
-        y_bc = st.box_cox(self._y_in_sample, self.lambda_)
+        # The sizes: zero where there is no demand, and the scale divided by all the
+        # observations, as ADAM's of an occurrence model, which the forecaster
+        # de-biases by the non-zero ones
+        ot = self._ot
+        y_bc = st.box_cox_sizes(self._y_in_sample, self.lambda_, ot)
+        scale = scale_debias(self.scale, self.distribution, int(ot.sum()), self.nobs)
 
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
             """ADAM's forecaster in the space of the transformed data."""
@@ -770,10 +926,11 @@ class TBATS:
                     "profiles_recent_table": best["fitted"]["profile"],
                     "residuals": pd.Series(self.residuals),
                     "y_fitted": y_bc - self.residuals,
-                    "scale": self.scale,
+                    "scale": scale,
                 },
                 observations_dict={
                     "obs_in_sample": self.nobs,
+                    "obs_nonzero": int(ot.sum()),
                     "y_in_sample": y_bc,
                     "y_forecast_start": self._forecast_start(),
                     "frequency": self._frequency(),
@@ -822,7 +979,66 @@ class TBATS:
             result.lower = _inverse_like(result.lower, self.lambda_)
         if result.upper is not None:
             result.upper = _inverse_like(result.upper, self.lambda_)
+        if intermittent and h > 0:
+            self._mixture(result, run, p_forecast, interval, level, side, point)
         return result
+
+    def _mixture(
+        self,
+        result: ForecastResult,
+        run: Any,
+        p_forecast: NDArray,
+        interval: str,
+        level: Any,
+        side: str,
+        point: str,
+    ) -> None:
+        """The mixture of no demand and the sizes: the skeleton and the mean
+        multiplied by the probability, the median and the bounds its quantiles."""
+        if point == "median":
+            interval_used = "prediction" if interval == "none" else interval
+            result.mean[:] = self._mixture_quantiles(
+                run, interval_used, np.array([0.5]), p_forecast
+            )[:, 0]
+        else:
+            result.mean[:] = np.asarray(result.mean, dtype=float) * p_forecast
+        if interval == "none":
+            return
+        levels = np.atleast_1d(np.asarray(level, dtype=float))
+        levels = np.where(levels > 1, levels / 100, levels)
+        probs = {
+            "both": ((1 - levels) / 2, (1 + levels) / 2),
+            "upper": (np.zeros(len(levels)), levels),
+            "lower": (1 - levels, np.ones(len(levels))),
+        }[side]
+        for bounds, prob in zip((result.lower, result.upper), probs):
+            if bounds is not None:
+                bounds.iloc[:, :] = self._mixture_quantiles(
+                    run, interval, prob, p_forecast
+                )
+
+    def _mixture_quantiles(
+        self, run: Any, interval: str, probs: NDArray, p_forecast: NDArray
+    ) -> NDArray:
+        """The quantiles of the mixture of no demand and the sizes (R's
+        ``tbats_mixtureQuantiles``): zero below the probability of no demand,
+        otherwise the quantile (q-(1-p))/p of the sizes, by the method of the
+        interval."""
+        quantiles = np.zeros((len(p_forecast), len(probs)))
+        for p in np.unique(p_forecast):
+            rows = p_forecast == p
+            size_levels = (probs - (1 - p)) / p
+            quantiles[np.ix_(rows, size_levels >= 1)] = np.inf
+            columns = np.flatnonzero((size_levels > 0) & (size_levels < 1))
+            if len(columns) > 0:
+                sizes, _ = run(interval, list(size_levels[columns]), "upper")
+                upper = st.box_cox_inverse(
+                    np.asarray(sizes.upper, dtype=float), self.lambda_
+                )
+                quantiles[np.ix_(rows, columns)] = upper.reshape(len(p_forecast), -1)[
+                    rows
+                ]
+        return quantiles
 
     def _mean(self, run: Any, nsim: int) -> NDArray:
         """The mean of the forecast distribution of the data (R's ``tbats_mean``):
@@ -958,9 +1174,17 @@ class TBATS:
         names = self.component_names
         lambdas = np.array([refit["lambda"] for refit in refits])
         columns = [f"nsim{i}" for i in range(1, nsim + 1)]
-        refitted = np.column_stack(
-            [st.box_cox_inverse(r["fitted"], lam) for r, lam in zip(refits, lambdas)]
+        refitted = (
+            np.column_stack(
+                [
+                    st.box_cox_inverse(r["fitted"], lam)
+                    for r, lam in zip(refits, lambdas)
+                ]
+            )
+            * self._occurrence["p_fitted"][:, None]
         )
+        # The sizes: no error where there is no demand
+        ot = self._ot
         return TBATSReapplyResult(
             time_elapsed=time.time() - start_time,
             y=pd.Series(self.actuals),
@@ -983,7 +1207,7 @@ class TBATS:
             lambdas=lambdas,
             errors=np.column_stack(
                 [
-                    st.box_cox(self._y_in_sample, lam) - r["fitted"]
+                    (st.box_cox_sizes(self._y_in_sample, lam, ot) - r["fitted"]) * ot
                     for r, lam in zip(refits, lambdas)
                 ]
             ),
@@ -1042,9 +1266,12 @@ class TBATS:
         ][:, obs + lag_max :]
         lookup = np.asfortranarray(lookup, dtype=np.uint64)
         n_scale = int(self.loss == "likelihood")
-        df_scale = obs - (self.nparam - n_scale)
+        # The scale of the sizes, on the non-zero observations (R's adam_dfScale)
+        ot = self._ot
+        obs_nonzero = int(np.sum(self._y_in_sample != 0))
+        df_scale = obs_nonzero - (self.nparam - n_scale)
         if df_scale <= 0:
-            df_scale = obs
+            df_scale = obs_nonzero
         draws = refitted.random_parameters
         adam_cpp = best["adam_cpp"]
         # The future values of the regressors, as predict() takes them
@@ -1064,18 +1291,19 @@ class TBATS:
                     if "shape" in draws
                     else best["elements"]["shape"]
                 )
+                errors_sizes = refitted.errors[ot, j]
                 scale = scale_debias(
-                    st.scale_value(refitted.errors[:, j], self.distribution, shape),
+                    st.scale_value(errors_sizes, self.distribution, shape),
                     self.distribution,
-                    obs,
+                    len(errors_sizes),
                     df_scale,
                 )
                 errors = generate_errors(
                     self.distribution,
                     h * nsim,
                     scale,
-                    obs_in_sample=obs,
-                    n_param=obs - df_scale,
+                    obs_in_sample=obs_nonzero,
+                    n_param=obs_nonzero - df_scale,
                     shape=shape,
                     random_state=rng,
                 )
@@ -1094,9 +1322,21 @@ class TBATS:
                 skeleton = adam_cpp.forecast(mat_wt, mat_f, lookup, profile, h).forecast
                 paths.append(st.box_cox_inverse(np.ravel(skeleton), lam).reshape(h, 1))
         path_matrix = np.column_stack(paths)
+        # The occurrence drawn with its probabilities
+        p_forecast = _p_forecast(self._occurrence["model"], h)
+        if np.any(p_forecast < 1):
+            if cumulative:
+                raise ValueError(
+                    "Cumulative forecasts of TBATS with an occurrence model are not "
+                    "available yet."
+                )
+            path_matrix = path_matrix * rng.binomial(
+                1, np.repeat(p_forecast[:, None], path_matrix.shape[1], axis=1)
+            )
         if cumulative:
             path_matrix = path_matrix.sum(axis=0, keepdims=True)
 
+        # The skeleton, times the probability with an occurrence model
         point_forecast = self.predict(h=h, X=future).mean
         mean = point_forecast
         if cumulative:
@@ -1149,16 +1389,18 @@ class TBATS:
         lag_max = struct["lags_model_max"]
         n_ets = struct["n_ets"]
         n_scale = int(self.loss == "likelihood")
-        df_scale = max(self.nobs - (self.nparam - n_scale), 1)
+        # The scale of the sizes, de-biased on the non-zero observations
+        obs_nonzero = int(self._ot.sum())
+        df_scale = max(obs_nonzero - (self.nparam - n_scale), 1)
         rng = np.random.default_rng(seed)
-        scale = scale_debias(self.scale, self.distribution, self.nobs, df_scale)
+        scale = scale_debias(self.scale, self.distribution, obs_nonzero, df_scale)
         errors = np.reshape(
             generate_errors(
                 self.distribution,
                 obs * nsim,
                 scale,
-                obs_in_sample=self.nobs,
-                n_param=self.nobs - df_scale,
+                obs_in_sample=obs_nonzero,
+                n_param=obs_nonzero - df_scale,
                 shape=best["elements"]["shape"],
                 random_state=rng,
             ),
@@ -1197,7 +1439,10 @@ class TBATS:
             constant=False,
         )
         data = st.box_cox_inverse(np.asarray(result["matrixYt"]), self.lambda_)
-        data = data.reshape(obs, nsim)
+        # The sizes, and the occurrence drawn with the fitted probabilities
+        probability = np.resize(self._occurrence["p_fitted"], obs)
+        occurrence = rng.binomial(1, np.repeat(probability[:, None], nsim, axis=1))
+        data = data.reshape(obs, nsim) * occurrence
         return SimulateResult(
             model=self.model_name,
             data=pd.Series(data[:, 0]) if nsim == 1 else pd.DataFrame(data),
@@ -1207,8 +1452,8 @@ class TBATS:
             measurement=measurement,
             transition=best["elements"]["mat_f"].copy(),
             initial=profile.copy(),
-            probability=np.ones(obs),
-            occurrence=None,
+            probability=probability,
+            occurrence=None if self._occurrence["model"] is None else occurrence,
             profile=profile.copy(),
             other={"shape": best["elements"]["shape"]}
             if self.distribution == "dgnorm"
@@ -1301,6 +1546,15 @@ class TBATS:
             kwargs["regressors"] = (
                 "adapt" if self._best["struct"]["xreg_adapt"] else "use"
             )
+        # The occurrence model is refitted on the sample, with its type
+        model = self._occurrence["model"]
+        if model is not None:
+            if isinstance(model, dict):
+                raise ValueError(
+                    "The refits need an occurrence model, not the provided "
+                    "probabilities."
+                )
+            kwargs["occurrence"] = model.occurrence
         if self.distribution == "dgnorm" and "shape" not in self.coef_names:
             kwargs["shape"] = self._best["elements"]["shape"]
         return kwargs

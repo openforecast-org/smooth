@@ -78,6 +78,20 @@
 #' refitted with the selected ones and kept if it improves the information criterion),
 #' or \code{"adapt"} their coefficients over time (one smoothing parameter per
 #' regressor, \code{delta1}, ..., as in \link[smooth]{adam}).
+#' @param occurrence The occurrence of an intermittent demand. \code{"none"} (the
+#' default) fits the zeros as values, with a warning. A fitted \link[smooth]{om} (or
+#' \code{omg()}, \code{oes()}) model is used as it is, and a numeric vector gives the
+#' probabilities of occurrence (or 0/1) of the in-sample observations, and possibly of
+#' the horizon. \code{"fixed"}, \code{"auto"}, \code{"odds-ratio"},
+#' \code{"inverse-odds-ratio"}, \code{"direct"} and \code{"general"} fit
+#' \code{om(y, model="ZXN", lags=1)} of that type: a level-only occurrence with the
+#' trend selected, as the seasonal pattern of the probability is hard to find in zeros
+#' and ones (a seasonal one can be provided as a fitted \code{om()}). The sizes are then
+#' modelled on the non-zero observations: the Box-Cox transform, its Jacobian and the
+#' global model use them only, and the states evolve through the zeros. The
+#' log-likelihood and the number of parameters include those of the occurrence model, and
+#' the fitted values and forecasts are the probability times those of the sizes (see
+#' \code{point} in \link[smooth]{forecast.adam}).
 #' @param distribution The distribution of the error term in the space of the
 #' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 #' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
@@ -129,6 +143,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                   trend=c("auto","none","additive","damped"),
                   lambda=NULL, orders=list(ar=3, ma=3, select=TRUE),
                   xreg=NULL, regressors=c("use","select","adapt"),
+                  occurrence=c("none","auto","fixed","general","odds-ratio","inverse-odds-ratio","direct"),
                   distribution=c("dnorm","dlaplace","ds","dgnorm"),
                   loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                   ic=c("AICc","AIC","BIC","BICc"), h=0, holdout=FALSE,
@@ -158,6 +173,10 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         }
         lags <- model$lags;
         harmonics <- model$harmonics;
+        # The occurrence model of the model, as it is
+        if(!is.null(model$occurrence)){
+            occurrence <- model$occurrence;
+        }
         trend <- model$trendType;
         armaSpecProvided <- model$armaSpec;
         distribution <- model$distribution;
@@ -200,10 +219,15 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         stop("tbats() does not support missing values yet.", call.=FALSE);
     }
     xregSpec <- tbats_xreg(xreg, length(yInSample), checked$h, regressors);
+    occurrenceSpec <- tbats_occurrence(occurrence, yInSample, loss);
+    # Under a name of its own: checked has occurrence elements of adam(), which $ matches
+    # partially
+    checked[["tbatsOccurrence"]] <- occurrenceSpec;
+    otLogical <- occurrenceSpec$otLogical;
 
     #### The structure ####
     periods <- sort(unique(lags[lags>1]));
-    lambdaSpec <- tbats_lambdaSpec(lambdaProvided, yInSample, loss);
+    lambdaSpec <- tbats_lambdaSpec(lambdaProvided, yInSample[otLogical], loss);
     armaSpec <- if(is.null(armaSpecProvided)) tbats_armaSpec(orders, lags) else armaSpecProvided;
     # With the selection, the trend is chosen without ARMA, and without the regressors
     armaSpecFit <- if(armaSpec$select) tbats_armaBuild(0, 0, 1) else armaSpec;
@@ -213,7 +237,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     # Harmonics from the global model, at the starting value of lambda
     if(is.null(harmonics)){
         harmonics <- tbats_harmonicsSelect(yInSample, periods, any(trendTypes!="none"),
-                                           lambdaSpec, checked$icFunction, ic, xregSpecFit$data);
+                                           lambdaSpec, checked$icFunction, ic, xregSpecFit$data, otLogical);
     }
     else{
         if(length(harmonics)!=length(periods)){
@@ -243,7 +267,8 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     # the model with them is kept only if it beats the one without
     if(regressors=="select" && !is.null(xregSpec)){
         shapeEstimated <- any(names(best$B)=="shape");
-        selected <- names(adam_xreg_selector(best$fitted$errors, xregSpec$data, length(yInSample), ic,
+        selected <- names(adam_xreg_selector(best$fitted$errors[otLogical], xregSpec$data[otLogical,,drop=FALSE],
+                                             sum(otLogical), ic,
                                              length(best$B)+1-shapeEstimated, distribution, "none",
                                              best$elements$shape)$initialXreg);
         xregSpecSelected <- tbats_xregSubset(xregSpec, make.names(selected));
@@ -263,8 +288,9 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     # best one: on its errors, the adaptive level hides an AR in a near-unit MA root.
     # The winner is fitted and kept only if it beats the models without ARMA
     if(armaSpec$select && armaSpec$nParam>0){
-        X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable, xregSpecFit$data);
-        armaSpecBest <- tbats_armaSelect(qr.resid(qr(X), tbats_boxCox(yInSample, best$elements$lambda)),
+        X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable,
+                          xregSpecFit$data)[otLogical,,drop=FALSE];
+        armaSpecBest <- tbats_armaSelect(qr.resid(qr(X), tbats_boxCox(yInSample[otLogical], best$elements$lambda)),
                                          armaSpec, distribution, best$elements$shape,
                                          best$nParamEstimated, ic);
         if(armaSpecBest$nParam>0){
@@ -356,6 +382,83 @@ tbats_boxCoxInverse <- function(z, lambda){
     return(pmax(lambda*z+1, 0)^(1/lambda));
 }
 
+# The occurrence of an intermittent demand: a provided om() / omg() / oes() model, the
+# provided probabilities (or 0/1), or an om() with the level only (and the trend
+# selected) for the occurrence type: its seasonal pattern is hard to find in zeros and
+# ones. The non-zero observations, and the log-likelihood and parameters of the
+# occurrence, which are added to those of the sizes
+#' @keywords internal
+tbats_occurrence <- function(occurrence, y, loss){
+    obs <- length(y);
+    otLogical <- y!=0;
+    none <- list(model=NULL, otLogical=rep(TRUE, obs), logLik=0, nParam=0, pFitted=rep(1, obs));
+    if(is.occurrence(occurrence)){
+        omModel <- occurrence;
+        if(length(fitted(omModel))!=obs){
+            stop("The occurrence model should be fitted to the in-sample data.", call.=FALSE);
+        }
+    }
+    else if(is.numeric(occurrence) || is.logical(occurrence)){
+        probabilities <- as.numeric(occurrence);
+        if(length(probabilities)<obs || any(probabilities<0 | probabilities>1)){
+            stop("The provided occurrence should have the probabilities (in [0, 1]) of the in-sample ",
+                 "observations, and possibly of the horizon.", call.=FALSE);
+        }
+        pFitted <- probabilities[1:obs];
+        if(any(pFitted[otLogical]==0) || any(pFitted[!otLogical]==1)){
+            stop("The provided occurrence contradicts the data.", call.=FALSE);
+        }
+        omModel <- list(occurrence="provided", fitted=pFitted, forecast=probabilities[-(1:obs)],
+                        logLik=sum(log(pFitted[otLogical])) + sum(log(1-pFitted[!otLogical])));
+        return(list(model=omModel, otLogical=otLogical, logLik=omModel$logLik, nParam=0,
+                    pFitted=pFitted));
+    }
+    else{
+        occurrence <- match.arg(occurrence[1], c("none","auto","fixed","general","odds-ratio",
+                                                 "inverse-odds-ratio","direct"));
+        if(occurrence=="none"){
+            if(any(y==0)){
+                warning("The data has zeros, which are fitted as values. For an intermittent demand, ",
+                        "use the occurrence argument.", call.=FALSE);
+            }
+            return(none);
+        }
+        # No zeros: nothing to model
+        if(all(otLogical)){
+            return(none);
+        }
+        omModel <- om(y, model="ZXN", lags=1, occurrence=occurrence, silent=TRUE);
+    }
+    if(any(loss==c("MSEh","TMSE","GTMSE","MSCE","GPL"))){
+        stop("The multistep losses are not available with an occurrence model.", call.=FALSE);
+    }
+    return(list(model=omModel, otLogical=otLogical, logLik=as.numeric(logLik(omModel)),
+                nParam=nparam(omModel), pFitted=as.vector(fitted(omModel))));
+}
+
+# The probabilities of occurrence for the horizon: forecasts of the occurrence model, or
+# the provided ones (the last of them repeated)
+#' @keywords internal
+tbats_pForecast <- function(object, h){
+    occurrence <- object$occurrence;
+    if(is.null(occurrence) || h<=0){
+        return(rep(1, max(h, 0)));
+    }
+    if(is.occurrence(occurrence)){
+        return(as.vector(forecast(occurrence, h=h)$mean));
+    }
+    pForecast <- c(occurrence$forecast, rep(tail(c(occurrence$fitted, occurrence$forecast), 1), h));
+    return(pForecast[1:h]);
+}
+
+# The transformed sizes, zero where there is no demand (the fitter skips them)
+#' @keywords internal
+tbats_boxCoxSizes <- function(y, lambda, otLogical){
+    yBC <- rep(0, length(y));
+    yBC[otLogical] <- tbats_boxCox(y[otLogical], lambda);
+    return(yBC);
+}
+
 # How lambda is treated: estimated in [0, 1] only with the likelihood and positive
 # data; otherwise fixed (provided, or 1 with a message)
 #' @keywords internal
@@ -439,18 +542,25 @@ tbats_lambdaStart <- function(y, X, lambdaSpec){
 # The number of harmonics of each period by the information criterion of the global
 # model, one period at a time, stopping after two harmonics without improvement
 #' @keywords internal
-tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, ic, xregData=NULL){
+tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, ic, xregData=NULL,
+                                  otLogical=rep(TRUE, length(y))){
     harmonics <- rep(0, length(periods));
     if(length(periods)==0){
         return(harmonics);
     }
     kMax <- pmax(ceiling(periods/2)-1, 0);
+    # The non-zero observations of an occurrence model, with their time index
+    obsAll <- length(y);
+    design <- function(harmonicsTest){
+        return(tbats_design(obsAll, trendIn, tbats_harmonics(periods, harmonicsTest),
+                            xregData)[otLogical,,drop=FALSE]);
+    }
+    y <- y[otLogical];
     obs <- length(y);
-    lambda <- tbats_lambdaStart(y, tbats_design(obs, trendIn, tbats_harmonics(periods, pmin(kMax, 3)),
-                                             xregData), lambdaSpec);
+    lambda <- tbats_lambdaStart(y, design(pmin(kMax, 3)), lambdaSpec);
     yBC <- tbats_boxCox(y, lambda);
     icValue <- function(harmonicsTest){
-        X <- tbats_design(obs, trendIn, tbats_harmonics(periods, harmonicsTest), xregData);
+        X <- design(harmonicsTest);
         if(ncol(X)>=obs-1){
             return(Inf);
         }
@@ -876,11 +986,16 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     if(nrow(harmonicTable)==0){
         struct$periods <- numeric(0);
     }
-    X <- tbats_design(obs, struct$trendIn, harmonicTable, xregSpec$data);
+    # With an occurrence model, the sizes: the global model, the transform and its
+    # Jacobian on the non-zero observations, which keep their time index
+    occurrenceSpec <- checked[["tbatsOccurrence"]];
+    otLogical <- occurrenceSpec$otLogical;
+    obsNonzero <- sum(otLogical);
+    X <- tbats_design(obs, struct$trendIn, harmonicTable, xregSpec$data)[otLogical,,drop=FALSE];
     qrX <- qr(X);
-    lambdaStart <- tbats_lambdaStart(y, X, lambdaSpec);
-    yBCStart <- tbats_boxCox(y, lambdaStart);
-    logY <- if(lambdaSpec$estimate || lambdaStart!=1) sum(log(y)) else 0;
+    lambdaStart <- tbats_lambdaStart(y[otLogical], X, lambdaSpec);
+    yBCStart <- tbats_boxCoxSizes(y, lambdaStart, otLogical);
+    logY <- if(lambdaSpec$estimate || lambdaStart!=1) sum(log(y[otLogical])) else 0;
 
     adamCpp <- new(adamCore, struct$lagsModelAll, "A", if(struct$trendIn) "A" else "N", "N",
                    struct$nETS, 0, struct$nETS, struct$nComponents-struct$nETS-struct$nXreg, struct$nXreg,
@@ -890,7 +1005,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     lookup <- adamProfileCreator(struct$lagsModelAll, struct$lagsModelMax, obs+max(checked$h, 1),
                                  headLength=headLength$geometry)$lookup;
     matVt <- matrix(0, struct$nComponents, obs+headLength$geometry);
-    ot <- rep(1, obs);
+    ot <- otLogical*1;
 
     initialType <- initial;
     backcast <- any(initialType==c("backcasting","complete"));
@@ -901,7 +1016,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     # The starting values of the ARMA from Hannan-Rissanen on the global residuals
     armaStart <- numeric(0);
     if(armaSpec$nParam>0){
-        armaStart <- as.vector(arimaHRCpp(qr.resid(qrX, yBCStart), armaSpec$arOrders, armaSpec$maOrders,
+        armaStart <- as.vector(arimaHRCpp(qr.resid(qrX, yBCStart[otLogical]), armaSpec$arOrders, armaSpec$maOrders,
                                           armaSpec$lags, TRUE, TRUE, numeric(0),
                                           rep(1, length(armaSpec$lags)), checked$bounds!="none"));
     }
@@ -916,8 +1031,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 
     #### The cost function ####
     fitStates <- function(elements){
-        yBC <- if(lambdaSpec$estimate) tbats_boxCox(y, elements$lambda) else yBCStart;
-        states <- tbats_globalStates(qr.coef(qrX, yBC), struct);
+        yBC <- if(lambdaSpec$estimate) tbats_boxCoxSizes(y, elements$lambda, otLogical) else yBCStart;
+        states <- tbats_globalStates(qr.coef(qrX, yBC[otLogical]), struct);
         armaInitial <- rep(0, struct$armaLagMax);
         if(!is.null(elements$deviations)){
             states$level <- states$level + elements$deviations$level;
@@ -945,14 +1060,14 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             return(elements$penalty);
         }
         fitted <- fitStates(elements);
-        errors <- fitted$errors;
+        errors <- fitted$errors[otLogical];
         if(any(lossUsed==c("likelihood","MSE","MAE","HAM","custom"))){
             value <- switch(lossUsed,
-                            "likelihood"=-tbats_logLik(errors, distribution, elements$shape, obs) -
+                            "likelihood"=-tbats_logLik(errors, distribution, elements$shape, obsNonzero) -
                                 (elements$lambda-1)*logY,
-                            "MSE"=sum(errors^2)/obs,
-                            "MAE"=sum(abs(errors))/obs,
-                            "HAM"=sum(sqrt(abs(errors)))/obs,
+                            "MSE"=sum(errors^2)/obsNonzero,
+                            "MAE"=sum(abs(errors))/obsNonzero,
+                            "HAM"=sum(sqrt(abs(errors)))/obsNonzero,
                             "custom"=checked$lossFunction(actual=fitted$yBC, fitted=fitted$fitted, B=B));
         }
         else{
@@ -996,7 +1111,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                                  "complete", checked, xregSpec);
         common <- intersect(names(B), names(backcastFit$B));
         B[common] <- backcastFit$B[common];
-        B <- tbats_deviations(B, backcastFit, struct, qrX, y, lambdaSpec);
+        B <- tbats_deviations(B, backcastFit, struct, qrX, y[otLogical], lambdaSpec);
     }
     if(!is.null(checked$B)){
         if(length(checked$B)!=length(B)){
@@ -1051,7 +1166,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     nInitials <- 1 + struct$trendIn + 2*struct$nHarmonics + struct$armaLagMax;
     nParamEstimated <- length(B)*(checked$modelDo=="estimate") + 1 + nInitials*backcast +
         struct$nXreg*!xregEstimate;
-    logLikValue <- -lossValue(B, "likelihood");
+    # The likelihood of the occurrence model is added, as its parameters are
+    logLikValue <- -lossValue(B, "likelihood") + occurrenceSpec$logLik;
 
     # The Hessian of the log-likelihood
     FI <- NA;
@@ -1060,7 +1176,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         colnames(FI) <- rownames(FI) <- names(B);
     }
 
-    scale <- tbats_scale(fitted$errors, distribution, elements$shape, obs);
+    scale <- tbats_scale(fitted$errors[otLogical], distribution, elements$shape, obsNonzero);
     forecastBC <- NULL;
     if(checked$h>0){
         forecastBC <- adamCpp$forecast(tbats_matWt(elements$w, struct, checked$h, xregSpec$future),
@@ -1070,7 +1186,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     }
 
     return(list(B=B, res=res, lossValue=lossFinal,
-                logLik=structure(logLikValue, nobs=obs, df=nParamEstimated, class="logLik"),
+                logLik=structure(logLikValue, nobs=obs, df=nParamEstimated+occurrenceSpec$nParam,
+                                 class="logLik"),
                 nParamEstimated=nParamEstimated, nInitials=nInitials*backcast,
                 struct=struct, armaSpec=armaSpec, elements=elements, fitted=fitted, states=states,
                 initialRead=initialRead, scale=scale, forecastBC=forecastBC, FI=FI,
@@ -1113,12 +1230,27 @@ tbats_scale <- function(errors, distribution, shape, obs){
 # The log-likelihood of the errors in the space of the transformed data
 #' @keywords internal
 tbats_logLik <- function(errors, distribution, shape, obs){
-    scale <- tbats_scale(errors, distribution, shape, obs);
-    return(sum(switch(distribution,
-                      "dnorm"=dnorm(errors, 0, sqrt(scale), log=TRUE),
-                      "dlaplace"=dlaplace(errors, 0, scale, log=TRUE),
-                      "ds"=ds(errors, 0, scale, log=TRUE),
-                      "dgnorm"=dgnorm(errors, 0, scale, shape, log=TRUE))));
+    return(sum(tbats_logDensities(errors, distribution, shape, tbats_scale(errors, distribution, shape, obs))));
+}
+
+# The log-densities of the errors in the space of the transformed data
+#' @keywords internal
+tbats_logDensities <- function(errors, distribution, shape, scale){
+    return(switch(distribution,
+                  "dnorm"=dnorm(errors, 0, sqrt(scale), log=TRUE),
+                  "dlaplace"=dlaplace(errors, 0, scale, log=TRUE),
+                  "ds"=ds(errors, 0, scale, log=TRUE),
+                  "dgnorm"=dgnorm(errors, 0, scale, shape, log=TRUE)));
+}
+
+# The fitted probabilities of occurrence (ones without an occurrence model)
+#' @keywords internal
+tbats_pFitted <- function(object){
+    occurrence <- object$occurrence;
+    if(is.null(occurrence)){
+        return(rep(1, nobs(object)));
+    }
+    return(as.vector(if(is.occurrence(occurrence)) fitted(occurrence) else occurrence$fitted));
 }
 
 #### The returned object ####
@@ -1135,10 +1267,13 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
         }
         return(zoo(values, order.by=checked$yInSampleIndex));
     }
-    yFitted <- makeSeries(tbats_boxCoxInverse(best$fitted$fitted, lambda));
+    # With an occurrence model, the probability times the sizes
+    occurrenceSpec <- checked[["tbatsOccurrence"]];
+    yFitted <- makeSeries(tbats_boxCoxInverse(best$fitted$fitted, lambda) * occurrenceSpec$pFitted);
     errors <- makeSeries(best$fitted$errors);
     if(checked$h>0){
-        yForecast <- tbats_boxCoxInverse(best$forecastBC, lambda);
+        yForecast <- tbats_boxCoxInverse(best$forecastBC, lambda) *
+            tbats_pForecast(list(occurrence=occurrenceSpec$model), checked$h);
         if(any(yClasses=="ts")){
             yForecast <- ts(yForecast, start=checked$yForecastStart, frequency=checked$yFrequency);
         }
@@ -1180,6 +1315,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                                       c("nParamInternal","nParamXreg","nParamOccurrence",
                                                         "nParamScale","nParamAll")));
     parametersNumber[1,1] <- best$nParamEstimated - 1;
+    parametersNumber[1,3] <- occurrenceSpec$nParam;
     parametersNumber[1,4] <- 1;
     parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
     parametersNumber[2,1] <- length(best$B)*(checked$modelDo=="use");
@@ -1241,6 +1377,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     nParam=parametersNumber,
                                     formula=formula, xregNames=struct$xreg$names,
                                     regressors=struct$xreg$regressors,
+                                    occurrence=occurrenceSpec$model,
                                     loss=checked$loss, lossValue=best$lossValue, lossFunction=checked$lossFunction,
                                     logLik=best$logLik,
                                     ICs=ICs,
@@ -1263,7 +1400,15 @@ tbats_boxCoxObject <- function(object){
     lambda <- object$lambda;
     objectBC <- object;
     class(objectBC) <- c("adam","smooth");
-    yBC <- tbats_boxCox(actuals(object), lambda);
+    # The sizes: the occurrence is taken into account in the space of the data. They are
+    # zero where there is no demand, so that nobs(all=FALSE) and adam_dfScale() count the
+    # non-zero observations, and their scale is divided by all the observations, as
+    # adam()'s of an occurrence model, which adam_varianceDebiased() multiplies by T/df
+    objectBC$occurrence <- NULL;
+    y <- as.numeric(actuals(object));
+    otLogical <- y!=0 | is.null(object$occurrence);
+    yBC <- tbats_boxCoxSizes(y, lambda, otLogical);
+    objectBC$scale <- adam_scaleDebias(object$scale, object$distribution, sum(otLogical), length(y));
     # The response only: the regressors stay as they are
     objectBC$data[,1] <- yBC;
     objectBC$fitted[] <- yBC - residuals(object);
@@ -1316,7 +1461,7 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
     lagsModelMax <- max(object$lagsAll);
     lambdas <- sapply(refits, function(refit) refit$lambda);
     refitted <- matrix(sapply(1:nsim, function(i) tbats_boxCoxInverse(refits[[i]]$fitted, lambdas[i])),
-                       obs, nsim, dimnames=list(NULL, paste0("nsim",1:nsim)));
+                       obs, nsim, dimnames=list(NULL, paste0("nsim",1:nsim))) * tbats_pFitted(object);
     if(any(class(actuals(object))=="ts")){
         refitted <- ts(refitted, start=start(actuals(object)), frequency=frequency(actuals(object)));
     }
@@ -1335,7 +1480,10 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
                                         c(nComponents, lagsModelMax, nsim)),
                           randomParameters=draws, lambda=lambdas,
                           errors=sapply(1:nsim, function(i){
-                              return(tbats_boxCox(as.numeric(actuals(object)), lambdas[i]) - refits[[i]]$fitted);
+                              # The sizes: no error where there is no demand
+                              otLogical <- as.numeric(actuals(object))!=0 | is.null(object$occurrence);
+                              return((tbats_boxCoxSizes(as.numeric(actuals(object)), lambdas[i], otLogical) -
+                                          refits[[i]]$fitted) * otLogical);
                           })),
                      class="reapply"));
 }
@@ -1356,6 +1504,13 @@ tbats_refitCall <- function(object){
                       silent=TRUE);
     if(!is.null(object$xregNames)){
         arguments$regressors <- if(object$regressors=="adapt") "adapt" else "use";
+    }
+    # The occurrence model is refitted on the sample, with its type
+    if(!is.null(object$occurrence)){
+        if(!is.occurrence(object$occurrence)){
+            stop("The refits need an occurrence model, not the provided probabilities.", call.=FALSE);
+        }
+        arguments$occurrence <- object$occurrence$occurrence;
     }
     if(object$distribution=="dgnorm" && !any(names(object$B)=="shape")){
         arguments$shape <- object$other$shape;
@@ -1424,6 +1579,8 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     lookup <- adamProfileCreator(lagsModelAll, lagsModelMax, obs+h)$lookup[,-c(1:(obs+lagsModelMax)),drop=FALSE];
     draws <- objectRefitted$randomParameters;
     dfScale <- adam_dfScale(object);
+    # The sizes of an occurrence model are the non-zero observations
+    otLogical <- as.numeric(actuals(object))!=0 | is.null(object$occurrence);
     # The future values of the regressors, as forecast.adam() takes them
     xregRows <- which(colnames(object$states) %in% object$xregNames);
     xregFuture <- if(length(xregRows)>0) adam_xregNewdata(object, h, tbats_newdata(object, newdata));
@@ -1436,8 +1593,9 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
         lambda <- objectRefitted$lambda[j];
         if(interval=="prediction"){
             shape <- if(any(colnames(draws)=="shape")) draws[j,"shape"] else object$other$shape;
-            scale <- adam_scaleDebias(tbats_scale(objectRefitted$errors[,j], object$distribution, shape, obs),
-                                      object$distribution, obs, dfScale);
+            errorsSizes <- objectRefitted$errors[otLogical,j];
+            scale <- adam_scaleDebias(tbats_scale(errorsSizes, object$distribution, shape, length(errorsSizes)),
+                                      object$distribution, length(errorsSizes), dfScale);
             errors <- array(adam_errorsSimulate(h*nsim, object$distribution, scale, list(shape=shape), dfScale),
                             c(h, nsim, 1));
             simulated <- object$adamCpp$reforecast(errors, array(1, c(h, nsim, 1)),
@@ -1454,6 +1612,15 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
     }
     paths <- do.call(cbind, paths);
+    # The occurrence drawn with its probabilities
+    pForecast <- tbats_pForecast(object, h);
+    if(any(pForecast<1)){
+        if(cumulative){
+            stop("Cumulative forecasts of tbats() with an occurrence model are not available yet.",
+                 call.=FALSE);
+        }
+        paths[] <- paths * rbinom(length(paths), 1, pForecast);
+    }
     if(cumulative){
         paths <- matrix(colSums(paths), 1);
     }
@@ -1470,7 +1637,7 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
     pointForecast <- forecast(tbats_boxCoxObject(object), h=h, newdata=tbats_newdata(object, newdata),
                               interval="none")$mean;
     yForecast <- pointForecast;
-    yForecast[] <- tbats_boxCoxInverse(pointForecast, object$lambda);
+    yForecast[] <- tbats_boxCoxInverse(pointForecast, object$lambda) * pForecast;
     if(cumulative){
         yForecast <- sum(yForecast);
     }
@@ -1513,17 +1680,61 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
                           level=level, side=match.arg(side), cumulative=cumulative,
                           nsim=if(is.null(nsim)) 100 else nsim, point=point, ...));
     }
-    # The median of the transformed data is its skeleton, and transforms back into the
-    # median of the data
-    result <- forecast(objectBC, h=h, newdata=newdata, occurrence=occurrence,
-                       interval=interval, level=level, side=side, cumulative=cumulative, nsim=nsim,
-                       scenarios=scenarios, ...);
+    # The probabilities of occurrence: provided, or forecast by the occurrence model
+    pForecast <- if(is.null(occurrence)) tbats_pForecast(object, h) else
+        rep(as.numeric(occurrence), length.out=max(h, 0));
+    intermittent <- any(pForecast<1);
+    if(intermittent && cumulative){
+        stop("Cumulative forecasts of tbats() with an occurrence model are not available yet.",
+             call.=FALSE);
+    }
+    # The sizes. The median of the transformed data is its skeleton, and transforms back
+    # into the median of the data
+    result <- forecast(objectBC, h=h, newdata=newdata, interval=interval, level=level, side=side,
+                       cumulative=cumulative, nsim=nsim, scenarios=scenarios, ...);
     result <- tbats_boxCoxForecast(result, object);
     if(point=="mean" && object$lambda!=1 && h>0){
         result$mean[] <- tbats_mean(object, objectBC, h, newdata, nsim, ...);
     }
+    # The mixture of no demand and the sizes: the skeleton and the mean multiplied by the
+    # probability, the median and the bounds its quantiles
+    if(intermittent && h>0){
+        quantiles <- function(probs, intervalUsed){
+            return(tbats_mixtureQuantiles(object, objectBC, h, newdata, intervalUsed, probs,
+                                          pForecast, nsim, ...));
+        }
+        result$mean[] <- if(point=="median") quantiles(0.5, if(interval[1]=="none") "prediction" else
+            interval[1]) else result$mean * pForecast;
+        if(interval[1]!="none"){
+            level[level>1] <- level[level>1]/100;
+            side <- match.arg(side);
+            result$lower[] <- quantiles(switch(side, "both"=(1-level)/2, "upper"=rep(0, length(level)),
+                                               "lower"=1-level), interval[1]);
+            result$upper[] <- quantiles(switch(side, "both"=(1+level)/2, "upper"=level,
+                                               "lower"=rep(1, length(level))), interval[1]);
+        }
+    }
     result$point <- point;
     return(result);
+}
+
+# The quantiles of the mixture of no demand and the sizes: zero below the probability of no
+# demand, otherwise the quantile (q-(1-p))/p of the sizes, by the method of the interval
+#' @keywords internal
+tbats_mixtureQuantiles <- function(object, objectBC, h, newdata, interval, probs, pForecast, nsim, ...){
+    quantiles <- matrix(0, h, length(probs));
+    for(p in unique(pForecast)){
+        rows <- which(pForecast==p);
+        sizeLevels <- (probs-(1-p))/p;
+        quantiles[rows, sizeLevels>=1] <- Inf;
+        columns <- which(sizeLevels>0 & sizeLevels<1);
+        if(length(columns)>0){
+            bounds <- forecast(objectBC, h=h, newdata=newdata, interval=interval, level=sizeLevels[columns],
+                               side="upper", nsim=nsim, ...)$upper;
+            quantiles[rows, columns] <- matrix(tbats_boxCoxInverse(bounds, object$lambda), h)[rows,];
+        }
+    }
+    return(quantiles);
 }
 
 # The mean of the forecast distribution of the data: Gauss-Hermite quadrature over the
@@ -1582,8 +1793,19 @@ predict.tbats <- function(object, newdata=NULL, interval=c("none", "confidence",
 # The log-densities of the data: those of the transformed data and the Jacobian
 #' @export
 pointLik.tbats <- function(object, log=TRUE, ...){
-    likValues <- pointLik(tbats_boxCoxObject(object), log=TRUE) +
-        (object$lambda-1)*log(as.numeric(actuals(object)));
+    y <- as.numeric(actuals(object));
+    if(is.null(object$occurrence)){
+        likValues <- pointLik(tbats_boxCoxObject(object), log=TRUE) + (object$lambda-1)*log(y);
+    }
+    # The occurrence, and the sizes with the Jacobian where there is a demand
+    else{
+        otLogical <- y!=0;
+        pFitted <- tbats_pFitted(object);
+        likValues <- log(1-pFitted);
+        likValues[otLogical] <- log(pFitted[otLogical]) +
+            tbats_logDensities(as.numeric(residuals(object))[otLogical], object$distribution,
+                               object$other$shape, object$scale) + (object$lambda-1)*log(y[otLogical]);
+    }
     if(!log){
         likValues <- exp(likValues);
     }
@@ -1613,7 +1835,9 @@ covarOPGtbats <- function(object, stepSize=.Machine$double.eps^(1/4)){
 #' @export
 simulate.tbats <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
     result <- simulate(tbats_boxCoxObject(object), nsim=nsim, seed=seed, obs=obs, ...);
-    result$data[] <- tbats_boxCoxInverse(result$data, object$lambda);
+    # The sizes, and the occurrence drawn with the fitted probabilities
+    result$data[] <- tbats_boxCoxInverse(result$data, object$lambda) *
+        rbinom(obs*nsim, 1, rep(tbats_pFitted(object), length.out=obs));
     result$model <- object$model;
     return(result);
 }

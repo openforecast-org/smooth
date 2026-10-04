@@ -4,7 +4,7 @@ and covariance as R's tbats() on the same data."""
 import numpy as np
 import pytest
 
-from smooth import TBATS
+from smooth import OM, TBATS
 from tests._r_bridge import r_dict
 
 pytestmark = pytest.mark.r_parity
@@ -274,3 +274,56 @@ def test_the_mean_by_quadrature_agrees(lam):
     np.testing.assert_allclose(
         fit.predict(h=24, point="mean").mean, r["mean"], rtol=1e-10
     )
+
+
+INTERMITTENT = (
+    "set.seed(7); y <- ts(exp(2 + 0.4*sin(2*pi*(1:300)/7) + rnorm(300, 0, 0.3))*"
+    "rbinom(300, 1, 0.7), frequency=7);"
+)
+OCCURRENCE_CASES = {
+    "odds-ratio": ("'odds-ratio'", lambda y: "odds-ratio"),
+    "general": ("'general'", lambda y: "general"),
+    "seasonal om": (
+        "om(y, model='ANA', lags=c(1,7), occurrence='odds-ratio')",
+        lambda y: OM(model="ANA", lags=[1, 7], occurrence="odds-ratio").fit(y),
+    ),
+    "probabilities": (
+        "c(rep(0.7, 300), rep(0.6, 3))",
+        lambda y: np.r_[np.full(300, 0.7), np.full(3, 0.6)],
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(OCCURRENCE_CASES))
+def test_the_occurrence_mixture_agrees(case):
+    r_occurrence, py_occurrence = OCCURRENCE_CASES[case]
+    r = r_dict(
+        f"{{ {INTERMITTENT} m <- tbats(y, occurrence={r_occurrence},"
+        " orders=list(ar=0, ma=0, select=FALSE));"
+        " both <- forecast(m, h=7, interval='prediction', level=c(0.8, 0.95));"
+        " list(y=as.numeric(y), B=unname(m$B), logLik=as.numeric(logLik(m)),"
+        " nparam=nparam(m), fitted=as.numeric(fitted(m)),"
+        " skeleton=as.numeric(both$mean),"
+        " lower=as.numeric(both$lower), upper=as.numeric(both$upper),"
+        " mean=as.numeric(forecast(m, h=7, point='mean')$mean),"
+        " median=as.numeric(forecast(m, h=7, point='median')$mean),"
+        " side=as.numeric(forecast(m, h=7, interval='prediction',"
+        " side='upper')$upper)) }"
+    )
+    y = np.asarray(r["y"], dtype=float)
+    fit = TBATS(lags=[1, 7], occurrence=py_occurrence(y), orders=ORDERS0).fit(y)
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-8, atol=1e-10)
+    assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
+    assert fit.nparam == r["nparam"][0]
+    np.testing.assert_allclose(fit.fitted, r["fitted"], rtol=1e-8)
+    both = fit.predict(h=7, interval="prediction", level=[0.8, 0.95])
+    np.testing.assert_allclose(both.mean, r["skeleton"], rtol=1e-10)
+    np.testing.assert_allclose(both.lower.to_numpy().T.ravel(), r["lower"], atol=1e-10)
+    np.testing.assert_allclose(both.upper.to_numpy().T.ravel(), r["upper"], rtol=1e-10)
+    mean = fit.predict(h=7, point="mean").mean
+    np.testing.assert_allclose(mean, r["mean"], rtol=1e-10)
+    np.testing.assert_allclose(
+        fit.predict(h=7, point="median").mean, r["median"], rtol=1e-10, atol=1e-12
+    )
+    upper = fit.predict(h=7, interval="prediction", side="upper").upper
+    np.testing.assert_allclose(np.ravel(upper), r["side"], rtol=1e-10)

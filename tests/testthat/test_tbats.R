@@ -335,3 +335,37 @@ test_that("the point forecasts: the skeleton is the median, the mean by quadratu
     set.seed(41);
     expect_true(all(forecast(fit, h=6, point="median", interval="complete", nsim=10)$mean>0));
 });
+
+# An intermittent demand: log-normal sizes with a weekly pattern, on 45% of the days
+set.seed(41);
+yIntermittent <- ts(exp(2 + 0.4*sin(2*pi*(1:365)/7) + rnorm(365, 0, 0.3))*rbinom(365, 1, 0.45),
+                    frequency=7);
+
+test_that("the occurrence: the sizes on the non-zero observations, the forecasts of the mixture", {
+    expect_warning(tbats(yIntermittent, orders=orders0), "occurrence");
+    fit <- tbats(yIntermittent, occurrence="odds-ratio", orders=orders0, h=14, holdout=TRUE);
+    expect_equal(fit$nParam[1,3], nparam(fit$occurrence));
+    expect_equal(sum(pointLik(fit)), as.numeric(logLik(fit)), tolerance=1e-8);
+    # The sizes are log-normal
+    expect_equal(fit$lambda, 0, tolerance=0.05);
+    pForecast <- as.vector(forecast(fit$occurrence, h=14)$mean);
+    skeleton <- forecast(tbats_boxCoxObject(fit), h=14)$mean;
+    forecasted <- forecast(fit, h=14, interval="prediction");
+    expect_equal(as.numeric(forecasted$mean), tbats_boxCoxInverse(skeleton, fit$lambda)*pForecast);
+    expect_equal(as.numeric(forecasted$mean), as.numeric(fit$forecast));
+    # The scale of the sizes is de-biased by the non-zero observations, as that of tbats
+    objectBC <- tbats_boxCoxObject(fit);
+    expect_equal(adam_dfScale(objectBC), adam_dfScale(fit));
+    expect_equal(adam_varianceDebiased(objectBC),
+                 fit$scale*sum(actuals(fit)!=0)/adam_dfScale(fit));
+    # The probability of no demand is above 0.5: the median and the lower bound are zero
+    expect_true(all(forecast(fit, h=14, point="median")$mean==0));
+    expect_true(all(forecasted$lower==0) && all(forecasted$upper>forecasted$mean));
+    expect_true(all(forecast(fit, h=14, point="mean")$mean>forecasted$mean));
+    set.seed(41);
+    expect_true(mean(simulate(fit, nsim=2)$data==0)>0.3);
+    refit <- tbats(yIntermittent, model=fit, h=14, holdout=TRUE);
+    expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)));
+    expect_error(forecast(tbats(yIntermittent, occurrence="fixed", orders=orders0, lambda=1), h=5,
+                          cumulative=TRUE), "occurrence");
+});

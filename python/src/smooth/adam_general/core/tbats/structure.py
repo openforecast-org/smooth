@@ -32,6 +32,13 @@ def box_cox_inverse(z: NDArray, lam: float) -> NDArray:
     return np.maximum(lam * z + 1, 0) ** (1 / lam)
 
 
+def box_cox_sizes(y: NDArray, lam: float, ot_logical: NDArray) -> NDArray:
+    """The transformed sizes, zero where there is no demand (the fitter skips them)."""
+    y_bc = np.zeros(len(y))
+    y_bc[ot_logical] = box_cox(np.asarray(y, dtype=float)[ot_logical], lam)
+    return y_bc
+
+
 def lambda_spec(lam: Optional[float], y: NDArray, loss: str) -> Dict[str, Any]:
     """How lambda is treated: estimated in [0, 1] only with the likelihood and
     positive data; otherwise fixed (provided, or 1)."""
@@ -289,19 +296,27 @@ def harmonics_select(
     spec: Dict[str, Any],
     ic: str,
     xreg: Optional[NDArray] = None,
+    ot_logical: Optional[NDArray] = None,
 ) -> List[int]:
     """The number of harmonics of each period by the IC of the global model, one
-    period at a time, stopping after two harmonics without improvement."""
+    period at a time, stopping after two harmonics without improvement. With an
+    occurrence model, on the non-zero observations, which keep their time index."""
     harmonics = [0] * len(periods)
     if len(periods) == 0:
         return harmonics
     k_max = [max(math.ceil(p / 2) - 1, 0) for p in periods]
+    obs_all = len(y)
+    rows = np.ones(obs_all, dtype=bool) if ot_logical is None else ot_logical
+
+    def design_used(test: List[int]) -> NDArray:
+        return design(obs_all, trend_in, harmonics_table(periods, test), xreg)[rows]
+
+    y = np.asarray(y, dtype=float)[rows]
     obs = len(y)
-    table = harmonics_table(periods, [min(k, 3) for k in k_max])
-    y_bc = box_cox(y, lambda_start(y, design(obs, trend_in, table, xreg), spec))
+    y_bc = box_cox(y, lambda_start(y, design_used([min(k, 3) for k in k_max]), spec))
 
     def value(test: List[int]) -> float:
-        X = design(obs, trend_in, harmonics_table(periods, test), xreg)
+        X = design_used(test)
         if X.shape[1] >= obs - 1:
             return math.inf
         rss = _sum_r(QR(X).resid(y_bc) ** 2)

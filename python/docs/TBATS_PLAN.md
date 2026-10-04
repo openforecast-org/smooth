@@ -483,10 +483,33 @@ with `"skeleton"` the default everywhere.
   in the Box-Cox space. `reforecast()`: the median of its paths.
 - Fitted values are not affected.
 
+## O. Occurrence (intermittent demand)
+
+- `occurrence`: `"none"` (the default; with zeros in the data a warning suggests
+  `occurrence`, and the zeros are fitted as values, as before), a fitted `om()` /
+  `omg()` / `oes()` model (used as it is, as in `adam()`), a numeric vector of
+  probabilities or 0/1 (provided), or a string: `"fixed"`, `"auto"`, `"odds-ratio"`,
+  `"inverse-odds-ratio"`, `"direct"` or `"general"` fit `om(y, model="ZXN", lags=1)`
+  with that type, a level-only occurrence with the trend selected (seasonal
+  probabilities need a provided `om(y, lags=...)`: their pattern is hard to find in
+  zeros and ones, and `om()` has no trigonometric seasonality).
+- The sizes: the Box-Cox transform, its Jacobian and the global model (lambda, the
+  harmonics, the initials, the ARMA screen) on the non-zero observations, keeping their
+  time index; the fitter takes `ot`, so the states evolve through the zeros with no
+  error. The likelihood is that of the sizes plus that of the occurrence model, whose
+  parameters are counted too.
+- The sizes handed to ADAM's forecaster keep zeros where there is no demand, so its
+  `nobs(all=FALSE)` and `adam_dfScale()` are those of the non-zero observations, and
+  their scale is divided by all the observations, as ADAM's of an occurrence model,
+  which `adam_varianceDebiased()` multiplies by T/df.
+- Forecasts: the skeleton is p times the skeleton of the sizes, the mean p times their
+  mean, the median and the bounds the quantiles of the mixture: zero below 1-p, the
+  quantile (q-(1-p))/p of the sizes otherwise, from the method of the interval.
+  Fitted values: p times those of the sizes. The cumulative forecasts with occurrence
+  are not supported yet.
+
 ## M. Later phases
 
-- `occurrence` accepting a provided or estimated `om` / `omg` model, with the Box-Cox
-  transform and its Jacobian on the non-zero observations only;
 - missing values (the fitter's `ot`, as ADAM, with the global model on the observed
   rows);
 - the trend candidates fitted in parallel (most of the time on long series: 43 of the

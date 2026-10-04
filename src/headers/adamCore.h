@@ -271,7 +271,8 @@ private:
                                      nComponents, constant);
             double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
-            vecResiduals(idx) = matrixYt(idx) - p;
+            // A missing observation does not enter the least squares
+            vecResiduals(idx) = std::isnan(matrixYt(idx)) ? 0 : matrixYt(idx) - p;
 
             profilesRecent(indexLookupTable.col(i)) =
                 adamFvalue(profilesRecent(indexLookupTable.col(i)),
@@ -331,8 +332,10 @@ private:
                                                      nComponents, nSeasonal) * sensCurrent;
             double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
-            vecResiduals(idx) = matrixYt(idx) - p;
-            jacobian.row(idx) = -dpdy * dyFit;
+            // A missing observation does not enter the least squares
+            bool const missing = std::isnan(matrixYt(idx));
+            vecResiduals(idx) = missing ? 0 : matrixYt(idx) - p;
+            jacobian.row(idx) = missing ? arma::rowvec(dyFit.n_elem, arma::fill::zeros) : arma::rowvec(-dpdy * dyFit);
             arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O) * dyFit;
 
             adamGvalueJac(vCurrent, matrixF, wRow, E, T, S,
@@ -401,8 +404,10 @@ private:
             arma::rowvec const dyFit = wRow * sensCurrent;   // linear: d(yhat) = w'S
             double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
-            vecResiduals(idx) = matrixYt(idx) - p;
-            jacobian.row(idx) = -dpdy * dyFit;
+            // A missing observation does not enter the least squares
+            bool const missing = std::isnan(matrixYt(idx));
+            vecResiduals(idx) = missing ? 0 : matrixYt(idx) - p;
+            jacobian.row(idx) = missing ? arma::rowvec(dyFit.n_elem, arma::fill::zeros) : arma::rowvec(-dpdy * dyFit);
             arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O) * dyFit;
 
             profilesRecent(cells) =
@@ -795,8 +800,9 @@ public:
             vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                     matrixWt.row(idx), E, T, S,
                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-            // We need this multiplication for cases, when occurrence is fractional
-            if(vectorOt(idx) != 0) {
+            // We need this multiplication for cases, when occurrence is fractional (NaN
+            // marks a missing occurrence, which has no error)
+            if(vectorOt(idx) != 0 && !std::isnan(vectorOt(idx))) {
                 vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
             }
             // errorf() returns 0 when ot==0; dispatches to occurrenceError() when O!='n'
@@ -818,7 +824,7 @@ public:
             vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                     matrixWt.row(idx), E, T, S,
                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-            if(vectorOt(idx) != 0) {
+            if(vectorOt(idx) != 0 && !std::isnan(vectorOt(idx))) {
                 vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
             }
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
@@ -1123,7 +1129,8 @@ public:
                 double aFit = (E=='A')  ? std::exp(fg.fittedA(idx)) : fg.fittedA(idx);
                 double bFit = (EB=='A') ? std::exp(fg.fittedB(idx)) : fg.fittedB(idx);
                 double p = aFit / (aFit + bFit);
-                res(idx) = vectorOt(idx) - p;
+                // A missing observation does not enter the least squares
+                res(idx) = std::isnan(vectorOt(idx)) ? 0 : vectorOt(idx) - p;
                 if(!std::isfinite(p) || p<=0 || p>=1){
                     return false;
                 }
@@ -1183,7 +1190,8 @@ public:
                 double bFit = (EB=='A') ? std::exp(fitB) : fitB;
                 double denom = aFit + bFit;
                 double p = aFit / denom;
-                res(idx) = vectorOt(idx) - p;
+                // A missing observation does not enter the least squares
+                res(idx) = std::isnan(vectorOt(idx)) ? 0 : vectorOt(idx) - p;
                 if(!std::isfinite(p) || p<=0 || p>=1){
                     return false;
                 }
@@ -1192,6 +1200,7 @@ public:
                 double dbB = (EB=='A') ? bFit : 1.0;
                 arma::rowvec dp = (bFit/(denom*denom)*daA) * dfitA
                                 - (aFit/(denom*denom)*dbB) * dfitB;
+                bool const missingObs = std::isnan(vectorOt(idx));
                 jac.row(idx) = -dp;
 
                 // occurrenceError('g'): u=(1+o-p)/2; errorA/errorB per side type.
@@ -1202,6 +1211,14 @@ public:
                 double dEBdu = (EB=='A') ? -1.0/(u*(1-u)) : -1.0/(u*u);
                 arma::rowvec dEA = (dEAdu * -0.5) * dp;
                 arma::rowvec dEB = (dEBdu * -0.5) * dp;
+                // A missing observation: no error, no residual, the states move only
+                if(missingObs){
+                    jac.row(idx).zeros();
+                    eA = 0;
+                    eB = 0;
+                    dEA.zeros();
+                    dEB.zeros();
+                }
 
                 profA(cA) = adamFvalue(vA, matrixFA, E, T, S, nETS, nNonSeasonal,
                                        nSeasonal, nArima, nComponents, constant) +

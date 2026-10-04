@@ -346,7 +346,8 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     parametersNames <- names(coef(object));
@@ -513,7 +514,8 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -588,7 +590,8 @@ covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -635,7 +638,8 @@ covarOPGsparma <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -814,7 +818,8 @@ covarOPGom <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -848,7 +853,8 @@ covarOPGomg <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));

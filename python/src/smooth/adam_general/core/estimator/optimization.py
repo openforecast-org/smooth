@@ -405,7 +405,9 @@ def _calculate_loglik(
     # In case of likelihood, we typically have one more parameter to estimate - scale.
     return {
         "value": log_lik_adam_value,
-        "nobs": observations_dict["obs_in_sample"],
+        # The missing observations are not in the likelihood
+        "nobs": observations_dict["obs_in_sample"]
+        - int(np.sum(observations_dict.get("y_na_values", []))),
         # The scale is always an estimated parameter (concentrated likelihood).
         "df": n_param_estimated + 1,
     }

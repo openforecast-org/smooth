@@ -95,6 +95,10 @@ py::array_t<double> householder_resid_wrapper(const arma::mat& qr, const arma::v
     return householder_vector(householderResid(HouseholderQR{qr, qraux, r_diag}, y));
 }
 
+py::array_t<double> na_fill_wrapper(const arma::vec& y, unsigned int lag_max) {
+    return householder_vector(naFillCore(y, lag_max));
+}
+
 PYBIND11_MODULE(_ols, m) {
     m.doc() = "Shared C++ OLS solver (pivoted QR with rank cutoff)";
     m.def(
@@ -142,6 +146,9 @@ PYBIND11_MODULE(_ols, m) {
     m.def("householder_resid", &householder_resid_wrapper,
           "Least-squares residuals from householder_qr, as R's qr.resid().",
           py::arg("qr"), py::arg("qraux"), py::arg("r_diag"), py::arg("y"));
+    m.def("na_fill", &na_fill_wrapper,
+          "The missing values of a series filled for the initialisation (see olsCore.h).",
+          py::arg("y"), py::arg("lag_max"));
     m.def(
         "arima_parameter_bounds",
         &arima_parameter_bounds_wrapper,

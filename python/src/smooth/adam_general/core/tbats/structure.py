@@ -431,6 +431,16 @@ def loglik_value(errors: NDArray, distribution: str, shape: Optional[float]) -> 
     return float(_sum_r(np.asarray(values, dtype=float)))
 
 
+def gapped(residuals: NDArray, ot_logical: NDArray) -> NDArray:
+    """The residuals of the observed values at their places and zeros at the gaps
+    (the zeros of the occurrence), so that the lags of the ARMA stay aligned. The
+    residuals of the global model are centred, and so is the series in
+    Hannan-Rissanen."""
+    result = np.zeros(len(ot_logical))
+    result[ot_logical] = residuals
+    return result
+
+
 def arma_select(
     residuals: NDArray,
     spec: Dict[str, Any],
@@ -438,15 +448,21 @@ def arma_select(
     shape: Optional[float],
     n_param_base: float,
     ic: str,
+    observed: Optional[NDArray] = None,
 ) -> Dict[str, Any]:
     """The ARMA orders screened with Hannan-Rissanen on the residuals of a model
-    without ARMA, one lag at a time from the largest."""
+    without ARMA, one lag at a time from the largest. The IC of a candidate comes
+    from the likelihood of its innovations on a common sample of the observed
+    values."""
     lags = spec["lags"]
     ar_orders = np.zeros(len(lags), dtype=int)
     ma_orders = np.zeros(len(lags), dtype=int)
     obs = len(residuals)
     n_drop = min(int((spec["ar_orders"] * lags).sum()), obs // 4)
-    obs_used = obs - n_drop
+    used = np.arange(obs) >= n_drop
+    if observed is not None:
+        used &= observed
+    obs_used = int(used.sum())
     for i in np.argsort(-lags, kind="stable"):
         orders, _, innovations = _ols.arima_hr_select(
             np.asarray(residuals, dtype=float),
@@ -461,7 +477,7 @@ def arma_select(
         others = np.delete(ar_orders + ma_orders, i).sum()
         values = [
             ic_value(
-                loglik_value(innovations[n_drop:, j], distribution, shape),
+                loglik_value(innovations[used, j], distribution, shape),
                 obs_used,
                 n_param_base + others + orders[j].sum(),
                 ic,

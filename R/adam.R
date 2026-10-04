@@ -873,8 +873,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                        scale=scale*abs(adamFitted$fitted[otLogical]), log=TRUE)
                 ));
 
-                # Differential entropy for the logLik of occurrence model
-                if(occurrenceModel || any(!otLogical)){
+                # Differential entropy for the logLik of occurrence model, over the observed
+                # zeros: a missing observation is not a zero
+                otZero <- !otLogical & !yNAValues[1:obsInSample];
+                if(occurrenceModel || any(otZero)){
                     CFValueEntropy <- switch(distribution,
                                              "dnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5),
                                              "dlnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5)-scale/2,
@@ -892,10 +894,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                              # "dinvgauss" = obsZero*(0.5*(log(pi/2)+1+suppressWarnings(log(scale)))));
                                              # "dinvgauss" =0);
                                              "dinvgauss" = 0.5*(obsZero*(log(pi/2)+1+suppressWarnings(log(scale)))-
-                                                                    sum(log(adamFitted$fitted[!otLogical]))),
+                                                                    sum(log(adamFitted$fitted[otZero]))),
                                              "dgamma" = obsZero*(1/scale + log(gamma(1/scale)) +
                                                                      (1-1/scale)*digamma(1/scale)) +
-                                                 sum(log(scale*adamFitted$fitted[!otLogical]))
+                                                 sum(log(scale*adamFitted$fitted[otZero]))
                     );
                     # If the entropy is NA then something is wrong. It shouldn't be!
                     if(is.na(CFValueEntropy)){
@@ -1570,7 +1572,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                      # The distribution scale is always an estimated
                                      # parameter: every reported logLik is a concentrated
                                      # likelihood, so the scale counts for every loss.
-                                     nobs=obsInSample,df=nParamEstimated+1,class="logLik");
+                                     # The missing observations are not in the likelihood
+                                     nobs=sum(!yNAValues[1:obsInSample]),df=nParamEstimated+1,class="logLik");
         xregIndex <- 1;
         #### If we do variables selection, do it here, then reestimate the model. ####
         if(regressors=="select"){
@@ -2155,16 +2158,20 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         holdout=holdout, bounds=bounds, regressors=regressors,
                                         initial=initialType, ets=ets, silent=TRUE));
         pFitted[] <- fitted(omModel);
+        # A missing observation is neither a demand nor its absence: a probability of zero
+        # there keeps it out of the likelihood of the occurrence, as without an occurrence model
+        pFitted[yNAValues[1:obsInSample]] <- 0;
         parametersNumber[1,3] <- nparam(omModel);
         # print(omModel)
         # This should not happen, but just in case...
         if(omModel$occurrence=="n"){
             occurrence <- "n";
-            otLogical <- rep(TRUE,obsInSample);
+            # The missing observations stay out of the fit
+            otLogical <- !yNAValues[1:obsInSample];
             occurrenceModel <- FALSE;
             ot <- matrix(otLogical*1,ncol=1);
             obsNonzero <- sum(ot);
-            obsZero <- obsInSample - obsNonzero;
+            obsZero <- 0;
             Etype[] <- switch(Etype,
                               "M"="A",
                               "Y"=,
@@ -2659,7 +2666,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                 bounds, loss, lossFunction, distributionNew, horizon,
                                                 multisteps, denominator, yDenominator, other, otherParameterEstimate, lambda,
                                                 adamCpp)
-                                     ,nobs=obsInSample,df=parametersNumber[1,5],class="logLik")
+                                     ,nobs=sum(!yNAValues[1:obsInSample]),df=parametersNumber[1,5],class="logLik")
 
         icSelection <- icFunction(logLikADAMValue);
         # If Fisher Information is required, do that analytically
@@ -5303,7 +5310,9 @@ actuals.adam <- function(object, all=TRUE, ...){
         response <- object$data[,responseName];
     }
     else{
-        response <- object$data[object$data[,responseName]!=0,responseName];
+        # The non-zero observed values: a missing one is neither
+        response <- object$data[!is.na(object$data[,responseName]) &
+                                    object$data[,responseName]!=0,responseName];
     }
     if(inherits(response,"tbl")){
         response <- response[[1]];
@@ -7261,7 +7270,7 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
     }
     else if(type=="simulated"){
         # This code is based on the forecast.adam() with simulations
-        obsInSample <- nobs(object, all=FALSE);
+        obsInSample <- nobs(object);
         Etype <- errorType(object);
         Stype <- substr(modelType(object),nchar(modelType(object)),nchar(modelType(object)));
 
@@ -7381,12 +7390,19 @@ pointLik.adam <- function(object, log=TRUE, ...){
     distribution <- object$distribution;
     yInSample <- actuals(object);
     obsInSample <- nobs(object);
-    if(is.occurrence(object$occurrence)){
-        otLogical <- yInSample!=0;
+    # The missing observations are not in the likelihood: their values stay zero
+    observed <- !is.na(as.vector(yInSample));
+    pOccurrence <- if(is.occurrence(object$occurrence)) as.vector(fitted(object$occurrence)) else
+        rep(1, obsInSample);
+    # With missing values alone, the occurrence is provided as ones at the observed values:
+    # no mixture there
+    mixture <- is.occurrence(object$occurrence) && any(pOccurrence[observed]!=1);
+    if(mixture){
+        otLogical <- observed & (as.vector(yInSample)!=0);
         yFitted <- fitted(object) / fitted(object$occurrence);
     }
     else{
-        otLogical <- rep(TRUE, obsInSample);
+        otLogical <- observed;
         yFitted <- fitted(object);
     }
     scale <- extractScale(object);
@@ -7452,8 +7468,10 @@ pointLik.adam <- function(object, log=TRUE, ...){
     }
 
     # If this is a mixture model, take the respective probabilities into account (differential entropy)
-    if(is.occurrence(object$occurrence)){
-        likValues[!otLogical] <- -switch(distribution,
+    # As in the estimation, a negative entropy (it should not be) is set to zero
+    if(mixture){
+        otZero <- !otLogical & observed;
+        entropyValues <- rep(switch(distribution,
                                          "dnorm" = (log(sqrt(2*pi*scale))+0.5),
                                          "dlnorm" = (log(sqrt(2*pi*scale))+0.5) -scale/2,
                                          "dlogis" = 2,
@@ -7466,12 +7484,22 @@ pointLik.adam <- function(object, log=TRUE, ...){
                                          "dls" = (2 + 2*log(2*scale)),
                                          "dgnorm" =,
                                          "dlgnorm" = 1/other-log(other/(2*scale*gamma(1/other))),
-                                         "dinvgauss" = (0.5*(log(pi/2)+1+log(scale))),
-                                         "dgamma" = (1/scale + log(scale*yFitted[!otLogical]) +
+                                         "dinvgauss" = 0.5*(log(pi/2)+1+log(scale)-log(yFitted[otZero])),
+                                         "dgamma" = (1/scale + log(scale*yFitted[otZero]) +
                                                          log(gamma(1/scale)) + (1-1/scale)*digamma(1/scale))
-        );
+        ), length.out=sum(otZero));
+        if(sum(entropyValues)<0){
+            entropyValues[] <- 0;
+        }
+        likValues[otZero] <- -entropyValues;
 
-        likValues[] <- likValues + pointLik(object$occurrence);
+        # The likelihood of the occurrence: of its model, or of the provided probabilities
+        occurrenceLik <- if(object$occurrence$occurrence=="provided"){
+            ifelse(otLogical, log(pOccurrence), log(1-pOccurrence));
+        } else {
+            as.vector(pointLik(object$occurrence));
+        }
+        likValues[observed] <- likValues[observed] + occurrenceLik[observed];
     }
     likValues <- ts(likValues, start=start(yFitted), frequency=frequency(yFitted));
 

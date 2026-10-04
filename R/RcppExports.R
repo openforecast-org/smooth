@@ -41,6 +41,10 @@ householderResidCpp <- function(qr, qraux, rDiag, y) {
     .Call('_smooth_householderResidCpp', PACKAGE = 'smooth', qr, qraux, rDiag, y)
 }
 
+naFillCpp <- function(y, lagMax) {
+    .Call('_smooth_naFillCpp', PACKAGE = 'smooth', y, lagMax)
+}
+
 forecasterwrap <- function(matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX) {
     .Call('_smooth_forecasterwrap', PACKAGE = 'smooth', matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX)
 }

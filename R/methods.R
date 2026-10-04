@@ -319,7 +319,13 @@ logLik.smooth <- function(object, ...){
         return(NULL);
     }
     else{
-        return(structure(object$logLik,nobs=nobs(object),df=nparam(object),class="logLik"));
+        # The missing observations are not in the likelihood
+        obs <- nobs(object);
+        yActuals <- actuals(object);
+        if(length(yActuals)==obs){
+            obs <- obs - sum(is.na(yActuals));
+        }
+        return(structure(object$logLik,nobs=obs,df=nparam(object),class="logLik"));
     }
 }
 #' @export
@@ -600,8 +606,11 @@ pointLik.om <- function(object, log=TRUE, ...){
     pFitted <- as.numeric(fitted(object));
     otLogical <- ot == 1;
     likValues <- numeric(length(ot));
+    # The missing observations are not in the likelihood: their values stay zero
+    otLogical[is.na(ot)] <- FALSE;
+    observed <- !is.na(ot);
     likValues[otLogical]  <- log(pFitted[otLogical]);
-    likValues[!otLogical] <- log(1 - pFitted[!otLogical]);
+    likValues[!otLogical & observed] <- log(1 - pFitted[!otLogical & observed]);
     fittedTS <- fitted(object);
     likValues <- ts(likValues, start=start(fittedTS), frequency=frequency(fittedTS));
     if(!log){

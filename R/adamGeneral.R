@@ -955,7 +955,8 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         ot <- ts(matrix(otLogical*1,ncol=1), start=c(0,0), frequency=lagsModelMax);
     }
     obsNonzero <- sum(ot);
-    obsZero <- obsInSample - obsNonzero;
+    # The observed zeros: a missing observation is neither a demand nor its absence
+    obsZero <- obsInSample - obsNonzero - sum(yNAValues[1:obsInSample]);
 
     # If occurrence is provided, use it as is
     if(occurrence=="provided"){

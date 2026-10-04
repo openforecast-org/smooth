@@ -122,29 +122,21 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
              call.=FALSE)
     }
 
-    # Interpolate NAs using fourier + polynomials
+    # The missing values, filled for the initialisation and skipped by the fit
     yNAValues <- is.na(y)
     if(any(yNAValues)){
         warning("Data contains NAs. The values will be ignored during the model construction.",
                 call.=FALSE)
-        lagMax <- max(max(lags), 10)
-        X <- cbind(1, poly(c(1:obsAll), degree=min(max(trunc(obsAll/10),1),5)),
-                   sinpi(matrix(c(1:obsAll)*rep(c(1:lagMax),each=obsAll)/lagMax,
-                                ncol=lagMax)))
-        if(any(y[!yNAValues]<=0)){
-            lmFit <- .lm.fit(X[!yNAValues,,drop=FALSE], matrix(y[!yNAValues],ncol=1))
-            y[yNAValues] <- (X %*% coef(lmFit))[yNAValues]
+        # The estimates rest on the observed values only
+        if(sum(!yNAValues[1:obsInSample]) < obsInSample/2){
+            warning("More than half of the in-sample data is missing (", sum(yNAValues[1:obsInSample]),
+                    " of ", obsInSample, "): the estimates rest on few observations.", call.=FALSE)
         }
-        else{
-            lmFit <- .lm.fit(X[!yNAValues,,drop=FALSE], matrix(log(y[!yNAValues]),ncol=1))
-            y[yNAValues] <- exp(X %*% coef(lmFit))[yNAValues]
-        }
+        # The values for the initialisation only, as the fit skips them: a polynomial of the
+        # time and harmonics fitted to the observed values, shared with Python
+        y[yNAValues] <- naFillCpp(as.numeric(y), max(max(lags), 10))[yNAValues]
         if(!is.null(xregData)){
             xregData[yNAValues,responseName] <- y[yNAValues]
-        }
-        rm(X)
-        if(obsInSample>10000){
-            gc(verbose=FALSE)
         }
     }
 
@@ -1135,8 +1127,7 @@ adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, c
 adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal,
                                   lags, arOrders, iOrders, maOrders, arEstimate, maEstimate,
                                   armaParameters, bounded, smoother, xregInSample){
-    # Missing and zero (intermittent) values are treated as NAs and are then
-    # replaced by the mean of the transformed series
+    # Missing and zero (intermittent) values are treated as NAs, the gaps
     y <- as.vector(yInSample)
     y[!otLogical] <- NA
     if(etsModel){
@@ -1148,22 +1139,22 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
     else if(Etype=="M"){
         y <- log(y)
     }
-    # The series with missing values filled, the one with NAs to track which
-    # differences are observed, and the regressors, all differenced alike
-    yFilled <- y
-    yFilled[!is.finite(y)] <- mean(y[is.finite(y)])
-    yDiffs <- cbind(yFilled, y, xregInSample)
+    # The series and the regressors, differenced alike: a difference that touches a
+    # gap is a gap too
+    yDiffs <- cbind(y, xregInSample)
     for(i in which(iOrders>0)){
         yDiffs <- diff(yDiffs, lag=lags[i], differences=iOrders[i])
     }
     y <- yDiffs[,1]
+    observed <- is.finite(y)
     # Regression on the differences: in levels, an integrated error makes it spurious
     if(!is.null(xregInSample)){
-        observed <- is.finite(yDiffs[,2])
-        xregDiffs <- cbind(1, yDiffs[,-c(1,2),drop=FALSE])
+        xregDiffs <- cbind(1, yDiffs[,-1,drop=FALSE])
         y <- as.vector(y - xregDiffs %*% olsCpp(xregDiffs[observed,,drop=FALSE], y[observed]))
-        y[!observed] <- mean(y[observed])
     }
+    # The gaps are zeros of the centred series (Hannan-Rissanen centres it), which keeps
+    # the lags aligned without inventing differences across them
+    y[!observed] <- mean(y[observed])
 
     useLevel <- !(etsModel & modelIsSeasonal & lags>1)
     return(as.vector(arimaHRCpp(y, arOrders, maOrders, lags, arEstimate, maEstimate,

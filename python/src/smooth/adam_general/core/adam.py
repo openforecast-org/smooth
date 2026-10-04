@@ -1128,16 +1128,24 @@ class ADAM:
         self._om_model = None
         if self._occurrence.get("occurrence_model"):
             ot_logical = self._observations["ot_logical"]
-            self._observations["obs_zero"] = int(np.sum(~ot_logical))
+            # The observed zeros: a missing observation is neither
+            missing = self._observations.get("y_na_values")
+            zero = ~ot_logical if missing is None else ~ot_logical & ~missing
+            self._observations["obs_zero"] = int(np.sum(zero))
             occurrence = self._occurrence["occurrence"]
             # Already fitted: take it as it is, the way R reuses
             # object$occurrence rather than estimating a second one.
             self._om_model = (
                 occurrence
                 if not isinstance(occurrence, str)
-                else self._fit_occurrence_model(y)
+                else self._fit_occurrence_model(y, X)
             )
-            self._occurrence["p_fitted"] = self._om_model.fitted
+            p_fitted = np.array(self._om_model.fitted, dtype=float)
+            # A missing observation: a probability of zero keeps it out of the
+            # likelihood of the occurrence, as R
+            if missing is not None:
+                p_fitted[missing] = 0.0
+            self._occurrence["p_fitted"] = p_fitted
             self._occurrence["oes_model"] = occurrence
 
         # Execute model estimation or selection based on model_do
@@ -2144,7 +2152,12 @@ class ADAM:
         >>> original_data = model.actuals
         """
         self._check_is_fitted()
-        return np.array(self._observations["y_in_sample"])
+        y = np.array(self._observations["y_in_sample"], dtype=float)
+        # The missing observations stay missing, as R's data
+        missing = self._observations.get("y_na_values")
+        if missing is not None and np.any(missing):
+            y[missing] = np.nan
+        return y
 
     @property
     def coef(self) -> NDArray:
@@ -2254,8 +2267,14 @@ class ADAM:
         if self.distribution_ in _RATIO_RESIDUAL_DISTRIBUTIONS:
             e = np.asarray(e, dtype=np.float64)
             if self.error_type == "A":
-                return np.abs(1.0 + e / np.asarray(self.fitted, dtype=np.float64))
-            return 1.0 + e
+                e = np.abs(1.0 + e / np.asarray(self.fitted, dtype=np.float64))
+            else:
+                e = 1.0 + e
+        # No residual where the observation is missing, as R
+        missing = self._observations.get("y_na_values")
+        if missing is not None and np.any(missing):
+            e = np.array(e, dtype=np.float64)
+            e[missing] = np.nan
         return e
 
     def rstandard(self) -> NDArray:
@@ -2950,6 +2969,7 @@ class ADAM:
         densities themselves are returned.
         """
         from smooth.adam_general.core.utils.utils import (
+            _sum_r,
             calculate_entropy,
             calculate_likelihood,
         )
@@ -2969,13 +2989,20 @@ class ADAM:
             )
 
         occurrence_model = bool(self._occurrence.get("occurrence_model", False))
+        # The missing observations are not in the likelihood: their values stay zero
+        observed = ~np.isnan(y)
         if occurrence_model:
             p_fitted = np.asarray(self._occurrence["p_fitted"], dtype=float).ravel()
-            y_fitted = np.asarray(self.fitted, dtype=float).ravel() / p_fitted
-            ot_logical = y != 0
+            # The probability is zero at the missing observations, which stay NaN
+            y_fitted = np.full(obs, np.nan)
+            y_fitted[observed] = (
+                np.asarray(self.fitted, dtype=float).ravel()[observed]
+                / p_fitted[observed]
+            )
+            ot_logical = observed & (y != 0)
         else:
             y_fitted = np.asarray(self.fitted, dtype=float).ravel()
-            ot_logical = np.ones(obs, dtype=bool)
+            ot_logical = observed
 
         lik_values = np.zeros(obs, dtype=float)
         # calculate_likelihood reshapes y to a column, so y_fitted must be a
@@ -2995,19 +3022,33 @@ class ADAM:
         if occurrence_model:
             # Differential entropy for the unobserved (zero) demand sizes, then
             # add the occurrence-model Bernoulli contribution (mirrors R).
-            zero = ~ot_logical
-            if np.any(zero):
-                lik_values[zero] = -np.asarray(
-                    calculate_entropy(distribution, scale, other, 1.0, y_fitted[zero]),
-                    dtype=float,
-                ).ravel()
-            om_model = self._occurrence.get("oes_model") or self._occurrence.get(
-                "occurrence"
+            # One zero at a time: the entropy of dgamma and dinvgauss sums over the
+            # fitted values it is given. As in the estimation, a negative entropy
+            # (it should not be) is set to zero
+            zero = ~ot_logical & observed
+            entropy = np.array(
+                [
+                    float(
+                        np.ravel(
+                            calculate_entropy(
+                                distribution, scale, other, 1.0, y_fitted[j : j + 1]
+                            )
+                        )[0]
+                    )
+                    for j in np.flatnonzero(zero)
+                ]
             )
-            if hasattr(om_model, "point_lik"):
-                lik_values = (
-                    lik_values + np.asarray(om_model.point_lik(), dtype=float).ravel()
+            lik_values[zero] = 0.0 if _sum_r(entropy) < 0 else -entropy
+            # The fitted occurrence model (the occurrence entry holds its name
+            # when ADAM fitted it)
+            om_model = getattr(self, "_om_model", None)
+            if om_model is None:
+                om_model = self._occurrence.get("oes_model") or self._occurrence.get(
+                    "occurrence"
                 )
+            if hasattr(om_model, "point_lik"):
+                occurrence_lik = np.asarray(om_model.point_lik(), dtype=float).ravel()
+                lik_values[observed] = lik_values[observed] + occurrence_lik[observed]
 
         if not log:
             lik_values = np.exp(lik_values)
@@ -3783,35 +3824,52 @@ class ADAM:
             interval=interval,
         )
 
-    def _fit_occurrence_model(self, y):
+    def _fit_occurrence_model(self, y, X=None):
         """Fit an occurrence model on ``y`` and return it.
 
-        The occurrence type is taken from ``self._occurrence["occurrence"]``.
+        The occurrence type is taken from ``self._occurrence["occurrence"]``. As
+        R's adam(), the model takes the ARIMA orders, the regressors and the ETS
+        form of the demand sizes (``"general"`` on both of its sides).
         """
         from smooth.adam_general.core.auto_om import AutoOM
+        from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
         from smooth.adam_general.core.om import OM
 
         occ = self._occurrence["occurrence"]
-        lags = list(self._lags_model.get("lags", [1]))
         adam_model = self._model_type.get("model", "MNN")
+        orders, _ = resolve_arima_orders(
+            self._init_orders,
+            self.ar_order,
+            self.i_order,
+            self.ma_order,
+            arima_select=self.arima_select,
+        )
         common = dict(
-            lags=lags,
+            lags=list(self._lags_model.get("lags", [1])),
             h=self._general.get("h", 0),
             holdout=self._general.get("holdout", False),
             ic=self._general.get("ic", "AICc"),
             bounds=self._general.get("bounds", "usual"),
             initial=self._initials.get("initial_type", "backcasting"),
+            ets=self.ets,
         )
-        if occ == "auto":
-            m = AutoOM(model=adam_model, **common)
-        elif occ == "general":
+        if occ == "general":
             from smooth.adam_general.core.omg import OMG
 
-            m = OMG(**common)
+            m = OMG(
+                model_a=adam_model,
+                model_b=adam_model,
+                orders_a=orders,
+                orders_b=orders,
+                regressors_a=self.regressors,
+                regressors_b=self.regressors,
+                **common,
+            )
         else:
-            m = OM(model=adam_model, occurrence=occ, **common)
-        m.fit(y)
-        return m
+            common.update(model=adam_model, orders=orders, regressors=self.regressors)
+            m = AutoOM(**common) if occ == "auto" else OM(occurrence=occ, **common)
+        # AutoOM returns the selected model
+        return m.fit(y, X)
 
     def _nlopt_params(self) -> Dict[str, Any]:
         """The optimiser settings without B, lb and ub, which fit one model only."""

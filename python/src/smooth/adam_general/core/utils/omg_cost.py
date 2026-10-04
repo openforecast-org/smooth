@@ -216,9 +216,10 @@ def omg_cf(  # noqa: N802
         adam_cpp=side_b["adam_cpp"],
     )
 
-    # Each side's bounds, shared with CF (R's adam_bounds_checker)
-    for side, elem in ((side_a, elem_a), (side_b, elem_b)):
-        penalty = adam_bounds_checker(
+    # Each side's bounds, shared with CF (R's adam_bounds_checker); a violation on
+    # either side is the uniform penalty, as R's omgCF_local
+    penalty = sum(
+        adam_bounds_checker(
             elem,
             bounds,
             side["model_type_dict"],
@@ -230,8 +231,10 @@ def omg_cf(  # noqa: N802
             side["constant"],
             observations_dict["obs_in_sample"],
         )
-        if penalty > 0:
-            return float(penalty)
+        for side, elem in ((side_a, elem_a), (side_b, elem_b))
+    )
+    if penalty > 0:
+        return 1e300
 
     # Refresh the profile seed from the freshly-filled mat_vt
     side_a["profile"]["profiles_recent_table"][:] = elem_a["mat_vt"][
@@ -241,7 +244,11 @@ def omg_cf(  # noqa: N802
         :, : side_b["lags_dict"]["lags_model_max"]
     ]
 
-    ot = np.asarray(observations_dict["ot"], dtype=np.float64)
+    # The occurrence indicators, NaN where the observation is missing (the fitter
+    # skips their update)
+    ot = np.asarray(
+        observations_dict.get("ot_fit", observations_dict["ot"]), dtype=np.float64
+    )
 
     # Build Fortran-ordered copies for the C++ call
     def _f(x, dtype=np.float64):
@@ -332,8 +339,10 @@ def omg_cf(  # noqa: N802
     ):
         return 1e300
 
+    # The missing observations (NaN in ot) are not in the loss
     ot_logical = observations_dict["ot_logical"]
-    residual = ot - p_combined
+    observed = ~np.isnan(ot)
+    residual = (ot - p_combined)[observed]
 
     if loss == "custom":
         if loss_function is None:
@@ -341,12 +350,16 @@ def omg_cf(  # noqa: N802
                 "loss='custom' requires `loss_function`; OMG.__init__ should "
                 "have captured the callable and passed it through."
             )
-        return float(loss_function(actual=ot, fitted=p_combined, B=np.asarray(B)))
+        return float(
+            loss_function(
+                actual=ot[observed], fitted=p_combined[observed], B=np.asarray(B)
+            )
+        )
     if loss == "likelihood":
         return float(
             -(
                 _sum_r(_log_r(p_combined[ot_logical]))
-                + _sum_r(_log_r(1.0 - p_combined[~ot_logical]))
+                + _sum_r(_log_r(1.0 - p_combined[~ot_logical & observed]))
             )
         )
     if loss == "MSE":
@@ -380,7 +393,7 @@ def omg_cf(  # noqa: N802
                     elem["mat_wt"],
                     side["components_dict"],
                     side["explanatory"]["xreg_number"],
-                    ot,
+                    ot[observed],
                 ),
                 side["constant"]["constant_estimate"],
             )
@@ -390,11 +403,10 @@ def omg_cf(  # noqa: N802
         )
         B_penalty = np.concatenate([B_pen_a, B_pen_b])  # noqa: N806
 
-        obs_in_sample = int(observations_dict.get("obs_in_sample", len(residual)))
         error_term = (
             (1.0 - lam)
             * float(np.linalg.norm(residual))
-            / float(np.sqrt(obs_in_sample))
+            / float(np.sqrt(len(residual)))
         )
         if loss == "LASSO":
             return error_term + lam * _sum_r(np.abs(B_penalty))

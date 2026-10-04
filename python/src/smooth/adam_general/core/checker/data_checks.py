@@ -1,4 +1,8 @@
+import warnings
+
 import numpy as np
+
+from smooth.adam_general import _ols  # type: ignore[attr-defined]
 
 from ._utils import _warn
 
@@ -29,8 +33,11 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
     obs_in_sample = len(data_list)
     obs_all = obs_in_sample + (h if holdout else 0)
     # Identify non-zero observations
+    # A missing value is neither a demand nor its absence
     nonzero_indices = [
-        i for i, val in enumerate(data_list) if val is not None and val != 0
+        i
+        for i, val in enumerate(data_list)
+        if val is not None and not np.isnan(val) and val != 0
     ]
     obs_nonzero = len(nonzero_indices)
 
@@ -81,6 +88,41 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
         "obs_nonzero": obs_nonzero,
         "obs_all": obs_all,
     }
+
+
+def _fill_missing(data, data_values, lags, obs_in_sample):
+    """The missing values, filled for the initialisation and skipped by the fit, as R's
+    ``adam_checkData``: a polynomial of the time and harmonics fitted to the observed
+    values (``naFillCore`` in src/headers/olsCore.h, shared with R).
+
+    Returns the data and its values with the missing ones filled, and their mask.
+    """
+    values = np.asarray(data_values, dtype=float).ravel()
+    y_na_values = np.isnan(values)
+    if not np.any(y_na_values):
+        return data, data_values, y_na_values
+    warnings.warn(
+        "Data contains NAs. The values will be ignored during the model construction.",
+        stacklevel=4,
+    )
+    observed = int(np.sum(~y_na_values[:obs_in_sample]))
+    if observed < obs_in_sample / 2:
+        warnings.warn(
+            f"More than half of the in-sample data is missing "
+            f"({obs_in_sample - observed} of {obs_in_sample}): the estimates rest on "
+            "few observations.",
+            stacklevel=4,
+        )
+    lag_max = max(int(max(np.atleast_1d(lags if lags is not None else [1]))), 10)
+    filled = values.copy()
+    filled[y_na_values] = np.asarray(_ols.na_fill(values, lag_max))[y_na_values]
+    if hasattr(data, "index") and hasattr(data, "values"):
+        import pandas as pd
+
+        data = pd.Series(filled, index=data.index, name=getattr(data, "name", None))
+    else:
+        data = filled
+    return data, filled, y_na_values
 
 
 def _check_lags(lags, obs_in_sample, silent=False):
@@ -153,6 +195,7 @@ def _calculate_ot_logical(
     obs_in_sample,
     h=0,
     holdout=False,
+    y_na_values=None,
 ):
     """
     Calculate logical observation vector and observation time indices.
@@ -202,6 +245,12 @@ def _calculate_ot_logical(
     # If occurrence model is not used and occurrence is not "provided"
     if not occurrence_model and occurrence != "provided":
         ot_logical = np.ones_like(ot_logical, dtype=bool)
+
+    # The missing observations stay out of the fit (no error there), as R does
+    if y_na_values is not None:
+        ot_logical = ot_logical & ~np.asarray(
+            y_na_values[: len(ot_logical)], dtype=bool
+        )
 
     # Determine frequency from pandas index if available
     freq = "1"

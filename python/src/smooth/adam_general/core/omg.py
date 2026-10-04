@@ -10,6 +10,7 @@ sub-models simultaneously inside the optimiser.
 
 from __future__ import annotations
 
+import copy
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Literal, Optional, Union
@@ -249,7 +250,12 @@ class OMG:
         # so fitted and logLik stay mutually consistent for every loss — the
         # standalone per-side refits (model_a/model_b below) only approximate it
         # and are kept for sub-model diagnostics. Mirrors R's omgCF_local.
-        ot = np.asarray(side_a["observations_dict"]["ot"], dtype=np.float64)
+        # The missing observations (NaN in ot_fit) are not in the likelihood
+        observations_a = side_a["observations_dict"]
+        ot = np.asarray(
+            observations_a.get("ot_fit", observations_a["ot"]), dtype=np.float64
+        )
+        observed = ~np.isnan(ot)
         self._fitted_combined = np.asarray(
             omg_cf(
                 B_used,
@@ -268,13 +274,13 @@ class OMG:
         ).ravel()
         self._residuals_combined = ot - self._fitted_combined
         self._ot = ot
-        p_fit = self._fitted_combined
-        self._loglik = _sum_r(_log_r(np.where(ot == 1, p_fit, 1.0 - p_fit)))
+        p_fit = self._fitted_combined[observed]
+        self._loglik = _sum_r(_log_r(np.where(ot[observed] == 1, p_fit, 1.0 - p_fit)))
 
         # Information-criterion bookkeeping mirrors OM (must be set before
         # building sub-models — _om_from_side reads _log_lik_dict and
         # _ic_value).
-        nobs = side_a["observations_dict"]["obs_in_sample"]
+        nobs = int(np.sum(observed))
         # Both sides' initials count towards df like a single OM, so the
         # OM-vs-OMG selection is fair (mirrors the om initial-df fix).
         df = (
@@ -344,7 +350,9 @@ class OMG:
         y = getattr(self, "_y_raw", None)
         if y is None:
             return self._ot.copy()
-        return (np.asarray(y, dtype=float) != 0).astype(float)
+        y = np.asarray(y, dtype=float)
+        # The missing observations stay missing, as R
+        return np.where(np.isnan(y), np.nan, (y != 0).astype(float))
 
     @property
     def coef(self) -> NDArray:
@@ -372,10 +380,12 @@ class OMG:
         """
         ot = np.asarray(self.actuals, dtype=float).ravel()
         p = np.asarray(self.fitted, dtype=float).ravel()
+        # The missing observations are not in the likelihood: their values stay zero
+        observed = ~np.isnan(ot)
         ot_logical = ot == 1
-        lik_values = np.empty(len(ot), dtype=float)
+        lik_values = np.zeros(len(ot), dtype=float)
         lik_values[ot_logical] = np.log(p[ot_logical])
-        lik_values[~ot_logical] = np.log(1.0 - p[~ot_logical])
+        lik_values[~ot_logical & observed] = np.log(1.0 - p[~ot_logical & observed])
         if not log:
             lik_values = np.exp(lik_values)
         return lik_values
@@ -566,10 +576,13 @@ class OMG:
         The per-observation score is that of the coupled Bernoulli likelihood:
         ``omg_cf(b, return_fitted=True)`` gives the coupled fitted probability at
         a perturbed ``b``, whose Bernoulli log-density is differenced. Mirrors
-        R's ``covarOPGomg``.
+        R's ``covarOPGomg``. Returns None (so vcov falls back to the Hessian) for
+        the losses other than the likelihood, as R.
         """
         from smooth.adam_general.core.utils.var_covar import covar_opg
 
+        if self.loss != "likelihood":
+            return None
         side_a = self._side_a
         side_b = self._side_b
         n_params_a = int(self._n_params_a)
@@ -584,7 +597,7 @@ class OMG:
                 side_b=side_b,
                 n_params_a=n_params_a,
                 observations_dict=observations,
-                bounds="none",
+                bounds=self.bounds,
                 adam_ets=adam_ets,
                 loss=self.loss,  # type: ignore[arg-type]
                 loss_function=self.loss_function,
@@ -599,7 +612,10 @@ class OMG:
                 or np.any(p >= 1.0)
             ):
                 return None
-            return np.where(ot == 1, np.log(p), np.log(1.0 - p))
+            # The missing observations are not in the likelihood
+            return np.where(
+                np.isnan(ot), 0.0, np.where(ot == 1, np.log(p), np.log(1.0 - p))
+            )
 
         return covar_opg(
             self._B_joint, point_lik_at, ot.shape[0], float(self.loglik), step_size
@@ -1019,11 +1035,7 @@ class OMG:
             }
 
         scaffold._restore_user_model_spec(requested)
-        ot = np.asarray(scaffold._observations["ot"], dtype=np.float64)
-        scaffold._observations["y_in_sample"] = ot
-        scaffold._observations["obs_zero"] = int(
-            np.sum(~scaffold._observations["ot_logical"])
-        )
+        scaffold._set_occurrence_series()
 
         adam_cpp, adam_created, profile_dict = scaffold._build_om_artifacts(
             lags_max_pad
@@ -1114,7 +1126,7 @@ class OMG:
             arima_checked=side["arima"],
             constants_checked=side["constant"],
             explanatory_checked=side["explanatory"],
-            observations_dict=side["observations_dict"],
+            observations_dict=side["scaffold"]._observations_for_initialiser(),
             bounds=self.bounds,
             phi_dict=side["phi"],
             profile_dict=side["profile"],
@@ -1236,7 +1248,9 @@ class OMG:
             "adam_cpp": side["adam_cpp"],
         }
         scaffold._adam_cpp = side["adam_cpp"]
-        scaffold._profile = side["profile"]
+        # Copies: the preparator writes the fitted states into them, and the joint
+        # cost (the OPG re-evaluates it) must keep its own seeds
+        scaffold._profile = copy.deepcopy(side["profile"])
         scaffold._ic_selection = self._ic_value
         scaffold._select_distribution()
 
@@ -1249,7 +1263,7 @@ class OMG:
         # different state-space structure). Standalone Python ``OM`` still
         # rebuilds via ``_build_final_fit_adam_created`` (matching standalone
         # R ``om()``); only the OMG post-fit shares the joint matrices.
-        scaffold._adam_created = side["matrices_dict"]
+        scaffold._adam_created = copy.deepcopy(side["matrices_dict"])
 
         scaffold._prepared = om_preparator(
             model_type_dict=scaffold._model_type,

@@ -290,9 +290,9 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     if(armaSpec$select && armaSpec$nParam>0){
         X <- tbats_design(length(yInSample), best$trendType!="none", harmonicTable,
                           xregSpecFit$data)[otLogical,,drop=FALSE];
-        armaSpecBest <- tbats_armaSelect(tbats_qrResid(tbats_qr(X), tbats_boxCox(yInSample[otLogical], best$elements$lambda)),
-                                         armaSpec, distribution, best$elements$shape,
-                                         best$nParamEstimated, ic);
+        residuals <- tbats_qrResid(tbats_qr(X), tbats_boxCox(yInSample[otLogical], best$elements$lambda));
+        armaSpecBest <- tbats_armaSelect(tbats_gapped(residuals, otLogical), armaSpec, distribution,
+                                         best$elements$shape, best$nParamEstimated, ic, otLogical);
         if(armaSpecBest$nParam>0){
             candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecBest, lambdaSpec,
                                    distribution, initial, checked, xregSpecFit);
@@ -646,22 +646,35 @@ tbats_armaBuild <- function(ar, ma, armaLags, select=FALSE){
                 stateLags=stateLags, nParam=sum(arOrders+maOrders), names=names));
 }
 
+# The residuals of the observed values at their places and zeros at the gaps (the zeros
+# of the occurrence), so that the lags of the ARMA stay aligned. The residuals of the
+# global model are centred, and so is the series in Hannan-Rissanen
+#' @keywords internal
+tbats_gapped <- function(residuals, otLogical){
+    gapped <- numeric(length(otLogical));
+    gapped[otLogical] <- residuals;
+    return(gapped);
+}
+
 # The ARMA orders screened with Hannan-Rissanen on the residuals of a model without ARMA,
 # one lag at a time from the largest. The IC of a candidate comes from the likelihood of
-# its innovations on a common sample: the rest of the model is common to all of them
+# its innovations on a common sample of the observed values: the rest of the model is
+# common to all of them
 #' @keywords internal
-tbats_armaSelect <- function(errors, armaSpec, distribution, shape, nParamBase, ic){
+tbats_armaSelect <- function(errors, armaSpec, distribution, shape, nParamBase, ic,
+                             observed=rep(TRUE, length(errors))){
     lags <- armaSpec$lags;
     arOrders <- maOrders <- rep(0, length(lags));
     obs <- length(errors);
     nDrop <- min(sum(armaSpec$arOrders*lags), floor(obs/4));
-    obsUsed <- obs-nDrop;
+    used <- seq_len(obs)>nDrop & observed;
+    obsUsed <- sum(used);
     for(i in order(lags, decreasing=TRUE)){
         screen <- arimaHRSelectCpp(errors, arOrders, maOrders, lags, i-1,
                                    armaSpec$arOrders[i], armaSpec$maOrders[i], TRUE);
         nParam <- nParamBase + sum(arOrders[-i]+maOrders[-i]) + rowSums(screen$orders);
         ICs <- sapply(seq_len(nrow(screen$orders)), function(j){
-            innovations <- screen$innovations[nDrop+seq_len(obsUsed), j];
+            innovations <- screen$innovations[used, j];
             logLikValue <- structure(tbats_logLik(innovations, distribution, shape, obsUsed),
                                      nobs=obsUsed, df=nParam[j], class="logLik");
             return(tbats_IC(logLikValue, ic));
@@ -1034,7 +1047,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     # The starting values of the ARMA from Hannan-Rissanen on the global residuals
     armaStart <- numeric(0);
     if(armaSpec$nParam>0){
-        armaStart <- as.vector(arimaHRCpp(tbats_qrResid(qrX, yBCStart[otLogical]), armaSpec$arOrders, armaSpec$maOrders,
+        armaStart <- as.vector(arimaHRCpp(tbats_gapped(tbats_qrResid(qrX, yBCStart[otLogical]), otLogical),
+                                          armaSpec$arOrders, armaSpec$maOrders,
                                           armaSpec$lags, TRUE, TRUE, numeric(0),
                                           rep(1, length(armaSpec$lags)), checked$bounds!="none"));
     }

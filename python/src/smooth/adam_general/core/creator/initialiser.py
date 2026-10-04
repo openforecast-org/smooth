@@ -56,11 +56,11 @@ def _arima_initialiser(
     error), with the ETS part approximated by the decomposition that gives the ETS
     initials (the same smoother), differenced as the model requires, and the
     regressors (``xreg_in_sample``, or None, differenced alike) by OLS on the
-    differences. Missing and zero values become the mean of the transformed
-    series. The seasonal ARIMA factors that coincide with the ETS
-    seasonality keep the defaults. With ``bounded``, the factors that the cost
-    function would reject (not stationary AR, not invertible MA, see
-    src/headers/arimaBounds.h) are moved inside the boundary.
+    differences. Missing and zero values are gaps, and so is any difference that
+    touches one; they are zeros of the centred series. The seasonal ARIMA factors
+    that coincide with the ETS seasonality keep the defaults. With ``bounded``, the
+    factors that the cost function would reject (not stationary AR, not invertible
+    MA, see src/headers/arimaBounds.h) are moved inside the boundary.
 
     Returns the AR / MA values in the order of B.
     """
@@ -84,12 +84,9 @@ def _arima_initialiser(
             y = np.log(y) - np.log(fitted) if error_type == "M" else y - fitted
         elif error_type == "M":
             y = np.log(y)
-    # The series with missing values filled, the one with NaNs to track which
-    # differences are observed, and the regressors, all differenced alike
-    finite = np.isfinite(y)
-    y_filled = y.copy()
-    y_filled[~finite] = _mean_r(y[finite])
-    columns = [y_filled, y]
+    # The series and the regressors, differenced alike: a difference that touches
+    # a gap is a gap too
+    columns = [y]
     if xreg_in_sample is not None:
         columns.append(np.asarray(xreg_in_sample, dtype=np.float64))
     y_diffs = np.column_stack(columns)
@@ -98,12 +95,14 @@ def _arima_initialiser(
             for _ in range(int(order)):
                 y_diffs = y_diffs[int(lag) :] - y_diffs[: -int(lag)]
     y = y_diffs[:, 0].copy()
+    observed = np.isfinite(y)
     # Regression on the differences: in levels, an integrated error makes it spurious
     if xreg_in_sample is not None:
-        observed = np.isfinite(y_diffs[:, 1])
-        xreg_diffs = np.column_stack([np.ones(len(y)), y_diffs[:, 2:]])
+        xreg_diffs = np.column_stack([np.ones(len(y)), y_diffs[:, 1:]])
         y = y - xreg_diffs @ _ols.ols(xreg_diffs[observed], y[observed])
-        y[~observed] = _mean_r(y[observed])
+    # The gaps are zeros of the centred series (Hannan-Rissanen centres it), which
+    # keeps the lags aligned without inventing differences across them
+    y[~observed] = _mean_r(y[observed])
 
     use_level = ~(ets_model & model_is_seasonal & (lags_arr > 1))
     return _ols.arima_hr(

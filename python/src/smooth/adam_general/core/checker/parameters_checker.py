@@ -6,7 +6,12 @@ import pandas as pd
 
 from ._utils import _warn
 from .arima_checks import _check_arima
-from .data_checks import _calculate_ot_logical, _check_lags, _check_occurrence
+from .data_checks import (
+    _calculate_ot_logical,
+    _check_lags,
+    _check_occurrence,
+    _fill_missing,
+)
 from .model_checks import _check_ets_model
 from .organizers import (
     _calculate_n_param_max,
@@ -532,6 +537,13 @@ def parameters_checker(
             raise ValueError("Data must be numeric or convertible to numeric values")
 
     occ_info = _check_occurrence(data_values, occurrence, silent, holdout, h)
+    # The missing values: filled for the initialisation and skipped by the fit, as R
+    data, data_values, y_na_values = _fill_missing(
+        data,
+        data_values,
+        lags,
+        len(data_values) - (h if holdout else 0),
+    )
     obs_in_sample = occ_info["obs_in_sample"]
     obs_nonzero = occ_info["obs_nonzero"]
     occurrence_model = occ_info["occurrence_model"]
@@ -885,6 +897,7 @@ def parameters_checker(
         obs_in_sample=obs_in_sample,
         h=h,
         holdout=holdout,
+        y_na_values=y_na_values,
     )
 
     # Create observations dictionary
@@ -904,6 +917,11 @@ def parameters_checker(
         # "obs_states": obs_states,
         "ot_logical": ot_info["ot_logical"],
         "ot": ot_info["ot"],
+        # The missing in-sample observations, outside the likelihood
+        "y_na_values": y_na_values[:actual_obs_in_sample],
+        "obs_zero": int(
+            np.sum(~ot_info["ot_logical"] & ~y_na_values[:actual_obs_in_sample])
+        ),
         "y_in_sample": ot_info.get("y_in_sample", data),
         "y_holdout": ot_info.get("y_holdout", None),
         "frequency": ot_info["frequency"],

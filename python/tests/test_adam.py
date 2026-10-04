@@ -1314,3 +1314,23 @@ class TestADAMARIMAStates:
             if name.startswith("ARIMAState")
         ]
         np.testing.assert_allclose(arima_initials, expected["arima"], rtol=1e-5)
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+@pytest.mark.parametrize("distribution", ["dgamma", "dinvgauss", "dnorm"])
+def test_adam_keeps_the_missing_values_apart_from_the_zeros(distribution):
+    rng = np.random.default_rng(3)
+    y = rng.binomial(1, 0.4, 200) * np.exp(rng.normal(2, 0.3, 200))
+    y[list(range(9, 20)) + [99]] = np.nan
+    model = ADAM(model="MNN", occurrence="odds-ratio", distribution=distribution)
+    model.fit(y)
+    assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-8)
+    # A negative entropy of the zeros is set to zero, so the optimiser moves
+    assert model.loglik > -1e100
+
+
+def test_adam_warns_when_more_than_half_of_the_data_is_missing():
+    y = np.random.default_rng(5).normal(100, 10, 100)
+    y[:60] = np.nan
+    with pytest.warns(UserWarning, match="More than half of the in-sample data"):
+        ADAM(model="ANN").fit(y)

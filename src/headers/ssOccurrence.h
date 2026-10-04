@@ -17,6 +17,13 @@ inline std::vector<double> occurrenceError(
     double kappa = 1E-10;
     std::vector<double> output(2);
 
+    // A missing observation (NaN): no error, so the states move with the transition only
+    if(std::isnan(yAct)){
+        output[0] = 0;
+        output[1] = 0;
+        return output;
+    }
+
     switch(O){
         // The direct probability model
         case 'd':

@@ -554,3 +554,30 @@ def test_om_penalty_matches_r(kwargs, r_call, with_x):
     estimated = model._adam_estimated
     assert estimated["CF_value"] == pytest.approx(expected[0], rel=1e-8)
     np.testing.assert_allclose(estimated["B"], expected[1:], rtol=1e-5, atol=1e-8)
+
+
+def _intermittent_with_gaps(seed):
+    rng = np.random.default_rng(seed)
+    y = rng.binomial(1, 0.4, 200) * np.exp(rng.normal(2, 0.3, 200))
+    y[list(range(9, 20)) + [99]] = np.nan
+    return y
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+def test_om_skips_the_missing_observations():
+    y = _intermittent_with_gaps(1)
+    observed = ~np.isnan(y)
+    model = OM(model="ANN", occurrence="odds-ratio").fit(y)
+    assert model._nobs_observed() == observed.sum()
+    assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-10)
+    assert np.all(model.point_lik()[~observed] == 0)
+    # The fixed probability is the occurrence rate of the observed values
+    model = OM(model="ANN", occurrence="fixed").fit(y)
+    assert model.fitted[0] == pytest.approx(np.mean(y[observed] != 0))
+
+
+def test_om_with_a_fixed_probability_has_no_arima():
+    y = np.random.default_rng(44).poisson(0.7, 120).astype(float)
+    model = OM(model="MNN", orders={"ar": [1], "ma": [1]}, occurrence="fixed").fit(y)
+    assert model.model == "oETS(ANN)[F]"
+    assert np.isfinite(model.loglik)

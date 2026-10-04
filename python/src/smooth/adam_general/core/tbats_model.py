@@ -445,12 +445,13 @@ class TBATS:
                 st.box_cox(y_in_sample[ot], best["elements"]["lambda"])
             )
             spec_best = st.arma_select(
-                residuals,
+                st.gapped(residuals, ot),
                 spec,
                 self.distribution,
                 best["elements"]["shape"],
                 best["n_param_estimated"],
                 self.ic,
+                ot,
             )
             if spec_best["n_param"] > 0:
                 candidate = ft.fit(

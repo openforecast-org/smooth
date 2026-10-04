@@ -891,3 +891,25 @@ test_that("reforecast() totals each path for the cumulative forecasts", {
     expect_equal(as.numeric(reforecast(testModel, h=5, cumulative=TRUE, nsim=50, point="mean")$mean),
                  sum(forecast(testModel, h=5)$mean), tolerance=1e-2);
 });
+
+test_that("adam keeps the missing values apart from the zeros of the occurrence", {
+    set.seed(3)
+    y <- rbinom(200, 1, 0.4) * exp(rnorm(200, 2, 0.3))
+    y[c(10:20, 100)] <- NA
+    for(distribution in c("dgamma", "dinvgauss", "dnorm")){
+        testModel <- suppressWarnings(adam(y, "MNN", occurrence="odds-ratio",
+                                           distribution=distribution))
+        expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
+        expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)))
+    }
+    # Without the occurrence, the missing values are skipped in the same way
+    testModel <- suppressWarnings(adam(y + 1, "ANN"))
+    expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel), na.rm=TRUE))
+})
+
+test_that("adam warns when more than half of the data is missing", {
+    y <- rnorm(100, 100, 10)
+    y[1:60] <- NA
+    expect_warning(adam(y, "ANN"), "More than half of the in-sample data is missing")
+})

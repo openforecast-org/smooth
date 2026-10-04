@@ -113,7 +113,10 @@ def om_cf(  # noqa: N802
         return penalty
 
     # 3. Run the C++ fitter with O=occurrence_char and y=ot=binary indicators
-    ot = np.asarray(observations_dict["ot"], dtype=np.float64)
+    # NaN where the observation is missing: the fitter skips it, the loss ignores it
+    ot = np.asarray(
+        observations_dict.get("ot_fit", observations_dict["ot"]), dtype=np.float64
+    )
 
     mat_wt = np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64)
     mat_f = np.asfortranarray(adam_elements["mat_f"], dtype=np.float64)
@@ -186,9 +189,10 @@ def om_cf(  # noqa: N802
     # ``residual = ot - p_fitted`` on the probability scale instead of the
     # ADAM additive/multiplicative errors.
     ot_logical = observations_dict["ot_logical"]
+    observed = ~np.isnan(ot)
     loss = general.get("loss", "likelihood")
     loss_function = general.get("loss_function")
-    residual = ot - p_fitted
+    residual = (ot - p_fitted)[observed]
 
     if loss == "custom":
         if loss_function is None:
@@ -196,7 +200,11 @@ def om_cf(  # noqa: N802
                 "loss='custom' requires `loss_function` in `general` dict; "
                 "om.OM.__init__ should have spliced it in."
             )
-        cf_value = float(loss_function(actual=ot, fitted=p_fitted, B=np.asarray(B)))
+        cf_value = float(
+            loss_function(
+                actual=ot[observed], fitted=p_fitted[observed], B=np.asarray(B)
+            )
+        )
     elif loss == "likelihood":
         # Bernoulli log-likelihood: -(sum log p[ot=1] + sum log(1-p)[ot=0]).
         # No epsilon floor inside log() — see CLAUDE.md "never clip" rule.
@@ -210,7 +218,7 @@ def om_cf(  # noqa: N802
         # deterministic simplex into a different basin on flat-loss seasonal
         # OM surfaces.  Vectorised, unlike math.fsum(...tolist()).
         p_on = p_fitted[ot_logical]
-        p_off = p_fitted[~ot_logical]
+        p_off = p_fitted[~ot_logical & observed]
         cf_value = -(_sum_r(_log_r(p_on)) + _sum_r(_log_r(1.0 - p_off)))
     elif loss == "MSE":
         cf_value = _mean_r(residual**2)
@@ -231,7 +239,7 @@ def om_cf(  # noqa: N802
             adam_elements["mat_wt"],
             components_dict,
             explanatory_checked["xreg_number"],
-            ot,
+            ot[observed],
         )["denominator"]
         B_penalty = trim_b_for_penalty(  # noqa: N806
             B,

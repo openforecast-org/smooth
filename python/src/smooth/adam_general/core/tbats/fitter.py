@@ -463,7 +463,7 @@ def fit(
     if spec["n_param"] > 0:
         arma_start = np.asarray(
             _ols.arima_hr(
-                qr_x.resid(y_bc_start[ot_logical]),
+                st.gapped(qr_x.resid(y_bc_start[ot_logical]), ot_logical),
                 spec["ar_orders"].astype(np.uint64),
                 spec["ma_orders"].astype(np.uint64),
                 spec["lags"].astype(np.uint64),

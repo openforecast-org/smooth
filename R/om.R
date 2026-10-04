@@ -231,11 +231,14 @@ om <- function(data,
     list2env(dataChecked, envir=environment());
 
     #### Force ETS(A,N,N) with persistence=0 for "fixed" occurrence ####
+    # A constant probability has no ARIMA either
     if(occurrence == "fixed"){
         model <- "ANN";
         persistence <- 0;
         initial <- "optimal";
         modelDo <- "use";
+        orders <- list(ar=0, i=0, ma=0);
+        constant <- FALSE;
     }
 
     #### Call parametersChecker ####
@@ -411,7 +414,8 @@ om <- function(data,
     # For "fixed": set initial level analytically and disable estimation
     if(occurrenceType == "fixed"){
         if(initialLevelEstimate){
-            initialLevel <- mean(ot);
+            # The occurrence rate of the observed values: a missing one is not a zero
+            initialLevel <- mean(ot[!yNAValues[1:obsInSample]]);
         }
         initialType <- "provided";
         initialLevelEstimate <- FALSE;
@@ -432,6 +436,15 @@ om <- function(data,
 
     # Binary indicators (ot from checker is already binary when occurrence != "none")
     yInSample[] <- (yInSample!=0)*1;
+    # Missing observations are not no-demand: the fitter skips their update (NA in the
+    # indicators it gets, otFit) and the loss ignores them, while the initialisation, which
+    # needs a value there, takes the occurrence rate of the observed ones
+    otObserved <- !yNAValues[1:obsInSample];
+    if(!all(otObserved)){
+        ot[!otObserved] <- yInSample[!otObserved] <- mean(yInSample[otObserved]);
+    }
+    otFit <- as.numeric(ot);
+    otFit[!otObserved] <- NA;
     if(holdout){
         yHoldout[] <- (yHoldout != 0) * 1;
         if(any(yClasses=="ts")){
@@ -578,7 +591,8 @@ om <- function(data,
                                     constantEstimate, constantName,
                                     otherParameterEstimate,
                                     adamCpp,
-                                    ets, bounds, ot, otLogicalInternal,
+                                    # The missing values are gaps for the starting values
+                                    ets, bounds, ot, otObserved,
                                     iOrders, armaParameters, other, smoother, adamCreated$matWt);
 
         # Respect user-supplied B / lb / ub from ellipses (mirrors adam.R
@@ -659,7 +673,7 @@ om <- function(data,
             constantRequired=constantRequired,
             constantEstimate=constantEstimate,
             bounds=bounds, regressors=regressors, loss=loss,
-            ot=ot, otLogical=otLogical, obsInSample=obsInSample,
+            ot=otFit, otLogical=otLogical, obsInSample=obsInSample,
             nIterations=nIterations,
             occurrence=occurrence, occurrenceChar=occurrenceChar,
             adamCpp=adamCpp,
@@ -767,7 +781,8 @@ om <- function(data,
 
     icFunction <- function(ll){
         nP <- .icEnv$nP;
-        llObj <- structure(ll, nobs=obsInSample, df=nP, class="logLik");
+        # The missing observations are not in the likelihood
+        llObj <- structure(ll, nobs=sum(otObserved), df=nP, class="logLik");
         return(switch(ic,
                       "AIC"  = AIC(llObj),
                       "AICc" = AICc(llObj),
@@ -884,7 +899,7 @@ om <- function(data,
         adamFitted <- adam_fitOrGradient(adamFilled$matVt, adamFilled$matWt,
                                          adamFilled$matF, adamFilled$vecG,
                                          adamArchitect$indexLookupTable, prof,
-                                         as.numeric(ot), as.numeric(ot),
+                                         otFit, otFit,
                                          initialType, nIterations, adamArchitect$adamCpp,
                                          nla$etsModel, nla$arimaModel, xregModel,
                                          nla$Etype, nla$Ttype, nla$Stype,
@@ -907,8 +922,8 @@ om <- function(data,
         # probability surfaces as -Inf instead of being silently clipped.
         # (The empty-B estimator path also arrives here with logLik absent.)
         if(is.null(res$logLikADAMValue) || loss != "likelihood"){
-            ot_vec   <- as.numeric(yInSample);
-            yfit_vec <- as.numeric(yFitted);
+            ot_vec   <- otFit[otObserved];
+            yfit_vec <- as.numeric(yFitted)[otObserved];
             ll <- sum(ot_vec * log(yfit_vec) + (1 - ot_vec) * log(1 - yfit_vec));
             res$logLikADAMValue <- ll;
         }
@@ -922,7 +937,7 @@ om <- function(data,
         # while logLik stays the (possibly NaN) Bernoulli — they are allowed to
         # be misaligned. LASSO/RIDGE/custom keep the optimiser's value (their
         # penalty terms are not recoverable from the fitted alone).
-        errorsFinal <- as.numeric(yInSample) - as.numeric(yFitted);
+        errorsFinal <- (otFit - as.numeric(yFitted))[otObserved];
         res$CFValue <- switch(loss,
                               "likelihood" = -res$logLikADAMValue,
                               "MSE"  = mean(errorsFinal^2),
@@ -1060,7 +1075,8 @@ om <- function(data,
         subModel <- list(
             model = modelName,
             timeElapsed = Sys.time() - startTime,
-            data = yInSample,
+            # The missing observations stay missing
+            data = replace(yInSample, !otObserved, NA),
             fitted = yFitted,
             residuals = errors,
             forecast = yForecast,
@@ -1389,7 +1405,7 @@ om <- function(data,
             constantRequired=constantRequired,
             constantEstimate=constantEstimate,
             bounds=bounds, regressors=regressors, loss=loss,
-            ot=ot, otLogical=otLogical, obsInSample=obsInSample,
+            ot=otFit, otLogical=otLogical, obsInSample=obsInSample,
             nIterations=nIterations,
             occurrence=occurrence, occurrenceChar=occurrenceChar,
             adamCpp=adamArchitectUse$adamCpp);
@@ -1831,16 +1847,18 @@ omCF_local <- function(B,
     if(any(is.nan(yFitted)) || any(yFitted<0) || any(yFitted>1)){
         return(1e+300);
     }
+    # The missing observations (NA in ot) are not in the loss
+    otObserved <- !is.na(ot);
     # Loss dispatch — mirrors R/adam.R:885-940 single-step block. ``errors``
     # are on the probability scale (``ot - yFitted``) since the OM target is
     # binary. The LASSO/RIDGE branch follows the same penalty structure as
     # adam() (R/adam.R:894-937).
-    errors <- as.numeric(ot) - yFitted;
+    errors <- (as.numeric(ot) - yFitted)[otObserved];
     if(loss == "custom"){
-        CFValue <- lossFunction(actual=as.numeric(ot), fitted=yFitted, B=B);
+        CFValue <- lossFunction(actual=as.numeric(ot)[otObserved], fitted=yFitted[otObserved], B=B);
     }
     else if(loss == "likelihood"){
-        CFValue <- -(sum(log(yFitted[otLogical])) + sum(log(1 - yFitted[!otLogical])));
+        CFValue <- -(sum(log(yFitted[otLogical])) + sum(log(1 - yFitted[!otLogical & otObserved])));
     }
     else if(loss == "MSE"){
         CFValue <- mean(errors^2);
@@ -1863,7 +1881,7 @@ omCF_local <- function(B,
                                            xregParametersEstimated, constantEstimate, FALSE,
                                            adam_lassoDenominators(loss, matWt, componentsNumberETS,
                                                                   componentsNumberARIMA, xregNumber,
-                                                                  ot)$denominator);
+                                                                  as.numeric(ot)[otObserved])$denominator);
         errorTerm <- (1 - lambda) * sqrt(mean(errors^2));
         if(loss == "LASSO"){
             CFValue <- errorTerm + lambda * sum(abs(BPenalty));

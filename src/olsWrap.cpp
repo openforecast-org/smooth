@@ -50,3 +50,9 @@ arma::vec householderResidCpp(const arma::mat& qr, const arma::vec& qraux, const
                               const arma::vec& y) {
     return householderResid(HouseholderQR{qr, qraux, rDiag}, y);
 }
+
+// The missing values of a series filled for the initialisation (src/headers/olsCore.h)
+// [[Rcpp::export]]
+arma::vec naFillCpp(const arma::vec& y, unsigned int lagMax) {
+    return naFillCore(y, lagMax);
+}

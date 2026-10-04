@@ -632,19 +632,25 @@ def CF(  # noqa: N802
                 other,
             )
             CFValue = -_sum_r(np.asarray(ll, dtype=np.float64).ravel())
-            # Differential entropy for the logLik of occurrence model
-            if observations_dict.get("occurrence_model", False) or any(
-                ~observations_dict["ot_logical"]
-            ):
+            # Differential entropy for the logLik of occurrence model, over the
+            # observed zeros: a missing observation is not a zero
+            ot_zero = ~observations_dict["ot_logical"]
+            if observations_dict.get("y_na_values") is not None:
+                ot_zero = ot_zero & ~observations_dict["y_na_values"]
+            if observations_dict.get("occurrence_model", False) or any(ot_zero):
                 CFValueEntropy = calculate_entropy(
                     general["distribution_new"],
                     scale,
                     other,
-                    observations_dict["obs_zero"],
-                    adam_fitted.fitted[~observations_dict["ot_logical"]],
+                    int(np.sum(ot_zero)),
+                    adam_fitted.fitted[ot_zero],
                 )
-                if np.isnan(CFValueEntropy) or CFValueEntropy < 0:
+                # NaN means something is wrong; a negative entropy (it should not
+                # be) becomes zero, so that occurrence does not distort the sizes
+                if np.isnan(CFValueEntropy):
                     CFValueEntropy = np.inf
+                elif CFValueEntropy < 0:
+                    CFValueEntropy = 0.0
                 CFValue += CFValueEntropy
 
         elif general["loss"] == "MSE":

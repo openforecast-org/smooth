@@ -556,3 +556,17 @@ def test_omg_mixed_model_matches_r(B, r_args):
         R_data={"y": y},
     )
     assert model.loss_value == pytest.approx(float(expected[0]), rel=1e-8)
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+def test_omg_skips_the_missing_observations():
+    rng = np.random.default_rng(1)
+    y = rng.binomial(1, 0.4, 200) * np.exp(rng.normal(2, 0.3, 200))
+    y[list(range(9, 20)) + [99]] = np.nan
+    model = OMG(model_a="ANN", model_b="ANN").fit(y)
+    assert model._log_lik_dict["nobs"] == np.sum(~np.isnan(y))
+    assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-10)
+    assert np.all(np.isnan(model.actuals[np.isnan(y)]))
+    # The covariance re-evaluates the cost at the estimates, which the sub-models
+    # must not have changed
+    assert np.all(np.isfinite(np.diag(model.vcov())))

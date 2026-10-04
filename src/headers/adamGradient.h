@@ -516,6 +516,10 @@ inline void occurrenceLinkJac(double const &yFit, char const &E, char const &O,
 // branch; e is the update-channel error the state recursion consumes).
 inline double occurrenceErrorJac(double const &yAct, double const &yFit,
                                  char const &E, char const &O){
+    // A missing observation has no error (see occurrenceError())
+    if(std::isnan(yAct)){
+        return 0;
+    }
     double p, dpdy;
     occurrenceLinkJac(yFit, E, O, p, dpdy);
     if(O=='d'){

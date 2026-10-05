@@ -185,6 +185,27 @@ inline arma::vec adamFvalue(arma::vec const &matrixVt, arma::mat const &matrixF,
     return matrixVtnew;
 }
 
+// The transition F v as a sparse product, where adamFvalue() is the plain product and F
+// is large and mostly zeros (the harmonics of TBATS, the ARIMA polynomials). Below five
+// states Armadillo's dense product of the small matrices is faster. Compile with
+// SMOOTH_DENSE_F to switch it off.
+struct SparseTransition {
+    bool use = false;
+    arma::sp_mat matrixF;
+    SparseTransition(arma::mat const &matrixFDense, char const E, char const T,
+                     unsigned int const nETS, unsigned int const nArima, bool const constant){
+#ifndef SMOOTH_DENSE_F
+        bool plainProduct = (T=='N' || T=='A') &&
+            !(E=='M' && (nArima>0 || (constant && nETS>0)));
+        if(plainProduct && matrixFDense.n_rows>4 &&
+           arma::accu(matrixFDense!=0)*2 <= matrixFDense.n_elem){
+            use = true;
+            matrixF = arma::sp_mat(matrixFDense);
+        }
+#endif
+    }
+};
+
 /* # Function returns value of g() -- the update of states -- used in components estimation for the persistence */
 inline arma::vec adamGvalue(arma::vec const &matrixVt, arma::mat const &matrixF, arma::mat const &rowvecW,
                             char const &E, char const &T, char const &S,

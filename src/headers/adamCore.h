@@ -790,6 +790,15 @@ public:
         arma::vec vecYfit(obs, arma::fill::zeros);
         arma::vec vecErrors(obs, arma::fill::zeros);
         arma::vec backcasts(H, arma::fill::zeros);
+        // The transition of the forward and backward passes, sparse where that pays
+        const SparseTransition sparseF(matrixF, E, T, nETS, nArima, constant);
+        auto transition = [&](arma::vec const &v) -> arma::vec {
+            if(sparseF.use) {
+                return sparseF.matrixF * v;
+            }
+            return adamFvalue(v, matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                              nComponents, constant);
+        };
         // The head steps all measure with the same regressor row; hoist it out of the loops
         const arma::rowvec wHead = matrixWt.row(0);
 
@@ -809,8 +818,7 @@ public:
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
             /* # Transition equation */
             profilesRecent(indexLookupTable.col(i)) =
-                adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                           matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                transition(profilesRecent(indexLookupTable.col(i))) +
                 adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorG, vecErrors(idx), vecYfit(idx), adamETS);
@@ -830,8 +838,7 @@ public:
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
             /* # Transition equation */
             profilesRecent(indexLookupTable.col(i)) =
-                adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                           matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                transition(profilesRecent(indexLookupTable.col(i))) +
                 adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorG, vecErrors(idx), vecYfit(idx), adamETS);

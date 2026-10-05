@@ -116,10 +116,12 @@ def eigens(
     mat_f: NDArray, vec_g: NDArray, w: NDArray, struct: Dict[str, Any]
 ) -> NDArray:
     """The moduli of the eigenvalues of the discount matrix of the level, trend and
-    harmonics, on the lag-expanded form: a harmonic is (v1_t, v2_t, v2_{t-1})."""
+    harmonics. A harmonic is reduced to (s_t, v2_t) with s_t = v1_t + v2_{t-1}: the
+    lag-expanded form (v1_t, v2_t, v2_{t-1}) only adds a zero eigenvalue, as the
+    discount matrix sends v1_t - v2_{t-1} to zero."""
     n_ets = struct["n_ets"]
     n_h = struct["n_harmonics"]
-    k = n_ets + 3 * n_h
+    k = n_ets + 2 * n_h
     fe = np.zeros((k, k))
     ge = np.zeros(k)
     we = np.zeros(k)
@@ -128,11 +130,11 @@ def eigens(
     we[:n_ets] = w[:n_ets]
     for i in range(n_h):
         old = struct["harmonic_rows"][i]
-        rows = n_ets + 3 * i + np.arange(3)
-        eta = mat_f[old : old + 2, old]
-        fe[np.ix_(rows, rows)] = [[eta[0], 0, eta[0]], [eta[1], 0, eta[1]], [0, 1, 0]]
-        ge[rows[:2]] = vec_g[old : old + 2]
-        we[rows] = [1, 0, 1]
+        row = n_ets + 2 * i
+        fe[row : row + 2, row] = mat_f[old : old + 2, old]
+        fe[row, row + 1] = 1
+        ge[row : row + 2] = vec_g[old : old + 2]
+        we[row] = 1
     return np.abs(np.linalg.eigvals(fe - np.outer(ge, we)))
 
 

@@ -1020,12 +1020,14 @@ tbats_gammaStart <- function(B, struct, armaSpec, lambdaSpec, other, initialEsti
 }
 
 # The moduli of the eigenvalues of the discount matrix of the level, trend and
-# harmonics, on the lag-expanded form: a harmonic is (v1_t, v2_t, v2_{t-1})
+# harmonics. A harmonic is reduced to (s_t, v2_t) with s_t = v1_t + v2_{t-1}: the
+# lag-expanded form (v1_t, v2_t, v2_{t-1}) only adds a zero eigenvalue, as the discount
+# matrix sends v1_t - v2_{t-1} to zero
 #' @keywords internal
 tbats_eigens <- function(matF, vecG, w, struct){
     nETS <- struct$nETS;
     nH <- struct$nHarmonics;
-    k <- nETS + 3*nH;
+    k <- nETS + 2*nH;
     Fe <- matrix(0, k, k);
     ge <- rep(0, k);
     we <- rep(0, k);
@@ -1034,11 +1036,10 @@ tbats_eigens <- function(matF, vecG, w, struct){
     we[1:nETS] <- w[1:nETS];
     for(i in seq_len(nH)){
         rowOld <- struct$harmonicRows[i];
-        rows <- nETS + 3*(i-1) + 1:3;
-        eta <- matF[rowOld+0:1, rowOld];
-        Fe[rows, rows] <- rbind(c(eta[1], 0, eta[1]), c(eta[2], 0, eta[2]), c(0, 1, 0));
-        ge[rows[1:2]] <- vecG[rowOld+0:1];
-        we[rows] <- c(1, 0, 1);
+        rows <- nETS + 2*(i-1) + 1:2;
+        Fe[rows, rows] <- cbind(matF[rowOld+0:1, rowOld], c(1, 0));
+        ge[rows] <- vecG[rowOld+0:1];
+        we[rows[1]] <- 1;
     }
     return(Mod(eigen(Fe - ge %o% we, only.values=TRUE)$values));
 }

@@ -27,6 +27,8 @@ struct FitResult {
     arma::vec fitted;
     arma::vec errors;
     arma::mat profile;
+    // The profile the fit started from (the solved one of initial="gradient")
+    arma::mat profileInitial;
 };
 
 // Result structure for the general occurrence model fitter (two parallel models)
@@ -95,7 +97,7 @@ public:
     // filters over. 0 means "use lagsModelMax", i.e. the behaviour before this change.
     unsigned int headLength = 0;
 
-    // The transition of fit() as a sparse product (SparseTransition), for the large and
+    // The transition of fit() and reapply() as a sparse product (SparseTransition), for the large and
     // mostly zero matrices of tbats() and ssarima(). Set from R/Python; false otherwise.
     bool sparseTransition = false;
 
@@ -767,6 +769,17 @@ public:
     // occurrence multiplier (1, fractional, or 0 for intermittent).
     // For occurrence models (O='d'/'o'/'i'): pass vectorOt as both vectorYt and vectorOt;
     // the raw state-space output is transformed to a probability post-loop.
+    // The transition of the forward and backward passes: the sparse product where
+    // SparseTransition took it, adamFvalue() otherwise
+    arma::vec transitionValue(SparseTransition const &sparseF, arma::vec const &v,
+                              arma::mat const &matrixF) const {
+        if(sparseF.use) {
+            return sparseF.matrixF * v;
+        }
+        return adamFvalue(v, matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                          nComponents, constant);
+    }
+
     FitResult fit(arma::mat matrixVt, arma::mat const &matrixWt,
                   arma::mat &matrixF, arma::vec const &vectorG,
                   arma::umat const &indexLookupTable, arma::mat profilesRecent,
@@ -779,6 +792,7 @@ public:
          * # lags is a vector of lags
          */
 
+        const arma::mat profileInitial = profilesRecent;
         int obs = vectorYt.n_rows;
         int lagsModelMax = max(lags);
         unsigned int H = (headLength == 0 ? lagsModelMax : headLength);
@@ -794,15 +808,8 @@ public:
         arma::vec vecYfit(obs, arma::fill::zeros);
         arma::vec vecErrors(obs, arma::fill::zeros);
         arma::vec backcasts(H, arma::fill::zeros);
-        // The transition of the forward and backward passes, sparse where that pays
+        // The transition of the forward and backward passes, sparse where requested
         const SparseTransition sparseF(sparseTransition, matrixF, E, T, nETS, nArima, constant);
-        auto transition = [&](arma::vec const &v) -> arma::vec {
-            if(sparseF.use) {
-                return sparseF.matrixF * v;
-            }
-            return adamFvalue(v, matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
-                              nComponents, constant);
-        };
         // The head steps all measure with the same regressor row; hoist it out of the loops
         const arma::rowvec wHead = matrixWt.row(0);
 
@@ -822,7 +829,7 @@ public:
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
             /* # Transition equation */
             profilesRecent(indexLookupTable.col(i)) =
-                transition(profilesRecent(indexLookupTable.col(i))) +
+                transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
                 adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorG, vecErrors(idx), vecYfit(idx), adamETS);
@@ -842,7 +849,7 @@ public:
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
             /* # Transition equation */
             profilesRecent(indexLookupTable.col(i)) =
-                transition(profilesRecent(indexLookupTable.col(i))) +
+                transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
                 adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorG, vecErrors(idx), vecYfit(idx), adamETS);
@@ -922,6 +929,7 @@ public:
         result.fitted = vecYfit;
         result.errors = vecErrors;
         result.profile = profilesRecent;
+        result.profileInitial = profileInitial;
         return result;
     }
 
@@ -1571,6 +1579,9 @@ public:
         arma::vec vecErrors(obs, arma::fill::zeros);
 
         for(unsigned int k=0; k<nSeries; k=k+1){
+            // The data of each series, when they differ (the Box-Cox transforms of tbats)
+            arma::vec const vectorYt = matrixYt.col(matrixYt.n_cols==nSeries ? k : 0);
+            const SparseTransition sparseF(sparseTransition, arrayF.slice(k), E, T, nETS, nArima, constant);
             // Loop for the backcasting
             arma::vec backcasts(H, arma::fill::zeros);
             // The head states as the backward pass leaves them, from time -H+1 to 0
@@ -1635,13 +1646,13 @@ public:
                         matYfit(i-H,k) = matrixOt(i-H) * matYfit(i-H,k);
                     }
                     // errorf() returns 0 immediately when ot==0
-                    vecErrors(i-H) = errorf(matrixYt(i-H), matYfit(i-H,k), E,
+                    vecErrors(i-H) = errorf(vectorYt(i-H), matYfit(i-H,k), E,
                                                        matrixOt(i-H));
 
                     /* # Transition equation */
                     arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                    adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
-                               arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                    transitionValue(sparseF, arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
+                                    arrayF.slice(k)) +
                                    adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                                               arrayF.slice(k), arrayWt.slice(k).row(i-H), E, T, S,
                                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
@@ -1684,13 +1695,13 @@ public:
                         if(matrixOt(i-H)!=0){
                             matYfit(i-H,k) = matrixOt(i-H) * matYfit(i-H,k);
                         }
-                        vecErrors(i-H) = errorf(matrixYt(i-H), matYfit(i-H,k), E,
+                        vecErrors(i-H) = errorf(vectorYt(i-H), matYfit(i-H,k), E,
                                                            matrixOt(i-H));
 
                         /* # Transition equation */
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                        adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
-                                   arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                        transitionValue(sparseF, arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
+                                        arrayF.slice(k)) +
                                        adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                                                   arrayF.slice(k), arrayWt.slice(k).row(i-H), E, T, S,
                                                   nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,

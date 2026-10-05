@@ -532,7 +532,9 @@ def fit(
         b_list["B"] = gamma_start(b_list["B"], names, filler)
 
     # The cost function
-    def fit_states(elements: Dict[str, Any]) -> Dict[str, Any]:
+    def fit_inputs(elements: Dict[str, Any]) -> Dict[str, Any]:
+        """The transformed data, the initial profile and the measurement of the
+        elements."""
         y_bc = (
             st.box_cox_sizes(y, elements["lambda"], ot_logical)
             if lam_spec["estimate"]
@@ -546,8 +548,15 @@ def fit(
                 states[key] = states[key] + deviations[key]
             arma_initial = deviations["arma"]
         states["xreg"] = states["xreg"] + elements["xreg_deviations"]
-        profile = st.profile(states, arma_initial, struct, elements["phi"])
-        w_t = st.mat_wt(elements["w"], struct, obs, xreg_data)
+        return {
+            "y_bc": y_bc,
+            "profile": st.profile(states, arma_initial, struct, elements["phi"]),
+            "mat_wt": st.mat_wt(elements["w"], struct, obs, xreg_data),
+        }
+
+    def fit_states(elements: Dict[str, Any]) -> Dict[str, Any]:
+        inputs = fit_inputs(elements)
+        y_bc, profile, w_t = inputs["y_bc"], inputs["profile"], inputs["mat_wt"]
         # "gradient" solves for the initials of the states by least squares (the
         # model is additive in the transformed space), the regressors staying in B
         fitted = adam_fit_or_gradient(
@@ -579,7 +588,7 @@ def fit(
             "errors": np.ravel(fitted.errors),
             "profile": np.asarray(fitted.profile),
             "y_bc": y_bc,
-            "profile_initial": profile,
+            "profile_initial": np.asarray(fitted.profileInitial),
             "mat_wt": w_t,
         }
 
@@ -665,13 +674,52 @@ def fit(
         result[ot_logical] += sizes
         return result
 
-    def fitter(B: NDArray) -> Optional[Dict[str, Any]]:
-        """The fit at any parameters, for reapply: None outside the bounds."""
-        elements = filler(np.asarray(B, dtype=float), s["bounds"])
-        if elements["penalty"] > 0:
-            return None
-        fitted = fit_states(elements)
-        return {**fitted, **elements}
+    def in_bounds(B: NDArray) -> bool:
+        """Whether the parameters satisfy the bounds, for the draws of reapply."""
+        return bool(filler(np.asarray(B, dtype=float), s["bounds"])["penalty"] == 0)
+
+    # The refits at the draws of the parameters (rows), for reapply: the C++ refitter
+    # over all of them at once, each with its own matrices, initial profile and, with
+    # lambda, data. The solved initials of "gradient" are kept as their deviations
+    # from the global model (profile_offset, set after the estimation)
+    profile_offset: Any = 0.0
+    refit_backcast = backcast
+
+    def refitter(draws: NDArray) -> Dict[str, Any]:
+        refits = []
+        for draw in np.atleast_2d(draws):
+            elements = filler(np.asarray(draw, dtype=float), s["bounds"])
+            refits.append({**elements, **fit_inputs(elements)})
+        nsim = len(refits)
+        # The missing values are skipped, as in the fit
+        y_bc = np.column_stack([r["y_bc"] for r in refits])
+        missing = np.isnan(y_bc[:, 0]) | np.isnan(ot)
+        y_bc[missing] = 0.0
+        ot_refit = np.where(missing, 0.0, ot)
+        arr_f = np.stack([r["mat_f"] for r in refits], axis=2)
+        arr_wt = np.stack([r["mat_wt"] for r in refits], axis=2)
+        mat_g = np.column_stack([np.ravel(r["vec_g"]) for r in refits])
+        profiles = np.stack([r["profile"] + profile_offset for r in refits], axis=2)
+        refitted = adam_cpp.reapply(
+            matrixYt=np.asfortranarray(y_bc),
+            matrixOt=np.asfortranarray(ot_refit[:, None]),
+            arrayVt=np.zeros((*mat_vt.shape, nsim), order="F"),
+            arrayWt=np.asfortranarray(arr_wt),
+            arrayF=np.asfortranarray(arr_f),
+            matrixG=np.asfortranarray(mat_g),
+            indexLookupTable=lookup,
+            arrayProfilesRecent=np.asfortranarray(profiles),
+            backcast=refit_backcast,
+        )
+        return {
+            "fitted": np.asarray(refitted.fitted),
+            "states": np.asarray(refitted.states),
+            "profile": np.asarray(refitted.profile),
+            "mat_f": arr_f,
+            "mat_wt": arr_wt,
+            "vec_g": mat_g,
+            "lambda": np.array([r["lambda"] for r in refits]),
+        }
 
     # Estimation
     B = b_list["B"].copy()
@@ -680,7 +728,9 @@ def fit(
         warm = np.array([b_start.get(n, b) for n, b in zip(names, B)])
         if cf(warm) < cf(B):
             B = warm
-    if initial == "two-stage":
+    # Backcast first, then optimise all from its parameters and initials, unless B is
+    # provided
+    if initial == "two-stage" and s["B"] is None:
         backcast_fit = fit(
             y,
             trend_type,
@@ -728,6 +778,11 @@ def fit(
     if head["geometry"] > struct["lags_model_max"]:
         states = states[:, head["geometry"] - struct["lags_model_max"] :]
     initial_read = st.initials_read(states, struct)
+    # The solved initials of "gradient" for the refits; a failed solve falls back to
+    # the backcast fit
+    if initial == "gradient":
+        profile_offset = fitted["profile_initial"] - fit_inputs(elements)["profile"]
+        refit_backcast = bool(np.all(profile_offset == 0))
     # The profile of the identified initials (the backcast ones with backcasting),
     # where the simulations start
     fitted["profile_initial"] = st.profile(
@@ -801,7 +856,8 @@ def fit(
         "adam_cpp": adam_cpp,
         "lookup": lookup,
         "head": head,
-        "fitter": fitter,
+        "in_bounds": in_bounds,
+        "refitter": refitter,
         "loss_function": loss_value,
         "point_lik": point_lik,
         "y": y,

@@ -1298,13 +1298,13 @@ class TBATS:
         """The point of the segment from the estimates to ``point`` that is the
         furthest from them and satisfies the bounds, by bisection (R's
         ``tbats_pullBack``)."""
-        fitter = self._best["fitter"]
-        if fitter(point) is not None:
+        in_bounds = self._best["in_bounds"]
+        if in_bounds(point):
             return point
         inside, outside = 0.0, 1.0
         for _ in range(20):
             share = (inside + outside) / 2
-            if fitter(parameters + share * (point - parameters)) is None:
+            if not in_bounds(parameters + share * (point - parameters)):
                 outside = share
             else:
                 inside = share
@@ -1335,21 +1335,18 @@ class TBATS:
         parameters = self.coef
         rng = np.random.default_rng(seed)
         draws = rng.multivariate_normal(parameters, covariance, size=nsim)
-        refits = []
         for i in range(nsim):
             draws[i] = self._pull_back(parameters, draws[i])
-            refits.append(self._best["fitter"](draws[i]))
+        refits = self._best["refitter"](draws)
         obs = self.nobs
         lag_max = self._best["struct"]["lags_model_max"]
         names = self.component_names
-        lambdas = np.array([refit["lambda"] for refit in refits])
+        lambdas = refits["lambda"]
+        fitted_bc = refits["fitted"]
         columns = [f"nsim{i}" for i in range(1, nsim + 1)]
         refitted = (
             np.column_stack(
-                [
-                    st.box_cox_inverse(r["fitted"], lam)
-                    for r, lam in zip(refits, lambdas)
-                ]
+                [st.box_cox_inverse(fitted_bc[:, i], lambdas[i]) for i in range(nsim)]
             )
             * self._occurrence["p_fitted"][:, None]
         )
@@ -1359,20 +1356,14 @@ class TBATS:
         return TBATSReapplyResult(
             time_elapsed=time.time() - start_time,
             y=pd.Series(self.actuals),
-            states=np.stack(
-                [r["states"][:, -(obs + lag_max) :] for r in refits], axis=2
-            ),
+            states=refits["states"][:, -(obs + lag_max) :, :],
             refitted=pd.DataFrame(refitted, columns=columns),
             fitted=pd.Series(self.fitted),
             model=self.model_name,
-            transition=np.stack([r["mat_f"] for r in refits], axis=2),
-            measurement=np.stack([r["mat_wt"] for r in refits], axis=2),
-            persistence=pd.DataFrame(
-                np.column_stack([r["vec_g"] for r in refits]),
-                index=names,
-                columns=columns,
-            ),
-            profile=np.stack([r["profile"] for r in refits], axis=2),
+            transition=refits["mat_f"],
+            measurement=refits["mat_wt"],
+            persistence=pd.DataFrame(refits["vec_g"], index=names, columns=columns),
+            profile=refits["profile"],
             random_parameters=pd.DataFrame(draws, columns=self.coef_names),
             nsim=nsim,
             lambdas=lambdas,
@@ -1382,8 +1373,8 @@ class TBATS:
                 np.nan,
                 np.column_stack(
                     [
-                        (st.box_cox_sizes(y, lam, ot) - r["fitted"]) * ot
-                        for r, lam in zip(refits, lambdas)
+                        (st.box_cox_sizes(y, lambdas[i], ot) - fitted_bc[:, i]) * ot
+                        for i in range(nsim)
                     ]
                 ),
             ),

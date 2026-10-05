@@ -1110,7 +1110,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     }
 
     #### The cost function ####
-    fitStates <- function(elements){
+    # The transformed data, the initial profile and the measurement of the elements
+    fitInputs <- function(elements){
         yBC <- if(lambdaSpec$estimate) tbats_boxCoxSizes(y, elements$lambda, otLogical) else yBCStart;
         states <- tbats_globalStates(tbats_qrCoef(qrX, yBC[otLogical]), struct);
         armaInitial <- rep(0, struct$armaLagMax);
@@ -1122,8 +1123,14 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             armaInitial <- elements$deviations$arma;
         }
         states$xreg <- states$xreg + elements$xregDeviations;
-        profile <- tbats_profile(states, armaInitial, struct, elements$phi);
-        matWt <- tbats_matWt(elements$w, struct, obs, xregSpec$data);
+        return(list(yBC=yBC, profile=tbats_profile(states, armaInitial, struct, elements$phi),
+                    matWt=tbats_matWt(elements$w, struct, obs, xregSpec$data)));
+    }
+    fitStates <- function(elements){
+        inputs <- fitInputs(elements);
+        yBC <- inputs$yBC;
+        profile <- inputs$profile;
+        matWt <- inputs$matWt;
         # "gradient" solves for the initials of the states by least squares (the
         # model is additive in the transformed space), the regressors staying in B
         fitted <- adam_fitOrGradient(matVt, matWt, elements$matF, elements$vecG, lookup, profile,
@@ -1138,7 +1145,6 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                                      struct$lagsModelAll, struct$nXreg);
         fitted$matWt <- matWt;
         fitted$yBC <- yBC;
-        fitted$profileInitial <- profile;
         return(fitted);
     }
     lossValue <- function(B, lossUsed){
@@ -1184,18 +1190,43 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     CF <- function(B){
         return(lossValue(B, checked$loss));
     }
-    # The fit at any parameters, for reapply(): NULL where they violate the bounds
-    fitter <- function(B){
+    # Whether the parameters satisfy the bounds, for the draws of reapply()
+    inBounds <- function(B){
         names(B) <- names(BList$B);
-        elements <- tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
-                                 checked$bounds, adamCpp, xregEstimate);
-        if(elements$penalty>0){
-            return(NULL);
-        }
-        fitted <- fitStates(elements);
-        return(list(fitted=fitted$fitted, states=fitted$states, profile=fitted$profile,
-                    matF=elements$matF, vecG=elements$vecG, w=elements$w, matWt=fitted$matWt,
-                    lambda=elements$lambda));
+        return(tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
+                            checked$bounds, adamCpp, xregEstimate)$penalty==0);
+    }
+
+    # The refits at the draws of the parameters (rows), for reapply(): the C++ refitter
+    # over all of them at once, each with its own matrices, initial profile and, with
+    # lambda, data. The solved initials of "gradient" are kept as their deviations from
+    # the global model (profileOffset, set after the estimation)
+    profileOffset <- 0;
+    refitBackcast <- backcast;
+    refitter <- function(draws){
+        nsim <- nrow(draws);
+        nComponents <- struct$nComponents;
+        draws <- matrix(draws, nsim, dimnames=list(NULL, names(BList$B)));
+        refits <- lapply(1:nsim, function(i){
+            elements <- tbats_filler(draws[i,], struct, armaSpec, lambdaSpec, other, initialEstimate,
+                                     checked$bounds, adamCpp, xregEstimate);
+            return(c(elements, fitInputs(elements)));
+        });
+        # The missing values are skipped, as in the fit
+        yBC <- sapply(refits, function(refit) refit$yBC);
+        missing <- is.na(yBC[,1]) | is.na(ot);
+        yBC[missing,] <- 0;
+        otRefit <- replace(ot, missing, 0);
+        arrF <- array(sapply(refits, function(refit) refit$matF), c(nComponents, nComponents, nsim));
+        arrWt <- array(sapply(refits, function(refit) refit$matWt), c(obs, nComponents, nsim));
+        matG <- sapply(refits, function(refit) refit$vecG[,1]);
+        profiles <- array(sapply(refits, function(refit) refit$profile + profileOffset),
+                          c(nComponents, struct$lagsModelMax, nsim));
+        refitted <- adamCpp$reapply(yBC, matrix(otRefit), array(0, c(dim(matVt), nsim)), arrWt,
+                                    arrF, matrix(matG, nComponents), lookup, profiles, refitBackcast);
+        return(list(fitted=refitted$fitted, states=refitted$states, profile=refitted$profile,
+                    matF=arrF, matWt=arrWt, vecG=matrix(matG, nComponents),
+                    lambda=sapply(refits, function(refit) refit$lambda)));
     }
 
     #### Estimation ####
@@ -1209,8 +1240,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             B <- BWarm;
         }
     }
-    if(initialType=="two-stage"){
-        # Backcast first, then optimise all from its parameters and initials
+    # Backcast first, then optimise all from its parameters and initials, unless B is provided
+    if(initialType=="two-stage" && is.null(checked$B)){
         backcastFit <- tbats_fit(y, trendType, harmonicTable, armaSpec, lambdaSpec, distribution,
                                  "complete", checked, xregSpec, BStart);
         common <- intersect(names(B), names(backcastFit$B));
@@ -1264,6 +1295,12 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     initialRead <- tbats_initialsRead(states, struct);
     # The profile of the identified initials (the backcast ones with backcasting),
     # where the simulations start
+    # The solved initials of "gradient" for the refits; a failed solve falls back to
+    # the backcast fit
+    if(initialType=="gradient"){
+        profileOffset <- fitted$profileInitial - fitInputs(elements)$profile;
+        refitBackcast <- all(profileOffset==0);
+    }
     fitted$profileInitial <- tbats_profile(initialRead$states, initialRead$arma, struct, elements$phi);
 
     # The identified initials are counted whether they are optimised, backcast or solved
@@ -1296,7 +1333,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                 struct=struct, armaSpec=armaSpec, elements=elements, fitted=fitted, states=states,
                 initialRead=initialRead, scale=scale, forecastBC=forecastBC, FI=FI,
                 trendType=trendType, initialType=initialType, distribution=distribution,
-                adamCpp=adamCpp, lookup=lookup, headLength=headLength, fitter=fitter,
+                adamCpp=adamCpp, lookup=lookup, headLength=headLength, inBounds=inBounds, refitter=refitter,
                 y=y, lambdaSpec=lambdaSpec, checked=checked, xregEstimate=xregEstimate));
 }
 
@@ -1498,7 +1535,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     distribution=best$distribution, other=other, bounds=checked$bounds,
                                     scale=best$scale, B=best$B, lags=c(1, periods),
                                     lagsAll=struct$lagsModelAll, res=best$res, FI=best$FI,
-                                    adamCpp=best$adamCpp, fitter=best$fitter),
+                                    adamCpp=best$adamCpp, inBounds=best$inBounds, refitter=best$refitter),
                                class=c("tbats","adam","smooth"));
     if(!silent){
         plot(modelReturned, 7);
@@ -1573,40 +1610,31 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
     vcovMatrix <- reapply_vcov(object, type, heuristics, nsim, ...);
     draws <- matrix(MASS::mvrnorm(nsim, parameters, vcovMatrix), ncol=length(parameters),
                     dimnames=list(NULL, names(parameters)));
-    refits <- vector("list", nsim);
     for(i in 1:nsim){
         draws[i,] <- tbats_pullBack(object, parameters, draws[i,]);
-        refits[[i]] <- object$fitter(draws[i,]);
     }
+    refits <- object$refitter(draws);
     obs <- nobs(object);
-    nComponents <- ncol(object$states);
     lagsModelMax <- max(object$lagsAll);
-    lambdas <- sapply(refits, function(refit) refit$lambda);
-    refitted <- matrix(sapply(1:nsim, function(i) tbats_boxCoxInverse(refits[[i]]$fitted, lambdas[i])),
+    lambdas <- refits$lambda;
+    refitted <- matrix(sapply(1:nsim, function(i) tbats_boxCoxInverse(refits$fitted[,i], lambdas[i])),
                        obs, nsim, dimnames=list(NULL, paste0("nsim",1:nsim))) * tbats_pFitted(object);
     if(any(class(actuals(object))=="ts")){
         refitted <- ts(refitted, start=start(actuals(object)), frequency=frequency(actuals(object)));
     }
-    states <- array(sapply(refits, function(refit){
-        return(refit$states[, ncol(refit$states)-(obs+lagsModelMax)+1:(obs+lagsModelMax), drop=FALSE]);
-    }), c(nComponents, obs+lagsModelMax, nsim));
+    nStates <- dim(refits$states)[2];
     return(structure(list(timeElapsed=Sys.time()-startTime,
-                          y=actuals(object), states=states, refitted=refitted,
-                          fitted=fitted(object), model=object$model,
-                          transition=array(sapply(refits, function(refit) refit$matF),
-                                           c(nComponents, nComponents, nsim)),
-                          measurement=array(sapply(refits, function(refit) refit$matWt),
-                                            c(obs, nComponents, nsim)),
-                          persistence=matrix(sapply(refits, function(refit) refit$vecG[,1]), nComponents, nsim),
-                          profile=array(sapply(refits, function(refit) refit$profile),
-                                        c(nComponents, lagsModelMax, nsim)),
+                          y=actuals(object), states=refits$states[, nStates-(obs+lagsModelMax)+1:(obs+lagsModelMax),, drop=FALSE],
+                          refitted=refitted, fitted=fitted(object), model=object$model,
+                          transition=refits$matF, measurement=refits$matWt,
+                          persistence=refits$vecG, profile=refits$profile,
                           randomParameters=draws, lambda=lambdas,
                           errors=sapply(1:nsim, function(i){
                               # The sizes: no error where there is no demand, NA where the
                               # value is missing
                               y <- as.numeric(actuals(object));
                               otLogical <- tbats_sizes(y, object);
-                              errors <- (tbats_boxCoxSizes(y, lambdas[i], otLogical) - refits[[i]]$fitted) * otLogical;
+                              errors <- (tbats_boxCoxSizes(y, lambdas[i], otLogical) - refits$fitted[,i]) * otLogical;
                               return(replace(errors, is.na(y), NA));
                           })),
                      class="reapply"));
@@ -1648,14 +1676,14 @@ tbats_refitCall <- function(object){
 # boundary of the admissible region
 #' @keywords internal
 tbats_pullBack <- function(object, parameters, point){
-    if(!is.null(object$fitter(point))){
+    if(object$inBounds(point)){
         return(point);
     }
     inside <- 0;
     outside <- 1;
     for(iteration in 1:20){
         share <- (inside+outside)/2;
-        if(is.null(object$fitter(parameters + share*(point-parameters)))){
+        if(!object$inBounds(parameters + share*(point-parameters))){
             outside <- share;
         }
         else{

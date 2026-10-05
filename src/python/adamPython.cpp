@@ -30,7 +30,8 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("states", &FitResult::states)
         .def_readonly("fitted", &FitResult::fitted)
         .def_readonly("errors", &FitResult::errors)
-        .def_readonly("profile", &FitResult::profile);
+        .def_readonly("profile", &FitResult::profile)
+        .def_readonly("profileInitial", &FitResult::profileInitial);
 
     // Bind OmFitGeneralResult struct
     py::class_<OmFitGeneralResult>(m, "OmFitGeneralResult")

@@ -31,7 +31,8 @@ namespace Rcpp {
             Named("states") = result.states,
             Named("fitted") = result.fitted,
             Named("errors") = result.errors,
-            Named("profile") = result.profile
+            Named("profile") = result.profile,
+            Named("profileInitial") = result.profileInitial
         );
     }
 

@@ -404,8 +404,10 @@ def fit(
     initial: str,
     s: Dict[str, Any],
     xreg: Optional[Dict[str, Any]] = None,
+    b_start: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
-    """One fit of a fixed structure in the space of the Box-Cox transformed data."""
+    """One fit of a fixed structure in the space of the Box-Cox transformed data,
+    warm started from the parameters of a related fit in ``b_start``."""
     obs = len(y)
     periods = sorted(set(table["period"].tolist()))
     struct = st.structure(trend_type, table, spec, periods, xreg)
@@ -671,9 +673,23 @@ def fit(
 
     # Estimation
     B = b_list["B"].copy()
+    # The warm start from the parameters of a related fit, kept if it beats the default
+    if b_start is not None:
+        warm = np.array([b_start.get(n, b) for n, b in zip(names, B)])
+        if cf(warm) < cf(B):
+            B = warm
     if initial == "two-stage":
         backcast_fit = fit(
-            y, trend_type, table, spec, lam_spec, distribution, "complete", s, xreg
+            y,
+            trend_type,
+            table,
+            spec,
+            lam_spec,
+            distribution,
+            "complete",
+            s,
+            xreg,
+            b_start,
         )
         common = [n for n in names if n in backcast_fit["names"]]
         for name in common:

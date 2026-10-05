@@ -64,6 +64,11 @@ class TBATSReapplyResult(ReapplyResult):
     errors: NDArray
 
 
+def _named_b(fitted: Dict[str, Any]) -> Dict[str, float]:
+    """The parameters of a fit by name, the warm start of a related one."""
+    return dict(zip(fitted["names"], fitted["B"]))
+
+
 def _refit_one_replicate(
     actuals: NDArray,
     X: Optional[NDArray],
@@ -467,21 +472,24 @@ class TBATS:
                 harmonics = [min(k, m) for k, m in zip(harmonics, k_max)]
         table = st.harmonics_table(periods, harmonics)
 
-        # Fit the candidates and select
-        candidates = [
-            ft.fit(
-                y_in_sample,
-                t,
-                table,
-                spec_fit,
-                lam_spec,
-                self.distribution,
-                self.initial,
-                settings,
-                xreg_fit,
+        # Fit the candidates and select. The trends are warm started from the model
+        # without it, with no trend smoothing
+        candidates: List[Dict[str, Any]] = []
+        for t in trend_types:
+            candidates.append(
+                ft.fit(
+                    y_in_sample,
+                    t,
+                    table,
+                    spec_fit,
+                    lam_spec,
+                    self.distribution,
+                    self.initial,
+                    settings,
+                    xreg_fit,
+                    {**_named_b(candidates[0]), "beta": 0.0} if candidates else None,
+                )
             )
-            for t in trend_types
-        ]
         ics: Dict[str, float] = {
             t: self._ic(c) for t, c in zip(trend_types, candidates)
         }
@@ -513,6 +521,8 @@ class TBATS:
                 ot,
             )
             if spec_best["n_param"] > 0:
+                # Warm started from the best model, with no ARMA
+                no_arma = dict.fromkeys(spec_best["names"], 0.0)
                 candidate = ft.fit(
                     y_in_sample,
                     best["trend_type"],
@@ -523,6 +533,7 @@ class TBATS:
                     self.initial,
                     settings,
                     xreg_fit,
+                    {**_named_b(best), **no_arma},
                 )
                 ic_candidate = self._ic(candidate)
                 if ic_candidate < min(ics.values()):
@@ -582,6 +593,7 @@ class TBATS:
             self.initial,
             settings,
             subset,
+            _named_b(best),
         )
         ic_candidate = self._ic(candidate)
         improves = ic_candidate < min(ics.values())

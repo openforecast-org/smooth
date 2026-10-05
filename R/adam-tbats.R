@@ -279,10 +279,13 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     harmonicTable <- tbats_harmonics(periods, harmonics);
 
     #### Fit the candidates and select ####
-    candidates <- lapply(trendTypes, function(trendType){
-        return(tbats_fit(yInSample, trendType, harmonicTable, armaSpecFit, lambdaSpec,
-                         distribution, initial, checked, xregSpecFit));
-    });
+    # The trends are warm started from the model without it, with no trend smoothing
+    candidates <- vector("list", length(trendTypes));
+    for(i in seq_along(trendTypes)){
+        candidates[[i]] <- tbats_fit(yInSample, trendTypes[i], harmonicTable, armaSpecFit, lambdaSpec,
+                                     distribution, initial, checked, xregSpecFit,
+                                     if(i>1) c(candidates[[1]]$B, beta=0));
+    }
     ICs <- sapply(candidates, function(candidate){
         return(tbats_IC(candidate$logLik, ic));
     });
@@ -300,7 +303,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         xregSpecSelected <- tbats_xregSubset(xregSpec, make.names(selected));
         if(!is.null(xregSpecSelected)){
             candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecFit, lambdaSpec,
-                                   distribution, initial, checked, xregSpecSelected);
+                                   distribution, initial, checked, xregSpecSelected, best$B);
             icCandidate <- tbats_IC(candidate$logLik, ic);
             if(icCandidate<min(ICs)){
                 best <- candidate;
@@ -320,8 +323,10 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         armaSpecBest <- tbats_armaSelect(tbats_gapped(residuals, otLogical), armaSpec, distribution,
                                          best$elements$shape, best$nParamEstimated, ic, otLogical);
         if(armaSpecBest$nParam>0){
+            # Warm started from the best model, with no ARMA
             candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecBest, lambdaSpec,
-                                   distribution, initial, checked, xregSpecFit);
+                                   distribution, initial, checked, xregSpecFit,
+                                   c(best$B, setNames(rep(0, armaSpecBest$nParam), armaSpecBest$names)));
             icCandidate <- tbats_IC(candidate$logLik, ic);
             if(icCandidate<min(ICs)){
                 best <- candidate;
@@ -1049,7 +1054,7 @@ tbats_eigens <- function(matF, vecG, w, struct){
 # the forecasts, all in the space of the Box-Cox transformed data
 #' @keywords internal
 tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distribution,
-                      initial, checked, xregSpec=NULL){
+                      initial, checked, xregSpec=NULL, BStart=NULL){
     obs <- length(y);
     struct <- tbats_structure(trendType, harmonicTable, armaSpec, sort(unique(harmonicTable$period)),
                               xregSpec);
@@ -1193,10 +1198,19 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 
     #### Estimation ####
     B <- BList$B;
+    # The warm start from the parameters of a related fit, kept if it beats the default
+    if(!is.null(BStart)){
+        common <- intersect(names(B), names(BStart));
+        BWarm <- B;
+        BWarm[common] <- BStart[common];
+        if(CF(BWarm)<CF(B)){
+            B <- BWarm;
+        }
+    }
     if(initialType=="two-stage"){
         # Backcast first, then optimise all from its parameters and initials
         backcastFit <- tbats_fit(y, trendType, harmonicTable, armaSpec, lambdaSpec, distribution,
-                                 "complete", checked, xregSpec);
+                                 "complete", checked, xregSpec, BStart);
         common <- intersect(names(B), names(backcastFit$B));
         B[common] <- backcastFit$B[common];
         B <- tbats_deviations(B, backcastFit, struct, qrX, y[otLogical], lambdaSpec);

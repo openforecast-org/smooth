@@ -186,7 +186,12 @@ matrix-vector product. It provides:
 ## F. Selection (3 or 4 full fits by default)
 
 1. Harmonics: from the global OLS model only (no full fits).
-2. Trend: the requested candidates, fitted without ARMA, chosen by IC (`parallel` allowed).
+2. Trend: the requested candidates, fitted without ARMA, chosen by IC. The trends are
+   warm started from the model without it, with no trend smoothing (beta=0), and the ARMA
+   fit from the best model with zero ARMA coefficients; a warm start is kept only if its
+   loss beats the default start. On Taylor this reaches far better optima than the
+   default starts (AICc 50058 -> 49926 at n=3696, damped instead of no trend), at the
+   same cost.
 3. ARMA (`orders$select=TRUE`; the orders are the maxima):
    - the residuals of the global model at the λ of the chosen model without ARMA. Not the
      errors of that model: its adaptive level turns an AR into an ARMA with a near-unit MA

@@ -420,3 +420,16 @@ test_that("tbats takes the missing values for gaps", {
     expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
     expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)))
 })
+
+test_that("initial='gradient' solves for the initials of the states", {
+    fitBackcast <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0);
+    fitGradient <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, initial="gradient");
+    # The initials are counted as with backcasting, and the likelihood is that of the fit
+    expect_equal(nparam(fitGradient), nparam(fitBackcast));
+    expect_equal(as.numeric(logLik(fitGradient)), sum(pointLik(fitGradient)));
+    # At the same parameters, the solved initials fit at least as well as the backcast ones
+    atBackcast <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, initial="gradient",
+                        B=fitBackcast$B, maxeval=1);
+    expect_lte(atBackcast$lossValue, fitBackcast$lossValue);
+    expect_true(all(is.finite(forecast(fitGradient, h=12, interval="prediction")$upper)));
+})

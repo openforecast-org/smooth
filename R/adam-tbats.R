@@ -109,8 +109,13 @@
 #' @param holdout If \code{TRUE}, the holdout of the size \code{h} is taken from
 #' the data.
 #' @param initial The initialisation: \code{"backcasting"} (default),
-#' \code{"optimal"}, \code{"two-stage"} or \code{"complete"} (the same as
-#' backcasting here).
+#' \code{"optimal"}, \code{"two-stage"}, \code{"complete"} (the same as
+#' backcasting here) or \code{"gradient"}, which solves for the initial states by
+#' profiling the estimation loss at the current parameters, as in
+#' \link[smooth]{adam}: the model is additive in the space of the transformed data,
+#' so this is a linear solve (with weighted least squares sweeps for the robust and
+#' multistep losses). The coefficients of the regressors are estimated with the
+#' other parameters.
 #' @param bounds The bounds of the parameters: \code{"admissible"} (default)
 #' guarantees the stability of the model (the eigenvalues of the discount matrix
 #' of the level, trend and harmonics lie in the unit circle and the ARMA is
@@ -156,7 +161,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                   distribution=c("dnorm","dlaplace","ds","dgnorm"),
                   loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                   ic=c("AICc","AIC","BIC","BICc"), h=0, holdout=FALSE,
-                  initial=c("backcasting","optimal","two-stage","complete"),
+                  initial=c("backcasting","optimal","two-stage","complete","gradient"),
                   bounds=c("admissible","usual","none"), silent=TRUE, model=NULL, ...){
     startTime <- Sys.time();
     cl <- match.call();
@@ -1062,6 +1067,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 
     initialType <- initial;
     backcast <- any(initialType==c("backcasting","complete"));
+    # The initials of the states that the fit determines (backcast or solved)
+    initialsProfiled <- backcast || initialType=="gradient";
     initialEstimate <- any(initialType==c("optimal","two-stage"));
     # The coefficients of the regressors are estimated unless all is backcast, as in adam()
     xregEstimate <- struct$nXreg>0 && initialType!="complete";
@@ -1098,8 +1105,18 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         states$xreg <- states$xreg + elements$xregDeviations;
         profile <- tbats_profile(states, armaInitial, struct, elements$phi);
         matWt <- tbats_matWt(elements$w, struct, obs, xregSpec$data);
-        fitted <- adamCpp$fit(matVt, matWt, elements$matF, elements$vecG, lookup, profile,
-                              yBC, ot, backcast, checked$nIterations, "n");
+        # "gradient" solves for the initials of the states by least squares (the
+        # model is additive in the transformed space), the regressors staying in B
+        fitted <- adam_fitOrGradient(matVt, matWt, elements$matF, elements$vecG, lookup, profile,
+                                     yBC, ot, initialType, checked$nIterations, adamCpp,
+                                     TRUE, struct$nComponents>struct$nETS+struct$nXreg, FALSE, "A",
+                                     if(struct$trendIn) "A" else "N", "N",
+                                     struct$nETS, 0, struct$nETS, struct$lagsModelAll,
+                                     struct$lagsModelMax, obs, checked$loss, distribution,
+                                     elements$shape, checked$h,
+                                     any(checked$loss==c("MSEh","TMSE","GTMSE","MSCE","GPL")), "n",
+                                     struct$nComponents-struct$nETS-struct$nXreg,
+                                     struct$lagsModelAll, struct$nXreg);
         fitted$matWt <- matWt;
         fitted$yBC <- yBC;
         fitted$profileInitial <- profile;
@@ -1219,9 +1236,9 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     # where the simulations start
     fitted$profileInitial <- tbats_profile(initialRead$states, initialRead$arma, struct, elements$phi);
 
-    # The identified initials are counted whether they are optimised or backcast
+    # The identified initials are counted whether they are optimised, backcast or solved
     nInitials <- 1 + struct$trendIn + 2*struct$nHarmonics + struct$armaLagMax;
-    nParamEstimated <- length(B)*(checked$modelDo=="estimate") + 1 + nInitials*backcast +
+    nParamEstimated <- length(B)*(checked$modelDo=="estimate") + 1 + nInitials*initialsProfiled +
         struct$nXreg*!xregEstimate;
     # The likelihood of the occurrence model is added, as its parameters are
     logLikValue <- -lossValue(B, "likelihood") + occurrenceSpec$logLik;
@@ -1245,7 +1262,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     return(list(B=B, res=res, lossValue=lossFinal,
                 logLik=structure(logLikValue, nobs=sum(!is.na(y)), df=nParamEstimated+occurrenceSpec$nParam,
                                  class="logLik"),
-                nParamEstimated=nParamEstimated, nInitials=nInitials*backcast,
+                nParamEstimated=nParamEstimated, nInitials=nInitials*initialsProfiled,
                 struct=struct, armaSpec=armaSpec, elements=elements, fitted=fitted, states=states,
                 initialRead=initialRead, scale=scale, forecastBC=forecastBC, FI=FI,
                 trendType=trendType, initialType=initialType, distribution=distribution,

@@ -161,7 +161,7 @@ matrix-vector product. It provides:
   model at the current λ, so λ and the level do not fight. The collector reads the
   identified initials back, so `initial` of a backcasted model reproduces its fit and
   two-stage hands it over without loss. The degrees of freedom count exactly these.
-- `two-stage`, `complete`: as in `gum()`. `gradient` is not supported in the first version.
+- `two-stage`, `complete`: as in `gum()`. `gradient` solves for the initials of the level, trend, harmonics and ARMA through ADAM's `adam_fitOrGradient` (exact least squares: the model is additive in the transformed space), from the same start as backcasting, as in `adam()`; the coefficients of the regressors stay in B, and the initials are counted as with backcasting.
 
 ## E. Bounds
 

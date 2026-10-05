@@ -40,7 +40,7 @@ LOSS_OPTIONS = (
     "GPL",
 )
 IC_OPTIONS = ("AICc", "AIC", "BIC", "BICc")
-INITIAL_OPTIONS = ("backcasting", "optimal", "two-stage", "complete")
+INITIAL_OPTIONS = ("backcasting", "optimal", "two-stage", "complete", "gradient")
 BOUNDS_OPTIONS = ("admissible", "usual", "none")
 REGRESSORS_OPTIONS = ("use", "select", "adapt")
 OCCURRENCE_OPTIONS = (
@@ -358,7 +358,9 @@ class TBATS:
         """R's ``checked``: the settings of the fitter."""
         n_iterations = self.n_iterations
         if n_iterations is None:
-            n_iterations = 2 if self.initial in ("backcasting", "complete") else 1
+            n_iterations = (
+                2 if self.initial in ("backcasting", "complete", "gradient") else 1
+            )
         return {
             "h": self.h,
             "loss": self.loss,
@@ -1713,7 +1715,7 @@ class TBATS:
             self.nobs,
             nsim,
             obs_minimum,
-            self.initial in ("backcasting", "complete"),
+            self.initial in ("backcasting", "complete", "gradient"),
             np.random.default_rng(seed),
         )
         xreg = self._best["struct"]["xreg"]

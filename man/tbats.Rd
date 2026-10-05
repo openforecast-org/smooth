@@ -12,8 +12,8 @@ tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   "ds", "dgnorm"), loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh",
   "TMSE", "GTMSE", "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC", "BICc"),
   h = 0, holdout = FALSE, initial = c("backcasting", "optimal",
-  "two-stage", "complete"), bounds = c("admissible", "usual", "none"),
-  silent = TRUE, model = NULL, ...)
+  "two-stage", "complete", "gradient"), bounds = c("admissible", "usual",
+  "none"), silent = TRUE, model = NULL, ...)
 }
 \arguments{
 \item{y}{Vector or ts object, containing the data needed to be forecasted. The
@@ -95,8 +95,13 @@ ellipsis).}
 the data.}
 
 \item{initial}{The initialisation: \code{"backcasting"} (default),
-\code{"optimal"}, \code{"two-stage"} or \code{"complete"} (the same as
-backcasting here).}
+\code{"optimal"}, \code{"two-stage"}, \code{"complete"} (the same as
+backcasting here) or \code{"gradient"}, which solves for the initial states by
+profiling the estimation loss at the current parameters, as in
+\link[smooth]{adam}: the model is additive in the space of the transformed data,
+so this is a linear solve (with weighted least squares sweeps for the robust and
+multistep losses). The coefficients of the regressors are estimated with the
+other parameters.}
 
 \item{bounds}{The bounds of the parameters: \code{"admissible"} (default)
 guarantees the stability of the model (the eigenvalues of the discount matrix

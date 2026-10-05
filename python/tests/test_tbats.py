@@ -570,3 +570,20 @@ def test_tbats_takes_the_missing_values_for_gaps():
     assert np.all(np.isnan(model.residuals[np.isnan(y)]))
     assert np.all(np.isfinite(model.fitted))
     assert np.all(np.isfinite(model.predict(h=12, interval="prediction").upper))
+
+
+def test_initial_gradient_solves_for_the_initials(air):
+    """The initials are counted as with backcasting, and at the same parameters the
+    solved initials fit at least as well as the backcast ones."""
+    arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
+    backcast = TBATS(**arguments).fit(air)
+    gradient = TBATS(initial="gradient", **arguments).fit(air)
+    assert gradient.nparam == backcast.nparam
+    assert gradient.point_lik().sum() == pytest.approx(gradient.loglik, rel=1e-12)
+    at_backcast = TBATS(
+        initial="gradient",
+        B=backcast.coef,
+        maxeval=1,
+        **arguments,
+    ).fit(air)
+    assert at_backcast.loss_value <= backcast.loss_value

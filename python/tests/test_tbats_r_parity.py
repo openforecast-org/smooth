@@ -398,3 +398,46 @@ def test_the_cumulative_skeletons_agree():
     np.testing.assert_allclose(
         air.predict(h=12, cumulative=True).mean, r["air"], rtol=1e-10
     )
+
+
+GRADIENT_CASES = {
+    "additive": (
+        f"harmonics=5, trend='additive', {R_ORDERS0}",
+        dict(harmonics=[5], trend="additive", orders=ORDERS0),
+    ),
+    "damped arma": (
+        "harmonics=5, trend='damped', orders=list(ar=1, ma=1, select=FALSE)",
+        dict(
+            harmonics=[5],
+            trend="damped",
+            orders={"ar": 1, "ma": 1, "select": False},
+        ),
+    ),
+    "MAE": (
+        f"harmonics=5, trend='none', loss='MAE', {R_ORDERS0}",
+        dict(harmonics=[5], trend="none", loss="MAE", orders=ORDERS0),
+    ),
+    "TMSE": (
+        f"harmonics=5, trend='additive', loss='TMSE', h=6, {R_ORDERS0}",
+        dict(harmonics=[5], trend="additive", loss="TMSE", h=6, orders=ORDERS0),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(GRADIENT_CASES))
+def test_the_gradient_initials_agree(case):
+    r_arguments, arguments = GRADIENT_CASES[case]
+    r = r_dict(
+        f"{{ m <- suppressWarnings(tbats(AirPassengers, initial='gradient', {r_arguments}));"
+        " list(y=as.numeric(AirPassengers), B=unname(m$B), ll=as.numeric(logLik(m)),"
+        " nparam=nparam(m), fc=as.numeric(forecast(m, h=12)$mean)) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = TBATS(lags=[1, 12], initial="gradient", **arguments).fit(
+            np.asarray(r["y"], dtype=float)
+        )
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+    assert fit.loglik == pytest.approx(r["ll"][0], rel=1e-10)
+    assert fit.nparam == r["nparam"][0]
+    np.testing.assert_allclose(fit.predict(h=12).mean, r["fc"], rtol=1e-10)

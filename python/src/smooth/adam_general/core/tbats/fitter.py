@@ -17,6 +17,7 @@ from smooth.adam_general.core.creator.architector import (
     adam_profile_creator,
 )
 from smooth.adam_general.core.tbats import structure as st
+from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import (
     _log_r,
     _sum_r,
@@ -454,8 +455,32 @@ def fit(
     )
     mat_vt = np.zeros((struct["n_components"], obs + head["geometry"]), order="F")
     ot = ot_logical * 1.0
+    # The structure as ADAM's gradient solve reads it: the level and trend as ETS, the
+    # harmonics and the ARMA in the slot of ARIMA; the regressors stay in B
+    n_arima = struct["n_components"] - n_ets - struct["n_xreg"]
+    gradient_model = {
+        "ets_model": True,
+        "arima_model": n_arima > 0,
+        "xreg_model": False,
+        "error_type": "A",
+        "trend_type": "A" if struct["trend_in"] else "N",
+        "season_type": "N",
+    }
+    gradient_components = {
+        "components_number_ets": n_ets,
+        "components_number_ets_seasonal": 0,
+        "components_number_ets_non_seasonal": n_ets,
+        "components_number_arima": n_arima,
+    }
+    gradient_lags = {
+        "lags_model": list(lags_all),
+        "lags_model_all": list(lags_all),
+        "lags_model_max": struct["lags_model_max"],
+    }
 
     backcast = initial in ("backcasting", "complete")
+    # The initials of the states that the fit determines (backcast or solved)
+    initials_profiled = backcast or initial == "gradient"
     initial_estimate = initial in ("optimal", "two-stage")
     # The coefficients of the regressors are estimated unless all is backcast
     xreg_estimate = struct["n_xreg"] > 0 and initial != "complete"
@@ -516,7 +541,10 @@ def fit(
         states["xreg"] = states["xreg"] + elements["xreg_deviations"]
         profile = st.profile(states, arma_initial, struct, elements["phi"])
         w_t = st.mat_wt(elements["w"], struct, obs, xreg_data)
-        fitted = adam_cpp.fit(
+        # "gradient" solves for the initials of the states by least squares (the
+        # model is additive in the transformed space), the regressors staying in B
+        fitted = adam_fit_or_gradient(
+            adam_cpp,
             mat_vt.copy(order="F"),
             w_t.copy(order="F"),
             np.asfortranarray(elements["mat_f"]),
@@ -525,9 +553,18 @@ def fit(
             np.array(profile, order="F"),
             np.asarray(y_bc, dtype=float),
             ot,
-            backcast,
+            initial,
             int(s["n_iterations"]),
-            "n",
+            backcast,
+            gradient_model,
+            gradient_components,
+            gradient_lags,
+            obs,
+            loss=s["loss"],
+            distribution=distribution,
+            other=elements["shape"],
+            horizon=s["h"],
+            multisteps=s["loss"] in MULTISTEP_LOSSES,
         )
         return {
             "states": np.asarray(fitted.states),
@@ -667,14 +704,15 @@ def fit(
         initial_read["states"], initial_read["arma"], struct, elements["phi"]
     )
 
-    # The identified initials are counted whether they are optimised or backcast
+    # The identified initials are counted whether they are optimised, backcast or
+    # solved
     n_initials = (
         1 + int(struct["trend_in"]) + 2 * struct["n_harmonics"] + struct["arma_lag_max"]
     )
     n_param_estimated = (
         len(B) * (s["model_do"] == "estimate")
         + 1
-        + n_initials * backcast
+        + n_initials * initials_profiled
         + struct["n_xreg"] * (not xreg_estimate)
     )
     # The likelihood of the occurrence model is added, as its parameters are
@@ -717,7 +755,7 @@ def fit(
         "loglik": loglik,
         "n_param_estimated": n_param_estimated,
         "n_param_occurrence": occurrence["n_param"],
-        "n_initials": n_initials * backcast,
+        "n_initials": n_initials * initials_profiled,
         "struct": struct,
         "spec": spec,
         "elements": elements,

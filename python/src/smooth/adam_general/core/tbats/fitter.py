@@ -447,6 +447,8 @@ def fit(
         constant=False,
         adamETS=False,
     )
+    # The harmonics make F large and mostly zeros
+    adam_cpp.sparseTransition = True
     head = adam_head_length(s["head_length"], struct["lags_model_max"], obs)
     adam_cpp.headLength = head["flag"]
     lookup = np.asfortranarray(

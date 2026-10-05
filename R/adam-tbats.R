@@ -1077,6 +1077,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                    struct$nComponents, FALSE, FALSE);
     headLength <- adam_headLength(checked$headLengthUser, struct$lagsModelMax, obs);
     adamCpp$headLength <- headLength$flag;
+    # The harmonics make F large and mostly zeros
+    adamCpp$sparseTransition <- TRUE;
     lookup <- adamProfileCreator(struct$lagsModelAll, struct$lagsModelMax, obs+max(checked$h, 1),
                                  headLength=headLength$geometry)$lookup;
     matVt <- matrix(0, struct$nComponents, obs+headLength$geometry);

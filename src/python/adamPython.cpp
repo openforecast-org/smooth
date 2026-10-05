@@ -89,6 +89,7 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("adamETS"))
         .def_readwrite("flipConstant", &adamCore::flipConstant)
         .def_readwrite("headLength", &adamCore::headLength)
+        .def_readwrite("sparseTransition", &adamCore::sparseTransition)
         .def("polynomialise", &adamCore::polynomialise,
             py::arg("B"),
             py::arg("arOrders"),

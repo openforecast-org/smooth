@@ -568,6 +568,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     # of differencing is odd — the ARIMA analog of the ETS trend reversal
     adamCpp$flipConstant <- constantRequired && (sum(iOrders) %% 2 == 1);
     adamCpp$headLength <- headLengthResolved$flag;
+    # The companion form makes F large and mostly zeros with seasonal lags
+    adamCpp$sparseTransition <- TRUE;
 
     if(!is.null(initialValueProvided)){
         initialType <- "provided";

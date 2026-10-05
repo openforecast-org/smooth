@@ -95,6 +95,10 @@ public:
     // filters over. 0 means "use lagsModelMax", i.e. the behaviour before this change.
     unsigned int headLength = 0;
 
+    // The transition of fit() as a sparse product (SparseTransition), for the large and
+    // mostly zero matrices of tbats() and ssarima(). Set from R/Python; false otherwise.
+    bool sparseTransition = false;
+
 private:
     arma::uvec lags;
     char E;
@@ -791,7 +795,7 @@ public:
         arma::vec vecErrors(obs, arma::fill::zeros);
         arma::vec backcasts(H, arma::fill::zeros);
         // The transition of the forward and backward passes, sparse where that pays
-        const SparseTransition sparseF(matrixF, E, T, nETS, nArima, constant);
+        const SparseTransition sparseF(sparseTransition, matrixF, E, T, nETS, nArima, constant);
         auto transition = [&](arma::vec const &v) -> arma::vec {
             if(sparseF.use) {
                 return sparseF.matrixF * v;

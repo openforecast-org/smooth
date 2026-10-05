@@ -105,7 +105,8 @@ profiling the estimation loss at the current parameters, as in
 \link[smooth]{adam}: the model is additive in the space of the transformed data,
 so this is a linear solve (with weighted least squares sweeps for the robust and
 multistep losses). The coefficients of the regressors are estimated with the
-other parameters.}
+other parameters. With a custom loss, it is switched to \code{"backcasting"} with a
+warning.}
 
 \item{bounds}{The bounds of the parameters: \code{"admissible"} (default)
 guarantees the stability of the model (the eigenvalues of the discount matrix

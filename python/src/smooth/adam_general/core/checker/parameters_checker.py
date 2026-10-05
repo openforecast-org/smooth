@@ -651,13 +651,15 @@ def parameters_checker(
     )
 
     # The gradient initial-state solve profiles the loss in C++, which a custom
-    # loss callable cannot cross; the fit falls back to backcasting (mirrors R)
+    # loss callable cannot cross: the initials are backcast instead, and the model
+    # says so (as R)
     if init_info["initial_type"] == "gradient" and loss == "custom":
-        _warn(
+        warnings.warn(
             'initial="gradient" is not available for custom loss functions. '
-            "Backcasting will be used instead.",
-            silent,
+            'Switching to initial="backcasting".',
+            stacklevel=3,
         )
+        init_info["initial_type"] = "backcasting"
 
     # Process n_iterations parameter (for backcasting)
     # Default behavior: 2 for backcasting/complete, 1 for optimal/two-stage

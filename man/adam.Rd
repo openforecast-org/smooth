@@ -227,8 +227,8 @@ iteration for multiplicative / mixed ETS. It avoids the divergence that
 backcasting can exhibit for additive seasonal models with a trend and a large
 seasonal smoothing parameter. This option currently supports ETS models (no
 ARIMA/xreg, single seasonality) and the built-in losses; other specifications
-(including custom loss functions, which cannot be profiled in C++) fall back
-to backcasting.
+fall back to backcasting. A custom loss function cannot be profiled in C++, so
+with it the initialisation is switched to \code{"backcasting"} with a warning.
 
 If a use provides a list of values, it is recommended to use the named one and
 to provide the initial components that are available. For example:

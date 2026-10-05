@@ -330,6 +330,14 @@ class TBATS:
         self.h = int(h)
         self.holdout = holdout
         self.initial = _match(initial, INITIAL_OPTIONS, "initial")
+        # The gradient solve cannot take a custom loss: the initials are backcast
+        if self.initial == "gradient" and self.loss == "custom":
+            warnings.warn(
+                'initial="gradient" is not available for custom loss functions. '
+                'Switching to initial="backcasting".',
+                stacklevel=2,
+            )
+            self.initial = "backcasting"
         self.bounds = _match(bounds, BOUNDS_OPTIONS, "bounds")
         self.verbose = verbose
         self.B = B

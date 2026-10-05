@@ -196,12 +196,18 @@ test_that("gradient solves the additive multistep losses on the multistep design
     }
 })
 
-test_that("gradient with a custom loss function falls back to backcasting", {
+test_that("gradient with a custom loss function switches to backcasting", {
     lossCustom <- function(actual, fitted, B) { sum(abs(actual - fitted)^1.5) }
     fB <- adam(xLoss, "AAA", initial = "backcasting", loss = lossCustom, silent = TRUE)
-    fG <- suppressMessages(adam(xLoss, "AAA", initial = "gradient",
-                                loss = lossCustom, silent = TRUE))
+    expect_warning(fG <- adam(xLoss, "AAA", initial = "gradient", loss = lossCustom, silent = TRUE),
+                   "Switching to initial=\"backcasting\"")
+    expect_equal(fG$initialType, "backcasting")
     expect_equal(fG$lossValue, fB$lossValue, tolerance = 1e-8)
+    # tbats() does the same through the checker
+    expect_warning(fT <- tbats(AirPassengers, harmonics=2, orders=list(ar=0, ma=0, select=FALSE),
+                               initial="gradient", loss=lossCustom),
+                   "Switching to initial=\"backcasting\"")
+    expect_equal(fT$initialType, "backcasting")
 })
 
 test_that("gradient solves om ARIMA and xreg initials (occurrence)", {

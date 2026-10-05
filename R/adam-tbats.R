@@ -119,7 +119,8 @@
 #' \link[smooth]{adam}: the model is additive in the space of the transformed data,
 #' so this is a linear solve (with weighted least squares sweeps for the robust and
 #' multistep losses). The coefficients of the regressors are estimated with the
-#' other parameters.
+#' other parameters. With a custom loss, it is switched to \code{"backcasting"} with a
+#' warning.
 #' @param bounds The bounds of the parameters: \code{"admissible"} (default)
 #' guarantees the stability of the model (the eigenvalues of the discount matrix
 #' of the level, trend and harmonics lie in the unit circle and the ARMA is
@@ -232,6 +233,9 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                                  occurrence="none", ic=ic, bounds=bounds, regressors="use",
                                  yName=yName, silent=silent, modelDo=modelDo,
                                  ellipsis=ellipsis, fast=FALSE);
+    # The initialisation the checker settled on (backcasting for "gradient" with a
+    # custom loss)
+    initial <- checked$initialType;
     checked$headLengthUser <- ellipsis$headLength;
     checked$modelDo <- modelDo;
     checked$bounds <- bounds;

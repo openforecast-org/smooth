@@ -36,6 +36,7 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* `initial="gradient"` with a custom loss function (`ADAM` and its wrappers, `TBATS`) backcast the initials while the model kept `initial="gradient"`: it now switches to `initial="backcasting"` explicitly, with a warning, as R.
 * The multistep losses of `TBATS` with missing values took all the windows of the multistep errors and divided by T-h, where R takes the windows with all their targets observed (TMSE of 12131.0 against R's 9369.0 on AirPassengers with three gaps).
 * `ADAM(ets="adam")` without ETS components (ARIMA, regressors) left the update of the states at 1 rather than the persistence times the error, in the shared C++ (`g()`): it is the conventional model there again, as in R.
 * The coefficients of the regressors of `ADAM` are named after their variables, as R's (`x`, `my.var`: R's `make.names`, also in the states and the selection), rather than `xreg1`, `xreg2`; and its constant is `drift` with ETS or differences, as R, rather than `constant` everywhere.

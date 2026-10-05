@@ -10,8 +10,9 @@ test_gradient.R`` on the R side.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from smooth import ADAM
+from smooth import ADAM, TBATS
 
 # Seasonal series with trend — the case where backcasting historically drifted.
 _Y = np.array(
@@ -284,13 +285,19 @@ def test_gradient_loss_code_mapping_matches_r():
     )
 
 
-def test_gradient_custom_loss_falls_back_to_backcasting():
+def test_gradient_custom_loss_switches_to_backcasting():
     def loss_fn(actual, fitted, B):  # noqa: N803
         return float(np.sum(np.abs(actual - fitted) ** 1.5))
 
     mb = ADAM(model="AAA", lags=[12], initial="backcasting", loss=loss_fn).fit(_YL)
-    mg = ADAM(model="AAA", lags=[12], initial="gradient", loss=loss_fn).fit(_YL)
+    with pytest.warns(UserWarning, match='Switching to initial="backcasting"'):
+        mg = ADAM(model="AAA", lags=[12], initial="gradient", loss=loss_fn).fit(_YL)
+    assert mg._initials["initial_type"] == "backcasting"
     assert abs(_loss_value(mg) - _loss_value(mb)) < 1e-8
+    # TBATS does the same
+    with pytest.warns(UserWarning, match='Switching to initial="backcasting"'):
+        tbats = TBATS(lags=[1, 12], harmonics=[2], initial="gradient", loss=loss_fn)
+    assert tbats.initial == "backcasting"
 
 
 # --- Occurrence models (om) -------------------------------------------------

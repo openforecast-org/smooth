@@ -103,7 +103,11 @@
 #' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 #' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
 #' ellipsis).
-#' @param loss The loss function, see \link[smooth]{adam}.
+#' @param loss The loss function, see \link[smooth]{adam}. A custom loss is a function
+#' of \code{actual}, \code{fitted} and \code{B}, as in \link[smooth]{adam}, which
+#' receives the observed values with demand and their fitted values in the space of the
+#' Box-Cox transformed data (lambda is then 1, as with the other losses than the
+#' likelihood).
 #' @param ic The information criterion used in the selection.
 #' @param h The forecast horizon.
 #' @param holdout If \code{TRUE}, the holdout of the size \code{h} is taken from
@@ -170,7 +174,10 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
 
     trend <- match.arg(trend);
     distribution <- match.arg(distribution);
-    loss <- match.arg(loss);
+    # A function is a custom loss, handled by the checker
+    if(!is.function(loss)){
+        loss <- match.arg(loss);
+    }
     ic <- match.arg(ic);
     initial <- match.arg(initial);
     bounds <- match.arg(bounds);
@@ -194,7 +201,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         trend <- model$trendType;
         armaSpecProvided <- model$armaSpec;
         distribution <- model$distribution;
-        loss <- model$loss;
+        loss <- if(model$loss=="custom") model$lossFunction else model$loss;
         initial <- model$initialType;
         bounds <- model$bounds;
         # The regressors of the model, selected or not, are used as they are
@@ -234,7 +241,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     yInSample[checked$yNAValues[seq_along(yInSample)]] <- NA;
     xregSpec <- tbats_xreg(xreg, length(yInSample), checked$h, regressors);
     yInSample[xregSpec$missing] <- NA;
-    occurrenceSpec <- tbats_occurrence(occurrence, yInSample, loss);
+    occurrenceSpec <- tbats_occurrence(occurrence, yInSample, checked$loss);
     # Under a name of its own: checked has occurrence elements of adam(), which $ matches
     # partially
     checked[["tbatsOccurrence"]] <- occurrenceSpec;
@@ -242,7 +249,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
 
     #### The structure ####
     periods <- sort(unique(lags[lags>1]));
-    lambdaSpec <- tbats_lambdaSpec(lambdaProvided, yInSample[otLogical], loss);
+    lambdaSpec <- tbats_lambdaSpec(lambdaProvided, yInSample[otLogical], checked$loss);
     armaSpec <- if(is.null(armaSpecProvided)) tbats_armaSpec(orders, lags) else armaSpecProvided;
     # With the selection, the trend is chosen without ARMA, and without the regressors
     armaSpecFit <- if(armaSpec$select) tbats_armaBuild(0, 0, 1) else armaSpec;
@@ -1139,7 +1146,9 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                             "MSE"=sum(errors^2)/obsNonzero,
                             "MAE"=sum(abs(errors))/obsNonzero,
                             "HAM"=sum(sqrt(abs(errors)))/obsNonzero,
-                            "custom"=checked$lossFunction(actual=fitted$yBC, fitted=fitted$fitted, B=B));
+                            # On the observed values with demand, in the transformed space
+                            "custom"=checked$lossFunction(actual=fitted$yBC[otLogical],
+                                                          fitted=fitted$fitted[otLogical], B=B));
         }
         else{
             hor <- checked$h;
@@ -1592,7 +1601,8 @@ tbats_refitCall <- function(object){
                    ma=ifelse(is.na(position), 0, armaSpec$maOrders[position]), select=FALSE);
     arguments <- list(y=NULL, lags=object$lags, harmonics=object$harmonics, trend=object$trendType,
                       lambda=if(any(names(object$B)=="lambda")) NULL else object$lambda,
-                      orders=orders, distribution=object$distribution, loss=object$loss,
+                      orders=orders, distribution=object$distribution,
+                      loss=if(object$loss=="custom") object$lossFunction else object$loss,
                       initial=object$initialType, bounds=object$bounds,
                       B=object$B, lb=rep(-Inf, length(object$B)), ub=rep(Inf, length(object$B)),
                       silent=TRUE);

@@ -433,3 +433,17 @@ test_that("initial='gradient' solves for the initials of the states", {
     expect_lte(atBackcast$lossValue, fitBackcast$lossValue);
     expect_true(all(is.finite(forecast(fitGradient, h=12, interval="prediction")$upper)));
 })
+
+test_that("tbats() takes a custom loss", {
+    lossMSE <- function(actual, fitted, B){
+        return(mean((actual-fitted)^2));
+    }
+    fitCustom <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, loss=lossMSE);
+    fitMSE <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, loss="MSE");
+    expect_equal(fitCustom$loss, "custom");
+    expect_equal(fitCustom$lossValue, fitMSE$lossValue);
+    expect_equal(fitCustom$B, fitMSE$B);
+    # The refits take the function back
+    expect_equal(tbats(AirPassengers, model=fitCustom)$lossValue, fitCustom$lossValue);
+    expect_s3_class(coefbootstrap(fitCustom, nsim=3), "bootstrap");
+})

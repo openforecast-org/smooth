@@ -441,3 +441,39 @@ def test_the_gradient_initials_agree(case):
     assert fit.loglik == pytest.approx(r["ll"][0], rel=1e-10)
     assert fit.nparam == r["nparam"][0]
     np.testing.assert_allclose(fit.predict(h=12).mean, r["fc"], rtol=1e-10)
+
+
+# A custom loss of R and its Python twin, and a multistep loss over gaps
+CUSTOM_LOSS_R = "function(actual, fitted, B) mean(abs(actual-fitted)^1.5)"
+CUSTOM_DATA = {
+    "custom": "y <- as.numeric(AirPassengers);",
+    "custom gaps": "y <- as.numeric(AirPassengers); y[c(10,50,51)] <- NA;",
+    "TMSE gaps": "y <- as.numeric(AirPassengers); y[c(10,50,51)] <- NA;",
+}
+
+
+def _custom_loss(actual, fitted, B):
+    return float(np.mean(np.abs(actual - fitted) ** 1.5))
+
+
+@pytest.mark.parametrize("case", list(CUSTOM_DATA))
+def test_the_custom_and_multistep_losses_agree(case):
+    multistep = case == "TMSE gaps"
+    r_loss = "loss='TMSE', h=6" if multistep else f"loss={CUSTOM_LOSS_R}"
+    r = r_dict(
+        f"{{ {CUSTOM_DATA[case]} m <- suppressWarnings(tbats(ts(y, frequency=12),"
+        f" harmonics=5, trend='additive', {R_ORDERS0}, {r_loss}));"
+        " list(y=y, B=unname(m$B), loss=m$lossValue, ll=as.numeric(logLik(m)),"
+        " fc=as.numeric(forecast(m, h=6)$mean)) }"
+    )
+    y = np.array([np.nan if v in (None, "NA") else v for v in r["y"]], float)
+    loss = dict(loss="TMSE", h=6) if multistep else dict(loss=_custom_loss)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = TBATS(
+            lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0, **loss
+        ).fit(y)
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+    assert fit.loss_value == pytest.approx(r["loss"][0], rel=1e-10)
+    assert fit.loglik == pytest.approx(r["ll"][0], rel=1e-10)
+    np.testing.assert_allclose(fit.predict(h=6).mean, r["fc"], rtol=1e-10)

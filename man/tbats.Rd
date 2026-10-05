@@ -85,7 +85,11 @@ Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
 \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
 ellipsis).}
 
-\item{loss}{The loss function, see \link[smooth]{adam}.}
+\item{loss}{The loss function, see \link[smooth]{adam}. A custom loss is a function
+of \code{actual}, \code{fitted} and \code{B}, as in \link[smooth]{adam}, which
+receives the observed values with demand and their fitted values in the space of the
+Box-Cox transformed data (lambda is then 1, as with the other losses than the
+likelihood).}
 
 \item{ic}{The information criterion used in the selection.}
 

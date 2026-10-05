@@ -4,7 +4,7 @@ import math
 import time
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -289,7 +289,7 @@ class TBATS:
         regressors: str = "use",
         occurrence: Any = "none",
         distribution: str = "dnorm",
-        loss: str = "likelihood",
+        loss: Union[str, Callable[..., float]] = "likelihood",
         ic: str = "AICc",
         h: int = 0,
         holdout: bool = False,
@@ -323,7 +323,9 @@ class TBATS:
             _match(occurrence, OCCURRENCE_OPTIONS, "occurrence")
         self.occurrence = occurrence
         self.distribution = _match(distribution, DISTRIBUTION_OPTIONS, "distribution")
-        self.loss = _match(loss, LOSS_OPTIONS, "loss")
+        # A function is a custom loss of actual, fitted and B, as in ADAM
+        self.loss_function = loss if callable(loss) else None
+        self.loss = "custom" if callable(loss) else _match(loss, LOSS_OPTIONS, "loss")
         self.ic = _match(ic, IC_OPTIONS, "ic")
         self.h = int(h)
         self.holdout = holdout
@@ -364,6 +366,7 @@ class TBATS:
         return {
             "h": self.h,
             "loss": self.loss,
+            "loss_function": self.loss_function,
             "bounds": self.bounds,
             "model_do": "estimate",
             "B": self.B,
@@ -1666,7 +1669,7 @@ class TBATS:
                 "select": False,
             },
             "distribution": self.distribution,
-            "loss": self.loss,
+            "loss": self.loss_function if self.loss == "custom" else self.loss,
             "initial": self.initial,
             "bounds": self.bounds,
             "B": B,

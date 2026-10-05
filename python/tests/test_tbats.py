@@ -587,3 +587,18 @@ def test_initial_gradient_solves_for_the_initials(air):
         **arguments,
     ).fit(air)
     assert at_backcast.loss_value <= backcast.loss_value
+
+
+def test_a_custom_loss(air):
+    """A function of actual, fitted and B, on the values in the transformed space."""
+    arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
+
+    def loss_mse(actual, fitted, B):
+        return float(np.mean((actual - fitted) ** 2))
+
+    custom = TBATS(loss=loss_mse, **arguments).fit(air)
+    mse = TBATS(loss="MSE", **arguments).fit(air)
+    assert custom.loss == "custom"
+    assert custom.loss_value == pytest.approx(mse.loss_value, rel=1e-12)
+    np.testing.assert_allclose(custom.coef, mse.coef, rtol=1e-10)
+    assert custom.coefbootstrap(nsim=3, seed=1).nsim_effective == 3

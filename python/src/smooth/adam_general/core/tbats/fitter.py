@@ -22,6 +22,7 @@ from smooth.adam_general.core.utils.utils import (
     _log_r,
     _sum_r,
     calculate_likelihood,
+    complete_windows,
 )
 
 PENALTY = 1e100
@@ -595,7 +596,9 @@ def fit(
                     np.asarray(fitted["y_bc"], dtype=float),
                 ).errors
             )
-            n = obs - horizon
+            # The windows with all their targets observed, as R's
+            adam_errors = adam_errors[complete_windows(~np.isnan(y), horizon)]
+            n = len(adam_errors)
             squares = _sum_r(adam_errors**2, axis=0) / n
             if loss == "MSEh":
                 value = _sum_r(adam_errors[:, horizon - 1] ** 2) / n
@@ -616,6 +619,13 @@ def fit(
             value = _sum_r(errors**2) / obs_nonzero
         elif loss == "MAE":
             value = _sum_r(np.abs(errors)) / obs_nonzero
+        elif loss == "custom":
+            # On the observed values with demand, in the transformed space
+            value = s["loss_function"](
+                actual=fitted["y_bc"][ot_logical],
+                fitted=fitted["fitted"][ot_logical],
+                B=B,
+            )
         else:
             value = _sum_r(np.sqrt(np.abs(errors))) / obs_nonzero
         return float(value) if np.isfinite(value) else 1e300

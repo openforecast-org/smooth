@@ -437,7 +437,7 @@ def test_adaptive_regressors_stay_within_the_bounds(bounds):
     # The averaged condition of ADAM rejects a coefficient that explodes
     exploding = fit.coef.copy()
     exploding[fit.coef_names.index("delta1")] = 3
-    assert fit._best["fitter"](exploding) is None
+    assert not fit._best["in_bounds"](exploding)
 
 
 def test_the_selection_keeps_the_relevant_regressor(xreg_data):

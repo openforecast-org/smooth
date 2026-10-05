@@ -772,6 +772,9 @@ tbats_structure <- function(trendType, harmonicTable, armaSpec, periods, xregSpe
                 harmonicRows=harmonicRows, armaRows=armaRows, xregRows=xregRows, matF=matF,
                 xreg=xregSpec, xregAdapt=nXreg>0 && xregSpec$regressors=="adapt",
                 harmonicTable=harmonicTable, periods=periods, periodIndex=periodIndex,
+                # The periods with harmonics, and the one of each harmonic among them
+                periodsUsed=periods[sort(unique(periodIndex))],
+                gammaIndex=match(periodIndex, sort(unique(periodIndex))),
                 responseCos=cos(angles), responseSin=sin(angles),
                 armaLagMax=if(nArma>0) max(armaSpec$stateLags) else 0,
                 componentNames=componentNames));
@@ -855,7 +858,7 @@ tbats_harmonicLabels <- function(struct){
 tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distribution,
                     otherParameterEstimate, initialEstimate, xregEstimate, bounds){
     nPeriods <- length(unique(struct$harmonicTable$period));
-    periodsUsed <- struct$periods[sort(unique(struct$periodIndex))];
+    periodsUsed <- struct$periodsUsed;
     B <- c(alpha=0.1,
            beta=if(struct$trendIn) 0.05,
            phi=if(struct$damped) 0.95,
@@ -908,10 +911,8 @@ tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate
     alpha <- B[["alpha"]];
     beta <- get("beta", 0);
     phi <- get("phi", 1);
-    periodsUsed <- struct$periods[sort(unique(struct$periodIndex))];
-    gammaIndex <- match(struct$harmonicTable$period, periodsUsed);
-    gamma1 <- B[grepl("^gamma1\\[", names(B))][gammaIndex];
-    gamma2 <- B[grepl("^gamma2\\[", names(B))][gammaIndex];
+    gamma1 <- B[grepl("^gamma1\\[", names(B))][struct$gammaIndex];
+    gamma2 <- B[grepl("^gamma2\\[", names(B))][struct$gammaIndex];
     lambda <- get("lambda", lambdaSpec$value);
     shape <- get("shape", if(is.null(other)) 2 else other);
     penalty <- 0;
@@ -1046,7 +1047,7 @@ tbats_eigens <- function(matF, vecG, w, struct){
         ge[rows] <- vecG[rowOld+0:1];
         we[rows[1]] <- 1;
     }
-    return(Mod(eigen(Fe - ge %o% we, only.values=TRUE)$values));
+    return(Mod(eigen(Fe - ge %o% we, symmetric=FALSE, only.values=TRUE)$values));
 }
 
 #### The fitter ####

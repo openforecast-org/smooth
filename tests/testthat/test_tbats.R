@@ -305,7 +305,7 @@ test_that("adaptive regressors are ADAM's ETSX{D} and stay within the bounds", {
     refit <- tbats(y, lags=1, model=fit);
     expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)), tolerance=1e-10);
     # The averaged condition of adam() rejects a coefficient that explodes
-    expect_null(fit$fitter(replace(coef(fit), "delta1", 3)));
+    expect_false(fit$inBounds(replace(coef(fit), "delta1", 3)));
 });
 
 test_that("the selection keeps the relevant regressor and drops the noise", {

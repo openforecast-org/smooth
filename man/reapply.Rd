@@ -3,6 +3,7 @@
 \name{reapply}
 \alias{reapply}
 \alias{reforecast}
+\alias{reforecast.adam}
 \title{Reapply the model with randomly generated initial parameters and produce forecasts}
 \usage{
 reapply(object, nsim = 1000, type = c("opg", "hessian", "bootstrap"),
@@ -12,6 +13,12 @@ reforecast(object, h = 10, newdata = NULL, occurrence = NULL,
   interval = c("prediction", "confidence", "none"), level = 0.95,
   side = c("both", "upper", "lower"), cumulative = FALSE, nsim = 100,
   ...)
+
+\method{reforecast}{adam}(object, h = 10, newdata = NULL,
+  occurrence = NULL, interval = c("prediction", "confidence", "none"),
+  level = 0.95, side = c("both", "upper", "lower"), cumulative = FALSE,
+  nsim = 100, type = c("opg", "hessian", "bootstrap"), bootstrap = FALSE,
+  heuristics = NULL, point = c("skeleton", "mean", "median"), ...)
 }
 \arguments{
 \item{object}{Model estimated using one of the functions of smooth package.}

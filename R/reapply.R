@@ -938,6 +938,7 @@ reforecast.default <- function(object, h=10, newdata=NULL, occurrence=NULL,
                     nsim=nsim, ...));
 }
 
+#' @rdname reapply
 #' @export
 reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                             interval=c("prediction", "confidence", "none"),

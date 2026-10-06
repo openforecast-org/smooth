@@ -723,9 +723,8 @@ def generate_multistep_interval(
             mat_f,
         )
     else:
-        adam_errors = np.asarray(prepared_model["residuals"], dtype=float).reshape(
-            -1, 1
-        )
+        # A copy: under pandas' copy-on-write the array of the residuals is read-only
+        adam_errors = np.array(prepared_model["residuals"], dtype=float).reshape(-1, 1)
         # No residual at the missing values
         adam_errors[~observed_mask(observations_dict)] = np.nan
 

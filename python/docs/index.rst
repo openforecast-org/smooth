@@ -201,6 +201,7 @@ customize the optimization behavior via the ``nlopt_kwargs`` parameter:
    autoadam
    sma
    msarima
+   tbats
    om
    sm
    msdecompose

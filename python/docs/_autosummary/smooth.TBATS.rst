@@ -61,8 +61,8 @@
    ~TBATS.scale
    ~TBATS.states
    ~TBATS.transition
+   ~TBATS.xreg_names_
    ~TBATS.harmonics_
    ~TBATS.trend_type_
    ~TBATS.lambda_
-   ~TBATS.xreg_names_
 

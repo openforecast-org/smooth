@@ -9,7 +9,7 @@ default (``r_parity`` marker).
 import numpy as np
 import pytest
 
-from smooth import ADAM, CES, MSARIMA, OM, OMG, AdamTBATS
+from smooth import ADAM, CES, MSARIMA, OM, OMG, TBATS
 
 from ._r_bridge import r_dict
 
@@ -136,12 +136,12 @@ GAP_CASES = {
             "*rbinom(300, 1, 0.7), frequency=7);"
         ),
         "tbats(y, occurrence='odds-ratio')",
-        lambda: AdamTBATS(lags=[1, 7], occurrence="odds-ratio"),
+        lambda: TBATS(lags=[1, 7], occurrence="odds-ratio"),
     ),
     "tbats occurrence arma": (
         TBATS_INTERMITTENT,
         "tbats(y, occurrence='odds-ratio', orders=list(ar=1, ma=1, select=FALSE))",
-        lambda: AdamTBATS(
+        lambda: TBATS(
             lags=[1, 7],
             occurrence="odds-ratio",
             orders={"ar": 1, "ma": 1, "select": False},
@@ -229,20 +229,20 @@ GAPS_CASES = {
     "tbats": (
         AIRPASSENGERS_GAPS,
         "tbats(ts(y, frequency=12), lags=c(1,12))",
-        lambda: AdamTBATS(lags=[1, 12]),
+        lambda: TBATS(lags=[1, 12]),
         False,
     ),
     "tbats arma": (
         AIRPASSENGERS_GAPS,
         "tbats(ts(y, frequency=12), lags=c(1,12), "
         "orders=list(ar=1, ma=1, select=FALSE))",
-        lambda: AdamTBATS(lags=[1, 12], orders={"ar": 1, "ma": 1, "select": False}),
+        lambda: TBATS(lags=[1, 12], orders={"ar": 1, "ma": 1, "select": False}),
         False,
     ),
     "tbats occurrence": (
         INTERMITTENT_GAPS,
         "tbats(y, lags=c(1,7), occurrence='odds-ratio')",
-        lambda: AdamTBATS(lags=[1, 7], occurrence="odds-ratio"),
+        lambda: TBATS(lags=[1, 7], occurrence="odds-ratio"),
         False,
     ),
 }

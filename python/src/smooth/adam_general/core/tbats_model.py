@@ -83,7 +83,7 @@ def _refit_one_replicate(
     so that joblib can pickle it."""
     try:
         X_i = None if X is None else X[indices[i]]
-        coef = AdamTBATS(**kwargs).fit(actuals[indices[i]], X_i).coef
+        coef = TBATS(**kwargs).fit(actuals[indices[i]], X_i).coef
     except Exception:
         return None
     if coef.shape[0] != k or not np.all(np.isfinite(coef)):
@@ -221,7 +221,7 @@ def _match(value: str, options: tuple, name: str) -> str:
     return value
 
 
-class AdamTBATS:
+class TBATS:
     """
     Trigonometric Box-Cox ARMA Trend Seasonal model (De Livera et al., 2011) in the
     Single Source of Error framework of ADAM: the level and trend of ETS, a
@@ -403,7 +403,7 @@ class AdamTBATS:
             "shape_estimate": self.shape is None,
         }
 
-    def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "AdamTBATS":
+    def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "TBATS":
         """Fit the model to the series ``y``, with the explanatory variables ``X``
         (a numeric array or data frame with the rows of ``y``, and of the horizon
         ``h`` for its forecasts) in the space of the transformed data.
@@ -1919,7 +1919,7 @@ class AdamTBATS:
     def __repr__(self) -> str:
         if hasattr(self, "_best"):
             return f"{self.model_name}, AICc {self.aicc:.3f}"
-        return "AdamTBATS (not fitted)"
+        return "TBATS (not fitted)"
 
 
 def _r_round(value: float, digits: int) -> str:

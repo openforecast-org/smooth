@@ -21,7 +21,7 @@ from smooth.adam_general.core.simulate import (
 )
 from smooth.adam_general.core.sm import sm
 from smooth.adam_general.core.sma import SMA
-from smooth.adam_general.core.tbats_model import AdamTBATS
+from smooth.adam_general.core.tbats_model import TBATS
 from smooth.adam_general.core.utils.utils import msdecompose
 from smooth.utils import show_versions
 
@@ -42,7 +42,7 @@ __all__ = [
     "OM",
     "OMG",
     "SMA",
-    "AdamTBATS",
+    "TBATS",
     "SimulateResult",
     "__version__",
     "msdecompose",

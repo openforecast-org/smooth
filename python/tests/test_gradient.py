@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from smooth import ADAM, AdamTBATS
+from smooth import ADAM, TBATS
 
 # Seasonal series with trend — the case where backcasting historically drifted.
 _Y = np.array(
@@ -296,7 +296,7 @@ def test_gradient_custom_loss_switches_to_backcasting():
     assert abs(_loss_value(mg) - _loss_value(mb)) < 1e-8
     # TBATS does the same
     with pytest.warns(UserWarning, match='Switching to initial="backcasting"'):
-        tbats = AdamTBATS(lags=[1, 12], harmonics=[2], initial="gradient", loss=loss_fn)
+        tbats = TBATS(lags=[1, 12], harmonics=[2], initial="gradient", loss=loss_fn)
     assert tbats.initial == "backcasting"
 
 

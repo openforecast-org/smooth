@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 import pytest
 
-from smooth import OM, AdamTBATS
+from smooth import OM, TBATS
 from tests._r_bridge import r_dict
 
 pytestmark = pytest.mark.r_parity
@@ -66,9 +66,7 @@ def _r_fit(series, arguments, extra=""):
 def test_the_fits_agree_on_air_passengers(case):
     r_arguments, python_arguments = CASES[case]
     r = _r_fit("AirPassengers", r_arguments)
-    fit = AdamTBATS(lags=[1, 12], **python_arguments).fit(
-        np.asarray(r["y"], dtype=float)
-    )
+    fit = TBATS(lags=[1, 12], **python_arguments).fit(np.asarray(r["y"], dtype=float))
     assert fit.model_name == r["model"][0]
     assert fit.coef_names == r["names"]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
@@ -77,7 +75,7 @@ def test_the_fits_agree_on_air_passengers(case):
 
 def test_the_selection_agrees_on_bjsales():
     r = _r_fit("BJsales", "", ", ICs=unname(m$ICs)")
-    fit = AdamTBATS().fit(np.asarray(r["y"], dtype=float))
+    fit = TBATS().fit(np.asarray(r["y"], dtype=float))
     assert fit.model_name == r["model"][0]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
     np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
@@ -92,7 +90,7 @@ def test_the_arma_selection_agrees_on_harmonics_with_an_ar():
         " list(y=as.numeric(y), model=m$model, B=unname(m$B), ICs=unname(m$ICs),"
         " ICnames=names(m$ICs)) }"
     )
-    fit = AdamTBATS(lags=[1, 12], harmonics=[1], trend="none").fit(
+    fit = TBATS(lags=[1, 12], harmonics=[1], trend="none").fit(
         np.asarray(r["y"], dtype=float)
     )
     assert fit.model_name == r["model"][0]
@@ -111,7 +109,7 @@ def test_the_forecasts_and_the_covariance_agree():
         " upper=as.numeric(forecast(m, h=12, interval='prediction')$upper)),"
         " se=unname(sqrt(diag(vcov(m)))), pointLik=as.numeric(pointLik(m))",
     )
-    fit = AdamTBATS(lags=[1, 12], **CASES["damped-arma"][1]).fit(
+    fit = TBATS(lags=[1, 12], **CASES["damped-arma"][1]).fit(
         np.asarray(r["y"], dtype=float)
     )
     forecast = fit.predict(h=12, interval="prediction")
@@ -128,7 +126,7 @@ def test_confint_agrees():
         CASES["damped-arma"][0],
         ", ci=unname(confint(m)[,2:3])",
     )
-    fit = AdamTBATS(lags=[1, 12], **CASES["damped-arma"][1]).fit(
+    fit = TBATS(lags=[1, 12], **CASES["damped-arma"][1]).fit(
         np.asarray(r["y"], dtype=float)
     )
     np.testing.assert_allclose(
@@ -231,7 +229,7 @@ def _r_xreg_fit(case, extra=""):
 @pytest.mark.parametrize("case", list(XREG_CASES))
 def test_the_fits_with_regressors_agree(case):
     r = _r_xreg_fit(case)
-    fit = AdamTBATS(**XREG_CASES[case][2]).fit(
+    fit = TBATS(**XREG_CASES[case][2]).fit(
         np.asarray(r["y"], dtype=float), np.asarray(r["X"], dtype=float)
     )
     assert fit.model_name == r["model"][0]
@@ -252,7 +250,7 @@ def test_the_intervals_with_new_regressors_agree():
         " list(mean=as.numeric(f$mean), lower=as.numeric(f$lower),"
         f" upper=as.numeric(f$upper)) }}, Xnew={newdata}",
     )
-    fit = AdamTBATS(**XREG_CASES["use"][2]).fit(
+    fit = TBATS(**XREG_CASES["use"][2]).fit(
         np.asarray(r["y"], dtype=float), np.asarray(r["X"], dtype=float)
     )
     forecast = fit.predict(
@@ -270,7 +268,7 @@ def test_the_mean_by_quadrature_agrees(lam):
         CASES["additive"][0] + f", lambda={lam}",
         ", mean=as.numeric(forecast(m, h=24, point='mean')$mean)",
     )
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         lambda_bc=None if lam == "NULL" else 0.0,
         **CASES["additive"][1],
@@ -315,7 +313,7 @@ def test_the_occurrence_mixture_agrees(case):
         " side='upper')$upper)) }"
     )
     y = np.asarray(r["y"], dtype=float)
-    fit = AdamTBATS(lags=[1, 7], occurrence=py_occurrence(y), orders=ORDERS0).fit(y)
+    fit = TBATS(lags=[1, 7], occurrence=py_occurrence(y), orders=ORDERS0).fit(y)
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-8, atol=1e-10)
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
     assert fit.nparam == r["nparam"][0]
@@ -370,7 +368,7 @@ def test_the_fits_with_missing_regressors_agree(case):
     X[[14, 59], 0] = np.nan
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        fit = AdamTBATS(**arguments).fit(np.asarray(r["y"], dtype=float), X)
+        fit = TBATS(**arguments).fit(np.asarray(r["y"], dtype=float), X)
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
     # No fitted values without the regressors
@@ -390,11 +388,11 @@ def test_the_cumulative_skeletons_agree():
         " cumulative=TRUE)$mean)) }"
     )
     y = np.asarray(r["y"], dtype=float)
-    fit = AdamTBATS(lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0).fit(y)
+    fit = TBATS(lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0).fit(y)
     np.testing.assert_allclose(
         fit.predict(h=7, cumulative=True).mean, r["mixture"], rtol=1e-10
     )
-    air = AdamTBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(
+    air = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(
         np.asarray(r_dict("list(y=as.numeric(AirPassengers))")["y"], dtype=float)
     )
     np.testing.assert_allclose(
@@ -437,7 +435,7 @@ def test_the_gradient_initials_agree(case):
     )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        fit = AdamTBATS(lags=[1, 12], initial="gradient", **arguments).fit(
+        fit = TBATS(lags=[1, 12], initial="gradient", **arguments).fit(
             np.asarray(r["y"], dtype=float)
         )
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
@@ -473,7 +471,7 @@ def test_the_custom_and_multistep_losses_agree(case):
     loss = dict(loss="TMSE", h=6) if multistep else dict(loss=_custom_loss)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        fit = AdamTBATS(
+        fit = TBATS(
             lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0, **loss
         ).fit(y)
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
@@ -493,7 +491,7 @@ def test_the_diagnostics_agree():
         " analytical=as.numeric(multicov(m, h=3)),"
         " empirical=as.numeric(multicov(m, type='empirical', h=3))) }"
     )
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         harmonics=[5],
         trend="damped",

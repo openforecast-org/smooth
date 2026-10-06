@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from smooth import AdamTBATS
+from smooth import TBATS
 from smooth.adam_general.core.tbats import fitter as ft
 from smooth.adam_general.core.tbats import structure as st
 
@@ -48,7 +48,7 @@ def test_errors_are_those_of_the_rotation_form():
         + np.cumsum(rng.normal(0, 0.5, 300))
         + rng.normal(size=300)
     )
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 7, 30.4375],
         harmonics=[2, 1],
         trend="additive",
@@ -94,7 +94,7 @@ def test_backcasting_reproduces_a_noise_free_fractional_period():
         + 4 * np.cos(2 * np.pi * tt / 7.3)
         + 2 * np.sin(4 * np.pi * tt / 7.3)
     )
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 7.3],
         harmonics=[2],
         trend="additive",
@@ -107,10 +107,10 @@ def test_backcasting_reproduces_a_noise_free_fractional_period():
 
 
 def test_lambda_zero_is_the_model_of_the_logarithms(air):
-    fit_log = AdamTBATS(
+    fit_log = TBATS(
         lags=[1, 12], harmonics=[5], trend="additive", lambda_bc=0, orders=ORDERS0
     ).fit(air)
-    fit_level = AdamTBATS(
+    fit_level = TBATS(
         lags=[1, 12],
         harmonics=[5],
         trend="additive",
@@ -125,18 +125,16 @@ def test_lambda_zero_is_the_model_of_the_logarithms(air):
 
 
 def test_lambda_is_estimated_in_the_unit_interval_or_falls_back(air):
-    fit = AdamTBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(
-        air
-    )
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(air)
     assert 0 <= fit.lambda_ <= 1
     assert "lambda" in fit.coef_names
     with pytest.warns(UserWarning, match="positive data"):
-        negative = AdamTBATS(
+        negative = TBATS(
             lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0
         ).fit(air - 200)
     assert negative.lambda_ == 1
     with pytest.warns(UserWarning, match="likelihood"):
-        mse = AdamTBATS(
+        mse = TBATS(
             lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0, loss="MSE"
         ).fit(air)
     assert mse.lambda_ == 1
@@ -144,7 +142,7 @@ def test_lambda_is_estimated_in_the_unit_interval_or_falls_back(air):
 
 @pytest.mark.parametrize("distribution", ["dnorm", "dlaplace", "ds", "dgnorm"])
 def test_the_distributions_are_fitted(air, distribution):
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         harmonics=[5],
         trend="additive",
@@ -156,7 +154,7 @@ def test_the_distributions_are_fitted(air, distribution):
 
 
 def test_a_provided_shape_is_not_estimated(air):
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         harmonics=[5],
         trend="additive",
@@ -168,7 +166,7 @@ def test_a_provided_shape_is_not_estimated(air):
 
 
 def test_usual_bounds_keep_the_response_in_the_unit_interval(air):
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0, bounds="usual"
     ).fit(air)
     B = dict(zip(fit.coef_names, fit.coef))
@@ -195,7 +193,7 @@ def test_coinciding_harmonics_are_dropped_and_arma_lags_merged():
 
 @pytest.mark.parametrize("initial", ["backcasting", "optimal", "two-stage"])
 def test_admissible_bounds_keep_the_discount_matrix_stable(air, initial):
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12], harmonics=[5], trend="damped", orders=ARMA11, initial=initial
     ).fit(air)
     best = fit._best
@@ -209,24 +207,24 @@ def test_admissible_bounds_keep_the_discount_matrix_stable(air, initial):
 
 
 def test_two_stage_cannot_end_below_the_backcasted_fit(air):
-    complete = AdamTBATS(
+    complete = TBATS(
         lags=[1, 12], trend="damped", orders=ARMA11, initial="complete"
     ).fit(air)
-    two_stage = AdamTBATS(
+    two_stage = TBATS(
         lags=[1, 12], trend="damped", orders=ARMA11, initial="two-stage"
     ).fit(air)
     assert two_stage.loglik >= complete.loglik - 1e-8
 
 
 def test_the_arma_falls_back_to_none_when_it_does_not_help(air):
-    fit = AdamTBATS(lags=[1, 12], harmonics=[5], trend="additive").fit(air)
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive").fit(air)
     assert sum(fit.orders_["ar"]) + sum(fit.orders_["ma"]) == 0
     assert any("+ARMA" in name for name in fit.ics)
     assert min(fit.ics.values()) == pytest.approx(fit.aicc)
 
 
 def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         harmonics=[5],
         trend="damped",
@@ -253,16 +251,12 @@ def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
 
 
 def test_point_likelihoods_sum_to_the_log_likelihood(air):
-    fit = AdamTBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(
-        air
-    )
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(air)
     assert fit.point_lik().sum() == pytest.approx(fit.loglik, rel=1e-12)
 
 
 def test_the_covariance_is_finite(air):
-    fit = AdamTBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(
-        air
-    )
+    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0).fit(air)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         covariance = fit.vcov()
@@ -272,20 +266,18 @@ def test_the_covariance_is_finite(air):
 
 def test_bad_arguments_raise():
     with pytest.raises(ValueError, match="trend"):
-        AdamTBATS(trend="multiplicative")
+        TBATS(trend="multiplicative")
     with pytest.raises(ValueError, match="lambda"):
-        AdamTBATS(lambda_bc=2).fit(np.arange(1.0, 30.0))
+        TBATS(lambda_bc=2).fit(np.arange(1.0, 30.0))
 
 
 @pytest.fixture(scope="module")
 def damped_arma(air):
-    return AdamTBATS(lags=[1, 12], harmonics=[5], trend="damped", orders=ARMA11).fit(
-        air
-    )
+    return TBATS(lags=[1, 12], harmonics=[5], trend="damped", orders=ARMA11).fit(air)
 
 
 def test_reapply_reproduces_the_fit_with_a_tiny_covariance(air):
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12], harmonics=[4], trend="additive", lambda_bc=1, orders=ORDERS0
     ).fit(air)
     refitted = fit.reapply(nsim=5, heuristics=1e-12, seed=41)
@@ -307,7 +299,7 @@ def test_the_intervals_with_the_uncertainty_of_the_parameters(damped_arma):
 
 @pytest.mark.parametrize("initial", ["backcasting", "optimal"])
 def test_the_simulations_start_from_the_initials_of_the_model(air, initial):
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         harmonics=[3],
         trend="damped",
@@ -357,7 +349,7 @@ def xreg_data():
 @pytest.fixture(scope="module")
 def xreg_fit(xreg_data):
     y, X = xreg_data
-    return AdamTBATS(
+    return TBATS(
         lags=[1, 12],
         harmonics=[1],
         trend="none",
@@ -371,8 +363,8 @@ def xreg_fit(xreg_data):
 def test_lambda_zero_with_a_regressor_is_the_model_of_the_logarithms(xreg_data):
     y, X = xreg_data
     arguments = dict(lags=[1, 12], harmonics=[1], trend="none", orders=ORDERS0)
-    fit_log = AdamTBATS(lambda_bc=0, **arguments).fit(y[:120], X[:120])
-    fit_level = AdamTBATS(lambda_bc=1, B=fit_log.coef, maxeval=1, **arguments).fit(
+    fit_log = TBATS(lambda_bc=0, **arguments).fit(y[:120], X[:120])
+    fit_level = TBATS(lambda_bc=1, B=fit_log.coef, maxeval=1, **arguments).fit(
         np.log(y[:120]), X[:120]
     )
     assert fit_log.loglik == pytest.approx(
@@ -415,7 +407,7 @@ def test_the_intervals_follow_the_future_regressors(xreg_fit, xreg_data):
 
 def test_all_backcast_regressors_are_counted_in_the_parameters(xreg_fit, xreg_data):
     y, X = xreg_data
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         harmonics=[1],
         trend="none",
@@ -436,9 +428,9 @@ def test_adaptive_regressors_stay_within_the_bounds(bounds):
     beta = 5 + np.cumsum(rng.normal(0, 0.05, 150))
     noise = np.cumsum(rng.normal(size=150)) + rng.normal(size=150)
     y = 200 + beta * X[:, 0] - 2 * X[:, 1] + noise
-    fit = AdamTBATS(
-        regressors="adapt", trend="none", orders=ORDERS0, bounds=bounds
-    ).fit(y, X)
+    fit = TBATS(regressors="adapt", trend="none", orders=ORDERS0, bounds=bounds).fit(
+        y, X
+    )
     assert fit.model_name.endswith("{D}")
     deltas = fit.coef[[fit.coef_names.index(n) for n in ("delta1", "delta2")]]
     assert np.all((deltas >= 0) & (deltas <= 1))
@@ -451,22 +443,20 @@ def test_adaptive_regressors_stay_within_the_bounds(bounds):
 def test_the_selection_keeps_the_relevant_regressor(xreg_data):
     y, X = xreg_data
     X = X.assign(noise=np.random.default_rng(7).normal(size=len(y)))
-    fit = AdamTBATS(lags=[1, 12], regressors="select", h=12, holdout=True).fit(y, X)
+    fit = TBATS(lags=[1, 12], regressors="select", h=12, holdout=True).fit(y, X)
     assert fit.xreg_names_ == ["x1"]
     assert any("+X(x1)" in name for name in fit.ics)
     np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit.forecast_)
 
 
 def test_the_point_forecasts(air):
-    fit = AdamTBATS(lags=[1, 12], harmonics=[3], trend="additive", orders=ORDERS0).fit(
-        air
-    )
+    fit = TBATS(lags=[1, 12], harmonics=[3], trend="additive", orders=ORDERS0).fit(air)
     skeleton = fit.predict(h=24).mean.to_numpy()
     np.testing.assert_allclose(fit.predict(h=24, point="median").mean, skeleton)
     mean = fit.predict(h=24, point="mean").mean.to_numpy()
     assert np.all(mean > skeleton)
     # lambda=0 and the S distribution: the mean does not exist
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 12],
         harmonics=[3],
         trend="additive",
@@ -493,10 +483,10 @@ def test_the_occurrence_mixture(intermittent):
     # The zeros are fitted as values, and the Box-Cox transform falls back to 1
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        AdamTBATS(lags=[1, 7], orders=ORDERS0).fit(intermittent)
+        TBATS(lags=[1, 7], orders=ORDERS0).fit(intermittent)
     messages = " ".join(str(w.message) for w in caught)
     assert "occurrence" in messages and "lambda=1" in messages
-    fit = AdamTBATS(
+    fit = TBATS(
         lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0, h=14, holdout=True
     ).fit(intermittent)
     occurrence = fit._occurrence["model"]
@@ -522,9 +512,7 @@ def test_the_occurrence_mixture(intermittent):
 def test_the_cumulative_forecasts_of_the_mixture(intermittent):
     # The sum of the skeletons times the probabilities, and the quantiles of the sums
     # of the paths
-    fit = AdamTBATS(lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0).fit(
-        intermittent
-    )
+    fit = TBATS(lags=[1, 7], occurrence="odds-ratio", orders=ORDERS0).fit(intermittent)
     forecasted = fit.predict(h=14)
     cumulative = fit.predict(h=14, cumulative=True, interval="prediction", seed=41)
     mean = float(cumulative.mean.iloc[0])
@@ -542,12 +530,12 @@ def test_the_observations_with_missing_regressors_are_dropped(xreg_data):
     X_na = X.copy()
     X_na.iloc[[14, 59], 0] = np.nan
     with pytest.warns(UserWarning, match="missing values"):
-        fit = AdamTBATS(**arguments).fit(y, X_na)
+        fit = TBATS(**arguments).fit(y, X_na)
     y_na = y.copy()
     y_na[[14, 59]] = np.nan
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        fit_na = AdamTBATS(**arguments).fit(y_na, X)
+        fit_na = TBATS(**arguments).fit(y_na, X)
     assert fit.loglik == pytest.approx(fit_na.loglik, rel=1e-12)
     np.testing.assert_allclose(fit.coef, fit_na.coef, rtol=1e-10)
     assert np.all(np.isnan(fit.fitted[[14, 59]]))
@@ -555,20 +543,18 @@ def test_the_observations_with_missing_regressors_are_dropped(xreg_data):
         warnings.simplefilter("ignore")
         X_future_na = X.to_numpy().copy()
         X_future_na[-2:] = np.nan
-        AdamTBATS(h=12, **arguments).fit(y[:120], X_future_na)
+        TBATS(h=12, **arguments).fit(y[:120], X_future_na)
 
 
 def test_the_occurrence_errors(intermittent):
     with pytest.raises(ValueError, match="contradicts"):
-        AdamTBATS(lags=[1, 7], occurrence=np.where(intermittent > 0, 0.0, 0.5)).fit(
+        TBATS(lags=[1, 7], occurrence=np.where(intermittent > 0, 0.0, 0.5)).fit(
             intermittent
         )
     with pytest.raises(ValueError, match="multistep"):
-        AdamTBATS(lags=[1, 7], occurrence="odds-ratio", loss="MSEh", h=3).fit(
-            intermittent
-        )
+        TBATS(lags=[1, 7], occurrence="odds-ratio", loss="MSEh", h=3).fit(intermittent)
     with pytest.raises(ValueError, match="occurrence"):
-        AdamTBATS(occurrence="sometimes")
+        TBATS(occurrence="sometimes")
 
 
 @pytest.mark.filterwarnings("ignore:Data contains NAs")
@@ -579,7 +565,7 @@ def test_tbats_takes_the_missing_values_for_gaps():
         5 + 0.01 * t + 0.2 * np.sin(2 * np.pi * t / 12) + rng.normal(0, 0.05, 144)
     )
     y[[9, 49, 50, 89]] = np.nan
-    model = AdamTBATS(lags=[1, 12]).fit(y)
+    model = TBATS(lags=[1, 12]).fit(y)
     assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-8)
     assert np.all(np.isnan(model.residuals[np.isnan(y)]))
     assert np.all(np.isfinite(model.fitted))
@@ -590,11 +576,11 @@ def test_initial_gradient_solves_for_the_initials(air):
     """The initials are counted as with backcasting, and at the same parameters the
     solved initials fit at least as well as the backcast ones."""
     arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
-    backcast = AdamTBATS(**arguments).fit(air)
-    gradient = AdamTBATS(initial="gradient", **arguments).fit(air)
+    backcast = TBATS(**arguments).fit(air)
+    gradient = TBATS(initial="gradient", **arguments).fit(air)
     assert gradient.nparam == backcast.nparam
     assert gradient.point_lik().sum() == pytest.approx(gradient.loglik, rel=1e-12)
-    at_backcast = AdamTBATS(
+    at_backcast = TBATS(
         initial="gradient",
         B=backcast.coef,
         maxeval=1,
@@ -610,8 +596,8 @@ def test_a_custom_loss(air):
     def loss_mse(actual, fitted, B):
         return float(np.mean((actual - fitted) ** 2))
 
-    custom = AdamTBATS(loss=loss_mse, **arguments).fit(air)
-    mse = AdamTBATS(loss="MSE", **arguments).fit(air)
+    custom = TBATS(loss=loss_mse, **arguments).fit(air)
+    mse = TBATS(loss="MSE", **arguments).fit(air)
     assert custom.loss == "custom"
     assert custom.loss_value == pytest.approx(mse.loss_value, rel=1e-12)
     np.testing.assert_allclose(custom.coef, mse.coef, rtol=1e-10)
@@ -624,9 +610,7 @@ def test_the_diagnostics_and_plots_of_adam_work(air):
     import matplotlib
 
     matplotlib.use("Agg")
-    fit = AdamTBATS(lags=[1, 12], harmonics=[3], trend="none", h=12, holdout=True).fit(
-        air
-    )
+    fit = TBATS(lags=[1, 12], harmonics=[3], trend="none", h=12, holdout=True).fit(air)
     n = fit.nobs
     assert fit.rstandard().shape == (n,) and fit.rstudent().shape == (n,)
     assert np.isclose(fit.sigma, np.sqrt(np.nansum(fit.residuals**2) / fit._df_scale))

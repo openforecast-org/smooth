@@ -1617,7 +1617,7 @@ adam_varianceDebiased <- function(object, scaleValue=extractScale(object)){
 #' @keywords internal
 adam_completeWindows <- function(observed, h){
     missingCount <- cumsum(c(0, !observed));
-    rows <- seq_len(max(length(observed)-h, 0));
+    rows <- seq_len(max(length(observed)-h+1, 0));
     return(missingCount[rows+h] - missingCount[rows] == 0);
 }
 

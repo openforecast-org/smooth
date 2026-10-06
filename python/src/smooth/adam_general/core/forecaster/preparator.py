@@ -142,7 +142,10 @@ def _prepare_fitter_inputs(
     index_lookup_table = np.asfortranarray(
         profiles_dict["index_lookup_table"], dtype=np.uint64
     )
-    profiles_recent_table = np.asfortranarray(profiles_recent_table, dtype=np.float64)
+    # A copy, as R's: the profile is a view of the head of mat_vt, and the binding
+    # passes both to the fit without copying, so the updates of the profile would
+    # overwrite the head of the states with the last ones
+    profiles_recent_table = np.array(profiles_recent_table, dtype=np.float64, order="F")
 
     return (
         y_in_sample,

@@ -616,7 +616,8 @@ def test_the_diagnostics_and_plots_of_adam_work(air):
     assert np.isclose(fit.sigma, np.sqrt(np.nansum(fit.residuals**2) / fit._df_scale))
     errors = fit.rmultistep(h=3).to_numpy()
     # The errors of the transformed data, not of the data
-    assert errors.shape == (n - 3, 3) and np.nanmax(np.abs(errors)) < 1
+    assert errors.shape == (n - 2, 3) and np.nanmax(np.abs(errors)) < 1
+    np.testing.assert_allclose(errors[:, 0], fit.residuals[: n - 2], atol=1e-10)
     covariance = fit.multicov(h=3).to_numpy()
     assert covariance.shape == (3, 3) and np.all(np.diag(covariance) > 0)
     for which in range(1, 17):

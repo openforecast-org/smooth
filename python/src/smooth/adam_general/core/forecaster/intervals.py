@@ -695,7 +695,7 @@ def generate_multistep_interval(
 ):
     """Generate semiparametric, empirical, or nonparametric prediction intervals.
 
-    All three interval types use the ``(T - h) × h`` multistep in-sample
+    All three interval types use the ``(T - h + 1) × h`` multistep in-sample
     error matrix produced by ``ferrors``.
 
     Returns
@@ -735,7 +735,7 @@ def generate_multistep_interval(
         y_fitted = np.asarray(prepared_model["y_fitted"], dtype=float)
         if h > 1:
             fitted_matrix = np.column_stack(
-                [y_fitted[i : obs - h + i] for i in range(1, h + 1)]
+                [y_fitted[i - 1 : obs - h + i] for i in range(1, h + 1)]
             )
         else:
             fitted_matrix = y_fitted.reshape(-1, 1)

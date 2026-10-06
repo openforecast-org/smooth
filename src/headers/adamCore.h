@@ -1440,37 +1440,26 @@ public:
                         arma::mat matrixF,
                         arma::umat const &indexLookupTable, arma::mat profilesRecent,
                         unsigned int const &horizon, arma::vec vectorYt) {
-        unsigned int obs = vectorYt.n_rows;
         unsigned int lagsModelMax = max(lags);
-        // This is needed for cases, when hor>obs
-        unsigned int hh = 0;
-        arma::mat matErrors(horizon, obs, arma::fill::zeros);
+        // The windows with all their targets in the sample
+        int nWindows = std::max((int)vectorYt.n_rows - (int)horizon + 1, 0);
+        arma::mat matErrors(horizon, nWindows, arma::fill::zeros);
 
         // Fill in the head, similar to how it's done in the fitter
         for (unsigned int i=0; i<lagsModelMax; i=i+1) {
             profilesRecent(indexLookupTable.col(i)) = matrixVt.col(i);
         }
 
-        for(unsigned int i = 0; i < (obs-horizon); i=i+1){
-            hh = std::min(horizon, obs-i);
-            // Update the profile to get the recent value from the state matrix
-            // lagsModelMax moves the thing to the next obs. This way, we have the structure
-            // similar to the fitter
-            profilesRecent(indexLookupTable.col(i+lagsModelMax)) = matrixVt.col(i+lagsModelMax);
-            // This needs to take probability of occurrence into account in order to deal with intermittent models
-            // The problem is that the probability needs to be a matrix, i.e. to reflect multistep from each point
-            matErrors.submat(0, i, hh-1, i) =
-                errorvf(vectorYt.rows(i, i+hh-1),
-                        forecast(matrixWt.rows(i,i+hh-1), matrixF,
-                                 indexLookupTable.cols(i+lagsModelMax,i+lagsModelMax+hh-1), profilesRecent,
-                                 hh).forecast,
-                                 // vectorPt.rows(i, i+hh-1),
-                                 E);
-        }
-
-        // Cut-off the redundant last part
-        if(obs>horizon){
-            matErrors = matErrors.cols(0,obs-horizon-1);
+        // Row i forecasts the targets i..i+h-1 from the states after the observation
+        // i-1 (the head for i=0), which the fitter stored in the column i+lagsModelMax-1
+        for(int i = 0; i < nWindows; i=i+1){
+            profilesRecent(indexLookupTable.col(i+lagsModelMax-1)) = matrixVt.col(i+lagsModelMax-1);
+            matErrors.col(i) =
+                errorvf(vectorYt.rows(i, i+horizon-1),
+                        forecast(matrixWt.rows(i, i+horizon-1), matrixF,
+                                 indexLookupTable.cols(i+lagsModelMax, i+lagsModelMax+horizon-1),
+                                 profilesRecent, horizon).forecast,
+                        E);
         }
 
         ErrorResult result;
@@ -1804,7 +1793,7 @@ public:
                 }
             }
             bool const multistep = gradientLossMultistep(L);
-            int const nOrigins = multistep ? (obs - hor) : 0;
+            int const nOrigins = multistep ? (obs - hor + 1) : 0;
             arma::mat msDesign(multistep ? nOrigins*hor : 0, nFree);
             arma::vec msResiduals(multistep ? nOrigins*hor : 0);
 
@@ -1853,19 +1842,11 @@ public:
                 // i.e. minus the residual sensitivity.
                 design.row(idx) = -dError;
 
-                prof(cells) = adamFvalue(prof(cells), matrixF, E, T, S,
-                                         nETS, nNonSeasonal, nSeasonal, nArima,
-                                         nComponents, constant) +
-                              adamGvalue(prof(cells), matrixF, matrixWt.row(idx),
-                                         E, T, S, nETS, nNonSeasonal, nSeasonal,
-                                         nArima, nXreg, nComponents, constant,
-                                         vectorG, residuals(idx), yFit, adamETS);
-                sens.rows(cells) = matrixF * sens.rows(cells) + vectorG * dError;
-
                 // Multistep losses: replicate the ferrors() recursion from the
-                // just-updated buffers -- h no-update forecast steps from every
-                // origin, with the sensitivities following through F. Like
-                // ferrors(), the multistep errors ignore the occurrence.
+                // buffers before the update with the observation idx -- h no-update
+                // forecast steps of the targets idx..idx+h-1, with the sensitivities
+                // following through F. Like ferrors(), the multistep errors ignore
+                // the occurrence.
                 if(multistep && idx < nOrigins){
                     arma::mat profStep = prof;
                     arma::mat sensStep = sens;
@@ -1885,6 +1866,15 @@ public:
                         sensStep.rows(cellsStep) = matrixF * sensStep.rows(cellsStep);
                     }
                 }
+
+                prof(cells) = adamFvalue(prof(cells), matrixF, E, T, S,
+                                         nETS, nNonSeasonal, nSeasonal, nArima,
+                                         nComponents, constant) +
+                              adamGvalue(prof(cells), matrixF, matrixWt.row(idx),
+                                         E, T, S, nETS, nNonSeasonal, nSeasonal,
+                                         nArima, nXreg, nComponents, constant,
+                                         vectorG, residuals(idx), yFit, adamETS);
+                sens.rows(cells) = matrixF * sens.rows(cells) + vectorG * dError;
             }
 
             if(!residuals.is_finite() || !design.is_finite()){

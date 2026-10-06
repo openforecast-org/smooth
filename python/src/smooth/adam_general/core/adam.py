@@ -3341,7 +3341,7 @@ class ADAM:
         return getattr(self, "_om_model", None)
 
     def rmultistep(self, h: int = 10) -> pd.DataFrame:
-        """Return the (T-h) × h matrix of rolling in-sample multistep forecast errors.
+        """Return the (T-h+1) × h matrix of rolling in-sample multistep forecast errors.
 
         For each origin ``t``, computes the ``h``-step-ahead forecast and the
         corresponding errors against the realised observations. Must be called
@@ -3355,7 +3355,7 @@ class ADAM:
         Returns
         -------
         pd.DataFrame
-            Shape (T-h, h) where T is obs_in_sample.
+            Shape (T-h+1, h) where T is obs_in_sample.
         """
         from smooth.adam_general.core.forecaster._helpers import (
             _compute_multistep_errors,

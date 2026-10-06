@@ -1039,3 +1039,19 @@ test_that("The point likelihoods of sm() sum to its log-likelihood", {
         expect_equal(sum(pointLik(scaleModel)), as.numeric(logLik(scaleModel)));
     }
 })
+
+test_that("The multistep errors start from the states before their targets", {
+    # Row i forecasts the targets i..i+h-1, so the first column is the residuals,
+    # and MSEh with h=1 is the MSE
+    for(model in list(adam(AirPassengers, "ANN"), adam(AirPassengers, "AAA", lags=12),
+                      adam(AirPassengers, "NNN", orders=list(ar=2, i=1)))){
+        errors <- rmultistep(model, h=3);
+        expect_equal(nrow(errors), nobs(model)-2);
+        expect_equal(as.numeric(errors[,1]), as.numeric(residuals(model))[1:nrow(errors)],
+                     tolerance=1e-8);
+    }
+    fitMSE <- adam(BJsales, "ANN", persistence=0.3, initial="optimal", loss="MSE");
+    fitMSEh <- adam(BJsales, "ANN", persistence=0.3, initial="optimal", loss="MSEh", h=1,
+                    B=fitMSE$B, maxeval=1);
+    expect_equal(fitMSEh$lossValue, fitMSE$lossValue, tolerance=1e-10);
+});

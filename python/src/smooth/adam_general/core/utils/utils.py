@@ -782,7 +782,7 @@ def complete_windows(observed, h):
     i..i+h-1) whose targets are all observed: the losses over the missing values are
     not taken (R's ``adam_completeWindows``)."""
     missing_count = np.concatenate([[0], np.cumsum(~np.asarray(observed, dtype=bool))])
-    rows = np.arange(max(len(observed) - h, 0))
+    rows = np.arange(max(len(observed) - h + 1, 0))
     return missing_count[rows + h] - missing_count[rows] == 0
 
 

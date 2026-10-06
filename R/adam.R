@@ -6553,7 +6553,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 if(any(object$distribution==c("dinvgauss","dgamma","dlnorm","dls","dllaplace","dlgnorm")) && (Etype=="A")){
                     yFittedMatrix <- adamErrors;
                     for(i in 1:h){
-                        yFittedMatrix[,i] <- fitted(object)[1:(obsInSample-h)+i];
+                        yFittedMatrix[,i] <- fitted(object)[1:nrow(adamErrors)+i-1];
                     }
                     adamErrors[] <- adamErrors/yFittedMatrix;
                 }

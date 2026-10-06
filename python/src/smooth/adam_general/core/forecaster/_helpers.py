@@ -13,7 +13,7 @@ def _compute_multistep_errors(
     mat_wt,
     mat_f,
 ):
-    """Call adam_cpp.ferrors() and return the (T-h) × h in-sample error matrix.
+    """Call adam_cpp.ferrors() and return the (T-h+1) × h in-sample error matrix.
 
     Uses the INITIAL profile and an in-sample lookup table — same as R's
     rmultistep.adam() which calls adamCpp$ferrors with object$profileInitial

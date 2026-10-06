@@ -164,15 +164,16 @@ def test_adam_multicov_empirical_shape_and_labels(y_continuous):
 
 def test_adam_multicov_empirical_matches_rmultistep_formula(y_continuous):
     """Internal-consistency check: multicov(empirical) is literally
-    ``(errorsᵀ errors) / (nobs - h)`` where ``errors = rmultistep(h)`` —
-    R/adam.R:7090-7092."""
+    ``(errorsᵀ errors) / n_windows`` where ``errors = rmultistep(h)``, with its
+    ``nobs - h + 1`` windows -- R's ``nrow(adamErrors)``."""
     with _silence():
         warnings.simplefilter("ignore")
         m = ADAM(model="ANN").fit(y_continuous)
     h = 5
     M = m.multicov(type="empirical", h=h).to_numpy()
     errors = m.rmultistep(h=h).to_numpy()
-    expected = (errors.T @ errors) / (m.nobs - h)
+    assert errors.shape[0] == m.nobs - h + 1
+    expected = (errors.T @ errors) / errors.shape[0]
     np.testing.assert_allclose(M, expected, rtol=1e-12, atol=1e-12)
 
 

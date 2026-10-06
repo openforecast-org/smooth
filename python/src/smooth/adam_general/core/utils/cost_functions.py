@@ -738,7 +738,7 @@ def CF(  # noqa: N802
             horizon=h,
             vectorYt=y_in_sample,
         )
-        adam_errors = error_result.errors  # Matrix: (obs_in_sample - h) x h
+        adam_errors = error_result.errors  # Matrix: (obs_in_sample - h + 1) x h
         # The windows with all their targets observed
         adam_errors = adam_errors[complete_windows(observed, h)]
 
@@ -940,7 +940,8 @@ def log_Lik_ADAM(  # noqa: N802
     - MAEh, TMAE, MACE: :math:`-(T-h)(\\log(2) + 1 + \\log(\\text{loss}))`
     - HAMh, THAM, CHAM: :math:`-(T-h)(\\log(4) + 2 + 2\\log(\\text{loss}))`
 
-    where T is the sample size and h is the forecast horizon.
+    where T-h is replaced by the number of windows with all their targets observed
+    (T-h+1 without missing values).
 
     **Occurrence Model**:
 

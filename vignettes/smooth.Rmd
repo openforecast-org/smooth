@@ -24,6 +24,7 @@ The package includes the following functions:
 3. [ces() - Complex Exponential Smoothing](ces.html);
 4. [gum() - Generalised Univariate Model](gum.html);
 5. [sma() - Simple Moving Average in state-space form](sma.html);
+5. [tbats() - Trigonometric Box-Cox ARMA Trend Seasonal model](tbats.html), TBATS in the ADAM framework, for long and multiple seasonal periods;
 6. [Simulate functions of the package](simulate.html).
 7. `smoothCombine()` - function that combines forecasts of the main univariate functions of smooth package based on information criteria.
 8. [oes() - Occurrence part of iETS model](oes.html) -- function that estimates probability of occurrence of variable using one of the following model types: 1. Fixed probability; 2. Odds ratio probability; 3. Inverse odds ratio probability; 4. Direct probability; 5. General. It can also select the most appropriate model among these five. The model produced by `oes()` can then be used in any forecasting function as input variable for `occurrence` parameter. This is the new function introduced in smooth v2.5.0, substituting the old `iss()` function.

@@ -2,7 +2,8 @@
 
 Issue: openforecast-org/smooth#396. `tbats()` in R and `TBATS` in Python, built as a
 native linear single-source-of-error model on the shared `adamCore` (the generic path,
-`adamETS=FALSE`, as CES and GUM use it). The fitter itself needs no C++ changes.
+`adamETS=FALSE`, as CES and GUM use it). The fitter itself needed no C++ changes; the
+speed-ups of section P added an opt-in sparse transition and per-draw data to the core.
 
 Updated after openforecast-org/smooth#413 (per-lag backcasting turns) and the scale
 convention of master (October 2026).
@@ -175,12 +176,16 @@ matrix-vector product. It provides:
     is precomputed; the check is a penalty, like β ≤ α;
   - ARMA stationarity / invertibility factor by factor (`arimaBounds.h`);
   - λ ∈ [0, 1], dgnorm shape > 0.
-- `admissible`: eigenvalues of `F − g w'` for the ETS and harmonic block on the
-  lag-expanded matrix, plus the factor-by-factor ARMA checks. `smoothEigens()` cannot be
-  reused: it splits the states by unique lag (`eigenCalc.h`), which separates the two
-  coupled states of a harmonic. Lag-expanded, a harmonic is
-  `x_t = (v_{1,t}, v_{2,t}, v_{2,t−1})'` with
-  `F̃ = [η₁ 0 η₁; η₂ 0 η₂; 0 1 0]`, `w̃ = (1, 0, 1)'`, `g̃ = (g₁, g₂, 0)'`, all lag 1.
+- `admissible`: eigenvalues of `F − g w'` for the ETS and harmonic block, plus the
+  factor-by-factor ARMA checks. `smoothEigens()` cannot be reused: it splits the states
+  by unique lag (`eigenCalc.h`), which separates the two coupled states of a harmonic.
+  Lag-expanded, a harmonic is `x_t = (v_{1,t}, v_{2,t}, v_{2,t−1})'` with
+  `F̃ = [η₁ 0 η₁; η₂ 0 η₂; 0 1 0]`, `w̃ = (1, 0, 1)'`, `g̃ = (g₁, g₂, 0)'`, all lag 1. The
+  discount matrix sends `v_{1,t} − v_{2,t−1}` to zero, so the check uses the reduced
+  `(s_t, v_{2,t})` with `s_t = v_{1,t} + v_{2,t−1}`: `F̃ = [η₁ 1; η₂ 0]`, `w̃ = (1, 0)'`,
+  `g̃ = (g₁, g₂)'`, the same non-zero eigenvalues (to 4e-14) on `nETS + 2·nH` rows
+  instead of `nETS + 3·nH`. R calls `eigen(symmetric=FALSE)`: the symmetry test took a
+  third of each check.
 - `none`.
 
 ## F. Selection (3 or 4 full fits by default)
@@ -397,8 +402,8 @@ which runs `stepwise` on the raw y before any fit):
   fixed there, as ADAM's simulated intervals with regressors have the same defect.
 - holdout: `xreg` covers it, its rows go into the measurement for the forecast stored in
   the object and the error measures.
-- reapply / reforecast: the fitter already carries the measurement; reforecast takes
-  `newdata` / X for the horizon rows of each draw.
+- reapply / reforecast: the refitter (section P) builds the measurement of each draw with
+  the regressors; reforecast takes `newdata` / X for the horizon rows of each draw.
 - coefbootstrap: the refit call passes the rows of `xreg` with the rows of `y`
   ("select" becomes "use", as ADAM).
 - vcov (OPG, Hessian), confint, simulate (in-sample regressors), pointLik: through the
@@ -521,8 +526,50 @@ with `"skeleton"` the default everywhere.
   median of the sums of the paths, and their quantiles as the bounds (R
   `tbats_cumulative`, Python `TBATS._cumulative`); `reforecast()` sums its own paths.
 
+## P. Performance (October 2026)
+
+Benchmark: Taylor's half-hourly series, `lags=c(1,48,336)`, h=336, three origins
+(n = 3024, 3360, 3696). smooth R and Python select the same models and give identical
+forecasts; statsforecast's `AutoTBATS` takes three times as long and is less accurate
+(mean MASE 0.666 against 0.840 after the changes below). The R timings need an optimised
+build: `pkgload::load_all()` compiles the C++ with `-O0`, which made R look 2.5 times
+slower than Python.
+
+Profile (R, n=3696): the trend candidates take two thirds of the time, the final fit with
+ARMA one third, the harmonics 1%. Per evaluation: the C++ fit 66% (the dense `F v` of
+about 85 states, while F is mostly 2×2 rotation blocks), the admissible eigenvalues 23%,
+the rest in R.
+
+Done, instead of fitting the trend candidates in parallel:
+
+- the admissible check on the reduced harmonics (section E), 12% of the time;
+- warm starts: the trends start from the model without trend with β=0, the ARMA fit from
+  the best model with zero coefficients, the selected regressors from the best model;
+  each is kept only if its loss beats the default start. Chaining the trends (damped from
+  additive) left the damped model in a poor optimum, and the none optimum with the
+  default β is inadmissible. The time is unchanged, but the optima are much better (AICc
+  50058 → 49926 at n=3696, damped+ARMA instead of none+ARMA, mean MASE 0.688 → 0.666);
+  3 of 12 candidates on other series came out slightly worse (≤ 3.3 AICc);
+- the sparse transition: `adamCore::sparseTransition` (default false), set by `tbats()`,
+  `ssarima()` and Python `TBATS`, makes `fit()` and `reapply()` take `F v` as a sparse
+  product when F has more than four states and at most half of it is non-zero. The same
+  values; tbats 1.5 times faster on Taylor; nothing to gain for the small or dense F of
+  ETS, CES, GUM and ADAM's ARIMA, which keep the dense product;
+- reapply through the C++ refitter `adamCore::reapply`, as `reapply.adam`, instead of the
+  estimation's fit per draw: the refitter takes one column of data per draw (each draw
+  has its own λ), the solved initials of "gradient" are kept as deviations from the global
+  model (from `FitResult::profileInitial`, the profile the fit starts from), and the draws
+  are pulled into the bounds with the penalty only (`inBounds` / `in_bounds`). Taylor
+  nsim=100 20.7 → 13.9 s, AirPassengers nsim=1000 13.3 → 7.7 s, the same refits.
+
 ## M. Later phases
 
-- the trend candidates fitted in parallel (most of the time on long series: 43 of the
-  68 s on Taylor);
-- a vignette.
+- multistep losses with an occurrence model (not available in `adam()` either);
+- the bootstrap with provided occurrence probabilities (openforecast-org/smooth#416);
+- a seasonal occurrence model built by `tbats()` itself;
+- the optimiser still stops in poorer optima on some series (see the warm starts in P);
+- `initial="gradient"` is slow with many harmonics (about 220 s against 3 s for
+  backcasting with <48,8>, <336,14> on the vignette's series): the solve runs over all
+  the states in every evaluation;
+- the vignette (`vignettes/tbats.Rmd`) covers R; the Python documentation of `TBATS`
+  has no tutorial yet.

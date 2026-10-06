@@ -625,3 +625,15 @@ def test_the_diagnostics_and_plots_of_adam_work(air):
     states = fit.plot(which=12)
     labels = [ax.get_ylabel() for fig in states for ax in fig.axes]
     assert labels[:3] == ["Actuals", "level", "s1[12]"]
+
+
+def test_the_eigenvalue_moduli_agree_with_lapack():
+    # The shared LAPACK-free routine of the admissible bounds
+    from smooth.adam_general._eigenCalc import eigen_moduli
+
+    rng = np.random.default_rng(5)
+    for n in (1, 2, 5, 13, 25):
+        A = rng.normal(size=(n, n))
+        ours = np.sort(np.ravel(eigen_moduli(np.asfortranarray(A))))
+        lapack = np.sort(np.abs(np.linalg.eigvals(A)))
+        np.testing.assert_allclose(ours, lapack, rtol=1e-12, atol=1e-12)

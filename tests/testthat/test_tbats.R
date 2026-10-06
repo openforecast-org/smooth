@@ -470,3 +470,12 @@ test_that("the class does not take the methods of forecast::tbats()", {
     expect_output(print(model), "TBATS");
     expect_s3_class(forecast(model, h=12), "smooth.forecast");
 })
+
+test_that("the eigenvalue moduli of the admissible bounds agree with LAPACK", {
+    set.seed(5);
+    for(n in c(1, 2, 5, 13, 25)){
+        A <- matrix(rnorm(n*n), n);
+        expect_equal(sort(eigenModuliCpp(A)), sort(Mod(eigen(A, only.values=TRUE)$values)),
+                     tolerance=1e-12);
+    }
+})

@@ -998,7 +998,9 @@ tbats_gammaStart <- function(B, struct, armaSpec, lambdaSpec, other, initialEsti
 # The moduli of the eigenvalues of the discount matrix of the level, trend and
 # harmonics. A harmonic is reduced to (s_t, v2_t) with s_t = v1_t + v2_{t-1}: the
 # lag-expanded form (v1_t, v2_t, v2_{t-1}) only adds a zero eigenvalue, as the discount
-# matrix sends v1_t - v2_{t-1} to zero
+# matrix sends v1_t - v2_{t-1} to zero. The eigenvalues come from the LAPACK-free routine
+# shared with Python (eigenModuliCore): the optima often lie on the boundary, where two
+# LAPACK builds disagreed in the last bit on which parameters were admissible
 tbats_eigens <- function(matF, vecG, w, struct){
     nETS <- struct$nETS;
     nH <- struct$nHarmonics;
@@ -1016,7 +1018,7 @@ tbats_eigens <- function(matF, vecG, w, struct){
         ge[rows] <- vecG[rowOld+0:1];
         we[rows[1]] <- 1;
     }
-    return(Mod(eigen(Fe - ge %o% we, symmetric=FALSE, only.values=TRUE)$values));
+    return(eigenModuliCpp(Fe - ge %o% we));
 }
 
 #### The fitter ####

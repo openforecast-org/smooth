@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from smooth.adam_general import _adamCore, _ols  # type: ignore[attr-defined]
-from smooth.adam_general._eigenCalc import smooth_eigens
+from smooth.adam_general._eigenCalc import eigen_moduli, smooth_eigens
 from smooth.adam_general._numDeriv import hessian as _hessian_cpp
 from smooth.adam_general.core.creator.architector import (
     adam_head_length,
@@ -118,7 +118,10 @@ def eigens(
     """The moduli of the eigenvalues of the discount matrix of the level, trend and
     harmonics. A harmonic is reduced to (s_t, v2_t) with s_t = v1_t + v2_{t-1}: the
     lag-expanded form (v1_t, v2_t, v2_{t-1}) only adds a zero eigenvalue, as the
-    discount matrix sends v1_t - v2_{t-1} to zero."""
+    discount matrix sends v1_t - v2_{t-1} to zero. The eigenvalues come from the
+    LAPACK-free routine shared with R (``eigenModuliCore``): the optima often lie on the
+    boundary, where two LAPACK builds disagreed in the last bit on which parameters
+    were admissible."""
     n_ets = struct["n_ets"]
     n_h = struct["n_harmonics"]
     k = n_ets + 2 * n_h
@@ -135,7 +138,7 @@ def eigens(
         fe[row, row + 1] = 1
         ge[row : row + 2] = vec_g[old : old + 2]
         we[row] = 1
-    return np.abs(np.linalg.eigvals(fe - np.outer(ge, we)))
+    return np.ravel(eigen_moduli(np.asfortranarray(fe - np.outer(ge, we))))
 
 
 class Filler:

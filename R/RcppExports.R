@@ -5,6 +5,10 @@ smoothEigensR <- function(persistence, transition, measurement, lagsModelAll, xr
     .Call('_smooth_smoothEigensR', PACKAGE = 'smooth', persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber, constantRequired)
 }
 
+eigenModuliCpp <- function(A) {
+    .Call('_smooth_eigenModuliCpp', PACKAGE = 'smooth', A)
+}
+
 hessianCpp <- function(f, x0, h = 1.220703125e-4) {
     .Call('_smooth_hessianCpp', PACKAGE = 'smooth', f, x0, h)
 }

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from smooth import OM, TBATS
-from tests._r_bridge import r_dict
+from tests._r_bridge import r_dict, r_eval
 
 pytestmark = pytest.mark.r_parity
 
@@ -513,3 +513,17 @@ def test_the_diagnostics_agree():
         r["empirical"],
         rtol=1e-8,
     )
+
+
+def test_the_eigenvalue_moduli_are_those_of_r_to_the_bit():
+    # The admissible bounds take them from the routine shared with R, written without
+    # LAPACK: the optima lie on the boundary, where two LAPACK builds disagree
+    from smooth.adam_general._eigenCalc import eigen_moduli
+
+    rng = np.random.default_rng(3)
+    for n in (2, 7, 21):
+        A = rng.normal(size=(n, n))
+        values = ",".join(repr(float(v)) for v in A.ravel(order="F"))
+        r = r_eval(f"sprintf('%a', eigenModuliCpp(matrix(c({values}), {n})))")
+        python = np.ravel(eigen_moduli(np.asfortranarray(A)))
+        assert [float.fromhex(v) for v in np.atleast_1d(r)] == list(python)

@@ -529,9 +529,22 @@ with `"skeleton"` the default everywhere.
 ## P. Performance (October 2026)
 
 Benchmark: Taylor's half-hourly series, `lags=c(1,48,336)`, h=336, three origins
-(n = 3024, 3360, 3696). smooth R and Python select the same models and give identical
-forecasts; statsforecast's `AutoTBATS` takes three times as long and is less accurate
-(mean MASE 0.666 against 0.840 after the changes below). The R timings need an optimised
+(n = 3024, 3360, 3696), MASE scaled by the in-sample MAE of the weekly seasonal naive.
+Means over the origins, after the changes below:
+
+| | time, s | MASE | RMSE |
+|---|---|---|---|
+| smooth `tbats()`, R | 114 | 0.666 | 495 |
+| smooth `AdamTBATS`, Python | 112 | 0.666 | 495 |
+| forecast 8.21.1 `tbats()`, one core | 116 | 1.196 | 872 |
+| forecast 8.21.1 `tbats()`, default (two cores) | 87 | 1.196 | 872 |
+| statsforecast `AutoTBATS` | 406 | 0.840 | 667 |
+
+smooth R and Python select the same models (damped trend, ARMA(1,3) or (2,3), harmonics
+8 and 32) and give identical forecasts. forecast's `tbats()` takes about as long on one
+core, but picks the log transform (λ=0) with 6 weekly harmonics at all origins and is
+worse than the seasonal naive. statsforecast's `AutoTBATS` (no Box-Cox, 8 and 37
+harmonics, ARMA(5,1)) is in between and takes 3.5 times as long. The R timings need an optimised
 build: `pkgload::load_all()` compiles the C++ with `-O0`, which made R look 2.5 times
 slower than Python.
 

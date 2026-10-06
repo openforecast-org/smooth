@@ -128,7 +128,7 @@ will not estimate anything and will use all its parameters.}
 \code{FI}, \code{stepSize} and \code{shape}.}
 }
 \value{
-Object of class \code{c("tbats","adam","smooth")} is returned with
+Object of class \code{c("adamTBATS","adam","smooth")} is returned with
 similar elements to the \link[smooth]{adam} function, together with
 \code{lambda}, \code{harmonics}, \code{periods} and the information criteria of
 the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:

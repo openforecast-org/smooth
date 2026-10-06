@@ -137,7 +137,7 @@
 #' \code{ftol_abs}, \code{print_level}, \code{nIterations}, \code{headLength},
 #' \code{FI}, \code{stepSize} and \code{shape}.
 #'
-#' @return Object of class \code{c("tbats","adam","smooth")} is returned with
+#' @return Object of class \code{c("adamTBATS","adam","smooth")} is returned with
 #' similar elements to the \link[smooth]{adam} function, together with
 #' \code{lambda}, \code{harmonics}, \code{periods} and the information criteria of
 #' the fitted candidates in \code{ICs}. The methods of \link[smooth]{adam} apply:
@@ -1499,7 +1499,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     scale=best$scale, B=best$B, lags=c(1, periods),
                                     lagsAll=struct$lagsModelAll, res=best$res, FI=best$FI,
                                     adamCpp=best$adamCpp, inBounds=best$inBounds, refitter=best$refitter),
-                               class=c("tbats","adam","smooth"));
+                               class=c("adamTBATS","adam","smooth"));
     if(!silent){
         plot(modelReturned, 7);
     }
@@ -1558,7 +1558,7 @@ tbats_boxCoxForecast <- function(result, object){
 # The in-sample multistep forecast errors of the transformed data, with the C++ core
 # of the model: rmultistep.adam would compare its forecasts with the data
 #' @export
-rmultistep.tbats <- function(object, h=10, ...){
+rmultistep.adamTBATS <- function(object, h=10, ...){
     y <- as.numeric(actuals(object));
     yBC <- tbats_boxCoxSizes(y, object$lambda, tbats_sizes(y, object));
     lookup <- adamProfileCreator(object$lagsAll, max(object$lagsAll), nobs(object))$lookup;
@@ -1577,7 +1577,7 @@ rmultistep.tbats <- function(object, h=10, ...){
 # estimate often lies on the boundary of the admissible region, where most draws
 # would otherwise be rejected.
 #' @export
-reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+reapply.adamTBATS <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                           bootstrap=FALSE, heuristics=NULL, ...){
     startTime <- Sys.time();
     type <- covarTypeResolver(type, bootstrap);
@@ -1685,7 +1685,7 @@ tbats_confintBounds <- function(object, parameters, bounds){
 # back. The point forecast is the skeleton of the model, or the mean / median of the
 # paths.
 #' @export
-reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
+reforecast.adamTBATS <- function(object, h=10, newdata=NULL, occurrence=NULL,
                              interval=c("prediction", "confidence", "none"),
                              level=0.95, side=c("both","upper","lower"), cumulative=FALSE,
                              nsim=100, type=c("opg","hessian","bootstrap"),
@@ -1771,7 +1771,7 @@ reforecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
 }
 
 #' @export
-forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
+forecast.adamTBATS <- function(object, h=10, newdata=NULL, occurrence=NULL,
                            interval=c("none", "prediction", "confidence", "simulated",
                                       "approximate", "semiparametric", "nonparametric",
                                       "empirical","complete"),
@@ -1946,7 +1946,7 @@ tbats_newdata <- function(object, newdata){
 }
 
 #' @export
-predict.tbats <- function(object, newdata=NULL, interval=c("none", "confidence", "prediction"),
+predict.adamTBATS <- function(object, newdata=NULL, interval=c("none", "confidence", "prediction"),
                           level=0.95, side=c("both","upper","lower"), ...){
     result <- predict(tbats_boxCoxObject(object), newdata=tbats_newdata(object, newdata), interval=interval,
                       level=level, side=side, ...);
@@ -1955,7 +1955,7 @@ predict.tbats <- function(object, newdata=NULL, interval=c("none", "confidence",
 
 # The log-densities of the data: those of the transformed data and the Jacobian
 #' @export
-pointLik.tbats <- function(object, log=TRUE, ...){
+pointLik.adamTBATS <- function(object, log=TRUE, ...){
     y <- as.numeric(actuals(object));
     # The missing values are not in the likelihood: their values stay zero
     observed <- !is.na(y);
@@ -1998,7 +1998,7 @@ covarOPGtbats <- function(object, stepSize=.Machine$double.eps^(1/4)){
 }
 
 #' @export
-simulate.tbats <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
+simulate.adamTBATS <- function(object, nsim=1, seed=NULL, obs=nobs(object), ...){
     result <- simulate(tbats_boxCoxObject(object), nsim=nsim, seed=seed, obs=obs, ...);
     # The sizes, and the occurrence drawn with the fitted probabilities
     result$data[] <- tbats_boxCoxInverse(result$data, object$lambda) *

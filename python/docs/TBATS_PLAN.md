@@ -1,6 +1,6 @@
 # TBATS in smooth: implementation plan
 
-Issue: openforecast-org/smooth#396. `tbats()` in R and `TBATS` in Python, built as a
+Issue: openforecast-org/smooth#396. `tbats()` in R and `AdamTBATS` in Python, built as a
 native linear single-source-of-error model on the shared `adamCore` (the generic path,
 `adamETS=FALSE`, as CES and GUM use it). The fitter itself needed no C++ changes; the
 speed-ups of section P added an opt-in sparse transition and per-draw data to the core.
@@ -117,7 +117,7 @@ tbats(y, lags=c(1, frequency(y)), harmonics=NULL,
 - `orders` align with `lags` as in `adam()`; `ar=3` / `ma=3` refer to lag 1 only.
 - `model=` refits a previous `tbats` object (needed for the Hessian / FI).
 
-Python: `TBATS(lags=..., harmonics=None, trend="auto", lambda_bc=None, orders=...,
+Python: `AdamTBATS(lags=..., harmonics=None, trend="auto", lambda_bc=None, orders=...,
 distribution="dnorm", loss="likelihood", ic="AICc", h=0, holdout=False,
 initial="backcasting", bounds="usual", ...)` with `.fit(y)` / `.predict(h)`.
 
@@ -242,7 +242,7 @@ greybox densities.
   the de-biased variance), inverse-transformed. Python hands its matrices to ADAM's
   `forecaster()`, as `CES.predict()` now does, rather than having its own forecast code.
 - Fitted values are back-transformed; residuals stay on the Box-Cox scale.
-- Class `c("adam","smooth")`, `smoothType()` "TBATS", `tbatsChecker()`, added wherever
+- Class `c("adamTBATS","adam","smooth")` (not `"tbats"`, which is the class of `forecast::tbats()` and would dispatch to its methods), `smoothType()` "TBATS", `tbatsChecker()`, added wherever
   `cesChecker()` / `gumChecker()` already branch (`coefbootstrap`, the OPG `vcov`,
   `reapply`, `print`, `plot`). Printed name `TBATS(λ, {p,q}, φ, <m₁,k₁>, …)`, without
   "ARIMA", so `arimaChecker()` stays false. `pointLik()` / Python `point_lik()` as CES has
@@ -315,7 +315,7 @@ forecasts on AirPassengers and the two-period `taylor` data.
 Scope: `regressors` "use", "select" and "adapt" ("integrate" is not planned). The
 variables come in a separate argument, no formula: R `tbats(y, xreg=NULL,
 regressors=c("use","select","adapt"), ...)`, `forecast(object, h, newdata=)`; Python
-`TBATS(regressors=...)`, `.fit(y, X=None)`, `.predict(h, X=None)`. A numeric matrix or
+`AdamTBATS(regressors=...)`, `.fit(y, X=None)`, `.predict(h, X=None)`. A numeric matrix or
 data frame (Python: array or DataFrame) with one row per observation, holdout and
 horizon rows included when available; the names come from the columns (`x1`, `x2`, ...
 otherwise). Factors are not expanded (an error with numeric conversion advice). The
@@ -387,7 +387,7 @@ which runs `stepwise` on the raw y before any fit):
 
 ### L.5 Forecasts and methods
 
-- R `forecast.tbats` / `predict.tbats` keep delegating to `forecast.adam` on the model
+- R `forecast.adamTBATS` / `predict.adamTBATS` keep delegating to `forecast.adam` on the model
   in the Box-Cox space: the object carries `data = cbind(y, xreg)` with an internal
   formula built from the names, so `newdata` (a matrix or data frame with the same
   columns) goes through ADAM's own code. Without `newdata` (and no holdout to cover
@@ -470,8 +470,8 @@ All reproduced and fixed:
 
 ## N. The point forecast: `point = c("skeleton", "mean", "median")`
 
-One argument of `forecast.adam()` / `forecast.tbats()` / `reforecast()` / the
-combinations, and of `ADAM.predict()` / `TBATS.predict()` / `reforecast()` in Python,
+One argument of `forecast.adam()` / `forecast.adamTBATS()` / `reforecast()` / the
+combinations, and of `ADAM.predict()` / `AdamTBATS.predict()` / `reforecast()` in Python,
 with `"skeleton"` the default everywhere.
 
 - `"skeleton"`: the model run forward with every future error at its neutral value
@@ -524,7 +524,7 @@ with `"skeleton"` the default everywhere.
   forecaster's simulation in the transformed space, transformed back, with the
   occurrence drawn (`rbinom(p)`): the sum of the skeletons times p, or the mean or
   median of the sums of the paths, and their quantiles as the bounds (R
-  `tbats_cumulative`, Python `TBATS._cumulative`); `reforecast()` sums its own paths.
+  `tbats_cumulative`, Python `AdamTBATS._cumulative`); `reforecast()` sums its own paths.
 
 ## P. Performance (October 2026)
 
@@ -551,7 +551,7 @@ Done, instead of fitting the trend candidates in parallel:
   50058 → 49926 at n=3696, damped+ARMA instead of none+ARMA, mean MASE 0.688 → 0.666);
   3 of 12 candidates on other series came out slightly worse (≤ 3.3 AICc);
 - the sparse transition: `adamCore::sparseTransition` (default false), set by `tbats()`,
-  `ssarima()` and Python `TBATS`, makes `fit()` and `reapply()` take `F v` as a sparse
+  `ssarima()` and Python `AdamTBATS`, makes `fit()` and `reapply()` take `F v` as a sparse
   product when F has more than four states and at most half of it is non-zero. The same
   values; tbats 1.5 times faster on Taylor; nothing to gain for the small or dense F of
   ETS, CES, GUM and ADAM's ARIMA, which keep the dense product;
@@ -571,5 +571,5 @@ Done, instead of fitting the trend candidates in parallel:
 - `initial="gradient"` is slow with many harmonics (about 220 s against 3 s for
   backcasting with <48,8>, <336,14> on the vignette's series): the solve runs over all
   the states in every evaluation;
-- the vignette (`vignettes/tbats.Rmd`) covers R; the Python documentation of `TBATS`
+- the vignette (`vignettes/tbats.Rmd`) covers R; the Python documentation of `AdamTBATS`
   has no tutorial yet.

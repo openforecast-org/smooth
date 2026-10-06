@@ -5,10 +5,10 @@ Trigonometric Box-Cox ARMA Trend Seasonal model.
 
 .. currentmodule:: smooth
 
-.. autoclass:: TBATS
+.. autoclass:: AdamTBATS
    :members: fit, predict
 
-``TBATS`` implements the model of De Livera, Hyndman and Snyder (2011) in the
+``AdamTBATS`` implements the model of De Livera, Hyndman and Snyder (2011) in the
 Single Source of Error state space framework of :class:`ADAM`: the level and
 trend of ETS, a trigonometric seasonality for each seasonal period, and an ARMA,
 all in the space of the Box-Cox transformed data. The trigonometric seasonality
@@ -96,7 +96,7 @@ errors of Python and R differ):
 Automatic model
 ---------------
 
-By default, ``TBATS`` selects the structure of the model itself:
+By default, ``AdamTBATS`` selects the structure of the model itself:
 
 1. the number of harmonics for each period, by the information criterion of the
    global model (a regression on a trend and the Fourier terms);
@@ -112,9 +112,9 @@ held out:
 
 .. code-block:: python
 
-   from smooth import TBATS
+   from smooth import AdamTBATS
 
-   model = TBATS(lags=[1, 48, 336], h=336, holdout=True)
+   model = AdamTBATS(lags=[1, 48, 336], h=336, holdout=True)
    model.fit(y)
    print(model)        # TBATS(lambda, {p,q}, phi, <48,k1>, <336,k2>), AICc ...
    model.ics           # the information criteria of the candidate models
@@ -146,7 +146,7 @@ transformation:
 
 .. code-block:: python
 
-   model = TBATS(
+   model = AdamTBATS(
        lags=[1, 48, 336],
        harmonics=[8, 16],
        trend="none",
@@ -200,7 +200,7 @@ probabilities of occurrence. The sizes are then modelled on the non-zero values:
    rng = np.random.default_rng(41)
    y_intermittent = rng.poisson(3, 120) * rng.binomial(1, 0.7, 120)
 
-   model = TBATS(lags=[1, 12], occurrence="auto", h=12, holdout=True)
+   model = AdamTBATS(lags=[1, 12], occurrence="auto", h=12, holdout=True)
    model.fit(y_intermittent.astype(float))
    model.predict(h=12).mean
 

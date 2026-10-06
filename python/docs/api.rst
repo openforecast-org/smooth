@@ -18,7 +18,7 @@ Classes
    OM
    OMG
    AutoOM
-   TBATS
+   AdamTBATS
 
 Functions
 ---------

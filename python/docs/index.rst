@@ -24,7 +24,7 @@ Classes
    OM
    OMG
    AutoOM
-   TBATS
+   AdamTBATS
 
 ADAM Methods
 ------------

@@ -45,7 +45,7 @@ When writing R code specifically:
 - Always use explicit `return(object)` at the end of every function.
 - Always wrap `if`, `for`, and `while` bodies in `{}`, even for single-line bodies: `if (...) { ... }`.
 - Never expose internal (non-exported) functions via roxygen. Do not give them a roxygen title/description block or an `@export` — a title/description makes `roxygen2::roxygenise()` generate a `man/*.Rd` page for them, which leaks the helper into the documentation. Internal helpers get no roxygen at all: use plain `#` comments for the explanation, matching the other internal helpers (e.g. `adam_checkOptimizer`). `#' @keywords internal` is pointless on a block without a title (no Rd page is generated anyway) and must not be added.
-- Export only the user-facing functions and their S3 methods (for a model, e.g. `tbats()` and `forecast.tbats()`); every helper stays internal: no `@export`, no NAMESPACE entry, no Rd page. Check the user's view with `library(smooth)` or `pkgload::load_all(export_all=FALSE)`: the default `load_all()` attaches all the internal functions, so they show up in the console's completion although the installed package does not expose them.
+- Export only the user-facing functions and their S3 methods (for a model, e.g. `tbats()` and `forecast.adamTBATS()`); every helper stays internal: no `@export`, no NAMESPACE entry, no Rd page. Check the user's view with `library(smooth)` or `pkgload::load_all(export_all=FALSE)`: the default `load_all()` attaches all the internal functions, so they show up in the console's completion although the installed package does not expose them.
 
 
 ## R Package Development

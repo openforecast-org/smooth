@@ -83,7 +83,7 @@ def _refit_one_replicate(
     so that joblib can pickle it."""
     try:
         X_i = None if X is None else X[indices[i]]
-        coef = TBATS(**kwargs).fit(actuals[indices[i]], X_i).coef
+        coef = AdamTBATS(**kwargs).fit(actuals[indices[i]], X_i).coef
     except Exception:
         return None
     if coef.shape[0] != k or not np.all(np.isfinite(coef)):
@@ -221,7 +221,7 @@ def _match(value: str, options: tuple, name: str) -> str:
     return value
 
 
-class TBATS:
+class AdamTBATS:
     """
     Trigonometric Box-Cox ARMA Trend Seasonal model (De Livera et al., 2011) in the
     Single Source of Error framework of ADAM: the level and trend of ETS, a
@@ -403,7 +403,7 @@ class TBATS:
             "shape_estimate": self.shape is None,
         }
 
-    def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "TBATS":
+    def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "AdamTBATS":
         """Fit the model to the series ``y``, with the explanatory variables ``X``
         (a numeric array or data frame with the rows of ``y``, and of the horizon
         ``h`` for its forecasts) in the space of the transformed data.
@@ -1456,7 +1456,7 @@ class TBATS:
         **vcov_kwargs: Any,
     ) -> "TBATSReapplyResult":
         """The refits at parameters drawn from their distribution (R's
-        ``reapply.tbats``). Each draw has its own lambda; a draw outside the bounds
+        ``reapply.adamTBATS``). Each draw has its own lambda; a draw outside the bounds
         is pulled towards the estimates."""
         from smooth.adam_general.core.utils.reapply import sampling_vcov
         from smooth.adam_general.core.utils.var_covar import resolve_covar_type
@@ -1533,7 +1533,7 @@ class TBATS:
         **vcov_kwargs: Any,
     ) -> ReforecastResult:
         """The forecasts with the uncertainty of the parameters (R's
-        ``reforecast.tbats``): for each draw of :meth:`reapply`, its point forecasts
+        ``reforecast.adamTBATS``): for each draw of :meth:`reapply`, its point forecasts
         (``"confidence"``) or its paths simulated with the scale of its own errors
         (``"prediction"``), in the space of its own transform and transformed back.
         The point forecast is the skeleton of the model (its median), or the mean or
@@ -1655,7 +1655,7 @@ class TBATS:
         self, nsim: int = 1, seed: Optional[int] = None, obs: Optional[int] = None
     ) -> SimulateResult:
         """Series simulated from the model in the space of the transformed data,
-        transformed back (R's ``simulate.tbats``), starting from its initials."""
+        transformed back (R's ``simulate.adamTBATS``), starting from its initials."""
         from smooth.adam_general._adam_general import adam_simulator
         from smooth.adam_general.core.creator.architector import adam_profile_creator
         from smooth.adam_general.core.utils.distributions import generate_errors
@@ -1919,7 +1919,7 @@ class TBATS:
     def __repr__(self) -> str:
         if hasattr(self, "_best"):
             return f"{self.model_name}, AICc {self.aicc:.3f}"
-        return "TBATS (not fitted)"
+        return "AdamTBATS (not fitted)"
 
 
 def _r_round(value: float, digits: int) -> str:

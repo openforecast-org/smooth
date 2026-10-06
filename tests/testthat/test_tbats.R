@@ -459,3 +459,14 @@ test_that("rmultistep() of tbats() gives the errors of the transformed data", {
     expect_lt(max(abs(errors)), 1);
     expect_true(all(is.finite(multicov(fit, type="empirical", h=3))));
 });
+
+test_that("the class does not take the methods of forecast::tbats()", {
+    model <- tbats(AirPassengers, lags=c(1,12), harmonics=2, orders=orders0);
+    expect_equal(class(model), c("adamTBATS","adam","smooth"));
+    # forecast registers print, plot, fitted, residuals, forecast and simulate for "tbats"
+    print.tbats <- forecast.tbats <- function(...){
+        stop("the method of forecast::tbats()");
+    };
+    expect_output(print(model), "TBATS");
+    expect_s3_class(forecast(model, h=12), "smooth.forecast");
+})

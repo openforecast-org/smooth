@@ -104,7 +104,6 @@ reapply.default <- function(object, nsim=1000, type=c("opg","hessian","bootstrap
 # The covariance of the parameters for the draws of reapply(): a parameter with a
 # non-finite variance (not identified by the data) is held at its estimate, and a
 # matrix that is not positive semi-definite is repaired
-#' @keywords internal
 reapply_vcov <- function(object, type, heuristics, nsim, ...){
     parametersNames <- names(coef(object));
     vcovAdam <- suppressWarnings(vcov(object, type=type, heuristics=heuristics, nsim=nsim, ...));

@@ -3,7 +3,6 @@
 # other future functions without duplicating logic.
 
 #### Data preparation ####
-#' @keywords internal
 adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse) {
     responseName <- yName
 
@@ -225,7 +224,6 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
 }
 
 #### Optimiser / ellipsis parameter processing ####
-#' @keywords internal
 adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags, arimaModel) {
     if(is.null(ellipsis$maxeval)){
         maxeval <- NULL
@@ -347,7 +345,6 @@ adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags,
 # for initialType="optimal" (initials sit in B and are counted via length(B),
 # with the seasonal redundancy handled by the caller) and for "provided".
 # Shared by the estimator-free "use" paths of adam()/om() and by omg().
-#' @keywords internal
 dfInitialsBackcast <- function(etsModel, modelIsSeasonal, modelIsTrendy,
                                lagsModelSeasonal, initialLevelEstimate,
                                initialTrendEstimate, initialSeasonalEstimate,
@@ -384,7 +381,6 @@ dfInitialsBackcast <- function(etsModel, modelIsSeasonal, modelIsTrendy,
 # NULL (absent): geometry=lagsModelMax, flag=lagsModelMax (filtering on, one cycle).
 # hl==0: geometry=lagsModelMax, flag=0L (filtering off, legacy behaviour).
 # hl>0: geometry=flag=max(lagsModelMax, min(round(hl), obsInSample)).
-#' @keywords internal
 adam_headLength <- function(hl, lagsModelMax, obsInSample){
     hlRequested <- if(is.null(hl)) lagsModelMax else max(0, round(hl))
     geometry <- max(lagsModelMax, min(hlRequested, obsInSample))
@@ -393,7 +389,6 @@ adam_headLength <- function(hl, lagsModelMax, obsInSample){
 }
 
 #### Model architecture and initial matrix creation ####
-#' @keywords internal
 adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeasonal,
                              xregNumber, obsInSample, initialType,
                              arimaModel, lagsModelARIMA, xregModel, constantRequired,
@@ -498,7 +493,6 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
     ))
 }
 
-#' @keywords internal
 adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
                          lags, lagsModel, lagsModelARIMA, lagsModelAll, lagsModelMax,
                          profilesRecentTable=NULL, profilesRecentProvided=FALSE,
@@ -865,7 +859,6 @@ adam_creator <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSe
     return(list(matVt=matVt, matWt=matWt, matF=matF, vecG=vecG, arimaPolynomials=arimaPolynomials))
 }
 
-#' @keywords internal
 adam_filler <- function(B,
                         etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
                         componentsNumberETS, componentsNumberETSNonSeasonal,
@@ -1038,7 +1031,6 @@ adam_filler <- function(B,
 # the pre-sample value x in the convention of adam_arimaPreSample (-y, 1/y for
 # "M"; oldest first, x[m] at time 0), so the initial k is the sum of
 # ari_L * x[m-L+k] over the ARI lags L >= k.
-#' @keywords internal
 adam_arimaInitials <- function(ariPolynomial, x, Etype){
     m <- length(x)
     x <- switch(Etype, "M"=log(x), x)
@@ -1053,7 +1045,6 @@ adam_arimaInitials <- function(ariPolynomial, x, Etype){
 # above), for the states estimated in any way, e.g. by backcasting. The fitted
 # states are aligned in time: the head column c is the time c-lagsModelMax, so
 # the state with lag L gives to the time k its column lagsModelMax-L+k.
-#' @keywords internal
 adam_arimaHeadInitials <- function(matVtARIMA, lagsModelARIMA, lagsModelMax, Etype){
     head <- switch(Etype, "M"=log(matVtARIMA[,1:lagsModelMax,drop=FALSE]),
                    matVtARIMA[,1:lagsModelMax,drop=FALSE])
@@ -1069,7 +1060,6 @@ adam_arimaHeadInitials <- function(matVtARIMA, lagsModelARIMA, lagsModelMax, Ety
 # multiplicative error), whose drift it is, or by one step for ETS, where it is the
 # drift of the level. With seasonal differencing, the drift is the change over a
 # season, not over one step.
-#' @keywords internal
 adam_driftSeries <- function(y, Etype, etsModel, lags, iOrders){
     if(Etype=="M"){
         y <- log(y)
@@ -1092,7 +1082,6 @@ adam_driftSeries <- function(y, Etype, etsModel, lags, iOrders){
 # level to the time 1-lagsMax, over any gap of the smoother. With no differences,
 # the constant is the level, and the values are deviations from it.
 # Returned as -y (1/y for "M"), oldest first (see adam_arimaInitials).
-#' @keywords internal
 adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, constantLevel, smoother){
     y <- as.vector(yInSample)
     y[!otLogical] <- NA
@@ -1127,7 +1116,6 @@ adam_arimaPreSample <- function(yInSample, otLogical, Etype, lags, iOrders, m, c
 # With bounded, the factors that the cost function would reject (not stationary AR,
 # not invertible MA, see src/headers/arimaBounds.h) are moved inside the boundary.
 # Returns the AR / MA values in the order of B.
-#' @keywords internal
 adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal,
                                   lags, arOrders, iOrders, maOrders, arEstimate, maEstimate,
                                   armaParameters, bounded, smoother, xregInSample){
@@ -1166,7 +1154,6 @@ adam_arimaInitialiser <- function(yInSample, otLogical, etsModel, Etype, Stype, 
                                 useLevel, bounded)))
 }
 
-#' @keywords internal
 adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
                              componentsNumberETSNonSeasonal, componentsNumberETSSeasonal,
                              componentsNumberETS,
@@ -1517,7 +1504,6 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     return(list(B=B,Bl=Bl,Bu=Bu))
 }
 
-#' @keywords internal
 adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other){
     return(switch(distribution,
                   "dnorm"=sum(errors^2)/obsInSample,
@@ -1557,7 +1543,6 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
 # The scale is the parameter of the distribution as written in the ADAM monograph
 # (Tables 11.1-11.2): sigma^2 for dnorm, dlnorm, dinvgauss and dgamma, s for the
 # others. The variance of the error is proportional to scale^p, with p returned here.
-#' @keywords internal
 adam_scalePower <- function(distribution){
     return(switch(distribution,
                   "ds"=,"dls"=4,
@@ -1567,14 +1552,12 @@ adam_scalePower <- function(distribution){
 
 # De-bias the scale in the variance space: the variance is multiplied by obs/df,
 # so the scale is multiplied by (obs/df)^(1/p).
-#' @keywords internal
 adam_scaleDebias <- function(scale, distribution, obs, df){
     return(scale*(obs/df)^(1/adam_scalePower(distribution)));
 }
 
 # Degrees of freedom for de-biasing the scale: the non-zero observations minus the
 # parameters, without the scale ones when they were estimated by likelihood.
-#' @keywords internal
 adam_dfScale <- function(object){
     nParam <- nparam(object);
     if(!is.null(object$loss) && object$loss=="likelihood"){
@@ -1588,7 +1571,6 @@ adam_dfScale <- function(object){
 }
 
 # The variance of the error term implied by the scale (see adam_scalePower)
-#' @keywords internal
 adam_scaleVariance <- function(scale, distribution, other){
     return(switch(distribution,
                   "dlaplace"=,"dllaplace"=2*scale^2,
@@ -1602,7 +1584,6 @@ adam_scaleVariance <- function(scale, distribution, other){
 # The de-biased variance of the error term implied by the scale, or by the scale
 # model's values. This, not sigma(), feeds the analytical intervals, so they come
 # from the same estimate of the distribution as the likelihood and the simulations.
-#' @keywords internal
 adam_varianceDebiased <- function(object, scaleValue=extractScale(object)){
     # An occurrence model has no scale: its errors are on the link scale
     if(is.occurrence(object)){
@@ -1614,7 +1595,6 @@ adam_varianceDebiased <- function(object, scaleValue=extractScale(object)){
 
 # The windows of the multistep errors (row i of ferrors() has the targets i..i+h-1)
 # whose targets are all observed: the losses over the missing values are not taken
-#' @keywords internal
 adam_completeWindows <- function(observed, h){
     missingCount <- cumsum(c(0, !observed));
     rows <- seq_len(max(length(observed)-h+1, 0));
@@ -1623,7 +1603,6 @@ adam_completeWindows <- function(observed, h){
 
 # The multistep loss over the windows with all their targets observed (the multistep
 # losses of adam(), ces(), gum() and ssarima()): adamErrors are the errors of ferrors()
-#' @keywords internal
 adam_multistepLoss <- function(adamErrors, loss, h, observed){
     adamErrors <- adamErrors[adam_completeWindows(observed, h),,drop=FALSE];
     nWindows <- nrow(adamErrors);
@@ -1648,7 +1627,6 @@ adam_multistepLoss <- function(adamErrors, loss, h, observed){
 # The concentrated log-likelihood of a multistep loss over the windows with all their
 # targets observed, rescaled to the observed values to be comparable with the
 # one-step likelihoods (taking T instead of T-h is not well motivated at the moment)
-#' @keywords internal
 adam_multistepLogLik <- function(lossValue, loss, h, observed){
     nWindows <- sum(adam_completeWindows(observed, h));
     logLikValue <- -switch(loss,
@@ -1668,7 +1646,6 @@ adam_multistepLogLik <- function(lossValue, loss, h, observed){
 
 # The accuracy on the observed values of the holdout, scaled by the observed in-sample
 # ones: the missing values (NA) are not compared with anything
-#' @keywords internal
 adam_accuracy <- function(holdout, forecast, inSample){
     observed <- !is.na(as.vector(holdout));
     if(!any(observed)){
@@ -1680,13 +1657,11 @@ adam_accuracy <- function(holdout, forecast, inSample){
 }
 
 # The observed values, which the scale is divided by: the missing ones are not
-#' @keywords internal
 adam_nobsObserved <- function(object){
     return(sum(!is.na(actuals(object))));
 }
 
 # The de-biased variance from the scale model's forecasts
-#' @keywords internal
 adam_scaleModelVariance <- function(object, h, newdata){
     scaleValue <- forecast(object$scale,h=h,newdata=newdata,interval="none")$mean;
     scaleValue[] <- adam_varianceDebiased(object, scaleValue);
@@ -1695,14 +1670,12 @@ adam_scaleModelVariance <- function(object, h, newdata){
 
 # The scale for simulations, de-biased in the variance space with the df of the
 # location model. scaleValue is either the scale or the scale model's values.
-#' @keywords internal
 adam_scaleSimulation <- function(object, scaleValue){
     return(adam_scaleDebias(scaleValue, object$distribution, adam_nobsObserved(object), adam_dfScale(object)));
 }
 
 # Random errors of the model for the provided scale (see adam_scalePower).
 # dnorm and dlnorm take the square root of their scale, sigma^2.
-#' @keywords internal
 adam_errorsSimulate <- function(n, distribution, scale, other, dfT){
     return(switch(distribution,
                   "plogis"=,
@@ -1724,7 +1697,6 @@ adam_errorsSimulate <- function(n, distribution, scale, other, dfT){
 # The power-law quantile A1*j^A2, j=1..h, of the multistep errors at the level,
 # minimising the pinball loss (Taylor & Bunn). For a given A2 the best A1 is the
 # weighted quantile of e/j^A2 with weights j^A2, so only A2 is optimised.
-#' @keywords internal
 adam_quantilePower <- function(errors, level){
     h <- ncol(errors);
     horizons <- col(errors)[!is.na(errors)];
@@ -1749,7 +1721,6 @@ adam_quantilePower <- function(errors, level){
 }
 
 #### IC weights (Akaike weights) ####
-#' @keywords internal
 adam_ic_weights <- function(icSelection, threshold=1e-5){
     icBest <- min(icSelection);
     weights <- exp(-0.5*(icSelection - icBest)) / sum(exp(-0.5*(icSelection - icBest)));
@@ -1762,7 +1733,6 @@ adam_ic_weights <- function(icSelection, threshold=1e-5){
 # The scales of LASSO / RIDGE: the standard deviations of the explanatory variables
 # (denominator), which normalise their parameters, and of the differenced series
 # (yDenominator), which normalises the errors of adam()
-#' @keywords internal
 adam_lassoDenominators <- function(loss, matWt, componentsNumberETS, componentsNumberARIMA,
                                    xregNumber, yInSample){
     denominator <- yDenominator <- NULL;
@@ -1782,7 +1752,6 @@ adam_lassoDenominators <- function(loss, matWt, componentsNumberETS, componentsN
 # good understanding how to shrink ARMA"), MA and regressors of zero, the additive
 # regressors normalised by their standard deviations (denominator). The initial states
 # are not shrunk. Shared by adam(), om() and omg()
-#' @keywords internal
 adam_penaltyParameters <- function(B, Etype, etsModel, modelIsTrendy, modelIsSeasonal,
                                    persistenceEstimate, persistenceLevelEstimate,
                                    persistenceTrendEstimate, persistenceSeasonalEstimate,
@@ -1811,7 +1780,6 @@ adam_penaltyParameters <- function(B, Etype, etsModel, modelIsTrendy, modelIsSea
              1-arma[arEstimated], arma[!arEstimated], xreg));
 }
 
-#' @keywords internal
 adam_bounds_checker <- function(adamElements, arimaPolynomials,
                                 bounds,
                                 etsModel, modelIsTrendy, modelIsSeasonal,
@@ -1886,7 +1854,6 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
 }
 
 #### xreg variable selector using stepwise regression on residuals ####
-#' @keywords internal
 adam_xreg_selector <- function(errors, xregData, obsInSample, ic, df, distribution,
                                occurrence, other){
     alpha <- shape <- nu <- NULL;
@@ -1909,7 +1876,6 @@ adam_xreg_selector <- function(errors, xregData, obsInSample, ic, df, distributi
 }
 
 #### Model name assembler ####
-#' @keywords internal
 adam_model_name <- function(etsModel, model, xregModel, arimaModel,
                             arOrders, iOrders, maOrders, lags,
                             regressors, constantRequired, constantName,
@@ -1989,7 +1955,6 @@ adam_model_name <- function(etsModel, model, xregModel, arimaModel,
 }
 
 #### Initial values collector ####
-#' @keywords internal
 adam_initial_collector <- function(matVt, etsModel, modelIsTrendy, modelIsSeasonal,
                                    lagsModel, lagsModelMax,
                                    initialLevelEstimate, initialTrendEstimate,
@@ -2085,7 +2050,6 @@ adam_initial_collector <- function(matVt, etsModel, modelIsTrendy, modelIsSeason
 }
 
 #### ETS model selector (branch-and-bound + full pool) ####
-#' @keywords internal
 adam_selector <- function(estimator_fn, model, modelsPool, allowMultiplicative,
                           modelDo="estimate",
                           etsModel, Etype, Ttype, Stype, damped, lags,
@@ -2419,7 +2383,6 @@ adam_selector <- function(estimator_fn, model, modelsPool, allowMultiplicative,
 }
 
 #### Parallel setup / teardown ####
-#' @keywords internal
 adam_setupParallel <- function(parallel, nModels){
     if(is.numeric(parallel)){
         nCores <- parallel;
@@ -2470,7 +2433,6 @@ adam_setupParallel <- function(parallel, nModels){
     return(list(parallel=parallel, cluster=cluster, nCores=nCores));
 }
 
-#' @keywords internal
 adam_teardownParallel <- function(cluster){
     if(!is.null(cluster)){
         parallel::stopCluster(cluster);
@@ -2478,7 +2440,6 @@ adam_teardownParallel <- function(cluster){
 }
 
 #### ARIMA order selector ####
-#' @keywords internal
 adam_arimaSelector <- function(data, model, lags, arMax, iMax, maMax,
                                 h, holdout,
                                 persistence, phi, initial,

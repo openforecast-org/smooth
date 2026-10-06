@@ -5123,7 +5123,6 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 
 # The data of a refit in coefbootstrap(): tbats() takes the response and the regressors
 # in separate arguments
-#' @keywords internal
 adam_bootstrapData <- function(newCall, dataArgument, data){
     if(dataArgument=="y" && NCOL(data)>1){
         newCall$y <- data[,1];
@@ -5849,7 +5848,6 @@ plot.adam.predict <- function(x, ...){
 
 # Forecasts of a pure regression, done by forecast.alm() on the alm() model
 # that adam() returned. All the prediction intervals of adam are parametric there.
-#' @keywords internal
 adam_forecastRegression <- function(object, h, newdata, occurrence, interval, level, side,
                                     cumulative, ...){
     side <- match.arg(side[1], c("both","upper","lower"));
@@ -5893,7 +5891,6 @@ adam_forecastRegression <- function(object, h, newdata, occurrence, interval, le
 # The future values of the explanatory variables of an adam model for h steps ahead,
 # as a matrix with a column per variable: newdata, else the holdout, else the
 # variables forecast by adam() (adam_xregForecast) with a warning
-#' @keywords internal
 adam_xregNewdata <- function(object, h, newdata){
     xregNumber <- length(object$initial$xreg);
     xregNames <- names(object$initial$xreg);
@@ -6006,7 +6003,6 @@ adam_xregNewdata <- function(object, h, newdata){
 # The future values of the explanatory variables in a matrix xreg (the columns of the
 # data), when newdata is missing: each variable but the response forecast by adam() into
 # the last hNeeded rows
-#' @keywords internal
 adam_xregForecast <- function(object, xreg, hNeeded){
     responseName <- all.vars(formula(object))[1];
     rows <- nrow(xreg)-hNeeded+seq_len(hNeeded);
@@ -6931,7 +6927,6 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 }
 
 # Whether a model works in logarithms, with its forecasts exponentiated in forecast.adam()
-#' @keywords internal
 adam_logModel <- function(object){
     return(any(unlist(gregexpr("in logs", object$model))!=-1) ||
                (gumChecker(object) && identical(object$type, "multiplicative")));
@@ -6943,7 +6938,6 @@ adam_logModel <- function(object){
 # multiplicative trend only at the first step, and with a multiplicative seasonality
 # until its first lag, as for the choice of the simulated interval. The median: an
 # additive model with a symmetric distribution. Neither with an intermittent median.
-#' @keywords internal
 adam_skeletonSteps <- function(object, point, Etype, Ttype, Stype, arimaModel, lagsModelMin,
                                intermittent){
     if(adam_logModel(object) || object$distribution=="dalaplace"){
@@ -6967,7 +6961,6 @@ adam_skeletonSteps <- function(object, point, Etype, Ttype, Stype, arimaModel, l
 
 # The mean of the simulated paths (the occurrence drawn in them), or the 50% quantile of
 # the method of the interval (simulated with an occurrence model)
-#' @keywords internal
 adam_pointForecast <- function(object, point, h, newdata, occurrence, interval, cumulative, nsim,
                                intermittent, ...){
     if(point=="mean"){

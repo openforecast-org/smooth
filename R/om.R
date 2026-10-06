@@ -1754,7 +1754,6 @@ omLinkFunction <- function(x, Etype, occurrence){
 
 # The mixed ETS models that are dangerous to start from the initialiser's values,
 # and that om() and omg() start from no smoothing instead
-#' @keywords internal
 om_mixedModel <- function(Etype, Ttype, Stype){
     return(any(paste0(Etype, Ttype, Stype)==c("AAM","AMA","MAA","MAN","AMN","MMA","MNA","ANM")));
 }

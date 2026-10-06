@@ -3071,7 +3071,6 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 }
 
 #### adamSpecificChecker: thin wrapper adding outliers/distribution early-exit ####
-#' @keywords internal
 adamSpecificChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
                                 outliers=c("ignore","use","select"), level=0.99,
                                 persistence, phi, initial,

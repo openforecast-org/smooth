@@ -343,7 +343,6 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
 # The explanatory variables: numeric, one column per variable, named; the in-sample
 # rows and those of the horizon (the holdout or the future), the last row repeated
 # when they do not reach it
-#' @keywords internal
 tbats_xreg <- function(xreg, obsInSample, h, regressors){
     if(is.null(xreg)){
         return(NULL);
@@ -379,7 +378,6 @@ tbats_xreg <- function(xreg, obsInSample, h, regressors){
 }
 
 # Some of the regressors, used as they are (NULL if none)
-#' @keywords internal
 tbats_xregSubset <- function(xregSpec, names){
     if(length(names)==0){
         return(NULL);
@@ -391,7 +389,6 @@ tbats_xregSubset <- function(xregSpec, names){
 
 # The measurement matrix for the rows of the regressors (or a number of rows). Their
 # missing values are placeholders: the fit skips those observations
-#' @keywords internal
 tbats_matWt <- function(w, struct, rows, xregData=NULL){
     matWt <- matrix(w, rows, struct$nComponents, byrow=TRUE);
     if(struct$nXreg>0){
@@ -403,7 +400,6 @@ tbats_matWt <- function(w, struct, rows, xregData=NULL){
 
 #### Box-Cox ####
 # The Box-Cox transform and its inverse
-#' @keywords internal
 tbats_boxCox <- function(y, lambda){
     if(lambda==0){
         return(log(y));
@@ -411,7 +407,6 @@ tbats_boxCox <- function(y, lambda){
     return((y^lambda-1)/lambda);
 }
 
-#' @keywords internal
 tbats_boxCoxInverse <- function(z, lambda){
     z <- as.numeric(z);
     if(lambda==0){
@@ -426,7 +421,6 @@ tbats_boxCoxInverse <- function(z, lambda){
 # ones. The non-zero observations, and the log-likelihood and parameters of the
 # occurrence, which are added to those of the sizes. The missing values are neither:
 # otLogical marks the observed (and non-zero) values that the sizes are fitted to
-#' @keywords internal
 tbats_occurrence <- function(occurrence, y, loss){
     obs <- length(y);
     observed <- !is.na(y);
@@ -479,7 +473,6 @@ tbats_occurrence <- function(occurrence, y, loss){
 
 # The probabilities of occurrence for the horizon: forecasts of the occurrence model, or
 # the provided ones (the last of them repeated)
-#' @keywords internal
 tbats_pForecast <- function(object, h){
     occurrence <- object$occurrence;
     if(is.null(occurrence) || h<=0){
@@ -493,7 +486,6 @@ tbats_pForecast <- function(object, h){
 }
 
 # The transformed sizes, zero where there is no demand (the fitter skips them)
-#' @keywords internal
 tbats_boxCoxSizes <- function(y, lambda, otLogical){
     yBC <- rep(0, length(y));
     yBC[otLogical] <- tbats_boxCox(y[otLogical], lambda);
@@ -502,7 +494,6 @@ tbats_boxCoxSizes <- function(y, lambda, otLogical){
 
 # How lambda is treated: estimated in [0, 1] only with the likelihood and positive
 # data; otherwise fixed (provided, or 1 with a message)
-#' @keywords internal
 tbats_lambdaSpec <- function(lambda, y, loss){
     if(!is.null(lambda)){
         if(lambda<0 || lambda>1){
@@ -528,7 +519,6 @@ tbats_lambdaSpec <- function(lambda, y, loss){
 #### Harmonics and the global model ####
 # The harmonics of the periods, without those of a longer period whose frequency
 # coincides with a harmonic of a shorter one (the 7th of 168 is the 1st of 24)
-#' @keywords internal
 tbats_harmonics <- function(periods, harmonics){
     table <- data.frame(period=numeric(0), j=integer(0), frequency=numeric(0));
     for(i in seq_along(periods)){
@@ -542,7 +532,6 @@ tbats_harmonics <- function(periods, harmonics){
 
 # The design of the global model: an intercept, a trend, the Fourier terms and the
 # regressors
-#' @keywords internal
 tbats_design <- function(obs, trendIn, harmonicTable, xregData=NULL){
     times <- 1:obs;
     X <- matrix(1, obs, 1);
@@ -559,24 +548,20 @@ tbats_design <- function(obs, trendIn, harmonicTable, xregData=NULL){
 # The least squares of the global model through the Householder QR shared with Python
 # (src/headers/olsCore.h, BLAS-free), so that the two agree to the last bit; R's qr()
 # is LINPACK's and numpy's LAPACK's, which round differently
-#' @keywords internal
 tbats_qr <- function(X){
     return(householderQRCpp(X));
 }
 
-#' @keywords internal
 tbats_qrCoef <- function(qrX, y){
     return(as.vector(householderCoefCpp(qrX$qr, qrX$qraux, qrX$rDiag, y)));
 }
 
-#' @keywords internal
 tbats_qrResid <- function(qrX, y){
     return(as.vector(householderResidCpp(qrX$qr, qrX$qraux, qrX$rDiag, y)));
 }
 
 # The maximum of the profile log-likelihood of the global model in lambda, with the
 # Jacobian
-#' @keywords internal
 tbats_lambdaProfile <- function(y, qrX){
     obs <- length(y);
     logY <- sum(log(y));
@@ -590,7 +575,6 @@ tbats_lambdaProfile <- function(y, qrX){
 }
 
 # The starting value of lambda (or its fixed value) for a design
-#' @keywords internal
 tbats_lambdaStart <- function(y, X, lambdaSpec){
     if(!lambdaSpec$estimate){
         return(lambdaSpec$value);
@@ -600,7 +584,6 @@ tbats_lambdaStart <- function(y, X, lambdaSpec){
 
 # The number of harmonics of each period by the information criterion of the global
 # model, one period at a time, stopping after two harmonics without improvement
-#' @keywords internal
 tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, ic, xregData=NULL,
                                   otLogical=rep(TRUE, length(y))){
     harmonics <- rep(0, length(periods));
@@ -649,7 +632,6 @@ tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, i
 
 #### ARMA ####
 # The orders of the ARMA aligned with the lags, truncated to integer lags and merged
-#' @keywords internal
 tbats_armaSpec <- function(orders, lags){
     select <- isTRUE(orders$select);
     ar <- if(is.null(orders$ar)) 0 else orders$ar;
@@ -661,7 +643,6 @@ tbats_armaSpec <- function(orders, lags){
 }
 
 # The specification of the ARMA from its orders per lag
-#' @keywords internal
 tbats_armaBuild <- function(ar, ma, armaLags, select=FALSE){
     lagsUnique <- sort(unique(armaLags));
     arOrders <- sapply(lagsUnique, function(lag) max(ar[armaLags==lag]));
@@ -690,7 +671,6 @@ tbats_armaBuild <- function(ar, ma, armaLags, select=FALSE){
 # The residuals of the observed values at their places and zeros at the gaps (the zeros
 # of the occurrence), so that the lags of the ARMA stay aligned. The residuals of the
 # global model are centred, and so is the series in Hannan-Rissanen
-#' @keywords internal
 tbats_gapped <- function(residuals, otLogical){
     gapped <- numeric(length(otLogical));
     gapped[otLogical] <- residuals;
@@ -701,7 +681,6 @@ tbats_gapped <- function(residuals, otLogical){
 # one lag at a time from the largest. The IC of a candidate comes from the likelihood of
 # its innovations on a common sample of the observed values: the rest of the model is
 # common to all of them
-#' @keywords internal
 tbats_armaSelect <- function(errors, armaSpec, distribution, shape, nParamBase, ic,
                              observed=rep(TRUE, length(errors))){
     lags <- armaSpec$lags;
@@ -728,7 +707,6 @@ tbats_armaSelect <- function(errors, armaSpec, distribution, shape, nParamBase, 
 }
 
 # The information criterion of a log-likelihood
-#' @keywords internal
 tbats_IC <- function(logLikValue, ic){
     return(switch(ic, "AIC"=AIC(logLikValue), "AICc"=AICc(logLikValue),
                   "BIC"=BIC(logLikValue), "BICc"=BICc(logLikValue)));
@@ -738,7 +716,6 @@ tbats_IC <- function(logLikValue, ic){
 # The parts of the model that do not depend on the parameters: the lags, the rows of
 # the components, the fixed transition blocks of the harmonics and the matrices of
 # the usual bounds
-#' @keywords internal
 tbats_structure <- function(trendType, harmonicTable, armaSpec, periods, xregSpec=NULL){
     trendIn <- trendType!="none";
     nETS <- 1+trendIn;
@@ -783,7 +760,6 @@ tbats_structure <- function(trendType, harmonicTable, armaSpec, periods, xregSpe
 #### Initial states ####
 # The initial states of the global model: the level and trend at t=0 and the
 # Fourier coefficients of the harmonics
-#' @keywords internal
 tbats_globalStates <- function(beta, struct){
     beta[!is.finite(beta)] <- 0;
     nH <- struct$nHarmonics;
@@ -798,7 +774,6 @@ tbats_globalStates <- function(beta, struct){
 # s(t) = a sin(lambda t) + b cos(lambda t) holds 2cos(lambda) s(0) in its lag-1 state
 # and -s(-1), -s(0) in the two cells of its lag-2 state; the ARMA initials sit in the
 # last ARMA state
-#' @keywords internal
 tbats_profile <- function(states, armaInitial, struct, phi=1){
     profile <- matrix(0, struct$nComponents, struct$lagsModelMax);
     # One step back from (l_t, b_t) is (l_t - b_t, b_t / phi)
@@ -825,7 +800,6 @@ tbats_profile <- function(states, armaInitial, struct, phi=1){
 }
 
 # The identified initials read back from the states (columns up to t=0)
-#' @keywords internal
 tbats_initialsRead <- function(matVt, struct){
     L <- struct$lagsModelMax;
     states <- list(level=matVt[1, L], trend=if(struct$trendIn) matVt[2, L] else 0,
@@ -844,7 +818,6 @@ tbats_initialsRead <- function(matVt, struct){
 }
 
 # The labels of the harmonics, "j[period]"
-#' @keywords internal
 tbats_harmonicLabels <- function(struct){
     if(struct$nHarmonics==0){
         return(character(0));
@@ -854,7 +827,6 @@ tbats_harmonicLabels <- function(struct){
 
 #### Parameters ####
 # The names, starting values and bounds of the parameter vector
-#' @keywords internal
 tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distribution,
                     otherParameterEstimate, initialEstimate, xregEstimate, bounds){
     nPeriods <- length(unique(struct$harmonicTable$period));
@@ -902,7 +874,6 @@ tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distri
 
 # The elements of the model for the parameter vector: the matrices, the initial
 # deviations, lambda and the shape, and a penalty when the bounds are violated
-#' @keywords internal
 tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate, bounds, adamCpp,
                          xregEstimate=FALSE){
     get <- function(name, default){
@@ -1006,7 +977,6 @@ tbats_filler <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate
 # sits on the boundary of the region, so the optimiser would start half in the
 # penalty. The point of a small grid, shared by the periods, that is the furthest
 # inside the region
-#' @keywords internal
 tbats_gammaStart <- function(B, struct, armaSpec, lambdaSpec, other, initialEstimate, adamCpp){
     gammas <- grepl("^gamma", names(B));
     grid <- expand.grid(gamma1=c(-0.01, -0.001, 0, 0.001, 0.01), gamma2=c(-0.01, -0.001, 0, 0.001, 0.01));
@@ -1029,7 +999,6 @@ tbats_gammaStart <- function(B, struct, armaSpec, lambdaSpec, other, initialEsti
 # harmonics. A harmonic is reduced to (s_t, v2_t) with s_t = v1_t + v2_{t-1}: the
 # lag-expanded form (v1_t, v2_t, v2_{t-1}) only adds a zero eigenvalue, as the discount
 # matrix sends v1_t - v2_{t-1} to zero
-#' @keywords internal
 tbats_eigens <- function(matF, vecG, w, struct){
     nETS <- struct$nETS;
     nH <- struct$nHarmonics;
@@ -1053,7 +1022,6 @@ tbats_eigens <- function(matF, vecG, w, struct){
 #### The fitter ####
 # One fit of a fixed structure: the estimation of the parameters, the final fit and
 # the forecasts, all in the space of the Box-Cox transformed data
-#' @keywords internal
 tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distribution,
                       initial, checked, xregSpec=NULL, BStart=NULL){
     obs <- length(y);
@@ -1339,7 +1307,6 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 }
 
 # The initial deviations from the global model that reproduce the initials of a fit
-#' @keywords internal
 tbats_deviations <- function(B, backcastFit, struct, qrX, y, lambdaSpec){
     lambda <- backcastFit$elements$lambda;
     states <- tbats_globalStates(tbats_qrCoef(qrX, tbats_boxCox(y, lambda)), struct);
@@ -1364,19 +1331,16 @@ tbats_deviations <- function(B, backcastFit, struct, qrX, y, lambdaSpec){
 
 #### Scale and likelihood ####
 # The scale as in the ADAM monograph: sigma^2 for dnorm, s for the others
-#' @keywords internal
 tbats_scale <- function(errors, distribution, shape, obs){
     return(adam_scaler(distribution, "A", errors, NULL, obs, shape));
 }
 
 # The log-likelihood of the errors in the space of the transformed data
-#' @keywords internal
 tbats_logLik <- function(errors, distribution, shape, obs){
     return(sum(tbats_logDensities(errors, distribution, shape, tbats_scale(errors, distribution, shape, obs))));
 }
 
 # The log-densities of the errors in the space of the transformed data
-#' @keywords internal
 tbats_logDensities <- function(errors, distribution, shape, scale){
     return(switch(distribution,
                   "dnorm"=dnorm(errors, 0, sqrt(scale), log=TRUE),
@@ -1386,7 +1350,6 @@ tbats_logDensities <- function(errors, distribution, shape, scale){
 }
 
 # The fitted probabilities of occurrence (ones without an occurrence model)
-#' @keywords internal
 tbats_pFitted <- function(object){
     occurrence <- object$occurrence;
     if(is.null(occurrence)){
@@ -1396,7 +1359,6 @@ tbats_pFitted <- function(object){
 }
 
 #### The returned object ####
-#' @keywords internal
 tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, silent){
     struct <- best$struct;
     lambda <- best$elements$lambda;
@@ -1547,7 +1509,6 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
 #### Methods ####
 # The model in the space of the Box-Cox transform, as an adam object: the adam
 # methods work there, and the tbats ones transform their results back
-#' @keywords internal
 tbats_boxCoxObject <- function(object){
     lambda <- object$lambda;
     objectBC <- object;
@@ -1574,14 +1535,12 @@ tbats_boxCoxObject <- function(object){
 }
 
 # The values the sizes are fitted to: the observed ones, non-zero with an occurrence model
-#' @keywords internal
 tbats_sizes <- function(y, object){
     return(!is.na(y) & (y!=0 | is.null(object$occurrence)));
 }
 
 # The quantiles of the transformed data map onto those of the data, so the
 # forecasts and the bounds are transformed back; the point forecast is the median
-#' @keywords internal
 tbats_boxCoxForecast <- function(result, object){
     lambda <- object$lambda;
     for(element in c("mean","lower","upper")){
@@ -1658,7 +1617,6 @@ reapply.tbats <- function(object, nsim=1000, type=c("opg","hessian","bootstrap")
 
 # The call refitting the model with its structure, starting from its parameters
 # without bounds, as coefbootstrap() does for adam()
-#' @keywords internal
 tbats_refitCall <- function(object){
     armaSpec <- object$armaSpec;
     position <- match(trunc(object$lags), armaSpec$lags);
@@ -1690,7 +1648,6 @@ tbats_refitCall <- function(object){
 # The point of the segment from the estimate to a point that is the furthest from
 # the estimate and satisfies the bounds, by bisection: the estimate often lies on the
 # boundary of the admissible region
-#' @keywords internal
 tbats_pullBack <- function(object, parameters, point){
     if(object$inBounds(point)){
         return(point);
@@ -1711,7 +1668,6 @@ tbats_pullBack <- function(object, parameters, point){
 
 # The bounds of the confidence intervals of the parameters (as deviations from the
 # estimates) moved inside the bounds of the model, one parameter at a time
-#' @keywords internal
 tbats_confintBounds <- function(object, parameters, bounds){
     for(j in seq_along(parameters)){
         for(side in 1:2){
@@ -1874,7 +1830,6 @@ forecast.tbats <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
 # The quantiles of the mixture of no demand and the sizes: zero below the probability of no
 # demand, otherwise the quantile (q-(1-p))/p of the sizes, by the method of the interval
-#' @keywords internal
 tbats_mixtureQuantiles <- function(object, objectBC, h, newdata, interval, probs, pForecast, nsim, ...){
     quantiles <- matrix(0, h, length(probs));
     for(p in unique(pForecast)){
@@ -1895,7 +1850,6 @@ tbats_mixtureQuantiles <- function(object, objectBC, h, newdata, interval, probs
 # normal forecast distribution of the transformed data, with the variance of the
 # approximate interval (the closed form for lambda=0); for the other distributions the
 # mean of the simulated paths transformed back
-#' @keywords internal
 #' @importFrom statmod gauss.quad
 tbats_mean <- function(object, objectBC, h, newdata, nsim, ...){
     lambda <- object$lambda;
@@ -1925,7 +1879,6 @@ tbats_mean <- function(object, objectBC, h, newdata, nsim, ...){
 
 # The simulated paths of the data (h x nsim): those of the transformed data from the
 # forecaster, transformed back, with the occurrence drawn with its probabilities
-#' @keywords internal
 tbats_paths <- function(object, objectBC, h, newdata, nsim, pForecast, ...){
     paths <- forecast(objectBC, h=h, newdata=newdata, interval="simulated",
                       nsim=if(is.null(nsim)) 10000 else nsim, scenarios=TRUE, ...)$scenarios;
@@ -1933,7 +1886,6 @@ tbats_paths <- function(object, objectBC, h, newdata, nsim, pForecast, ...){
 }
 
 # The paths with the occurrence drawn with its probabilities (unchanged without occurrence)
-#' @keywords internal
 tbats_occurrenceDraws <- function(paths, pForecast){
     if(any(pForecast<1)){
         paths[] <- paths * rbinom(length(paths), 1, pForecast);
@@ -1943,7 +1895,6 @@ tbats_occurrenceDraws <- function(paths, pForecast){
 
 # The bounds of the paths (a row per horizon): their quantiles at the levels of the side,
 # zero and Inf at the levels 0 and 1
-#' @keywords internal
 tbats_pathsBounds <- function(paths, level, side){
     level[level>1] <- level[level>1]/100;
     levelLow <- switch(side, "both"=(1-level)/2, "upper"=rep(0, length(level)), "lower"=1-level);
@@ -1961,7 +1912,6 @@ tbats_pathsBounds <- function(paths, level, side){
 
 # The cumulative forecast from the paths of the data: the sum of the skeletons (times the
 # probabilities), or the mean or median of the sums of the paths, and their quantiles
-#' @keywords internal
 tbats_cumulative <- function(object, objectBC, h, newdata, interval, level, side, nsim, point,
                              pForecast, ...){
     totals <- matrix(colSums(tbats_paths(object, objectBC, h, newdata, nsim, pForecast, ...)), 1);
@@ -1986,7 +1936,6 @@ tbats_cumulative <- function(object, objectBC, h, newdata, interval, level, side
 }
 
 # The future values of the regressors with their names, when given without them
-#' @keywords internal
 tbats_newdata <- function(object, newdata){
     if(!is.null(newdata) && !is.null(object$xregNames) && is.null(colnames(newdata)) &&
        NCOL(newdata)==length(object$xregNames)){
@@ -2031,7 +1980,6 @@ pointLik.tbats <- function(object, log=TRUE, ...){
 
 # The OPG covariance of the parameters: the scores of the log-densities, refitting
 # the model at each perturbed parameter
-#' @keywords internal
 covarOPGtbats <- function(object, stepSize=.Machine$double.eps^(1/4)){
     parameterValues <- coef(object);
     y <- actuals(object);

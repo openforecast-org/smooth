@@ -78,7 +78,6 @@ modelType <- function(object, ...) UseMethod("modelType")
 
 # The observed in-sample values (TRUE where the lengths do not match): the missing
 # ones are not observations
-#' @keywords internal
 smooth_observed <- function(object){
     observed <- !is.na(as.vector(actuals(object)));
     if(length(observed)!=length(object$fitted)){
@@ -88,7 +87,6 @@ smooth_observed <- function(object){
 }
 
 # The observations of the likelihood, its nobs attribute where it has one
-#' @keywords internal
 smooth_nobsLogLik <- function(object){
     obs <- attr(logLik(object), "nobs");
     if(is.null(obs)){

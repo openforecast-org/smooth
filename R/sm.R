@@ -329,7 +329,6 @@ implant.adam <- function(location, scale, ...){
 # The log-likelihood of the location model's observations given the scale, observation
 # by observation (the likelihood of sm()): the log-densities of the values with demand,
 # and minus the differential entropy at the zeros of an occurrence model
-#' @keywords internal
 sm_logDensities <- function(y, mu, scale, distribution, Etype, other, otLogical, occurrenceModel){
     EtypeSM <- Etype;
     values <- rep(0, length(y));

@@ -428,7 +428,8 @@ GRADIENT_CASES = {
 def test_the_gradient_initials_agree(case):
     r_arguments, arguments = GRADIENT_CASES[case]
     r = r_dict(
-        f"{{ m <- suppressWarnings(tbats(AirPassengers, initial='gradient', {r_arguments}));"
+        "{ m <- suppressWarnings(tbats(AirPassengers, initial='gradient',"
+        f" {r_arguments}));"
         " list(y=as.numeric(AirPassengers), B=unname(m$B), ll=as.numeric(logLik(m)),"
         " nparam=nparam(m), fc=as.numeric(forecast(m, h=12)$mean)) }"
     )
@@ -477,3 +478,38 @@ def test_the_custom_and_multistep_losses_agree(case):
     assert fit.loss_value == pytest.approx(r["loss"][0], rel=1e-10)
     assert fit.loglik == pytest.approx(r["ll"][0], rel=1e-10)
     np.testing.assert_allclose(fit.predict(h=6).mean, r["fc"], rtol=1e-10)
+
+
+def test_the_diagnostics_agree():
+    """The diagnostics shared with ADAM, on the residuals of the transformed data."""
+    r = r_dict(
+        "{ m <- tbats(AirPassengers, harmonics=5, trend='damped',"
+        " orders=list(ar=1, ma=0, select=FALSE), h=12, holdout=TRUE);"
+        " list(y=as.numeric(AirPassengers), rstandard=as.numeric(rstandard(m)),"
+        " rstudent=as.numeric(rstudent(m)), sigma=sigma(m),"
+        " rmultistep=as.numeric(rmultistep(m, h=3)),"
+        " analytical=as.numeric(multicov(m, h=3)),"
+        " empirical=as.numeric(multicov(m, type='empirical', h=3))) }"
+    )
+    fit = TBATS(
+        lags=[1, 12],
+        harmonics=[5],
+        trend="damped",
+        orders={"ar": 1, "ma": 0, "select": False},
+        h=12,
+        holdout=True,
+    ).fit(np.asarray(r["y"], dtype=float))
+    np.testing.assert_allclose(fit.rstandard(), r["rstandard"], rtol=1e-8)
+    np.testing.assert_allclose(fit.rstudent(), r["rstudent"], rtol=1e-8)
+    np.testing.assert_allclose(fit.sigma, r["sigma"], rtol=1e-8)
+    np.testing.assert_allclose(
+        fit.rmultistep(h=3).to_numpy().ravel(order="F"), r["rmultistep"], rtol=1e-8
+    )
+    np.testing.assert_allclose(
+        fit.multicov(h=3).to_numpy().ravel(), r["analytical"], rtol=1e-8
+    )
+    np.testing.assert_allclose(
+        fit.multicov(type="empirical", h=3).to_numpy().ravel(),
+        r["empirical"],
+        rtol=1e-8,
+    )

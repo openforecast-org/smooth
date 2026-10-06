@@ -1596,6 +1596,21 @@ tbats_boxCoxForecast <- function(result, object){
     return(result);
 }
 
+# The in-sample multistep forecast errors of the transformed data, with the C++ core
+# of the model: rmultistep.adam would compare its forecasts with the data
+#' @export
+rmultistep.tbats <- function(object, h=10, ...){
+    y <- as.numeric(actuals(object));
+    yBC <- tbats_boxCoxSizes(y, object$lambda, tbats_sizes(y, object));
+    lookup <- adamProfileCreator(object$lagsAll, max(object$lagsAll), nobs(object))$lookup;
+    errors <- object$adamCpp$ferrors(t(object$states), object$measurement, object$transition,
+                                     lookup, object$profileInitial, h, matrix(yBC))$errors;
+    if(any(class(actuals(object))=="ts")){
+        return(ts(errors, start=start(actuals(object)), frequency=frequency(actuals(object))));
+    }
+    return(zoo(errors, order.by=time(actuals(object))));
+}
+
 # The refits at parameters drawn from their distribution. Each draw has its own
 # lambda, so its states are in the space of its own transform; the refitted values
 # are transformed back. A draw outside the bounds is pulled towards the estimate,

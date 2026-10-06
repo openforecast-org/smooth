@@ -207,11 +207,18 @@ probabilities of occurrence. The sizes are then modelled on the non-zero values:
 Methods
 -------
 
-The fitted model has the methods of :class:`ADAM` for the analysis of the
-parameters and their uncertainty:
+The fitted model has the methods of :class:`ADAM` for the diagnostics and the
+analysis of the parameters and their uncertainty. The diagnostics are those of
+the residuals of the transformed data:
 
 .. code-block:: python
 
+   model.plot(which=[1, 6, 7, 10])   # actuals vs fitted, QQ, series, ACF
+   model.plot(which=12)              # the states, named as the components
+   model.rstandard()         # the standardised residuals
+   model.outlierdummy()      # the outliers and their dummy variables
+   model.rmultistep(h=12)    # the in-sample multistep forecast errors
+   model.multicov(h=12)      # their covariance
    model.summary()           # the coefficients, log-likelihood and criteria
    model.vcov()              # the covariance matrix of the parameters
    model.confint()           # their confidence intervals

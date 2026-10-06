@@ -602,3 +602,25 @@ def test_a_custom_loss(air):
     assert custom.loss_value == pytest.approx(mse.loss_value, rel=1e-12)
     np.testing.assert_allclose(custom.coef, mse.coef, rtol=1e-10)
     assert custom.coefbootstrap(nsim=3, seed=1).nsim_effective == 3
+
+
+def test_the_diagnostics_and_plots_of_adam_work(air):
+    """TBATS shares ADAM's diagnostics, on the residuals of the transformed data,
+    and its plots, with the states named as the components."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    fit = TBATS(lags=[1, 12], harmonics=[3], trend="none", h=12, holdout=True).fit(air)
+    n = fit.nobs
+    assert fit.rstandard().shape == (n,) and fit.rstudent().shape == (n,)
+    assert np.isclose(fit.sigma, np.sqrt(np.nansum(fit.residuals**2) / fit._df_scale))
+    errors = fit.rmultistep(h=3).to_numpy()
+    # The errors of the transformed data, not of the data
+    assert errors.shape == (n - 3, 3) and np.nanmax(np.abs(errors)) < 1
+    covariance = fit.multicov(h=3).to_numpy()
+    assert covariance.shape == (3, 3) and np.all(np.diag(covariance) > 0)
+    for which in range(1, 17):
+        fit.plot(which=which)
+    states = fit.plot(which=12)
+    labels = [ax.get_ylabel() for fig in states for ax in fig.axes]
+    assert labels[:3] == ["Actuals", "level", "s1[12]"]

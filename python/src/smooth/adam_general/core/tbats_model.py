@@ -4,12 +4,14 @@ import math
 import time
 import warnings
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from smooth.adam_general.core.adam import ADAM
 from smooth.adam_general.core.checker.data_checks import _warn_missing
 from smooth.adam_general.core.forecaster.forecaster import forecaster
 from smooth.adam_general.core.forecaster.result import ForecastResult
@@ -636,7 +638,6 @@ class TBATS:
         self._check_fitted()
         return len(self._y_in_sample)
 
-    @property
     def _nobs_observed(self) -> int:
         """The observed values, which the likelihood and the information criteria
         count: the missing ones are not (R's nobs attribute of logLik)."""
@@ -651,7 +652,7 @@ class TBATS:
 
     @property
     def aic(self) -> float:
-        return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "AIC")
+        return st.ic_value(self.loglik, self._nobs_observed(), self.nparam, "AIC")
 
     def _ic_sizes(self) -> Optional[Tuple[float, float, int]]:
         """``(n_param_all, n_param_sizes, obs)`` of a mixture, or None: R's
@@ -668,20 +669,20 @@ class TBATS:
     def aicc(self) -> float:
         terms = self._ic_sizes()
         if terms is None:
-            return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "AICc")
+            return st.ic_value(self.loglik, self._nobs_observed(), self.nparam, "AICc")
         n_all, n_sizes, obs = terms
         correction = 2 * n_sizes * (n_sizes + 1) / (obs - n_sizes - 1)
         return float(2 * n_all - 2 * self.loglik + correction)
 
     @property
     def bic(self) -> float:
-        return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "BIC")
+        return st.ic_value(self.loglik, self._nobs_observed(), self.nparam, "BIC")
 
     @property
     def bicc(self) -> float:
         terms = self._ic_sizes()
         if terms is None:
-            return st.ic_value(self.loglik, self._nobs_observed, self.nparam, "BICc")
+            return st.ic_value(self.loglik, self._nobs_observed(), self.nparam, "BICc")
         _, n_sizes, obs = terms
         return float(
             -2 * self.loglik + n_sizes * math.log(obs) * obs / (obs - n_sizes - 1)
@@ -762,6 +763,133 @@ class TBATS:
         """sigma^2 for dnorm, s for the other distributions."""
         self._check_fitted()
         return float(self._best["scale"])
+
+    # The diagnostics of ADAM, which need only the residuals, the scale and the
+    # distribution: the residuals are those of the transformed data
+    _check_is_fitted = _check_fitted
+    rstandard = ADAM.rstandard
+    rstudent = ADAM.rstudent
+    outlierdummy = ADAM.outlierdummy
+    multicov = ADAM.multicov
+    _multicov_empirical = ADAM._multicov_empirical
+    _variance_debiased = ADAM._variance_debiased
+    plot = ADAM.plot
+    scale_model = None
+    is_combined = False
+
+    @property
+    def _df_scale(self) -> float:
+        """The degrees of freedom of the scale (R's ``adam_dfScale``): the non-zero
+        observations minus the parameters, without the scale under likelihood."""
+        obs_nonzero = int(self._ot.sum())
+        df = obs_nonzero - (self.nparam - int(self.loss == "likelihood"))
+        return float(df if df > 0 else obs_nonzero)
+
+    def _gnorm_shape(self) -> Optional[float]:
+        """The dgnorm shape, provided or estimated."""
+        return float(self._best["elements"]["shape"])
+
+    def extract_scale(self) -> float:
+        """The scale of the distribution (R's ``extractScale``)."""
+        return self.scale
+
+    @property
+    def sigma(self) -> float:
+        """The standard deviation of the residuals, de-biased (R's ``sigma``)."""
+        self._check_fitted()
+        return float(np.sqrt(np.nansum(self.residuals**2) / self._df_scale))
+
+    def extract_sigma(self) -> float:
+        """The standard deviation of the residuals (R's ``extractSigma``)."""
+        return self.sigma
+
+    @property
+    def error_type(self) -> str:
+        """The type of the error, additive in the transformed space."""
+        return "A"
+
+    @property
+    def lags_used(self) -> List[float]:
+        """The lags of the model: 1 and the seasonal periods."""
+        self._check_fitted()
+        return [1.0, *self.periods_]
+
+    @property
+    def data(self) -> NDArray:
+        """The in-sample data."""
+        self._check_fitted()
+        return self._y_in_sample.copy()
+
+    @property
+    def holdout_data(self) -> Optional[NDArray]:
+        """The holdout, when it was requested."""
+        return self._y_holdout
+
+    @property
+    def _auto_forecast(self) -> Any:
+        """The forecast of the fit, for the plot of the series."""
+        forecast = self.forecast_
+        return None if forecast is None else SimpleNamespace(mean=forecast)
+
+    def rmultistep(self, h: int = 10) -> pd.DataFrame:
+        """The in-sample multistep forecast errors of the transformed data (R's
+        ``rmultistep``), a row per origin and a column per horizon."""
+        from smooth.adam_general.core.creator.architector import adam_profile_creator
+
+        self._check_fitted()
+        best, struct = self._best, self._best["struct"]
+        lookup = adam_profile_creator(
+            struct["lags_model_all"], struct["lags_model_max"], self.nobs
+        )["index_lookup_table"]
+        y_bc = st.box_cox_sizes(self._y_in_sample, self.lambda_, self._ot)
+        y_bc[np.isnan(self._y_in_sample)] = np.nan
+        errors = (
+            best["adam_cpp"]
+            .ferrors(
+                np.asfortranarray(self.states),
+                np.asfortranarray(self.measurement),
+                np.asfortranarray(best["elements"]["mat_f"]),
+                np.asfortranarray(lookup, dtype=np.uint64),
+                np.asfortranarray(best["fitted"]["profile_initial"]),
+                int(h),
+                np.asarray(y_bc, dtype=float),
+            )
+            .errors
+        )
+        return pd.DataFrame(errors, columns=[f"h={i + 1}" for i in range(int(h))])
+
+    def _multicov_analytical(
+        self, h: int, covar_anal_fn: Any, var_anal_fn: Any
+    ) -> NDArray:
+        """The covariance of the transformed data from the matrices (R's
+        ``multicov`` analytical), with the measurement of the last ``h`` rows."""
+        struct = self._best["struct"]
+        measurement = np.asarray(self.measurement, dtype=float)
+        if measurement.shape[0] < h:
+            mat_wt = np.tile(measurement[-1], (h, 1))
+        else:
+            mat_wt = measurement[-h:]
+        return np.asarray(
+            covar_anal_fn(
+                np.asarray(struct["lags_model_all"]).flatten(),
+                h,
+                mat_wt,
+                np.asarray(self._best["elements"]["mat_f"], dtype=float),
+                np.asarray(self._best["elements"]["vec_g"], dtype=float).flatten(),
+                # ADAM's method, which needs only the scale and the distribution
+                self._variance_debiased(),  # type: ignore[misc]
+            ),
+            dtype=float,
+        )
+
+    def _multicov_simulated(self, h: int, nsim: int) -> NDArray:
+        """The covariance of the simulated paths of the transformed data (R's
+        ``multicov`` simulated)."""
+        run = self._forecaster_run(h, None, False, nsim, None)
+        _, general = run("simulated", 0.5, "both", scenarios=True, cumulative=False)
+        paths = np.asarray(general["_scenarios_matrix"], dtype=float)
+        centred = paths - paths.mean(axis=1, keepdims=True)
+        return np.asarray((centred @ centred.T) / nsim)
 
     @property
     def loss_value(self) -> float:
@@ -995,6 +1123,31 @@ class TBATS:
             ).to_forecast_result()
         if nsim is None:
             nsim = 10000
+        run = self._forecaster_run(h, X, cumulative, nsim, seed)
+
+        # The sums of the transformed values do not transform back: the cumulative
+        # forecasts come from the paths of the data
+        if cumulative and h > 0 and (self.lambda_ != 1 or intermittent):
+            return self._cumulative(run, interval, level, side, point, p_forecast, seed)
+        # The median of the transformed data is its skeleton, and transforms back into
+        # the median of the data
+        result, _ = run(interval, level, side)
+        result.mean = _inverse_like(result.mean, self.lambda_)
+        if point == "mean" and self.lambda_ != 1:
+            result.mean[:] = self._mean(run, nsim)
+        if result.lower is not None:
+            result.lower = _inverse_like(result.lower, self.lambda_)
+        if result.upper is not None:
+            result.upper = _inverse_like(result.upper, self.lambda_)
+        if intermittent and h > 0:
+            self._mixture(result, run, p_forecast, interval, level, side, point)
+        return result
+
+    def _forecaster_run(
+        self, h: int, X: Optional[Any], cumulative: bool, nsim: int, seed: Any
+    ) -> Callable[..., Any]:
+        """ADAM's forecaster in the space of the transformed data, as a function of
+        the interval, the level, the side and the other general settings."""
         best = self._best
         struct = best["struct"]
         n_ets = struct["n_ets"]
@@ -1010,7 +1163,7 @@ class TBATS:
         y_bc = st.box_cox_sizes(self._y_in_sample, self.lambda_, ot)
         y_bc[np.isnan(self._y_in_sample)] = np.nan
         scale = scale_debias(
-            self.scale, self.distribution, int(ot.sum()), self._nobs_observed
+            self.scale, self.distribution, int(ot.sum()), self._nobs_observed()
         )
 
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
@@ -1087,23 +1240,7 @@ class TBATS:
             )
             return result, general_dict
 
-        # The sums of the transformed values do not transform back: the cumulative
-        # forecasts come from the paths of the data
-        if cumulative and h > 0 and (self.lambda_ != 1 or intermittent):
-            return self._cumulative(run, interval, level, side, point, p_forecast, seed)
-        # The median of the transformed data is its skeleton, and transforms back into
-        # the median of the data
-        result, _ = run(interval, level, side)
-        result.mean = _inverse_like(result.mean, self.lambda_)
-        if point == "mean" and self.lambda_ != 1:
-            result.mean[:] = self._mean(run, nsim)
-        if result.lower is not None:
-            result.lower = _inverse_like(result.lower, self.lambda_)
-        if result.upper is not None:
-            result.upper = _inverse_like(result.upper, self.lambda_)
-        if intermittent and h > 0:
-            self._mixture(result, run, p_forecast, interval, level, side, point)
-        return result
+        return run
 
     def _mixture(
         self,
@@ -1425,13 +1562,10 @@ class TBATS:
             "index_lookup_table"
         ][:, obs + lag_max :]
         lookup = np.asfortranarray(lookup, dtype=np.uint64)
-        n_scale = int(self.loss == "likelihood")
         # The scale of the sizes, on the non-zero observations (R's adam_dfScale)
         ot = self._ot
         obs_nonzero = int(self._ot.sum())
-        df_scale = obs_nonzero - (self.nparam - n_scale)
-        if df_scale <= 0:
-            df_scale = obs_nonzero
+        df_scale = self._df_scale
         draws = refitted.random_parameters
         adam_cpp = best["adam_cpp"]
         # The future values of the regressors, as predict() takes them

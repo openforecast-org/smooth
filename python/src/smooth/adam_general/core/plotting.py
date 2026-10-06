@@ -128,7 +128,11 @@ def _make_fig(mpl_figure, **kwargs):
 
 
 def _state_labels(model):
-    """Derive human-readable labels for each row of model.states."""
+    """Derive human-readable labels for each row of model.states: the names of the
+    components where the model has them (TBATS), as R's column names."""
+    names = getattr(model, "component_names", None)
+    if names is not None:
+        return list(names)
     comp = model._components
     is_trendy = comp.get("model_is_trendy", False)
     n_seasonal = comp.get("components_number_ets_seasonal", 0)
@@ -586,13 +590,14 @@ def _plot8(model, mpl_figure, **kw):
         print("Combination of models was done. Nothing to plot for states.")
         return []
 
-    states = model.states  # shape (n_states, T+1); col 0 is initial state
+    states = model.states  # shape (n_states, head + T)
     actuals = np.asarray(model.actuals, dtype=float).ravel()
     resid = np.asarray(model.residuals, dtype=float).ravel()
     n_obs = len(actuals)
 
-    # Drop initial state column so states align with actuals (both length T)
-    states_aligned = states[:, 1 : n_obs + 1]
+    # Drop the head (the initial states, lags_model_max columns with seasonality)
+    # so the states align with the actuals, as R's plot.adam
+    states_aligned = states[:, states.shape[1] - n_obs :]
 
     # Prepend actuals, append residuals (matching R's plot8)
     all_series = np.vstack(

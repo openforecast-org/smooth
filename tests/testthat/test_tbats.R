@@ -447,3 +447,13 @@ test_that("tbats() takes a custom loss", {
     expect_equal(tbats(AirPassengers, model=fitCustom)$lossValue, fitCustom$lossValue);
     expect_s3_class(coefbootstrap(fitCustom, nsim=3), "bootstrap");
 })
+
+test_that("rmultistep() of tbats() gives the errors of the transformed data", {
+    fit <- tbats(AirPassengers, lags=c(1,12), harmonics=3, trend="none",
+                 orders=list(ar=0, ma=0, select=FALSE));
+    errors <- rmultistep(fit, h=3);
+    expect_equal(dim(errors), c(nobs(fit)-3, 3));
+    # Of the logarithms, not of the passengers
+    expect_lt(max(abs(errors)), 1);
+    expect_true(all(is.finite(multicov(fit, type="empirical", h=3))));
+});

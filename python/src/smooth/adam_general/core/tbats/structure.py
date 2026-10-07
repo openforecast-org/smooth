@@ -14,6 +14,7 @@ from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 from smooth.adam_general.core.utils.utils import (
     _exp_r,
+    _log_density_r,
     _log_r,
     _pow_r,
     _sum_r,
@@ -421,12 +422,8 @@ def loglik_value(errors: NDArray, distribution: str, shape: Optional[float]) -> 
     scale = scale_value(errors, distribution, shape)
     if distribution == "dnorm":
         values = gb.dnorm(errors, 0, math.sqrt(scale), log=True)
-    elif distribution == "dlaplace":
-        values = gb.dlaplace(errors, 0, scale, log=True)
-    elif distribution == "ds":
-        values = gb.ds(errors, 0, scale, log=True)
     else:
-        values = gb.dgnorm(errors, 0, scale, shape, log=True)
+        values = _log_density_r(distribution, errors, scale, shape)
     return float(_sum_r(np.asarray(values, dtype=float)))
 
 

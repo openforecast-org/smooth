@@ -637,3 +637,27 @@ def test_the_eigenvalue_moduli_agree_with_lapack():
         ours = np.sort(np.ravel(eigen_moduli(np.asfortranarray(A))))
         lapack = np.sort(np.abs(np.linalg.eigvals(A)))
         np.testing.assert_allclose(ours, lapack, rtol=1e-12, atol=1e-12)
+
+
+def test_the_eigenvalue_moduli_converge_near_pure_rotations():
+    # Clustered eigenvalues near the unit circle, as with small smoothing parameters
+    from smooth.adam_general._eigenCalc import eigen_moduli
+
+    rng = np.random.default_rng(3)
+    for k in (2, 6, 11):
+        A = np.eye(2 * k + 1)
+        for j in range(k):
+            theta = rng.uniform(0, np.pi)
+            c, s = np.cos(theta), np.sin(theta)
+            A[2 * j + 1 : 2 * j + 3, 2 * j + 1 : 2 * j + 3] = [[c, s], [-s, c]]
+        g = np.concatenate([[rng.uniform()], rng.uniform(-1e-5, 1e-5, 2 * k)])
+        w = np.concatenate([[1.0], np.tile([1.0, 0.0], k)])
+        A = A - np.outer(g, w)
+        moduli = np.ravel(eigen_moduli(np.asfortranarray(A)))
+        assert np.all(np.isfinite(moduli))
+        np.testing.assert_allclose(
+            np.sort(moduli),
+            np.sort(np.abs(np.linalg.eigvals(A))),
+            rtol=1e-12,
+            atol=1e-12,
+        )

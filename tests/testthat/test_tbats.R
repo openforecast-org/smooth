@@ -479,3 +479,19 @@ test_that("the eigenvalue moduli of the admissible bounds agree with LAPACK", {
                      tolerance=1e-12);
     }
 })
+
+test_that("the eigenvalue moduli converge for harmonics close to pure rotations", {
+    # Clustered eigenvalues near the unit circle, as with small smoothing parameters
+    set.seed(3);
+    for(k in c(2, 6, 11)){
+        A <- diag(2*k+1);
+        for(j in 1:k){
+            theta <- runif(1, 0, pi);
+            A[2*j+0:1, 2*j+0:1] <- matrix(c(cos(theta), -sin(theta), sin(theta), cos(theta)), 2);
+        }
+        A <- A - c(runif(1), runif(2*k, -1e-5, 1e-5)) %o% c(1, rep(c(1, 0), k));
+        moduli <- eigenModuliCpp(A);
+        expect_true(all(is.finite(moduli)));
+        expect_equal(sort(moduli), sort(Mod(eigen(A, only.values=TRUE)$values)), tolerance=1e-12);
+    }
+})

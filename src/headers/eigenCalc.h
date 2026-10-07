@@ -120,9 +120,10 @@ arma::vec smoothEigensCpp(const arma::mat& persistence,
 // that the R and Python builds round identically whatever library each links (the
 // admissible bounds of tbats() sit on the boundary, where a last-bit difference between
 // two LAPACK builds decided which parameters were admissible). EISPACK's balancing,
-// orthogonal reduction to Hessenberg form and shifted QR (balanc, orthes and hqr), with
-// 1-based indices as there. A matrix whose QR
-// does not converge gets infinite moduli, so that it is never admissible.
+// orthogonal reduction to Hessenberg form and shifted QR (balanc, orthes and hqr, with
+// the iteration limit and exceptional shifts of LAPACK's dlahqr), with 1-based indices
+// as there. A matrix whose QR does not converge gets infinite moduli, so that it is
+// never admissible.
 inline arma::vec eigenModuliCore(const arma::mat& A) {
     const int n = A.n_rows;
     arma::vec moduli(n);
@@ -223,6 +224,10 @@ inline arma::vec eigenModuliCore(const arma::mat& A) {
             anorm += std::fabs(a(i, j));
         }
     }
+    // LAPACK's dlahqr: up to 30*max(10, n) iterations per eigenvalue, with an exceptional
+    // shift every tenth (hqr's 30 and two shifts fail on the clustered eigenvalues near
+    // the unit circle of harmonics with small smoothing parameters)
+    const int maxIterations = 30 * std::max(10, n);
     int nn = n, l = 1, m = 1;
     double t = 0.0, p = 0.0, q = 0.0, r = 0.0, s, w, x, y, z, u, v;
     while(nn >= 1) {
@@ -266,11 +271,11 @@ inline arma::vec eigenModuliCore(const arma::mat& A) {
                     nn -= 2;
                 }
                 else {
-                    if(its == 30) {
+                    if(its == maxIterations) {
                         moduli.fill(arma::datum::inf);
                         return moduli;
                     }
-                    if(its == 10 || its == 20) {
+                    if(its > 0 && its % 10 == 0) {
                         t += x;
                         for(int i = 1; i <= nn; i++) {
                             a(i, i) -= x;

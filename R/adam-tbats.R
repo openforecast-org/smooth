@@ -1021,6 +1021,18 @@ tbats_eigens <- function(matF, vecG, w, struct){
     return(eigenModuliCpp(Fe - ge %o% we));
 }
 
+# The starting values within a hair of a finite bound, moved onto it: NLopt's default
+# initial step shrinks to the distance to the bound, so the simplex of Nelder-Mead
+# collapses within ~1e-14 of it (nloptr then fails and returns the start), while on the
+# bound it steps inwards. The values outside the bounds are left as they are
+tbats_ontoBounds <- function(B, lb, ub, tol=1e-10){
+    nearUpper <- is.finite(ub) & ub-B>=0 & ub-B<tol*pmax(1, abs(ub));
+    nearLower <- is.finite(lb) & B-lb>=0 & B-lb<tol*pmax(1, abs(lb));
+    B[nearUpper] <- ub[nearUpper];
+    B[nearLower] <- lb[nearLower];
+    return(B);
+}
+
 #### The fitter ####
 # One fit of a fixed structure: the estimation of the parameters, the final fit and
 # the forecasts, all in the space of the Box-Cox transformed data
@@ -1241,11 +1253,12 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         opts <- list(algorithm=checked$algorithm, xtol_rel=checked$xtol_rel, xtol_abs=checked$xtol_abs,
                      ftol_rel=checked$ftol_rel, ftol_abs=checked$ftol_abs,
                      maxeval=maxevalUsed, maxtime=checked$maxtime, print_level=printLevel);
+        B <- tbats_ontoBounds(B, lb, ub);
         res <- suppressWarnings(nloptr(B, CF, lb=lb, ub=ub, opts=opts));
         # Stuck on a penalty: restart from no smoothing, unless B was provided
         if(is.null(checked$B) && (is.infinite(res$objective) || res$objective>=1E+100)){
             B[grepl("^(alpha|beta|gamma)", names(B))] <- 0;
-            res <- suppressWarnings(nloptr(B, CF, lb=lb, ub=ub, opts=opts));
+            res <- suppressWarnings(nloptr(tbats_ontoBounds(B, lb, ub), CF, lb=lb, ub=ub, opts=opts));
         }
         if(checked$print_level>0){
             print(res);

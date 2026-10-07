@@ -360,6 +360,25 @@ def gamma_start(B: NDArray, names: List[str], filler: Filler) -> NDArray:
     return B
 
 
+def _onto_bounds(B: NDArray, lb: NDArray, ub: NDArray, tol: float = 1e-10) -> NDArray:
+    """The starting values within a hair of a finite bound, moved onto it, as R's
+    tbats_ontoBounds: NLopt's default initial step shrinks to the distance to the
+    bound, so the simplex of Nelder-Mead collapses within ~1e-14 of it (NLopt then
+    fails), while on the bound it steps inwards. The values outside the bounds are
+    left as they are."""
+    B = np.array(B, dtype=float)
+    lb, ub = np.asarray(lb, dtype=float), np.asarray(ub, dtype=float)
+    with np.errstate(invalid="ignore"):
+        to_upper, to_lower = ub - B, B - lb
+        hair_upper = tol * np.maximum(1, abs(ub))
+        hair_lower = tol * np.maximum(1, abs(lb))
+        near_upper = np.isfinite(ub) & (to_upper >= 0) & (to_upper < hair_upper)
+        near_lower = np.isfinite(lb) & (to_lower >= 0) & (to_lower < hair_lower)
+    B[near_upper] = ub[near_upper]
+    B[near_lower] = lb[near_lower]
+    return B
+
+
 def _optimise(
     cf: Callable[[NDArray], float],
     B: NDArray,
@@ -368,6 +387,7 @@ def _optimise(
     s: Dict[str, Any],
 ) -> Dict[str, Any]:
     """NLopt with R's nloptr settings; the best point seen is returned."""
+    B = _onto_bounds(B, lb, ub)
     best_x = [B.copy()]
     best_f = [math.inf]
 

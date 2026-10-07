@@ -661,3 +661,17 @@ def test_the_eigenvalue_moduli_converge_near_pure_rotations():
             rtol=1e-12,
             atol=1e-12,
         )
+
+
+def test_a_start_a_hair_inside_a_bound_is_estimated_as_one_on_the_bound(air):
+    # NLopt's simplex collapses within ~1e-14 of a bound; the start is moved onto it
+    kw = dict(lags=[1, 12], harmonics=[2], trend="none", orders=ORDERS0)
+    model = TBATS(**kw).fit(air)
+    B = model.coef.copy()
+    B[model.coef_names.index("alpha")] *= 0.9
+    on_bound = B.copy()
+    on_bound[model.coef_names.index("lambda")] = 1.0
+    B[model.coef_names.index("lambda")] = 1 - 2.65e-14
+    np.testing.assert_array_equal(
+        TBATS(B=B, **kw).fit(air).coef, TBATS(B=on_bound, **kw).fit(air).coef
+    )

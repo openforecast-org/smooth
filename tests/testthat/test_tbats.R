@@ -495,3 +495,15 @@ test_that("the eigenvalue moduli converge for harmonics close to pure rotations"
         expect_equal(sort(moduli), sort(Mod(eigen(A, only.values=TRUE)$values)), tolerance=1e-12);
     }
 })
+
+test_that("a start a hair inside a bound is estimated as one on the bound", {
+    # NLopt's simplex collapses within ~1e-14 of a bound; the start is moved onto it
+    arguments <- list(AirPassengers, lags=c(1,12), harmonics=2, trend="none", orders=orders0);
+    B <- do.call(tbats, arguments)$B;
+    B["alpha"] <- B["alpha"]*0.9;
+    BBound <- B;
+    BBound["lambda"] <- 1;
+    B["lambda"] <- 1-2.65e-14;
+    expect_equal(do.call(tbats, c(arguments, list(B=B)))$B, do.call(tbats, c(arguments, list(B=BBound)))$B,
+                 tolerance=0);
+})

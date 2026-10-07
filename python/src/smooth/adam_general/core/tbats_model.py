@@ -29,7 +29,7 @@ from smooth.adam_general.core.utils.utils import (
 )
 
 TREND_OPTIONS = ("auto", "none", "additive", "damped")
-DISTRIBUTION_OPTIONS = ("dnorm", "dlaplace", "ds", "dgnorm")
+DISTRIBUTION_OPTIONS = ("auto", "dnorm", "dlaplace", "ds", "dgnorm")
 LOSS_OPTIONS = (
     "likelihood",
     "MSE",
@@ -270,9 +270,17 @@ class TBATS:
         the zeros. The log-likelihood and the number of parameters include those of
         the occurrence model, and the fitted values and forecasts are the probability
         times those of the sizes (see ``point`` in :meth:`predict`).
-    distribution : str, default="dnorm"
-        ``"dnorm"``, ``"dlaplace"``, ``"ds"`` or ``"dgnorm"``, in the space of the
-        transformed data.
+    distribution : str, default="auto"
+        ``"auto"``, ``"dnorm"``, ``"dlaplace"``, ``"ds"`` or ``"dgnorm"``, in the
+        space of the transformed data. With ``"auto"``, the model is selected with
+        ``"dgnorm"``, whose shape nests the others (2 is the normal, 1 the Laplace and
+        0.5 the S distribution), and the named distribution closest to the estimated
+        shape on the log scale is then fitted on the selected structure (from the
+        default starting values and from the estimates of ``"dgnorm"``, the higher
+        likelihood kept); its information criterion is added to ``ics``. With a loss
+        other than the likelihood, ``"auto"`` is ``"dlaplace"`` for ``"MAE"``,
+        ``"ds"`` for ``"HAM"`` and ``"dnorm"`` otherwise, as in ``ADAM``. The
+        distribution used is ``distribution_``.
     loss, ic, h, holdout, initial, bounds
         As in R's ``tbats()``; ``bounds="admissible"`` keeps the model stable.
     verbose : int, default=0
@@ -295,7 +303,7 @@ class TBATS:
         orders: Optional[Dict[str, Any]] = None,
         regressors: str = "use",
         occurrence: Any = "none",
-        distribution: str = "dnorm",
+        distribution: str = "auto",
         loss: Union[str, Callable[..., float]] = "likelihood",
         ic: str = "AICc",
         h: int = 0,
@@ -446,6 +454,7 @@ class TBATS:
         spec_fit = st.arma_build([0], [0], [1]) if spec["select"] else spec
         trend_types = ["none", "additive", "damped"] if trend == "auto" else [trend]
         settings = {**self._settings(), "occurrence": occurrence}
+        distribution = self._distribution_selection()
         # The regressors are selected on the errors of the model without them
         xreg_fit = None if self.regressors == "select" else xreg
 
@@ -485,7 +494,7 @@ class TBATS:
                     table,
                     spec_fit,
                     lam_spec,
-                    self.distribution,
+                    distribution,
                     self.initial,
                     settings,
                     xreg_fit,
@@ -499,7 +508,16 @@ class TBATS:
 
         if self.regressors == "select" and xreg is not None:
             best, xreg_fit = self._select_xreg(
-                best, xreg, ics, y_in_sample, table, spec_fit, lam_spec, settings, ot
+                best,
+                xreg,
+                ics,
+                y_in_sample,
+                table,
+                spec_fit,
+                lam_spec,
+                settings,
+                ot,
+                distribution,
             )
 
         # The ARMA orders, screened on the residuals of the global model
@@ -516,7 +534,7 @@ class TBATS:
             spec_best = st.arma_select(
                 st.gapped(residuals, ot),
                 spec,
-                self.distribution,
+                distribution,
                 best["elements"]["shape"],
                 best["n_param_estimated"],
                 self.ic,
@@ -531,7 +549,7 @@ class TBATS:
                     table,
                     spec_best,
                     lam_spec,
-                    self.distribution,
+                    distribution,
                     self.initial,
                     settings,
                     xreg_fit,
@@ -543,6 +561,10 @@ class TBATS:
                 ar = ",".join(str(o) for o in spec_best["ar_orders"])
                 ma = ",".join(str(o) for o in spec_best["ma_orders"])
                 ics[f"{candidate['trend_type']}+ARMA({ar};{ma})"] = ic_candidate
+
+        if self.distribution == "auto" and distribution == "dgnorm":
+            best = self._closest(best, y_in_sample, table, lam_spec, settings, xreg_fit)
+            ics[best["distribution"]] = self._ic(best)
 
         self._best = best
         self._settings_used = settings
@@ -568,6 +590,7 @@ class TBATS:
         lam_spec: Dict[str, Any],
         settings: Dict[str, Any],
         ot: NDArray,
+        distribution: str,
     ) -> Any:
         """The regressors selected by ``stepwise()`` on the errors of the best model
         without them, as R's ``adam_xreg_selector``: the model refitted with them is
@@ -579,7 +602,7 @@ class TBATS:
             xreg["names"],
             self.ic,
             len(best["B"]) + 1 - shape_estimated,
-            self.distribution,
+            distribution,
             best["elements"]["shape"],
         )
         subset = st.xreg_subset(xreg, selected)
@@ -591,7 +614,7 @@ class TBATS:
             table,
             spec,
             lam_spec,
-            self.distribution,
+            distribution,
             self.initial,
             settings,
             subset,
@@ -601,6 +624,51 @@ class TBATS:
         improves = ic_candidate < min(ics.values())
         ics[f"{candidate['trend_type']}+X({','.join(subset['names'])})"] = ic_candidate
         return (candidate, subset) if improves else (best, None)
+
+    def _distribution_selection(self) -> str:
+        """The distribution of the selection: ``"auto"`` selects with dgnorm, unless
+        the loss implies one, as in ADAM."""
+        if self.distribution != "auto":
+            return self.distribution
+        implied = {"likelihood": "dgnorm", "MAE": "dlaplace", "HAM": "ds"}
+        return implied.get(self.loss, "dnorm")
+
+    def _closest(
+        self,
+        best: Dict[str, Any],
+        y: NDArray,
+        table: Dict[str, NDArray],
+        lam_spec: Dict[str, Any],
+        settings: Dict[str, Any],
+        xreg: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """The named distribution closest to the shape of dgnorm on the log scale
+        (S 0.5, Laplace 1, normal 2), fitted on the structure selected with dgnorm
+        from the default start and from its estimates without the shape, the higher
+        likelihood kept (R's ``tbats_closest``)."""
+        shapes = {"ds": 0.5, "dlaplace": 1.0, "dnorm": 2.0}
+        log_shape = np.log(best["elements"]["shape"])
+        distribution = min(shapes, key=lambda d: abs(log_shape - np.log(shapes[d])))
+        keep = np.array([name != "shape" for name in best["names"]])
+        bounds = {
+            key: None if settings[key] is None else np.asarray(settings[key])[keep]
+            for key in ("lb", "ub")
+        }
+        fits = [
+            ft.fit(
+                y,
+                best["trend_type"],
+                table,
+                best["spec"],
+                lam_spec,
+                distribution,
+                self.initial,
+                {**settings, **bounds, "B": start},
+                xreg,
+            )
+            for start in (None, best["B"][keep])
+        ]
+        return max(fits, key=lambda fit: fit["loglik"])
 
     def _ic(self, fitted: Dict[str, Any]) -> float:
         return st.ic_value(
@@ -898,7 +966,9 @@ class TBATS:
 
     @property
     def distribution_(self) -> str:
-        return self.distribution
+        """The distribution of the model, the one chosen with ``"auto"``."""
+        self._check_fitted()
+        return str(self._best["distribution"])
 
     @property
     def loss_(self) -> str:
@@ -1163,7 +1233,7 @@ class TBATS:
         y_bc = st.box_cox_sizes(self._y_in_sample, self.lambda_, ot)
         y_bc[np.isnan(self._y_in_sample)] = np.nan
         scale = scale_debias(
-            self.scale, self.distribution, int(ot.sum()), self._nobs_observed()
+            self.scale, self.distribution_, int(ot.sum()), self._nobs_observed()
         )
 
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
@@ -1173,7 +1243,7 @@ class TBATS:
                 "cumulative": cumulative,
                 "nsim": nsim,
                 "scenarios": False,
-                "distribution": self.distribution,
+                "distribution": self.distribution_,
                 "loss": self.loss,
                 "other": {"shape": best["elements"]["shape"]},
                 "n_param": None,
@@ -1308,7 +1378,7 @@ class TBATS:
         from scipy.stats import norm
 
         lam = self.lambda_
-        if self.distribution == "dnorm":
+        if self.distribution_ == "dnorm":
             # The bound at the level 2*pnorm(1)-1 is one standard deviation away
             bounds, _ = run("approximate", 2 * norm.cdf(1) - 1, "both")
             mu = np.asarray(bounds.mean, dtype=float)
@@ -1322,10 +1392,10 @@ class TBATS:
             return np.asarray(values @ weights / np.sqrt(np.pi))
         shape = self._best["elements"]["shape"]
         if lam == 0 and (
-            self.distribution == "ds" or (self.distribution == "dgnorm" and shape < 1)
+            self.distribution_ == "ds" or (self.distribution_ == "dgnorm" and shape < 1)
         ):
             warnings.warn(
-                f"With lambda=0 and the {self.distribution} distribution, the mean of "
+                f"With lambda=0 and the {self.distribution_} distribution, the mean of "
                 "the forecast distribution does not exist: the simulated one is "
                 "unstable and grows with nsim.",
                 stacklevel=3,
@@ -1587,13 +1657,13 @@ class TBATS:
                 )
                 errors_sizes = refitted.errors[ot, j]
                 scale = scale_debias(
-                    st.scale_value(errors_sizes, self.distribution, shape),
-                    self.distribution,
+                    st.scale_value(errors_sizes, self.distribution_, shape),
+                    self.distribution_,
                     len(errors_sizes),
                     df_scale,
                 )
                 errors = generate_errors(
-                    self.distribution,
+                    self.distribution_,
                     h * nsim,
                     scale,
                     obs_in_sample=obs_nonzero,
@@ -1672,10 +1742,10 @@ class TBATS:
         obs_nonzero = int(self._ot.sum())
         df_scale = max(obs_nonzero - (self.nparam - n_scale), 1)
         rng = np.random.default_rng(seed)
-        scale = scale_debias(self.scale, self.distribution, obs_nonzero, df_scale)
+        scale = scale_debias(self.scale, self.distribution_, obs_nonzero, df_scale)
         errors = np.reshape(
             generate_errors(
-                self.distribution,
+                self.distribution_,
                 obs * nsim,
                 scale,
                 obs_in_sample=obs_nonzero,
@@ -1735,7 +1805,7 @@ class TBATS:
             occurrence=None if self._occurrence["model"] is None else occurrence,
             profile=profile.copy(),
             other={"shape": best["elements"]["shape"]}
-            if self.distribution == "dgnorm"
+            if self.distribution_ == "dgnorm"
             else {},
         )
 
@@ -1813,7 +1883,7 @@ class TBATS:
                 ],
                 "select": False,
             },
-            "distribution": self.distribution,
+            "distribution": self.distribution_,
             "loss": self.loss_function if self.loss == "custom" else self.loss,
             "initial": self.initial,
             "bounds": self.bounds,
@@ -1834,7 +1904,7 @@ class TBATS:
                     "probabilities."
                 )
             kwargs["occurrence"] = model.occurrence
-        if self.distribution == "dgnorm" and "shape" not in self.coef_names:
+        if self.distribution_ == "dgnorm" and "shape" not in self.coef_names:
             kwargs["shape"] = self._best["elements"]["shape"]
         return kwargs
 

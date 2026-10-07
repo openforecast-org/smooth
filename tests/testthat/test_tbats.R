@@ -46,15 +46,15 @@ test_that("backcasting reproduces a noise-free series with a fractional period",
     tt <- 1:200;
     y <- ts(100 + 0.5*tt + 10*sin(2*pi*tt/7.3) + 4*cos(2*pi*tt/7.3) + 2*sin(4*pi*tt/7.3));
     fit <- tbats(y, lags=c(1, 7.3), harmonics=2, trend="additive", lambda=1, orders=orders0,
-                 B=c(alpha=0.1, beta=0.01, `gamma1[7.3]`=0.01, `gamma2[7.3]`=0.01), maxeval=1);
+                 distribution="dnorm", B=c(alpha=0.1, beta=0.01, `gamma1[7.3]`=0.01, `gamma2[7.3]`=0.01), maxeval=1);
     expect_lt(max(abs(residuals(fit))), 1e-8);
 });
 
 test_that("lambda=0 is the model of the logarithms", {
     y <- AirPassengers;
-    fitLog <- tbats(y, harmonics=5, trend="additive", lambda=0, orders=orders0);
+    fitLog <- tbats(y, harmonics=5, trend="additive", lambda=0, orders=orders0, distribution="dnorm");
     fitLevel <- tbats(log(y), harmonics=5, trend="additive", lambda=1, orders=orders0,
-                      B=fitLog$B, maxeval=1);
+                      distribution="dnorm", B=fitLog$B, maxeval=1);
     expect_equal(as.numeric(logLik(fitLog)), as.numeric(logLik(fitLevel)) - sum(log(y)), tolerance=1e-8);
 });
 
@@ -80,6 +80,18 @@ test_that("all the distributions are fitted and the dgnorm shape is estimated", 
     fitShape <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0,
                       distribution="dgnorm", shape=1.5);
     expect_false(any(names(fitShape$B)=="shape"));
+    # "auto" refits the named distribution closest to the shape, at least as well as from its start
+    shapes <- c(ds=0.5, dlaplace=1, dnorm=2);
+    fitAuto <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, shape=0.9);
+    expect_equal(fitAuto$distribution, "dlaplace");
+    fitAuto <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0);
+    expect_equal(fitAuto$distribution, names(shapes)[which.min(abs(log(fit$other$shape/shapes)))]);
+    fitNamed <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0,
+                      distribution=fitAuto$distribution);
+    expect_gte(as.numeric(logLik(fitAuto)), as.numeric(logLik(fitNamed)) - 1e-8);
+    expect_equal(fitAuto$ICs[[fitAuto$distribution]], as.numeric(AICc(fitAuto)));
+    expect_equal(tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, loss="MAE")$distribution,
+                 "dlaplace");
 });
 
 test_that("the usual bounds keep the response to an error in [0, 1] over the cycle", {
@@ -122,8 +134,10 @@ test_that("the admissible bounds (the default) keep the discount matrix stable",
 
 test_that("two-stage starts from the backcasted fit and cannot end below it", {
     for(y in list(AirPassengers, BJsales)){
-        fitBackcast <- tbats(y, trend="damped", orders=list(ar=1, ma=1, select=FALSE), initial="complete");
-        fitTwoStage <- tbats(y, trend="damped", orders=list(ar=1, ma=1, select=FALSE), initial="two-stage");
+        fitBackcast <- tbats(y, trend="damped", orders=list(ar=1, ma=1, select=FALSE), initial="complete",
+                             distribution="dnorm");
+        fitTwoStage <- tbats(y, trend="damped", orders=list(ar=1, ma=1, select=FALSE), initial="two-stage",
+                             distribution="dnorm");
         expect_gte(as.numeric(logLik(fitTwoStage)), as.numeric(logLik(fitBackcast)) - 1e-8);
     }
 });
@@ -193,13 +207,13 @@ test_that("the ARMA selection finds an AR(1) and falls back to no ARMA", {
     set.seed(41);
     tt <- 1:240;
     y <- ts(500 + 20*sin(2*pi*tt/12) + 10*cos(2*pi*tt/12) + arima.sim(list(ar=0.7), 240, sd=5), frequency=12);
-    fit <- tbats(y, harmonics=1, trend="none");
+    fit <- tbats(y, harmonics=1, trend="none", distribution="dnorm");
     expect_equal(fit$orders$ar, 1);
     expect_equal(fit$orders$ma, 0);
     expect_equal(min(fit$ICs), as.numeric(AICc(fit)));
     refit <- tbats(y, model=fit);
     expect_equal(as.numeric(logLik(refit)), as.numeric(logLik(fit)), tolerance=1e-10);
-    fitAir <- tbats(AirPassengers, harmonics=5, trend="additive");
+    fitAir <- tbats(AirPassengers, harmonics=5, trend="additive", distribution="dnorm");
     expect_equal(sum(fitAir$orders$ar+fitAir$orders$ma), 0);
 });
 
@@ -244,16 +258,16 @@ test_that("with regressors, TBATS is ADAM's ETSX at the same parameters", {
     B <- c(alpha=coef(fitADAM)[["alpha"]], level=coef(fitADAM)[["level"]]-1-beta[[1]],
            x1=coef(fitADAM)[["x1"]]-beta[[2]], x2=coef(fitADAM)[["x2"]]-beta[[3]]);
     fit <- tbats(y, lags=1, xreg=xreg, trend="none", lambda=1, orders=orders0, initial="optimal",
-                 B=B, maxeval=1);
+                 distribution="dnorm", B=B, maxeval=1);
     expect_equal(as.numeric(logLik(fit)), as.numeric(logLik(fitADAM)), tolerance=1e-10);
     expect_equal(as.numeric(fitted(fit)), as.numeric(fitted(fitADAM)), tolerance=1e-10);
 });
 
 test_that("lambda=0 with a regressor is the model of the logarithms with it", {
     fitLog <- tbats(yXreg[1:120], lags=c(1,12), xreg=xregTest[1:120,], harmonics=1, trend="none",
-                    lambda=0, orders=orders0);
+                    lambda=0, orders=orders0, distribution="dnorm");
     fitLevel <- tbats(log(yXreg[1:120]), lags=c(1,12), xreg=xregTest[1:120,], harmonics=1, trend="none",
-                      lambda=1, orders=orders0, B=coef(fitLog), maxeval=1);
+                      lambda=1, orders=orders0, distribution="dnorm", B=coef(fitLog), maxeval=1);
     expect_equal(as.numeric(logLik(fitLog)), as.numeric(logLik(fitLevel)) - sum(log(yXreg[1:120])),
                  tolerance=1e-8);
 });
@@ -294,7 +308,7 @@ test_that("adaptive regressors are ADAM's ETSX{D} and stay within the bounds", {
     B <- c(parameters[c("alpha","delta1","delta2")], level=parameters[["level"]]-1-beta[[1]],
            x1=parameters[["x1"]]-beta[[2]], x2=parameters[["x2"]]-beta[[3]]);
     fit <- tbats(y, lags=1, xreg=xreg, regressors="adapt", trend="none", lambda=1, orders=orders0,
-                 initial="optimal", B=B, maxeval=1);
+                 initial="optimal", distribution="dnorm", B=B, maxeval=1);
     expect_equal(as.numeric(logLik(fit)), as.numeric(logLik(fitADAM)), tolerance=1e-10);
     for(bounds in c("usual","admissible")){
         fit <- tbats(y, lags=1, xreg=xreg, regressors="adapt", trend="none", orders=orders0, bounds=bounds);
@@ -310,7 +324,9 @@ test_that("adaptive regressors are ADAM's ETSX{D} and stay within the bounds", {
 
 test_that("the selection keeps the relevant regressor and drops the noise", {
     set.seed(7);
-    fit <- tbats(yXreg, xreg=cbind(xregTest, noise=rnorm(132)), regressors="select", h=12, holdout=TRUE);
+    # With dgnorm, the shape of 2.7 of the model without regressors lets the noise in on this sample
+    fit <- tbats(yXreg, xreg=cbind(xregTest, noise=rnorm(132)), regressors="select", h=12, holdout=TRUE,
+                 distribution="dnorm");
     expect_equal(names(fit$initial$xreg), "x1");
     expect_equal(colnames(fit$data)[-1], "x1");
     expect_true(any(grepl("\\+X\\(x1\\)", names(fit$ICs))));
@@ -422,14 +438,15 @@ test_that("tbats takes the missing values for gaps", {
 })
 
 test_that("initial='gradient' solves for the initials of the states", {
-    fitBackcast <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0);
-    fitGradient <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, initial="gradient");
+    fitBackcast <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, distribution="dnorm");
+    fitGradient <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, initial="gradient",
+                         distribution="dnorm");
     # The initials are counted as with backcasting, and the likelihood is that of the fit
     expect_equal(nparam(fitGradient), nparam(fitBackcast));
     expect_equal(as.numeric(logLik(fitGradient)), sum(pointLik(fitGradient)));
     # At the same parameters, the solved initials fit at least as well as the backcast ones
     atBackcast <- tbats(AirPassengers, harmonics=5, trend="additive", orders=orders0, initial="gradient",
-                        B=fitBackcast$B, maxeval=1);
+                        distribution="dnorm", B=fitBackcast$B, maxeval=1);
     expect_lte(atBackcast$lossValue, fitBackcast$lossValue);
     expect_true(all(is.finite(forecast(fitGradient, h=12, interval="prediction")$upper)));
 })
@@ -498,7 +515,8 @@ test_that("the eigenvalue moduli converge for harmonics close to pure rotations"
 
 test_that("a start a hair inside a bound is estimated as one on the bound", {
     # NLopt's simplex collapses within ~1e-14 of a bound; the start is moved onto it
-    arguments <- list(AirPassengers, lags=c(1,12), harmonics=2, trend="none", orders=orders0);
+    arguments <- list(AirPassengers, lags=c(1,12), harmonics=2, trend="none", orders=orders0,
+                      distribution="dnorm");
     B <- do.call(tbats, arguments)$B;
     B["alpha"] <- B["alpha"]*0.9;
     BBound <- B;

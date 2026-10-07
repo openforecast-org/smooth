@@ -105,6 +105,7 @@ By default, ``TBATS`` selects the structure of the model itself:
 3. the orders of the ARMA (up to ``orders["ar"]`` and ``orders["ma"]``), screened on
    the residuals of the global model. The model with the ARMA is kept only if it
    improves the information criterion.
+4. the distribution of the error term, see `Distribution`_.
 
 The Box-Cox parameter is estimated together with the other parameters (with
 ``loss="likelihood"``), unless it is provided in ``lambda_bc``. The last week is
@@ -141,8 +142,8 @@ Specifying the structure
 
 The automatic selection takes time on long series, because several models are
 estimated. If the structure is known, it can be specified directly, which is much
-faster. Here is the model with 8 and 16 harmonics, no trend, no ARMA and no
-transformation:
+faster. Here is the model with 8 and 16 harmonics, no trend, no ARMA, no
+transformation and the normal distribution:
 
 .. code-block:: python
 
@@ -152,6 +153,7 @@ transformation:
        trend="none",
        orders={"ar": 0, "ma": 0, "select": False},
        lambda_bc=1,
+       distribution="dnorm",
        h=336,
        holdout=True,
    )
@@ -163,6 +165,45 @@ and 2, so they are dropped, leaving 14 harmonics for the weekly period. The tren
 can be ``"none"``, ``"additive"``, ``"damped"`` or ``"auto"``, and
 ``orders={"ar": 1, "ma": 1, "select": False}`` fits the ARMA(1,1) instead of
 selecting the orders.
+
+Distribution
+------------
+
+The error term in the space of the transformed data follows the normal
+(``"dnorm"``), Laplace (``"dlaplace"``), S (``"ds"``) or Generalised Normal
+(``"dgnorm"``) distribution. The last one nests the others: its shape β is 2 for
+the normal, 1 for the Laplace and 0.5 for the S distribution. The default
+``distribution="auto"`` uses this to choose the distribution without fitting a
+model for each one:
+
+1. the structure of the model is selected as above, with the Generalised Normal
+   distribution and its shape estimated;
+2. the named distribution closest to the estimated shape on the log scale is
+   taken: the S distribution for β < 0.71, the Laplace for 0.71 ≤ β < 1.41 and the
+   normal otherwise;
+3. this distribution is fitted on the selected structure, from the default
+   starting values and from the estimates of the Generalised Normal model, and the
+   fit with the higher likelihood is returned.
+
+The shape tells how heavy the tails of the error term are, so the data with
+outliers get the Laplace or the S distribution, which are less sensitive to them,
+and the data without them get the normal. The estimate of the shape is noisy, so
+the named distribution, which has one parameter less, is used even when the
+Generalised Normal one has the lower information criterion: on the hourly series of
+the M4 competition, its forecasts were more accurate than those of the Generalised
+Normal distribution and of the choice between the two by the information criterion.
+The chosen distribution and its information criterion are in the model:
+
+.. code-block:: python
+
+   model.distribution_   # "dnorm", "dlaplace" or "ds"
+   model.ics             # the candidates, then the chosen distribution
+
+The two steps after the selection add to the time of the estimation, so a known
+distribution is better specified directly, e.g. ``distribution="dnorm"``. With a
+loss other than the likelihood, ``"auto"`` is the distribution that the loss
+implies, as in :class:`ADAM`: ``"dlaplace"`` for ``loss="MAE"``, ``"ds"`` for
+``loss="HAM"`` and ``"dnorm"`` otherwise.
 
 Initialisation
 --------------

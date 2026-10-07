@@ -8,10 +8,10 @@ tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   "none", "additive", "damped"), lambda = NULL, orders = list(ar = 3, ma =
   3, select = TRUE), xreg = NULL, regressors = c("use", "select", "adapt"),
   occurrence = c("none", "auto", "fixed", "general", "odds-ratio",
-  "inverse-odds-ratio", "direct"), distribution = c("dnorm", "dlaplace",
-  "ds", "dgnorm"), loss = c("likelihood", "MSE", "MAE", "HAM", "MSEh",
-  "TMSE", "GTMSE", "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC", "BICc"),
-  h = 0, holdout = FALSE, initial = c("backcasting", "optimal",
+  "inverse-odds-ratio", "direct"), distribution = c("auto", "dnorm",
+  "dlaplace", "ds", "dgnorm"), loss = c("likelihood", "MSE", "MAE", "HAM",
+  "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC",
+  "BICc"), h = 0, holdout = FALSE, initial = c("backcasting", "optimal",
   "two-stage", "complete", "gradient"), bounds = c("admissible", "usual",
   "none"), silent = TRUE, model = NULL, ...)
 }
@@ -81,9 +81,16 @@ the fitted values and forecasts are the probability times those of the sizes (se
 \code{point} in \link[smooth]{forecast.adam}).}
 
 \item{distribution}{The distribution of the error term in the space of the
-Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
-\code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
-ellipsis).}
+Box-Cox transformed data: \code{"auto"} (default), \code{"dnorm"},
+\code{"dlaplace"}, \code{"ds"} or \code{"dgnorm"} (the shape is estimated unless
+\code{shape} is provided in ellipsis). With \code{"auto"}, the model is selected
+with \code{"dgnorm"}, whose shape nests the others (2 is the normal, 1 the Laplace
+and 0.5 the S distribution), and the named distribution closest to the estimated
+shape on the log scale is then fitted on the selected structure (from the default
+starting values and from the estimates of \code{"dgnorm"}, the higher likelihood
+kept). Its information criterion is added to \code{ICs}. With a loss other than the
+likelihood, \code{"auto"} is \code{"dlaplace"} for \code{"MAE"}, \code{"ds"} for
+\code{"HAM"} and \code{"dnorm"} otherwise, as in \link[smooth]{adam}.}
 
 \item{loss}{The loss function, see \link[smooth]{adam}. A custom loss is a function
 of \code{actual}, \code{fitted} and \code{B}, as in \link[smooth]{adam}, which

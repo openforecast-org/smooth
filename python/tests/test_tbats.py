@@ -100,6 +100,7 @@ def test_backcasting_reproduces_a_noise_free_fractional_period():
         trend="additive",
         lambda_bc=1,
         orders=ORDERS0,
+        distribution="dnorm",
         B=np.array([0.1, 0.01, 0.01, 0.01]),
         maxeval=1,
     ).fit(y)
@@ -108,7 +109,12 @@ def test_backcasting_reproduces_a_noise_free_fractional_period():
 
 def test_lambda_zero_is_the_model_of_the_logarithms(air):
     fit_log = TBATS(
-        lags=[1, 12], harmonics=[5], trend="additive", lambda_bc=0, orders=ORDERS0
+        lags=[1, 12],
+        harmonics=[5],
+        trend="additive",
+        lambda_bc=0,
+        orders=ORDERS0,
+        distribution="dnorm",
     ).fit(air)
     fit_level = TBATS(
         lags=[1, 12],
@@ -116,6 +122,7 @@ def test_lambda_zero_is_the_model_of_the_logarithms(air):
         trend="additive",
         lambda_bc=1,
         orders=ORDERS0,
+        distribution="dnorm",
         B=fit_log.coef,
         maxeval=1,
     ).fit(np.log(air))
@@ -140,17 +147,22 @@ def test_lambda_is_estimated_in_the_unit_interval_or_falls_back(air):
     assert mse.lambda_ == 1
 
 
-@pytest.mark.parametrize("distribution", ["dnorm", "dlaplace", "ds", "dgnorm"])
+@pytest.mark.parametrize("distribution", ["auto", "dnorm", "dlaplace", "ds", "dgnorm"])
 def test_the_distributions_are_fitted(air, distribution):
-    fit = TBATS(
-        lags=[1, 12],
-        harmonics=[5],
-        trend="additive",
-        orders=ORDERS0,
-        distribution=distribution,
-    ).fit(air)
+    arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
+    fit = TBATS(distribution=distribution, **arguments).fit(air)
     assert np.isfinite(fit.loglik)
     assert ("shape" in fit.coef_names) == (distribution == "dgnorm")
+    if distribution == "auto":
+        # The named distribution closest to the shape, at least as good as its start
+        gnorm = TBATS(distribution="dgnorm", **arguments).fit(air)
+        shape = gnorm.coef[gnorm.coef_names.index("shape")]
+        shapes = {"ds": 0.5, "dlaplace": 1.0, "dnorm": 2.0}
+        closest = min(shapes, key=lambda d: abs(np.log(shape / shapes[d])))
+        assert fit.distribution_ == closest
+        named = TBATS(distribution=closest, **arguments).fit(air)
+        assert fit.loglik >= named.loglik - 1e-8
+        assert fit.ics[closest] == pytest.approx(fit.aicc)
 
 
 def test_a_provided_shape_is_not_estimated(air):
@@ -163,6 +175,9 @@ def test_a_provided_shape_is_not_estimated(air):
         shape=1.5,
     ).fit(air)
     assert "shape" not in fit.coef_names
+    arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
+    assert TBATS(shape=0.9, **arguments).fit(air).distribution_ == "dlaplace"
+    assert TBATS(loss="MAE", **arguments).fit(air).distribution_ == "dlaplace"
 
 
 def test_usual_bounds_keep_the_response_in_the_unit_interval(air):
@@ -217,7 +232,9 @@ def test_two_stage_cannot_end_below_the_backcasted_fit(air):
 
 
 def test_the_arma_falls_back_to_none_when_it_does_not_help(air):
-    fit = TBATS(lags=[1, 12], harmonics=[5], trend="additive").fit(air)
+    fit = TBATS(
+        lags=[1, 12], harmonics=[5], trend="additive", distribution="dnorm"
+    ).fit(air)
     assert sum(fit.orders_["ar"]) + sum(fit.orders_["ma"]) == 0
     assert any("+ARMA" in name for name in fit.ics)
     assert min(fit.ics.values()) == pytest.approx(fit.aicc)
@@ -362,7 +379,9 @@ def xreg_fit(xreg_data):
 
 def test_lambda_zero_with_a_regressor_is_the_model_of_the_logarithms(xreg_data):
     y, X = xreg_data
-    arguments = dict(lags=[1, 12], harmonics=[1], trend="none", orders=ORDERS0)
+    arguments = dict(
+        lags=[1, 12], harmonics=[1], trend="none", orders=ORDERS0, distribution="dnorm"
+    )
     fit_log = TBATS(lambda_bc=0, **arguments).fit(y[:120], X[:120])
     fit_level = TBATS(lambda_bc=1, B=fit_log.coef, maxeval=1, **arguments).fit(
         np.log(y[:120]), X[:120]
@@ -575,7 +594,13 @@ def test_tbats_takes_the_missing_values_for_gaps():
 def test_initial_gradient_solves_for_the_initials(air):
     """The initials are counted as with backcasting, and at the same parameters the
     solved initials fit at least as well as the backcast ones."""
-    arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
+    arguments = dict(
+        lags=[1, 12],
+        harmonics=[5],
+        trend="additive",
+        orders=ORDERS0,
+        distribution="dnorm",
+    )
     backcast = TBATS(**arguments).fit(air)
     gradient = TBATS(initial="gradient", **arguments).fit(air)
     assert gradient.nparam == backcast.nparam
@@ -665,7 +690,9 @@ def test_the_eigenvalue_moduli_converge_near_pure_rotations():
 
 def test_a_start_a_hair_inside_a_bound_is_estimated_as_one_on_the_bound(air):
     # NLopt's simplex collapses within ~1e-14 of a bound; the start is moved onto it
-    kw = dict(lags=[1, 12], harmonics=[2], trend="none", orders=ORDERS0)
+    kw = dict(
+        lags=[1, 12], harmonics=[2], trend="none", orders=ORDERS0, distribution="dnorm"
+    )
     model = TBATS(**kw).fit(air)
     B = model.coef.copy()
     B[model.coef_names.index("alpha")] *= 0.9

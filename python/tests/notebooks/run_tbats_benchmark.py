@@ -1,7 +1,7 @@
 """TBATS benchmark on M4 hourly: data, the Python forecasters and the scores.
 
     python run_tbats_benchmark.py data                    # download and verify M4 hourly
-    python run_tbats_benchmark.py run smooth statsforecast [--workers 4]
+    python run_tbats_benchmark.py run smooth smooth-dnorm statsforecast [--workers 4]
     python run_tbats_benchmark.py score OUT.csv           # score every method in the cache
 
 The R forecasters (forecast::tbats and smooth's R tbats()) are run by
@@ -73,13 +73,17 @@ def quantiles(point, lower, upper):
     return np.column_stack([lower, np.asarray(point, float), upper[:, ::-1]])
 
 
-def forecast_smooth(x):
+def forecast_smooth(x, distribution="auto"):
     from smooth import TBATS
 
-    model = TBATS(lags=LAGS).fit(x)
+    model = TBATS(lags=LAGS, distribution=distribution).fit(x)
     fc = model.predict(h=H, interval="prediction", level=TWO, side="both")
     point = np.asarray(fc.mean, float).ravel()
-    return point, quantiles(point, fc.lower, fc.upper), model.model_name
+    return point, quantiles(point, fc.lower, fc.upper), f"{model.model_name} {model.distribution_}"
+
+
+def forecast_smooth_dnorm(x):
+    return forecast_smooth(x, "dnorm")
 
 
 def forecast_statsforecast(x):
@@ -98,7 +102,11 @@ def forecast_statsforecast(x):
     return fc["mean"], quantiles(fc["mean"], lower, upper), name
 
 
-FORECASTERS = {"smooth": forecast_smooth, "statsforecast": forecast_statsforecast}
+FORECASTERS = {
+    "smooth": forecast_smooth,
+    "smooth-dnorm": forecast_smooth_dnorm,
+    "statsforecast": forecast_statsforecast,
+}
 
 
 def _alarm(signum, frame):
@@ -224,6 +232,7 @@ def versions():
     python = sys.version.split()[0]
     return {
         "smooth": f"smooth {version('smooth')} (git {commit}), Python {python}",
+        "smooth-dnorm": f"smooth {version('smooth')} (git {commit}), Python {python}",
         "smooth-R": f"smooth {r_version[0]} (git {commit}), R {r_version[2]}",
         "statsforecast": f"statsforecast {version('statsforecast')}, Python {python}",
         "forecast": f"forecast {r_version[1]}, R {r_version[2]}",
@@ -231,7 +240,7 @@ def versions():
 
 
 def run_all(output, workers):
-    # The whole benchmark: the four methods one after another (so their timings do not
+    # The whole benchmark: the methods one after another (so their timings do not
     # compete), smooth's R package installed from this working tree, then the scores.
     data()
     for method in FORECASTERS:

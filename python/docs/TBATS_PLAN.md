@@ -575,6 +575,37 @@ Done, instead of fitting the trend candidates in parallel:
   are pulled into the bounds with the penalty only (`inBounds` / `in_bounds`). Taylor
   nsim=100 20.7 → 13.9 s, AirPassengers nsim=1000 13.3 → 7.7 s, the same refits.
 
+## Q. The distribution: `distribution="auto"` (October 2026)
+
+The default. The Generalised Normal nests the named distributions (shape 2 normal, 1
+Laplace, 0.5 S), so one selection gives the distribution too:
+
+1. the structure (harmonics, trend, ARMA, regressors) is selected with `dgnorm`;
+2. the named distribution closest to its shape on the log scale is taken (S below
+   sqrt(0.5) = 0.71, Laplace below sqrt(2) = 1.41, normal above);
+3. it is fitted on that structure from the default start and from the `dgnorm`
+   estimates without the shape, and the higher likelihood is kept (`tbats_closest()` /
+   `TBATS._closest`). Its IC is added to `ICs` / `ics` under its name.
+
+With a loss other than the likelihood, `"auto"` is the distribution of the loss, as in
+`adam()` (MAE: Laplace, HAM: S, the others normal). A `B` with `"auto"` is the start of
+the `dgnorm` selection, so it includes the shape.
+
+The alternatives on the 414 hourly series of M4 (h=48, 99 quantiles; RMSSE and pinball
+scaled by the in-sample one-step differences; MCE the mean absolute calibration error):
+
+| | mean RMSSE | mean pinball | MCE | time, s |
+|---|---|---|---|---|
+| `dnorm` | 0.845 | 0.323 | 0.051 | 11.3 |
+| `dgnorm` | 0.920 | 0.360 | 0.038 | 13.0 |
+| `dgnorm` or the closest by AICc | 0.871 | 0.342 | | |
+| the same, with S for a shape below 0.5 | 0.831 | 0.317 | 0.038 | |
+| the closest (`"auto"`) | 0.829 | 0.316 | 0.041 | 20.0 |
+
+The shape is noisy: `dgnorm` alone is the worst on the points, and the choice by AICc
+picks it with shapes near zero (0.106 on H223), whose forecasts are far off. The timings of
+section P are with `dnorm`.
+
 ## M. Later phases
 
 - multistep losses with an occurrence model (not available in `adam()` either);

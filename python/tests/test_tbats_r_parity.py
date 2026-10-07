@@ -4,6 +4,7 @@ and covariance as R's tbats() on the same data."""
 import warnings
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from smooth import OM, TBATS
@@ -220,7 +221,8 @@ def _r_xreg_fit(case, extra=""):
     call, (y, X), _ = XREG_CASES[case]
     return r_dict(
         f"{{ {XREG_DATA} m <- suppressWarnings({call});"
-        f" list(y=as.numeric({y}), X={X}, model=m$model, B=unname(m$B),"
+        f" list(y=as.numeric({y}), X={X}, Xnames=colnames({X}), model=m$model,"
+        " B=unname(m$B),"
         " names=names(m$B), logLik=as.numeric(logLik(m)), ICs=unname(m$ICs),"
         f" ICnames=names(m$ICs), forecast=as.numeric(m$forecast){extra}) }}"
     )
@@ -229,9 +231,8 @@ def _r_xreg_fit(case, extra=""):
 @pytest.mark.parametrize("case", list(XREG_CASES))
 def test_the_fits_with_regressors_agree(case):
     r = _r_xreg_fit(case)
-    fit = TBATS(**XREG_CASES[case][2]).fit(
-        np.asarray(r["y"], dtype=float), np.asarray(r["X"], dtype=float)
-    )
+    X = pd.DataFrame(np.asarray(r["X"], dtype=float), columns=r["Xnames"])
+    fit = TBATS(**XREG_CASES[case][2]).fit(np.asarray(r["y"], dtype=float), X)
     assert fit.model_name == r["model"][0]
     assert fit.coef_names == r["names"]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)

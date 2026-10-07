@@ -100,9 +100,16 @@
 #' the fitted values and forecasts are the probability times those of the sizes (see
 #' \code{point} in \link[smooth]{forecast.adam}).
 #' @param distribution The distribution of the error term in the space of the
-#' Box-Cox transformed data: \code{"dnorm"}, \code{"dlaplace"}, \code{"ds"} or
-#' \code{"dgnorm"} (the shape is estimated unless \code{shape} is provided in
-#' ellipsis).
+#' Box-Cox transformed data: \code{"auto"} (default), \code{"dnorm"},
+#' \code{"dlaplace"}, \code{"ds"} or \code{"dgnorm"} (the shape is estimated unless
+#' \code{shape} is provided in ellipsis). With \code{"auto"}, the model is selected
+#' with \code{"dgnorm"}, whose shape nests the others (2 is the normal, 1 the Laplace
+#' and 0.5 the S distribution), and the named distribution closest to the estimated
+#' shape on the log scale is then fitted on the selected structure (from the default
+#' starting values and from the estimates of \code{"dgnorm"}, the higher likelihood
+#' kept). Its information criterion is added to \code{ICs}. With a loss other than the
+#' likelihood, \code{"auto"} is \code{"dlaplace"} for \code{"MAE"}, \code{"ds"} for
+#' \code{"HAM"} and \code{"dnorm"} otherwise, as in \link[smooth]{adam}.
 #' @param loss The loss function, see \link[smooth]{adam}. A custom loss is a function
 #' of \code{actual}, \code{fitted} and \code{B}, as in \link[smooth]{adam}, which
 #' receives the observed values with demand and their fitted values in the space of the
@@ -163,7 +170,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                   lambda=NULL, orders=list(ar=3, ma=3, select=TRUE),
                   xreg=NULL, regressors=c("use","select","adapt"),
                   occurrence=c("none","auto","fixed","general","odds-ratio","inverse-odds-ratio","direct"),
-                  distribution=c("dnorm","dlaplace","ds","dgnorm"),
+                  distribution=c("auto","dnorm","dlaplace","ds","dgnorm"),
                   loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                   ic=c("AICc","AIC","BIC","BICc"), h=0, holdout=FALSE,
                   initial=c("backcasting","optimal","two-stage","complete","gradient"),
@@ -222,6 +229,14 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         }
         ellipsis$B <- model$B;
         modelDo <- "use";
+    }
+    # "auto": the structure is selected with dgnorm, then refitted with the named
+    # distribution closest to its shape; the other losses imply one, as in adam()
+    distributionAuto <- distribution=="auto";
+    if(distributionAuto){
+        lossName <- if(is.function(loss)) "custom" else loss;
+        distribution <- switch(lossName, "likelihood"="dgnorm", "MAE"="dlaplace", "HAM"="ds", "dnorm");
+        distributionAuto <- distribution=="dgnorm";
     }
 
     # The checker handles the data, the holdout and the optimiser settings in ellipsis
@@ -336,7 +351,32 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         }
     }
 
+    if(distributionAuto){
+        best <- tbats_closest(best, yInSample, harmonicTable, lambdaSpec, initial, checked, xregSpecFit);
+        ICs[best$distribution] <- tbats_IC(best$logLik, ic);
+    }
+
     return(tbats_return(best, checked, cl, startTime, periods, harmonics, ICs, silent));
+}
+
+# The named distribution closest to the shape of dgnorm on the log scale (S 0.5, Laplace
+# 1, normal 2), fitted on the structure selected with dgnorm from the default start and
+# from its estimates without the shape, the higher likelihood kept
+tbats_closest <- function(best, y, harmonicTable, lambdaSpec, initial, checked, xregSpec){
+    shapes <- c(ds=0.5, dlaplace=1, dnorm=2);
+    distribution <- names(shapes)[which.min(abs(log(best$elements$shape)-log(shapes)))];
+    checked["other"] <- list(NULL);
+    checked$otherParameterEstimate <- FALSE;
+    keep <- names(best$B)!="shape";
+    checked["lb"] <- list(checked$lb[keep]);
+    checked["ub"] <- list(checked$ub[keep]);
+    starts <- list(NULL, best$B[keep]);
+    fits <- lapply(starts, function(B){
+        checked["B"] <- list(B);
+        return(tbats_fit(y, best$trendType, harmonicTable, best$armaSpec, lambdaSpec, distribution,
+                         initial, checked, xregSpec));
+    });
+    return(fits[[which.max(sapply(fits, function(fit) as.numeric(fit$logLik)))]]);
 }
 
 #### Explanatory variables ####

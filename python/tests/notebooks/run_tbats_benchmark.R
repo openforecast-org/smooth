@@ -41,7 +41,7 @@ forecasters <- list(
     "smooth-R"=function(x) {
         model <- smooth::tbats(ts(x, frequency=24), lags=c(1, 24, 168))
         fc <- generics::forecast(model, h=h, interval="prediction", level=two, side="both")
-        return(list(Q=quantiles(fc$mean, fc$lower, fc$upper), model=model$model))
+        return(list(Q=quantiles(fc$mean, fc$lower, fc$upper), model=paste(model$model, model$distribution)))
     }
 )
 

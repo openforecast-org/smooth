@@ -26,6 +26,7 @@ The package includes the following models:
 - [MSARIMA](https://github.com/openforecast-org/smooth/wiki/MSARIMA) - Multiple seasonal ARIMA in state space form, implemented in the `MSARIMA` class (fixed orders) and `AutoMSARIMA` class (automatic order selection).
 - [OM](https://github.com/openforecast-org/smooth/wiki/OM) - Occurrence Model for intermittent demand, implemented in the `OM` class (plus `OMG` for the general two-component model and `AutoOM` for automatic type selection).
 - [SMA](https://github.com/openforecast-org/smooth/wiki/SMA) - Simple Moving Average in state-space form (an AR(m) model with fixed coefficients), implemented in the `SMA` class with automatic order selection.
+- TBATS - De Livera et al.'s TBATS in ADAM's framework, for multiple and non-integer seasonal periods, implemented in the `TBATS` class (see [docs/tbats.rst](https://github.com/openforecast-org/smooth/blob/master/python/docs/tbats.rst)).
 - [SM](https://github.com/openforecast-org/smooth/wiki/Scale-Model) - Scale Model, a second ADAM fitted to the scale of the error term so the variance evolves over time, available as the `.sm()` method on a fitted model.
 
 The package also provides standalone data generators that mirror R's `sim.*` family — `sim_es`, `sim_ssarima`, `sim_ces`, `sim_gum`, `sim_sma`, and `sim_oes` — plus a `.simulate()` method on fitted `ADAM`, `OM`, and `OMG` objects. See [Simulation Functions](https://github.com/openforecast-org/smooth/wiki/Simulation-Functions).
@@ -233,6 +234,31 @@ which mirrors R's call form; it is the same function the method wraps.
 can carry its own ETS structure, ARIMA orders or explanatory variables.
 Set `model.scale_model = None` to detach it. There is no `implant()` function:
 Python can modify a fitted object in place, so assignment does the job.
+
+## TBATS — Multiple and Non-Integer Seasonality
+
+`TBATS` mirrors R's `tbats()`: De Livera, Hyndman and Snyder's (2011) model in ADAM's
+single source of error framework — an ETS level and trend, a trigonometric seasonality
+for each period and ARMA errors, after a Box-Cox transform. The periods can be several
+and need not be integers; the number of harmonics, the trend and the ARMA orders are
+selected by the information criterion.
+
+```python
+import numpy as np
+from smooth import TBATS
+
+# Ten years of weekly data with a yearly cycle of 52.18 weeks
+t = np.arange(1, 521)
+y = 100 + 0.05 * t + 10 * np.sin(2 * np.pi * t / 52.18) + np.random.normal(0, 2, 520)
+
+model = TBATS(lags=[1, 52.18], h=52, holdout=True).fit(y)
+print(model.model_name)        # TBATS(lambda, {p,q}, phi, <52.18,k>)
+fc = model.predict(h=52, interval="prediction")
+print(fc.mean[:3])
+```
+
+See [docs/tbats.rst](https://github.com/openforecast-org/smooth/blob/master/python/docs/tbats.rst) for a tutorial on half-hourly data with daily and
+weekly seasonality, regressors and intermittent demand.
 
 ## Documentation
 

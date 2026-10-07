@@ -88,6 +88,33 @@ model = ES(model="ZXZ")
 model.fit(y)
 ```
 
+### TBATS
+
+`tbats()` in R and `TBATS` in Python implement TBATS (De Livera, Hyndman and Snyder, 2011) in ADAM's single source of error framework: an ETS level and trend, a trigonometric seasonality for each period, ARMA errors, all after a Box-Cox transform. The seasonal periods can be several and need not be integers (52.18 weeks in a year, 8766 hours), and the number of harmonics, the trend and the ARMA orders are selected automatically. R and Python fit the same model to the same data.
+
+```r
+library(smooth)
+
+# Ten years of weekly data with a yearly cycle of 52.18 weeks
+y <- ts(100 + 0.05*(1:520) + 10*sin(2*pi*(1:520)/52.18) + rnorm(520, 0, 2), frequency=52)
+model <- tbats(y, lags=c(1, 52.18), h=52, holdout=TRUE)
+model$model     # TBATS(lambda, {p,q}, phi, <52.18,k>)
+forecast(model, h=52, interval="prediction")
+```
+
+```python
+import numpy as np
+from smooth import TBATS
+
+t = np.arange(1, 521)
+y = 100 + 0.05 * t + 10 * np.sin(2 * np.pi * t / 52.18) + np.random.normal(0, 2, 520)
+model = TBATS(lags=[1, 52.18], h=52, holdout=True).fit(y)
+print(model.model_name)
+fc = model.predict(h=52, interval="prediction")
+```
+
+See the [TBATS vignette](https://github.com/openforecast-org/smooth/blob/master/vignettes/tbats.Rmd) for R and the [TBATS tutorial](https://github.com/openforecast-org/smooth/blob/master/python/docs/tbats.rst) for Python.
+
 ## Documentation
 
 Full documentation is available on the **[GitHub Wiki](https://github.com/openforecast-org/smooth/wiki)**, including:

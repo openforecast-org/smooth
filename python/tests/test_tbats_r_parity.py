@@ -528,3 +528,20 @@ def test_the_eigenvalue_moduli_are_those_of_r_to_the_bit():
         r = r_eval(f"sprintf('%a', eigenModuliCpp(matrix(c({values}), {n})))")
         python = np.ravel(eigen_moduli(np.asfortranarray(A)))
         assert [float.fromhex(v) for v in np.atleast_1d(r)] == list(python)
+
+
+@pytest.mark.parametrize("distribution", ["dlaplace", "ds", "dgnorm"])
+def test_the_log_likelihoods_are_those_of_r_to_the_bit(distribution):
+    # The surfaces are flat enough for the last bit of the likelihood to move the
+    # optimiser. greybox evaluates these log-densities identically in both languages
+    # from R's greybox 2.0.10 and Python's 1.0.9 on
+    from smooth.adam_general.core.tbats.structure import loglik_value
+
+    errors = np.random.default_rng(5).standard_t(3, 300) * 4
+    values = ",".join(repr(float(v)) for v in errors)
+    for shape in (0.37, 1.3719, 2.5, 7.3):
+        r = r_eval(
+            f"sprintf('%a', tbats_logLik(c({values}), '{distribution}', {shape}, 300))"
+        )
+        python = loglik_value(errors, distribution, shape)
+        assert float.fromhex(np.atleast_1d(r)[0]) == python

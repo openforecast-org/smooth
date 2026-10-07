@@ -227,13 +227,16 @@ def versions():
         "-e",
         f'cat(as.character(packageVersion("smooth", lib.loc="{R_LIB}")),'
         ' as.character(packageVersion("forecast")),'
-        ' paste(R.version$major, R.version$minor, sep="."))',
+        ' paste(R.version$major, R.version$minor, sep="."),'
+        ' as.character(packageVersion("greybox")))',
     ).split()
     python = sys.version.split()[0]
+    smooth = f"smooth {version('smooth')} (git {commit}), greybox {version('greybox')}"
     return {
-        "smooth": f"smooth {version('smooth')} (git {commit}), Python {python}",
-        "smooth-dnorm": f"smooth {version('smooth')} (git {commit}), Python {python}",
-        "smooth-R": f"smooth {r_version[0]} (git {commit}), R {r_version[2]}",
+        "smooth": f"{smooth}, Python {python}",
+        "smooth-dnorm": f"{smooth}, Python {python}",
+        "smooth-R": f"smooth {r_version[0]} (git {commit}), greybox {r_version[3]},"
+        f" R {r_version[2]}",
         "statsforecast": f"statsforecast {version('statsforecast')}, Python {python}",
         "forecast": f"forecast {r_version[1]}, R {r_version[2]}",
     }

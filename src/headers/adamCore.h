@@ -27,6 +27,8 @@ struct FitResult {
     arma::vec fitted;
     arma::vec errors;
     arma::mat profile;
+    // The profile the fit started from (the solved one of initial="gradient")
+    arma::mat profileInitial;
 };
 
 // Result structure for the general occurrence model fitter (two parallel models)
@@ -94,6 +96,10 @@ public:
     // Length of the zero-error head that headFillBwd() produces and that the final forward pass
     // filters over. 0 means "use lagsModelMax", i.e. the behaviour before this change.
     unsigned int headLength = 0;
+
+    // The transition of fit() and reapply() as a sparse product (SparseTransition), for the large and
+    // mostly zero matrices of tbats() and ssarima(). Set from R/Python; false otherwise.
+    bool sparseTransition = false;
 
 private:
     arma::uvec lags;
@@ -271,7 +277,8 @@ private:
                                      nComponents, constant);
             double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
-            vecResiduals(idx) = matrixYt(idx) - p;
+            // A missing observation does not enter the least squares
+            vecResiduals(idx) = std::isnan(matrixYt(idx)) ? 0 : matrixYt(idx) - p;
 
             profilesRecent(indexLookupTable.col(i)) =
                 adamFvalue(profilesRecent(indexLookupTable.col(i)),
@@ -331,8 +338,10 @@ private:
                                                      nComponents, nSeasonal) * sensCurrent;
             double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
-            vecResiduals(idx) = matrixYt(idx) - p;
-            jacobian.row(idx) = -dpdy * dyFit;
+            // A missing observation does not enter the least squares
+            bool const missing = std::isnan(matrixYt(idx));
+            vecResiduals(idx) = missing ? 0 : matrixYt(idx) - p;
+            jacobian.row(idx) = missing ? arma::rowvec(dyFit.n_elem, arma::fill::zeros) : arma::rowvec(-dpdy * dyFit);
             arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O) * dyFit;
 
             adamGvalueJac(vCurrent, matrixF, wRow, E, T, S,
@@ -401,8 +410,10 @@ private:
             arma::rowvec const dyFit = wRow * sensCurrent;   // linear: d(yhat) = w'S
             double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
-            vecResiduals(idx) = matrixYt(idx) - p;
-            jacobian.row(idx) = -dpdy * dyFit;
+            // A missing observation does not enter the least squares
+            bool const missing = std::isnan(matrixYt(idx));
+            vecResiduals(idx) = missing ? 0 : matrixYt(idx) - p;
+            jacobian.row(idx) = missing ? arma::rowvec(dyFit.n_elem, arma::fill::zeros) : arma::rowvec(-dpdy * dyFit);
             arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O) * dyFit;
 
             profilesRecent(cells) =
@@ -436,10 +447,9 @@ private:
         for (unsigned int j=1; j<=nIterations; j=j+1) {
             if(j == 1 || !useHeadFilter) {
                 // Refine the head so the initial level/trend land at position -H+1
-                // and walk forward across the head cycle. Skip when H=1 (nothing to fill).
-                if(H > 1) {
-                    headFillFwd();
-                }
+                // and walk forward across the head cycle. With H=1 this only writes
+                // the head column, which after a backcast holds the backcasted states.
+                headFillFwd();
             } else {
                 headForwardStep();
             }
@@ -550,11 +560,18 @@ private:
         else if(T_ == 'M') { states.row(1) = 1/states.row(1); }
     }
 
+    // Private helper: the constant (drift) of the time-reversed series. It is additive
+    // with an additive error and a ratio with a multiplicative one, so time reversal
+    // takes minus it in the first case and its inverse in the second, as for the trend
+    void flipDrift(double &drift) const {
+        drift = (E == 'M') ? 1/drift : -drift;
+    }
+
     // Private helper: undo the backward-pass flips of the slope states in recorded states
     void unflipSlopes(arma::mat &states) const {
         unflipTrend(states, T);
         if(constant && flipConstant) {
-            states.row(nComponents-1) = -states.row(nComponents-1);
+            states.row(nComponents-1).transform([this](double drift){ flipDrift(drift); return drift; });
         }
     }
 
@@ -752,6 +769,17 @@ public:
     // occurrence multiplier (1, fractional, or 0 for intermittent).
     // For occurrence models (O='d'/'o'/'i'): pass vectorOt as both vectorYt and vectorOt;
     // the raw state-space output is transformed to a probability post-loop.
+    // The transition of the forward and backward passes: the sparse product where
+    // SparseTransition took it, adamFvalue() otherwise
+    arma::vec transitionValue(SparseTransition const &sparseF, arma::vec const &v,
+                              arma::mat const &matrixF) const {
+        if(sparseF.use) {
+            return sparseF.matrixF * v;
+        }
+        return adamFvalue(v, matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                          nComponents, constant);
+    }
+
     FitResult fit(arma::mat matrixVt, arma::mat const &matrixWt,
                   arma::mat &matrixF, arma::vec const &vectorG,
                   arma::umat const &indexLookupTable, arma::mat profilesRecent,
@@ -764,6 +792,7 @@ public:
          * # lags is a vector of lags
          */
 
+        const arma::mat profileInitial = profilesRecent;
         int obs = vectorYt.n_rows;
         int lagsModelMax = max(lags);
         unsigned int H = (headLength == 0 ? lagsModelMax : headLength);
@@ -779,6 +808,8 @@ public:
         arma::vec vecYfit(obs, arma::fill::zeros);
         arma::vec vecErrors(obs, arma::fill::zeros);
         arma::vec backcasts(H, arma::fill::zeros);
+        // The transition of the forward and backward passes, sparse where requested
+        const SparseTransition sparseF(sparseTransition, matrixF, E, T, nETS, nArima, constant);
         // The head steps all measure with the same regressor row; hoist it out of the loops
         const arma::rowvec wHead = matrixWt.row(0);
 
@@ -789,16 +820,16 @@ public:
             vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                     matrixWt.row(idx), E, T, S,
                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-            // We need this multiplication for cases, when occurrence is fractional
-            if(vectorOt(idx) != 0) {
+            // We need this multiplication for cases, when occurrence is fractional (NaN
+            // marks a missing occurrence, which has no error)
+            if(vectorOt(idx) != 0 && !std::isnan(vectorOt(idx))) {
                 vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
             }
             // errorf() returns 0 when ot==0; dispatches to occurrenceError() when O!='n'
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
             /* # Transition equation */
             profilesRecent(indexLookupTable.col(i)) =
-                adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                           matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
                 adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorG, vecErrors(idx), vecYfit(idx), adamETS);
@@ -812,14 +843,13 @@ public:
             vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                     matrixWt.row(idx), E, T, S,
                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-            if(vectorOt(idx) != 0) {
+            if(vectorOt(idx) != 0 && !std::isnan(vectorOt(idx))) {
                 vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
             }
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
             /* # Transition equation */
             profilesRecent(indexLookupTable.col(i)) =
-                adamFvalue(profilesRecent(indexLookupTable.col(i)),
-                           matrixF, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
                 adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorG, vecErrors(idx), vecYfit(idx), adamETS);
@@ -848,7 +878,7 @@ public:
             if(T == 'A')      { profilesRecent(1) = -profilesRecent(1); }
             else if(T == 'M') { profilesRecent(1) = 1/profilesRecent(1); }
             if(constant && flipConstant) {
-                profilesRecent(nComponents-1) = -profilesRecent(nComponents-1);
+                flipDrift(profilesRecent(nComponents-1));
             }
         };
 
@@ -899,6 +929,7 @@ public:
         result.fitted = vecYfit;
         result.errors = vecErrors;
         result.profile = profilesRecent;
+        result.profileInitial = profileInitial;
         return result;
     }
 
@@ -1117,7 +1148,8 @@ public:
                 double aFit = (E=='A')  ? std::exp(fg.fittedA(idx)) : fg.fittedA(idx);
                 double bFit = (EB=='A') ? std::exp(fg.fittedB(idx)) : fg.fittedB(idx);
                 double p = aFit / (aFit + bFit);
-                res(idx) = vectorOt(idx) - p;
+                // A missing observation does not enter the least squares
+                res(idx) = std::isnan(vectorOt(idx)) ? 0 : vectorOt(idx) - p;
                 if(!std::isfinite(p) || p<=0 || p>=1){
                     return false;
                 }
@@ -1177,7 +1209,8 @@ public:
                 double bFit = (EB=='A') ? std::exp(fitB) : fitB;
                 double denom = aFit + bFit;
                 double p = aFit / denom;
-                res(idx) = vectorOt(idx) - p;
+                // A missing observation does not enter the least squares
+                res(idx) = std::isnan(vectorOt(idx)) ? 0 : vectorOt(idx) - p;
                 if(!std::isfinite(p) || p<=0 || p>=1){
                     return false;
                 }
@@ -1186,6 +1219,7 @@ public:
                 double dbB = (EB=='A') ? bFit : 1.0;
                 arma::rowvec dp = (bFit/(denom*denom)*daA) * dfitA
                                 - (aFit/(denom*denom)*dbB) * dfitB;
+                bool const missingObs = std::isnan(vectorOt(idx));
                 jac.row(idx) = -dp;
 
                 // occurrenceError('g'): u=(1+o-p)/2; errorA/errorB per side type.
@@ -1196,6 +1230,14 @@ public:
                 double dEBdu = (EB=='A') ? -1.0/(u*(1-u)) : -1.0/(u*u);
                 arma::rowvec dEA = (dEAdu * -0.5) * dp;
                 arma::rowvec dEB = (dEBdu * -0.5) * dp;
+                // A missing observation: no error, no residual, the states move only
+                if(missingObs){
+                    jac.row(idx).zeros();
+                    eA = 0;
+                    eB = 0;
+                    dEA.zeros();
+                    dEB.zeros();
+                }
 
                 profA(cA) = adamFvalue(vA, matrixFA, E, T, S, nETS, nNonSeasonal,
                                        nSeasonal, nArima, nComponents, constant) +
@@ -1398,37 +1440,26 @@ public:
                         arma::mat matrixF,
                         arma::umat const &indexLookupTable, arma::mat profilesRecent,
                         unsigned int const &horizon, arma::vec vectorYt) {
-        unsigned int obs = vectorYt.n_rows;
         unsigned int lagsModelMax = max(lags);
-        // This is needed for cases, when hor>obs
-        unsigned int hh = 0;
-        arma::mat matErrors(horizon, obs, arma::fill::zeros);
+        // The windows with all their targets in the sample
+        int nWindows = std::max((int)vectorYt.n_rows - (int)horizon + 1, 0);
+        arma::mat matErrors(horizon, nWindows, arma::fill::zeros);
 
         // Fill in the head, similar to how it's done in the fitter
         for (unsigned int i=0; i<lagsModelMax; i=i+1) {
             profilesRecent(indexLookupTable.col(i)) = matrixVt.col(i);
         }
 
-        for(unsigned int i = 0; i < (obs-horizon); i=i+1){
-            hh = std::min(horizon, obs-i);
-            // Update the profile to get the recent value from the state matrix
-            // lagsModelMax moves the thing to the next obs. This way, we have the structure
-            // similar to the fitter
-            profilesRecent(indexLookupTable.col(i+lagsModelMax)) = matrixVt.col(i+lagsModelMax);
-            // This needs to take probability of occurrence into account in order to deal with intermittent models
-            // The problem is that the probability needs to be a matrix, i.e. to reflect multistep from each point
-            matErrors.submat(0, i, hh-1, i) =
-                errorvf(vectorYt.rows(i, i+hh-1),
-                        forecast(matrixWt.rows(i,i+hh-1), matrixF,
-                                 indexLookupTable.cols(i+lagsModelMax,i+lagsModelMax+hh-1), profilesRecent,
-                                 hh).forecast,
-                                 // vectorPt.rows(i, i+hh-1),
-                                 E);
-        }
-
-        // Cut-off the redundant last part
-        if(obs>horizon){
-            matErrors = matErrors.cols(0,obs-horizon-1);
+        // Row i forecasts the targets i..i+h-1 from the states after the observation
+        // i-1 (the head for i=0), which the fitter stored in the column i+lagsModelMax-1
+        for(int i = 0; i < nWindows; i=i+1){
+            profilesRecent(indexLookupTable.col(i+lagsModelMax-1)) = matrixVt.col(i+lagsModelMax-1);
+            matErrors.col(i) =
+                errorvf(vectorYt.rows(i, i+horizon-1),
+                        forecast(matrixWt.rows(i, i+horizon-1), matrixF,
+                                 indexLookupTable.cols(i+lagsModelMax, i+lagsModelMax+horizon-1),
+                                 profilesRecent, horizon).forecast,
+                        E);
         }
 
         ErrorResult result;
@@ -1537,6 +1568,9 @@ public:
         arma::vec vecErrors(obs, arma::fill::zeros);
 
         for(unsigned int k=0; k<nSeries; k=k+1){
+            // The data of each series, when they differ (the Box-Cox transforms of tbats)
+            arma::vec const vectorYt = matrixYt.col(matrixYt.n_cols==nSeries ? k : 0);
+            const SparseTransition sparseF(sparseTransition, arrayF.slice(k), E, T, nETS, nArima, constant);
             // Loop for the backcasting
             arma::vec backcasts(H, arma::fill::zeros);
             // The head states as the backward pass leaves them, from time -H+1 to 0
@@ -1553,20 +1587,20 @@ public:
                 else if(j == 1 || !useHeadFilter) {
                     // Refine the head via the shared helper so it is walked one step
                     // per column across the head cycle (or copied verbatim when T=='N').
-                    if(H > 1) {
-                        // Bind slice views so refineHeadFwd can mutate them via references.
-                        arma::mat sliceVt = arrayVt.slice(k);
-                        arma::mat sliceProfile = arrayProfilesRecent.slice(k);
-                        arma::mat sliceF = arrayF.slice(k);
-                        // Note: reapply's original branch used the full profile column,
-                        // not just the trend rows, so we call refineHeadFwd once here to
-                        // match — the helper writes the trend-walked value into the
-                        // level+trend rows and preserves the seasonal via the profile.
-                        refineHeadFwd(sliceVt, sliceProfile, sliceF,
-                                      indexLookupTable, lagsModelMax, H);
-                        arrayVt.slice(k) = sliceVt;
-                        arrayProfilesRecent.slice(k) = sliceProfile;
-                    }
+                    // As in fit(), this also writes the initial states of a head of one
+                    // column, which otherwise kept those of the original model.
+                    // Bind slice views so refineHeadFwd can mutate them via references.
+                    arma::mat sliceVt = arrayVt.slice(k);
+                    arma::mat sliceProfile = arrayProfilesRecent.slice(k);
+                    arma::mat sliceF = arrayF.slice(k);
+                    // Note: reapply's original branch used the full profile column,
+                    // not just the trend rows, so we call refineHeadFwd once here to
+                    // match — the helper writes the trend-walked value into the
+                    // level+trend rows and preserves the seasonal via the profile.
+                    refineHeadFwd(sliceVt, sliceProfile, sliceF,
+                                  indexLookupTable, lagsModelMax, H);
+                    arrayVt.slice(k) = sliceVt;
+                    arrayProfilesRecent.slice(k) = sliceProfile;
                 } else {
                     for(unsigned int i=0; i<H; i=i+1) {
                         // Gather the profile cells for this head step once and reuse them
@@ -1601,13 +1635,13 @@ public:
                         matYfit(i-H,k) = matrixOt(i-H) * matYfit(i-H,k);
                     }
                     // errorf() returns 0 immediately when ot==0
-                    vecErrors(i-H) = errorf(matrixYt(i-H), matYfit(i-H,k), E,
+                    vecErrors(i-H) = errorf(vectorYt(i-H), matYfit(i-H,k), E,
                                                        matrixOt(i-H));
 
                     /* # Transition equation */
                     arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                    adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
-                               arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                    transitionValue(sparseF, arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
+                                    arrayF.slice(k)) +
                                    adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                                               arrayF.slice(k), arrayWt.slice(k).row(i-H), E, T, S,
                                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
@@ -1633,8 +1667,7 @@ public:
                     // The constant (drift) flips sign when the total order of
                     // differencing is odd — ARIMA analog of the trend reversal
                     if(constant && flipConstant){
-                        arrayProfilesRecent.slice(k)(nComponents-1) =
-                            -arrayProfilesRecent.slice(k)(nComponents-1);
+                        flipDrift(arrayProfilesRecent.slice(k)(nComponents-1));
                     }
 
                     for(int i=obs+H-1; i>=(int)H; i=i-1) {
@@ -1651,13 +1684,13 @@ public:
                         if(matrixOt(i-H)!=0){
                             matYfit(i-H,k) = matrixOt(i-H) * matYfit(i-H,k);
                         }
-                        vecErrors(i-H) = errorf(matrixYt(i-H), matYfit(i-H,k), E,
+                        vecErrors(i-H) = errorf(vectorYt(i-H), matYfit(i-H,k), E,
                                                            matrixOt(i-H));
 
                         /* # Transition equation */
                         arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)) =
-                        adamFvalue(arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
-                                   arrayF.slice(k), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
+                        transitionValue(sparseF, arrayProfilesRecent.slice(k)(indexLookupTable.col(i)),
+                                        arrayF.slice(k)) +
                                        adamGvalue(arrayProfilesRecent.slice(k).elem(indexLookupTable.col(i)),
                                                   arrayF.slice(k), arrayWt.slice(k).row(i-H), E, T, S,
                                                   nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
@@ -1682,8 +1715,7 @@ public:
                     }
                     // Restore the constant sign after the backward pass
                     if(constant && flipConstant){
-                        arrayProfilesRecent.slice(k)(nComponents-1) =
-                            -arrayProfilesRecent.slice(k)(nComponents-1);
+                        flipDrift(arrayProfilesRecent.slice(k)(nComponents-1));
                     }
                 }
             }
@@ -1761,7 +1793,7 @@ public:
                 }
             }
             bool const multistep = gradientLossMultistep(L);
-            int const nOrigins = multistep ? (obs - hor) : 0;
+            int const nOrigins = multistep ? (obs - hor + 1) : 0;
             arma::mat msDesign(multistep ? nOrigins*hor : 0, nFree);
             arma::vec msResiduals(multistep ? nOrigins*hor : 0);
 
@@ -1810,19 +1842,11 @@ public:
                 // i.e. minus the residual sensitivity.
                 design.row(idx) = -dError;
 
-                prof(cells) = adamFvalue(prof(cells), matrixF, E, T, S,
-                                         nETS, nNonSeasonal, nSeasonal, nArima,
-                                         nComponents, constant) +
-                              adamGvalue(prof(cells), matrixF, matrixWt.row(idx),
-                                         E, T, S, nETS, nNonSeasonal, nSeasonal,
-                                         nArima, nXreg, nComponents, constant,
-                                         vectorG, residuals(idx), yFit, adamETS);
-                sens.rows(cells) = matrixF * sens.rows(cells) + vectorG * dError;
-
                 // Multistep losses: replicate the ferrors() recursion from the
-                // just-updated buffers -- h no-update forecast steps from every
-                // origin, with the sensitivities following through F. Like
-                // ferrors(), the multistep errors ignore the occurrence.
+                // buffers before the update with the observation idx -- h no-update
+                // forecast steps of the targets idx..idx+h-1, with the sensitivities
+                // following through F. Like ferrors(), the multistep errors ignore
+                // the occurrence.
                 if(multistep && idx < nOrigins){
                     arma::mat profStep = prof;
                     arma::mat sensStep = sens;
@@ -1842,6 +1866,15 @@ public:
                         sensStep.rows(cellsStep) = matrixF * sensStep.rows(cellsStep);
                     }
                 }
+
+                prof(cells) = adamFvalue(prof(cells), matrixF, E, T, S,
+                                         nETS, nNonSeasonal, nSeasonal, nArima,
+                                         nComponents, constant) +
+                              adamGvalue(prof(cells), matrixF, matrixWt.row(idx),
+                                         E, T, S, nETS, nNonSeasonal, nSeasonal,
+                                         nArima, nXreg, nComponents, constant,
+                                         vectorG, residuals(idx), yFit, adamETS);
+                sens.rows(cells) = matrixF * sens.rows(cells) + vectorG * dError;
             }
 
             if(!residuals.is_finite() || !design.is_finite()){
@@ -2096,7 +2129,7 @@ public:
     ReforecastResult reforecast(arma::cube const &arrayErrors, arma::cube const &arrayOt,
                                 arma::cube const &arrayWt,
                                 arma::cube const &arrayF, arma::mat const &matrixG,
-                                arma::umat const &indexLookupTable, arma::cube arrayProfileRecent,
+                                arma::umat const &indexLookupTable, arma::cube const &arrayProfileRecent,
                                 char const &E){
 
         unsigned int obs = arrayErrors.n_rows;
@@ -2111,14 +2144,16 @@ public:
 
         for(unsigned int j=0; j<nsim; j=j+1){
             for(unsigned int k=0; k<nSeries; k=k+1){
+                // Every path starts from the profile at the end of the sample
+                arma::mat profile = arrayProfileRecent.slice(j);
                 for(unsigned int i=lagsModelMax; i<obs+lagsModelMax; i=i+1) {
                     /* # Measurement equation and the error term */
-                    yFitted = adamWvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                    yFitted = adamWvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                          arrayWt.slice(j).row(i-lagsModelMax), E, T, S,
                                          nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
 
                     arrY(i-lagsModelMax,k,j) = arrayOt(i-lagsModelMax,k,j) *
-                        (yFitted + adamRvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                        (yFitted + adamRvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                               arrayWt.slice(j).row(i-lagsModelMax), E, T, S,
                                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant) *
                                                   arrayErrors.slice(j)(i-lagsModelMax,k));
@@ -2129,13 +2164,13 @@ public:
                     }
 
                     /* # Transition equation */
-                    arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)) =
-                    (adamFvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                    profile.elem(indexLookupTable.col(i-lagsModelMax)) =
+                    (adamFvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                 arrayF.slice(j), E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nComponents, constant) +
-                                    adamGvalue(arrayProfileRecent.slice(j).elem(indexLookupTable.col(i-lagsModelMax)),
+                                    adamGvalue(profile.elem(indexLookupTable.col(i-lagsModelMax)),
                                                arrayF.slice(j), arrayWt.slice(j).row(i-lagsModelMax),
                                                E, T, S, nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
-                                               nComponents, constant, matrixG.col(k),
+                                               nComponents, constant, matrixG.col(j),
                                                arrayErrors.slice(j)(i-lagsModelMax,k), yFitted, adamETS));
                 }
             }

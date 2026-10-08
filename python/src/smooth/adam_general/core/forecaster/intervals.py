@@ -7,7 +7,12 @@ from smooth.adam_general.core.utils.distributions import (
     generate_errors,
     normalize_errors,
 )
-from smooth.adam_general.core.utils.utils import _sum_r, scale_debias, scale_variance
+from smooth.adam_general.core.utils.utils import (
+    _sum_r,
+    observed_mask,
+    scale_debias,
+    scale_variance,
+)
 from smooth.adam_general.core.utils.var_covar import (
     covar_anal,
     var_anal,
@@ -48,7 +53,16 @@ def ensure_level_format(level, side):
         level_low = 1 - level
         level_up = np.ones_like(level)
 
-    return np.round(level_low, 5), np.round(level_up, 5)
+    # Exact, as R: only the names of the columns are rounded
+    return level_low, level_up
+
+
+def _obs_observed(observations_dict):
+    """The observed in-sample values, which the scale is divided by: the missing
+    ones are not (R: ``adam_nobsObserved``)."""
+    missing = observations_dict.get("y_na_values")
+    n_missing = 0 if missing is None else int(np.sum(missing))
+    return observations_dict["obs_in_sample"] - n_missing
 
 
 def _df_scale(general, observations_dict, params_info):
@@ -82,7 +96,7 @@ def _scale_model_variance(general, observations_dict, params_info):
 
     sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
     variance = scale_variance(sf, general["distribution"], general.get("other"))
-    obs = observations_dict["obs_in_sample"]
+    obs = _obs_observed(observations_dict)
     return variance * obs / _df_scale(general, observations_dict, params_info)
 
 
@@ -112,7 +126,7 @@ def generate_prediction_interval(
         scale_variance(
             prepared_model["scale"], general["distribution"], general.get("other")
         )
-        * observations_dict["obs_in_sample"]
+        * _obs_observed(observations_dict)
         / _df_scale(general, observations_dict, params_info)
     )
     s2_forecast = _scale_model_variance(general, observations_dict, params_info)
@@ -411,6 +425,8 @@ def generate_simulation_interval(
     """
     h = general_dict["h"]
     lags_model_max = lags_dict["lags_model_max"]
+    # The errors and the occurrence draws, reproducible with a seed
+    rng = np.random.default_rng(general_dict.get("seed"))
 
     # Get number of components
     n_components = (
@@ -429,7 +445,7 @@ def generate_simulation_interval(
         arr_vt[:, :lags_model_max, i] = mat_vt[:, :lags_model_max]
 
     # 2. The scale, or the scale model's forecasts, de-biased in the variance space
-    obs_in_sample = observations_dict["obs_in_sample"]
+    obs_in_sample = _obs_observed(observations_dict)
     df = _df_scale(general_dict, observations_dict, params_info)
     scale_forecast = general_dict.get("scale_forecast")
     if scale_forecast is None:
@@ -467,6 +483,7 @@ def generate_simulation_interval(
             n_param=obs_in_sample - df,
             shape=other_params.get("shape"),
             alpha=other_params.get("alpha"),
+            random_state=rng,
         )
         mat_errors = errors_flat.reshape((h, nsim), order="F")
 
@@ -507,7 +524,6 @@ def generate_simulation_interval(
 
     # Occurrence matrix: Bernoulli draws when occurrence model is active
     if p_forecast is not None:
-        rng = np.random.default_rng()
         mat_ot = rng.binomial(
             1, np.asarray(p_forecast, dtype=float).reshape(-1, 1), (h, nsim)
         ).astype(float)
@@ -679,7 +695,7 @@ def generate_multistep_interval(
 ):
     """Generate semiparametric, empirical, or nonparametric prediction intervals.
 
-    All three interval types use the ``(T - h) × h`` multistep in-sample
+    All three interval types use the ``(T - h + 1) × h`` multistep in-sample
     error matrix produced by ``ferrors``.
 
     Returns
@@ -706,19 +722,26 @@ def generate_multistep_interval(
             mat_wt,
             mat_f,
         )
-        n = obs - h
     else:
-        adam_errors = np.asarray(prepared_model["residuals"], dtype=float).reshape(
-            -1, 1
-        )
-        n = obs
+        # A copy: under pandas' copy-on-write the array of the residuals is read-only
+        adam_errors = np.array(prepared_model["residuals"], dtype=float).reshape(-1, 1)
+        # No residual at the missing values
+        adam_errors[~observed_mask(observations_dict)] = np.nan
 
-    if h > 1 and distribution in _LOG_DISTS and e_type == "A":
+    # The errors relative to the fitted values for the ratio distributions with an
+    # additive error, at h=1 as for the multistep ones
+    if distribution in _LOG_DISTS and e_type == "A":
         y_fitted = np.asarray(prepared_model["y_fitted"], dtype=float)
-        fitted_matrix = np.column_stack(
-            [y_fitted[i : obs - h + i] for i in range(1, h + 1)]
-        )
+        if h > 1:
+            fitted_matrix = np.column_stack(
+                [y_fitted[i - 1 : obs - h + i] for i in range(1, h + 1)]
+            )
+        else:
+            fitted_matrix = y_fitted.reshape(-1, 1)
         adam_errors = adam_errors / fitted_matrix
+    # The windows with all their targets observed
+    adam_errors = adam_errors[~np.any(np.isnan(adam_errors), axis=1)]
+    n = len(adam_errors)
 
     if interval_type == "semiparametric":
         if cumulative:
@@ -762,12 +785,12 @@ def generate_multistep_interval(
         )
 
     pred_col = yf.reshape(-1, 1)
-    if e_type == "M":
+    # The errors relative to the forecast: those of a multiplicative error, and of
+    # the ratio distributions with an additive one (R: the forecast plus the
+    # quantile times the forecast)
+    if e_type == "M" or distribution in _LOG_DISTS:
         y_lower = pred_col * (1.0 + y_lower)
         y_upper = pred_col * (1.0 + y_upper)
-    elif distribution in _LOG_DISTS:
-        y_lower = pred_col * y_lower
-        y_upper = pred_col * y_upper
     else:
         y_lower = pred_col + y_lower
         y_upper = pred_col + y_upper

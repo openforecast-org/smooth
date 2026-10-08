@@ -54,7 +54,7 @@ test_that("forecast(oes_obj) dispatches via forecast.om and matches forecast.ada
     expect_s3_class(fc, "adam.forecast")
     expect_equal(names(fc),
                  c("mean","lower","upper","model","level","interval",
-                   "side","cumulative","h","scenarios"))
+                   "side","cumulative","h","scenarios","point"))
     expect_equal(fc$interval, "none")
     expect_equal(fc$level, 0.95)
 })

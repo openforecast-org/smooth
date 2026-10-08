@@ -560,6 +560,9 @@ test_that("ARIMA starting values with missing and intermittent data", {
     set.seed(44)
     y <- ts(rpois(120, 0.7) * (1 + rnorm(120)^2))
     expect_true(all(is.finite(adam(y, "MNN", orders=list(ar=1), occurrence="odds-ratio", maxeval=1)$B)))
+    # ETS with ARIMA and no differencing: the series is a ts without regressors
+    expect_true(all(is.finite(adam(AirPassengers, "ANA", orders=list(ar=c(1,1), ma=c(1,1)),
+                                   lags=c(1,12), initial="optimal", maxeval=1)$B)))
 })
 
 test_that("ARIMA with constant starts from the intercept consistent with AR", {
@@ -813,3 +816,242 @@ test_that("Pure regression is forecasted and predicted by forecast.alm() / predi
         }
     }
 })
+
+# Every path of a draw starts from the profile and uses the persistence of that draw
+test_that("reforecast keeps the paths of a draw on its own profile and persistence", {
+    fit <- adam(BJsales, "ANN");
+    h <- 3;
+    paths <- fit$adamCpp$reforecast(array(1, c(h, 2, 2)), array(1, c(h, 2, 2)), array(1, c(h, 1, 2)),
+                                     array(1, c(1, 1, 2)), matrix(c(0, 1), 1, 2),
+                                     matrix(0L, 1, h), array(200, c(1, 1, 2)), "A")$data;
+    expect_equal(paths[,,1], matrix(201, h, 2));
+    expect_equal(paths[,,2], matrix(201:203, h, 2));
+});
+
+# Without newdata, each regressor is forecast by adam() into its own column
+test_that("the regressors forecast without newdata land in their own columns", {
+    set.seed(41);
+    x1 <- rnorm(120, 10, 2);
+    x2 <- 50+cumsum(rnorm(120));
+    data <- cbind(y=100+3*x1+cumsum(rnorm(120)), x1=x1, x2=x2);
+    fit <- adam(data, "ANN", formula=y~x1+x2);
+    forecasted <- suppressWarnings(forecast(fit, h=5));
+    x1Forecast <- adam(data[,"x1"], h=5, silent=TRUE)$forecast;
+    x2Forecast <- adam(data[,"x2"], h=5, silent=TRUE)$forecast;
+    expect_equal(as.numeric(forecasted$mean),
+                 as.numeric(fit$states[nrow(fit$states),"level"] + fit$initial$xreg[["x1"]]*x1Forecast +
+                                fit$initial$xreg[["x2"]]*x2Forecast), tolerance=1e-10);
+});
+
+test_that("a named B is matched by name, not by position", {
+    testModel <- adam(BJsales, "AAN", distribution="dgnorm");
+    refit <- adam(BJsales, "AAN", distribution="dgnorm", B=rev(testModel$B), maxeval=1);
+    expect_equal(refit$B, testModel$B);
+});
+
+test_that("the models of a combination count their regressors once", {
+    xregData <- cbind(y=BJsales, x=BJsales.lead);
+    combined <- adam(xregData, "CXN");
+    expect_match(combined$model, "^ETSX");
+    expect_equal(nparam(combined$models$ANN), nparam(adam(xregData, "ANN")));
+});
+
+test_that("the point forecast is the skeleton, the mean or the median", {
+    testModel <- adam(BJsales, "ANN");
+    skeleton <- forecast(testModel, h=12)$mean;
+    expect_equal(forecast(testModel, h=12, point="mean")$mean, skeleton);
+    expect_equal(forecast(testModel, h=12, point="median")$mean, skeleton);
+    # A multiplicative error on additive components: the skeleton is the mean, and
+    # the median is lower, the distribution being skewed to the right
+    testModel <- adam(BJsales, "MNN");
+    skeleton <- forecast(testModel, h=12)$mean;
+    expect_equal(forecast(testModel, h=12, point="mean")$mean, skeleton);
+    expect_true(all(forecast(testModel, h=12, point="median")$mean < skeleton));
+    # A multiplicative trend: the mean is the skeleton at the first step only
+    testModel <- adam(BJsales, "MMdN");
+    set.seed(41);
+    forecasted <- forecast(testModel, h=12, point="mean")$mean;
+    skeleton <- forecast(testModel, h=12)$mean;
+    expect_equal(forecasted[1], skeleton[1]);
+    expect_equal(as.numeric(forecasted), as.numeric(skeleton), tolerance=1e-3);
+    # The median of an intermittent demand with a probability below 0.5 is zero
+    set.seed(3);
+    yIntermittent <- rpois(120, 0.6)*rep(c(5,1),60);
+    testModel <- adam(yIntermittent, "MNN", occurrence="odds-ratio");
+    set.seed(41);
+    expect_true(all(forecast(testModel, h=6, point="median")$mean==0));
+    expect_equal(forecast(testModel, h=6, point="mean")$mean, forecast(testModel, h=6)$mean);
+    expect_error(forecast(testModel, h=6, point="mode"));
+});
+
+test_that("reforecast() totals each path for the cumulative forecasts", {
+    testModel <- adam(BJsales, "AAN");
+    set.seed(41);
+    forecasted <- reforecast(testModel, h=5, cumulative=TRUE, nsim=50);
+    expect_equal(as.numeric(forecasted$mean), sum(forecast(testModel, h=5)$mean));
+    expect_true(forecasted$lower < forecasted$mean && forecasted$mean < forecasted$upper);
+    set.seed(41);
+    expect_equal(as.numeric(reforecast(testModel, h=5, cumulative=TRUE, nsim=50, point="mean")$mean),
+                 sum(forecast(testModel, h=5)$mean), tolerance=1e-2);
+});
+
+test_that("adam keeps the missing values apart from the zeros of the occurrence", {
+    set.seed(3)
+    y <- rbinom(200, 1, 0.4) * exp(rnorm(200, 2, 0.3))
+    y[c(10:20, 100)] <- NA
+    for(distribution in c("dgamma", "dinvgauss", "dnorm")){
+        testModel <- suppressWarnings(adam(y, "MNN", occurrence="odds-ratio",
+                                           distribution=distribution))
+        expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
+        expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)))
+    }
+    # Without the occurrence, the missing values are skipped in the same way
+    testModel <- suppressWarnings(adam(y + 1, "ANN"))
+    expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel), na.rm=TRUE))
+})
+
+test_that("adam warns when more than half of the data is missing", {
+    y <- rnorm(100, 100, 10)
+    y[1:60] <- NA
+    expect_warning(adam(y, "ANN"), "More than half of the in-sample data is missing")
+})
+
+test_that("adam uses the filled values only for the initialisation", {
+    y <- AirPassengers
+    y[c(10, 50, 51, 90, 140)] <- NA
+    testModel <- suppressWarnings(adam(y, "MAM", h=12, holdout=TRUE))
+    # Missing values alone are not an occurrence model
+    expect_equal(modelName(testModel), "ETS(MAM)")
+    expect_true(all(is.finite(fitted(testModel))))
+    expect_equal(AICc(testModel), AICc(logLik(testModel)))
+    # The holdout keeps its gap, and the accuracy is on its observed values
+    expect_true(is.na(testModel$holdout[8, 1]))
+    expect_equal(testModel$accuracy[["ME"]],
+                 mean(as.numeric(testModel$holdout[-8, 1]) - as.numeric(testModel$forecast)[-8]))
+    # The holdout does not enter the fill of the in-sample gaps
+    yChanged <- y
+    yChanged[144] <- 10000
+    expect_equal(coef(suppressWarnings(adam(yChanged, "MAM", h=12, holdout=TRUE))), coef(testModel))
+    # The multistep loss is over the windows with all their targets observed
+    expect_true(is.finite(suppressWarnings(adam(y, "ANN", loss="TMSE", h=6))$lossValue))
+    expect_true(all(is.finite(forecast(testModel, h=6, interval="semiparametric")$upper)))
+    expect_false(all(is.na(rstudent(testModel))))
+})
+
+test_that("A regression with missing values keeps its rows aligned", {
+    set.seed(1)
+    xreg <- data.frame(y=as.numeric(AirPassengers), x1=rnorm(144), x2=as.numeric(AirPassengers)/10+rnorm(144))
+    xreg$y[c(10, 50, 51)] <- NA
+    testModel <- suppressWarnings(adam(xreg, "NNN", h=6, holdout=TRUE))
+    reference <- adam(xreg[-c(10, 50, 51),], "NNN", h=6, holdout=TRUE)
+    expect_equal(coef(testModel), coef(reference))
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(reference)))
+    expect_true(is.na(residuals(testModel)[10]))
+    expect_true(is.finite(fitted(testModel)[10]))
+})
+
+test_that("rstudent of dgamma leaves its own observation out with an occurrence model", {
+    set.seed(3)
+    y <- rbinom(200, 1, 0.4) * exp(rnorm(200, 2, 0.3))
+    testModel <- adam(y, "MNN", occurrence="odds-ratio")
+    errors <- residuals(testModel)
+    used <- which(y!=0)
+    i <- used[5]
+    expect_equal(as.numeric(rstudent(testModel)[i]), as.numeric(errors[i] / mean(errors[used[used!=i]])))
+})
+
+test_that("The empirical interval at h=1 takes the errors, as the multistep ones", {
+    testModel <- adam(AirPassengers, "MAM", h=12, holdout=TRUE)
+    errors <- as.vector(testModel$residuals)
+    expect_equal(as.numeric(forecast(testModel, h=1, interval="empirical")$upper),
+                 as.numeric(testModel$forecast[1]) * (1 + quantile(errors, 0.975, type=7)),
+                 check.attributes=FALSE)
+})
+
+test_that("The smoothing parameters of the regressors with a provided alpha", {
+    set.seed(41)
+    x <- rnorm(120, 0, 1)
+    xregData <- data.frame(y=100*exp(0.002*(1:120) + 0.1*x + rnorm(120, 0, 0.02)), x=x)
+    testModel <- adam(xregData, "ANN", persistence=list(alpha=0.3), regressors="adapt")
+    expect_equal(testModel$persistence[["alpha"]], 0.3)
+    expect_equal(testModel$persistence[["delta1"]], testModel$B[["delta1"]])
+    # The usual bounds of delta hold with one regressor too
+    expect_true(testModel$B[["delta1"]]>=0 && testModel$B[["delta1"]]<=1)
+})
+
+test_that("The draws of reapply() start the states of the regressors", {
+    set.seed(41)
+    x <- rnorm(120, 10, 2)
+    xregData <- data.frame(y=100 + 0.5*(1:120) + 10*sin(2*pi*(1:120)/12) + 3*x + rnorm(120), x=x)
+    for(model in c("AAN","AAA")){
+        for(initial in c("backcasting","optimal")){
+            testModel <- adam(xregData, model, lags=c(1,12), initial=initial)
+            refitted <- reapply(testModel, nsim=5)
+            expect_equal(refitted$states["x",1,], refitted$randomParameters[,"x"], check.attributes=FALSE)
+        }
+    }
+})
+
+test_that("The constant is a ratio with a multiplicative error and regressors", {
+    set.seed(41)
+    x <- rnorm(120, 0, 1)
+    xregData <- data.frame(y=100*exp(0.002*(1:120) + 0.1*x + rnorm(120, 0, 0.02)), x=x)
+    testModel <- adam(xregData, "MNN", constant=TRUE, initial="optimal")
+    expect_equal(as.numeric(fitted(testModel)[2]),
+                 as.numeric(testModel$states[2,"level"] * testModel$B[["drift"]] *
+                                exp(testModel$B[["x"]] * x[2])))
+})
+
+test_that("ets='adam' changes nothing without ETS components", {
+    for(orders in list(list(ar=1,i=1,ma=1), list(ar=1,i=1,ma=0))){
+        testModel <- adam(BJsales, "NNN", orders=orders, ets="conventional")
+        testModelADAM <- adam(BJsales, "NNN", orders=orders, ets="adam")
+        expect_equal(as.numeric(logLik(testModelADAM)), as.numeric(logLik(testModel)))
+        expect_equal(testModelADAM$B, testModel$B)
+    }
+})
+
+test_that("sm() and pls() take the missing values for gaps", {
+    y <- AirPassengers;
+    y[c(10, 50, 51, 90)] <- NA;
+    testModel <- suppressWarnings(adam(y, "MAM", h=12, holdout=TRUE));
+    # The gaps of the location model are not an occurrence of the scale
+    scaleModel <- suppressWarnings(sm(testModel));
+    expect_false(grepl("iETS", scaleModel$model));
+    expect_equal(attr(logLik(scaleModel), "nobs"), sum(!is.na(y[1:132])));
+    # pls() over the holdout of any length, and the observed values of it only
+    holdout <- as.vector(testModel$holdout);
+    holdout[c(3, 5)] <- NA;
+    covarMat <- multicov(testModel, h=12)[-c(3, 5), -c(3, 5)];
+    errors <- log(holdout[-c(3, 5)]) - log(as.vector(testModel$forecast)[-c(3, 5)]);
+    expect_equal(pls(testModel, holdout=holdout),
+                 -as.vector(log(2*pi*det(covarMat))/2 + t(errors) %*% solve(covarMat) %*% errors/2) -
+                     sum(log(holdout[-c(3, 5)])));
+})
+
+test_that("The point likelihoods of sm() sum to its log-likelihood", {
+    set.seed(41);
+    yIntermittent <- rbinom(200, 1, 0.6) * exp(rnorm(200, 2, 0.3));
+    for(testModel in list(adam(AirPassengers, "MAM"), adam(AirPassengers, "ANN", distribution="dlaplace"),
+                          adam(yIntermittent, "MNN", occurrence="odds-ratio"))){
+        scaleModel <- sm(testModel);
+        expect_equal(sum(pointLik(scaleModel)), as.numeric(logLik(scaleModel)));
+    }
+})
+
+test_that("The multistep errors start from the states before their targets", {
+    # Row i forecasts the targets i..i+h-1, so the first column is the residuals,
+    # and MSEh with h=1 is the MSE
+    for(model in list(adam(AirPassengers, "ANN"), adam(AirPassengers, "AAA", lags=12),
+                      adam(AirPassengers, "NNN", orders=list(ar=2, i=1)))){
+        errors <- rmultistep(model, h=3);
+        expect_equal(nrow(errors), nobs(model)-2);
+        expect_equal(as.numeric(errors[,1]), as.numeric(residuals(model))[1:nrow(errors)],
+                     tolerance=1e-8);
+    }
+    fitMSE <- adam(BJsales, "ANN", persistence=0.3, initial="optimal", loss="MSE");
+    fitMSEh <- adam(BJsales, "ANN", persistence=0.3, initial="optimal", loss="MSEh", h=1,
+                    B=fitMSE$B, maxeval=1);
+    expect_equal(fitMSEh$lossValue, fitMSE$lossValue, tolerance=1e-10);
+});

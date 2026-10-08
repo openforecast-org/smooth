@@ -257,3 +257,17 @@ class TestNoIntervalOccurrence:
         assert fc.upper is None
         assert fc.mean.shape == (5,)
         assert np.all(fc.mean.values >= -1e-10)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize("occurrence", ["auto", "general", "odds-ratio", "direct"])
+def test_the_name_has_the_type_of_the_fitted_occurrence(occurrence):
+    """As R: the type of the model "auto" selected, not "auto"."""
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        "{ set.seed(3); y <- rbinom(200,1,0.4)*exp(rnorm(200,2,0.3));"
+        f" list(y=y, name=modelName(adam(y, 'MNN', occurrence='{occurrence}'))) }}"
+    )
+    fit = ADAM(model="MNN", occurrence=occurrence).fit(np.asarray(r["y"], dtype=float))
+    assert fit.model_name == r["name"][0]

@@ -11,7 +11,8 @@ Supported ``occurrence`` values:
   handled by :class:`OM` itself (Stage 1).
 * ``"general"`` — :class:`OM`'s ``__new__`` transparently returns an
   :class:`OMG` instance (Stage 2).
-* ``"auto"`` — raises :class:`NotImplementedError`; coming in Stage 4.
+* ``"auto"``, the default, as R's ``om()`` — :class:`OM`'s ``__new__`` returns an
+  :class:`AutoOM`, whose ``fit()`` returns the model of the selected type.
 
 Design: ``OM(ADAM)`` reuses ADAM's architector → creator → forecaster
 machinery. It overrides exactly the surfaces that differ between regular ADAM
@@ -45,7 +46,11 @@ from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.om_cost import om_cf, om_link_function
-from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT, SmootherType
+from smooth.adam_general.core.utils.utils import (
+    SMOOTHER_DEFAULT,
+    SmootherType,
+    _mean_r,
+)
 
 # Map user-facing occurrence string to the single-character flag the C++
 # adamCore.fit() expects via its ``O=`` parameter (see src/headers/adamCore.h).
@@ -248,8 +253,11 @@ def om_preparator(
     # 2. Profile setup
     profiles_recent_table = matrices_dict["mat_vt"][:, : lags_dict["lags_model_max"]]
 
-    # 3. Run adam_cpp.fit() with vectorYt = vectorOt = ot, O = occurrence_char
-    ot = np.asarray(observations_dict["ot"], dtype=np.float64)
+    # 3. Run adam_cpp.fit() with vectorYt = vectorOt = ot, O = occurrence_char (NaN
+    # where the observation is missing, which the fitter skips)
+    ot = np.asarray(
+        observations_dict.get("ot_fit", observations_dict["ot"]), dtype=np.float64
+    )
     mat_vt = np.asfortranarray(matrices_dict["mat_vt"], dtype=np.float64)
     mat_wt = np.asfortranarray(matrices_dict["mat_wt"], dtype=np.float64)
     mat_f = np.asfortranarray(matrices_dict["mat_f"], dtype=np.float64)
@@ -429,6 +437,23 @@ def draw_occurrence(probability, seed=None):
     return probability, occurrence
 
 
+def _check_om_loss(loss) -> None:
+    """The losses of an occurrence model, or a callable returning a scalar."""
+    if not callable(loss) and loss not in (
+        "likelihood",
+        "MSE",
+        "MAE",
+        "HAM",
+        "LASSO",
+        "RIDGE",
+    ):
+        raise ValueError(
+            f"Invalid loss={loss!r}; expected one of "
+            "'likelihood', 'MSE', 'MAE', 'HAM', 'LASSO', 'RIDGE', "
+            "or a callable returning a scalar."
+        )
+
+
 class OM(ADAM):
     """Occurrence model — state-space model for the probability of demand occurrence.
 
@@ -441,7 +466,8 @@ class OM(ADAM):
     _OM_DEFAULT_LOSS = "likelihood"
 
     def __new__(cls, *args, **kwargs):
-        occ = kwargs.get("occurrence")
+        # "auto" is the default, as R's om()
+        occ = kwargs.get("occurrence", "auto")
         if occ == "general":
             from smooth.adam_general.core.omg import _build_omg_from_om_kwargs
 
@@ -473,10 +499,17 @@ class OM(ADAM):
                         "bounds",
                         "verbose",
                         "nlopt_kwargs",
+                        "loss",
+                        "lambda_param",
                     )
                 }
             )
         return super().__new__(cls)
+
+    def __getnewargs_ex__(self):
+        # copy and pickle call __new__ with these: the fitted type, not the default
+        # "auto", which would redirect to AutoOM
+        return (), {"occurrence": self._om_occurrence}
 
     def __init__(
         self,
@@ -491,7 +524,7 @@ class OM(ADAM):
         regressors: Literal["use", "select", "adapt"] = "use",
         # ``str`` (not just the OM_OCCURRENCE_OPTIONS literals) because ``__new__``
         # also routes "general"/"auto", and wrappers pass runtime-validated strings.
-        occurrence: str = "odds-ratio",
+        occurrence: str = "auto",
         loss: Union[
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE", "custom"],
             Callable,
@@ -529,26 +562,18 @@ class OM(ADAM):
         # ADAM's ``parameter_checks._check_distribution_and_loss`` which
         # detects ``callable(loss)`` and sets the internal flag to
         # ``"custom"`` while populating ``_general["loss_function"]``.
-        if not callable(loss) and loss not in (
-            "likelihood",
-            "MSE",
-            "MAE",
-            "HAM",
-            "LASSO",
-            "RIDGE",
-        ):
-            raise ValueError(
-                f"Invalid loss={loss!r}; expected one of "
-                "'likelihood', 'MSE', 'MAE', 'HAM', 'LASSO', 'RIDGE', "
-                "or a callable returning a scalar."
-            )
+        _check_om_loss(loss)
 
         # For "fixed" occurrence the model is forced to ANN with persistence
-        # disabled and an analytic initial level.
+        # disabled and an analytic initial level. A constant probability has no
+        # ARIMA either.
         if occurrence == "fixed":
             model = "ANN"
             persistence = 0
             initial = "optimal"
+            ar_order = i_order = ma_order = 0
+            orders = None
+            constant = False
 
         super().__init__(
             model=model,
@@ -729,11 +754,7 @@ class OM(ADAM):
 
         self._restore_user_model_spec(requested_model_spec)
 
-        # Replace y_in_sample with the binary occurrence indicator so the
-        # inherited forecaster/preparator paths see the 0/1 series.
-        ot = np.asarray(self._observations["ot"], dtype=np.float64)
-        self._observations["y_in_sample"] = ot
-        self._observations["obs_zero"] = int(np.sum(~self._observations["ot_logical"]))
+        self._set_occurrence_series()
         # Binarise the holdout as well.
         y_hld_raw = self._observations.get("y_holdout")
         if self._general.get("holdout") and y_hld_raw is not None:
@@ -743,6 +764,13 @@ class OM(ADAM):
 
         if self._om_occurrence == "fixed":
             self._fit_fixed()
+        elif self._model_type.get("model_do") == "select":
+            self._select_occurrence()
+        elif self._model_type.get("model_do") == "combine":
+            raise NotImplementedError(
+                "The combination of the occurrence models (model with C) is not "
+                "available in Python yet."
+            )
         else:
             self._fit_occurrence()
 
@@ -859,13 +887,17 @@ class OM(ADAM):
             return int(df_initials)
         return -int(ets_redundancy)
 
-    def _build_om_artifacts(self):
+    def _build_om_artifacts(self, lags_max_pad: int = 0):
         """Run architector → creator → om_initial_transform; return artifacts.
 
         Mirrors the in-place R block in om.R (lines ~317-375): the creator is
         called with ``Etype="A"`` to keep the state-space decomposition
-        well-defined for binary data.
+        well-defined for binary data. ``lags_max_pad`` is the other side's
+        ``lags_model_max`` in OMG, whose joint fit loops over this side's lookup
+        table and states up to it (R's obsAllB_opt / obsStatesB_opt).
         """
+        obs_in_sample = self._observations["obs_in_sample"]
+        obs_all = self._observations["obs_all"]
         (
             model_type_dict,
             components_dict,
@@ -876,7 +908,10 @@ class OM(ADAM):
         ) = architector(
             self._model_type,
             self._lags_model,
-            self._observations,
+            {
+                **self._observations,
+                "obs_all": max(obs_all, obs_in_sample + lags_max_pad),
+            },
             self._arima,
             self._explanatory,
             self._constant,
@@ -915,6 +950,10 @@ class OM(ADAM):
         # adam_creator() has no such guard and always decomposes.
         observations_dict_for_creator["obs_nonzero"] = int(
             observations_dict["obs_in_sample"]
+        )
+        observations_dict_for_creator["obs_all"] = obs_all
+        observations_dict_for_creator["obs_states"] = max(
+            observations_dict["obs_states"], obs_in_sample + lags_max_pad
         )
 
         adam_created = creator(
@@ -975,7 +1014,7 @@ class OM(ADAM):
         self._model_type = model_type_dict
         self._components = components_dict
         self._lags_model = lags_dict
-        self._observations = observations_dict
+        self._observations = {**observations_dict, "obs_all": obs_all}
         self._profile = profile_dict
         self._adam_created = adam_created
         self._adam_cpp = adam_cpp
@@ -1054,6 +1093,48 @@ class OM(ADAM):
 
         return adam_created
 
+    def _select_occurrence(self):
+        """The ETS model of the occurrence selected by the information criterion, as
+        R's om() does with adam_selector(): the pool and the branch and bound of ADAM,
+        with each candidate estimated by the occurrence model's own estimator. The
+        information criteria of the candidates are kept in ``ics``."""
+        from smooth.adam_general.core.estimator.selector import selector
+
+        selected = selector(
+            model_type_dict=self._model_type,
+            phi_dict=self._phi_internal,
+            general_dict=self._general,
+            lags_dict=self._lags_model,
+            observations_dict=self._observations,
+            arima_dict=self._arima,
+            constant_dict=self._constant,
+            explanatory_dict=self._explanatory,
+            occurrence_dict=self._occurrence,
+            components_dict=self._components,
+            profiles_recent_table=self.profiles_recent_table,
+            profiles_recent_provided=self.profiles_recent_provided,
+            persistence_results=self._persistence,
+            initials_results=self._initials,
+            criterion=self._general["ic"],
+            silent=True,
+            smoother=self._resolve_smoother(),
+            estimator_function=self._estimate_candidate,
+        )
+        results = selected["results"]
+        best = results[int(np.argmin([result["IC"] for result in results]))]
+        self._model_type = {**best["model_type_dict"], "model_do": "estimate"}
+        self._phi_internal = dict(best["phi_dict"])
+        self._fit_occurrence()
+        self.ics = dict(selected["ic_selection"])
+
+    def _estimate_candidate(self, model_type_dict, phi_dict, **_kwargs):
+        """One candidate of the selection (R's omEstimatorWrapper): the occurrence
+        model with these components, estimated."""
+        self._model_type = dict(model_type_dict)
+        self._phi_internal = dict(phi_dict)
+        self._fit_occurrence()
+        return dict(self._adam_estimated)
+
     def _fit_occurrence(self):
         """Estimate persistence + initials for non-fixed occurrence types."""
         adam_cpp, adam_created, profile_dict = self._build_om_artifacts()
@@ -1068,7 +1149,7 @@ class OM(ADAM):
             arima_checked=self._arima,
             constants_checked=self._constant,
             explanatory_checked=self._explanatory,
-            observations_dict=self._observations,
+            observations_dict=self._observations_for_initialiser(),
             bounds=self._general["bounds"],
             phi_dict=self._phi_internal,
             profile_dict=profile_dict,
@@ -1254,7 +1335,7 @@ class OM(ADAM):
             "n_param_estimated": n_param_estimated,
             "log_lik_adam_value": {
                 "value": log_lik_value,
-                "nobs": self._observations["obs_in_sample"],
+                "nobs": self._nobs_observed(),
                 "df": n_param_estimated,
             },
             "arima_polynomials": adam_created.get("arima_polynomials"),
@@ -1277,7 +1358,9 @@ class OM(ADAM):
         self._initials["initial_type"] = "provided"
         self._initials["initial_level_estimate"] = False
         self._initials["initial_estimate"] = False
-        self._initials["initial_level"] = float(np.mean(self._observations["ot"]))
+        # The occurrence rate of the observed values: a missing one is not a zero
+        ot_fit = self._observations["ot_fit"]
+        self._initials["initial_level"] = _mean_r(ot_fit[~np.isnan(ot_fit)])
 
         adam_cpp, adam_created, profile_dict = self._build_om_artifacts()
 
@@ -1291,9 +1374,11 @@ class OM(ADAM):
         # (p at 0 or 1) surfaces as -inf rather than being clipped.
         p = self._initials["initial_level"]
         ot_logical = self._observations["ot_logical"]
+        observed = ~np.isnan(self._observations["ot_fit"])
         with np.errstate(divide="ignore"):
             ll = float(
-                np.log(p) * ot_logical.sum() + np.log(1.0 - p) * (~ot_logical).sum()
+                np.log(p) * ot_logical.sum()
+                + np.log(1.0 - p) * (~ot_logical & observed).sum()
             )
 
         n_param_estimated = 1  # The level
@@ -1303,7 +1388,7 @@ class OM(ADAM):
             "n_param_estimated": n_param_estimated,
             "log_lik_adam_value": {
                 "value": ll,
-                "nobs": self._observations["obs_in_sample"],
+                "nobs": self._nobs_observed(),
                 "df": n_param_estimated,
             },
             "arima_polynomials": adam_created.get("arima_polynomials"),
@@ -1367,13 +1452,14 @@ class OM(ADAM):
             t = t + "d"
         ets_str = f"{e}{t}{s}"
         bracket = _OCC_TO_BRACKET[self._om_occurrence]
-        parts = [f"oETS({ets_str})[{bracket}]"]
+        parts = [f"oETS({ets_str})"]
         if self._arima.get("arima_model"):
             ar = (self._arima.get("ar_orders") or [0])[0]
             i = (self._arima.get("i_orders") or [0])[0]
             ma = (self._arima.get("ma_orders") or [0])[0]
             parts.append(f"ARIMA({ar},{i},{ma})")
-        self.model = "+".join(parts)
+        # The type of the occurrence closes the name, as R's adam_model_name
+        self.model = "+".join(parts) + f"[{bracket}]"
 
     def _auto_predict_om(self):
         h = getattr(self, "h", None)
@@ -1498,13 +1584,20 @@ class OM(ADAM):
         occurrence: Optional[NDArray] = None,
         scenarios: bool = False,
         seed: Optional[int] = None,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
     ):
         """Probability forecast for the occurrence model.
 
-        Currently only ``interval="none"`` is supported; intervals on the
-        probability scale are not implemented yet.
+        Currently only ``interval="none"`` and ``point="skeleton"`` are supported;
+        intervals on the probability scale are not implemented yet.
         """
         self._check_is_fitted()
+        if point != "skeleton":
+            warnings.warn(
+                "Only the skeleton of the probability is available for OM. "
+                'Using point="skeleton".',
+                stacklevel=2,
+            )
         if interval != "none":
             warnings.warn(
                 "Intervals on the probability scale are not implemented for OM "
@@ -1598,7 +1691,10 @@ class OM(ADAM):
             fitted = np.asarray(self.fitted, dtype=float)
             residuals = np.asarray(self.residuals, dtype=float)
             return fitted + residuals
-        return np.asarray(self._observations["ot"], dtype=float)
+        # The missing observations stay missing, as R
+        return np.asarray(
+            self._observations.get("ot_fit", self._observations["ot"]), dtype=float
+        )
 
     @property
     def fitted(self) -> NDArray:
@@ -1643,6 +1739,48 @@ class OM(ADAM):
         self._check_is_fitted()
         return float(self._adam_estimated["log_lik_adam_value"]["value"])
 
+    def _set_occurrence_series(self) -> None:
+        """Replace y_in_sample with the binary occurrence indicator.
+
+        The inherited forecaster/preparator paths then see the 0/1 series. Missing
+        observations are not no-demand: the fitter skips their update (NaN in the
+        indicators it gets, ot_fit) and the loss ignores them, while the
+        initialisation, which needs a value there, takes the occurrence rate of the
+        observed ones (as R's om()).
+        """
+        ot = np.asarray(self._observations["ot"], dtype=np.float64)
+        missing = self._observations.get("y_na_values")
+        if missing is None:
+            missing = np.zeros(len(ot), dtype=bool)
+        ot_fit = ot.copy()
+        if np.any(missing):
+            ot = ot.copy()
+            ot[missing] = _mean_r(ot[~missing])
+            ot_fit[missing] = np.nan
+        self._observations["ot"] = ot
+        self._observations["ot_fit"] = ot_fit
+        self._observations["y_in_sample"] = ot
+        self._observations["obs_zero"] = int(
+            np.sum(~self._observations["ot_logical"] & ~missing)
+        )
+
+    def _observations_for_initialiser(self) -> Dict[str, Any]:
+        """The observations for the starting values: the zeros of the occurrence
+        are data, only the missing values are gaps (R's otObserved)."""
+        ot_fit = self._observations.get("ot_fit")
+        observed = (
+            np.ones(len(self._observations["ot"]), dtype=bool)
+            if ot_fit is None
+            else ~np.isnan(ot_fit)
+        )
+        return dict(self._observations, ot_logical=observed)
+
+    def _nobs_observed(self) -> int:
+        """The observations in the likelihood: the missing ones are not."""
+        ot_fit = self._observations.get("ot_fit")
+        n = int(self._observations["obs_in_sample"])
+        return n if ot_fit is None else n - int(np.sum(np.isnan(ot_fit)))
+
     def point_lik(self, log: bool = True) -> NDArray:
         """Per-observation log-likelihood of the occurrence model.
 
@@ -1654,12 +1792,17 @@ class OM(ADAM):
         returned.
         """
         self._check_is_fitted()
-        ot = np.asarray(self._observations["ot"], dtype=float).ravel()
+        ot = np.asarray(
+            self._observations.get("ot_fit", self._observations["ot"]), dtype=float
+        ).ravel()
         p = np.asarray(self.fitted, dtype=float).ravel()
-        ot_logical = ot == 1
-        lik_values = np.empty(len(ot), dtype=float)
+        # The missing observations are not in the likelihood: their values stay zero
+        observed = ~np.isnan(ot)
+        ot_logical = observed & (ot == 1)
+        lik_values = np.zeros(len(ot), dtype=float)
         lik_values[ot_logical] = np.log(p[ot_logical])
-        lik_values[~ot_logical] = np.log(1.0 - p[~ot_logical])
+        zero = observed & ~ot_logical
+        lik_values[zero] = np.log(1.0 - p[zero])
         if not log:
             lik_values = np.exp(lik_values)
         return lik_values
@@ -1747,7 +1890,9 @@ class OM(ADAM):
         general_for_cf = dict(self._general)
         general_for_cf["loss"] = self._general.get("loss", "likelihood")
         pristine = getattr(self, "_fi_pristine", None)
-        ot = np.asarray(self._observations["ot"], dtype=float).ravel()
+        ot = np.asarray(
+            self._observations.get("ot_fit", self._observations["ot"]), dtype=float
+        ).ravel()
 
         def point_lik_at(b):
             if pristine is not None:
@@ -1784,7 +1929,10 @@ class OM(ADAM):
                 or np.any(p >= 1.0)
             ):
                 return None
-            return np.where(ot == 1, np.log(p), np.log(1.0 - p))
+            # The missing observations are not in the likelihood
+            return np.where(
+                np.isnan(ot), 0.0, np.where(ot == 1, np.log(p), np.log(1.0 - p))
+            )
 
         return covar_opg(
             np.asarray(self.coef, dtype=float),

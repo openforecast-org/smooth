@@ -3,6 +3,7 @@
 \name{reapply}
 \alias{reapply}
 \alias{reforecast}
+\alias{reforecast.adam}
 \title{Reapply the model with randomly generated initial parameters and produce forecasts}
 \usage{
 reapply(object, nsim = 1000, type = c("opg", "hessian", "bootstrap"),
@@ -12,6 +13,12 @@ reforecast(object, h = 10, newdata = NULL, occurrence = NULL,
   interval = c("prediction", "confidence", "none"), level = 0.95,
   side = c("both", "upper", "lower"), cumulative = FALSE, nsim = 100,
   ...)
+
+\method{reforecast}{adam}(object, h = 10, newdata = NULL,
+  occurrence = NULL, interval = c("prediction", "confidence", "none"),
+  level = 0.95, side = c("both", "upper", "lower"), cumulative = FALSE,
+  nsim = 100, type = c("opg", "hessian", "bootstrap"), bootstrap = FALSE,
+  heuristics = NULL, point = c("skeleton", "mean", "median"), ...)
 }
 \arguments{
 \item{object}{Model estimated using one of the functions of smooth package.}
@@ -56,6 +63,11 @@ interval or only \code{"upper"}, or \code{"lower"}.}
 \item{cumulative}{If \code{TRUE}, then the cumulative forecast and prediction
 interval are produced instead of the normal ones. This is useful for
 inventory control systems.}
+
+\item{point}{What the point forecast is: \code{"skeleton"} (the default) is the one of
+the estimated model, as in \link[smooth]{forecast.adam}; \code{"mean"} and
+\code{"median"} are the (trimmed) mean and the median of the simulated paths, which
+include the uncertainty of the parameters.}
 }
 \value{
 \code{reapply()} returns object of the class "reapply", which contains:

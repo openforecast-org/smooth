@@ -70,4 +70,22 @@ test_that("backcasting reproduces noise-free series of time-symmetric models", {
                                      arma=list(ma=c(-0.5,-0.5)), constant=FALSE, nIterations=5)))), 1e-8)
     # The drift of an odd number of differences is flipped with the trend
     expect_lt(max(abs(residuals(adam(line, "NNN", orders=list(i=1), constant=TRUE)))), 1e-8)
+    # With seasonal differencing the drift is the change over a season, inside its bounds
+    seasonalDrift <- adam(seasonal, "NNN", lags=c(1,12), orders=list(i=c(0,1)), constant=TRUE)
+    expect_equal(as.numeric(seasonalDrift$constant), 6)
+    expect_lt(max(abs(residuals(seasonalDrift))), 1e-8)
+    # A multiplicative drift is a ratio: it is inverted in the backward pass and enters the
+    # ARIMA states in logs
+    geometric <- ts(100*1.02^tt)
+    expect_lt(max(abs(fitted(adam(geometric, "NNN", orders=list(i=1), constant=1.02,
+                                  distribution="dlnorm"))/geometric-1)), 1e-8)
 })
+
+# 7. With the largest lag 1, the head of a backcasted model is the backcasted state
+test_that("the head states of a backcasted model with lag 1 are those used at t=1", {
+    fitAAN <- adam(BJsales, "AAN", initial="backcasting");
+    expect_equal(as.numeric(fitted(fitAAN)[1]), sum(fitAAN$states[1, 1:2]));
+    expect_equal(as.numeric(fitAAN$initial$level), as.numeric(fitAAN$states[1, 1]));
+    fitANN <- adam(BJsales, "ANN", initial="backcasting");
+    expect_equal(as.numeric(fitted(fitANN)[1]), as.numeric(fitANN$states[1, 1]));
+});

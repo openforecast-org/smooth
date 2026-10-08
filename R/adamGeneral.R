@@ -920,14 +920,18 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
     # If there were NAs and the occurrence was not specified, do something with it
     # In all the other cases, NAs will be sorted out by the model
-    if(any(yNAValues) && (occurrence=="none")){
+    # The internal occurrence of the missing values alone, not an occurrence model
+    occurrenceMissingOnly <- any(yNAValues) && (occurrence=="none");
+    if(occurrenceMissingOnly){
         otLogical <- (!yNAValues)[1:obsInSample];
         occurrence[] <- "provided";
         pFitted[] <- otLogical*1;
         pForecast[] <- 1;
         occurrenceModel <- FALSE;
-        omModel <- structure(list(y=matrix((otLogical)*1,ncol=1),fitted=pFitted,forecast=pForecast,
-                                   occurrence="provided"),class="occurrence");
+        # Without an occurrence the probability is one: the fitter skips the missing values
+        # through ot, the occurrence returned has no zeros
+        omModel <- structure(list(y=matrix((otLogical)*1,ncol=1),fitted=rep(1, obsInSample),
+                                   forecast=pForecast, occurrence="provided"),class="occurrence");
     }
     else{
         if(occurrence=="none"){
@@ -955,7 +959,8 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         ot <- ts(matrix(otLogical*1,ncol=1), start=c(0,0), frequency=lagsModelMax);
     }
     obsNonzero <- sum(ot);
-    obsZero <- obsInSample - obsNonzero;
+    # The observed zeros: a missing observation is neither a demand nor its absence
+    obsZero <- obsInSample - obsNonzero - sum(yNAValues[1:obsInSample]);
 
     # If occurrence is provided, use it as is
     if(occurrence=="provided"){
@@ -963,7 +968,9 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     }
 
     # Check if multiplicative models can be fitted
-    allowMultiplicative <- !((any(yInSample<=0) && !occurrenceModel) || (occurrenceModel && any(yInSample<0)));
+    # on the observed values: the filled ones are not data
+    yObserved <- yInSample[!yNAValues[1:obsInSample]];
+    allowMultiplicative <- !((any(yObserved<=0) && !occurrenceModel) || (occurrenceModel && any(yObserved<0)));
 
     if(etsModel){
         # Clean the pool of models if only additive are allowed
@@ -1019,9 +1026,12 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     if(any(is.character(initial))){
         initialType[] <- match.arg(initial, c("backcasting","optimal","two-stage","complete","gradient"));
         # The gradient solve profiles the loss in C++, which a user-provided
-        # loss function cannot cross; the fit falls back to backcasting.
-        if(initialType=="gradient" && loss=="custom" && !silent){
-            message("initial=\"gradient\" is not available for custom loss functions. Backcasting will be used instead.");
+        # loss function cannot cross: the initials are backcast instead, and the
+        # model says so
+        if(initialType=="gradient" && loss=="custom"){
+            warning("initial=\"gradient\" is not available for custom loss functions. ",
+                    "Switching to initial=\"backcasting\".", call.=FALSE);
+            initialType[] <- "backcasting";
         }
     }
     else if(is.null(initial)){
@@ -1534,7 +1544,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
                 # Form subset in order to use in-sample only
                 subset <- rep(FALSE, obsAll);
-                subset[1:obsInSample] <- TRUE;
+                subset[1:obsInSample] <- !yNAValues[1:obsInSample]; # the observed values only
                 # Exclude zeroes if this is an occurrence model (demand-size models need
                 # only non-zero demand; for the occurrence-probability ALM we keep all obs)
                 if(occurrenceModel){
@@ -1581,7 +1591,9 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
                                                     distribution=distribution, loss=loss,
                                                     subset=almSubset,
-                                                    occurrence=omModel,FI=FI));
+                                                    # The missing values alone are out of the subset
+                                                    occurrence=if(occurrenceMissingOnly) "none" else omModel,
+                                                    FI=FI));
                     almModel$call$data <- as.name(yName);
                     return(almModel);
                 }
@@ -1977,7 +1989,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
                     # Form subset in order to use in-sample only
                     subset <- rep(FALSE, obsAll);
-                    subset[1:obsInSample] <- TRUE;
+                    subset[1:obsInSample] <- !yNAValues[1:obsInSample]; # the observed values only
                     # Exclude zeroes if this is an occurrence model
                     if(occurrenceModel){
                         subset[1:obsInSample][!otLogical] <- FALSE;
@@ -2189,14 +2201,15 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
                 # Form subset in order to use in-sample only
                 subset <- rep(FALSE, obsAll);
-                subset[1:obsInSample] <- TRUE;
+                subset[1:obsInSample] <- !yNAValues[1:obsInSample]; # the observed values only
                 # Exclude zeroes if this is an occurrence model
                 if(occurrenceModel){
                     subset[1:obsInSample][!otLogical] <- FALSE;
                 }
 
                 almModel <- do.call("stepwise", list(data=xregData, formula=formulaToUse, subset=subset,
-                                                     distribution=distribution, occurrence=omModel));
+                                                     distribution=distribution,
+                                                     occurrence=if(occurrenceMissingOnly) "none" else omModel));
                 almModel$call$data <- as.name(yName);
                 return(almModel);
             }
@@ -2277,7 +2290,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             lagsModelAll <- matrix(c(lagsModelAll,rep(1,xregNumber)),ncol=1);
         }
         # If there's only one explanatory variable, then there's nothing to select
-        if(xregNumber==1){
+        if(xregNumber==1 && regressors=="select"){
             regressors[] <- "use";
         }
 
@@ -2365,7 +2378,8 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     # Define the number of cols that should be in the matvt
     obsStates <- obsInSample + lagsModelMax;
 
-    if(any(yInSample<=0) && any(distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) &&
+    if(any(yInSample[!yNAValues[1:obsInSample]]<=0) &&
+       any(distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) &&
        !occurrenceModel && (occurrence!="provided")){
         warning(paste0("You have non-positive values in the data. ",
                        "The distribution ",distribution," does not support that. ",
@@ -2711,7 +2725,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 modelsPool <- NULL;
                 persistenceLevel <- 0;
                 persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- mean(yInSample);
+                initialLevel <- mean(yInSample[!yNAValues[1:obsInSample]]);
                 initialType <- "provided";
                 initialEstimate <- initialLevelEstimate <- FALSE;
                 warning("I did not have enough of non-zero observations, so persistence value was set to zero and initial was preset.",
@@ -2730,7 +2744,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 modelsPool <- NULL;
                 persistenceLevel <- 0;
                 persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- yInSample[yInSample!=0];
+                initialLevel <- yInSample[yInSample!=0 & !yNAValues[1:obsInSample]];
                 initialType <- "provided";
                 initialEstimate <- initialLevelEstimate <- FALSE;
                 warning("I did not have enough of non-zero observations, so I used Naive.",call.=FALSE);
@@ -2906,7 +2920,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         y = y,
         yHoldout = yHoldout,
         yInSample = yInSample,
-        yNAValues = yNAValues,
+        yNAValues = yNAValues, occurrenceMissingOnly = occurrenceMissingOnly,
         # Index and structure
         yClasses = yClasses,
         yIndex = yIndex,
@@ -3057,7 +3071,6 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 }
 
 #### adamSpecificChecker: thin wrapper adding outliers/distribution early-exit ####
-#' @keywords internal
 adamSpecificChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
                                 outliers=c("ignore","use","select"), level=0.99,
                                 persistence, phi, initial,

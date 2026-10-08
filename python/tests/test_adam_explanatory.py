@@ -5,7 +5,8 @@ Data generated in R:
     n <- 120
     x1 <- rnorm(n); x2 <- rnorm(n)
     y <- 10 + 2*x1 - 1.5*x2 + rnorm(n)
-    write.csv(data.frame(y=y, x1=x1, x2=x2), "tests/data/etsx_data.csv", row.names=FALSE)
+    write.csv(data.frame(y=y, x1=x1, x2=x2), "tests/data/etsx_data.csv",
+              row.names=FALSE)
 
 R reference (adam(df, model="AAN", regressors="use", formula=y~x1+x2)):
     smoother="global" (default since smooth v4.4.1 / Python v1.0.1)
@@ -93,6 +94,22 @@ def test_etsx_use_forecast_shape(etsx_data):
     fc = model.predict(h=12, X=X_new)
     assert len(fc.mean) == 12
     assert not np.any(np.isnan(fc.mean.values))
+
+
+@pytest.mark.parametrize("regressors", ["use", "adapt"])
+def test_etsx_simulated_interval_uses_the_new_x(etsx_data, regressors):
+    # The simulated paths take the new values of the regressors, as the point
+    # forecasts do, and predict() leaves the in-sample measurement as it is
+    y, X = etsx_data
+    model = ADAM(model="ANN", regressors=regressors).fit(y[:108], X[:108])
+    measurement = model.measurement.copy()
+    X_new = X[108:] + np.array([5.0, 0.0])
+    point = model.predict(h=12, X=X_new).mean.values
+    np.testing.assert_array_equal(model.measurement, measurement)
+    fc = model.predict(h=12, X=X_new, interval="simulated", nsim=2000)
+    np.testing.assert_allclose(fc.mean.values, point, rtol=1e-12)
+    centre = (np.ravel(fc.lower) + np.ravel(fc.upper)) / 2
+    np.testing.assert_allclose(centre, point, atol=1.0)
 
 
 def test_etsx_use_states_shape(etsx_data):

@@ -51,7 +51,7 @@ class TestNloptKwargsSingleModel:
         assert hasattr(model, "loglik")
 
     def test_maxeval_affects_loglik(self):
-        """Tight maxeval (very few evals) should give a different loglik than default."""
+        """Tight maxeval (very few evals) gives a different loglik than default."""
         m_tight = ADAM(model="ANN", lags=[1], nlopt_kwargs={"maxeval": 2})
         m_tight.fit(Y)
 

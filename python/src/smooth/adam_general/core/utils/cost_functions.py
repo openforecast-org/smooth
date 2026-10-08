@@ -5,10 +5,14 @@ from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
 from smooth.adam_general.core.utils.utils import (
+    _log_r,
     _sum_r,
     calculate_entropy,
     calculate_likelihood,
     calculate_multistep_loss,
+    complete_windows,
+    multistep_log_lik,
+    observed_mask,
     scaler,
 )
 
@@ -599,10 +603,10 @@ def CF(  # noqa: N802
             np.asarray(adam_fitted.errors).ravel(),
         )
 
-    # adam_fitted.errors = np.repeat()
-
-    # print('adam_fitted')
-    # print(adam_fitted)
+    # The missing values are not in the loss: the errors are zero there, and the
+    # losses are divided by the observed values
+    observed = observed_mask(observations_dict)
+    obs_observed = int(np.sum(observed))
     if not general["multisteps"]:
         if general["loss"] == "likelihood":
             scale = scaler(
@@ -610,7 +614,7 @@ def CF(  # noqa: N802
                 model_type_dict["error_type"],
                 adam_fitted.errors[observations_dict["ot_logical"]],
                 adam_fitted.fitted[observations_dict["ot_logical"]],
-                observations_dict["obs_in_sample"],
+                obs_observed,
                 other,
             )
             # Aggregate through _sum_r: R accumulates sum() in a long double
@@ -629,32 +633,33 @@ def CF(  # noqa: N802
                 other,
             )
             CFValue = -_sum_r(np.asarray(ll, dtype=np.float64).ravel())
-            # Differential entropy for the logLik of occurrence model
-            if observations_dict.get("occurrence_model", False) or any(
-                ~observations_dict["ot_logical"]
-            ):
+            # Differential entropy for the logLik of occurrence model, over the
+            # observed zeros: a missing observation is not a zero
+            ot_zero = ~observations_dict["ot_logical"]
+            if observations_dict.get("y_na_values") is not None:
+                ot_zero = ot_zero & ~observations_dict["y_na_values"]
+            if observations_dict.get("occurrence_model", False) or any(ot_zero):
                 CFValueEntropy = calculate_entropy(
                     general["distribution_new"],
                     scale,
                     other,
-                    observations_dict["obs_zero"],
-                    adam_fitted.fitted[~observations_dict["ot_logical"]],
+                    int(np.sum(ot_zero)),
+                    adam_fitted.fitted[ot_zero],
                 )
-                if np.isnan(CFValueEntropy) or CFValueEntropy < 0:
+                # NaN means something is wrong; a negative entropy (it should not
+                # be) becomes zero, so that occurrence does not distort the sizes
+                if np.isnan(CFValueEntropy):
                     CFValueEntropy = np.inf
+                elif CFValueEntropy < 0:
+                    CFValueEntropy = 0.0
                 CFValue += CFValueEntropy
 
         elif general["loss"] == "MSE":
-            CFValue = _sum_r(adam_fitted.errors**2) / observations_dict["obs_in_sample"]
+            CFValue = _sum_r(adam_fitted.errors**2) / obs_observed
         elif general["loss"] == "MAE":
-            CFValue = (
-                _sum_r(np.abs(adam_fitted.errors)) / observations_dict["obs_in_sample"]
-            )
+            CFValue = _sum_r(np.abs(adam_fitted.errors)) / obs_observed
         elif general["loss"] == "HAM":
-            CFValue = (
-                _sum_r(np.sqrt(np.abs(adam_fitted.errors)))
-                / observations_dict["obs_in_sample"]
-            )
+            CFValue = _sum_r(np.sqrt(np.abs(adam_fitted.errors))) / obs_observed
         elif general["loss"] in ["LASSO", "RIDGE"]:
             # Trim B for penalty term (shared helper — also called by om_cf
             # and omg_cf so OM/OMG penalise the exact same parameter subset
@@ -679,7 +684,7 @@ def CF(  # noqa: N802
 
             # Calculate error term based on error type
             error_type = model_type_dict.get("error_type", "A")
-            obs_in_sample = observations_dict.get("obs_in_sample", len(errors_flat))
+            obs_in_sample = obs_observed
             lambda_val = general.get("lambda", 0)
 
             if error_type == "A":
@@ -687,10 +692,9 @@ def CF(  # noqa: N802
                 y_denom = general.get("y_denominator", 1)
                 if y_denom is None or y_denom <= 0:
                     y_denom = 1  # Fallback to 1
-                error_term = (
-                    (1 - lambda_val)
-                    * np.linalg.norm(errors_flat / y_denom)
-                    / np.sqrt(obs_in_sample)
+                # R's sqrt(sum(x^2)/n): np.linalg.norm rounds differently
+                error_term = (1 - lambda_val) * np.sqrt(
+                    _sum_r((errors_flat / y_denom) ** 2) / obs_in_sample
                 )
                 CFValue = error_term
             else:  # "M"
@@ -699,25 +703,25 @@ def CF(  # noqa: N802
                 if np.any(log_arg <= 0):
                     CFValue = 1e100
                 else:
-                    error_term = (
-                        (1 - lambda_val)
-                        * np.linalg.norm(np.log(log_arg))
-                        / np.sqrt(obs_in_sample)
+                    error_term = (1 - lambda_val) * np.sqrt(
+                        _sum_r(_log_r(log_arg) ** 2) / obs_in_sample
                     )
                     CFValue = error_term
 
             # Add penalty term (LASSO = L1, RIDGE = L2)
             if general["loss"] == "LASSO":
-                CFValue += lambda_val * np.sum(np.abs(B_penalty))
+                CFValue += lambda_val * _sum_r(np.abs(B_penalty))
             else:  # "RIDGE"
-                CFValue += lambda_val * np.linalg.norm(B_penalty)
+                CFValue += lambda_val * np.sqrt(_sum_r(np.asarray(B_penalty) ** 2))
 
         elif general["loss"] == "custom":
             # Ensure arrays are 1D to avoid broadcasting issues
             # (armadillo vectors are column vectors that may become (n,1) shaped arrays)
             fitted_1d = np.asarray(adam_fitted.fitted).ravel()
             CFValue = general["loss_function"](
-                actual=y_in_sample, fitted=fitted_1d, B=B
+                actual=np.asarray(y_in_sample).ravel()[observed],
+                fitted=fitted_1d[observed],
+                B=B,
             )
     else:
         # Multistep loss functions (MSEh, TMSE, GTMSE, MSCE, etc.)
@@ -734,11 +738,13 @@ def CF(  # noqa: N802
             horizon=h,
             vectorYt=y_in_sample,
         )
-        adam_errors = error_result.errors  # Matrix: (obs_in_sample - h) x h
+        adam_errors = error_result.errors  # Matrix: (obs_in_sample - h + 1) x h
+        # The windows with all their targets observed
+        adam_errors = adam_errors[complete_windows(observed, h)]
 
         # Calculate loss based on type
         loss = general["loss"]
-        CFValue = calculate_multistep_loss(loss, adam_errors, obs_in_sample, h)
+        CFValue = calculate_multistep_loss(loss, adam_errors, len(adam_errors) + h, h)
 
     # A perfect fit (-inf) is kept, as in R
     if np.isnan(CFValue) or CFValue == np.inf:
@@ -934,7 +940,8 @@ def log_Lik_ADAM(  # noqa: N802
     - MAEh, TMAE, MACE: :math:`-(T-h)(\\log(2) + 1 + \\log(\\text{loss}))`
     - HAMh, THAM, CHAM: :math:`-(T-h)(\\log(4) + 2 + 2\\log(\\text{loss}))`
 
-    where T is the sample size and h is the forecast horizon.
+    where T-h is replaced by the number of windows with all their targets observed
+    (T-h+1 without missing values).
 
     **Occurrence Model**:
 
@@ -1038,50 +1045,32 @@ def log_Lik_ADAM(  # noqa: N802
                 otherParameterEstimate=otherParameterEstimate,
             )
 
-            # Handle occurrence model
+            # Handle occurrence model: the observed zeros, a missing value is not in
+            # the likelihood
             if occurrence_dict["occurrence_model"]:
                 if np.isinf(logLikReturn):
                     logLikReturn = 0
-                if any(
-                    1 - occurrence_dict["p_fitted"][~observations_dict["ot_logical"]]
-                    == 0
-                ) or any(
-                    occurrence_dict["p_fitted"][observations_dict["ot_logical"]] == 0
-                ):
-                    pt_new = occurrence_dict["p_fitted"][
-                        (occurrence_dict["p_fitted"] != 0)
-                        & (occurrence_dict["p_fitted"] != 1)
-                    ]
-                    ot_new = observations_dict["ot"][
-                        (occurrence_dict["p_fitted"] != 0)
-                        & (occurrence_dict["p_fitted"] != 1)
-                    ]
+                p_fitted = occurrence_dict["p_fitted"]
+                ot_logical = observations_dict["ot_logical"]
+                observed = observed_mask(observations_dict)
+                zero = ~ot_logical & observed
+                if any(1 - p_fitted[zero] == 0) or any(p_fitted[ot_logical] == 0):
+                    usable = (p_fitted != 0) & (p_fitted != 1) & observed
+                    pt_new = p_fitted[usable]
+                    ot_new = observations_dict["ot"][usable]
                     if len(pt_new) == 0:
                         return logLikReturn
                     else:
                         return (
                             logLikReturn
-                            + np.sum(np.log(pt_new[ot_new == 1]))
-                            + np.sum(np.log(1 - pt_new[ot_new == 0]))
+                            + _sum_r(_log_r(pt_new[ot_new == 1]))
+                            + _sum_r(_log_r(1 - pt_new[ot_new == 0]))
                         )
                 else:
                     return (
                         logLikReturn
-                        + np.sum(
-                            np.log(
-                                occurrence_dict["p_fitted"][
-                                    observations_dict["ot_logical"]
-                                ]
-                            )
-                        )
-                        + np.sum(
-                            np.log(
-                                1
-                                - occurrence_dict["p_fitted"][
-                                    ~observations_dict["ot_logical"]
-                                ]
-                            )
-                        )
+                        + _sum_r(_log_r(p_fitted[ot_logical]))
+                        + _sum_r(_log_r(1 - p_fitted[zero]))
                     )
             else:
                 return logLikReturn
@@ -1107,51 +1096,20 @@ def log_Lik_ADAM(  # noqa: N802
             bounds=None,
         )
 
-        # Concentrated log-likelihoods for the multistep losses
-        if general_dict["loss"] in ["MSEh", "aMSEh", "TMSE", "aTMSE", "MSCE", "aMSCE"]:
-            # is horizon different than h?
-            logLikReturn = (
-                -(observations_dict["obs_in_sample"] - general_dict["h"])
-                / 2
-                * (np.log(2 * np.pi) + 1 + np.log(logLikReturn))
-            )
-        elif general_dict["loss"] in ["GTMSE", "aGTMSE"]:
-            logLikReturn = (
-                -(observations_dict["obs_in_sample"] - general_dict["h"])
-                / 2
-                * (np.log(2 * np.pi) + 1 + logLikReturn)
-            )
-        elif general_dict["loss"] in ["MAEh", "TMAE", "GTMAE", "MACE"]:
-            logLikReturn = -(observations_dict["obs_in_sample"] - general_dict["h"]) * (
-                np.log(2) + 1 + np.log(logLikReturn)
-            )
-        elif general_dict["loss"] in ["HAMh", "THAM", "GTHAM", "CHAM"]:
-            logLikReturn = -(observations_dict["obs_in_sample"] - general_dict["h"]) * (
-                np.log(4) + 2 + 2 * np.log(logLikReturn)
-            )
-        elif general_dict["loss"] in ["GPL", "aGPL"]:
-            logLikReturn = (
-                -(observations_dict["obs_in_sample"] - general_dict["h"])
-                / 2
-                * (
-                    general_dict["h"] * np.log(2 * np.pi)
-                    + general_dict["h"]
-                    + logLikReturn
-                )
-                / general_dict["h"]
-            )
-
-        # Make likelihood comparable
-        logLikReturn = (
-            logLikReturn
-            / (observations_dict["obs_in_sample"] - general_dict["h"])
-            * observations_dict["obs_in_sample"]
+        # Concentrated log-likelihoods for the multistep losses, over the windows
+        # with all their targets observed
+        logLikReturn = multistep_log_lik(
+            logLikReturn,
+            general_dict["loss"],
+            general_dict["h"],
+            observed_mask(observations_dict),
         )
 
         # Handle multiplicative model
         if model_type_dict["ets_model"] and model_type_dict["error_type"] == "M":
-            # Fill in the matrices
-            adam_elements = filler(
+            # This refit only runs for the multistep losses, whose codes do not
+            # use the distribution parameter
+            adam_fitted = fit_at_parameters(
                 B,
                 model_type_dict,
                 components_dict,
@@ -1163,77 +1121,84 @@ def log_Lik_ADAM(  # noqa: N802
                 explanatory_dict,
                 phi_dict,
                 constant_dict,
+                observations_dict,
+                general_dict,
+                profile_dict,
                 adam_cpp,
             )
 
-            # Write down the initials in the recent profile
-            profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
-                :, : lags_dict["lags_model_max"]
-            ]
-
-            # Fit the model again to extract the fitted values.
-            # Check if initial_type is a list or string and compute backcast correctly
-            if isinstance(initials_dict["initial_type"], list):
-                backcast_value_log = any(
-                    [
-                        t == "complete" or t == "backcasting"
-                        for t in initials_dict["initial_type"]
-                    ]
-                )
-            else:
-                backcast_value_log = initials_dict["initial_type"] in [
-                    "complete",
-                    "backcasting",
-                ]
-
-            # Convert stuff to numpy arrays with float64 - C++ requires that
-            y_in_sample = np.asarray(observations_dict["y_in_sample"], dtype=np.float64)
-            ot = np.asarray(observations_dict["ot"], dtype=np.float64)
-            # Explicit copy -- see the matching comment in CF()
-            mat_vt = np.array(adam_elements["mat_vt"], dtype=np.float64, order="F")
-            mat_wt = np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64)
-            mat_f = np.asfortranarray(
-                adam_elements["mat_f"], dtype=np.float64
-            )  # Also copy mat_f since it's passed by reference
-            vec_g = np.asfortranarray(
-                adam_elements["vec_g"], dtype=np.float64
-            )  # Make sure it's a 1D array
-            index_lookup_table = np.asfortranarray(
-                profile_dict["index_lookup_table"], dtype=np.uint64
-            )
-            profiles_recent_table = np.asfortranarray(
-                profile_dict["profiles_recent_table"], dtype=np.float64
-            )
-
-            adam_fitted = adam_fit_or_gradient(
-                adam_cpp=adam_cpp,
-                mat_vt=mat_vt,
-                mat_wt=mat_wt,
-                mat_f=mat_f,
-                vec_g=vec_g,
-                index_lookup_table=index_lookup_table,
-                profiles_recent_table=profiles_recent_table,
-                y_in_sample=y_in_sample,
-                ot=ot,
-                initial_type=initials_dict["initial_type"],
-                n_iterations=initials_dict["n_iterations"],
-                backcast_value=backcast_value_log,
-                model_type_dict=model_type_dict,
-                components_dict=components_dict,
-                lags_dict=lags_dict,
-                obs_in_sample=observations_dict["obs_in_sample"],
-                loss=general_dict["loss"],
-                distribution=general_dict.get(
-                    "distribution_new", general_dict.get("distribution", "default")
-                ),
-                # This refit only runs for the multistep losses, whose codes do
-                # not use the distribution parameter
-                other=None,
-                horizon=general_dict.get("h", 0),
-                multisteps=general_dict["multisteps"],
-                xreg_number=int(explanatory_dict.get("xreg_number", 0) or 0),
-            )
-
-            logLikReturn -= np.sum(np.log(np.abs(adam_fitted.fitted)))
+            logLikReturn -= _sum_r(_log_r(np.abs(adam_fitted.fitted)))
 
         return logLikReturn
+
+
+def fit_at_parameters(
+    B,
+    model_type_dict,
+    components_dict,
+    lags_dict,
+    adam_created,
+    persistence_dict,
+    initials_dict,
+    arima_dict,
+    explanatory_dict,
+    phi_dict,
+    constant_dict,
+    observations_dict,
+    general_dict,
+    profile_dict,
+    adam_cpp,
+    other=None,
+):
+    """The fit of the model at the parameters B, as R's ``filler()`` followed by
+    ``adam_fitOrGradient()``: the initials are written into the recent profile."""
+    adam_elements = filler(
+        B,
+        model_type_dict,
+        components_dict,
+        lags_dict,
+        adam_created,
+        persistence_dict,
+        initials_dict,
+        arima_dict,
+        explanatory_dict,
+        phi_dict,
+        constant_dict,
+        adam_cpp,
+    )
+    profile_dict["profiles_recent_table"][:] = adam_elements["mat_vt"][
+        :, : lags_dict["lags_model_max"]
+    ]
+    initial_type = initials_dict["initial_type"]
+    types = initial_type if isinstance(initial_type, list) else [initial_type]
+    # Explicit copies: the C++ fitter writes into its arguments
+    return adam_fit_or_gradient(
+        adam_cpp=adam_cpp,
+        mat_vt=np.array(adam_elements["mat_vt"], dtype=np.float64, order="F"),
+        mat_wt=np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64),
+        mat_f=np.asfortranarray(adam_elements["mat_f"], dtype=np.float64),
+        vec_g=np.asfortranarray(adam_elements["vec_g"], dtype=np.float64),
+        index_lookup_table=np.asfortranarray(
+            profile_dict["index_lookup_table"], dtype=np.uint64
+        ),
+        profiles_recent_table=np.asfortranarray(
+            profile_dict["profiles_recent_table"], dtype=np.float64
+        ),
+        y_in_sample=np.asarray(observations_dict["y_in_sample"], dtype=np.float64),
+        ot=np.asarray(observations_dict["ot"], dtype=np.float64),
+        initial_type=initial_type,
+        n_iterations=initials_dict["n_iterations"],
+        backcast_value=any(t in ("complete", "backcasting") for t in types),
+        model_type_dict=model_type_dict,
+        components_dict=components_dict,
+        lags_dict=lags_dict,
+        obs_in_sample=observations_dict["obs_in_sample"],
+        loss=general_dict["loss"],
+        distribution=general_dict.get(
+            "distribution_new", general_dict.get("distribution", "default")
+        ),
+        other=other,
+        horizon=general_dict.get("h", 0),
+        multisteps=general_dict["multisteps"],
+        xreg_number=int(explanatory_dict.get("xreg_number", 0) or 0),
+    )

@@ -13,7 +13,7 @@ def _compute_multistep_errors(
     mat_wt,
     mat_f,
 ):
-    """Call adam_cpp.ferrors() and return the (T-h) × h in-sample error matrix.
+    """Call adam_cpp.ferrors() and return the (T-h+1) × h in-sample error matrix.
 
     Uses the INITIAL profile and an in-sample lookup table — same as R's
     rmultistep.adam() which calls adamCpp$ferrors with object$profileInitial
@@ -54,7 +54,15 @@ def _compute_multistep_errors(
         horizon=h,
         vectorYt=y_in_sample,
     )
-    return np.asarray(result.errors)
+    # No error where the target is missing, as R's rmultistep on its actuals: row i
+    # has the targets i..i+h-1
+    errors = np.array(result.errors, dtype=np.float64)
+    missing = observations_dict.get("y_na_values")
+    if missing is not None and np.any(missing):
+        missing = np.asarray(missing, dtype=bool)[:obs]
+        rows = np.arange(errors.shape[0])[:, None] + np.arange(errors.shape[1])
+        errors[missing[rows]] = np.nan
+    return errors
 
 
 def _safe_create_index(start, periods, freq):
@@ -155,8 +163,10 @@ def _prepare_matrices_for_forecast(
     # is what R does too (nrow(object$states)) — the head may have been trimmed.
     mat_vt = model_prepared["states"][:, -lags_dict["lags_model_max"] :]
 
-    # Get measurement matrix
-    if model_prepared["measurement"].shape[0] < general_dict["h"]:
+    # Get measurement matrix: that of the horizon when the new regressors are known
+    if model_prepared.get("measurement_forecast") is not None:
+        mat_wt = model_prepared["measurement_forecast"].copy()
+    elif model_prepared["measurement"].shape[0] < general_dict["h"]:
         mat_wt = np.tile(model_prepared["measurement"][-1], (general_dict["h"], 1))
     else:
         mat_wt = model_prepared["measurement"][-general_dict["h"] :]

@@ -12,6 +12,24 @@ from smooth.adam_general.core.utils.utils import (
 )
 
 
+def drift_series(y, error_type, ets_model, lags, i_orders):
+    """The series on the scale of the constant, from which its starting value and
+    bounds come (R's ``adam_driftSeries``): differenced as the ARIMA part of the
+    model differences it (in logs for a multiplicative error), whose drift it is,
+    or by one step for ETS, where it is the drift of the level. With seasonal
+    differencing, the drift is the change over a season, not over one step."""
+    y = np.asarray(y, dtype=np.float64).ravel()
+    if error_type == "M":
+        y = np.log(y)
+    i_orders = list(i_orders or [])
+    if ets_model or sum(i_orders) == 0:
+        return np.diff(y)
+    for lag, order in zip(lags, i_orders):
+        for _ in range(int(order)):
+            y = y[int(lag) :] - y[: -int(lag)]
+    return y
+
+
 def _arima_initialiser(
     y_in_sample,
     ot_logical,
@@ -38,11 +56,11 @@ def _arima_initialiser(
     error), with the ETS part approximated by the decomposition that gives the ETS
     initials (the same smoother), differenced as the model requires, and the
     regressors (``xreg_in_sample``, or None, differenced alike) by OLS on the
-    differences. Missing and zero values become the mean of the transformed
-    series. The seasonal ARIMA factors that coincide with the ETS
-    seasonality keep the defaults. With ``bounded``, the factors that the cost
-    function would reject (not stationary AR, not invertible MA, see
-    src/headers/arimaBounds.h) are moved inside the boundary.
+    differences. Missing and zero values are gaps, and so is any difference that
+    touches one; they are zeros of the centred series. The seasonal ARIMA factors
+    that coincide with the ETS seasonality keep the defaults. With ``bounded``, the
+    factors that the cost function would reject (not stationary AR, not invertible
+    MA, see src/headers/arimaBounds.h) are moved inside the boundary.
 
     Returns the AR / MA values in the order of B.
     """
@@ -66,12 +84,9 @@ def _arima_initialiser(
             y = np.log(y) - np.log(fitted) if error_type == "M" else y - fitted
         elif error_type == "M":
             y = np.log(y)
-    # The series with missing values filled, the one with NaNs to track which
-    # differences are observed, and the regressors, all differenced alike
-    finite = np.isfinite(y)
-    y_filled = y.copy()
-    y_filled[~finite] = _mean_r(y[finite])
-    columns = [y_filled, y]
+    # The series and the regressors, differenced alike: a difference that touches
+    # a gap is a gap too
+    columns = [y]
     if xreg_in_sample is not None:
         columns.append(np.asarray(xreg_in_sample, dtype=np.float64))
     y_diffs = np.column_stack(columns)
@@ -80,12 +95,14 @@ def _arima_initialiser(
             for _ in range(int(order)):
                 y_diffs = y_diffs[int(lag) :] - y_diffs[: -int(lag)]
     y = y_diffs[:, 0].copy()
+    observed = np.isfinite(y)
     # Regression on the differences: in levels, an integrated error makes it spurious
     if xreg_in_sample is not None:
-        observed = np.isfinite(y_diffs[:, 1])
-        xreg_diffs = np.column_stack([np.ones(len(y)), y_diffs[:, 2:]])
+        xreg_diffs = np.column_stack([np.ones(len(y)), y_diffs[:, 1:]])
         y = y - xreg_diffs @ _ols.ols(xreg_diffs[observed], y[observed])
-        y[~observed] = _mean_r(y[observed])
+    # The gaps are zeros of the centred series (Hannan-Rissanen centres it), which
+    # keeps the lags aligned without inventing differences across them
+    y[~observed] = _mean_r(y[observed])
 
     use_level = ~(ets_model & model_is_seasonal & (lags_arr > 1))
     return _ols.arima_hr(
@@ -834,7 +851,15 @@ def initialiser(
             B[j : j + xreg_number_to_estimate] = adam_created["mat_vt"][
                 xreg_start : xreg_start + xreg_number_to_estimate, 0
             ]
-            names.extend([f"xreg{idx + 1}" for idx in range(xreg_number_to_estimate)])
+            # The names of the estimated regressors, as R's
+            names.extend(
+                name
+                for name, estimated in zip(
+                    explanatory_checked["xreg_names"],
+                    explanatory_checked["xreg_parameters_estimated"],
+                )
+                if estimated == 1
+            )
             Bl[j : j + xreg_number_to_estimate] = -np.inf
             Bu[j : j + xreg_number_to_estimate] = np.inf
             j += xreg_number_to_estimate
@@ -869,44 +894,19 @@ def initialiser(
             arima_checked["i_orders"] is not None
             and sum(arima_checked["i_orders"]) != 0
         ):
+            drift = drift_series(
+                observations_dict["y_in_sample"][observations_dict["ot_logical"]],
+                model_type_dict["error_type"],
+                model_type_dict["ets_model"],
+                lags_dict["lags"],
+                arima_checked["i_orders"],
+            )
             if model_type_dict["error_type"] == "A":
-                Bu[j - 1] = np.quantile(
-                    np.diff(
-                        observations_dict["y_in_sample"][
-                            observations_dict["ot_logical"]
-                        ],
-                        axis=0,
-                    ),
-                    0.6,
-                )
+                Bu[j - 1] = np.quantile(drift, 0.6)
                 Bl[j - 1] = -Bu[j - 1]
             else:
-                Bu[j - 1] = np.exp(
-                    np.quantile(
-                        np.diff(
-                            np.log(
-                                observations_dict["y_in_sample"][
-                                    observations_dict["ot_logical"]
-                                ]
-                            ),
-                            axis=0,
-                        ),
-                        0.6,
-                    )
-                )
-                Bl[j - 1] = np.exp(
-                    np.quantile(
-                        np.diff(
-                            np.log(
-                                observations_dict["y_in_sample"][
-                                    observations_dict["ot_logical"]
-                                ]
-                            ),
-                            axis=0,
-                        ),
-                        0.4,
-                    )
-                )
+                Bu[j - 1] = np.exp(np.quantile(drift, 0.6))
+                Bl[j - 1] = np.exp(np.quantile(drift, 0.4))
 
             if Bu[j - 1] <= Bl[j - 1]:
                 Bu[j - 1] = np.inf

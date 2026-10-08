@@ -243,12 +243,12 @@ class TestNNNNonseasonal:
         return _fit_python("nnn_nonseasonal", r_outputs)
 
     def test_distribution(self, m, r_outputs):
-        assert m._selected_distribution == r_outputs["nnn_nonseasonal"]["distribution"][0]
+        expected = r_outputs["nnn_nonseasonal"]["distribution"][0]
+        assert m._selected_distribution == expected
 
     def test_i_orders(self, m, r_outputs):
-        assert _normalise_orders(m._selected_arima_orders["i_orders"]) == _normalise_orders(
-            r_outputs["nnn_nonseasonal"]["i_orders"]
-        )
+        expected = _normalise_orders(r_outputs["nnn_nonseasonal"]["i_orders"])
+        assert _normalise_orders(m._selected_arima_orders["i_orders"]) == expected
 
     def test_ar_orders(self, m, r_outputs):
         assert _normalise_orders(
@@ -360,7 +360,8 @@ class TestETSARIMASeasonal:
         assert r_outputs["ets_arima_seasonal"]["model_name"][0] in m.model
 
     def test_distribution(self, m, r_outputs):
-        assert m._selected_distribution == r_outputs["ets_arima_seasonal"]["distribution"][0]
+        expected = r_outputs["ets_arima_seasonal"]["distribution"][0]
+        assert m._selected_distribution == expected
 
     def test_ar_orders(self, m, r_outputs):
         assert _normalise_orders(

@@ -18,6 +18,7 @@ import numpy as np
 
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
+from smooth.adam_general.core.utils.utils import _exp_r, _log_r, _mean_r, _sum_r
 
 
 def _side_probe_basis(side, elem, o_type="g"):
@@ -72,7 +73,10 @@ def _omg_gradient_profiles(side_a, side_b, elem_a, elem_b, ot, loss, adam_ets=Fa
         return None
 
     def _f(x, dtype=np.float64):
-        return np.asfortranarray(x, dtype=dtype)
+        # A copy: the C++ writes into its arguments, and np.asfortranarray hands
+        # it this array when it is already Fortran-ordered, so the fit would leave
+        # its states in the seed of the next evaluation (R copies on every call)
+        return np.array(x, dtype=dtype, order="F", copy=True)
 
     n_a = int(elem_a["mat_vt"].shape[0])
     n_b = int(elem_b["mat_vt"].shape[0])
@@ -132,14 +136,17 @@ def omg_link_function(fitted_a, fitted_b, error_type_a, error_type_b):
     """
     fa = np.asarray(fitted_a, dtype=np.float64)
     fb = np.asarray(fitted_b, dtype=np.float64)
-    if error_type_a == "A" and error_type_b == "A":
-        return 1.0 / (1.0 + np.exp(fb - fa))
-    if error_type_a == "M" and error_type_b == "M":
-        return 1.0 / (1.0 + fb / fa)
-    if error_type_a == "M" and error_type_b == "A":
-        return 1.0 / (1.0 + np.exp(fb - np.log(fa)))
-    # error_type_a == "A", error_type_b == "M"
-    return 1.0 / (1.0 + np.exp(np.log(fb) - fa))
+    # A probe with a zero fitted value gives p of 0 or 1, as in R, which computes
+    # it silently; omg_cf's infeasibility guard turns it into the penalty
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        if error_type_a == "A" and error_type_b == "A":
+            return 1.0 / (1.0 + _exp_r(fb - fa))
+        if error_type_a == "M" and error_type_b == "M":
+            return 1.0 / (1.0 + fb / fa)
+        if error_type_a == "M" and error_type_b == "A":
+            return 1.0 / (1.0 + _exp_r(fb - _log_r(fa)))
+        # error_type_a == "A", error_type_b == "M"
+        return 1.0 / (1.0 + _exp_r(_log_r(fb) - fa))
 
 
 def omg_cf(  # noqa: N802
@@ -209,9 +216,10 @@ def omg_cf(  # noqa: N802
         adam_cpp=side_b["adam_cpp"],
     )
 
-    # Each side's bounds, shared with CF (R's adam_bounds_checker)
-    for side, elem in ((side_a, elem_a), (side_b, elem_b)):
-        penalty = adam_bounds_checker(
+    # Each side's bounds, shared with CF (R's adam_bounds_checker); a violation on
+    # either side is the uniform penalty, as R's omgCF_local
+    penalty = sum(
+        adam_bounds_checker(
             elem,
             bounds,
             side["model_type_dict"],
@@ -223,8 +231,10 @@ def omg_cf(  # noqa: N802
             side["constant"],
             observations_dict["obs_in_sample"],
         )
-        if penalty > 0:
-            return float(penalty)
+        for side, elem in ((side_a, elem_a), (side_b, elem_b))
+    )
+    if penalty > 0:
+        return 1e300
 
     # Refresh the profile seed from the freshly-filled mat_vt
     side_a["profile"]["profiles_recent_table"][:] = elem_a["mat_vt"][
@@ -234,11 +244,18 @@ def omg_cf(  # noqa: N802
         :, : side_b["lags_dict"]["lags_model_max"]
     ]
 
-    ot = np.asarray(observations_dict["ot"], dtype=np.float64)
+    # The occurrence indicators, NaN where the observation is missing (the fitter
+    # skips their update)
+    ot = np.asarray(
+        observations_dict.get("ot_fit", observations_dict["ot"]), dtype=np.float64
+    )
 
     # Build Fortran-ordered copies for the C++ call
     def _f(x, dtype=np.float64):
-        return np.asfortranarray(x, dtype=dtype)
+        # A copy: the C++ writes into its arguments, and np.asfortranarray hands
+        # it this array when it is already Fortran-ordered, so the fit would leave
+        # its states in the seed of the next evaluation (R copies on every call)
+        return np.array(x, dtype=dtype, order="F", copy=True)
 
     initials_a = side_a["initials"]
     init_type_a = initials_a["initial_type"]
@@ -322,8 +339,10 @@ def omg_cf(  # noqa: N802
     ):
         return 1e300
 
+    # The missing observations (NaN in ot) are not in the loss
     ot_logical = observations_dict["ot_logical"]
-    residual = ot - p_combined
+    observed = ~np.isnan(ot)
+    residual = (ot - p_combined)[observed]
 
     if loss == "custom":
         if loss_function is None:
@@ -331,20 +350,24 @@ def omg_cf(  # noqa: N802
                 "loss='custom' requires `loss_function`; OMG.__init__ should "
                 "have captured the callable and passed it through."
             )
-        return float(loss_function(actual=ot, fitted=p_combined, B=np.asarray(B)))
+        return float(
+            loss_function(
+                actual=ot[observed], fitted=p_combined[observed], B=np.asarray(B)
+            )
+        )
     if loss == "likelihood":
         return float(
             -(
-                np.sum(np.log(p_combined[ot_logical]))
-                + np.sum(np.log(1.0 - p_combined[~ot_logical]))
+                _sum_r(_log_r(p_combined[ot_logical]))
+                + _sum_r(_log_r(1.0 - p_combined[~ot_logical & observed]))
             )
         )
     if loss == "MSE":
-        return float(np.mean(residual**2))
+        return _mean_r(residual**2)
     if loss == "MAE":
-        return float(np.mean(np.abs(residual)))
+        return _mean_r(np.abs(residual))
     if loss == "HAM":
-        return float(np.mean(np.sqrt(np.abs(residual))))
+        return _mean_r(np.sqrt(np.abs(residual)))
     if loss in ("LASSO", "RIDGE"):
         from smooth.adam_general.core.utils.cost_functions import (
             lasso_denominators,
@@ -370,7 +393,7 @@ def omg_cf(  # noqa: N802
                     elem["mat_wt"],
                     side["components_dict"],
                     side["explanatory"]["xreg_number"],
-                    ot,
+                    ot[observed],
                 ),
                 side["constant"]["constant_estimate"],
             )
@@ -380,13 +403,12 @@ def omg_cf(  # noqa: N802
         )
         B_penalty = np.concatenate([B_pen_a, B_pen_b])  # noqa: N806
 
-        obs_in_sample = int(observations_dict.get("obs_in_sample", len(residual)))
         error_term = (
             (1.0 - lam)
             * float(np.linalg.norm(residual))
-            / float(np.sqrt(obs_in_sample))
+            / float(np.sqrt(len(residual)))
         )
         if loss == "LASSO":
-            return error_term + lam * float(np.sum(np.abs(B_penalty)))
+            return error_term + lam * _sum_r(np.abs(B_penalty))
         return error_term + lam * float(np.linalg.norm(B_penalty))
     raise ValueError(f"Unsupported OMG loss={loss!r}.")

@@ -70,11 +70,11 @@ class TestInit:
 
 
 class TestOMDelegation:
-    def test_om_auto_returns_autoOM_instance(self):
+    def test_om_auto_returns_auto_om_instance(self):
         m = OM(model="MNN", occurrence="auto", lags=[1])
         assert isinstance(m, AutoOM)
 
-    def test_delegated_autoOM_fits(self, intermittent_y):
+    def test_delegated_auto_om_fits(self, intermittent_y):
         m = OM(model="MNN", occurrence="auto", lags=[1]).fit(intermittent_y)
         assert isinstance(m, (OM, OMG))
         assert np.all(m.fitted >= 0.0)

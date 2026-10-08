@@ -18,6 +18,7 @@ Classes
    OM
    OMG
    AutoOM
+   TBATS
 
 Functions
 ---------
@@ -26,4 +27,3 @@ Functions
    :toctree: _autosummary
 
    msdecompose
-   lowess

@@ -41,6 +41,10 @@
 #' @param cumulative If \code{TRUE}, then the cumulative forecast and prediction
 #' interval are produced instead of the normal ones. This is useful for
 #' inventory control systems.
+#' @param point What the point forecast is: \code{"skeleton"} (the default) is the one of
+#' the estimated model, as in \link[smooth]{forecast.adam}; \code{"mean"} and
+#' \code{"median"} are the (trimmed) mean and the median of the simulated paths, which
+#' include the uncertainty of the parameters.
 #' @param ... Other parameters passed to \code{reapply()} and \code{mean()} functions in case of
 #' \code{reforecast} (\code{trim} parameter in \code{mean()} is set to
 #' 0.01 by default) and to \code{vcov} in case of \code{reapply}.
@@ -97,18 +101,11 @@ reapply.default <- function(object, nsim=1000, type=c("opg","hessian","bootstrap
                      class="reapply"));
 }
 
-#' @importFrom MASS mvrnorm
-#' @export
-reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
-                         bootstrap=FALSE, heuristics=NULL, ...){
-    type <- covarTypeResolver(type, bootstrap);
-    # Start measuring the time of calculations
-    startTime <- Sys.time();
+# The covariance of the parameters for the draws of reapply(): a parameter with a
+# non-finite variance (not identified by the data) is held at its estimate, and a
+# matrix that is not positive semi-definite is repaired
+reapply_vcov <- function(object, type, heuristics, nsim, ...){
     parametersNames <- names(coef(object));
-
-    # Check whether we deal with adam ETS or the conventional
-    adamETS <- adamETSChecker(object);
-
     vcovAdam <- suppressWarnings(vcov(object, type=type, heuristics=heuristics, nsim=nsim, ...));
     # The OPG covariance (the default) returns an infinite variance for a
     # parameter the data does not identify (e.g. an initial that washes out when
@@ -145,6 +142,22 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
             vcovAdam[] <- diag(diag(vcovAdam));
         }
     }
+    return(vcovAdam);
+}
+
+#' @importFrom MASS mvrnorm
+#' @export
+reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
+                         bootstrap=FALSE, heuristics=NULL, ...){
+    type <- covarTypeResolver(type, bootstrap);
+    # Start measuring the time of calculations
+    startTime <- Sys.time();
+    parametersNames <- names(coef(object));
+
+    # Check whether we deal with adam ETS or the conventional
+    adamETS <- adamETSChecker(object);
+
+    vcovAdam <- reapply_vcov(object, type, heuristics, nsim, ...);
 
     # All the variables needed in the refitter
     yInSample <- actuals(object);
@@ -681,10 +694,11 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                            "M"=1/apply(profilesRecentArray[j+i,1:(lagsSeasonal[i]-1),,drop=FALSE],3,prod),
                            0);
             }
-            j <- j+max(initialSeasonalIndices);
-            k <- k+length(initialSeasonalIndices);
+            k <- k+sum(substr(parametersNames,1,8)=="seasonal");
         }
     }
+    # The rows after ETS, whichever of its initials were estimated
+    j <- componentsNumberETS;
     # CES states
     # if(cesModel){}
     # GUM states
@@ -727,6 +741,10 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     }
 
     yt <- matrix(actuals(object));
+    # The missing values are skipped, as in the fit
+    missingValues <- is.na(yt[,1]);
+    ot[missingValues | is.na(ot[,1])] <- 0;
+    yt[missingValues] <- 0;
 
     # Refit the model with the new parameter
     adamRefitted <- adamCpp$reapply(yt, ot,
@@ -919,13 +937,15 @@ reforecast.default <- function(object, h=10, newdata=NULL, occurrence=NULL,
                     nsim=nsim, ...));
 }
 
+#' @rdname reapply
 #' @export
 reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                             interval=c("prediction", "confidence", "none"),
                             level=0.95, side=c("both","upper","lower"), cumulative=FALSE,
                             nsim=100, type=c("opg","hessian","bootstrap"),
-                            bootstrap=FALSE, heuristics=NULL, ...){
+                            bootstrap=FALSE, heuristics=NULL, point=c("skeleton","mean","median"), ...){
     type <- covarTypeResolver(type, bootstrap);
+    point <- match.arg(point);
 
     objectRefitted <- reapply(object, nsim=nsim, type=type, heuristics=heuristics, ...);
     ellipsis <- list(...);
@@ -1118,94 +1138,8 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     # Deal with explanatory variables
     if(ncol(object$data)>1){
-        xregNumber <- length(object$initial$xreg);
-        xregNames <- names(object$initial$xreg);
-        # The newdata is not provided
-        if(is.null(newdata) && ((!is.null(object$holdout) && nrow(object$holdout)<h) ||
-                                is.null(object$holdout))){
-            # Salvage what data we can (if there is something)
-            if(!is.null(object$holdout)){
-                hNeeded <- h-nrow(object$holdout);
-                xreg <- tail(object$data,h);
-                xreg[1:nrow(object$holdout),] <- object$holdout;
-            }
-            else{
-                hNeeded <- h;
-                xreg <- tail(object$data,h);
-            }
-
-            if(is.matrix(xreg)){
-                warning("The newdata is not provided.",
-                        "Predicting the explanatory variables based on the in-sample data.",
-                        call.=FALSE);
-                for(i in 1:xregNumber){
-                    xreg[,i] <- adam(object$data[,i+1],h=hNeeded,silent=TRUE)$forecast;
-                }
-            }
-            else{
-                warning("The newdata is not provided. Using last h in-sample observations instead.",
-                        call.=FALSE);
-            }
-        }
-        else if(is.null(newdata) && !is.null(object$holdout) && nrow(object$holdout)>=h){
-            xreg <- object$holdout[1:h,,drop=FALSE];
-        }
-        else{
-            # If this is not a matrix / data.frame, then convert to one
-            if(!is.data.frame(newdata) && !is.matrix(newdata)){
-                newdata <- as.data.frame(newdata);
-                colnames(newdata) <- "xreg";
-            }
-            if(nrow(newdata)<h){
-                warning(paste0("The newdata has ",nrow(newdata)," observations, while ",h," are needed. ",
-                               "Using the last available values as future ones."),
-                        call.=FALSE);
-                newnRows <- h-nrow(newdata);
-                # xreg <- rbind(as.matrix(newdata),matrix(rep(tail(newdata,1),each=newnRows),newnRows,ncol(newdata)));
-                xreg <- newdata[c(1:nrow(newdata),rep(nrow(newdata)),each=newnRows),];
-            }
-            else if(nrow(newdata)>h){
-                warning(paste0("The newdata has ",nrow(newdata)," observations, while only ",h," are needed. ",
-                               "Using the last ",h," of them."),
-                        call.=FALSE);
-                xreg <- tail(newdata,h);
-            }
-            else{
-                xreg <- newdata;
-            }
-        }
-
-        # If the names are wrong, transform to data frame and expand
-        if(!all(xregNames %in% colnames(xreg))){
-            xreg <- as.data.frame(xreg);
-        }
-
-        # Expand the xreg if it is data frame to get the proper matrix
-        if(is.data.frame(xreg)){
-            testFormula <- formula(object);
-            # Remove response variable
-            testFormula[[2]] <- NULL;
-            # Expand the variables. We cannot use alm, because it is based on obsInSample
-            xregData <- model.frame(testFormula,data=xreg);
-            # Binary, flagging factors in the data
-            # Expanded stuff with all levels for factors
-            if(any((attr(terms(xregData),"dataClasses")=="factor")[-1])){
-                xregModelMatrix <- model.matrix(xregData,xregData,
-                                                contrasts.arg=lapply(xregData[attr(terms(xregData),"dataClasses")=="factor"],
-                                                                     contrasts, contrasts=FALSE));
-            }
-            else{
-                xregModelMatrix <- model.matrix(xregData,data=xregData);
-            }
-            colnames(xregModelMatrix) <- make.names(colnames(xregModelMatrix), unique=TRUE);
-            newdata <- as.matrix(xregModelMatrix)[,xregNames,drop=FALSE];
-            rm(xregData,xregModelMatrix);
-        }
-        else{
-            newdata <- xreg[,xregNames];
-        }
-        rm(xreg);
-
+        newdata <- adam_xregNewdata(object, h, newdata);
+        xregNumber <- ncol(newdata);
         arrWt[,componentsNumberETS+componentsNumberARIMA+c(1:xregNumber),] <- newdata;
     }
     else{
@@ -1259,10 +1193,11 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     #### Note that the cumulative doesn't work with oes at the moment!
     if(cumulative){
-        yForecast[] <- mean(apply(arrayYSimulated,1,sum,na.rm=TRUE,trim=trim));
+        # The totals of the paths
+        yForecast[] <- mean(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),trim=trim);
         if(interval!="none"){
-            yLower[] <- quantile(apply(arrayYSimulated,1,sum,na.rm=TRUE),levelLow,type=7);
-            yUpper[] <- quantile(apply(arrayYSimulated,1,sum,na.rm=TRUE),levelUp,type=7);
+            yLower[] <- quantile(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),levelLow,type=7);
+            yUpper[] <- quantile(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),levelUp,type=7);
         }
     }
     else{
@@ -1362,8 +1297,22 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         yUpper[] <- exp(yUpper);
     }
 
+    # The point forecast: the skeleton of the model, or the mean / median of the paths
+    paths <- arrayYSimulated;
+    if(adam_logModel(object)){
+        paths[] <- exp(paths);
+    }
+    if(cumulative){
+        paths <- array(apply(paths,c(2,3),sum,na.rm=TRUE), c(1,nsim,nsim));
+    }
+    yForecast[] <- switch(point,
+                          "skeleton"=forecast(object, h=h, newdata=newdata, occurrence=occurrence,
+                                              interval="none", cumulative=cumulative)$mean,
+                          "mean"=apply(paths,1,mean,na.rm=TRUE,trim=trim),
+                          "median"=apply(paths,1,median,na.rm=TRUE));
+
     structure(list(mean=yForecast, lower=yLower, upper=yUpper, model=object,
                    level=level, interval=interval, side=side, cumulative=cumulative,
-                   h=h, paths=arrayYSimulated),
+                   h=h, paths=arrayYSimulated, point=point),
               class=c("adam.forecast","smooth.forecast","forecast"));
 }

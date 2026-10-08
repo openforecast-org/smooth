@@ -276,3 +276,14 @@ def test_reforecast_accepts_a_per_horizon_sigma():
     result = location.reforecast(h=12, nsim=20, interval="prediction", seed=7)
     assert result.paths.shape == (12, 20, 20)
     assert np.all(np.isfinite(np.asarray(result.mean, dtype=float)))
+
+
+def test_the_scale_model_takes_the_missing_values_for_gaps():
+    """The gaps of the location model are skipped by the scale model too, and are
+    not an occurrence of it."""
+    y = _series("positive").copy()
+    y[[9, 49, 50]] = np.nan
+    location = ADAM(model="MAM", lags=[1, 12]).fit(y)
+    scale = sm(location)
+    assert np.isfinite(scale.loglik)
+    assert "iETS" not in str(scale.model_name)

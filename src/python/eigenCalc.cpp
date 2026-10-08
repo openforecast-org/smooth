@@ -37,7 +37,12 @@ py::array_t<double> smooth_eigens_wrapper(
     return arr;
 }
 
+py::array_t<double> eigen_moduli_wrapper(const arma::mat& A) {
+    return carma::to_numpy(eigenModuliCore(A));
+}
+
 PYBIND11_MODULE(_eigenCalc, m) {
+    m.def("eigen_moduli", &eigen_moduli_wrapper, py::arg("A"));
     m.def(
         "smooth_eigens",
         &smooth_eigens_wrapper,

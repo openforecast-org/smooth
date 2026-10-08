@@ -238,9 +238,12 @@ def make_scale_loss(
     the location model's negative log-likelihood, evaluated at the scale the
     scale model currently proposes.
     """
+    # ADAM hands the custom loss the observed values only: its data are those too
     y = np.asarray(y_in_sample, dtype=np.float64).ravel()
-    mu = np.asarray(y_fitted, dtype=np.float64).ravel()
-    ot = np.asarray(ot_logical, dtype=bool).ravel()
+    observed = ~np.isnan(y)
+    y = y[observed]
+    mu = np.asarray(y_fitted, dtype=np.float64).ravel()[observed]
+    ot = np.asarray(ot_logical, dtype=bool).ravel()[observed]
 
     def loss(actual: Any = None, fitted: Any = None, B: Any = None, **_: Any) -> float:
         scale = np.asarray(fitted, dtype=np.float64).ravel()
@@ -293,6 +296,8 @@ def build_scale_response(
         ot = y_in != 0
     else:
         ot = np.ones(e.size, dtype=bool)
+    # The missing values are gaps, as in the location model
+    ot &= ~np.isnan(y_in)
 
     # Assign into the non-zero positions only. Transforming the whole vector
     # would recycle a shorter right-hand side across the sample for occurrence

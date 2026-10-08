@@ -76,6 +76,25 @@ modelType <- function(object, ...) UseMethod("modelType")
 
 ##### Likelihood function and stuff #####
 
+# The observed in-sample values (TRUE where the lengths do not match): the missing
+# ones are not observations
+smooth_observed <- function(object){
+    observed <- !is.na(as.vector(actuals(object)));
+    if(length(observed)!=length(object$fitted)){
+        return(TRUE);
+    }
+    return(observed);
+}
+
+# The observations of the likelihood, its nobs attribute where it has one
+smooth_nobsLogLik <- function(object){
+    obs <- attr(logLik(object), "nobs");
+    if(is.null(obs)){
+        obs <- nobs(object);
+    }
+    return(obs);
+}
+
 #' @importFrom greybox AICc
 #' @export
 AICc.smooth <- function(object, ...){
@@ -84,13 +103,13 @@ AICc.smooth <- function(object, ...){
     llikelihood <- llikelihood[1:length(llikelihood)];
 
     if(!is.null(object$occurrence)){
-        obs <- sum(object$fitted!=0);
+        obs <- sum(object$fitted!=0 & smooth_observed(object));
         nParamSizes <- nParamAll - object$nParam[1,3];
         IC <- (2*nParamAll - 2*llikelihood +
                    2*nParamSizes*(nParamSizes + 1) / (obs - nParamSizes - 1));
     }
     else{
-        obs <- nobs(object);
+        obs <- smooth_nobsLogLik(object);
         IC <- 2*nParamAll - 2*llikelihood + 2 * nParamAll * (nParamAll + 1) / (obs - nParamAll - 1);
     }
 
@@ -105,12 +124,12 @@ BICc.smooth <- function(object, ...){
     llikelihood <- llikelihood[1:length(llikelihood)];
 
     if(!is.null(object$occurrence)){
-        obs <- sum(object$fitted!=0);
+        obs <- sum(object$fitted!=0 & smooth_observed(object));
         nParamSizes <- nParamAll - object$nParam[1,3];
         IC <- - 2*llikelihood + (nParamSizes * log(obs) * obs) / (obs - nParamSizes - 1);
     }
     else{
-        obs <- nobs(object);
+        obs <- smooth_nobsLogLik(object);
         IC <- - 2*llikelihood + (nParamAll * log(obs) * obs) / (obs - nParamAll - 1);
     }
 
@@ -319,7 +338,13 @@ logLik.smooth <- function(object, ...){
         return(NULL);
     }
     else{
-        return(structure(object$logLik,nobs=nobs(object),df=nparam(object),class="logLik"));
+        # The missing observations are not in the likelihood
+        obs <- nobs(object);
+        yActuals <- actuals(object);
+        if(length(yActuals)==obs){
+            obs <- obs - sum(is.na(yActuals));
+        }
+        return(structure(object$logLik,nobs=obs,df=nparam(object),class="logLik"));
     }
 }
 #' @export
@@ -425,7 +450,6 @@ pls.smooth <- function(object, holdout=NULL, ...){
     }
     # If holdout is provided, check it and use it. Otherwise try extracting from the model
     yForecast <- object$forecast;
-    covarMat <- multicov(object, ...);
     if(!is.null(holdout)){
         if(length(yForecast)!=length(holdout)){
             if(is.null(object$holdout)){
@@ -445,6 +469,19 @@ pls.smooth <- function(object, holdout=NULL, ...){
         holdout <- object$holdout;
     }
     h <- length(holdout);
+    # The covariance of the errors over the horizon of the holdout (it was the default
+    # h=10 of multicov(), which failed for any other holdout)
+    covarMat <- multicov(object, h=h, ...);
+    # The missing values of the holdout are not scored: the density is the marginal one
+    # of the observed values (their rows and columns of the covariance)
+    observed <- !is.na(as.vector(holdout));
+    if(!any(observed)){
+        stop("No values for the holdout are available. Cannot proceed.",
+             call.=FALSE);
+    }
+    holdout <- as.vector(holdout)[observed];
+    yForecast <- as.vector(yForecast)[observed];
+    covarMat <- covarMat[observed, observed, drop=FALSE];
 
     Etype <- errorType(object);
     loss <- object$loss;
@@ -503,7 +540,7 @@ pls.smooth <- function(object, holdout=NULL, ...){
         # Intermittent data
         else{
             ot <- holdout!=0;
-            pForecast <- object$occurrence$forecast;
+            pForecast <- as.vector(object$occurrence$forecast)[observed];
             errors <- holdout - yForecast / pForecast;
             if(all(ot)){
                 plsValue <- densityFunction(loss, errors, covarMat) + sum(log(pForecast));
@@ -529,7 +566,7 @@ pls.smooth <- function(object, holdout=NULL, ...){
         # Intermittent data
         else{
             ot <- holdout!=0;
-            pForecast <- object$occurrence$forecast;
+            pForecast <- as.vector(object$occurrence$forecast)[observed];
             errors <- log(holdout) - log(yForecast / pForecast);
             if(all(ot)){
                 plsValue <- (densityFunction(loss, errors, covarMat) - sum(log(holdout)) +
@@ -600,8 +637,11 @@ pointLik.om <- function(object, log=TRUE, ...){
     pFitted <- as.numeric(fitted(object));
     otLogical <- ot == 1;
     likValues <- numeric(length(ot));
+    # The missing observations are not in the likelihood: their values stay zero
+    otLogical[is.na(ot)] <- FALSE;
+    observed <- !is.na(ot);
     likValues[otLogical]  <- log(pFitted[otLogical]);
-    likValues[!otLogical] <- log(1 - pFitted[!otLogical]);
+    likValues[!otLogical & observed] <- log(1 - pFitted[!otLogical & observed]);
     fittedTS <- fitted(object);
     likValues <- ts(likValues, start=start(fittedTS), frequency=frequency(fittedTS));
     if(!log){
@@ -2295,7 +2335,10 @@ simulate.smooth <- function(object, nsim=1, seed=NULL, obs=NULL, ...){
 #### Type of smooth model. Internal function ####
 smoothType <- function(object, ...){
     if(!is.list(object$model)){
-        if(gregexpr("ETS",object$model)!=-1){
+        if(gregexpr("TBATS",object$model)!=-1){
+            smoothType <- "TBATS";
+        }
+        else if(gregexpr("ETS",object$model)!=-1){
             smoothType <- "ETS";
         }
         else if(gregexpr("CES",object$model)!=-1){

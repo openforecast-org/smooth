@@ -11,7 +11,11 @@ import numpy as np
 
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.ces.filler import ces_filler
-from smooth.adam_general.core.utils.utils import _sum_r, calculate_multistep_loss
+from smooth.adam_general.core.utils.utils import (
+    _sum_r,
+    calculate_multistep_loss,
+    complete_windows,
+)
 
 _R_LN_SQRT_2PI = 0.918938533204672741780329736406
 
@@ -193,12 +197,15 @@ def ces_cf(
     errors = np.array(adam_fitted.errors).ravel()
     fitted = np.array(adam_fitted.fitted).ravel()
 
-    # Compute loss — R lines 510-555
+    # Compute loss — R lines 510-555. The missing values are not in the loss: the
+    # errors are zero there, and the losses are divided by the observed values
+    # (ot_logical: CES has no occurrence model), as in ADAM
+    obs_observed = int(np.sum(ot_logical))
     if not multisteps:
         if loss == "likelihood":
             # CES scaler: sqrt(sum(errors^2)/obs) — R line 482
             errors_ot = errors[ot_logical]
-            scale = math.sqrt(_sum_r(errors_ot**2) / obs_in_sample)
+            scale = math.sqrt(_sum_r(errors_ot**2) / obs_observed)
             y_ot = np.asarray(y_in_sample, dtype=float)[ot_logical]
             fitted_ot = fitted[ot_logical]
             log_scale = math.log(scale)
@@ -206,13 +213,13 @@ def ces_cf(
                 _R_LN_SQRT_2PI + 0.5 * ((y_ot - fitted_ot) / scale) ** 2 + log_scale
             )
         elif loss == "MSE":
-            cf_value = _sum_r(errors**2) / obs_in_sample
+            cf_value = _sum_r(errors**2) / obs_observed
         elif loss == "MAE":
-            cf_value = _sum_r(np.abs(errors)) / obs_in_sample
+            cf_value = _sum_r(np.abs(errors)) / obs_observed
         elif loss == "HAM":
-            cf_value = _sum_r(np.sqrt(np.abs(errors))) / obs_in_sample
+            cf_value = _sum_r(np.sqrt(np.abs(errors))) / obs_observed
         else:
-            cf_value = _sum_r(errors**2) / obs_in_sample
+            cf_value = _sum_r(errors**2) / obs_observed
     else:
         # Multistep errors — R lines 534-555
         adam_errors = adam_cpp.ferrors(
@@ -224,11 +231,10 @@ def ces_cf(
             int(h),
             y_f,
         ).errors
-        adam_errors = np.array(adam_errors)
-
-        cf_value = calculate_multistep_loss(
-            loss, np.asarray(adam_errors, dtype=float), obs_in_sample, h
-        )
+        # The windows with all their targets observed
+        adam_errors = np.asarray(adam_errors, dtype=float)
+        adam_errors = adam_errors[complete_windows(ot_logical, h)]
+        cf_value = calculate_multistep_loss(loss, adam_errors, len(adam_errors) + h, h)
 
     if np.isnan(cf_value) or np.isinf(cf_value):
         cf_value = 1e300

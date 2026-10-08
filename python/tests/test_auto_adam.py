@@ -345,7 +345,8 @@ class TestAutoADAMDefaults:
         assert m._auto_arima_select is True
 
     def test_arima_select_on_via_explicit_flag(self):
-        m = AutoADAM(orders={"ar": [3, 3], "i": [2, 1], "ma": [3, 3]}, arima_select=True)
+        orders = {"ar": [3, 3], "i": [2, 1], "ma": [3, 3]}
+        m = AutoADAM(orders=orders, arima_select=True)
         assert m._auto_arima_select is True
 
     def test_default_ic_is_aicc(self):

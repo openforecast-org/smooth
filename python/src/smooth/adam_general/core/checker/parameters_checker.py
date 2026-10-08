@@ -1,11 +1,19 @@
 import warnings
+from functools import partial
 
 import numpy as np
 import pandas as pd
 
+from smooth.adam_general.core.utils.utils import make_names, observed_mask
+
 from ._utils import _warn
 from .arima_checks import _check_arima
-from .data_checks import _calculate_ot_logical, _check_lags, _check_occurrence
+from .data_checks import (
+    _calculate_ot_logical,
+    _check_lags,
+    _check_occurrence,
+    _fill_missing,
+)
 from .model_checks import _check_ets_model
 from .organizers import (
     _calculate_n_param_max,
@@ -531,6 +539,13 @@ def parameters_checker(
             raise ValueError("Data must be numeric or convertible to numeric values")
 
     occ_info = _check_occurrence(data_values, occurrence, silent, holdout, h)
+    # The missing values: filled for the initialisation and skipped by the fit, as R
+    data, data_values, y_na_values = _fill_missing(
+        data,
+        data_values,
+        lags,
+        len(data_values) - (h if holdout else 0),
+    )
     obs_in_sample = occ_info["obs_in_sample"]
     obs_nonzero = occ_info["obs_nonzero"]
     occurrence_model = occ_info["occurrence_model"]
@@ -554,8 +569,12 @@ def parameters_checker(
     #####################
     # 3) Check ETS Model
     #####################
+    # On the observed in-sample values: the filled ones are not data
+    data_observed = np.asarray(data_values, dtype=float)[:obs_in_sample][
+        ~y_na_values[:obs_in_sample]
+    ]
     ets_info = _check_ets_model(
-        model, distribution, data, silent, max_lag, occurrence_model
+        model, distribution, data_observed, silent, max_lag, occurrence_model
     )
     ets_model = ets_info["ets_model"]
     model_do = ets_info.get("model_do", "estimate")
@@ -632,13 +651,15 @@ def parameters_checker(
     )
 
     # The gradient initial-state solve profiles the loss in C++, which a custom
-    # loss callable cannot cross; the fit falls back to backcasting (mirrors R)
+    # loss callable cannot cross: the initials are backcast instead, and the model
+    # says so (as R)
     if init_info["initial_type"] == "gradient" and loss == "custom":
-        _warn(
+        warnings.warn(
             'initial="gradient" is not available for custom loss functions. '
-            "Backcasting will be used instead.",
-            silent,
+            'Switching to initial="backcasting".',
+            stacklevel=3,
         )
+        init_info["initial_type"] = "backcasting"
 
     # Process n_iterations parameter (for backcasting)
     # Default behavior: 2 for backcasting/complete, 1 for optimal/two-stage
@@ -884,6 +905,7 @@ def parameters_checker(
         obs_in_sample=obs_in_sample,
         h=h,
         holdout=holdout,
+        y_na_values=y_na_values,
     )
 
     # Create observations dictionary
@@ -903,6 +925,11 @@ def parameters_checker(
         # "obs_states": obs_states,
         "ot_logical": ot_info["ot_logical"],
         "ot": ot_info["ot"],
+        # The missing in-sample observations, outside the likelihood
+        "y_na_values": y_na_values[:actual_obs_in_sample],
+        "obs_zero": int(
+            np.sum(~ot_info["ot_logical"] & ~y_na_values[:actual_obs_in_sample])
+        ),
         "y_in_sample": ot_info.get("y_in_sample", data),
         "y_holdout": ot_info.get("y_holdout", None),
         "frequency": ot_info["frequency"],
@@ -1045,34 +1072,60 @@ def parameters_checker(
         from greybox import ALM
 
         n = observations_dict["obs_in_sample"]
-        y_is = np.asarray(observations_dict["y_in_sample"], dtype=float)
+        # The observed values only: the filled ones are for the initialisation of
+        # the states, which a regression does not have
+        observed = observed_mask(observations_dict)
+        y_is = np.asarray(observations_dict["y_in_sample"], dtype=float)[observed]
+        X_is = X[:n][observed]
         dist = _map_distribution_for_greybox(distribution)
         if regressors == "select":
             names = xreg_names_from_input or [f"x{i + 1}" for i in range(xreg_number)]
-            X_df = pd.DataFrame(X[:n], columns=names)
+            X_df = pd.DataFrame(X_is, columns=names)
             X_df.insert(0, "y", y_is)
             from greybox import stepwise
 
             return stepwise(X_df, ic=ic, distribution=dist, silent=True)
         alm = ALM(distribution=dist)
-        alm.fit(np.column_stack([np.ones(n), X[:n]]), y_is)
+        alm.fit(np.column_stack([np.ones(len(y_is)), X_is]), y_is)
         return alm
 
     # Build explanatory variables dictionary
-    if has_xreg:
-        xreg_dict = _process_xreg(
+    xreg_builder = partial(
+        _process_xreg,
+        regressors="use" if regressors == "select" else regressors,
+        y_in_sample=observations_dict["y_in_sample"],
+        obs_in_sample=observations_dict["obs_in_sample"],
+        distribution=distribution,
+        e_type=ets_info["error_type"],
+        ic=ic,
+        # The observed (non-zero) values: the missing ones are not in the regression
+        ot_logical=observations_dict["ot_logical"]
+        if occurrence_model or not np.all(observed_mask(observations_dict))
+        else None,
+    )
+    if has_xreg and regressors == "select":
+        # As R, the model is estimated without the regressors, and the estimator
+        # selects them on its errors
+        xreg_dict = {
+            **_xreg_dict_none("select"),
+            "select": {
+                "X": X,
+                "names": make_names(
+                    xreg_names_from_input or [f"x{i + 1}" for i in range(xreg_number)]
+                ),
+                "build": xreg_builder,
+            },
+        }
+        has_xreg = False
+        model_type_dict["xreg_model"] = False
+        persistence_dict["persistence_xreg_estimate"] = False
+        initials_dict["initial_xreg_estimate"] = False
+    elif has_xreg:
+        xreg_dict = xreg_builder(
             X=X,
-            regressors=regressors,
-            y_in_sample=observations_dict["y_in_sample"],
-            obs_in_sample=observations_dict["obs_in_sample"],
-            distribution=distribution,
-            e_type=ets_info["error_type"],
-            ic=ic,
             xreg_names_from_input=xreg_names_from_input,
             initial_xreg=initials_dict.get("initial_xreg"),
-            ot_logical=observations_dict["ot_logical"] if occurrence_model else None,
         )
-        # For "select": if no variables survived selection, disable xreg
         if not xreg_dict["xreg_model"]:
             has_xreg = False
             model_type_dict["xreg_model"] = False
@@ -1085,20 +1138,7 @@ def parameters_checker(
                 persistence_dict["persistence_xreg_estimate"] = False
                 initials_dict["initial_xreg_estimate"] = True
     else:
-        xreg_dict = {
-            "xreg_model": False,
-            "regressors": None,
-            "xreg_model_initials": None,
-            "xreg_data": None,
-            "xreg_number": 0,
-            "xreg_names": None,
-            "response_name": None,
-            "formula": None,
-            "xreg_parameters_missing": None,
-            "xreg_parameters_included": None,
-            "xreg_parameters_estimated": None,
-            "xreg_parameters_persistence": None,
-        }
+        xreg_dict = _xreg_dict_none(None)
 
     # LASSO / RIDGE with lambda=1 is the penalty alone, which is zero with the
     # parameters at their shrinkage targets: no smoothing, phi=1, AR=1 and MA=0. They
@@ -1108,6 +1148,24 @@ def parameters_checker(
         _lasso_ridge_targets(
             model_type_dict, persistence_dict, phi_dict, arima_dict, lags_dict
         )
+
+    # The constant is a drift with ETS or differences, as R names it
+    if constant_dict["constant_required"]:
+        constant_dict["constant_name"] = (
+            "drift"
+            if model_type_dict["ets_model"]
+            or any(np.atleast_1d(arima_dict.get("i_orders") or 0))
+            else "constant"
+        )
+
+    # The persistence is estimated if any of its parameters is (R's parametersChecker):
+    # a provided alpha leaves beta, gamma and delta to the estimation
+    persistence_dict["persistence_estimate"] = bool(
+        persistence_dict["persistence_level_estimate"]
+        or persistence_dict["persistence_trend_estimate"]
+        or any(persistence_dict["persistence_seasonal_estimate"] or [])
+        or persistence_dict["persistence_xreg_estimate"]
+    )
 
     # Calculate number of parameters using the new n_param table structure
     from smooth.adam_general.core.utils.n_param import build_n_param_table
@@ -1238,6 +1296,24 @@ def _map_distribution_for_greybox(distribution):
     return _map.get(distribution, "dnorm")
 
 
+def _xreg_dict_none(regressors):
+    """The explanatory dict of a model without regressors."""
+    return {
+        "xreg_model": False,
+        "regressors": regressors,
+        "xreg_model_initials": None,
+        "xreg_data": None,
+        "xreg_number": 0,
+        "xreg_names": None,
+        "response_name": None,
+        "formula": None,
+        "xreg_parameters_missing": None,
+        "xreg_parameters_included": None,
+        "xreg_parameters_estimated": None,
+        "xreg_parameters_persistence": None,
+    }
+
+
 def _process_xreg(
     X,
     regressors,
@@ -1255,11 +1331,11 @@ def _process_xreg(
     Parameters
     ----------
     X : np.ndarray, shape (obs_all, p)
-    regressors : {"use", "select", "adapt"}
+    regressors : {"use", "adapt"} (the selection is done by the estimator)
     y_in_sample : array-like, shape (obs_in_sample,)
     obs_in_sample : int
     distribution : str  smooth distribution name
-    ic : str  information criterion for stepwise selection
+    ic : str  information criterion (unused: the estimator selects)
     xreg_names_from_input : list[str] or None
     initial_xreg : np.ndarray or None
         User-supplied initial coefficient values, shape (p, 1). If provided,
@@ -1270,53 +1346,22 @@ def _process_xreg(
 
     Returns
     -------
-    dict  populated xreg_dict (xreg_model may be False if selection drops all vars)
+    dict  populated xreg_dict
     """
     from greybox import ALM
 
     n_cols = X.shape[1]
-    X_in_sample = X[:obs_in_sample]
     y_is = np.asarray(y_in_sample, dtype=float)
 
     # Default names
-    xreg_names = (
+    # The names of the variables, syntactic and unique as R makes them
+    xreg_names = make_names(
         xreg_names_from_input
         if xreg_names_from_input is not None
         else [f"x{i + 1}" for i in range(n_cols)]
     )
 
-    # ---------- variable selection ----------
     selected_mask = np.ones(n_cols, dtype=bool)
-    if regressors == "select":
-        import pandas as pd
-        from greybox import stepwise
-
-        df_sw = pd.DataFrame(X_in_sample, columns=xreg_names)
-        df_sw.insert(0, "y", y_is)
-        sw_dist = _map_distribution_for_greybox(distribution)
-        try:
-            sw_model = stepwise(df_sw, ic=ic, distribution=sw_dist, silent=True)
-            sel_names = sw_model._feature_names or []
-            selected_mask = np.array([n in sel_names for n in xreg_names])
-        except Exception:
-            pass  # keep all variables on failure
-
-        if not selected_mask.any():
-            # No variables selected — return disabled xreg_dict
-            return {
-                "xreg_model": False,
-                "regressors": regressors,
-                "xreg_model_initials": None,
-                "xreg_data": None,
-                "xreg_number": 0,
-                "xreg_names": None,
-                "response_name": None,
-                "formula": None,
-                "xreg_parameters_missing": None,
-                "xreg_parameters_included": None,
-                "xreg_parameters_estimated": None,
-                "xreg_parameters_persistence": None,
-            }
 
     # Apply selection mask
     X_selected = X[:, selected_mask]

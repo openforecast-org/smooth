@@ -87,30 +87,31 @@ inline double adamWvalue(arma::vec const &vecVt, arma::rowvec const &rowvecW,
         }
     }
 
-    // Explanatory variables
+    // Explanatory variables, without the constant that follows them
     if(nXreg > 0){
+        unsigned int xregLast = nETS+nArima+nXreg-1;
         // If error is additive, add explanatory variables. Otherwise multiply by exp(ax)
         switch(E){
         case 'A':
-            yfit += as_scalar(rowvecW.cols(nETS+nArima,nComponents-1) *
-                vecVt.rows(nETS+nArima,nComponents-1));
+            yfit += as_scalar(rowvecW.cols(nETS+nArima,xregLast) *
+                vecVt.rows(nETS+nArima,xregLast));
             break;
         case 'M':
-            yfit = yfit * as_scalar(exp(rowvecW.cols(nETS+nArima,nComponents-1) *
-                vecVt.rows(nETS+nArima,nComponents-1)));
+            yfit = yfit * as_scalar(exp(rowvecW.cols(nETS+nArima,xregLast) *
+                vecVt.rows(nETS+nArima,xregLast)));
             break;
         }
     }
-    else{
-        if(constant){
-            switch(E){
-            case 'A':
-                yfit += vecVt(nComponents-1);
-                break;
-            case 'M':
-                yfit = yfit * vecVt(nComponents-1);
-                break;
-            }
+
+    // The constant: a summand with the additive error, a ratio with the multiplicative one
+    if(constant){
+        switch(E){
+        case 'A':
+            yfit += vecVt(nComponents-1);
+            break;
+        case 'M':
+            yfit = yfit * vecVt(nComponents-1);
+            break;
         }
     }
 
@@ -163,11 +164,17 @@ inline arma::vec adamFvalue(arma::vec const &matrixVt, arma::mat const &matrixF,
         break;
     }
 
-    // If there is ARIMA, fix the states for E='M'
+    // If there is ARIMA, fix the states for E='M'. They are multiplicative, so F acts on
+    // their logarithms, and the constant (a ratio) enters through its column in logs, as
+    // it does in levels with E='A': without it, the drift was absorbed by the states
     if(nArima>0 && E=='M'){
-        matrixVtnew.rows(nETS,nETS+nArima-1) =
-            exp(matrixF.submat(nETS,nETS,nETS+nArima-1,nETS+nArima-1) *
-            log(matrixVt.rows(nETS,nETS+nArima-1)));
+        arma::vec logStatesNew = matrixF.submat(nETS,nETS,nETS+nArima-1,nETS+nArima-1) *
+            log(matrixVt.rows(nETS,nETS+nArima-1));
+        if(constant){
+            logStatesNew += matrixF.submat(nETS,nComponents-1,nETS+nArima-1,nComponents-1) *
+                std::log(matrixVt(nComponents-1));
+        }
+        matrixVtnew.rows(nETS,nETS+nArima-1) = exp(logStatesNew);
     }
 
     // If there is a constant, fix the first state of ETS(M,*,*)
@@ -177,6 +184,24 @@ inline arma::vec adamFvalue(arma::vec const &matrixVt, arma::mat const &matrixF,
 
     return matrixVtnew;
 }
+
+// The transition F v as a sparse product, when requested, where adamFvalue() is the plain
+// product and F is large and mostly zeros (the harmonics of TBATS, the companion matrix of
+// SSARIMA). Below five states Armadillo's dense product of the small matrices is faster.
+struct SparseTransition {
+    bool use = false;
+    arma::sp_mat matrixF;
+    SparseTransition(bool const requested, arma::mat const &matrixFDense, char const E, char const T,
+                     unsigned int const nETS, unsigned int const nArima, bool const constant){
+        bool plainProduct = (T=='N' || T=='A') &&
+            !(E=='M' && (nArima>0 || (constant && nETS>0)));
+        if(requested && plainProduct && matrixFDense.n_rows>4 &&
+           arma::accu(matrixFDense!=0)*2 <= matrixFDense.n_elem){
+            use = true;
+            matrixF = arma::sp_mat(matrixFDense);
+        }
+    }
+};
 
 /* # Function returns value of g() -- the update of states -- used in components estimation for the persistence */
 inline arma::vec adamGvalue(arma::vec const &matrixVt, arma::mat const &matrixF, arma::mat const &rowvecW,
@@ -429,7 +454,9 @@ inline arma::vec adamGvalue(arma::vec const &matrixVt, arma::mat const &matrixF,
         g.rows(find_nonfinite(g)).fill(0);
     }
 
-    if(!adamETS){
+    // Without ETS components there is nothing specific to ADAM ETS: the other rows of
+    // g are those of the conventional one (they stayed at 1 otherwise)
+    if(!adamETS || nETS==0){
         // Do the multiplication in order to get the correct g(v) value
         g = g % vectorG * error;
     }

@@ -5,6 +5,10 @@ smoothEigensR <- function(persistence, transition, measurement, lagsModelAll, xr
     .Call('_smooth_smoothEigensR', PACKAGE = 'smooth', persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber, constantRequired)
 }
 
+eigenModuliCpp <- function(A) {
+    .Call('_smooth_eigenModuliCpp', PACKAGE = 'smooth', A)
+}
+
 hessianCpp <- function(f, x0, h = 1.220703125e-4) {
     .Call('_smooth_hessianCpp', PACKAGE = 'smooth', f, x0, h)
 }
@@ -21,8 +25,28 @@ arimaHRCpp <- function(y, arOrders, maOrders, lags, arEstimate, maEstimate, arma
     .Call('_smooth_arimaHRCpp', PACKAGE = 'smooth', y, arOrders, maOrders, lags, arEstimate, maEstimate, armaParameters, useLevel, bounded)
 }
 
+arimaHRSelectCpp <- function(y, arOrders, maOrders, lags, screen, arMax, maMax, bounded) {
+    .Call('_smooth_arimaHRSelectCpp', PACKAGE = 'smooth', y, arOrders, maOrders, lags, screen, arMax, maMax, bounded)
+}
+
 arimaParameterBoundsCpp <- function(values, j, sign) {
     .Call('_smooth_arimaParameterBoundsCpp', PACKAGE = 'smooth', values, j, sign)
+}
+
+householderQRCpp <- function(X) {
+    .Call('_smooth_householderQRCpp', PACKAGE = 'smooth', X)
+}
+
+householderCoefCpp <- function(qr, qraux, rDiag, y) {
+    .Call('_smooth_householderCoefCpp', PACKAGE = 'smooth', qr, qraux, rDiag, y)
+}
+
+householderResidCpp <- function(qr, qraux, rDiag, y) {
+    .Call('_smooth_householderResidCpp', PACKAGE = 'smooth', qr, qraux, rDiag, y)
+}
+
+naFillCpp <- function(y, lagMax) {
+    .Call('_smooth_naFillCpp', PACKAGE = 'smooth', y, lagMax)
 }
 
 forecasterwrap <- function(matvt, matF, matw, h, Etype, Ttype, Stype, lagsModel, matxt, matat, matFX) {

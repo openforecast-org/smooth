@@ -227,8 +227,8 @@ iteration for multiplicative / mixed ETS. It avoids the divergence that
 backcasting can exhibit for additive seasonal models with a trend and a large
 seasonal smoothing parameter. This option currently supports ETS models (no
 ARIMA/xreg, single seasonality) and the built-in losses; other specifications
-(including custom loss functions, which cannot be profiled in C++) fall back
-to backcasting.
+fall back to backcasting. A custom loss function cannot be profiled in C++, so
+with it the initialisation is switched to \code{"backcasting"} with a warning.
 
 If a use provides a list of values, it is recommended to use the named one and
 to provide the initial components that are available. For example:
@@ -366,7 +366,7 @@ the model,
 \item \code{lossValue} - the value of that loss function,
 \item \code{logLik} - the value of the log-likelihood,
 \item \code{distribution} - the distribution function used in the calculation of the likelihood,
-\item \code{scale} - the value of the scale parameter of the distribution, as in the ADAM monograph: sigma^2 for \code{dnorm}, \code{dlnorm}, \code{dinvgauss} and \code{dgamma}, and s for the others (the MLE, not de-biased), or the scale model from \link[smooth]{sm} after \code{implant()},
+\item \code{scale} - the value of the scale parameter of the distribution, as in the ADAM monograph: sigma^2 for \code{dnorm}, \code{dlnorm}, \code{dinvgauss} and \code{dgamma}, and s for the others (the MLE, not de-biased), or the scale model from \link[greybox]{sm} after \code{implant()},
 \item \code{lambda} - the value of the parameter used in LASSO / dalaplace / dt,
 \item \code{B} - the vector of all estimated parameters,
 \item \code{lags} - the vector of lags used in the model construction,

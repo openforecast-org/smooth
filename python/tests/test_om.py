@@ -57,7 +57,7 @@ class TestInit:
         assert m.occurrence == occ
         assert m.occurrence_char in ("f", "o", "i", "d")
 
-    def test_init_auto_returns_autoOM_instance(self):
+    def test_init_auto_returns_auto_om_instance(self):
         from smooth import AutoOM
 
         m = OM(occurrence="auto")
@@ -375,6 +375,32 @@ class TestETSShapes:
         assert m.fitted.shape == intermittent_y.shape
 
 
+class TestSelection:
+    @pytest.mark.parametrize(
+        "model,lags,pool",
+        [
+            ("ZXN", [1], {"ANN", "AAN", "MNN"}),
+            ("ZZN", [1], {"ANN", "AAN", "AAdN", "MNN", "MAN", "MAdN"}),
+            ("XXN", [1], {"ANN", "AAN", "AAdN"}),
+        ],
+    )
+    def test_select_picks_min_ic(self, intermittent_y, model, lags, pool):
+        m = OM(model=model, occurrence="odds-ratio", lags=lags).fit(intermittent_y)
+        assert set(m.ics) <= pool
+        assert m.model_type == min(m.ics, key=m.ics.get)
+        refit = OM(model=m.model_type, occurrence="odds-ratio", lags=lags)
+        assert refit.fit(intermittent_y).loglik == pytest.approx(m.loglik)
+
+    def test_general_selects_both_sides(self, intermittent_y):
+        m = OM(model="ZXN", occurrence="general", lags=[1]).fit(intermittent_y)
+        assert m.model.startswith("oETS[G]")
+        assert np.isfinite(m.loglik)
+
+    def test_combine_not_available(self, intermittent_y):
+        with pytest.raises(NotImplementedError):
+            OM(model="CCN", occurrence="odds-ratio", lags=[1]).fit(intermittent_y)
+
+
 # --------------------------------------------------------------------------
 # Input variants
 # --------------------------------------------------------------------------
@@ -499,7 +525,12 @@ class TestOMvcovType:
         ),
         # A mixed model starts from no smoothing, as in R
         (
-            {"model": "MAN", "loss": "LASSO", "lambda_param": 0.2, "initial": "optimal"},
+            {
+                "model": "MAN",
+                "loss": "LASSO",
+                "lambda_param": 0.2,
+                "initial": "optimal",
+            },
             "om(y, 'MAN', occurrence='odds-ratio', loss='LASSO', lambda=0.2,"
             " initial='optimal')",
             False,
@@ -523,3 +554,30 @@ def test_om_penalty_matches_r(kwargs, r_call, with_x):
     estimated = model._adam_estimated
     assert estimated["CF_value"] == pytest.approx(expected[0], rel=1e-8)
     np.testing.assert_allclose(estimated["B"], expected[1:], rtol=1e-5, atol=1e-8)
+
+
+def _intermittent_with_gaps(seed):
+    rng = np.random.default_rng(seed)
+    y = rng.binomial(1, 0.4, 200) * np.exp(rng.normal(2, 0.3, 200))
+    y[list(range(9, 20)) + [99]] = np.nan
+    return y
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+def test_om_skips_the_missing_observations():
+    y = _intermittent_with_gaps(1)
+    observed = ~np.isnan(y)
+    model = OM(model="ANN", occurrence="odds-ratio").fit(y)
+    assert model._nobs_observed() == observed.sum()
+    assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-10)
+    assert np.all(model.point_lik()[~observed] == 0)
+    # The fixed probability is the occurrence rate of the observed values
+    model = OM(model="ANN", occurrence="fixed").fit(y)
+    assert model.fitted[0] == pytest.approx(np.mean(y[observed] != 0))
+
+
+def test_om_with_a_fixed_probability_has_no_arima():
+    y = np.random.default_rng(44).poisson(0.7, 120).astype(float)
+    model = OM(model="MNN", orders={"ar": [1], "ma": [1]}, occurrence="fixed").fit(y)
+    assert model.model == "oETS(ANN)[F]"
+    assert np.isfinite(model.loglik)

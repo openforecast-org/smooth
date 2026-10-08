@@ -344,7 +344,7 @@ def test_reapply_xreg_runs_and_returns_finite():
     r = m.reapply(nsim=15, seed=0)
     assert r.refitted.shape == (m.nobs, 15)
     assert np.all(np.isfinite(r.refitted.to_numpy()))
-    assert "xreg1" in r.random_parameters.columns
+    assert "x1" in r.random_parameters.columns
     assert any("x" in nm for nm in r.persistence.index)
 
 
@@ -408,3 +408,29 @@ def test_reapply_inherits_in_msarima_subclass():
     assert isinstance(r, ReapplyResult)
     assert r.refitted.shape == (m.nobs, 10)
     assert np.all(np.isfinite(r.refitted.to_numpy()))
+
+
+@pytest.mark.parametrize(
+    "model_str, initial",
+    [
+        ("AAN", "backcasting"),
+        ("AAN", "optimal"),
+        ("AAA", "backcasting"),
+        ("AAA", "optimal"),
+    ],
+)
+def test_reapply_xreg_draws_are_the_states_of_the_regressors(model_str, initial):
+    """Each draw of the coefficient starts the state of its regressor, after the
+    ETS states whichever of their initials are estimated."""
+    rng = np.random.default_rng(41)
+    t = np.arange(1, 121)
+    x = rng.normal(10, 2, 120)
+    y = 100 + 0.5 * t + 10 * np.sin(2 * np.pi * t / 12) + 3 * x + rng.normal(size=120)
+    m = ADAM(model=model_str, lags=[1, 12], initial=initial).fit(y, X=x[:, None])
+    r = m.reapply(nsim=5, seed=1)
+    states = np.asarray(r.states)
+    np.testing.assert_allclose(
+        states[-1, 0, :],
+        r.random_parameters["x1"].to_numpy(),
+        rtol=1e-12,
+    )

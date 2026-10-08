@@ -30,6 +30,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// eigenModuliCpp
+arma::vec eigenModuliCpp(const arma::mat& A);
+RcppExport SEXP _smooth_eigenModuliCpp(SEXP ASEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type A(ASEXP);
+    rcpp_result_gen = Rcpp::wrap(eigenModuliCpp(A));
+    return rcpp_result_gen;
+END_RCPP
+}
 // hessianCpp
 NumericMatrix hessianCpp(Function f, NumericVector x0, double h);
 RcppExport SEXP _smooth_hessianCpp(SEXP fSEXP, SEXP x0SEXP, SEXP hSEXP) {
@@ -87,6 +98,24 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// arimaHRSelectCpp
+List arimaHRSelectCpp(const arma::vec& y, const arma::uvec& arOrders, const arma::uvec& maOrders, const arma::uvec& lags, int screen, int arMax, int maMax, bool bounded);
+RcppExport SEXP _smooth_arimaHRSelectCpp(SEXP ySEXP, SEXP arOrdersSEXP, SEXP maOrdersSEXP, SEXP lagsSEXP, SEXP screenSEXP, SEXP arMaxSEXP, SEXP maMaxSEXP, SEXP boundedSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type arOrders(arOrdersSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type maOrders(maOrdersSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type lags(lagsSEXP);
+    Rcpp::traits::input_parameter< int >::type screen(screenSEXP);
+    Rcpp::traits::input_parameter< int >::type arMax(arMaxSEXP);
+    Rcpp::traits::input_parameter< int >::type maMax(maMaxSEXP);
+    Rcpp::traits::input_parameter< bool >::type bounded(boundedSEXP);
+    rcpp_result_gen = Rcpp::wrap(arimaHRSelectCpp(y, arOrders, maOrders, lags, screen, arMax, maMax, bounded));
+    return rcpp_result_gen;
+END_RCPP
+}
 // arimaParameterBoundsCpp
 arma::vec arimaParameterBoundsCpp(const arma::vec& values, int j, double sign);
 RcppExport SEXP _smooth_arimaParameterBoundsCpp(SEXP valuesSEXP, SEXP jSEXP, SEXP signSEXP) {
@@ -97,6 +126,57 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type j(jSEXP);
     Rcpp::traits::input_parameter< double >::type sign(signSEXP);
     rcpp_result_gen = Rcpp::wrap(arimaParameterBoundsCpp(values, j, sign));
+    return rcpp_result_gen;
+END_RCPP
+}
+// householderQRCpp
+List householderQRCpp(const arma::mat& X);
+RcppExport SEXP _smooth_householderQRCpp(SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(householderQRCpp(X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// householderCoefCpp
+arma::vec householderCoefCpp(const arma::mat& qr, const arma::vec& qraux, const arma::vec& rDiag, const arma::vec& y);
+RcppExport SEXP _smooth_householderCoefCpp(SEXP qrSEXP, SEXP qrauxSEXP, SEXP rDiagSEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type qr(qrSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type qraux(qrauxSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type rDiag(rDiagSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    rcpp_result_gen = Rcpp::wrap(householderCoefCpp(qr, qraux, rDiag, y));
+    return rcpp_result_gen;
+END_RCPP
+}
+// householderResidCpp
+arma::vec householderResidCpp(const arma::mat& qr, const arma::vec& qraux, const arma::vec& rDiag, const arma::vec& y);
+RcppExport SEXP _smooth_householderResidCpp(SEXP qrSEXP, SEXP qrauxSEXP, SEXP rDiagSEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type qr(qrSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type qraux(qrauxSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type rDiag(rDiagSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    rcpp_result_gen = Rcpp::wrap(householderResidCpp(qr, qraux, rDiag, y));
+    return rcpp_result_gen;
+END_RCPP
+}
+// naFillCpp
+arma::vec naFillCpp(const arma::vec& y, unsigned int lagMax);
+RcppExport SEXP _smooth_naFillCpp(SEXP ySEXP, SEXP lagMaxSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type lagMax(lagMaxSEXP);
+    rcpp_result_gen = Rcpp::wrap(naFillCpp(y, lagMax));
     return rcpp_result_gen;
 END_RCPP
 }

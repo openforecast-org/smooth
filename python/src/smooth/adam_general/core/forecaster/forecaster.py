@@ -6,6 +6,7 @@ import pandas as pd
 # Note: adam_cpp instance is passed to functions that need C++ integration
 # The adamCore object is created in architector() and passed through the pipeline
 from smooth.adam_general.core.utils.n_param import NParam
+from smooth.adam_general.core.utils.utils import observed_mask
 
 from ._helpers import (
     _prepare_lookup_table,
@@ -68,7 +69,7 @@ def _prepare_forecast_index(observations_dict, general_dict):
     return observations_dict["y_forecast_index"]
 
 
-def _check_fitted_values(model_prepared, occurrence_dict):
+def _check_fitted_values(model_prepared, occurrence_dict, observations_dict):
     """
     Check fitted values for NaNs and adjust for occurrence if needed.
 
@@ -100,11 +101,12 @@ def _check_fitted_values(model_prepared, occurrence_dict):
             model_prepared["y_fitted"] * occurrence_dict["p_fitted"]
         )
 
-    # Fix cases when we have zeroes in the provided occurrence
+    # Fix cases when we have zeroes in the provided occurrence. At the missing
+    # values the fitted is the prediction of the model
     if occurrence_dict["occurrence"] == "provided":
-        model_prepared["y_fitted"][~occurrence_dict["ot_logical"]] = (
-            model_prepared["y_fitted"][~occurrence_dict["ot_logical"]]
-            * occurrence_dict["p_fitted"][~occurrence_dict["ot_logical"]]
+        zero = ~occurrence_dict["ot_logical"] & observed_mask(observations_dict)
+        model_prepared["y_fitted"][zero] = (
+            model_prepared["y_fitted"][zero] * occurrence_dict["p_fitted"][zero]
         )
 
     return model_prepared
@@ -233,23 +235,6 @@ def _generate_point_forecasts(
         model_prepared, observations_dict, lags_dict, general_dict
     )
 
-    # Inject new_xreg values into the forecast measurement matrix.
-    # The xreg columns of mat_wt must contain X values for the *forecast* period,
-    # not the last h rows of the in-sample X (which _prepare_matrices_for_forecast
-    # would have copied).  If the caller passed new_xreg, overwrite those columns.
-    new_xreg = explanatory_checked.get("new_xreg") if explanatory_checked else None
-    if (
-        explanatory_checked
-        and explanatory_checked.get("xreg_model")
-        and new_xreg is not None
-    ):
-        xreg_start = (
-            components_dict["components_number_ets"]
-            + components_dict["components_number_arima"]
-        )
-        xreg_end = xreg_start + explanatory_checked["xreg_number"]
-        mat_wt[:, xreg_start:xreg_end] = new_xreg
-
     # Prepare data for adam_forecaster
     # Must copy: adam_cpp.forecast() modifies profilesRecent in-place via carma memory
     # sharing, advancing the profile from T to T+h. Copy prevents corruption.
@@ -277,6 +262,29 @@ def _generate_point_forecasts(
     y_forecast = forecast_result.forecast.flatten()
 
     return y_forecast
+
+
+def _forecast_measurement(model_prepared, explanatory_checked, components_dict, h):
+    """The measurement matrix of the horizon, with the new values of the regressors
+    in their columns, shared by the point forecasts and the intervals (the in-sample
+    one would carry the last h values of the in-sample X)."""
+    new_xreg = explanatory_checked.get("new_xreg") if explanatory_checked else None
+    if not explanatory_checked or not explanatory_checked.get("xreg_model"):
+        return model_prepared
+    if new_xreg is None:
+        return model_prepared
+    measurement = model_prepared["measurement"]
+    if measurement.shape[0] < h:
+        mat_wt = np.tile(measurement[-1], (h, 1))
+    else:
+        mat_wt = measurement[-h:].copy()
+    xreg_start = (
+        components_dict["components_number_ets"]
+        + components_dict["components_number_arima"]
+    )
+    xreg_end = xreg_start + explanatory_checked["xreg_number"]
+    mat_wt[:, xreg_start:xreg_end] = new_xreg
+    return {**model_prepared, "measurement_forecast": mat_wt}
 
 
 def _handle_forecast_safety_checks(
@@ -669,10 +677,33 @@ def forecaster(
         ...     interval='prediction', level=0.95, ...
         ... )
     """
+    # The mean or the median rather than the skeleton
+    if general_dict.get("point", "skeleton") != "skeleton":
+        return _forecast_point(
+            dict(
+                model_prepared=model_prepared,
+                observations_dict=observations_dict,
+                general_dict=general_dict,
+                occurrence_dict=occurrence_dict,
+                lags_dict=lags_dict,
+                model_type_dict=model_type_dict,
+                explanatory_checked=explanatory_checked,
+                components_dict=components_dict,
+                constants_checked=constants_checked,
+                params_info=params_info,
+                adam_cpp=adam_cpp,
+                interval=interval,
+                level=level,
+                side=side,
+            )
+        )
+
     # 1. Prepare forecast index
     _prepare_forecast_index(observations_dict, general_dict)
     # 2. Check fitted values for issues and adjust for occurrence
-    model_prepared = _check_fitted_values(model_prepared, occurrence_dict)
+    model_prepared = _check_fitted_values(
+        model_prepared, occurrence_dict, observations_dict
+    )
 
     # 3. Return empty result if horizon is zero
     if general_dict["h"] <= 0:
@@ -685,6 +716,9 @@ def forecaster(
 
     # 5. Prepare lookup table for forecasting
     lookup = _prepare_lookup_table(lags_dict, observations_dict, general_dict)
+    model_prepared = _forecast_measurement(
+        model_prepared, explanatory_checked, components_dict, general_dict["h"]
+    )
 
     # 6. Set interval from caller and resolve "prediction" → "simulated"/"approximate"
     general_dict["interval"] = interval
@@ -822,12 +856,12 @@ def forecaster(
         upper_df = None
         if side != "upper":
             lower_df = pd.DataFrame(
-                {level_low[j]: y_lower[:, j] for j in range(n_levels)},
+                {round(level_low[j], 5): y_lower[:, j] for j in range(n_levels)},
                 index=forecast_index,
             )
         if side != "lower":
             upper_df = pd.DataFrame(
-                {level_up[j]: y_upper[:, j] for j in range(n_levels)},
+                {round(level_up[j], 5): y_upper[:, j] for j in range(n_levels)},
                 index=forecast_index,
             )
 
@@ -839,6 +873,90 @@ def forecaster(
         side=side,
         interval=resolved_interval,
     )
+
+
+SYMMETRIC_DISTRIBUTIONS = ("dnorm", "dlaplace", "ds", "dgnorm", "dlogis", "dt")
+
+
+def _skeleton_steps(point, model_type_dict, components_dict, lags_dict, distribution):
+    """The number of the first steps where the skeleton is the mean (median) of the
+    forecast distribution (R's ``adam_skeletonSteps``). The mean: wherever the model
+    is linear in the errors or they multiply additive components and the mean of the
+    error is its neutral value; with a multiplicative trend only at the first step,
+    and with a multiplicative seasonality until its first lag. The median: an
+    additive model with a symmetric distribution."""
+    if distribution == "dalaplace":
+        return 0
+    e_type = model_type_dict["error_type"]
+    t_type = model_type_dict.get("trend_type", "N")
+    s_type = model_type_dict.get("season_type", "N")
+    if point == "median":
+        additive = e_type == "A" and t_type != "M" and s_type != "M"
+        return np.inf if additive and distribution in SYMMETRIC_DISTRIBUTIONS else 0
+    if e_type == "M" and components_dict.get("components_number_arima", 0) > 0:
+        return 0
+    if t_type == "M":
+        return 1
+    if s_type == "M":
+        return lags_dict["lags_model_min"]
+    return np.inf
+
+
+def _forecast_point(arguments):
+    """The mean (of the simulated paths, with the occurrence drawn in them) or the
+    median (the 50% quantile of the method of the interval, simulated with an
+    occurrence) beyond the first steps where the skeleton is it (R's
+    ``adam_pointForecast``)."""
+    general_dict = arguments["general_dict"]
+    point = general_dict["point"]
+
+    def run(**changes):
+        general = {**general_dict, "point": "skeleton", **changes.pop("general", {})}
+        return forecaster(**{**arguments, "general_dict": general, **changes}), general
+
+    result, _ = run()
+    if result is None:
+        return None
+    h = general_dict["h"]
+    cumulative = general_dict.get("cumulative", False)
+    p_forecast, occurrence_model = _process_occurrence_forecast(
+        arguments["occurrence_dict"], {**general_dict}
+    )
+    intermittent = occurrence_model and np.any(np.asarray(p_forecast) < 1)
+    distribution = general_dict.get("distribution_new") or general_dict["distribution"]
+    steps = _skeleton_steps(
+        point,
+        arguments["model_type_dict"],
+        arguments["components_dict"],
+        arguments["lags_dict"],
+        distribution,
+    )
+    if point == "median" and intermittent:
+        steps = 0
+    if steps >= h:
+        return result
+
+    skeleton = np.asarray(result.mean, dtype=float)
+    if point == "mean":
+        _, general = run(
+            interval="simulated", general={"scenarios": True, "cumulative": False}
+        )
+        paths = np.asarray(general["_scenarios_matrix"], dtype=float)
+        values = np.atleast_1d(
+            np.mean(np.sum(paths, axis=0)) if cumulative else np.mean(paths, axis=1)
+        )
+    else:
+        interval = arguments["interval"]
+        if intermittent:
+            interval = "simulated"
+        elif interval == "none":
+            interval = "prediction"
+        median, _ = run(interval=interval, level=0.5, side="upper")
+        values = np.ravel(np.asarray(median.upper, dtype=float))
+    if not cumulative and steps > 0:
+        values[: int(steps)] = skeleton[: int(steps)]
+    result.mean = pd.Series(values, index=result.mean.index, name="mean")
+    return result
 
 
 def forecaster_combined(

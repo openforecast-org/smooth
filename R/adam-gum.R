@@ -329,13 +329,17 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
     }
 
     ##### Cost function for GUM #####
-    CF <- function(B, matVt, matF, vecG, matWt){
+    # loss / bounds are formals here so that logLikFunction() can re-evaluate the
+    # very same fit under the likelihood, as ces() does. nloptr inspects its
+    # objective's formals and insists every one of them be supplied, so it gets the
+    # fixed-arity CF() wrapper below.
+    CFgeneric <- function(B, matVt, matF, vecG, matWt, loss, bounds){
         # Obtain the elements of GUM
         elements <- filler(B, matVt[,1:lagsModelMax,drop=FALSE], matF, vecG, matWt);
 
         if(bounds=="admissible"){
             # Stability / invertibility condition
-            eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
+            eigenValues <- smoothEigens(elements$vecG, elements$matF, elements$matWt,
                                         lagsModelAll, xregModel, obsInSample);
             if(any(eigenValues>1+1E-50)){
                 return(1E+100*max(eigenValues));
@@ -368,10 +372,14 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                          obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
                                          componentsNumberARIMA, lagsModelAll);
 
+        # The missing values are not in the loss: the errors are zero there, and the
+        # losses are divided by the observed values, as in adam()
+        observed <- !yNAValues[1:obsInSample];
+        obsObserved <- sum(observed);
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                scale <- scaler(adamFitted$errors[otLogical], obsInSample);
+                scale <- scaler(adamFitted$errors[otLogical], obsObserved);
 
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
@@ -379,16 +387,16 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                       sd=sqrt(scale), log=TRUE));
             }
             else if(loss=="MSE"){
-                CFValue <- sum(adamFitted$errors^2)/obsInSample;
+                CFValue <- sum(adamFitted$errors^2)/obsObserved;
             }
             else if(loss=="MAE"){
-                CFValue <- sum(abs(adamFitted$errors))/obsInSample;
+                CFValue <- sum(abs(adamFitted$errors))/obsObserved;
             }
             else if(loss=="HAM"){
-                CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsInSample;
+                CFValue <- sum(sqrt(abs(adamFitted$errors)))/obsObserved;
             }
             else if(loss=="custom"){
-                CFValue <- lossFunction(actual=yInSample,fitted=adamFitted$fitted,B=B);
+                CFValue <- lossFunction(actual=yInSample[observed],fitted=adamFitted$fitted[observed],B=B);
             }
         }
         else{
@@ -398,22 +406,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                           indexLookupTable, profilesRecentTable,
                                           h, yInSample)$errors;
 
-            # Not done yet: "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL"
-            CFValue <- switch(loss,
-                              "MSEh"=sum(adamErrors[,h]^2)/(obsInSample-h),
-                              "TMSE"=sum(colSums(adamErrors^2)/(obsInSample-h)),
-                              "GTMSE"=sum(log(colSums(adamErrors^2)/(obsInSample-h))),
-                              "MSCE"=sum(rowSums(adamErrors)^2)/(obsInSample-h),
-                              "MAEh"=sum(abs(adamErrors[,h]))/(obsInSample-h),
-                              "TMAE"=sum(colSums(abs(adamErrors))/(obsInSample-h)),
-                              "GTMAE"=sum(log(colSums(abs(adamErrors))/(obsInSample-h))),
-                              "MACE"=sum(abs(rowSums(adamErrors)))/(obsInSample-h),
-                              "HAMh"=sum(sqrt(abs(adamErrors[,h])))/(obsInSample-h),
-                              "THAM"=sum(colSums(sqrt(abs(adamErrors)))/(obsInSample-h)),
-                              "GTHAM"=sum(log(colSums(sqrt(abs(adamErrors)))/(obsInSample-h))),
-                              "CHAM"=sum(sqrt(abs(rowSums(adamErrors))))/(obsInSample-h),
-                              "GPL"=log(det(t(adamErrors) %*% adamErrors/(obsInSample-h))),
-                              0);
+            CFValue <- adam_multistepLoss(adamErrors, loss, h, observed);
         }
 
         if(is.na(CFValue) || is.nan(CFValue)){
@@ -423,9 +416,22 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         return(CFValue);
     }
 
+    CF <- function(B, matVt, matF, vecG, matWt){
+        return(CFgeneric(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt,
+                         loss=loss, bounds=bounds));
+    }
+
     #### Likelihood function ####
+    # The reported logLik is a concentrated likelihood, never -loss: a fit-only loss
+    # reports the Normal likelihood at the fitted parameters, and a multistep loss the
+    # predictive likelihood of the GPL paper, as in ces() and adam()
     logLikFunction <- function(B, matVt, matF, vecG, matWt){
-        return(-CF(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt));
+        if(!multisteps){
+            return(-CFgeneric(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt,
+                              loss="likelihood", bounds="none"));
+        }
+        return(adam_multistepLogLik(CF(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt),
+                                    loss, h, !yNAValues[1:obsInSample]));
     }
 
     initialValue <- initialValueProvided;
@@ -880,7 +886,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
 
     # In case of likelihood, we typically have one more parameter to estimate - scale.
     logLikValue <- structure(logLikFunction(B, matVt=matVt, matF=matF, vecG=vecG, matWt=matWt),
-                             nobs=obsInSample, df=nParamEstimated, class="logLik");
+                             nobs=sum(!yNAValues[1:obsInSample]), df=nParamEstimated, class="logLik");
 
     adamFitted <- adam_fitOrGradient(matVt, matWt,
                                      matF, vecG,
@@ -893,6 +899,8 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;
+    # No errors at the missing values, where the fitted values are the predictions
+    errors[yNAValues[1:obsInSample]] <- NA;
     # Write down the recent profile for future use
     profilesRecentTable <- adamFitted$profile;
     matVt[] <- adamFitted$states;
@@ -903,7 +911,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         profilesRecentInitial <- matVt[,1:lagsModelMax,drop=FALSE];
     }
 
-    scale <- scaler(adamFitted$errors[otLogical], obsInSample);
+    scale <- scaler(adamFitted$errors[otLogical], sum(!yNAValues[1:obsInSample]));
 
     if(any(yClasses=="ts")){
         yForecast <- ts(rep(NA, max(1,h)), start=yForecastStart, frequency=yFrequency);
@@ -998,14 +1006,19 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
 
     # If this was a log-models, fix it
     if(modelIsMultiplicative){
-        logLikValue[] <- logLikValue - sum(yInSample);
+        logLikValue[] <- logLikValue - sum(yInSample[!yNAValues[1:obsInSample]]);
         yInSample[] <- exp(yInSample);
         yFitted[] <- exp(yFitted);
         yForecast[] <- exp(yForecast);
     }
 
+    # The missing values stay missing in the data, as in adam()
+    yInSample[yNAValues[1:obsInSample]] <- NA;
+    if(holdout && length(yNAValues)==obsAll){
+        yHoldout[yNAValues[-c(1:obsInSample)]] <- NA;
+    }
     if(holdout && h>0){
-        errormeasures <- measures(yHoldout,yForecast,yInSample);
+        errormeasures <- adam_accuracy(yHoldout, yForecast, yInSample);
     }
     else{
         errormeasures <- NULL;

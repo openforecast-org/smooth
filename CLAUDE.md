@@ -11,6 +11,8 @@ A Python implementation is under development in the `python/` subdirectory (see 
 ## Claude instructions
 Do not create summaries of what you do. Do not create additional files/documents if not explicitly asked to.
 
+**Always ask before introducing a new function** (exported or internal, in R, Python or C++), and say what it would do and where it would live. Look first for an existing one that does the job, in this repository and in its dependencies (e.g. greybox for anything about distributions: a change to a density belongs in greybox, not as a patch in smooth).
+
 **Never expose the Claude session URL (or any session identifier) in commits.** Do not add a `Claude-Session:` trailer, a `https://claude.ai/code/session_...` link, or any equivalent session reference to commit messages, PR descriptions, code, or files. These leak a private session handle and are a security concern. Commit messages must contain only the change description (a `Co-Authored-By:` line is fine if attribution is wanted); nothing that points back to a Claude session.
 
 **Never dismiss a failing test.** Do not write off a failure as "pre-existing", "stale reference", "tolerance too tight", "flat-surface optimiser-floor effect", or "unrelated to my changes". A failing test is a real signal that something is wrong, even when the diff is tiny or the immediate task did not touch the failing code path. Report every failure clearly with the actual numbers, and if the current task cannot accommodate fixing them, log them as a follow-up and revisit them once the current task is done. Comparing failure sets across commits ("the same tests failed before") does not make the failures acceptable — it only narrows where to look. The goal is zero failing tests, not unchanged failing-test counts.
@@ -44,7 +46,8 @@ When coding, use the best practice, focusing on the following principles:
 When writing R code specifically:
 - Always use explicit `return(object)` at the end of every function.
 - Always wrap `if`, `for`, and `while` bodies in `{}`, even for single-line bodies: `if (...) { ... }`.
-- Never expose internal (non-exported) functions via roxygen. Do not give them a roxygen title/description block or an `@export` — a title/description makes `roxygen2::roxygenise()` generate a `man/*.Rd` page for them, which leaks the helper into the documentation. Use plain `#` comments for the explanation and, if a roxygen tag is needed, only `#' @keywords internal` (with no title), matching the other internal helpers (e.g. `adam_checkOptimizer`).
+- Never expose internal (non-exported) functions via roxygen. Do not give them a roxygen title/description block or an `@export` — a title/description makes `roxygen2::roxygenise()` generate a `man/*.Rd` page for them, which leaks the helper into the documentation. Internal helpers get no roxygen at all: use plain `#` comments for the explanation, matching the other internal helpers (e.g. `adam_checkOptimizer`). `#' @keywords internal` is pointless on a block without a title (no Rd page is generated anyway) and must not be added.
+- Export only the user-facing functions and their S3 methods (for a model, e.g. `tbats()` and `forecast.adamTBATS()`); every helper stays internal: no `@export`, no NAMESPACE entry, no Rd page. Check the user's view with `library(smooth)` or `pkgload::load_all(export_all=FALSE)`: the default `load_all()` attaches all the internal functions, so they show up in the console's completion although the installed package does not expose them.
 
 
 ## R Package Development
@@ -76,7 +79,8 @@ Test files are in `tests/testthat/`: `test_adam.R`, `test_autoadam.R`,
 `test_es.R`, `test_ces.R`, `test_ssarima.R`, `test_sparma.R`, `test_gum.R`,
 `test_sma.R`, `test_om.R`, `test_omg.R`, `test_oes.R`, `test_simulate.R`,
 `test_df.R` (degrees of freedom), `test_gradient.R` (`initial="gradient"`),
-`test_vcov_opg.R` (OPG covariance).
+`test_vcov_opg.R` (OPG covariance), `test_backcastHead.R` (the head of backcasting),
+`test_tbats.R`.
 
 Run all tests with: `R -e "devtools::test()"`
 
@@ -144,6 +148,8 @@ Where:
 6. **Occurrence models** (`R/om.R`, `R/omg.R`, `R/om-oes.R`) - For intermittent demand
 
 7. **Scale model** (`R/sm.R`) - Dynamic model for the scale of the error term
+
+8. **TBATS** (`R/adam-tbats.R`) - ETS level and trend, trigonometric seasonality and ARMA in the Box-Cox space; the harmonics sit in the C++ `nArima` slot (see `python/docs/TBATS_PLAN.md`)
 
 ### R and C++ Integration
 
@@ -295,6 +301,14 @@ Key R packages:
 C++ dependencies:
 - Armadillo library (via RcppArmadillo)
 - C++11 or later
+
+**Pending version bumps (greybox).** R's greybox 2.0.10 and Python's 1.0.9 compute the
+log-densities of `dlaplace`, `ds` and `dgnorm` analytically and identically in both
+languages, which smooth's R/Python parity relies on (`tbats()` with `distribution="auto"`
+selects with `dgnorm`). Once they are released, raise the minimum versions: `greybox>=1.0.9`
+in `python/pyproject.toml` as soon as 1.0.9 is on PyPI, and `greybox (>= 2.0.10)` in
+`DESCRIPTION` with the next smooth release after 2.0.10 is on CRAN. Remove this note when
+both are done.
 
 ## Mac OS Specific Notes
 

@@ -232,6 +232,15 @@ omg <- function(data,
     #### Shared binary indicators (same data for A and B) ####
     ot         <- checkerA$ot
     otLogical  <- checkerA$otLogical
+    # Missing observations are not no-demand: the fitter skips their update (NA in the
+    # indicators it gets, otFit) and the loss ignores them, while the initialisation, which
+    # needs a value there, takes the occurrence rate of the observed ones (as om())
+    otObserved <- !yNAValues[1:obsInSample]
+    if(!all(otObserved)){
+        ot[!otObserved] <- mean(ot[otObserved])
+    }
+    otFit <- as.numeric(ot)
+    otFit[!otObserved] <- NA
     oInSample  <- matrix(as.numeric(ot), ncol=1)
     if(holdout) {
         yHoldout <- checkerA$yHoldout
@@ -426,7 +435,8 @@ omg <- function(data,
             checkerA$constantEstimate, checkerA$constantName,
             checkerA$otherParameterEstimate,
             adamCppA,
-            etsA, bounds, ot, otLogicalInternal,
+            # The missing values are gaps for the starting values
+            etsA, bounds, ot, otObserved,
             checkerA$iOrders, checkerA$armaParameters, checkerA$other, smoother, adamCreatedA$matWt)
 
         BValuesB <- adam_initialiser(
@@ -456,7 +466,8 @@ omg <- function(data,
             checkerB$constantEstimate, checkerB$constantName,
             checkerB$otherParameterEstimate,
             adamCppB,
-            etsB, bounds, ot, otLogicalInternal,
+            # The missing values are gaps for the starting values
+            etsB, bounds, ot, otObserved,
             checkerB$iOrders, checkerB$armaParameters, checkerB$other, smoother, adamCreatedB$matWt)
 
         # Capture user-supplied B / lb / ub from ellipses BEFORE the joint
@@ -611,7 +622,7 @@ omg <- function(data,
             adamETSB_flag=adamETSB,
             # Shared
             bounds=bounds, regressors=regressorsA,
-            ot=ot, otLogical=otLogical, obsInSample=obsInSample,
+            ot=otFit, otLogical=otLogical, obsInSample=obsInSample,
             nIterations=nIterations,
             nParamsA=nParamsA,
             loss=loss, lossFunction=omgUserLossFunction, lambda=lambda,
@@ -909,7 +920,7 @@ omg <- function(data,
         adamFitted <- adam_fitOrGradient(
             adamFilled$matVt, adamFilled$matWt, adamFilled$matF, adamFilled$vecG,
             adamArchitect$indexLookupTable, prof,
-            as.numeric(ot), as.numeric(ot),
+            otFit, otFit,
             checker$initialType, nIterations, adamArchitect$adamCpp,
             checker$etsModel, checker$arimaModel, checker$xregModel,
             checker$Etype, checker$Ttype, checker$Stype,
@@ -1029,7 +1040,8 @@ omg <- function(data,
         subModel <- list(
             model       = modelName,
             timeElapsed = Sys.time() - startTime,
-            data        = yInSample,
+            # The missing observations stay missing, as in om()
+            data        = replace(yInSample, !otObserved, NA),
             fitted      = yFitted,
             residuals   = errors,
             forecast    = yForecast,
@@ -1127,8 +1139,10 @@ omg <- function(data,
     yFitted[] <- pCoupled
     # logLik is the Bernoulli of that same coupled probability, so $fitted and
     # $logLik stay mutually consistent for every loss (mirrors om()).
-    otNumeric <- as.numeric(oInSample)
-    logLikOMG <- sum(otNumeric * log(pCoupled) + (1 - otNumeric) * log(1 - pCoupled))
+    # The missing observations are not in the likelihood
+    otNumeric <- otFit[otObserved]
+    pObserved <- pCoupled[otObserved]
+    logLikOMG <- sum(otNumeric * log(pObserved) + (1 - otNumeric) * log(1 - pObserved))
 
     if(h > 0) {
         yForecast <- modelA$forecast;
@@ -1154,9 +1168,9 @@ omg <- function(data,
     # top-level omg object's ``data`` matches what ``om(y, ...)`` stores.
     # Mirrors om.R:983-987.
     if(any(yClasses == "ts")) {
-        yData <- ts(yInSample, start=yStart, frequency=yFrequency);
+        yData <- ts(replace(yInSample, !otObserved, NA), start=yStart, frequency=yFrequency);
     } else {
-        yData <- zoo(yInSample, order.by=yInSampleIndex);
+        yData <- zoo(replace(yInSample, !otObserved, NA), order.by=yInSampleIndex);
     }
 
     result <- list(
@@ -1439,12 +1453,14 @@ omgCF_local <- function(B,
     # residual for MSE/MAE/HAM, regularised for LASSO/RIDGE, user callable
     # for "custom". The C++ joint state-space step ran first either way;
     # this just decides what scalar to hand to nloptr.
-    errors <- as.numeric(ot) - pCombined
+    # The missing observations (NA in ot) are not in the loss
+    otObserved <- !is.na(ot)
+    errors <- (as.numeric(ot) - pCombined)[otObserved]
     if(loss == "custom"){
-        return(lossFunction(actual=as.numeric(ot), fitted=pCombined, B=B))
+        return(lossFunction(actual=as.numeric(ot)[otObserved], fitted=pCombined[otObserved], B=B))
     } else if(loss == "likelihood"){
         return(-(sum(log(pCombined[otLogical])) +
-                     sum(log(1 - pCombined[!otLogical]))))
+                     sum(log(1 - pCombined[!otLogical & otObserved]))))
     } else if(loss == "MSE"){
         return(mean(errors^2))
     } else if(loss == "MAE"){
@@ -1463,7 +1479,7 @@ omgCF_local <- function(B,
                                              xregParametersEstimatedA, constantEstimateA, FALSE,
                                              adam_lassoDenominators(loss, matWtA, componentsNumberETSA,
                                                                     componentsNumberARIMAA, xregNumberA,
-                                                                    ot)$denominator),
+                                                                    as.numeric(ot)[otObserved])$denominator),
                       adam_penaltyParameters(B_B, EtypeB, etsModelB, modelIsTrendyB, modelIsSeasonalB,
                                              persistenceEstimateB, persistenceLevelEstimateB,
                                              persistenceTrendEstimateB, persistenceSeasonalEstimateB,
@@ -1474,7 +1490,7 @@ omgCF_local <- function(B,
                                              xregParametersEstimatedB, constantEstimateB, FALSE,
                                              adam_lassoDenominators(loss, matWtB, componentsNumberETSB,
                                                                     componentsNumberARIMAB, xregNumberB,
-                                                                    ot)$denominator))
+                                                                    as.numeric(ot)[otObserved])$denominator))
         errorTerm <- (1 - lambda) * sqrt(mean(errors^2))
         if(loss == "LASSO"){
             return(errorTerm + lambda * sum(abs(BPenalty)))
@@ -1484,7 +1500,7 @@ omgCF_local <- function(B,
     } else {
         # Fallback to likelihood for any unrecognised string.
         return(-(sum(log(pCombined[otLogical])) +
-                     sum(log(1 - pCombined[!otLogical]))))
+                     sum(log(1 - pCombined[!otLogical & otObserved]))))
     }
 }
 

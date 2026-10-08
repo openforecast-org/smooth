@@ -638,3 +638,64 @@ class TestPredictMultiLevel:
         assert "lower_0.05" in df.columns
         assert "upper_0.975" in df.columns
         assert df.shape == (5, 5)
+
+
+# The point forecast: the skeleton, the mean or the median
+@pytest.fixture(scope="module")
+def walk():
+    """A random walk around 200."""
+    rng = np.random.default_rng(41)
+    return 200 + np.cumsum(rng.normal(0, 1, 150))
+
+
+def test_the_additive_point_forecasts_coincide(walk):
+    model = ADAM(model="ANN").fit(walk)
+    skeleton = model.predict(h=12).mean.to_numpy()
+    for point in ("mean", "median"):
+        np.testing.assert_allclose(model.predict(h=12, point=point).mean, skeleton)
+
+
+def test_the_multiplicative_point_forecasts(walk):
+    # A multiplicative error on additive components: the skeleton is the mean and
+    # the median is lower
+    model = ADAM(model="MNN").fit(walk)
+    skeleton = model.predict(h=12).mean.to_numpy()
+    np.testing.assert_allclose(model.predict(h=12, point="mean").mean, skeleton)
+    assert np.all(model.predict(h=12, point="median").mean.to_numpy() < skeleton)
+    # A multiplicative trend: the skeleton is the mean at the first step only; the
+    # simulated mean is reproducible with a seed
+    model = ADAM(model="MMdN").fit(walk)
+    skeleton = model.predict(h=12).mean.to_numpy()
+    mean = model.predict(h=12, point="mean", seed=41).mean.to_numpy()
+    assert mean[0] == skeleton[0]
+    np.testing.assert_allclose(mean, skeleton, rtol=1e-3)
+    np.testing.assert_array_equal(
+        mean, model.predict(h=12, point="mean", seed=41).mean.to_numpy()
+    )
+    with pytest.raises(ValueError, match="point"):
+        model.predict(h=12, point="mode")
+
+
+def test_the_intermittent_median_is_zero():
+    rng = np.random.default_rng(3)
+    # A demand on about a quarter of the periods
+    y = rng.poisson(0.3, 120) * np.tile([5.0, 1.0], 60)
+    model = ADAM(model="MNN", occurrence="odds-ratio").fit(y)
+    np.testing.assert_array_equal(
+        model.predict(h=6, point="median", seed=41).mean.to_numpy(), 0.0
+    )
+    np.testing.assert_allclose(
+        model.predict(h=6, point="mean").mean, model.predict(h=6).mean
+    )
+
+
+def test_the_reforecast_point_forecasts(walk):
+    model = ADAM(model="AAN").fit(walk)
+    skeleton = model.predict(h=5, cumulative=True).mean.to_numpy()
+    forecasted = model.reforecast(h=5, cumulative=True, nsim=50, seed=41)
+    np.testing.assert_allclose(forecasted.mean, skeleton)
+    for point in ("mean", "median"):
+        forecasted = model.reforecast(
+            h=5, cumulative=True, nsim=50, seed=41, point=point
+        )
+        np.testing.assert_allclose(forecasted.mean, skeleton, rtol=1e-2)

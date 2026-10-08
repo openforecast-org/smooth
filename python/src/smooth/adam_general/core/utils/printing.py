@@ -397,9 +397,12 @@ def _compute_forecast_errors(
     y_fitted_holdout: np.ndarray,
     y_in_sample: np.ndarray,
     period: int = 1,
+    in_sample_missing: Optional[np.ndarray] = None,
 ) -> Dict[str, float]:
     """
-    Compute forecast error metrics using greybox.measures().
+    Compute forecast error metrics using greybox.measures(), on the observed values
+    of the holdout, scaled by the observed in-sample ones (``in_sample_missing``
+    marks the missing ones, which were filled), as R's ``adam_accuracy``.
 
     Parameters
     ----------
@@ -419,7 +422,16 @@ def _compute_forecast_errors(
     """
     from greybox.point_measures import measures
 
-    m = measures(y_holdout, y_fitted_holdout, y_in_sample)
+    y_holdout = np.asarray(y_holdout, dtype=float).ravel()
+    observed = ~np.isnan(y_holdout)
+    y_in_sample = np.asarray(y_in_sample, dtype=float).ravel()
+    if in_sample_missing is not None:
+        y_in_sample = y_in_sample[~np.asarray(in_sample_missing, dtype=bool)]
+    m = measures(
+        y_holdout[observed],
+        np.asarray(y_fitted_holdout, dtype=float).ravel()[observed],
+        y_in_sample[~np.isnan(y_in_sample)],
+    )
     m["RMSE"] = np.sqrt(m["MSE"])
     return m
 
@@ -729,32 +741,44 @@ def _build_model_name(model: Any) -> str:
         constant_name = "drift" if model_str != "NNN" else "constant"
         name += f" with {constant_name}"
 
-    # Occurrence models carry an "i" prefix and a bracketed letter for the
-    # occurrence type, as R's adam_model_name does (R/utils-adam.R:1688-1697).
-    occurrence = (getattr(model, "_occurrence", None) or {}).get("occurrence")
-    if not isinstance(occurrence, str):
-        # A provided (already fitted) occurrence model: take its own type.
-        occurrence = (
-            (getattr(occurrence, "_occurrence", None) or {}).get("occurrence")
-            if occurrence is not None
-            else None
+    return decorate_occurrence_name(
+        name or model_str or "Unknown",
+        getattr(model, "_occurrence", None),
+        getattr(model, "_om_model", None),
+    )
+
+
+OCCURRENCE_NAME_SUFFIX = {
+    "f": "[F]",
+    "fixed": "[F]",
+    "d": "[D]",
+    "direct": "[D]",
+    "o": "[O]",
+    "odds-ratio": "[O]",
+    "i": "[I]",
+    "inverse-odds-ratio": "[I]",
+    "g": "[G]",
+    "general": "[G]",
+}
+
+
+def decorate_occurrence_name(name, occurrence_dict, om_model=None):
+    """Prefix ``i`` and append the occurrence-type letter, as R's adam_model_name.
+    The type is that of the fitted occurrence model (``om_model``) when it was
+    selected by "auto" or provided, as R takes it from the model."""
+    occurrence = (occurrence_dict or {}).get("occurrence")
+    if not isinstance(occurrence, str) and om_model is None:
+        om_model = occurrence
+    selected = occurrence == "auto" or not isinstance(occurrence, str)
+    if om_model is not None and selected:
+        occurrence = getattr(om_model, "_om_occurrence", None) or (
+            "general"
+            if type(om_model).__name__ == "OMG"
+            else (getattr(om_model, "_occurrence", None) or {}).get("occurrence")
         )
-    suffix = {
-        "f": "[F]",
-        "fixed": "[F]",
-        "d": "[D]",
-        "direct": "[D]",
-        "o": "[O]",
-        "odds-ratio": "[O]",
-        "i": "[I]",
-        "inverse-odds-ratio": "[I]",
-        "g": "[G]",
-        "general": "[G]",
-    }
-    name = name or model_str or "Unknown"
-    if isinstance(occurrence, str) and occurrence not in ("n", "none"):
-        name = f"i{name}{suffix.get(occurrence, '')}"
-    return name
+    if not isinstance(occurrence, str) or occurrence in ("n", "none"):
+        return name
+    return f"i{name}{OCCURRENCE_NAME_SUFFIX.get(occurrence, '')}"
 
 
 def _get_model_name(model: Any) -> str:
@@ -990,7 +1014,13 @@ def _format_holdout_errors(model: Any, digits: int) -> str:
         lags = model._lags_model.get("lags", [1])
         period = max(lags) if lags else 1
 
-    errors = _compute_forecast_errors(y_holdout, y_forecast, y_in_sample, period)
+    errors = _compute_forecast_errors(
+        y_holdout,
+        y_forecast,
+        y_in_sample,
+        period,
+        model._observations.get("y_na_values"),
+    )
     return _format_forecast_errors(errors, digits)
 
 

@@ -99,11 +99,13 @@ class TestMsdecomposeSmoothers:
     def test_different_smoothers_different_results(self, seasonal_series):
         """Test that different smoothers produce different results."""
         result_lowess = msdecompose(seasonal_series, lags=[12], smoother='lowess')
-        result_ma = msdecompose(seasonal_series, lags=[12], smoother='ma')
+        msdecompose(seasonal_series, lags=[12], smoother='ma')
         result_global = msdecompose(seasonal_series, lags=[12], smoother='global')
 
         # Results should differ
-        assert not np.allclose(result_lowess['fitted'], result_global['fitted'], equal_nan=True)
+        assert not np.allclose(
+            result_lowess['fitted'], result_global['fitted'], equal_nan=True
+        )
 
 
 class TestMsdecomposeTypes:

@@ -388,3 +388,15 @@ test_that("omg keeps the provided B of a mixed model, as om", {
     testModel <- omg(y, modelA="MAN", modelB="MNN", initial="optimal", B=BProvided, maxeval=1)
     expect_equal(unname(c(testModel$modelA$B, testModel$modelB$B)), BProvided)
 })
+
+test_that("omg skips the missing observations and refits on them for the covariance", {
+    set.seed(1)
+    y <- rbinom(200, 1, 0.4) * exp(rnorm(200, 2, 0.3))
+    y[c(10:20, 100)] <- NA
+    testModel <- suppressWarnings(omg(y, modelA="ANN", modelB="ANN"))
+    expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)))
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)))
+    expect_true(all(is.na(testModel$modelA$data[is.na(y)])))
+    # The OPG reproduces the likelihood from the stored data, so it does not fall back
+    expect_silent(vcov(testModel))
+})

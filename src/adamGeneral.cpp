@@ -31,7 +31,8 @@ namespace Rcpp {
             Named("states") = result.states,
             Named("fitted") = result.fitted,
             Named("errors") = result.errors,
-            Named("profile") = result.profile
+            Named("profile") = result.profile,
+            Named("profileInitial") = result.profileInitial
         );
     }
 
@@ -106,6 +107,7 @@ RCPP_MODULE(adamCore_module) {
     .constructor<arma::uvec, char, char, char, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, bool, bool>()
     .field("flipConstant", &adamCore::flipConstant)
     .field("headLength", &adamCore::headLength)
+    .field("sparseTransition", &adamCore::sparseTransition)
     .method("polynomialise", &adamCore::polynomialise)
     .method("fit", &adamCore::fit)
     .method("omfitGeneral", &adamCore::omfitGeneral)

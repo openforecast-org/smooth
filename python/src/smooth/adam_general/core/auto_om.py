@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from numpy.typing import NDArray
 
-from smooth.adam_general.core.om import OM
+from smooth.adam_general.core.om import OM, _check_om_loss
 from smooth.adam_general.core.omg import OMG
 
 _VALID_OCCURRENCE = (
@@ -53,6 +53,9 @@ class AutoOM:
         Forecast horizon and holdout flag forwarded to every candidate.
     ic :
         Information criterion used for selection.
+    loss, lambda_param :
+        The loss (and the LASSO / RIDGE weight) of every candidate, as R's
+        ``auto.om()`` passes them to ``om()``.
     """
 
     def __init__(
@@ -78,7 +81,10 @@ class AutoOM:
         ar_order: Union[int, List[int]] = 3,
         i_order: Union[int, List[int]] = 2,
         ma_order: Union[int, List[int]] = 3,
+        loss: Any = "likelihood",
+        lambda_param: Optional[float] = None,
     ) -> None:
+        _check_om_loss(loss)
         if isinstance(occurrence, str):
             occurrence = [occurrence]
         unknown = set(occurrence) - set(_VALID_OCCURRENCE)
@@ -109,6 +115,9 @@ class AutoOM:
         self.ar_order = ar_order
         self.i_order = i_order
         self.ma_order = ma_order
+        # Passed to each candidate, as R's auto.om() passes its ellipsis to om()
+        self.loss = loss
+        self.lambda_param = lambda_param
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -124,6 +133,8 @@ class AutoOM:
             bounds=self.bounds,
             verbose=self.verbose,
             nlopt_kwargs=self.nlopt_kwargs,
+            loss=self.loss,
+            lambda_param=self.lambda_param,
         )
 
     def _build_candidate(self, occ: str) -> Union[OM, OMG]:

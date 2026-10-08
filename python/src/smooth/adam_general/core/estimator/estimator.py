@@ -4,7 +4,7 @@ import nlopt
 import numpy as np
 
 from smooth.adam_general.core.creator import architector, creator, filler, initialiser
-from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
+from smooth.adam_general.core.utils.cost_functions import fit_at_parameters
 from smooth.adam_general.core.utils.n_param import df_initials_ets_level_seasonal
 
 from .optimization import (
@@ -16,6 +16,7 @@ from .optimization import (
     _setup_optimization_parameters,
 )
 from .two_stage import _run_two_stage_estimator
+from .xreg_select import estimate_and_select
 
 
 def estimator(
@@ -275,9 +276,10 @@ def estimator(
         - Standard models: 40 × len(B)
         - Models with regressors: max(1500, 150 × len(B))
 
-    B_initial : numpy.ndarray, optional
+    B_initial : numpy.ndarray or dict, optional
         Initial parameter vector to start optimization from. If provided, it overrides
-        the default initialization computed by ``initialiser()``. Useful for:
+        the default initialization computed by ``initialiser()``; a dict replaces only
+        the parameters of its names, as R's named ``B``. Useful for:
 
         - Two-stage initialization (backcasting → optimal)
         - Warm-starting from previous estimates
@@ -413,6 +415,10 @@ def estimator(
         >>> B_initial = np.concatenate([stage1['B'], extracted_initials_from_stage1])
         >>> stage2 = estimator(..., B_initial=B_initial)
     """
+    # regressors="select": the model without them, then the selected ones (R)
+    if explanatory_dict.get("select") is not None:
+        return estimate_and_select(estimator, dict(locals()))
+
     # Handle two-stage initialization internally
     if initials_dict.get("initial_type") == "two-stage" and B_initial is None:
         return _run_two_stage_estimator(
@@ -503,7 +509,15 @@ def estimator(
         smoother=smoother,
     )
     # Get initial parameter vector and bounds; user-provided values are used as-is
-    B = np.array(B_initial, dtype=float) if B_initial is not None else b_values["B"]
+    # A dict of named values, as R's named B, replaces the parameters of those names
+    if isinstance(B_initial, dict):
+        B = np.array(b_values["B"], dtype=float)
+        names = list(b_values["names"])
+        for name, value in B_initial.items():
+            if name in names:
+                B[names.index(name)] = value
+    else:
+        B = np.array(B_initial, dtype=float) if B_initial is not None else b_values["B"]
     lb = np.asarray(lb, dtype=float) if lb is not None else b_values["Bl"]
     ub = np.asarray(ub, dtype=float) if ub is not None else b_values["Bu"]
 
@@ -774,43 +788,28 @@ def estimator(
             "backcasting",
         ] or (initials_dict["initial_type"] == "gradient" and not gradient_in_scope)
         if run_state_refit:
-            mat_vt = np.asfortranarray(adam_created["mat_vt"], dtype=np.float64)
-            mat_wt = np.asfortranarray(adam_created["mat_wt"], dtype=np.float64)
-            mat_f = np.asfortranarray(adam_created["mat_f"], dtype=np.float64)
-            vec_g = np.asfortranarray(adam_created["vec_g"], dtype=np.float64)
-            index_lookup_table = np.asfortranarray(
-                profile_dict["index_lookup_table"], dtype=np.uint64
+            # As R's two-stage reads the initials of the backcasted model: the fit
+            # starts from the profile of the filled matrices, not from whatever the
+            # last evaluation of the loss left in it
+            fitted = fit_at_parameters(
+                B,
+                model_type_dict,
+                components_dict,
+                lags_dict,
+                adam_created,
+                persistence_dict,
+                initials_dict,
+                arima_dict,
+                explanatory_dict,
+                phi_dict,
+                constant_dict,
+                observations_dict,
+                general_dict,
+                profile_dict,
+                adam_cpp,
+                abs(B[-1]) if other_parameter_estimate and len(B) else other,
             )
-            profiles_recent_table = np.asfortranarray(
-                profile_dict["profiles_recent_table"], dtype=np.float64
-            )
-            y_in_sample = np.asfortranarray(
-                observations_dict["y_in_sample"], dtype=np.float64
-            )
-            ot = np.asfortranarray(observations_dict["ot"], dtype=np.float64)
-
-            adam_fit_or_gradient(
-                adam_cpp=adam_cpp,
-                mat_vt=mat_vt,
-                mat_wt=mat_wt,
-                mat_f=mat_f,
-                vec_g=vec_g,
-                index_lookup_table=index_lookup_table,
-                profiles_recent_table=profiles_recent_table,
-                y_in_sample=y_in_sample,
-                ot=ot,
-                initial_type=initials_dict["initial_type"],
-                n_iterations=initials_dict.get("n_iterations", 2) or 2,
-                backcast_value=True,
-                model_type_dict=model_type_dict,
-                components_dict=components_dict,
-                lags_dict=lags_dict,
-                obs_in_sample=observations_dict["obs_in_sample"],
-                xreg_number=int(explanatory_dict.get("xreg_number", 0) or 0),
-            )
-
-            # Update original matrices
-            adam_created["mat_vt"][:] = mat_vt[:]
+            adam_created["mat_vt"][:] = np.asarray(fitted.states)
 
         result["matrices"] = adam_created
         result["lags_dict"] = lags_dict

@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Literal
 
 import greybox as gb
@@ -412,7 +413,9 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
     if type == "multiplicative":
         if np.any(y[~y_na_values] <= 0):
             y_na_values = y_na_values | (y <= 0)
-        y_insample = np.log(y)
+        # The non-positive values are imputed below, as the missing ones
+        with np.errstate(divide="ignore", invalid="ignore"):
+            y_insample = np.log(y)
     else:
         y_insample = y.copy()
 
@@ -765,6 +768,46 @@ def calculate_entropy(distribution, scale, other, obsZero, y_fitted):
         ) + np.sum(np.log(scale * y_fitted))
 
 
+def observed_mask(observations_dict):
+    """The observed in-sample values: the missing ones (``y_na_values``) are not."""
+    n = observations_dict["obs_in_sample"]
+    missing = observations_dict.get("y_na_values")
+    if missing is None:
+        return np.ones(n, dtype=bool)
+    return ~np.asarray(missing, dtype=bool)[:n]
+
+
+def complete_windows(observed, h):
+    """The windows of the multistep errors (row i of ferrors has the targets
+    i..i+h-1) whose targets are all observed: the losses over the missing values are
+    not taken (R's ``adam_completeWindows``)."""
+    missing_count = np.concatenate([[0], np.cumsum(~np.asarray(observed, dtype=bool))])
+    rows = np.arange(max(len(observed) - h + 1, 0))
+    return missing_count[rows + h] - missing_count[rows] == 0
+
+
+def multistep_log_lik(loss_value, loss, h, observed):
+    """The concentrated log-likelihood of a multistep loss over the windows with all
+    their targets observed, rescaled to the observed values to be comparable with
+    the one-step likelihoods (R's ``adam_multistepLogLik``)."""
+    n_windows = int(np.sum(complete_windows(observed, h)))
+    log_2pi = math.log(2 * math.pi)
+    if loss in ("MSEh", "aMSEh", "TMSE", "aTMSE", "MSCE", "aMSCE"):
+        value = -n_windows / 2 * (log_2pi + 1 + float(_log_r(loss_value)))
+    elif loss in ("GTMSE", "aGTMSE"):
+        value = -n_windows / 2 * (log_2pi + 1 + loss_value)
+    elif loss in ("MAEh", "TMAE", "GTMAE", "MACE"):
+        value = -n_windows * (math.log(2) + 1 + float(_log_r(loss_value)))
+    elif loss in ("HAMh", "THAM", "GTHAM", "CHAM"):
+        value = -n_windows * (math.log(4) + 2 + 2 * float(_log_r(loss_value)))
+    elif loss in ("GPL", "aGPL"):
+        # Divided by h to make it comparable with the univariate ones
+        value = -n_windows / 2 * (h * log_2pi + h + loss_value) / h
+    else:
+        value = loss_value
+    return value / n_windows * int(np.sum(observed))
+
+
 def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
     """Multistep loss over the matrix of h-steps-ahead errors.
 
@@ -805,6 +848,39 @@ def calculate_multistep_loss(loss, adam_errors, obs_in_sample, h):
         return np.log(np.linalg.det(adam_errors.T @ adam_errors / denom))
     else:
         return 0
+
+
+def _libm(fun, np_fun, x):
+    # Elementwise through the C library, as R's exp() / log() are. NumPy's SIMD
+    # kernels round differently in the last bit (exp on ~5% of inputs, log on
+    # ~0.4%), and one ulp in the OMG probability flipped a Nelder-Mead step.
+    # The non-finite results keep NumPy's value: math raises where R returns
+    # Inf / -Inf / NaN, and those are exact anyway.
+    arr = np.asarray(x, dtype=np.float64)
+    # R returns these silently; the values flow on unchanged
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        out = np.array(np_fun(arr), dtype=np.float64)
+    finite = np.isfinite(out)
+    values = arr[finite].tolist()
+    out[finite] = np.fromiter(map(fun, values), np.float64, len(values))
+    return out
+
+
+def _exp_r(x):
+    """``exp()`` as R computes it, elementwise through libm."""
+    return _libm(math.exp, np.exp, x)
+
+
+def _log_r(x):
+    """``log()`` as R computes it, elementwise through libm."""
+    return _libm(math.log, np.log, x)
+
+
+def _pow_r(x, power):
+    """``x^power`` as R computes it, elementwise through libm's ``pow`` (NumPy's
+    power rounds differently on ~5% of the inputs)."""
+    p = float(power)
+    return _libm(lambda v: math.pow(v, p), lambda a: np.power(a, p), x)
 
 
 def _sum_r(values, axis=None):
@@ -890,7 +966,9 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
 
     elif distribution == "dgnorm":
         beta = other if other is not None else 2.0
-        return (beta * _sum_r(np.abs(errors) ** beta) / obs_in_sample) ** (1 / beta)
+        return (beta * _sum_r(_pow_r(np.abs(errors), beta)) / obs_in_sample) ** (
+            1 / beta
+        )
 
     elif distribution == "dalaplace":
         return _sum_r(errors * (other - (errors <= 0) * 1)) / obs_in_sample
@@ -992,3 +1070,35 @@ def scale_variance(scale, distribution, other=None):
     if distribution == "dlogis":
         return scale**2 * np.pi**2 / 3
     return scale
+
+
+def xreg_selector(errors, xreg_data, names, ic, df, distribution, other=None):
+    """R's ``adam_xreg_selector``: ``stepwise()`` on the errors of the model without
+    the regressors, with its degrees of freedom added. The names of the selected
+    regressors."""
+    import warnings
+
+    data = pd.DataFrame(np.asarray(xreg_data, dtype=float), columns=list(names))
+    data.insert(0, "errorsIvan41", np.asarray(errors, dtype=float))
+    kwargs = {"shape": other} if distribution in ("dgnorm", "dlgnorm") else {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = gb.stepwise(
+            data, ic=ic, df=df, distribution=distribution, silent=True, **kwargs
+        )
+    return list(model._feature_names or [])
+
+
+def make_names(names: list) -> list:
+    """R's ``make.names(unique=TRUE)``: the syntactic, unique names of the
+    regressors, as R gives them to the variables of the model."""
+    result: list = []
+    for name in names:
+        name = re.sub(r"[^0-9A-Za-z._]", ".", str(name))
+        if not re.match(r"^([A-Za-z]|\.(?![0-9]))", name):
+            name = "X" + name
+        candidate, k = name, 1
+        while candidate in result:
+            candidate, k = f"{name}.{k}", k + 1
+        result.append(candidate)
+    return result

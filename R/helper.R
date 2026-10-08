@@ -61,7 +61,13 @@ componentsDefiner <- function(object){
     ssarimaModel <- ssarimaChecker(object);
     sparmaModel <- sparmaChecker(object);
 
-    if(cesModel){
+    if(tbatsChecker(object)){
+        # The level and trend in the ETS slot, the harmonics and the ARMA in the ARIMA one
+        componentsNumberETS <- componentsNumberETSNonSeasonal <- 1 + (object$trendType!="none");
+        componentsNumberETSSeasonal <- 0;
+        componentsNumberARIMA <- ncol(object$states) - componentsNumberETS - length(object$initial$xreg);
+    }
+    else if(cesModel){
         componentsNumberETS <- componentsNumberETSSeasonal <- componentsNumberETSNonSeasonal <- 0;
         componentsNumberARIMA <- length(object$initial$nonseasonal);
         # If seasonal is formed via a matrix, this must be "simple" or a "full" model
@@ -131,6 +137,10 @@ gumChecker <- function(object){
 
 ssarimaChecker <- function(object){
     return(smoothType(object)=="SSARIMA");
+}
+
+tbatsChecker <- function(object){
+    return(smoothType(object)=="TBATS");
 }
 
 cesChecker <- function(object){
@@ -261,23 +271,19 @@ covarOPGCore <- function(object, parameterValues, perturbedPointLik,
     keep <- diagJ > max(diagJ)*1e-10 & is.finite(diagJ);
     vcovMatrix <- matrix(Inf, nParam, nParam, dimnames=list(parametersNames, parametersNames));
     if(any(keep)){
-        Jkeep <- J[keep,keep,drop=FALSE];
-        vcovKeep <- try(solve(Jkeep), silent=TRUE);
-        if(inherits(vcovKeep,"try-error")){
-            # Ill-conditioned (collinear parameters): the plain inverse fails, so
-            # use the Moore-Penrose pseudo-inverse via the symmetric eigen-
-            # decomposition, dropping the (near-)zero-eigenvalue directions. Still
-            # PSD; the parameters spanning the collinear null space get a pooled
-            # variance rather than a spurious solve() failure.
-            eigenJ <- eigen(Jkeep, symmetric=TRUE);
-            positive <- eigenJ$values > max(eigenJ$values)*1e-10;
-            if(!any(positive)){
-                return(NULL);
-            }
-            vectorsKeep <- eigenJ$vectors[,positive,drop=FALSE];
-            vcovKeep <- vectorsKeep %*% (t(vectorsKeep)/eigenJ$values[positive]);
+        # The Moore-Penrose pseudo-inverse via the symmetric eigen-decomposition,
+        # dropping the (near-)zero-eigenvalue directions: the inverse when J is
+        # well conditioned, and for collinear parameters (e.g. both sides of omg at
+        # a boundary) a pooled variance rather than a huge one. Still PSD. solve()
+        # decides on singularity at the machine epsilon, where the last bits of the
+        # LU decide, so it is not used
+        eigenJ <- eigen(J[keep,keep,drop=FALSE], symmetric=TRUE);
+        positive <- eigenJ$values > max(eigenJ$values)*1e-10;
+        if(!any(positive)){
+            return(NULL);
         }
-        vcovMatrix[keep,keep] <- vcovKeep;
+        vectorsKeep <- eigenJ$vectors[,positive,drop=FALSE];
+        vcovMatrix[keep,keep] <- vectorsKeep %*% (t(vectorsKeep)/eigenJ$values[positive]);
     }
     return(vcovMatrix);
 }
@@ -308,12 +314,22 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
     baseArma <- if(length(c(names(armaAr), names(armaMa)))>0){ object$arma; } else { list(); }
     baseInitialArg <- if(initialsEstimated){ initialList; } else { initialType; }
 
-    refit <- function(persistence, phi, arma, initialArg){
+    # The parameter of the distribution (shape of dgnorm, alpha of dalaplace) and the
+    # constant (or drift) of ARIMA, provided at their values in the refits
+    baseOther <- object$other[intersect(names(object$other), c("shape","alpha","nu"))];
+    baseConstant <- if(is.numeric(object$constant)){ object$constant; } else { NULL; }
+
+    refit <- function(persistence, phi, arma, initialArg, other, constant){
         if(engine=="adam"){
-            args <- list(data=object$data, model=modelString, lags=modelLags,
-                         persistence=persistence, phi=phi, initial=initialArg,
-                         h=0, FI=FALSE, silent=TRUE);
+            # The distribution and the ETS form are those of the model: the refit at the
+            # estimates has to reproduce its likelihood
+            args <- c(list(data=object$data, model=modelString, lags=modelLags,
+                           persistence=persistence, phi=phi, initial=initialArg,
+                           distribution=object$distribution, ets=object$ets,
+                           h=0, FI=FALSE, silent=TRUE),
+                      lapply(other, unname));
             if(!is.null(regressorsMode)){ args$regressors <- regressorsMode; }
+            if(!is.null(constant)){ args$constant <- unname(constant); }
         }
         else{
             # ssarima: data argument is named `y`.
@@ -326,7 +342,8 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     parametersNames <- names(coef(object));
@@ -335,10 +352,19 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
         phi <- object$phi;
         arma <- baseArma;
         initialArg <- baseInitialArg;
+        other <- baseOther;
+        constant <- baseConstant;
         if(!is.null(j)){
             nameJ <- parametersNames[j];
-            if(nameJ %in% persistenceNames){
+            # The constant first: the persistence of ARIMA has an element "drift" too
+            if(nameJ %in% c("constant","drift") && !is.null(constant) && engine=="adam"){
+                constant <- constant+delta;
+            }
+            else if(nameJ %in% persistenceNames){
                 persistence[nameJ] <- persistence[nameJ]+delta;
+            }
+            else if(nameJ=="other" && length(other)==1 && engine=="adam"){
+                other[[1]] <- other[[1]]+delta;
             }
             else if(nameJ=="phi"){
                 phi <- phi+delta;
@@ -398,7 +424,7 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
                 return(NULL);
             }
         }
-        return(refit(persistence, phi, arma, initialArg));
+        return(refit(persistence, phi, arma, initialArg, other, constant));
     }
 
     return(covarOPGCore(object, coef(object), perturbedPointLik, stepSize));
@@ -484,7 +510,8 @@ covarOPGces <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -559,7 +586,8 @@ covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -606,7 +634,8 @@ covarOPGsparma <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -785,7 +814,8 @@ covarOPGom <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));
@@ -807,6 +837,9 @@ covarOPGomg <- function(object, stepSize=.Machine$double.eps^(1/4)){
 
     perturbedPointLik <- function(j, delta){
         clone <- object;
+        # The refit takes its bounds from the sub-models: switched off, so that a
+        # perturbation at a boundary is not a 1e+300 wall
+        clone$modelA$bounds <- clone$modelB$bounds <- "none";
         if(!is.null(j)){
             if(j<=nA){
                 clone$modelA$B[j] <- clone$modelA$B[j]+delta;
@@ -819,7 +852,8 @@ covarOPGomg <- function(object, stepSize=.Machine$double.eps^(1/4)){
         if(inherits(modelLocal,"try-error")){
             return(NULL);
         }
-        return(as.numeric(pointLik(modelLocal)));
+        # A perturbation out of the bounds gives non-finite values, handled by the core
+        return(as.numeric(suppressWarnings(pointLik(modelLocal))));
     }
 
     return(covarOPGCore(object, parameterValues, perturbedPointLik, stepSize));

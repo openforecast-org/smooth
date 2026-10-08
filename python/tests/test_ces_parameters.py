@@ -76,3 +76,16 @@ def test_sum_r_adds_in_order_as_r():
     values = np.array([2.0**64] + [1.0] * 7 + [-(2.0**64)] + [0.0] * 7)
     assert _sum_r(values) == 0.0
     assert np.array_equal(_sum_r(np.vstack([values, values]), axis=1), [0.0, 0.0])
+
+
+def test_ces_takes_the_missing_values_for_gaps():
+    """The missing values are skipped by the fit and are not in the loss: the
+    likelihood is over the observed values, as its per-observation terms."""
+    y = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].values.astype(float)
+    y[[9, 49, 50, 89]] = np.nan
+    with pytest.warns(UserWarning, match="NAs"):
+        model = CES(seasonality="full", lags=[12]).fit(y)
+    assert np.isfinite(model.loglik)
+    assert np.sum(model.point_lik()) == pytest.approx(model.loglik, rel=1e-12)
+    np.testing.assert_array_equal(np.isnan(model.residuals), np.isnan(y))
+    assert np.all(np.isfinite(model.predict(h=12, interval="prediction").upper))

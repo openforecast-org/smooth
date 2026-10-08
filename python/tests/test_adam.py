@@ -427,7 +427,8 @@ class TestADAMLags:
         ).fit(log_air)
         expected = r_array(
             "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12), loss='LASSO',"
-            " lambda=0.1, orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1))); unname(coef(m))}",
+            " lambda=0.1, orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1)));"
+            " unname(coef(m))}",
             R_data={"y": log_air},
         )
         np.testing.assert_allclose(model.coef, expected, rtol=1e-6)
@@ -451,7 +452,10 @@ class TestADAMRegularisation:
         "kwargs, r_args",
         [
             ({}, ""),
-            ({"lambda_param": 1, "initial": "optimal"}, ", lambda=1, initial='optimal'"),
+            (
+                {"lambda_param": 1, "initial": "optimal"},
+                ", lambda=1, initial='optimal'",
+            ),
         ],
     )
     def test_lambda_matches_r(self, log_air, kwargs, r_args):
@@ -475,22 +479,41 @@ class TestADAMRegularisation:
         "kwargs, r_args, with_x",
         [
             # Nothing is left to estimate: the loss at the targets, zero
-            ({"model": "AAN", "loss": "RIDGE", "lambda_param": 1}, "'AAN', loss='RIDGE', lambda=1", False),
+            (
+                {"model": "AAN", "loss": "RIDGE", "lambda_param": 1},
+                "'AAN', loss='RIDGE', lambda=1",
+                False,
+            ),
             # The constant after the regressors is not shrunk
             (
-                {"model": "NNN", "orders": {"ar": [1], "i": [1], "ma": [1]},
-                 "constant": True, "loss": "LASSO", "lambda_param": 0.1},
-                "'NNN', orders=list(ar=1,i=1,ma=1), constant=TRUE, loss='LASSO', lambda=0.1",
+                {
+                    "model": "NNN",
+                    "orders": {"ar": [1], "i": [1], "ma": [1]},
+                    "constant": True,
+                    "loss": "LASSO",
+                    "lambda_param": 0.1,
+                },
+                "'NNN', orders=list(ar=1,i=1,ma=1), constant=TRUE,"
+                " loss='LASSO', lambda=0.1",
                 True,
             ),
             # Provided smoothing: the rest is found where it is in B
             (
-                {"model": "AAN", "persistence": {"alpha": 0.3}, "loss": "LASSO", "lambda_param": 0.1},
+                {
+                    "model": "AAN",
+                    "persistence": {"alpha": 0.3},
+                    "loss": "LASSO",
+                    "lambda_param": 0.1,
+                },
                 "'AAN', persistence=list(alpha=0.3), loss='LASSO', lambda=0.1",
                 False,
             ),
             # Nothing to estimate without LASSO either: the loss, not inf
-            ({"model": "AAN", "persistence": {"alpha": 0.3, "beta": 0.1}}, "'AAN', persistence=list(alpha=0.3, beta=0.1)", False),
+            (
+                {"model": "AAN", "persistence": {"alpha": 0.3, "beta": 0.1}},
+                "'AAN', persistence=list(alpha=0.3, beta=0.1)",
+                False,
+            ),
         ],
     )
     def test_penalty_and_use_match_r(self, log_air, kwargs, r_args, with_x):
@@ -519,7 +542,10 @@ class TestADAMArmaFixed:
     @pytest.mark.parametrize(
         "arma, arma_r",
         [
-            ({"ar": [0.2, 0.3], "ma": [-0.4, -0.5]}, "list(ar=c(0.2,0.3), ma=c(-0.4,-0.5))"),
+            (
+                {"ar": [0.2, 0.3], "ma": [-0.4, -0.5]},
+                "list(ar=c(0.2,0.3), ma=c(-0.4,-0.5))",
+            ),
             ({"ma": [-0.4, -0.5]}, "list(ma=c(-0.4,-0.5))"),
             ({"ar": [0.2, 0.3]}, "list(ar=c(0.2,0.3))"),
         ],
@@ -543,10 +569,13 @@ class TestADAMArmaFixed:
         ).fit(y)
         expected = r_array(
             "{m <- adam(ts(y, frequency=12), 'NNN', lags=c(1,12), initial='optimal',"
-            f" orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1)), arma={arma_r}); m$lossValue}}",
+            f" orders=list(ar=c(1,1), i=c(1,1), ma=c(1,1)), arma={arma_r});"
+            " m$lossValue}",
             R_data={"y": y},
         )
-        assert model._adam_estimated["CF_value"] == pytest.approx(float(expected[0]), rel=1e-8)
+        assert model._adam_estimated["CF_value"] == pytest.approx(
+            float(expected[0]), rel=1e-8
+        )
 
     @pytest.fixture
     def arima_series(self):
@@ -869,7 +898,9 @@ class TestADAMARIMAInitialiser:
 
         # A non-invertible HR estimate is reflected to the invertible MA
         w = np.diff(np.random.default_rng(47).normal(size=300), n=2)
-        ma = [self._hr(w, [0], [1], [1], ar_est=False, bounds=b)[0] for b in (False, True)]
+        ma = [
+            self._hr(w, [0], [1], [1], ar_est=False, bounds=b)[0] for b in (False, True)
+        ]
         assert abs(ma[0]) < 1
         assert ma[1] == ma[0]
 
@@ -881,6 +912,23 @@ class TestADAMARIMAInitialiser:
         off = self._hr(y, [1, 1], [1, 1], [1, 12], use=[1, 0])
         np.testing.assert_array_equal(off[2:], [0.1, -0.1])
         assert len(self._hr(y, [1], [1], [1], ar_est=False, arma=[0.6])) == 1
+
+    def test_screen_matches_single_estimates(self):
+        """The screen of one level gives the estimates and innovations of each order."""
+        from smooth.adam_general import _ols
+
+        y = self._arma(300, 0.6, 0.3, 41)
+        lags = np.array([1, 12], dtype=np.uint64)
+        fixed = np.array([0, 1], dtype=np.uint64)
+        orders, parameters, innovations = _ols.arima_hr_select(
+            y, fixed, np.zeros(2, dtype=np.uint64), lags, 0, 2, 1, True
+        )
+        assert orders.shape == (6, 2)
+        assert innovations.shape == (300, 6)
+        for (p, q), row in zip(orders.astype(int), parameters):
+            b = self._hr(y, [p, 1], [q, 0], [1, 12])
+            np.testing.assert_allclose(row[: len(b)], b, rtol=1e-12)
+            assert np.isnan(row[len(b) :]).all()
 
     def test_regression_residuals(self):
         """HR runs on the residuals of the regression, not on the series."""
@@ -986,7 +1034,7 @@ class TestARIMABounds:
     """Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)."""
 
     def test_reflection_matches_the_roots(self):
-        """The largest reflection coefficient is below one exactly when all roots are outside."""
+        """The largest reflection coefficient is below one iff all roots are outside."""
         from smooth.adam_general import _adamCore
         from smooth.adam_general.core.utils.polynomials import adam_polynomialiser
 
@@ -1082,16 +1130,13 @@ class TestARIMABounds:
                 expected["loss"][0] < 1e100
             )
 
-
     def test_parameter_bounds_match_the_roots(self):
         """The bounds of a parameter within its factor are those of the roots."""
         from smooth.adam_general import _ols
 
         values = np.array([0.1, 0.2, 0.3])
         grid = np.arange(-3, 3, 0.001)
-        stable = [
-            np.all(np.abs(np.roots([-0.3, -v, -0.1, 1])) > 1) for v in grid
-        ]
+        stable = [np.all(np.abs(np.roots([-0.3, -v, -0.1, 1])) > 1) for v in grid]
         np.testing.assert_allclose(
             _ols.arima_parameter_bounds(values, 1, -1.0),
             [grid[stable].min(), grid[stable].max()],
@@ -1118,6 +1163,7 @@ class TestARIMABounds:
             R_data={"y": y},
         )
         np.testing.assert_allclose(model.confint().values, expected, rtol=1e-6)
+
 
 class TestADAMARIMAStates:
     """ARIMA initials: the initial state of the companion form, as in ssarima."""
@@ -1268,3 +1314,41 @@ class TestADAMARIMAStates:
             if name.startswith("ARIMAState")
         ]
         np.testing.assert_allclose(arima_initials, expected["arima"], rtol=1e-5)
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+@pytest.mark.parametrize("distribution", ["dgamma", "dinvgauss", "dnorm"])
+def test_adam_keeps_the_missing_values_apart_from_the_zeros(distribution):
+    rng = np.random.default_rng(3)
+    y = rng.binomial(1, 0.4, 200) * np.exp(rng.normal(2, 0.3, 200))
+    y[list(range(9, 20)) + [99]] = np.nan
+    model = ADAM(model="MNN", occurrence="odds-ratio", distribution=distribution)
+    model.fit(y)
+    assert np.sum(model.point_lik()) == pytest.approx(model.loglik, abs=1e-8)
+    # A negative entropy of the zeros is set to zero, so the optimiser moves
+    assert model.loglik > -1e100
+
+
+def test_adam_warns_when_more_than_half_of_the_data_is_missing():
+    y = np.random.default_rng(5).normal(100, 10, 100)
+    y[:60] = np.nan
+    with pytest.warns(UserWarning, match="More than half of the in-sample data"):
+        ADAM(model="ANN").fit(y)
+
+
+@pytest.mark.filterwarnings("ignore:Data contains NAs")
+def test_adam_uses_the_filled_values_only_for_the_initialisation():
+    rng = np.random.default_rng(1)
+    t = np.arange(144)
+    y = np.exp(5 + 0.01 * t + 0.2 * np.sin(2 * np.pi * t / 12) + rng.normal(0, 0.05, 144))
+    y[[9, 49, 50, 89, 139]] = np.nan
+    model = ADAM(model="MAM", lags=[12], h=12, holdout=True).fit(y)
+    assert np.all(np.isfinite(np.asarray(model.fitted, dtype=float)))
+    # The holdout does not enter the fill of the in-sample gaps
+    changed = y.copy()
+    changed[143] = 1e4
+    other = ADAM(model="MAM", lags=[12], h=12, holdout=True).fit(changed)
+    np.testing.assert_allclose(other.coef, model.coef)
+    # The multistep loss is over the windows with all their targets observed
+    assert np.isfinite(ADAM(model="ANN", loss="TMSE", h=6).fit(y).loss_value)
+    assert not np.all(np.isnan(model.rstudent()))

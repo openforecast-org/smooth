@@ -3,6 +3,7 @@ import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
+import greybox as gb
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
@@ -21,9 +22,11 @@ from smooth.adam_general.core.forecaster.intervals import ensure_level_format
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
+from smooth.adam_general.core.utils.printing import decorate_occurrence_name
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
+    observed_mask,
     resolve_smoother,
     scale_debias,
     scale_variance,
@@ -88,6 +91,7 @@ class OutlierDummy:
 
 def _adam_refit_one_replicate(
     actuals: NDArray,
+    xreg: Optional[NDArray],
     idx_matrix: Union[NDArray, list[NDArray]],
     refit_cls_name: str,
     model_spec: Any,
@@ -115,61 +119,16 @@ def _adam_refit_one_replicate(
             boot_model = refit_cls(model=model_spec, **refit_kwargs)
         else:
             boot_model = refit_cls(**refit_kwargs)
-        boot_model.fit(y_boot)
+        if xreg is None:
+            boot_model.fit(y_boot)
+        else:
+            boot_model.fit(y_boot, xreg[idx_matrix[i]])
         boot_coef = np.asarray(boot_model.coef, dtype=float)
     except Exception:
         return None
     if boot_coef.shape[0] != k or not np.all(np.isfinite(boot_coef)):
         return None
     return boot_coef
-
-
-def _psd_correct(vcov: NDArray) -> NDArray:
-    """Ensure ``vcov`` is positive semi-definite for the MVN sampler.
-
-    Mirrors R's ``reapply.adam`` lines 96-115: if the smallest eigenvalue
-    is negative, shift the diagonal by ``|min_eig| + 1e-10`` when the
-    shift is small (PSD repair). When the eigenvalue is below ``-1`` the
-    repair is too aggressive — fall back to the diagonal-only matrix
-    which is always PSD.
-    """
-    vcov = np.asarray(vcov, dtype=float)
-    if vcov.size == 0:
-        return vcov
-    try:
-        eig_min = float(np.min(np.linalg.eigvalsh(vcov)))
-    except np.linalg.LinAlgError:
-        # ``Eigenvalues did not converge`` can fire on platform-specific
-        # LAPACK iteration noise (seen on Windows wheels under
-        # ``bounds="admissible"`` reapply) even when the input is a
-        # well-formed covariance matrix. The diagonal-only matrix is
-        # PSD by construction, so use it as the safe fallback for the
-        # MVN sampler — same response as the very-negative-eigenvalue
-        # branch below.
-        warnings.warn(
-            "Eigendecomposition of the covariance matrix did not converge; "
-            "falling back to the diagonal-only matrix for MVN sampling.",
-            stacklevel=3,
-        )
-        return np.diag(np.diag(vcov))
-    if eig_min < 0:
-        if eig_min > -1:
-            warnings.warn(
-                "The covariance matrix of parameters is not positive "
-                "semi-definite; shifting the diagonal to repair it. "
-                "Consider re-estimating the model with a different "
-                "optimiser configuration.",
-                stacklevel=3,
-            )
-            return vcov + (-eig_min + 1e-10) * np.eye(vcov.shape[0])
-        warnings.warn(
-            "The covariance matrix of parameters has a large negative "
-            "eigenvalue; falling back to the diagonal-only matrix for "
-            "MVN sampling. It is worth re-estimating the model.",
-            stacklevel=3,
-        )
-        return np.diag(np.diag(vcov))
-    return vcov
 
 
 def _clip_ets_usual_smoothing(random_parameters: NDArray, idx: dict) -> None:
@@ -354,35 +313,6 @@ _RATIO_RESIDUAL_DISTRIBUTIONS = (
     "dgamma",
     "dinvgauss",
 )
-
-
-_OCCURRENCE_NAME_SUFFIX = {
-    "f": "[F]",
-    "fixed": "[F]",
-    "d": "[D]",
-    "direct": "[D]",
-    "o": "[O]",
-    "odds-ratio": "[O]",
-    "i": "[I]",
-    "inverse-odds-ratio": "[I]",
-    "g": "[G]",
-    "general": "[G]",
-}
-
-
-def _decorate_occurrence_name(name, occurrence_dict):
-    """Prefix ``i`` and append the occurrence-type letter (R: adam_model_name)."""
-    occurrence = (occurrence_dict or {}).get("occurrence")
-    if not isinstance(occurrence, str):
-        # A provided (already fitted) occurrence model: read its own type.
-        occurrence = (
-            (getattr(occurrence, "_occurrence", None) or {}).get("occurrence")
-            if occurrence is not None
-            else None
-        )
-    if not isinstance(occurrence, str) or occurrence in ("n", "none"):
-        return name
-    return f"i{name}{_OCCURRENCE_NAME_SUFFIX.get(occurrence, '')}"
 
 
 class ADAM:
@@ -766,7 +696,12 @@ class ADAM:
 
             The fitted value is accessible via ``model.constant_value``.
         regressors : Literal["use", "select", "adapt"], default="use"
-            How to handle external regressors.
+            How to handle external regressors: ``"use"`` them with constant
+            coefficients, ``"select"`` them as R's ``adam()`` (``stepwise()`` on the
+            errors of the model estimated without them, which is then estimated
+            with the selected ones), or ``"adapt"`` their coefficients over time.
+            With ``"select"``, ``predict()`` takes either the selected columns of X
+            or all those given to ``fit()``.
         distribution : Optional[DISTRIBUTION_OPTIONS], default=None
             Error distribution. If None, it is selected automatically based
             on the loss function.
@@ -1171,16 +1106,21 @@ class ADAM:
         self._om_model = None
         if self._occurrence.get("occurrence_model"):
             ot_logical = self._observations["ot_logical"]
-            self._observations["obs_zero"] = int(np.sum(~ot_logical))
+            # The observed zeros: a missing observation is neither
+            missing = self._observations.get("y_na_values")
+            zero = ~ot_logical if missing is None else ~ot_logical & ~missing
+            self._observations["obs_zero"] = int(np.sum(zero))
             occurrence = self._occurrence["occurrence"]
             # Already fitted: take it as it is, the way R reuses
             # object$occurrence rather than estimating a second one.
             self._om_model = (
                 occurrence
                 if not isinstance(occurrence, str)
-                else self._fit_occurrence_model(y)
+                else self._fit_occurrence_model(y, X)
             )
-            self._occurrence["p_fitted"] = self._om_model.fitted
+            # At a missing observation the probability is the prediction of the
+            # occurrence model: the likelihoods leave the gap out, as R
+            self._occurrence["p_fitted"] = np.array(self._om_model.fitted, dtype=float)
             self._occurrence["oes_model"] = occurrence
 
         # Execute model estimation or selection based on model_do
@@ -1363,9 +1303,14 @@ class ADAM:
             if "persistence_xreg" in self._persistence:
                 self.persistence_xreg_ = self._persistence["persistence_xreg"]
 
-        # For combined models, preserve original model specification with ETS prefix
+        # For combined models, preserve original model specification with ETS prefix;
+        # ETSX when any model of the pool has regressors, as R
         if getattr(self, "_is_combined", False):
-            self.model = f"ETS({self._original_model_spec})"
+            has_xreg = any(
+                m["explanatory_dict"].get("xreg_model", False)
+                for m in getattr(self, "_prepared_models", None) or []
+            )
+            self.model = f"ETS{'X' if has_xreg else ''}({self._original_model_spec})"
             return
 
         # Update self.model with the selected/estimated model name
@@ -1444,7 +1389,9 @@ class ADAM:
         # Occurrence models carry an "i" prefix and a bracketed letter naming
         # the occurrence type, as R's adam_model_name does
         # (R/utils-adam.R:1688-1697).
-        self.model = _decorate_occurrence_name(self.model, self._occurrence)
+        self.model = decorate_occurrence_name(
+            self.model, self._occurrence, getattr(self, "_om_model", None)
+        )
 
     # =========================================================================
     # Extraction properties — convenience accessors over the fitted state.
@@ -2182,7 +2129,12 @@ class ADAM:
         >>> original_data = model.actuals
         """
         self._check_is_fitted()
-        return np.array(self._observations["y_in_sample"])
+        y = np.array(self._observations["y_in_sample"], dtype=float)
+        # The missing observations stay missing, as R's data
+        missing = self._observations.get("y_na_values")
+        if missing is not None and np.any(missing):
+            y[missing] = np.nan
+        return y
 
     @property
     def coef(self) -> NDArray:
@@ -2286,14 +2238,30 @@ class ADAM:
         """
         self._check_is_fitted()
         if getattr(self, "_is_combined", False):
-            return self._combined_residuals
+            # No residual where the observation is missing
+            combined = self._combined_residuals
+            missing = ~observed_mask(self._observations)
+            if not np.any(missing):
+                return combined
+            combined = combined.copy().astype(float)
+            if isinstance(combined, pd.Series):
+                combined.iloc[missing] = np.nan
+            else:
+                combined[missing] = np.nan
+            return combined
 
         e = self._prepared["residuals"]
         if self.distribution_ in _RATIO_RESIDUAL_DISTRIBUTIONS:
             e = np.asarray(e, dtype=np.float64)
             if self.error_type == "A":
-                return np.abs(1.0 + e / np.asarray(self.fitted, dtype=np.float64))
-            return 1.0 + e
+                e = np.abs(1.0 + e / np.asarray(self.fitted, dtype=np.float64))
+            else:
+                e = 1.0 + e
+        # No residual where the observation is missing, as R
+        missing = self._observations.get("y_na_values")
+        if missing is not None and np.any(missing):
+            e = np.array(e, dtype=np.float64)
+            e[missing] = np.nan
         return e
 
     def rstandard(self) -> NDArray:
@@ -2340,11 +2308,12 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        obs = self.nobs
+        # The missing values (NaN residuals) are not observations
+        obs = self._nobs_observed()
         errors = self.residuals.copy().astype(float)
         dist = self.distribution_
         if dist in ("dinvgauss", "dgamma"):
-            return errors / np.mean(errors)
+            return errors / np.nanmean(errors)
 
         # R's rstandard.adam standardises by extractScale(), de-biased in the
         # variance space. extract_scale() is a vector when a scale model is
@@ -2359,7 +2328,7 @@ class ADAM:
             errors = errors + raw_scale / 2
         # The conventional residuals of Laplace, ALaplace and Logistic are not centred
         if dist not in ("dlaplace", "dalaplace", "dlogis"):
-            errors = errors - np.mean(errors)
+            errors = errors - np.nanmean(errors)
         # sigma for dnorm and dlnorm, s^2 for S, s for the rest
         if dist in ("dt", "dnorm", "dlnorm"):
             errors = errors / np.sqrt(scale)
@@ -2418,51 +2387,59 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        obs = self.nobs
+        # The missing values (NaN residuals) are not observations
+        obs = self._nobs_observed()
         df = obs - self.nparam - 1
         errors = self.residuals.copy().astype(float)
         dist = self.distribution_
 
         if dist == "dnorm":
-            errors -= np.mean(errors)
-            total_sq = np.sum(errors**2)
+            errors -= np.nanmean(errors)
+            total_sq = np.nansum(errors**2)
             denom = np.sqrt((total_sq - errors**2) / df)
             return errors / denom
 
         elif dist == "dlaplace":
-            errors -= np.mean(errors)
-            total_abs = np.sum(np.abs(errors))
+            errors -= np.nanmean(errors)
+            total_abs = np.nansum(np.abs(errors))
             denom = (total_abs - np.abs(errors)) / df
             return errors / denom
 
         elif dist == "ds":
-            errors -= np.mean(errors)
-            total_sqrt_abs = np.sum(np.sqrt(np.abs(errors)))
+            errors -= np.nanmean(errors)
+            total_sqrt_abs = np.nansum(np.sqrt(np.abs(errors)))
             denom = ((total_sqrt_abs - np.sqrt(np.abs(errors))) / (2 * df)) ** 2
             return errors / denom
 
         elif dist == "dgnorm":
             beta = self._gnorm_shape() or 2.0
-            errors -= np.mean(errors)
-            total_pow = np.sum(np.abs(errors) ** beta)
+            errors -= np.nanmean(errors)
+            total_pow = np.nansum(np.abs(errors) ** beta)
             denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
             return errors / denom
 
         elif dist in ("dinvgauss", "dgamma"):
-            total = np.sum(errors)
-            mean_loo = (total - errors) / (obs - 1)
-            return errors / mean_loo
+            # The observed values, non-zero with an occurrence model, as R's
+            # residsToGo: each leaves itself out of their mean
+            used = observed_mask(self._observations)
+            if getattr(self, "_om_model", None) is not None:
+                used = used & np.asarray(self._observations["ot_logical"], dtype=bool)
+            total = np.sum(errors[used])
+            mean_loo = (total - np.where(used, errors, 0.0)) / (
+                np.sum(used) - used.astype(float)
+            )
+            return np.where(used, errors / mean_loo, errors)
 
         elif dist == "dlnorm":
             scale = self.extract_scale()
-            log_e = np.log(errors) - np.mean(np.log(errors)) - scale / 2
-            total_sq = np.sum(log_e**2)
+            log_e = np.log(errors) - np.nanmean(np.log(errors)) - scale / 2
+            total_sq = np.nansum(log_e**2)
             denom = np.sqrt((total_sq - log_e**2) / df)
             return np.exp(log_e / denom)
 
         else:  # default: treat like normal
-            errors -= np.mean(errors)
-            total_sq = np.sum(errors**2)
+            errors -= np.nanmean(errors)
+            total_sq = np.nansum(errors**2)
             denom = np.sqrt((total_sq - errors**2) / df)
             return errors / denom
 
@@ -2546,27 +2523,33 @@ class ADAM:
         dist = self.distribution_
         p = np.array([(1 - level) / 2, (1 + level) / 2])
 
-        if dist == "dnorm":
-            stat = scipy_stats.norm.ppf(p)
-        elif dist == "dlaplace":
-            stat = scipy_stats.laplace.ppf(p)
-        elif dist == "ds":
-            stat = scipy_stats.gennorm.ppf(p, beta=0.5)
-        elif dist == "dgnorm":
-            beta = self._gnorm_shape() or 2.0
-            stat = scipy_stats.gennorm.ppf(p, beta=beta)
-        elif dist == "dlnorm":
-            errors = np.log(errors)
-            stat = scipy_stats.norm.ppf(p)
-        elif dist == "dgamma":
-            scale = self.sigma
-            stat = scipy_stats.gamma.ppf(p, a=1.0 / scale, scale=scale)
+        # The quantiles of the standardised distribution, as R's outlierdummy.adam
+        other = getattr(self, "other", None) or {}
+        scale = float(np.mean(self.extract_scale()))
+        if dist in ("dlaplace", "dllaplace"):
+            stat = gb.qlaplace(p, 0, 1)
+        elif dist == "dalaplace":
+            stat = gb.qalaplace(p, 0, 1, other.get("alpha", 0.5))
+        elif dist == "dlogis":
+            stat = gb.qlogis(p, 0, 1)
+        elif dist == "dt":
+            stat = scipy_stats.t.ppf(p, self._nobs_observed() - self.nparam)
+        elif dist in ("dgnorm", "dlgnorm"):
+            stat = gb.qgnorm(p, 0, 1, self._gnorm_shape() or 2.0)
+        elif dist in ("ds", "dls"):
+            stat = gb.qs(p, 0, 1)
         elif dist == "dinvgauss":
-            nobs, npar = self.nobs, self.nparam
-            disp = float(self.sigma) * nobs / (nobs - npar)
-            stat = scipy_stats.invgauss.ppf(p, mu=disp, scale=1.0 / disp)
+            # The scale is de-biased, taking n-k into account
+            stat = gb.qinvgauss(
+                p, 1, scale_debias(scale, dist, self._nobs_observed(), self._df_scale)
+            )
+        elif dist == "dgamma":
+            stat = gb.qgamma(p, 1.0 / scale, scale)
         else:
-            stat = scipy_stats.norm.ppf(p)
+            stat = gb.qnorm(p, 0, 1)
+        stat = np.asarray(stat, dtype=float)
+        if dist in ("dlnorm", "dllaplace", "dls", "dlgnorm"):
+            errors = np.log(errors)
 
         outlier_ids = np.where((errors > stat[1]) | (errors < stat[0]))[0]
         n_out = len(outlier_ids)
@@ -2710,7 +2693,13 @@ class ADAM:
         sample contains no zeroes.
         """
         y = np.asarray(self._observations["y_in_sample"], dtype=np.float64).ravel()
-        return int(np.count_nonzero(y))
+        # The missing values were filled: they are not observations
+        return int(np.count_nonzero(y[observed_mask(self._observations)]))
+
+    def _nobs_observed(self) -> int:
+        """The observed in-sample values (R: ``adam_nobsObserved``): the missing
+        ones are not."""
+        return int(np.sum(observed_mask(self._observations)))
 
     def _ic_occurrence_terms(self):
         """``(n_param_all, n_param_sizes, obs)`` for AICc/BICc.
@@ -2722,11 +2711,16 @@ class ADAM:
         non-zero fitted values.
         """
         n_param_all = float(self.nparam)
+        observed = observed_mask(self._observations)
         if getattr(self, "_om_model", None) is None:
-            return n_param_all, n_param_all, int(self.nobs)
+            return n_param_all, n_param_all, int(np.sum(observed))
         n_occurrence = float(self._n_param.estimated.get("occurrence", 0))
         fitted = np.asarray(self.fitted, dtype=np.float64).ravel()
-        return n_param_all, n_param_all - n_occurrence, int(np.count_nonzero(fitted))
+        return (
+            n_param_all,
+            n_param_all - n_occurrence,
+            int(np.count_nonzero(fitted[observed])),
+        )
 
     @property
     def scale_model(self):
@@ -2988,6 +2982,7 @@ class ADAM:
         densities themselves are returned.
         """
         from smooth.adam_general.core.utils.utils import (
+            _sum_r,
             calculate_entropy,
             calculate_likelihood,
         )
@@ -3007,13 +3002,20 @@ class ADAM:
             )
 
         occurrence_model = bool(self._occurrence.get("occurrence_model", False))
+        # The missing observations are not in the likelihood: their values stay zero
+        observed = ~np.isnan(y)
         if occurrence_model:
             p_fitted = np.asarray(self._occurrence["p_fitted"], dtype=float).ravel()
-            y_fitted = np.asarray(self.fitted, dtype=float).ravel() / p_fitted
-            ot_logical = y != 0
+            # The probability is zero at the missing observations, which stay NaN
+            y_fitted = np.full(obs, np.nan)
+            y_fitted[observed] = (
+                np.asarray(self.fitted, dtype=float).ravel()[observed]
+                / p_fitted[observed]
+            )
+            ot_logical = observed & (y != 0)
         else:
             y_fitted = np.asarray(self.fitted, dtype=float).ravel()
-            ot_logical = np.ones(obs, dtype=bool)
+            ot_logical = observed
 
         lik_values = np.zeros(obs, dtype=float)
         # calculate_likelihood reshapes y to a column, so y_fitted must be a
@@ -3033,19 +3035,33 @@ class ADAM:
         if occurrence_model:
             # Differential entropy for the unobserved (zero) demand sizes, then
             # add the occurrence-model Bernoulli contribution (mirrors R).
-            zero = ~ot_logical
-            if np.any(zero):
-                lik_values[zero] = -np.asarray(
-                    calculate_entropy(distribution, scale, other, 1.0, y_fitted[zero]),
-                    dtype=float,
-                ).ravel()
-            om_model = self._occurrence.get("oes_model") or self._occurrence.get(
-                "occurrence"
+            # One zero at a time: the entropy of dgamma and dinvgauss sums over the
+            # fitted values it is given. As in the estimation, a negative entropy
+            # (it should not be) is set to zero
+            zero = ~ot_logical & observed
+            entropy = np.array(
+                [
+                    float(
+                        np.ravel(
+                            calculate_entropy(
+                                distribution, scale, other, 1.0, y_fitted[j : j + 1]
+                            )
+                        )[0]
+                    )
+                    for j in np.flatnonzero(zero)
+                ]
             )
-            if hasattr(om_model, "point_lik"):
-                lik_values = (
-                    lik_values + np.asarray(om_model.point_lik(), dtype=float).ravel()
+            lik_values[zero] = 0.0 if _sum_r(entropy) < 0 else -entropy
+            # The fitted occurrence model (the occurrence entry holds its name
+            # when ADAM fitted it)
+            om_model = getattr(self, "_om_model", None)
+            if om_model is None:
+                om_model = self._occurrence.get("oes_model") or self._occurrence.get(
+                    "occurrence"
                 )
+            if hasattr(om_model, "point_lik"):
+                occurrence_lik = np.asarray(om_model.point_lik(), dtype=float).ravel()
+                lik_values[observed] = lik_values[observed] + occurrence_lik[observed]
 
         if not log:
             lik_values = np.exp(lik_values)
@@ -3325,7 +3341,7 @@ class ADAM:
         return getattr(self, "_om_model", None)
 
     def rmultistep(self, h: int = 10) -> pd.DataFrame:
-        """Return the (T-h) × h matrix of rolling in-sample multistep forecast errors.
+        """Return the (T-h+1) × h matrix of rolling in-sample multistep forecast errors.
 
         For each origin ``t``, computes the ``h``-step-ahead forecast and the
         corresponding errors against the realised observations. Must be called
@@ -3339,7 +3355,7 @@ class ADAM:
         Returns
         -------
         pd.DataFrame
-            Shape (T-h, h) where T is obs_in_sample.
+            Shape (T-h+1, h) where T is obs_in_sample.
         """
         from smooth.adam_general.core.forecaster._helpers import (
             _compute_multistep_errors,
@@ -3382,6 +3398,7 @@ class ADAM:
         occurrence: Optional[NDArray] = None,
         scenarios: bool = False,
         seed: Optional[int] = None,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
     ) -> ForecastResult:
         """
         Generate forecasts using the fitted ADAM model.
@@ -3433,10 +3450,23 @@ class ADAM:
             If True and ``interval="simulated"``, store the raw simulation
             matrix in ``self._general["_scenarios_matrix"]``.
         seed : int, optional
-            Seed forwarded to :meth:`reforecast` when ``interval`` is
-            ``"complete"`` or ``"confidence"``. Pins the Monte-Carlo
-            paths so the interval is reproducible across runs and
-            platforms. Ignored for the other ``interval`` modes.
+            Seed of the Monte-Carlo paths: those of :meth:`reforecast` when
+            ``interval`` is ``"complete"`` or ``"confidence"``, of the simulated
+            intervals and of the simulated mean or median, which are then
+            reproducible.
+        point : {"skeleton", "mean", "median"}, default="skeleton"
+            What the point forecast is (R's ``point``). ``"skeleton"`` is the model
+            run forward with all the future errors at their neutral values (zero
+            for the additive and one for the multiplicative ones), the "point
+            forecast" of Hyndman et al. (2008): the conditional mean of the additive
+            models and of those with a multiplicative error and additive
+            components, close to it otherwise; with an occurrence model it is
+            multiplied by the probability of occurrence. ``"mean"`` is the
+            conditional mean: the skeleton where they coincide, the mean of
+            ``nsim`` simulated paths otherwise. ``"median"`` is the 50% quantile of
+            the method of the interval (of ``"prediction"`` when
+            ``interval="none"``), from simulated paths for the occurrence models.
+            The fitted values do not change.
 
         Returns
         -------
@@ -3459,10 +3489,16 @@ class ADAM:
             if self._general["h"] is None:
                 raise ValueError("Forecast horizon is not set.")
 
+        if point not in ("skeleton", "mean", "median"):
+            raise ValueError(
+                f'point should be "skeleton", "mean" or "median", not {point!r}.'
+            )
         self._general["interval"] = interval
         self._general["nsim"] = nsim
         self._general["cumulative"] = cumulative
         self._general["scenarios"] = scenarios
+        self._general["point"] = point
+        self._general["seed"] = seed
 
         if occurrence is not None:
             self._occurrence["occurrence"] = occurrence
@@ -3493,11 +3529,13 @@ class ADAM:
                 cumulative=cumulative,
                 nsim=reforecast_nsim,
                 seed=seed,
+                point=point,
             )
             return reforecast_result.to_forecast_result()
 
         # Store new_xreg for forecast period (used in _generate_point_forecasts)
-        if X is not None and self._explanatory.get("xreg_model"):
+        new_xreg = None
+        if X is not None:
             new_xreg = np.asarray(X)
             if new_xreg.dtype.names is not None:
                 new_xreg = np.column_stack(
@@ -3507,9 +3545,7 @@ class ADAM:
                 new_xreg = new_xreg.astype(float)
             if new_xreg.ndim == 1:
                 new_xreg = new_xreg.reshape(-1, 1)
-            self._explanatory["new_xreg"] = new_xreg
-        else:
-            self._explanatory.pop("new_xreg", None)
+        self._set_new_xreg(new_xreg)
 
         # Validate prediction inputs and prepare data for forecasting
         self._validate_prediction_inputs()
@@ -3576,6 +3612,7 @@ class ADAM:
                     fc_values[:n],
                     np.asarray(y_in_sample, dtype=float),
                     period,
+                    self._observations.get("y_na_values"),
                 )
 
         return predictions
@@ -3706,13 +3743,33 @@ class ADAM:
         outputs into the ADAM attribute surface.
         """
         alm = self._alm_model
-        n = int(alm.nobs)
-        y_in_sample = np.asarray(y[:n], dtype=float)
-        fitted = np.asarray(alm.fitted_values_, dtype=float)
+        # The in-sample rows, the missing values included: ALM has the observed ones
+        values = np.asarray(y, dtype=float).ravel()
+        n = len(values) - (int(self.h) if (self.holdout and self.h) else 0)
+        y_in_sample = values[:n]
+        observed = ~np.isnan(y_in_sample)
+        # The fitted values at their rows: the prediction of the regression at the
+        # missing values, where there is no residual
+        fitted = np.full(n, np.nan)
+        fitted[observed] = np.asarray(alm.fitted_values_, dtype=float)
+        if not np.all(observed):
+            X_gaps = _validate_x(X, n)[1][~observed]
+            if alm._feature_names is not None:
+                names_all = _validate_x(X, n)[3] or [
+                    f"x{i + 1}" for i in range(X_gaps.shape[1])
+                ]
+                X_gaps = X_gaps[:, [names_all.index(nm) for nm in alm._feature_names]]
+            fitted[~observed] = np.ravel(
+                alm.predict(
+                    np.column_stack([np.ones(len(X_gaps)), X_gaps]), interval="none"
+                ).mean
+            )
 
         self._observations = {
             "y_in_sample": y_in_sample,
             "ot": (y_in_sample != 0).astype(float),
+            "obs_in_sample": n,
+            "y_na_values": ~observed,
         }
         self._model_type = {
             "model": "NNN",
@@ -3743,7 +3800,7 @@ class ADAM:
             "n_param_estimated": int(alm.nparam),
             "log_lik_adam_value": {
                 "value": float(alm.loglik),
-                "nobs": n,
+                "nobs": int(np.sum(observed)),
                 "df": int(alm.nparam),
             },
         }
@@ -3776,17 +3833,21 @@ class ADAM:
             side=side,
         )
 
-        n = int(alm.nobs)
+        n = len(self._observations["y_in_sample"])
         index = pd.RangeIndex(n, n + h)
         lower = upper = None
         if interval != "none":
             if side != "upper":
                 lower = pd.DataFrame(
-                    np.reshape(result.lower, (h, -1)), index=index, columns=bound_low
+                    np.reshape(result.lower, (h, -1)),
+                    index=index,
+                    columns=np.round(bound_low, 5),
                 )
             if side != "lower":
                 upper = pd.DataFrame(
-                    np.reshape(result.upper, (h, -1)), index=index, columns=bound_up
+                    np.reshape(result.upper, (h, -1)),
+                    index=index,
+                    columns=np.round(bound_up, 5),
                 )
         return ForecastResult(
             mean=pd.Series(np.ravel(result.mean), index=index, name="mean"),
@@ -3797,35 +3858,52 @@ class ADAM:
             interval=interval,
         )
 
-    def _fit_occurrence_model(self, y):
+    def _fit_occurrence_model(self, y, X=None):
         """Fit an occurrence model on ``y`` and return it.
 
-        The occurrence type is taken from ``self._occurrence["occurrence"]``.
+        The occurrence type is taken from ``self._occurrence["occurrence"]``. As
+        R's adam(), the model takes the ARIMA orders, the regressors and the ETS
+        form of the demand sizes (``"general"`` on both of its sides).
         """
         from smooth.adam_general.core.auto_om import AutoOM
+        from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
         from smooth.adam_general.core.om import OM
 
         occ = self._occurrence["occurrence"]
-        lags = list(self._lags_model.get("lags", [1]))
         adam_model = self._model_type.get("model", "MNN")
+        orders, _ = resolve_arima_orders(
+            self._init_orders,
+            self.ar_order,
+            self.i_order,
+            self.ma_order,
+            arima_select=self.arima_select,
+        )
         common = dict(
-            lags=lags,
+            lags=list(self._lags_model.get("lags", [1])),
             h=self._general.get("h", 0),
             holdout=self._general.get("holdout", False),
             ic=self._general.get("ic", "AICc"),
             bounds=self._general.get("bounds", "usual"),
             initial=self._initials.get("initial_type", "backcasting"),
+            ets=self.ets,
         )
-        if occ == "auto":
-            m = AutoOM(model=adam_model, **common)
-        elif occ == "general":
+        if occ == "general":
             from smooth.adam_general.core.omg import OMG
 
-            m = OMG(**common)
+            m = OMG(
+                model_a=adam_model,
+                model_b=adam_model,
+                orders_a=orders,
+                orders_b=orders,
+                regressors_a=self.regressors,
+                regressors_b=self.regressors,
+                **common,
+            )
         else:
-            m = OM(model=adam_model, occurrence=occ, **common)
-        m.fit(y)
-        return m
+            common.update(model=adam_model, orders=orders, regressors=self.regressors)
+            m = AutoOM(**common) if occ == "auto" else OM(occurrence=occ, **common)
+        # AutoOM returns the selected model
+        return m.fit(y, X)
 
     def _nlopt_params(self) -> Dict[str, Any]:
         """The optimiser settings without B, lb and ub, which fit one model only."""
@@ -3887,6 +3965,9 @@ class ADAM:
             )
             # Extract adam_cpp from estimation results
             self._adam_cpp = self._adam_estimated["adam_cpp"]
+            # regressors="select": the regressors the estimator selected
+            if "explanatory_dict" in self._adam_estimated:
+                self._apply_selected_regressors(self._adam_estimated)
 
             # Store back estimated gnorm shape
             if other_parameter_estimate and "B" in self._adam_estimated:
@@ -3937,6 +4018,53 @@ class ADAM:
 
         # Update parameters number
         self._update_parameters_number(self._adam_estimated["n_param_estimated"])
+
+    def _set_new_xreg(self, new_xreg):
+        """The future values of the regressors for the forecaster, in the dict of the
+        model and of each combined one: the columns of its regressors when X holds
+        all those given to ``fit()`` (``regressors="select"``)."""
+        models = getattr(self, "_prepared_models", None) or []
+        for explanatory in [self._explanatory] + [
+            m["explanatory_dict"] for m in models
+        ]:
+            explanatory.pop("new_xreg", None)
+            if new_xreg is None or not explanatory.get("xreg_model"):
+                continue
+            columns = explanatory.get("xreg_columns")
+            if columns is not None and new_xreg.shape[1] != explanatory["xreg_number"]:
+                explanatory["new_xreg"] = new_xreg[:, columns]
+            else:
+                explanatory["new_xreg"] = new_xreg
+
+    def _xreg_dicts(self, estimated):
+        """The explanatory, persistence and initials dicts of an estimated model:
+        with ``regressors="select"``, those of the regressors the estimator
+        selected (R's estimator returns them with the model)."""
+        explanatory = estimated.get("explanatory_dict")
+        if explanatory is None:
+            return self._explanatory, self._persistence, self._initials
+        return (
+            explanatory,
+            {**self._persistence, "persistence_xreg_estimate": False},
+            {**self._initials, "initial_xreg_estimate": explanatory["xreg_model"]},
+        )
+
+    def _apply_selected_regressors(self, estimated):
+        """Make the regressors selected by the estimator those of the model, and
+        count them in the parameters."""
+        from smooth.adam_general.core.utils.n_param import count_xreg_params
+
+        self._explanatory, self._persistence, self._initials = self._xreg_dicts(
+            estimated
+        )
+        self._model_type["xreg_model"] = bool(self._explanatory["xreg_model"])
+        n_param = self._general.get("n_param")
+        if n_param is not None:
+            n_estimated, n_provided = count_xreg_params(self._explanatory)
+            if self._initials.get("initial_type") == "complete":
+                n_estimated, n_provided = 0, n_provided + n_estimated
+            n_param.estimated["xreg"] = n_estimated
+            n_param.provided["xreg"] = n_provided
 
     def _update_parameters_number(self, n_param_estimated):
         """
@@ -4121,6 +4249,11 @@ class ADAM:
             observations_dict_copy = copy.deepcopy(self._observations)
             model_type_dict = result["model_type_dict"].copy()
             phi_dict = result["phi_dict"].copy()
+            # The regressors of this model (selected per model with "select")
+            explanatory, persistence, initials = self._xreg_dicts(
+                result["adam_estimated"]
+            )
+            model_type_dict["xreg_model"] = bool(explanatory["xreg_model"])
 
             # Call architector to get components for this model
             (
@@ -4136,7 +4269,7 @@ class ADAM:
                 observations_dict=observations_dict_copy,
                 arima_checked=self._arima,
                 constants_checked=self._constant,
-                explanatory_checked=self._explanatory,
+                explanatory_checked=explanatory,
                 profiles_recent_table=self.profiles_recent_table,
                 profiles_recent_provided=self.profiles_recent_provided,
                 adam_ets=(self.ets == "adam"),
@@ -4148,13 +4281,13 @@ class ADAM:
                 lags_dict=lags_dict_copy,
                 profiles_dict=profile_dict,
                 observations_dict=observations_dict_copy,
-                persistence_checked=self._persistence,
-                initials_checked=self._initials,
+                persistence_checked=persistence,
+                initials_checked=initials,
                 arima_checked=self._arima,
                 constants_checked=self._constant,
                 phi_dict=phi_dict,
                 components_dict=components_dict,
-                explanatory_checked=self._explanatory,
+                explanatory_checked=explanatory,
                 smoother=self._resolve_smoother(),
             )
 
@@ -4182,10 +4315,10 @@ class ADAM:
                 components_dict=components_dict,
                 lags_dict=lags_dict_copy,
                 matrices_dict=adam_created,
-                persistence_checked=self._persistence,
-                initials_checked=self._initials,
+                persistence_checked=persistence,
+                initials_checked=initials,
                 arima_checked=self._arima,
-                explanatory_checked=self._explanatory,
+                explanatory_checked=explanatory,
                 phi_dict=phi_dict,
                 constants_checked=self._constant,
                 observations_dict=observations_dict_copy,
@@ -4224,7 +4357,7 @@ class ADAM:
                     "phi_dict": phi_dict,
                     "adam_created": adam_created,
                     "prepared": prepared,
-                    "explanatory_dict": self._explanatory,
+                    "explanatory_dict": explanatory,
                     "constants_dict": self._constant,
                     "n_param_estimated": result["adam_estimated"]["n_param_estimated"],
                 }
@@ -4598,6 +4731,7 @@ class ADAM:
             fc_values[:n],
             np.asarray(y_in_sample, dtype=float),
             period,
+            self._observations.get("y_na_values"),
         )
 
     def _validate_prediction_inputs(self):
@@ -4918,8 +5052,15 @@ class ADAM:
             errors = np.asarray(errors, dtype=float).ravel()
             if not np.all(np.isfinite(fitted)):
                 return None
+            # An estimated shape is perturbed with the rest of b, as CF reads it
+            other_b = abs(float(b[-1])) if other_est else other
             scale = scaler(
-                distribution, e_type, errors[ot_logical], fitted[ot_logical], obs, other
+                distribution,
+                e_type,
+                errors[ot_logical],
+                fitted[ot_logical],
+                obs,
+                other_b,
             )
             lik = np.asarray(
                 calculate_likelihood(
@@ -4928,7 +5069,7 @@ class ADAM:
                     y[ot_logical],
                     fitted[ot_logical].reshape(-1, 1),
                     scale,
-                    other,
+                    other_b,
                 ),
                 dtype=float,
             ).ravel()
@@ -5324,8 +5465,9 @@ class ADAM:
         count) are dropped silently; ``result.nsim_effective`` reports the
         count that contributed to the variance estimate.
 
-        Bootstrap on a model with external regressors (``X``) is not yet
-        supported and will raise.
+        With external regressors (``X``), each replicate is refitted on its rows of
+        ``y`` and of the regressors of the model (those selected with
+        ``regressors="select"``, used as they are), as R.
 
         Examples
         --------
@@ -5353,12 +5495,6 @@ class ADAM:
                 "method='dsr' requires greybox.dsrboot which is not yet "
                 "available in Python; use method='cr'."
             )
-        if self._explanatory.get("xreg_model", False):
-            raise NotImplementedError(
-                "coefbootstrap does not yet support models with external "
-                "regressors (X). File an issue if you need this."
-            )
-
         nobs = int(self.nobs)
         if size is None:
             size = max(int(np.floor(0.75 * nobs)), 1)
@@ -5421,6 +5557,15 @@ class ADAM:
             include_model_kwarg = True
         refit_kwargs["holdout"] = False
         refit_kwargs.setdefault("verbose", 0)
+        # The regressors of the model, used as they are; the outliers are not
+        # detected again, as in R
+        xreg = None
+        if self._explanatory.get("xreg_model", False):
+            xreg = np.asarray(self._explanatory["xreg_data"], dtype=float)[:nobs]
+            if refit_kwargs.get("regressors") == "select":
+                refit_kwargs["regressors"] = "use"
+        if "outliers" in refit_kwargs:
+            refit_kwargs["outliers"] = "ignore"
         # As R, each refit starts from the estimates and is not bounded
         start = np.asarray(self.coef, dtype=float)
         refit_kwargs["nlopt_kwargs"] = {
@@ -5437,6 +5582,7 @@ class ADAM:
         worker = partial(
             _adam_refit_one_replicate,
             actuals,
+            xreg,
             idx_list,
             refit_cls_name,
             model_spec,
@@ -5517,12 +5663,15 @@ class ADAM:
         Notes
         -----
         Covers ETS (with ``bounds="usual"``, ``"admissible"`` or
-        ``"none"``) and pure / mixed ARIMA models. External regressors
-        (``X``) are still rejected — that branch arrives in a follow-up.
+        ``"none"``), pure / mixed ARIMA models and external regressors
+        (``X``), whose drawn coefficients start their states.
         """
         import time as _time
 
-        from smooth.adam_general.core.utils.reapply import ReapplyResult
+        from smooth.adam_general.core.utils.reapply import (
+            ReapplyResult,
+            sampling_vcov,
+        )
 
         self._check_is_fitted()
         t0 = _time.time()
@@ -5540,19 +5689,7 @@ class ADAM:
         vcov_df = self.vcov(type=cov_type, heuristics=heuristics, **vcov_call_kwargs)
         coef = np.asarray(self.coef, dtype=float)
         coef_names = list(self.coef_names)
-        # ``np.asarray`` can return a read-only view into the DataFrame's block;
-        # copy so the non-finite row/column zeroing below can write in place.
-        vcov_arr = np.array(vcov_df, dtype=float)
-        # The OPG covariance (the default) returns an infinite variance for a
-        # parameter the data does not identify (e.g. an initial that washes out
-        # when its smoothing parameter is at a bound). Such parameters cannot be
-        # resampled, so hold them at their point estimate (zero their row/column)
-        # before the multivariate-normal draw. Mirrors R's reapply.adam.
-        non_finite = ~np.isfinite(np.diag(vcov_arr))
-        if np.any(non_finite):
-            vcov_arr[non_finite, :] = 0.0
-            vcov_arr[:, non_finite] = 0.0
-        vcov_arr = _psd_correct(vcov_arr)
+        vcov_arr = sampling_vcov(vcov_df)
 
         # 2. MVN sample (R/reapply.R:251)
         rng = np.random.default_rng(seed)
@@ -5843,13 +5980,13 @@ class ADAM:
                     if stype == "A":
                         profiles_recent_array[j, lag_s - 1, :] = -arr.sum(axis=1)
                     elif stype == "M":
-                        prod = np.prod(arr, axis=1)
-                        # Guard against zero — fall back to 1 (R would emit NaN).
-                        profiles_recent_array[j, lag_s - 1, :] = np.where(
-                            prod != 0, 1.0 / prod, 1.0
+                        profiles_recent_array[j, lag_s - 1, :] = 1.0 / np.prod(
+                            arr, axis=1
                         )
                     j += 1
                 k += sum(len(v) for v in groups.values())
+        # The rows after ETS, whichever of its initials were estimated
+        j = self._components["components_number_ets"] if ets_model else 0
 
         # 6b. ARIMA profile fill (R/reapply.R). The estimated initials (none for
         # backcasting / complete) are held by the last ARIMA state.
@@ -5868,7 +6005,7 @@ class ADAM:
             k += initial_arima_number
 
         # 6b. xreg profile fill (R/reapply.R:730-740).
-        # Each xreg parameter named ``xreg1, xreg2, …`` carries its
+        # Each xreg parameter, named after its variable, carries its
         # initial coefficient on the profile row that follows the ETS +
         # ARIMA blocks. For numeric xreg ``estimated`` is all-ones and
         # ``missing`` is all-zeros; factor levels with one missing
@@ -5890,13 +6027,13 @@ class ADAM:
                 missing = np.asarray(missing_raw, dtype=int)
             n_to_estimate = int(estimated.sum())
             estimated_idx = np.where(estimated == 1)[0]
-            xreg_coef_names = [nm for nm in coef_names if nm.startswith("xreg")]
-            for slot, comp_offset in enumerate(estimated_idx):
-                if slot >= len(xreg_coef_names):
-                    break
-                profiles_recent_array[j + int(comp_offset), 0, :] = random_parameters[
-                    :, idx[xreg_coef_names[slot]]
-                ]
+            xreg_names = list(self._explanatory.get("xreg_names") or [])
+            for comp_offset in estimated_idx:
+                name = xreg_names[comp_offset]
+                if name in idx:
+                    profiles_recent_array[j + int(comp_offset), 0, :] = (
+                        random_parameters[:, idx[name]]
+                    )
             absent_indices = np.where(missing != 0)[0]
             if absent_indices.size > 0:
                 est_sum = profiles_recent_array[
@@ -5922,6 +6059,10 @@ class ADAM:
         else:
             ot = np.ones((n, 1), dtype=np.float64)
             pt = np.ones(n, dtype=np.float64)
+        # The missing values are skipped, as in the fit
+        missing = np.isnan(y_in_sample[:, 0])
+        ot[missing | np.isnan(ot[:, 0])] = 0.0
+        y_in_sample[missing] = 0.0
 
         # 8. Build the index lookup table and call C++ (R/reapply.R:239, 757-761)
         from smooth.adam_general.core.creator import adam_profile_creator
@@ -6035,6 +6176,7 @@ class ADAM:
         heuristics: Optional[float] = None,
         seed: Optional[int] = None,
         trim: float = 0.01,
+        point: Literal["skeleton", "mean", "median"] = "skeleton",
         **vcov_kwargs,
     ):
         """Produce ``h``-step-ahead forecasts via Monte-Carlo reforecasting.
@@ -6087,6 +6229,10 @@ class ADAM:
         trim : float, default=0.01
             Trim proportion for the point-forecast mean (R uses 1% by
             default).
+        point : {"skeleton", "mean", "median"}, default="skeleton"
+            The point forecast: the skeleton of the model (see :meth:`predict`),
+            or the trimmed mean or the median of the paths, which include the
+            uncertainty of the parameters.
 
         Returns
         -------
@@ -6220,6 +6366,9 @@ class ADAM:
                     )
                 if new_xreg.ndim == 1:
                     new_xreg = new_xreg.reshape(-1, 1)
+                columns = self._explanatory.get("xreg_columns")
+                if columns is not None and new_xreg.shape[1] != xreg_number:
+                    new_xreg = new_xreg[:, columns]
                 if new_xreg.shape[0] < h:
                     pad = np.tile(new_xreg[-1:], (h - new_xreg.shape[0], 1))
                     new_xreg = np.vstack([new_xreg, pad])
@@ -6357,6 +6506,22 @@ class ADAM:
                 dtype=float,
             )
             mean_series = pd.Series(mean_arr, index=mean_index)
+
+        # The point forecast: the skeleton of the model, or the trimmed mean (above)
+        # or the median of the paths, which include the uncertainty of the parameters
+        if point == "skeleton":
+            skeleton = self.predict(
+                h=h, X=X, occurrence=occurrence, cumulative=cumulative
+            ).mean
+            mean_series = pd.Series(
+                np.asarray(skeleton, dtype=float), index=mean_series.index
+            )
+        elif point == "median":
+            totals = np.nansum(paths, axis=0)[None] if cumulative else paths
+            mean_series = pd.Series(
+                np.nanmedian(totals.reshape(totals.shape[0], -1), axis=1),
+                index=mean_series.index,
+            )
 
         if interval == "none":
             return ReforecastResult(
@@ -6755,7 +6920,7 @@ class ADAM:
             and self._constant.get("constant_required", False)
             and len(names) < n_total
         ):
-            names.append("constant")
+            names.append(self._constant.get("constant_name") or "constant")
         # Pad with generic component names if anything is left over.
         while len(names) < n_total:
             names.append(f"c{len(names) + 1}")
@@ -6868,11 +7033,12 @@ class ADAM:
         bit-equivalent between languages.
         """
         errors = self.rmultistep(h=h).to_numpy()
-        n_obs = int(self.nobs)
+        # The windows with all their targets observed
+        errors = errors[~np.any(np.isnan(errors), axis=1)]
         # Guard the denominator against pathological tiny samples
         # (matches the spirit of R/methods.R:215 — ``df[df<=0] <-
         # obs[df<=0]``).
-        df = max(n_obs - h, 1)
+        df = max(len(errors), 1)
         return (errors.T @ errors) / df
 
     def _variance_debiased(self) -> float:
@@ -6880,7 +7046,7 @@ class ADAM:
         variance = scale_variance(
             self.extract_scale(), self.distribution_, getattr(self, "other", None)
         )
-        return float(np.mean(variance) * self.nobs / self._df_scale)
+        return float(np.mean(variance) * self._nobs_observed() / self._df_scale)
 
     def _multicov_analytical(self, h: int, covar_anal_fn, var_anal_fn) -> NDArray:
         """Closed-form covariance — mirrors R/adam.R:7087-7088."""
@@ -6997,7 +7163,7 @@ class ADAM:
 
             3  — Studentised Residuals vs Fitted
 
-            4  — |Residuals| vs Fitted
+            4  — ``|Residuals|`` vs Fitted
 
             5  — Residuals² vs Fitted
 
@@ -7015,7 +7181,7 @@ class ADAM:
 
             12 — Model states over time
 
-            13 — |Standardised Residuals| vs Fitted
+            13 — ``|Standardised Residuals|`` vs Fitted
 
             14 — Standardised Residuals² vs Fitted
 

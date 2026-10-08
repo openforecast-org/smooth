@@ -43,7 +43,7 @@ class TestRmultistep:
     def test_shape(self, ann_model):
         df = ann_model.rmultistep(h=H)
         t = len(AIRPASSENGERS)
-        assert df.shape == (t - H, H)
+        assert df.shape == (t - H + 1, H)
 
     def test_column_names(self, ann_model):
         df = ann_model.rmultistep(h=H)
@@ -55,7 +55,17 @@ class TestRmultistep:
 
     def test_h1_fallback(self, ann_model):
         df = ann_model.rmultistep(h=1)
-        assert df.shape == (len(AIRPASSENGERS) - 1, 1)
+        assert df.shape == (len(AIRPASSENGERS), 1)
+
+    @pytest.mark.parametrize("model", ["ann_model", "aan_model"])
+    def test_one_step_errors_are_the_residuals(self, model, request):
+        """Row i forecasts the targets i..i+h-1 from the states before them, so the
+        first column is the one-step forecast errors."""
+        fit = request.getfixturevalue(model)
+        df = fit.rmultistep(h=H)
+        np.testing.assert_allclose(
+            df.iloc[:, 0], np.asarray(fit.residuals)[: len(df)], atol=1e-8
+        )
 
     def test_requires_fit(self):
         m = ADAM(model="ANN", lags=[1])

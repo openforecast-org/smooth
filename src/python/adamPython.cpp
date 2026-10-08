@@ -30,7 +30,8 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("states", &FitResult::states)
         .def_readonly("fitted", &FitResult::fitted)
         .def_readonly("errors", &FitResult::errors)
-        .def_readonly("profile", &FitResult::profile);
+        .def_readonly("profile", &FitResult::profile)
+        .def_readonly("profileInitial", &FitResult::profileInitial);
 
     // Bind OmFitGeneralResult struct
     py::class_<OmFitGeneralResult>(m, "OmFitGeneralResult")
@@ -89,6 +90,7 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("adamETS"))
         .def_readwrite("flipConstant", &adamCore::flipConstant)
         .def_readwrite("headLength", &adamCore::headLength)
+        .def_readwrite("sparseTransition", &adamCore::sparseTransition)
         .def("polynomialise", &adamCore::polynomialise,
             py::arg("B"),
             py::arg("arOrders"),

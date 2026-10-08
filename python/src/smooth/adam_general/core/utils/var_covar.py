@@ -1,6 +1,7 @@
 import numpy as np
 
 from smooth.adam_general.core.utils.cost_functions import _sum_r
+from smooth.adam_general.core.utils.utils import observed_mask
 
 
 def sigma(observations_dict, params_info, general, prepared_model, error_type=None):
@@ -177,13 +178,18 @@ def sigma(observations_dict, params_info, general, prepared_model, error_type=No
     if general["loss"] == "likelihood" and len(params_info[0]) > 1:
         params_number = params_number - params_info[0][1]
 
-    vals = observations_dict["obs_in_sample"] - params_number
+    # The observed non-zero values, as R's nobs(object, all=FALSE)
+    vals = (
+        observations_dict.get("obs_nonzero", observations_dict["obs_in_sample"])
+        - params_number
+    )
     # If the sample is too small, then use biased estimator
     if vals <= 0:
         vals = observations_dict["obs_in_sample"]
 
+    # No residual at the missing values
     residuals = prepared_model["residuals"]
-    non_nan_mask = ~residuals.isna()
+    non_nan_mask = ~np.asarray(residuals.isna()) & observed_mask(observations_dict)
     r = np.asarray(residuals[non_nan_mask], dtype=np.float64)
 
     distribution = general["distribution"]
@@ -887,18 +893,17 @@ def covar_opg(parameter_values, point_lik_at, obs_in_sample, loglik, step_size=N
     keep = (diag_j > np.max(diag_j) * 1e-10) & np.isfinite(diag_j)
     vcov = np.full((n_param, n_param), np.inf)
     if np.any(keep):
-        j_keep = j_matrix[np.ix_(keep, keep)]
-        try:
-            vcov_keep = np.linalg.solve(j_keep, np.eye(j_keep.shape[0]))
-        except np.linalg.LinAlgError:
-            # Ill-conditioned: Moore-Penrose pseudo-inverse via symmetric eigen,
-            # dropping the (near-)zero-eigenvalue directions. Still PSD.
-            vals, vecs = np.linalg.eigh(j_keep)
-            positive = vals > np.max(vals) * 1e-10
-            if not np.any(positive):
-                return None
-            vecs_keep = vecs[:, positive]
-            vcov_keep = vecs_keep @ (vecs_keep.T / vals[positive][:, None])
+        # The Moore-Penrose pseudo-inverse via the symmetric eigen-decomposition,
+        # dropping the (near-)zero-eigenvalue directions: the inverse when J is
+        # well conditioned, a pooled variance for collinear parameters. As R, which
+        # does not use solve(): its singularity check at the machine epsilon is
+        # decided by the last bits of the LU.
+        vals, vecs = np.linalg.eigh(j_matrix[np.ix_(keep, keep)])
+        positive = vals > np.max(vals) * 1e-10
+        if not np.any(positive):
+            return None
+        vecs_keep = vecs[:, positive]
+        vcov_keep = vecs_keep @ (vecs_keep.T / vals[positive][:, None])
         vcov[np.ix_(keep, keep)] = vcov_keep
     return vcov
 

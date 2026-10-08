@@ -482,3 +482,27 @@ test_that("om LASSO penalises the estimated parameters as adam, not the initials
     expect_equal(testModel$lossValue,
                  0.5*sqrt(mean(errors^2)) + 0.5*abs(testModel$B[["alpha"]]))
 })
+
+test_that("om skips the missing observations: they are neither zeros nor in the likelihood", {
+    set.seed(1)
+    y <- rbinom(200, 1, 0.4) * exp(rnorm(200, 2, 0.3))
+    y[c(10:20, 100)] <- NA
+    observed <- !is.na(y)
+    testModel <- suppressWarnings(om(y, "ANN", occurrence="odds-ratio"))
+    expect_equal(attr(logLik(testModel), "nobs"), sum(observed))
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)))
+    expect_true(all(pointLik(testModel)[!observed] == 0))
+    expect_true(all(is.na(actuals(testModel)[!observed])))
+    expect_silent(vcov(testModel))
+    # The fixed probability is the occurrence rate of the observed values
+    testModel <- suppressWarnings(om(y, "ANN", occurrence="fixed"))
+    expect_equal(as.numeric(fitted(testModel)[1]), mean(y[observed] != 0))
+})
+
+test_that("om with a fixed probability has no ARIMA, whatever the orders", {
+    set.seed(44)
+    y <- ts(rpois(120, 0.7) * (1 + rnorm(120)^2))
+    testModel <- om(y, "MNN", orders=list(ar=1, ma=1), occurrence="fixed")
+    expect_equal(modelName(testModel), "oETS(ANN)[F]")
+    expect_true(is.finite(logLik(testModel)))
+})

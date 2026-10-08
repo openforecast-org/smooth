@@ -8,6 +8,7 @@ The reference loss values were recorded from the implementation to ensure consis
 """
 
 import numpy as np
+import pytest
 
 from smooth import ADAM
 
@@ -147,9 +148,10 @@ class TestADAMAirPassengersPartialPersistence:
         assert model.coef is not None
         assert model.persistence_level_ == 0.4
 
-        # Loss should be higher than optimal since alpha is fixed
-        # Reference: optimal loss is ~586, with alpha=0.4 it's ~649
-        expected_loss = 649.145309
+        # Loss should be higher than optimal since alpha is fixed; gamma is still
+        # estimated. Reference: R's adam(AirPassengers, "ANA", lags=12,
+        # persistence=list(level=0.4))$lossValue
+        expected_loss = 587.905327
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"Loss with alpha=0.4: {actual_loss} differs from expected {expected_loss}"
@@ -195,7 +197,8 @@ class TestADAMAirPassengersForecasting:
         # Reference forecast values (first 3 periods)
         expected_forecasts = [444.20935371, 419.61956321, 458.90904404]
 
-        for i, (actual, expected) in enumerate(zip(forecast_mean[:3], expected_forecasts)):
+        pairs = zip(forecast_mean[:3], expected_forecasts)
+        for i, (actual, expected) in enumerate(pairs):
             assert np.isclose(actual, expected, rtol=1e-4), \
                 f"Forecast[{i}] = {actual} differs from expected {expected}"
 
@@ -362,8 +365,8 @@ class TestADAMAirPassengersAAAPersistence:
         # Verify alpha is fixed
         assert model.persistence_level_ == 0.5
 
-        # Reference loss with alpha=0.5
-        expected_loss = 636.965563
+        # Reference loss with alpha=0.5, beta and gamma estimated (R's lossValue)
+        expected_loss = 588.263289
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
             f"AAA alpha=0.5 loss {actual_loss} differs from expected {expected_loss}"
@@ -377,11 +380,12 @@ class TestADAMAirPassengersAAAPersistence:
         assert model.persistence_level_ == 0.5
         assert model.persistence_trend_ == 0.1
 
-        # Reference loss
-        expected_loss = 654.328174
+        # Reference loss with gamma estimated (R's lossValue)
+        expected_loss = 624.288654
         actual_loss = model.loss_value
         assert np.isclose(actual_loss, expected_loss, rtol=1e-3), \
-            f"AAA alpha=0.5, beta=0.1 loss {actual_loss} differs from expected {expected_loss}"
+            f"AAA alpha=0.5, beta=0.1 loss {actual_loss} differs from expected " \
+            f"{expected_loss}"
 
     def test_aaa_persistence_bounds(self):
         """Test that AAA estimated persistence is within valid bounds."""
@@ -443,7 +447,8 @@ class TestADAMAirPassengersAAAPersistence:
 
         # Fixing more parameters with suboptimal values should increase loss
         assert loss2 > loss1, \
-            f"Loss with alpha+beta fixed {loss2} should be > loss with only alpha fixed {loss1}"
+            f"Loss with alpha+beta fixed {loss2} should be > loss with only alpha " \
+            f"fixed {loss1}"
 
 
 class TestADAMAirPassengersModelComparison:
@@ -587,7 +592,7 @@ class TestADAMMultipleSeasonalPersistence:
         B = model.coef
         # With backcasting, should estimate exactly 3 persistence params:
         # alpha, gamma1, gamma2
-        assert len(B) == 3, f"Expected 3 parameters (alpha, gamma1, gamma2), got {len(B)}"
+        assert len(B) == 3, f"Expected alpha, gamma1, gamma2, got {len(B)} parameters"
 
     def test_double_seasonal_ana_estimates_three_params(self):
         """Test that ETS(A,N,A) with lags=[3,12] estimates alpha, gamma1, gamma2."""
@@ -601,7 +606,7 @@ class TestADAMMultipleSeasonalPersistence:
         assert model.coef is not None
         B = model.coef
         # With backcasting, should estimate exactly 3 persistence params
-        assert len(B) == 3, f"Expected 3 parameters (alpha, gamma1, gamma2), got {len(B)}"
+        assert len(B) == 3, f"Expected alpha, gamma1, gamma2, got {len(B)} parameters"
 
     def test_double_seasonal_partial_gamma(self):
         """Test double seasonal with only gamma1 provided."""
@@ -617,3 +622,13 @@ class TestADAMMultipleSeasonalPersistence:
         B = model.coef
         # Should estimate alpha and gamma2 (gamma1 is provided)
         assert len(B) == 2, f"Expected 2 parameters (alpha, gamma2), got {len(B)}"
+
+
+def test_ets_adam_changes_nothing_without_ets_components():
+    """Without ETS components, ets="adam" fits the conventional model: the ARIMA
+    rows of g are its persistence times the error."""
+    for orders in ({"ar": [1], "i": [1], "ma": [1]}, {"ar": [1], "i": [1], "ma": [0]}):
+        conventional = ADAM(model="NNN", orders=orders).fit(AIRPASSENGERS)
+        adam_ets = ADAM(model="NNN", orders=orders, ets="adam").fit(AIRPASSENGERS)
+        assert adam_ets.loglik == pytest.approx(conventional.loglik, rel=1e-12)
+        np.testing.assert_allclose(adam_ets.coef, conventional.coef, rtol=1e-10)

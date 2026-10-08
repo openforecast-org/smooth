@@ -67,3 +67,13 @@ test_that("Use exogenous variables for CESX on BJsales", {
     testModel <- ces(BJsales, h=18, holdout=TRUE, silent=TRUE, regressors="use", xreg=BJsales.lead)
     expect_equal(length(testModel$initial$xreg),1);
 })
+
+test_that("ces() takes the missing values for gaps", {
+    y <- AirPassengers;
+    y[c(10, 50, 51, 90)] <- NA;
+    testModel <- suppressWarnings(ces(y, seasonality="full"));
+    expect_equal(attr(logLik(testModel), "nobs"), sum(!is.na(y)));
+    expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)));
+    expect_true(all(is.na(residuals(testModel)[is.na(y)])));
+    expect_true(all(is.finite(forecast(testModel, h=12, interval="prediction")$upper)));
+})

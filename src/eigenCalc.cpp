@@ -25,3 +25,8 @@ arma::vec smoothEigensR(const arma::mat& persistence,
                            xregNumber,
                            constantRequired);
 }
+
+// [[Rcpp::export]]
+arma::vec eigenModuliCpp(const arma::mat& A) {
+    return eigenModuliCore(A);
+}

@@ -235,7 +235,7 @@ def test_the_arma_falls_back_to_none_when_it_does_not_help(air):
     fit = TBATS(
         lags=[1, 12], harmonics=[5], trend="additive", distribution="dnorm"
     ).fit(air)
-    assert sum(fit.orders_["ar"]) + sum(fit.orders_["ma"]) == 0
+    assert sum(fit.orders["ar"]) + sum(fit.orders["ma"]) == 0
     assert any("+ARMA" in name for name in fit.ics)
     assert min(fit.ics.values()) == pytest.approx(fit.aicc)
 
@@ -250,14 +250,14 @@ def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
         holdout=True,
     ).fit(air)
     forecast = fit.predict(h=12, interval="prediction")
-    np.testing.assert_allclose(np.asarray(forecast.mean), fit.forecast_, rtol=1e-10)
+    np.testing.assert_allclose(np.asarray(forecast.mean), fit._forecast, rtol=1e-10)
     lower = np.asarray(forecast.lower).ravel()
     upper = np.asarray(forecast.upper).ravel()
     mean = np.asarray(forecast.mean)
     assert np.all((lower < mean) & (mean < upper))
     # The cumulative forecasts come from the paths in the space of the data
     np.testing.assert_allclose(
-        fit.predict(h=12, cumulative=True).mean, fit.forecast_.sum(), rtol=1e-10
+        fit.predict(h=12, cumulative=True).mean, fit._forecast.sum(), rtol=1e-10
     )
     cumulative = fit.predict(
         h=12, cumulative=True, interval="prediction", point="mean", seed=41
@@ -396,7 +396,7 @@ def test_the_regressors_are_estimated_and_used_in_the_forecasts(xreg_fit, xreg_d
     assert xreg_fit.model_name.startswith("TBATSX")
     assert list(xreg_fit.initial_value["xreg"]) == ["x1", "x2"]
     assert xreg_fit.initial_value["xreg"]["x1"] == pytest.approx(5, abs=0.5)
-    forecast = xreg_fit.forecast_
+    forecast = xreg_fit._forecast
     np.testing.assert_allclose(np.asarray(xreg_fit.predict(h=12).mean), forecast)
     future = X.to_numpy()[120:]
     np.testing.assert_allclose(
@@ -419,7 +419,7 @@ def test_the_intervals_follow_the_future_regressors(xreg_fit, xreg_data):
     for interval in ("approximate", "simulated", "complete"):
         forecast = xreg_fit.predict(h=12, X=future, interval=interval, nsim=200)
         mean = np.asarray(forecast.mean)
-        assert np.all(mean > xreg_fit.forecast_ + 40)
+        assert np.all(mean > xreg_fit._forecast + 40)
         lower, upper = np.ravel(forecast.lower), np.ravel(forecast.upper)
         assert np.all((lower < mean) & (mean < upper))
 
@@ -463,9 +463,9 @@ def test_the_selection_keeps_the_relevant_regressor(xreg_data):
     y, X = xreg_data
     X = X.assign(noise=np.random.default_rng(7).normal(size=len(y)))
     fit = TBATS(lags=[1, 12], regressors="select", h=12, holdout=True).fit(y, X)
-    assert fit.xreg_names_ == ["x1"]
+    assert fit._xreg_names == ["x1"]
     assert any("+X(x1)" in name for name in fit.ics)
-    np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit.forecast_)
+    np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit._forecast)
 
 
 def test_the_point_forecasts(air):
@@ -517,7 +517,7 @@ def test_the_occurrence_mixture(intermittent):
     forecasted = fit.predict(h=14, interval="prediction")
     sizes = st.box_cox_inverse(fit._best["forecast_bc"], fit.lambda_)
     np.testing.assert_allclose(forecasted.mean, sizes * p_forecast)
-    np.testing.assert_allclose(forecasted.mean, fit.forecast_)
+    np.testing.assert_allclose(forecasted.mean, fit._forecast)
     # The probability of no demand is above 0.5: the median and the lower bound are 0
     assert np.all(fit.predict(h=14, point="median").mean == 0)
     assert np.all(forecasted.lower.to_numpy() == 0)

@@ -18,6 +18,7 @@ from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.simulate.result import SimulateResult
 from smooth.adam_general.core.tbats import fitter as ft
 from smooth.adam_general.core.tbats import structure as st
+from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.reapply import ReapplyResult
 from smooth.adam_general.core.utils.reforecast import ReforecastResult
 from smooth.adam_general.core.utils.utils import (
@@ -332,7 +333,8 @@ class TBATS:
         self.harmonics = None if harmonics is None else [int(k) for k in harmonics]
         self.trend = _match(trend, TREND_OPTIONS, "trend")
         self.lambda_bc = lambda_bc
-        self.orders = {"ar": 3, "ma": 3, "select": True} if orders is None else orders
+        default_orders = {"ar": 3, "ma": 3, "select": True}
+        self._init_orders = default_orders if orders is None else orders
         self.regressors = _match(regressors, REGRESSORS_OPTIONS, "regressors")
         if isinstance(occurrence, str):
             _match(occurrence, OCCURRENCE_OPTIONS, "occurrence")
@@ -450,7 +452,7 @@ class TBATS:
 
         periods = sorted({lag for lag in lags if lag > 1})
         lam_spec = st.lambda_spec(self.lambda_bc, y_in_sample[ot], self.loss)
-        spec = st.arma_spec(self.orders, lags)
+        spec = st.arma_spec(self._init_orders, lags)
         spec_fit = st.arma_build([0], [0], [1]) if spec["select"] else spec
         trend_types = ["none", "additive", "damped"] if trend == "auto" else [trend]
         settings = {**self._settings(), "occurrence": occurrence}
@@ -576,7 +578,7 @@ class TBATS:
         self._y_in_sample = y_in_sample
         self._occurrence = occurrence
         self._ot = ot
-        self.time_elapsed = time.time() - start_time
+        self.time_elapsed_ = time.time() - start_time
         return self
 
     def _select_xreg(
@@ -719,6 +721,42 @@ class TBATS:
         return int(self._best["n_param_estimated"] + self._best["n_param_occurrence"])
 
     @property
+    def n_param(self) -> NParam:
+        """The table of the numbers of parameters, as ADAM's (R's ``$nParam``): the
+        scale apart from the internal ones."""
+        self._check_fitted()
+        n_param = NParam.from_dict(
+            {
+                "estimated": {
+                    "internal": int(self._best["n_param_estimated"]) - 1,
+                    "occurrence": int(self._best["n_param_occurrence"]),
+                    "scale": 1,
+                }
+            }
+        )
+        n_param.update_totals()
+        return n_param
+
+    @property
+    def profile(self) -> NDArray:
+        """The profile of the states at the end of the sample, from which the
+        forecasts start (R's ``$profile``)."""
+        self._check_fitted()
+        return np.asarray(self._best["fitted"]["profile"])
+
+    @property
+    def initial_type(self) -> str:
+        """The initialisation used (R's ``$initialType``)."""
+        self._check_fitted()
+        return str(self._best["initial_type"])
+
+    @property
+    def time_elapsed(self) -> float:
+        """The time of the fit in seconds (R's ``$timeElapsed``)."""
+        self._check_fitted()
+        return self.time_elapsed_
+
+    @property
     def aic(self) -> float:
         return st.ic_value(self.loglik, self._nobs_observed(), self.nparam, "AIC")
 
@@ -790,14 +828,14 @@ class TBATS:
         return self._best["states"].copy()
 
     @property
-    def component_names(self) -> List[str]:
+    def _component_names(self) -> List[str]:
         self._check_fitted()
         return list(self._best["struct"]["component_names"])
 
     @property
     def persistence_vector(self) -> Dict[str, float]:
         self._check_fitted()
-        return dict(zip(self.component_names, self._best["elements"]["vec_g"]))
+        return dict(zip(self._component_names, self._best["elements"]["vec_g"]))
 
     @property
     def transition(self) -> NDArray:
@@ -811,7 +849,7 @@ class TBATS:
         return self._best["fitted"]["mat_wt"].copy()
 
     @property
-    def xreg_names_(self) -> List[str]:
+    def _xreg_names(self) -> List[str]:
         """The names of the regressors in the model (after the selection)."""
         self._check_fitted()
         xreg = self._best["struct"]["xreg"]
@@ -896,7 +934,7 @@ class TBATS:
     @property
     def _auto_forecast(self) -> Any:
         """The forecast of the fit, for the plot of the series."""
-        forecast = self.forecast_
+        forecast = self._forecast
         return None if forecast is None else SimpleNamespace(mean=forecast)
 
     def rmultistep(self, h: int = 10) -> pd.DataFrame:
@@ -975,14 +1013,14 @@ class TBATS:
         return self.loss
 
     @property
-    def orders_(self) -> Dict[str, Any]:
-        """The ARMA orders and their lags."""
+    def orders(self) -> Dict[str, List[int]]:
+        """The ARMA orders as ADAM's, with no integration (R's ``$orders``)."""
         self._check_fitted()
         spec = self._best["spec"]
         return {
             "ar": spec["ar_orders"].tolist(),
+            "i": [0] * len(spec["lags"]),
             "ma": spec["ma_orders"].tolist(),
-            "lags": spec["lags"].tolist(),
         }
 
     @property
@@ -1008,7 +1046,7 @@ class TBATS:
             result["arma"] = np.asarray(read["arma"])
         if struct["n_xreg"] > 0:
             result["xreg"] = dict(
-                zip(self.xreg_names_, np.asarray(read["states"]["xreg"], dtype=float))
+                zip(self._xreg_names, np.asarray(read["states"]["xreg"], dtype=float))
             )
         return result
 
@@ -1038,13 +1076,13 @@ class TBATS:
         )
 
     @property
-    def fi_(self) -> Optional[NDArray]:
+    def fisher_information_(self) -> Optional[NDArray]:
         """The observed Fisher Information (with ``fi=True``)."""
         self._check_fitted()
         return self._best["fi"]
 
     @property
-    def forecast_(self) -> Optional[NDArray]:
+    def _forecast(self) -> Optional[NDArray]:
         """The forecasts of the fit for ``h`` steps ahead."""
         self._check_fitted()
         if self._best["forecast_bc"] is None:
@@ -1547,7 +1585,7 @@ class TBATS:
         refits = self._best["refitter"](draws)
         obs = self.nobs
         lag_max = self._best["struct"]["lags_model_max"]
-        names = self.component_names
+        names = self._component_names
         lambdas = refits["lambda"]
         fitted_bc = refits["fitted"]
         columns = [f"nsim{i}" for i in range(1, nsim + 1)]

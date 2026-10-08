@@ -95,7 +95,7 @@ def test_the_arma_selection_agrees_on_harmonics_with_an_ar():
         np.asarray(r["y"], dtype=float)
     )
     assert fit.model_name == r["model"][0]
-    assert fit.orders_["ar"] == [1]
+    assert fit.orders["ar"] == [1]
     assert list(fit.ics) == r["ICnames"]
     np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
@@ -239,8 +239,8 @@ def test_the_fits_with_regressors_agree(case):
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
     assert list(fit.ics) == r["ICnames"]
     np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
-    if fit.forecast_ is not None:
-        np.testing.assert_allclose(fit.forecast_, r["forecast"], rtol=1e-10)
+    if fit._forecast is not None:
+        np.testing.assert_allclose(fit._forecast, r["forecast"], rtol=1e-10)
 
 
 def test_the_intervals_with_new_regressors_agree():
@@ -375,8 +375,8 @@ def test_the_fits_with_missing_regressors_agree(case):
     # No fitted values without the regressors
     assert np.all(np.isnan(fit.fitted[[14, 59]]))
     np.testing.assert_allclose(np.nan_to_num(fit.fitted), r["fitted"], rtol=1e-8)
-    if fit.forecast_ is not None:
-        np.testing.assert_allclose(fit.forecast_, r["forecast"], rtol=1e-10)
+    if fit._forecast is not None:
+        np.testing.assert_allclose(fit._forecast, r["forecast"], rtol=1e-10)
 
 
 def test_the_cumulative_skeletons_agree():

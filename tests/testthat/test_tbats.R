@@ -525,3 +525,53 @@ test_that("a start a hair inside a bound is estimated as one on the bound", {
     expect_equal(do.call(tbats, c(arguments, list(B=B)))$B, do.call(tbats, c(arguments, list(B=BBound)))$B,
                  tolerance=0);
 })
+
+test_that("the values taken from a fit and provided reproduce its loss", {
+    arguments <- list(AirPassengers, lags=c(1,6,12), harmonics=c(1,2), trend="damped",
+                      orders=list(ar=1, ma=1, select=FALSE), lambda=0, distribution="dnorm",
+                      initial="optimal", h=12, holdout=TRUE);
+    model <- do.call(tbats, arguments);
+    seasonal <- model$initial$seasonal;
+    persistence <- list(level=model$B[["alpha"]], trend=model$B[["beta"]],
+                        seasonal=lapply(c(6,12), function(period){
+                            return(unname(model$B[paste0(c("gamma1[","gamma2["), period, "]")]));
+                        }));
+    initial <- list(level=model$initial$level, trend=model$initial$trend,
+                    seasonal=lapply(split(seasonal, seasonal$period), function(rows){
+                        return(c(rows$sin, rows$cos));
+                    }),
+                    arma=model$initial$arma);
+    arguments$initial <- initial;
+    modelProvided <- do.call(tbats, c(arguments, list(persistence=persistence, phi=model$B[["phi"]],
+                                                    arma=list(ar=model$B[["phi1[1]"]], ma=model$B[["theta1[1]"]]))));
+    expect_equal(modelProvided$lossValue, model$lossValue, tolerance=1e-10);
+    expect_length(modelProvided$B, 0);
+    expect_equal(nparam(modelProvided), 1);
+    expect_equal(modelProvided$initialType, "provided");
+})
+
+test_that("the provided values are fixed and the rest estimated", {
+    model <- tbats(AirPassengers, harmonics=2, trend="damped", orders=orders0, lambda=0,
+                   distribution="dnorm", persistence=list(level=0.3, seasonal=list(c(0.001, 0))),
+                   phi=0.98, initial=list(level=4.7));
+    expect_equal(unname(model$persistence[["level"]]), 0.3);
+    expect_equal(model$phi, 0.98);
+    expect_equal(unname(model$initial$level), 4.7);
+    expect_false(any(c("alpha","phi","gamma1[12]","gamma2[12]","level") %in% names(model$B)));
+    expect_true(all(c("beta","trend","sin1[12]") %in% names(model$B)));
+    # The model reused keeps them
+    expect_equal(as.numeric(logLik(tbats(AirPassengers, model=model))), as.numeric(logLik(model)));
+})
+
+test_that("the provided values that need a selected structure are estimated with a warning", {
+    expect_warning(model <- tbats(AirPassengers, phi=0.9, orders=orders0, distribution="dnorm"),
+                   "Predefined phi");
+    expect_warning(tbats(AirPassengers, persistence=c(0.1, 0.1), orders=orders0, distribution="dnorm"),
+                   "Predefined persistence");
+    expect_warning(tbats(AirPassengers, initial=c(4.7, 0), orders=orders0, distribution="dnorm"),
+                   "Predefined initials");
+    expect_warning(model <- tbats(AirPassengers, orders=list(ar=1, ma=1, select=FALSE), arma=0.5,
+                                  trend="none", harmonics=2, distribution="dnorm"),
+                   "ARMA parameters");
+    expect_true(all(c("phi1[1]","theta1[1]") %in% names(model$B)));
+})

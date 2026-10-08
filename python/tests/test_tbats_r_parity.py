@@ -51,6 +51,36 @@ CASES = {
         " bounds='usual'",
         dict(harmonics=[4], trend="additive", orders=ORDERS0, bounds="usual"),
     ),
+    "provided-list": (
+        "harmonics=3, trend='damped', orders=list(ar=1, ma=1, select=FALSE),"
+        " lambda=0, persistence=list(level=0.4, seasonal=list(c(0.001, 0))),"
+        " phi=0.98, arma=list(ar=0.3), initial=list(level=4.7,"
+        " seasonal=list(c(0.1, 0, 0, -0.05, 0, 0)))",
+        dict(
+            harmonics=[3],
+            trend="damped",
+            orders=ARMA11,
+            lambda_bc=0,
+            persistence={"level": 0.4, "seasonal": [[0.001, 0]]},
+            phi=0.98,
+            arma={"ar": 0.3},
+            initial={"level": 4.7, "seasonal": [[0.1, 0, 0, -0.05, 0, 0]]},
+        ),
+    ),
+    "provided-vector": (
+        "harmonics=2, trend='additive', orders=list(ar=1, ma=0, select=FALSE),"
+        " lambda=0, persistence=c(0.3, 0.01, 0.001, 0), arma=0.5,"
+        " initial=c(4.7, 0.01, 0.1, 0, -0.05, 0, 0)",
+        dict(
+            harmonics=[2],
+            trend="additive",
+            orders={"ar": 1, "ma": 0, "select": False},
+            lambda_bc=0,
+            persistence=[0.3, 0.01, 0.001, 0],
+            arma=[0.5],
+            initial=[4.7, 0.01, 0.1, 0, -0.05, 0, 0],
+        ),
+    ),
 }
 
 

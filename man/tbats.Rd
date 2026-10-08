@@ -11,9 +11,10 @@ tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   "inverse-odds-ratio", "direct"), distribution = c("auto", "dnorm",
   "dlaplace", "ds", "dgnorm"), loss = c("likelihood", "MSE", "MAE", "HAM",
   "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC",
-  "BICc"), h = 0, holdout = FALSE, initial = c("backcasting", "optimal",
-  "two-stage", "complete", "gradient"), bounds = c("admissible", "usual",
-  "none"), silent = TRUE, model = NULL, ...)
+  "BICc"), h = 0, holdout = FALSE, persistence = NULL, phi = NULL,
+  initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
+  arma = NULL, bounds = c("admissible", "usual", "none"), silent = TRUE,
+  model = NULL, ...)
 }
 \arguments{
 \item{y}{Vector or ts object, containing the data needed to be forecasted. The
@@ -105,6 +106,17 @@ likelihood).}
 \item{holdout}{If \code{TRUE}, the holdout of the size \code{h} is taken from
 the data.}
 
+\item{persistence}{The smoothing parameters, as in \link[smooth]{adam}: a vector
+(level, trend, a pair \eqn{\gamma_1, \gamma_2} per period of \code{lags} above 1,
+the smoothing parameters of the regressors with \code{regressors="adapt"}), used only
+when the structure is not selected, or a named list with \code{level}, \code{trend},
+\code{seasonal} (a list with one vector \code{c(gamma1, gamma2)} per period) and
+\code{xreg}, where only the provided elements are fixed. The values for the components
+that the model does not have are ignored.}
+
+\item{phi}{The damping parameter, used with \code{trend="damped"}. With
+\code{trend="auto"}, it is estimated with a warning, as in \link[smooth]{adam}.}
+
 \item{initial}{The initialisation: \code{"backcasting"} (default),
 \code{"optimal"}, \code{"two-stage"}, \code{"complete"} (the same as
 backcasting here) or \code{"gradient"}, which solves for the initial states by
@@ -113,7 +125,20 @@ profiling the estimation loss at the current parameters, as in
 so this is a linear solve (with weighted least squares sweeps for the robust and
 multistep losses). The coefficients of the regressors are estimated with the
 other parameters. With a custom loss, it is switched to \code{"backcasting"} with a
-warning.}
+warning.
+The initial states can also be provided, in the space of the Box-Cox transformed data
+(so they are meaningful with a provided \code{lambda}), as in \link[smooth]{adam}: a
+vector (level, trend, then for each period the sine coefficients of its harmonics
+followed by their cosine coefficients, the ARMA states, the coefficients of the
+regressors), used only when the structure is not selected, or a named list with
+\code{level}, \code{trend}, \code{seasonal} (a list with one vector of the sine and then
+the cosine coefficients per period, which needs \code{harmonics}), \code{arma} and
+\code{xreg}. The states not provided are estimated, with \code{"optimal"}
+initialisation.}
+
+\item{arma}{The parameters of the ARMA, as in \link[smooth]{adam}: a list with
+\code{ar} and \code{ma}, or a vector with the AR and then the MA parameters of each
+lag, lag by lag. If provided, the orders are not selected.}
 
 \item{bounds}{The bounds of the parameters: \code{"admissible"} (default)
 guarantees the stability of the model (the eigenvalues of the discount matrix

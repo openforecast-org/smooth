@@ -119,6 +119,15 @@
 #' @param h The forecast horizon.
 #' @param holdout If \code{TRUE}, the holdout of the size \code{h} is taken from
 #' the data.
+#' @param persistence The smoothing parameters, as in \link[smooth]{adam}: a vector
+#' (level, trend, a pair \eqn{\gamma_1, \gamma_2} per period of \code{lags} above 1,
+#' the smoothing parameters of the regressors with \code{regressors="adapt"}), used only
+#' when the structure is not selected, or a named list with \code{level}, \code{trend},
+#' \code{seasonal} (a list with one vector \code{c(gamma1, gamma2)} per period) and
+#' \code{xreg}, where only the provided elements are fixed. The values for the components
+#' that the model does not have are ignored.
+#' @param phi The damping parameter, used with \code{trend="damped"}. With
+#' \code{trend="auto"}, it is estimated with a warning, as in \link[smooth]{adam}.
 #' @param initial The initialisation: \code{"backcasting"} (default),
 #' \code{"optimal"}, \code{"two-stage"}, \code{"complete"} (the same as
 #' backcasting here) or \code{"gradient"}, which solves for the initial states by
@@ -128,6 +137,18 @@
 #' multistep losses). The coefficients of the regressors are estimated with the
 #' other parameters. With a custom loss, it is switched to \code{"backcasting"} with a
 #' warning.
+#' The initial states can also be provided, in the space of the Box-Cox transformed data
+#' (so they are meaningful with a provided \code{lambda}), as in \link[smooth]{adam}: a
+#' vector (level, trend, then for each period the sine coefficients of its harmonics
+#' followed by their cosine coefficients, the ARMA states, the coefficients of the
+#' regressors), used only when the structure is not selected, or a named list with
+#' \code{level}, \code{trend}, \code{seasonal} (a list with one vector of the sine and then
+#' the cosine coefficients per period, which needs \code{harmonics}), \code{arma} and
+#' \code{xreg}. The states not provided are estimated, with \code{"optimal"}
+#' initialisation.
+#' @param arma The parameters of the ARMA, as in \link[smooth]{adam}: a list with
+#' \code{ar} and \code{ma}, or a vector with the AR and then the MA parameters of each
+#' lag, lag by lag. If provided, the orders are not selected.
 #' @param bounds The bounds of the parameters: \code{"admissible"} (default)
 #' guarantees the stability of the model (the eigenvalues of the discount matrix
 #' of the level, trend and harmonics lie in the unit circle and the ARMA is
@@ -173,7 +194,8 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                   distribution=c("auto","dnorm","dlaplace","ds","dgnorm"),
                   loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
                   ic=c("AICc","AIC","BIC","BICc"), h=0, holdout=FALSE,
-                  initial=c("backcasting","optimal","two-stage","complete","gradient"),
+                  persistence=NULL, phi=NULL,
+                  initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
                   bounds=c("admissible","usual","none"), silent=TRUE, model=NULL, ...){
     startTime <- Sys.time();
     cl <- match.call();
@@ -187,6 +209,12 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         loss <- match.arg(loss);
     }
     ic <- match.arg(ic);
+    # The provided initials are estimated where they are missing, as in adam()
+    initialProvided <- NULL;
+    if(is.numeric(initial) || is.list(initial)){
+        initialProvided <- initial;
+        initial <- "optimal";
+    }
     initial <- match.arg(initial);
     bounds <- match.arg(bounds);
     regressors <- match.arg(regressors);
@@ -220,6 +248,14 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                               model$holdout[, model$xregNames, drop=FALSE]);
             }
         }
+        # The values provided to the model, as they were applied
+        persistence <- model$provided$persistence;
+        phi <- model$provided$phi;
+        arma <- model$provided$arma;
+        initialProvided <- model$provided$initial;
+        if(initial=="provided"){
+            initial <- "optimal";
+        }
         lambdaProvided <- if(is.null(model$B) || !any(names(model$B)=="lambda")) model$lambda else NULL;
         if(any(names(model$B)=="shape")){
             ellipsis$shape <- NULL;
@@ -230,6 +266,47 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         ellipsis$B <- model$B;
         modelDo <- "use";
     }
+    # The provided values, as adam() takes them: phi needs a preselected trend, and an unnamed
+    # vector needs a preselected structure to be matched with it
+    selection <- trend=="auto" || is.null(harmonics) || isTRUE(orders$select) || regressors=="select";
+    if(!is.null(phi) && trend=="auto"){
+        warning("Predefined phi can only be used with a preselected trend. Changing to estimation.",
+                call.=FALSE);
+        phi <- NULL;
+    }
+    if(!is.null(persistence) && !is.list(persistence) && selection){
+        warning(paste0("Predefined persistence vector can only be used with a preselected structure.\n",
+                       "Changing to estimation of persistence values."), call.=FALSE);
+        persistence <- NULL;
+    }
+    if(!is.null(initialProvided) && !is.list(initialProvided) && selection){
+        warning(paste0("Predefined initials vector can only be used with a preselected structure.\n",
+                       "Changing to estimation of initials."), call.=FALSE);
+        initialProvided <- NULL;
+    }
+    initialList <- is.list(initialProvided);
+    if(initialList && !is.null(initialProvided$seasonal) && is.null(harmonics)){
+        warning("Initial seasonal coefficients need the harmonics to be provided. Estimating them.",
+                call.=FALSE);
+        initialProvided$seasonal <- NULL;
+    }
+    if(initialList && !is.null(initialProvided$arma) && isTRUE(orders$select) && is.null(arma)){
+        warning("Initial ARMA states need the orders to be preselected. Estimating them.", call.=FALSE);
+        initialProvided$arma <- NULL;
+    }
+    if(initialList && !is.null(initialProvided$xreg) && regressors=="select"){
+        warning("Initial values of the regressors cannot be used with their selection. Estimating them.",
+                call.=FALSE);
+        initialProvided$xreg <- NULL;
+    }
+    # The ARMA parameters fix its orders
+    if(!is.null(arma)){
+        orders$select <- FALSE;
+    }
+    if(!is.null(initialProvided) && initial!="optimal"){
+        initial <- "optimal";
+    }
+
     # "auto": the structure is selected with dgnorm, then refitted with the named
     # distribution closest to its shape; the other losses imply one, as in adam()
     distributionAuto <- distribution=="auto";
@@ -254,6 +331,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     checked$headLengthUser <- ellipsis$headLength;
     checked$modelDo <- modelDo;
     checked$bounds <- bounds;
+    checked[["tbatsProvided"]] <- list(persistence=persistence, phi=phi, arma=arma, initial=initialProvided);
     # The missing values are gaps: the checker filled them, but the global model, the fit and
     # the likelihood use the observed values only
     yInSample <- as.vector(checked$yInSample);
@@ -270,6 +348,20 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     periods <- sort(unique(lags[lags>1]));
     lambdaSpec <- tbats_lambdaSpec(lambdaProvided, yInSample[otLogical], checked$loss);
     armaSpec <- if(is.null(armaSpecProvided)) tbats_armaSpec(orders, lags) else armaSpecProvided;
+    # The provided AR or MA parameters of a wrong number are estimated, as in adam()
+    if(!is.null(arma)){
+        armaKinds <- if(is.list(arma)) arma[intersect(c("ar","ma"), names(arma))] else list(arma=arma);
+        armaNeeded <- c(ar=sum(armaSpec$arOrders), ma=sum(armaSpec$maOrders), arma=armaSpec$nParam);
+        for(kind in names(armaKinds)){
+            if(length(armaKinds[[kind]])!=armaNeeded[[kind]]){
+                warning(paste0("The number of provided ", toupper(kind), " parameters is ",
+                               length(armaKinds[[kind]]), ", while the orders imply ", armaNeeded[[kind]],
+                               ". Estimating them."), call.=FALSE);
+                armaKinds[kind] <- list(NULL);
+            }
+        }
+        checked[["tbatsProvided"]]["arma"] <- list(if(is.list(arma)) armaKinds else armaKinds$arma);
+    }
     # With the selection, the trend is chosen without ARMA, and without the regressors
     armaSpecFit <- if(armaSpec$select) tbats_armaBuild(0, 0, 1) else armaSpec;
     xregSpecFit <- if(regressors=="select") NULL else xregSpec;
@@ -865,6 +957,107 @@ tbats_harmonicLabels <- function(struct){
     return(paste0(struct$harmonicTable$j, "[", round(struct$harmonicTable$period, 4), "]"));
 }
 
+#### Provided parameters ####
+# The parameters and initial states provided by the user for a structure, as in adam():
+# persistence, phi and the ARMA on the names of B, the initials as the states in the space
+# of the transformed data, which replace the global ones (and the B entries they make
+# redundant). The persistence is a vector (level, trend, a pair per period, the deltas of
+# the regressors) or a list with level, trend, seasonal (a pair per period) and xreg; the
+# initials are a vector or a list with level, trend, seasonal (per period, the sines and
+# then the cosines of its harmonics), arma and xreg; the ARMA is a vector or a list with ar
+# and ma, ordered lag-wise
+tbats_provided <- function(provided, struct, armaSpec){
+    nPeriods <- length(struct$periods);
+    nXreg <- struct$nXreg;
+    # The positions of an unnamed vector of values per period after the first ones
+    splitPeriods <- function(values, first, sizes){
+        ends <- first+cumsum(sizes);
+        return(lapply(seq_len(nPeriods), function(i) values[ends[i]-sizes[i]+seq_len(sizes[i])]));
+    }
+    rowsPeriod <- lapply(struct$periods, function(period) which(struct$harmonicTable$period==period));
+
+    values <- numeric(0);
+    persistence <- provided$persistence;
+    if(!is.null(persistence) && !is.list(persistence)){
+        k <- 1+struct$trendIn;
+        persistence <- list(level=persistence[1], trend=if(struct$trendIn) persistence[2],
+                            seasonal=splitPeriods(persistence, k, rep(2, nPeriods)),
+                            xreg=persistence[-seq_len(k+2*nPeriods)]);
+    }
+    if(!is.null(persistence$level)){
+        values["alpha"] <- persistence$level;
+    }
+    if(!is.null(persistence$trend) && struct$trendIn){
+        values["beta"] <- persistence$trend;
+    }
+    for(i in seq_along(persistence$seasonal)){
+        if(length(rowsPeriod[[i]])>0){
+            values[paste0(c("gamma1[","gamma2["), round(struct$periods[i], 4), "]")] <- persistence$seasonal[[i]];
+        }
+    }
+    if(length(persistence$xreg)>0 && struct$xregAdapt){
+        values[paste0("delta", seq_len(nXreg))] <- persistence$xreg;
+    }
+    if(!is.null(provided$phi) && struct$damped){
+        values["phi"] <- provided$phi;
+    }
+    arma <- provided$arma;
+    if(!is.null(arma) && armaSpec$nParam>0){
+        if(is.list(arma)){
+            if(!is.null(arma$ar)){
+                values[armaSpec$names[grepl("^phi", armaSpec$names)]] <- arma$ar;
+            }
+            if(!is.null(arma$ma)){
+                values[armaSpec$names[grepl("^theta", armaSpec$names)]] <- arma$ma;
+            }
+        }
+        else{
+            values[armaSpec$names] <- arma;
+        }
+    }
+
+    # The initials, NA where they are estimated
+    initial <- provided$initial;
+    if(!is.null(initial) && !is.list(initial)){
+        k <- 1+struct$trendIn;
+        sizes <- 2*sapply(rowsPeriod, length);
+        initial <- list(level=initial[1], trend=if(struct$trendIn) initial[2],
+                        seasonal=splitPeriods(initial, k, sizes),
+                        arma=initial[k+sum(sizes)+seq_len(struct$armaLagMax)],
+                        xreg=initial[k+sum(sizes)+struct$armaLagMax+seq_len(nXreg)]);
+    }
+    states <- list(level=NA, trend=NA, sinCoef=rep(NA, struct$nHarmonics),
+                   cosCoef=rep(NA, struct$nHarmonics), xreg=rep(NA, nXreg));
+    if(!is.null(initial$level)){
+        states$level <- initial$level;
+    }
+    if(!is.null(initial$trend) && struct$trendIn){
+        states$trend <- initial$trend;
+    }
+    for(i in seq_along(initial$seasonal)){
+        rows <- rowsPeriod[[i]];
+        if(length(initial$seasonal[[i]])!=2*length(rows)){
+            stop(paste0("The initial seasonal coefficients of the period ", struct$periods[i], " should be ",
+                        2*length(rows), " values: the sines and then the cosines of its harmonics."),
+                 call.=FALSE);
+        }
+        states$sinCoef[rows] <- initial$seasonal[[i]][seq_along(rows)];
+        states$cosCoef[rows] <- initial$seasonal[[i]][length(rows)+seq_along(rows)];
+    }
+    if(length(initial$xreg)>0){
+        states$xreg[] <- initial$xreg;
+    }
+    armaStates <- if(length(initial$arma)>0 && struct$armaLagMax>0) initial$arma else NULL;
+    labels <- tbats_harmonicLabels(struct);
+    drop <- c(if(!is.na(states$level)) "level", if(!is.na(states$trend)) "trend",
+              paste0("sin", labels)[!is.na(states$sinCoef)], paste0("cos", labels)[!is.na(states$cosCoef)],
+              if(!is.null(armaStates)) paste0("ARMAState", seq_len(struct$armaLagMax)),
+              struct$xreg$names[!is.na(states$xreg)]);
+    return(list(B=values, states=states, arma=armaStates, drop=drop,
+                number=length(values)+sum(!is.na(unlist(states)))+length(armaStates),
+                initial=length(drop)>0));
+}
+
 #### Parameters ####
 # The names, starting values and bounds of the parameter vector
 tbats_B <- function(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distribution,
@@ -1128,8 +1321,20 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     otherEstimate <- distribution=="dgnorm" && isTRUE(checked$otherParameterEstimate);
     BList <- tbats_B(struct, armaSpec, armaStart, lambdaSpec, lambdaStart, distribution,
                      otherEstimate, initialEstimate, xregEstimate, checked$bounds);
+    # The provided values: in the full vector (the starting gammas around them), out of B
+    provided <- tbats_provided(checked[["tbatsProvided"]], struct, armaSpec);
+    BAll <- BList$B;
+    BAll[names(provided$B)] <- provided$B;
     if(checked$bounds=="admissible" && struct$nHarmonics>0){
-        BList$B <- tbats_gammaStart(BList$B, struct, armaSpec, lambdaSpec, other, initialEstimate, adamCpp);
+        BAll <- tbats_gammaStart(BAll, struct, armaSpec, lambdaSpec, other, initialEstimate, adamCpp);
+        BAll[names(provided$B)] <- provided$B;
+    }
+    estimated <- !(names(BAll) %in% c(names(provided$B), provided$drop));
+    BList <- list(B=BAll[estimated], lb=BList$lb[estimated], ub=BList$ub[estimated]);
+    # The full vector for the parameters of B (named), the provided ones included
+    BFull <- function(B){
+        BAll[names(BList$B)] <- B;
+        return(BAll);
     }
 
     #### The cost function ####
@@ -1146,6 +1351,13 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             armaInitial <- elements$deviations$arma;
         }
         states$xreg <- states$xreg + elements$xregDeviations;
+        for(component in names(provided$states)){
+            known <- !is.na(provided$states[[component]]);
+            states[[component]][known] <- provided$states[[component]][known];
+        }
+        if(!is.null(provided$arma)){
+            armaInitial <- provided$arma;
+        }
         return(list(yBC=yBC, profile=tbats_profile(states, armaInitial, struct, elements$phi),
                     matWt=tbats_matWt(elements$w, struct, obs, xregSpec$data)));
     }
@@ -1173,7 +1385,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     lossValue <- function(B, lossUsed){
         # nloptr drops the names
         names(B) <- names(BList$B);
-        elements <- tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
+        elements <- tbats_filler(BFull(B), struct, armaSpec, lambdaSpec, other, initialEstimate,
                                  checked$bounds, adamCpp, xregEstimate);
         if(elements$penalty>0){
             return(elements$penalty);
@@ -1216,7 +1428,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     # Whether the parameters satisfy the bounds, for the draws of reapply()
     inBounds <- function(B){
         names(B) <- names(BList$B);
-        return(tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
+        return(tbats_filler(BFull(B), struct, armaSpec, lambdaSpec, other, initialEstimate,
                             checked$bounds, adamCpp, xregEstimate)$penalty==0);
     }
 
@@ -1231,7 +1443,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         nComponents <- struct$nComponents;
         draws <- matrix(draws, nsim, dimnames=list(NULL, names(BList$B)));
         refits <- lapply(1:nsim, function(i){
-            elements <- tbats_filler(draws[i,], struct, armaSpec, lambdaSpec, other, initialEstimate,
+            elements <- tbats_filler(BFull(draws[i,]), struct, armaSpec, lambdaSpec, other, initialEstimate,
                                      checked$bounds, adamCpp, xregEstimate);
             return(c(elements, fitInputs(elements)));
         });
@@ -1269,7 +1481,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                                  "complete", checked, xregSpec, BStart);
         common <- intersect(names(B), names(backcastFit$B));
         B[common] <- backcastFit$B[common];
-        B <- tbats_deviations(B, backcastFit, struct, qrX, y[otLogical], lambdaSpec);
+        B <- tbats_deviations(B, backcastFit, struct, qrX, y[otLogical], lambdaSpec)[names(BList$B)];
     }
     if(!is.null(checked$B)){
         if(length(checked$B)!=length(B)){
@@ -1308,7 +1520,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     lossFinal <- CF(B);
 
     #### The final fit ####
-    elements <- tbats_filler(B, struct, armaSpec, lambdaSpec, other, initialEstimate,
+    elements <- tbats_filler(BFull(B), struct, armaSpec, lambdaSpec, other, initialEstimate,
                              checked$bounds, adamCpp, xregEstimate);
     fitted <- fitStates(elements);
     states <- fitted$states;
@@ -1350,7 +1562,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                                        fitted$profile, checked$h)$forecast;
     }
 
-    return(list(B=B, res=res, lossValue=lossFinal,
+    return(list(B=B, BFull=BFull(B), nParamProvided=provided$number, initialProvided=provided$initial,
+                res=res, lossValue=lossFinal,
                 logLik=structure(logLikValue, nobs=sum(!is.na(y)), df=nParamEstimated+occurrenceSpec$nParam,
                                  class="logLik"),
                 nParamEstimated=nParamEstimated, nInitials=nInitials*initialsProfiled,
@@ -1456,7 +1669,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
         counts <- table(factor(struct$harmonicTable$period, levels=periods));
         paste0(", ", paste0("<", round(periods, 4), ",", as.vector(counts), ">")[counts>0], collapse="")
     } else "";
-    phiValue <- if(struct$damped) round(best$B[["phi"]], 3) else "-";
+    phiValue <- if(struct$damped) round(best$BFull[["phi"]], 3) else "-";
     modelName <- paste0("TBATS", if(struct$nXreg>0) "X", "(", round(lambda, 3), ", {", sum(armaSpec$arOrders), ",",
                         sum(armaSpec$maOrders), "}, ", phiValue, seasonalPart, ")", if(struct$xregAdapt) "{D}");
 
@@ -1483,7 +1696,7 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     parametersNumber[1,3] <- occurrenceSpec$nParam;
     parametersNumber[1,4] <- 1;
     parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
-    parametersNumber[2,1] <- length(best$B)*(checked$modelDo=="use");
+    parametersNumber[2,1] <- length(best$B)*(checked$modelDo=="use") + best$nParamProvided;
     parametersNumber[2,5] <- sum(parametersNumber[2,1:4]);
 
     yInSample <- replace(checked$yInSample, is.na(best$y), NA);
@@ -1526,8 +1739,8 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     orders <- list(ar=armaSpec$arOrders, i=rep(0, length(armaSpec$lags)), ma=armaSpec$maOrders);
     arma <- NULL;
     if(armaSpec$nParam>0){
-        arPart <- best$B[grepl("^phi[0-9]", names(best$B))];
-        maPart <- best$B[grepl("^theta", names(best$B))];
+        arPart <- best$BFull[grepl("^phi[0-9]", names(best$BFull))];
+        maPart <- best$BFull[grepl("^theta", names(best$BFull))];
         arma <- list(ar=if(length(arPart)>0) arPart, ma=if(length(maPart)>0) maPart);
     }
     other <- if(best$distribution=="dgnorm") list(shape=best$elements$shape) else list();
@@ -1537,9 +1750,10 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     fitted=yFitted, residuals=errors, forecast=yForecast,
                                     states=t(best$states), accuracy=errormeasures,
                                     profile=best$fitted$profile, profileInitial=best$fitted$profileInitial,
-                                    persistence=persistence, phi=if(struct$damped) best$B[["phi"]] else 1,
+                                    persistence=persistence, phi=if(struct$damped) best$BFull[["phi"]] else 1,
                                     transition=matF, measurement=matWt,
-                                    initial=initialValue, initialType=best$initialType,
+                                    initial=initialValue,
+                                    initialType=if(best$initialProvided) "provided" else best$initialType,
                                     orders=orders, arma=arma, armaSpec=armaSpec, armaLags=armaSpec$lags,
                                     lambda=lambda,
                                     harmonics=harmonics, periods=periods, trendType=best$trendType,
@@ -1551,7 +1765,8 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                     logLik=best$logLik,
                                     ICs=ICs,
                                     distribution=best$distribution, other=other, bounds=checked$bounds,
-                                    scale=best$scale, B=best$B, lags=c(1, periods),
+                                    scale=best$scale, B=best$B, provided=checked[["tbatsProvided"]],
+                                    lags=c(1, periods),
                                     lagsAll=struct$lagsModelAll, res=best$res, FI=best$FI,
                                     adamCpp=best$adamCpp, inBounds=best$inBounds, refitter=best$refitter),
                                class=c("adamTBATS","adam","smooth"));

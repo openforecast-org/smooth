@@ -702,3 +702,84 @@ def test_a_start_a_hair_inside_a_bound_is_estimated_as_one_on_the_bound(air):
     np.testing.assert_array_equal(
         TBATS(B=B, **kw).fit(air).coef, TBATS(B=on_bound, **kw).fit(air).coef
     )
+
+
+def test_the_values_taken_from_a_fit_and_provided_reproduce_its_loss(air):
+    arguments = dict(
+        lags=[1, 6, 12],
+        harmonics=[1, 2],
+        trend="damped",
+        orders=ARMA11,
+        lambda_bc=0,
+        distribution="dnorm",
+        h=12,
+        holdout=True,
+    )
+    model = TBATS(initial="optimal", **arguments).fit(air)
+    B = dict(zip(model.coef_names, model.coef))
+    seasonal = model.initial_value["seasonal"]
+    provided = TBATS(
+        persistence={
+            "level": B["alpha"],
+            "trend": B["beta"],
+            "seasonal": [[B[f"gamma1[{p}]"], B[f"gamma2[{p}]"]] for p in (6, 12)],
+        },
+        phi=B["phi"],
+        arma={"ar": B["phi1[1]"], "ma": B["theta1[1]"]},
+        initial={
+            "level": model.initial_value["level"],
+            "trend": model.initial_value["trend"],
+            "seasonal": [
+                np.r_[rows["sin"], rows["cos"]] for _, rows in seasonal.groupby("period")
+            ],
+            "arma": model.initial_value["arma"],
+        },
+        **arguments,
+    ).fit(air)
+    assert provided.loss_value == pytest.approx(model.loss_value, rel=1e-10)
+    assert provided.coef_names == []
+    assert provided.nparam == 1
+    assert provided.initial_type == "provided"
+
+
+def test_the_provided_values_are_fixed_and_the_rest_estimated(air):
+    model = TBATS(
+        lags=[1, 12],
+        harmonics=[2],
+        trend="damped",
+        orders=ORDERS0,
+        lambda_bc=0,
+        distribution="dnorm",
+        persistence={"level": 0.3, "seasonal": [[0.001, 0]]},
+        phi=0.98,
+        initial={"level": 4.7},
+    ).fit(air)
+    assert model.phi_ == 0.98
+    assert model.initial_value["level"] == 4.7
+    for name in ("alpha", "phi", "gamma1[12]", "gamma2[12]", "level"):
+        assert name not in model.coef_names
+    for name in ("beta", "trend", "sin1[12]"):
+        assert name in model.coef_names
+    # The refits keep them
+    assert model.reapply(nsim=3).refitted.shape == (len(air), 3)
+
+
+def test_the_provided_values_that_need_a_selected_structure_warn(air):
+    arguments = dict(lags=[1, 12], orders=ORDERS0, distribution="dnorm")
+    for extra, message in (
+        (dict(phi=0.9), "Predefined phi"),
+        (dict(persistence=[0.1, 0.1]), "Predefined persistence"),
+        (dict(initial=[4.7, 0]), "Predefined initials"),
+    ):
+        with pytest.warns(UserWarning, match=message):
+            TBATS(**arguments, **extra).fit(air)
+    with pytest.warns(UserWarning, match="ARMA parameters"):
+        model = TBATS(
+            lags=[1, 12],
+            harmonics=[2],
+            trend="none",
+            orders=ARMA11,
+            arma=[0.5],
+            distribution="dnorm",
+        ).fit(air)
+    assert {"phi1[1]", "theta1[1]"} <= set(model.coef_names)

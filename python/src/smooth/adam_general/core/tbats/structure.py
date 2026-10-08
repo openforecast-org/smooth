@@ -633,3 +633,140 @@ def initials_read(mat_vt: NDArray, struct: Dict[str, Any]) -> Dict[str, Any]:
             struct["arma_rows"][-1], lag_max - struct["arma_lag_max"] : lag_max
         ]
     return {"states": states, "arma": arma}
+
+
+# The provided parameters
+_PERSISTENCE_ALIASES = {"alpha": "level", "beta": "trend", "gamma": "seasonal"}
+
+
+def provided_values(
+    provided: Dict[str, Any], struct: Dict[str, Any], spec: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The parameters and initial states provided by the user for a structure, as in
+    ADAM (see R's ``tbats_provided``): persistence, phi and the ARMA on the names of
+    B, the initials as the states in the space of the transformed data, which replace
+    the global ones (and the B entries they make redundant)."""
+    periods = struct["periods"]
+    rows_period = [np.flatnonzero(struct["table"]["period"] == p) for p in periods]
+    k = 1 + int(struct["trend_in"])
+    n_xreg = struct["n_xreg"]
+    xreg_names = list(struct["xreg"]["names"]) if n_xreg > 0 else []
+
+    def split_periods(values: NDArray, sizes: List[int]) -> List[NDArray]:
+        """The values per period after the level and trend of an unnamed vector."""
+        ends = k + np.cumsum(sizes, dtype=int)
+        return [values[end - size : end] for end, size in zip(ends, sizes)]
+
+    values: Dict[str, float] = {}
+    persistence = provided.get("persistence")
+    if persistence is not None and not isinstance(persistence, dict):
+        vector = np.atleast_1d(np.asarray(persistence, dtype=float))
+        persistence = {
+            "level": vector[0],
+            "trend": vector[1] if struct["trend_in"] else None,
+            "seasonal": split_periods(vector, [2] * len(periods)),
+            "xreg": vector[k + 2 * len(periods) :],
+        }
+    persistence = {
+        _PERSISTENCE_ALIASES.get(key, key): value
+        for key, value in (persistence or {}).items()
+    }
+    if persistence.get("level") is not None:
+        values["alpha"] = float(persistence["level"])
+    if persistence.get("trend") is not None and struct["trend_in"]:
+        values["beta"] = float(persistence["trend"])
+    for period, rows, pair in zip(
+        periods, rows_period, persistence.get("seasonal") or []
+    ):
+        if len(rows) > 0:
+            label = _period_label(period)
+            values[f"gamma1[{label}]"], values[f"gamma2[{label}]"] = map(float, pair)
+    deltas = np.atleast_1d(np.asarray(persistence.get("xreg", []), dtype=float))
+    if len(deltas) > 0 and struct["xreg_adapt"]:
+        values.update({f"delta{j + 1}": float(v) for j, v in enumerate(deltas)})
+    if provided.get("phi") is not None and struct["damped"]:
+        values["phi"] = float(provided["phi"])
+    arma = provided.get("arma")
+    if arma is not None and spec["n_param"] > 0:
+        kinds = arma if isinstance(arma, dict) else {"arma": arma}
+        for kind, prefix in (("ar", "phi"), ("ma", "theta"), ("arma", "")):
+            if kinds.get(kind) is not None:
+                names = [n for n in spec["names"] if n.startswith(prefix)]
+                parameters = np.atleast_1d(np.asarray(kinds[kind], dtype=float))
+                values.update(zip(names, parameters.tolist()))
+
+    # The initials, NaN where they are estimated
+    initial = provided.get("initial")
+    sizes = [2 * len(rows) for rows in rows_period]
+    if initial is not None and not isinstance(initial, dict):
+        vector = np.atleast_1d(np.asarray(initial, dtype=float))
+        start = k + sum(sizes)
+        initial = {
+            "level": vector[0],
+            "trend": vector[1] if struct["trend_in"] else None,
+            "seasonal": split_periods(vector, sizes),
+            "arma": vector[start : start + struct["arma_lag_max"]],
+            "xreg": vector[
+                start + struct["arma_lag_max"] : start + struct["arma_lag_max"] + n_xreg
+            ],
+        }
+    initial = initial or {}
+    n_h = struct["n_harmonics"]
+    states: Dict[str, Any] = {
+        "level": np.nan,
+        "trend": np.nan,
+        "sin": np.full(n_h, np.nan),
+        "cos": np.full(n_h, np.nan),
+        "xreg": np.full(n_xreg, np.nan),
+    }
+    if initial.get("level") is not None:
+        states["level"] = float(initial["level"])
+    if initial.get("trend") is not None and struct["trend_in"]:
+        states["trend"] = float(initial["trend"])
+    for period, rows, size, coefficients in zip(
+        periods, rows_period, sizes, initial.get("seasonal") or []
+    ):
+        coefficients = np.asarray(coefficients, dtype=float)
+        if len(coefficients) != size:
+            raise ValueError(
+                f"The initial seasonal coefficients of the period {period:g} should be "
+                f"{size} values: the sines and then the cosines of its harmonics."
+            )
+        states["sin"][rows] = coefficients[: len(rows)]
+        states["cos"][rows] = coefficients[len(rows) :]
+    xreg = initial.get("xreg")
+    if isinstance(xreg, dict):
+        xreg = [xreg[name] for name in xreg_names]
+    xreg = np.atleast_1d(np.asarray([] if xreg is None else xreg, dtype=float))
+    if len(xreg) > 0:
+        states["xreg"][:] = xreg
+    arma_states = np.atleast_1d(np.asarray(initial.get("arma", []), dtype=float))
+    arma_initial = (
+        arma_states if len(arma_states) > 0 and struct["arma_lag_max"] > 0 else None
+    )
+    labels = harmonic_labels(struct["table"])
+    drop = (
+        (["level"] if not np.isnan(states["level"]) else [])
+        + (["trend"] if not np.isnan(states["trend"]) else [])
+        + [f"sin{x}" for x, v in zip(labels, states["sin"]) if not np.isnan(v)]
+        + [f"cos{x}" for x, v in zip(labels, states["cos"]) if not np.isnan(v)]
+        + (
+            [f"ARMAState{j}" for j in range(1, struct["arma_lag_max"] + 1)]
+            if arma_initial is not None
+            else []
+        )
+        + [name for name, v in zip(xreg_names, states["xreg"]) if not np.isnan(v)]
+    )
+    known = sum(
+        int(np.sum(~np.isnan(np.atleast_1d(value)))) for value in states.values()
+    )
+    return {
+        "B": values,
+        "states": states,
+        "arma": arma_initial,
+        "drop": drop,
+        "number": len(values)
+        + known
+        + (0 if arma_initial is None else len(arma_initial)),
+        "initial": len(drop) > 0,
+    }

@@ -282,8 +282,35 @@ class TBATS:
         other than the likelihood, ``"auto"`` is ``"dlaplace"`` for ``"MAE"``,
         ``"ds"`` for ``"HAM"`` and ``"dnorm"`` otherwise, as in ``ADAM``. The
         distribution used is ``distribution_``.
-    loss, ic, h, holdout, initial, bounds
+    loss, ic, h, holdout, bounds
         As in R's ``tbats()``; ``bounds="admissible"`` keeps the model stable.
+    persistence : dict, array or None
+        The smoothing parameters, as in ``ADAM``: a vector (level, trend, a pair
+        gamma1, gamma2 per period of ``lags`` above 1, the smoothing parameters of the
+        regressors with ``regressors="adapt"``), used only when the structure is not
+        selected, or a dict with ``"level"``, ``"trend"``, ``"seasonal"`` (a list
+        with one pair ``[gamma1, gamma2]`` per period) and ``"xreg"`` (or ``"alpha"``,
+        ``"beta"``, ``"gamma"``), where only the provided elements are fixed. The
+        values for the components that the model does not have are ignored.
+    phi : float or None
+        The damping parameter, used with ``trend="damped"``. With ``trend="auto"``,
+        it is estimated with a warning, as in ``ADAM``.
+    initial : str, dict or array, default="backcasting"
+        The initialisation, as in R's ``tbats()``, or the initial states in the space
+        of the Box-Cox transformed data (meaningful with a provided ``lambda_bc``): a
+        vector (level, trend, then for each period the sine coefficients of its
+        harmonics followed by their cosine coefficients, the ARMA states, the
+        coefficients of the regressors), used only when the structure is not
+        selected, or a dict with ``"level"``, ``"trend"``, ``"seasonal"`` (a list
+        with one array of the sine and then the cosine coefficients per period, which
+        needs ``harmonics``), ``"arma"`` and ``"xreg"`` (an array, or a dict by
+        name). The states not provided are estimated, with ``"optimal"``
+        initialisation, and ``initial_type`` is ``"provided"``.
+    arma : dict, array or None
+        The parameters of the ARMA, as in ``ADAM``: a dict with ``"ar"`` and
+        ``"ma"`` (either can be left out to estimate it), or a vector with the AR and
+        then the MA parameters of each lag, lag by lag. If provided, the orders are
+        not selected.
     verbose : int, default=0
         Not used yet (R's ``silent``).
     B, lb, ub, maxeval, maxtime, algorithm : optional
@@ -309,7 +336,10 @@ class TBATS:
         ic: str = "AICc",
         h: int = 0,
         holdout: bool = False,
-        initial: str = "backcasting",
+        persistence: Optional[Union[Dict[str, Any], List[float], NDArray]] = None,
+        phi: Optional[float] = None,
+        initial: Union[str, Dict[str, Any], List[float], NDArray] = "backcasting",
+        arma: Optional[Union[Dict[str, Any], List[float], NDArray]] = None,
         bounds: str = "admissible",
         verbose: int = 0,
         B: Optional[NDArray] = None,
@@ -346,15 +376,26 @@ class TBATS:
         self.ic = _match(ic, IC_OPTIONS, "ic")
         self.h = int(h)
         self.holdout = holdout
-        self.initial = _match(initial, INITIAL_OPTIONS, "initial")
+        self.persistence = persistence
+        self.phi = phi
+        self.initial = initial
+        self.arma = arma
+        # The provided initials are estimated where they are missing, as in ADAM
+        self._initial_method = (
+            _match(initial, INITIAL_OPTIONS, "initial")
+            if isinstance(initial, str)
+            else "optimal"
+        )
         # The gradient solve cannot take a custom loss: the initials are backcast
-        if self.initial == "gradient" and self.loss == "custom":
+        if self._initial_method == "gradient" and self.loss == "custom":
             warnings.warn(
                 'initial="gradient" is not available for custom loss functions. '
                 'Switching to initial="backcasting".',
                 stacklevel=2,
             )
-            self.initial = "backcasting"
+            self._initial_method = "backcasting"
+            if isinstance(self.initial, str):
+                self.initial = "backcasting"
         self.bounds = _match(bounds, BOUNDS_OPTIONS, "bounds")
         self.verbose = verbose
         self.B = B
@@ -386,7 +427,9 @@ class TBATS:
         n_iterations = self.n_iterations
         if n_iterations is None:
             n_iterations = (
-                2 if self.initial in ("backcasting", "complete", "gradient") else 1
+                2
+                if self._initial_method in ("backcasting", "complete", "gradient")
+                else 1
             )
         return {
             "h": self.h,
@@ -452,10 +495,98 @@ class TBATS:
 
         periods = sorted({lag for lag in lags if lag > 1})
         lam_spec = st.lambda_spec(self.lambda_bc, y_in_sample[ot], self.loss)
-        spec = st.arma_spec(self._init_orders, lags)
+        # The provided values, as ADAM takes them: phi needs a preselected trend, and
+        # an unnamed vector needs a preselected structure to be matched with it
+        orders = dict(self._init_orders)
+        persistence, phi, arma = self.persistence, self.phi, self.arma
+        initial = None if isinstance(self.initial, str) else self.initial
+        selection = (
+            trend == "auto"
+            or harmonics is None
+            or bool(orders.get("select"))
+            or self.regressors == "select"
+        )
+        if phi is not None and trend == "auto":
+            warnings.warn(
+                "Predefined phi can only be used with a preselected trend. Changing "
+                "to estimation.",
+                stacklevel=2,
+            )
+            phi = None
+        if persistence is not None and not isinstance(persistence, dict) and selection:
+            warnings.warn(
+                "Predefined persistence vector can only be used with a preselected "
+                "structure.\nChanging to estimation of persistence values.",
+                stacklevel=2,
+            )
+            persistence = None
+        if initial is not None and not isinstance(initial, dict) and selection:
+            warnings.warn(
+                "Predefined initials vector can only be used with a preselected "
+                "structure.\nChanging to estimation of initials.",
+                stacklevel=2,
+            )
+            initial = None
+        if isinstance(initial, dict):
+            initial = dict(initial)
+            for key, unknown, message in (
+                (
+                    "seasonal",
+                    harmonics is None,
+                    "Initial seasonal coefficients need the harmonics to be provided.",
+                ),
+                (
+                    "arma",
+                    bool(orders.get("select")) and arma is None,
+                    "Initial ARMA states need the orders to be preselected.",
+                ),
+                (
+                    "xreg",
+                    self.regressors == "select",
+                    "Initial values of the regressors cannot be used with their "
+                    "selection.",
+                ),
+            ):
+                if initial.get(key) is not None and unknown:
+                    warnings.warn(f"{message} Estimating them.", stacklevel=2)
+                    initial.pop(key)
+        # The ARMA parameters fix its orders
+        if arma is not None:
+            orders["select"] = False
+        spec = st.arma_spec(orders, lags)
+        # The provided AR or MA parameters of a wrong number are estimated, as in ADAM
+        if arma is not None:
+            kinds: Dict[str, Any] = (
+                dict(arma) if isinstance(arma, dict) else {"arma": arma}
+            )
+            needed = {
+                "ar": int(np.sum(spec["ar_orders"])),
+                "ma": int(np.sum(spec["ma_orders"])),
+                "arma": spec["n_param"],
+            }
+            for kind in [k for k in needed if kinds.get(k) is not None]:
+                count = len(np.atleast_1d(kinds[kind]))
+                if count != needed[kind]:
+                    warnings.warn(
+                        f"The number of provided {kind.upper()} parameters is {count}, "
+                        f"while the orders imply {needed[kind]}. Estimating them.",
+                        stacklevel=2,
+                    )
+                    kinds[kind] = None
+            arma = kinds if isinstance(arma, dict) else kinds["arma"]
+        self._provided = {
+            "persistence": persistence,
+            "phi": phi,
+            "arma": arma,
+            "initial": initial,
+        }
         spec_fit = st.arma_build([0], [0], [1]) if spec["select"] else spec
         trend_types = ["none", "additive", "damped"] if trend == "auto" else [trend]
-        settings = {**self._settings(), "occurrence": occurrence}
+        settings = {
+            **self._settings(),
+            "occurrence": occurrence,
+            "provided": self._provided,
+        }
         distribution = self._distribution_selection()
         # The regressors are selected on the errors of the model without them
         xreg_fit = None if self.regressors == "select" else xreg
@@ -475,8 +606,6 @@ class TBATS:
                 raise ValueError("harmonics should have one value per lag above 1.")
             k_max = [math.ceil(p / 2) - 1 for p in periods]
             if any(k > m for k, m in zip(harmonics, k_max)):
-                import warnings
-
                 warnings.warn(
                     "The number of harmonics has to be below half of the period. "
                     "Reducing it.",
@@ -497,7 +626,7 @@ class TBATS:
                     spec_fit,
                     lam_spec,
                     distribution,
-                    self.initial,
+                    self._initial_method,
                     settings,
                     xreg_fit,
                     {**_named_b(candidates[0]), "beta": 0.0} if candidates else None,
@@ -552,7 +681,7 @@ class TBATS:
                     spec_best,
                     lam_spec,
                     distribution,
-                    self.initial,
+                    self._initial_method,
                     settings,
                     xreg_fit,
                     {**_named_b(best), **no_arma},
@@ -617,7 +746,7 @@ class TBATS:
             spec,
             lam_spec,
             distribution,
-            self.initial,
+            self._initial_method,
             settings,
             subset,
             _named_b(best),
@@ -664,7 +793,7 @@ class TBATS:
                 best["spec"],
                 lam_spec,
                 distribution,
-                self.initial,
+                self._initial_method,
                 {**settings, **bounds, "B": start},
                 xreg,
             )
@@ -731,7 +860,8 @@ class TBATS:
                     "internal": int(self._best["n_param_estimated"]) - 1,
                     "occurrence": int(self._best["n_param_occurrence"]),
                     "scale": 1,
-                }
+                },
+                "provided": {"internal": int(self._best["n_param_provided"])},
             }
         )
         n_param.update_totals()
@@ -746,8 +876,11 @@ class TBATS:
 
     @property
     def initial_type(self) -> str:
-        """The initialisation used (R's ``$initialType``)."""
+        """The initialisation used (R's ``$initialType``): ``"provided"`` when some
+        initial states are."""
         self._check_fitted()
+        if self._best["initial_provided"]:
+            return "provided"
         return str(self._best["initial_type"])
 
     @property
@@ -1923,7 +2056,15 @@ class TBATS:
             },
             "distribution": self.distribution_,
             "loss": self.loss_function if self.loss == "custom" else self.loss,
-            "initial": self.initial,
+            # The provided values, as they were applied
+            "persistence": self._provided["persistence"],
+            "phi": self._provided["phi"],
+            "initial": (
+                self._initial_method
+                if self._provided["initial"] is None
+                else self._provided["initial"]
+            ),
+            "arma": self._provided["arma"],
             "bounds": self.bounds,
             "B": B,
             "lb": np.full(len(B), -np.inf),
@@ -1971,7 +2112,7 @@ class TBATS:
             self.nobs,
             nsim,
             obs_minimum,
-            self.initial in ("backcasting", "complete", "gradient"),
+            self._initial_method in ("backcasting", "complete", "gradient"),
             np.random.default_rng(seed),
         )
         xreg = self._best["struct"]["xreg"]

@@ -156,6 +156,19 @@ tbats(y, lags=c(1,48,336), harmonics=c(8,16), trend="none",
       initial="gradient", h=336, holdout=TRUE)
 ```
 
+## Provided parameters
+
+As in `adam()`, the smoothing parameters (`persistence`), the damping parameter (`phi`), the ARMA parameters (`arma`) and the initial states (`initial`) can be provided, and only the rest is estimated. The lists name the parts that are fixed; the seasonal elements have one vector per period of `lags`: the pair $\gamma_1, \gamma_2$ of the smoothing parameters, and the sine and then the cosine coefficients of the harmonics of the initial seasonality. The initial states are in the space of the Box-Cox transformed data, so they are meaningful with a provided `lambda`:
+
+```{r tbatsProvided, eval=FALSE}
+tbats(AirPassengers, harmonics=2, trend="damped", lambda=0,
+      orders=list(ar=1, ma=0, select=FALSE),
+      persistence=list(level=0.3, seasonal=list(c(0.001, 0))), phi=0.98,
+      arma=list(ar=0.5), initial=list(level=4.7), h=12, holdout=TRUE)
+```
+
+The vectors without names are matched with the parameters by their positions, so they need a structure that is not selected (the trend, the harmonics and the ARMA orders provided), and `phi` needs a provided damped trend: otherwise, they are estimated with a warning. Providing `arma` switches off the selection of the ARMA orders.
+
 ## Explanatory variables and intermittent demand
 
 Explanatory variables are included via `xreg`, and `regressors` defines what to do with them: `"use"` all of them, `"select"` the relevant ones based on the information criterion, or `"adapt"` their parameters over time, as in [adam()](adam.html).

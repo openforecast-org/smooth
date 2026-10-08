@@ -86,3 +86,15 @@ test_that("ces() takes the missing values for gaps", {
     expect_true(all(is.na(residuals(testModel)[is.na(y)])));
     expect_true(all(is.finite(forecast(testModel, h=12, interval="prediction")$upper)));
 })
+
+# reapply() bounds each smoothing parameter with the others at their values, the
+# transition and the persistence rebuilt from them, and keeps a provided a fixed
+test_that("reapply() of ces() keeps the draws in the stable region", {
+    m <- ces(AirPassengers, seasonality="none");
+    set.seed(1);
+    x <- suppressWarnings(reapply(m, nsim=100));
+    expect_lt(max(abs(x$refitted)), 2*max(AirPassengers));
+    m <- ces(AirPassengers, seasonality="partial", a=complex(real=1.35, imaginary=1.01));
+    x <- suppressWarnings(reapply(m, nsim=10));
+    expect_equal(unname(x$persistence[1:2,]), matrix(m$persistence[1:2], 2, 10));
+})

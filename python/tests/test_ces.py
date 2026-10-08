@@ -480,9 +480,7 @@ class TestAutoCESAirPassengers:
 
     def test_selected_seasonality(self):
         assert self.m.seasonality == self.ref["selected_seasonality"], (
-            "Selected:"
-            f" {self.m.seasonality} vs R"
-            f" {self.ref['selected_seasonality']}"
+            f"Selected: {self.m.seasonality} vs R {self.ref['selected_seasonality']}"
         )
 
     def test_model_name(self):
@@ -627,21 +625,29 @@ def test_the_methods_of_adam_agree_with_r(seasonality, initial):
 
 
 @pytest.mark.parametrize(
-    "seasonality, initial", [("partial", "backcasting"), ("full", "optimal")]
+    "seasonality, initial, a",
+    [
+        ("partial", "backcasting", None),
+        ("full", "optimal", None),
+        ("none", "optimal", None),
+        ("simple", "optimal", None),
+        ("full", "optimal", 1.35 + 1.01j),
+    ],
 )
-def test_reapply_agrees_with_r(seasonality, initial):
+def test_reapply_agrees_with_r(seasonality, initial, a):
     """The refits of reapply() on the draws of the parameters: the moments of R's."""
     from tests._r_bridge import r_dict
 
     path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
     y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r_a = "NULL" if a is None else f"complex(real={a.real}, imaginary={a.imag})"
     r = r_dict(
         f"{{set.seed(1); m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
-        f" initial='{initial}'); x <- reapply(m, nsim=2000);"
+        f" initial='{initial}', a={r_a}); x <- reapply(m, nsim=2000);"
         " list(m=as.vector(rowMeans(x$refitted)))}",
         R_data={"y": y},
     )
-    m = CES(seasonality=seasonality, lags=[12], initial=initial).fit(y)
+    m = CES(seasonality=seasonality, lags=[12], initial=initial, a=a).fit(y)
     refitted = np.asarray(m.reapply(nsim=2000, seed=1).refitted)
     np.testing.assert_allclose(refitted.mean(axis=1), r["m"], rtol=2e-3)
 

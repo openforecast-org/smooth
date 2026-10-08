@@ -75,6 +75,41 @@ def eigen_bounds(vec_g, variable_index, **static_args):
     return lower_bound, upper_bound
 
 
+def ces_bounds(params, names, variable_index, vec_g, **static_args):
+    """Stability bounds for a single smoothing parameter of CES.
+
+    Translation of R's ``cesBounds``: the range of the values of a grid on
+    [-5, 5] (and the value itself) at which the model is stable, with the other
+    parameters at their values. As :func:`eigen_bounds`, but each parameter moves
+    both the transition and the persistence, so both are rebuilt from ``params``:
+    each complex (alpha_0, alpha_1) and (beta_0, beta_1) gives a pair of states,
+    after the level and potential for beta, and the real beta of the partial
+    seasonality one. ``static_args`` are those of :func:`eigen_values`.
+    """
+    params = np.asarray(params, dtype=float).copy()
+    real = [i for i, n in enumerate(names) if n.startswith(("alpha_0", "beta_0"))]
+    imaginary = [i for i, n in enumerate(names) if n.startswith(("alpha_1", "beta_1"))]
+    partial = [i for i, n in enumerate(names) if n == "beta" or n.startswith("beta[")]
+    shift = 0 if any(n.startswith("alpha") for n in names) else 2
+    rows = 2 * np.arange(len(real)) + shift
+    transition = np.array(static_args.pop("transition"), dtype=float)
+    g = np.asarray(vec_g, dtype=float).copy()
+
+    def stable(value):
+        params[variable_index] = value
+        transition[rows, rows + 1] = params[imaginary] - 1
+        transition[rows + 1, rows + 1] = 1 - params[real]
+        g[rows] = params[real] - params[imaginary]
+        g[rows + 1] = params[real] + params[imaginary]
+        g[2 : 2 + len(partial)] = params[partial]
+        return not eigen_values(g, transition, **static_args)
+
+    value = params[variable_index]
+    grid = -5 + 0.01 * np.arange(1001)
+    values = [value] + [x for x in grid if stable(x)]
+    return min(values), max(values)
+
+
 def arima_parameter_bounds(names, params, arima, lags):
     """Stationarity / invertibility bounds of the ARMA parameters among ``names``.
 

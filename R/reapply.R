@@ -391,51 +391,10 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
         beta0 <- which(substr(parametersNames,1,6)=="beta_0");
         beta1 <- which(substr(parametersNames,1,6)=="beta_1");
 
-        # Check, if there is alpha_0
-        if(length(alpha0)>0){
-            for(i in 1:length(alpha0)){
-                alphaBounds <- eigenBounds(object, persistence,
-                                           variableNumber=alpha0[i]);
-                randomParameters[randomParameters[,alpha0[i]]<alphaBounds[1],alpha0[i]] <- alphaBounds[1];
-                randomParameters[randomParameters[,alpha0[i]]>alphaBounds[2],alpha0[i]] <- alphaBounds[2];
-            }
-        }
-        # Check, if there is alpha_1
-        if(length(alpha1)>0){
-            for(i in 1:length(alpha1)){
-                alphaBounds <- eigenBounds(object, persistence,
-                                           variableNumber=alpha1[i]);
-                randomParameters[randomParameters[,alpha1[i]]<alphaBounds[1],alpha1[i]] <- alphaBounds[1];
-                randomParameters[randomParameters[,alpha1[i]]>alphaBounds[2],alpha1[i]] <- alphaBounds[2];
-            }
-        }
-        # Check, if there is a unique beta from partial seasonal model
-        betaUnique <- beta[!(beta %in% beta0) & !(beta %in% beta1)];
-        if(length(betaUnique)>0){
-            for(i in 1:length(betaUnique)){
-                alphaBounds <- eigenBounds(object, persistence,
-                                           variableNumber=betaUnique[i]);
-                randomParameters[randomParameters[,betaUnique[i]]<alphaBounds[1],betaUnique[i]] <- alphaBounds[1];
-                randomParameters[randomParameters[,betaUnique[i]]>alphaBounds[2],betaUnique[i]] <- alphaBounds[2];
-            }
-        }
-        # Check, if there is alpha_0
-        if(length(beta0)>0){
-            for(i in 1:length(beta0)){
-                alphaBounds <- eigenBounds(object, persistence,
-                                           variableNumber=beta0[i]);
-                randomParameters[randomParameters[,beta0[i]]<alphaBounds[1],beta0[i]] <- alphaBounds[1];
-                randomParameters[randomParameters[,beta0[i]]>alphaBounds[2],beta0[i]] <- alphaBounds[2];
-            }
-        }
-        # Check, if there is alpha_1
-        if(length(beta1)>0){
-            for(i in 1:length(beta1)){
-                alphaBounds <- eigenBounds(object, persistence,
-                                           variableNumber=beta1[i]);
-                randomParameters[randomParameters[,beta1[i]]<alphaBounds[1],beta1[i]] <- alphaBounds[1];
-                randomParameters[randomParameters[,beta1[i]]>alphaBounds[2],beta1[i]] <- alphaBounds[2];
-            }
+        # The bounds of each smoothing parameter with the others at their values
+        for(i in c(alpha0, alpha1, beta)){
+            parameterBounds <- cesBounds(object, coef(object), i);
+            randomParameters[,i] <- pmin(pmax(randomParameters[,i], parameterBounds[1]), parameterBounds[2]);
         }
     }
 
@@ -546,21 +505,22 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
             }
         }
 
+        # The seasonal states follow the level and potential, also with a provided a
         if(length(beta)>0){
             if(object$seasonality=="partial"){
                 # Partial seasonality with a real part only
                 for(i in 1:nSeasonal){
-                    matG[k+i,] <- randomParameters[,beta[i]];
+                    matG[2+i,] <- randomParameters[,beta[i]];
                 }
                 k[] <- k + nSeasonal;
             }
             else if(object$seasonality=="full"){
                 # Full seasonality with both real and imaginary parts
                 for(i in 1:nSeasonal){
-                    arrF[k+i*2-1,k+i*2,] <- randomParameters[,beta1[i]]-1;
-                    arrF[k+i*2,k+i*2,] <- 1 - randomParameters[,beta0[i]];
-                    matG[k+2*i-1,] <- randomParameters[,beta0[i]] - randomParameters[,beta1[i]];
-                    matG[k+2*i,] <- randomParameters[,beta0[i]] + randomParameters[,beta1[i]];
+                    arrF[2+i*2-1,2+i*2,] <- randomParameters[,beta1[i]]-1;
+                    arrF[2+i*2,2+i*2,] <- 1 - randomParameters[,beta0[i]];
+                    matG[2+2*i-1,] <- randomParameters[,beta0[i]] - randomParameters[,beta1[i]];
+                    matG[2+2*i,] <- randomParameters[,beta0[i]] + randomParameters[,beta1[i]];
                 }
                 k[] <- k + 2*nSeasonal;
             }

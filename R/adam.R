@@ -4409,6 +4409,32 @@ eigenBounds <- function(object, persistence, variableNumber=1){
     return(c(lowerBound, upperBound));
 }
 
+# The bounds of a smoothing parameter of CES with the other parameters at their
+# values: the range of the values of a grid on [-5, 5] (and the value itself) at
+# which the model is stable. As eigenBounds(), but each parameter moves both the
+# transition and the persistence, so both are rebuilt from the parameters: each
+# complex (alpha_0, alpha_1) and (beta_0, beta_1) gives a pair of states, after the
+# level and potential for beta, and the real beta of the partial seasonality one
+cesBounds <- function(object, parameters, variableNumber){
+    parametersNames <- names(parameters);
+    real <- which(grepl("^(alpha|beta)_0", parametersNames));
+    imaginary <- which(grepl("^(alpha|beta)_1", parametersNames));
+    partial <- which(grepl("^beta($|\\[)", parametersNames));
+    rows <- 2*seq_along(real) + 2*!any(startsWith(parametersNames, "alpha"));
+    persistence <- as.matrix(object$persistence);
+    stable <- function(value){
+        parameters[variableNumber] <- value;
+        object$transition[cbind(rows-1, rows)] <- parameters[imaginary]-1;
+        object$transition[cbind(rows, rows)] <- 1-parameters[real];
+        persistence[rows-1,] <- parameters[real]-parameters[imaginary];
+        persistence[rows,] <- parameters[real]+parameters[imaginary];
+        persistence[2+seq_along(partial),] <- parameters[partial];
+        return(!eigenValues(object, persistence));
+    }
+    grid <- -5+0.01*(0:1000);
+    return(range(parameters[variableNumber], grid[vapply(grid, stable, logical(1))]));
+}
+
 # The bounds of the ARMA parameters among parametersNames, each within its factor
 # with the others at their values (src/headers/arimaBounds.h). The parameters of
 # the factors that are not stationary / invertible are left out

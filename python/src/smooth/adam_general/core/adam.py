@@ -5797,16 +5797,17 @@ class ADAM:
             _clip_ets_multiplicative_states(random_parameters, idx, self._model_type)
         _clip_deltas(random_parameters, idx)
 
-        # 3c. The smoothing parameters of CES (R/reapply.R): the eigenvalue bounds
-        # of the persistence rows at their positions in B, as R's eigenBounds()
+        # 3c. The smoothing parameters of CES (R/reapply.R): the bounds of each
+        # with the others at their values, as R's cesBounds()
         ces_model = self._model_type.get("ces_model", False)
         if ces_model:
-            from smooth.adam_general.core.utils.bounds import eigen_bounds
+            from smooth.adam_general.core.utils.bounds import ces_bounds
 
             vec_g_eig = np.asarray(self._adam_created["vec_g"], dtype=float).ravel()
-            static_args = self._eigen_static_args()
             for nm in [n for n in coef_names if n.startswith(("alpha_", "beta"))]:
-                lo, hi = eigen_bounds(vec_g_eig, idx[nm], **static_args)
+                lo, hi = ces_bounds(
+                    coef, coef_names, idx[nm], vec_g_eig, **self._eigen_static_args()
+                )
                 np.clip(
                     random_parameters[:, idx[nm]],
                     lo,
@@ -5913,6 +5914,9 @@ class ADAM:
             pairs = [("alpha_0", "alpha_1"), ("beta_0", "beta_1")]
             row = 0
             for first, second in pairs:
+                # The seasonal states follow the level and potential, also with a
+                # provided a
+                row = 2 if first == "beta_0" else row
                 names0 = [n for n in coef_names if n.startswith(first)]
                 names1 = [n for n in coef_names if n.startswith(second)]
                 for name0, name1 in zip(names0, names1):
@@ -5925,7 +5929,7 @@ class ADAM:
                     row += 2
             betas = [n for n in coef_names if n == "beta" or n.startswith("beta[")]
             for i, name in enumerate(betas):
-                mat_g[row + i, :] = random_parameters[:, idx[name]]
+                mat_g[2 + i, :] = random_parameters[:, idx[name]]
 
         # 5b. ARIMA polynomial fill into arr_f and mat_g (R/reapply.R:554-634).
         # For each parameter draw, call ``polynomialise`` to expand the

@@ -110,9 +110,10 @@ def _adam_refit_one_replicate(
     bind everything else with :func:`functools.partial` and pass the
     integer index as the call site.
     """
+    from smooth.adam_general.core.ces_model import CES as _CES
     from smooth.adam_general.core.om import OM as _OM
 
-    refit_cls = _OM if refit_cls_name == "OM" else ADAM
+    refit_cls = {"OM": _OM, "CES": _CES}.get(refit_cls_name, ADAM)
     y_boot = actuals[idx_matrix[i]]
     try:
         if include_model_kwarg:
@@ -5557,7 +5558,7 @@ class ADAM:
         )
         original_coef_names = list(self.coef_names)
         k = len(original_coef_names)
-        model_spec = self._model_type.get("model", self.model)
+        model_spec = self._model_type.get("model") or self.model
 
         # R's sampler picks variable-length contiguous windows for
         # time-series models. ``size`` is honoured only on the
@@ -5594,7 +5595,12 @@ class ADAM:
         # inherit) use the plain ADAM path.
         from smooth.adam_general.core.om import OM
 
-        if isinstance(self, OM):
+        if self._model_type.get("ces_model", False):
+            # CES is refitted with its own arguments, as R's ces() with its call
+            refit_cls_name = "CES"
+            refit_kwargs = {key: value for key, value in self._config.items()}
+            include_model_kwarg = False
+        elif isinstance(self, OM):
             refit_cls_name = "OM"
             refit_kwargs = {key: value for key, value in self._config.items()}
             include_model_kwarg = False  # already inside ``_config``
@@ -5791,6 +5797,23 @@ class ADAM:
             _clip_ets_multiplicative_states(random_parameters, idx, self._model_type)
         _clip_deltas(random_parameters, idx)
 
+        # 3c. The smoothing parameters of CES (R/reapply.R): the eigenvalue bounds
+        # of the persistence rows at their positions in B, as R's eigenBounds()
+        ces_model = self._model_type.get("ces_model", False)
+        if ces_model:
+            from smooth.adam_general.core.utils.bounds import eigen_bounds
+
+            vec_g_eig = np.asarray(self._adam_created["vec_g"], dtype=float).ravel()
+            static_args = self._eigen_static_args()
+            for nm in [n for n in coef_names if n.startswith(("alpha_", "beta"))]:
+                lo, hi = eigen_bounds(vec_g_eig, idx[nm], **static_args)
+                np.clip(
+                    random_parameters[:, idx[nm]],
+                    lo,
+                    hi,
+                    out=random_parameters[:, idx[nm]],
+                )
+
         # 3b. Stationarity and invertibility of the ARMA factors (R/reapply.R)
         arima_model = self._model_type.get("arima_model", False)
         non_zero_ari = np.atleast_2d(np.asarray(self._arima.get("non_zero_ari", [])))
@@ -5882,6 +5905,27 @@ class ADAM:
                 arr_f[1, 1, :] = phi_vals
                 arr_wt[:, 1, :] = phi_vals[np.newaxis, :]
                 k += 1
+
+        # 5d. The transition and persistence of CES (R/reapply.R): each complex
+        # parameter (alpha_0, alpha_1), and (beta_0, beta_1) of the full seasonality,
+        # gives a pair of states; the real beta of the partial one is a persistence
+        if ces_model:
+            pairs = [("alpha_0", "alpha_1"), ("beta_0", "beta_1")]
+            row = 0
+            for first, second in pairs:
+                names0 = [n for n in coef_names if n.startswith(first)]
+                names1 = [n for n in coef_names if n.startswith(second)]
+                for name0, name1 in zip(names0, names1):
+                    draws0 = random_parameters[:, idx[name0]]
+                    draws1 = random_parameters[:, idx[name1]]
+                    arr_f[row, row + 1, :] = draws1 - 1
+                    arr_f[row + 1, row + 1, :] = 1 - draws0
+                    mat_g[row, :] = draws0 - draws1
+                    mat_g[row + 1, :] = draws0 + draws1
+                    row += 2
+            betas = [n for n in coef_names if n == "beta" or n.startswith("beta[")]
+            for i, name in enumerate(betas):
+                mat_g[row + i, :] = random_parameters[:, idx[name]]
 
         # 5b. ARIMA polynomial fill into arr_f and mat_g (R/reapply.R:554-634).
         # For each parameter draw, call ``polynomialise`` to expand the
@@ -5995,8 +6039,12 @@ class ADAM:
                 ]
             k += len(delta_names)
 
-        # 6. Fill the profile array (R/reapply.R:637-674).
+        # 6. Fill the profile array (R/reapply.R:637-674), from the profile the fit
+        # started from (R's $profileInitial) where it differs from the states
         profiles_recent_array = _build_profiles_array(arr_vt_seed, L, nsim)
+        head = self._simulate_state_head(L)
+        if head is not None:
+            profiles_recent_array[:, :L, :] = np.asarray(head, dtype=float)[:, :L, None]
         j = 0
         if ets_model:
             j += 1
@@ -6032,8 +6080,11 @@ class ADAM:
                         )
                     j += 1
                 k += sum(len(v) for v in groups.values())
-        # The rows after ETS, whichever of its initials were estimated
+        # The rows after ETS, whichever of its initials were estimated; those after
+        # the states of CES, whose initials R does not draw
         j = self._components["components_number_ets"] if ets_model else 0
+        if ces_model:
+            j = self._components["components_number_arima"]
 
         # 6b. ARIMA profile fill (R/reapply.R). The estimated initials (none for
         # backcasting / complete) are held by the last ARIMA state.
@@ -6199,7 +6250,7 @@ class ADAM:
             states=new_states,
             refitted=refitted_df,
             fitted=fitted_series,
-            model=str(self._prepared.get("model", self.model)),
+            model=str(self._prepared.get("model") or self.model),
             transition=arr_f_out,
             measurement=arr_wt_out,
             persistence=persistence_df,

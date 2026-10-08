@@ -27,8 +27,6 @@ from smooth.adam_general.core.checker.data_checks import _fill_missing
 from smooth.adam_general.core.creator.architector import (
     adam_head_length,
 )
-from smooth.adam_general.core.forecaster.forecaster import forecaster
-from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import _sum_r, multistep_log_lik
@@ -53,6 +51,9 @@ _CES_NLOPT_WARNING_SHOWN = False
 # The settings of the two optimisers, as R's ces() takes them in the ellipsis: the
 # first (BOBYQA) with the suffix 0, the second (Nelder-Mead) without
 _NLOPT_DEFAULTS: Dict[str, Any] = {
+    "B": None,
+    "lb": None,
+    "ub": None,
     "algorithm0": "NLOPT_LN_BOBYQA",
     "algorithm": "NLOPT_LN_NELDERMEAD",
     "maxeval0": None,
@@ -184,8 +185,10 @@ class CES:
         The step of the Hessian behind the Fisher Information, as ``ADAM``.
     nlopt_kwargs : dict or None
         The settings of the two optimisers, as ``ADAM``'s ``nlopt_kwargs`` and R's
-        ellipsis of ``ces()``: the first one (``"algorithm0"``, default
-        ``"NLOPT_LN_BOBYQA"``; ``"maxeval0"``, default as ``"maxeval"``;
+        ellipsis of ``ces()``: the starting values and bounds of the parameters
+        (``"B"``, ``"lb"``, ``"ub"``, unbounded by default), the first one
+        (``"algorithm0"``, default ``"NLOPT_LN_BOBYQA"``; ``"maxeval0"``, default as
+        ``"maxeval"``;
         ``"maxtime0"``, ``"xtol_rel0"`` 1e-8, ``"xtol_abs0"``, ``"ftol_rel0"``,
         ``"ftol_abs0"`` 0) and the second one (``"algorithm"``, default
         ``"NLOPT_LN_NELDERMEAD"``; ``"maxeval"``, default 40 per parameter;
@@ -251,6 +254,25 @@ class CES:
                 f"Accepted: {', '.join(_NLOPT_DEFAULTS)}."
             )
         self._nlopt = {**_NLOPT_DEFAULTS, **(nlopt_kwargs or {})}
+        # The arguments of the model, which its refits take, as ADAM's
+        self._config = dict(
+            seasonality=self.seasonality,
+            lags=lags,
+            initial=initial,
+            a=a,
+            b=b,
+            loss=loss,
+            h=h,
+            holdout=holdout,
+            bounds=bounds,
+            ic=ic,
+            verbose=verbose,
+            regressors=regressors,
+            fi=fi,
+            step_size=step_size,
+            nlopt_kwargs=nlopt_kwargs,
+            head_length=head_length,
+        )
 
     def fit(self, y: NDArray, X: Optional[NDArray] = None) -> "CES":
         """
@@ -464,8 +486,13 @@ class CES:
             "CHAM",
         )
 
-        # Two-stage initialization — R lines 750-786
-        B: Optional[NDArray] = None
+        # The provided starting values, else two-stage initialisation — R lines
+        # 750-786
+        B: Optional[NDArray] = (
+            None
+            if nlopt_settings["B"] is None
+            else np.asarray(nlopt_settings["B"], dtype=float)
+        )
         if initial_type == "two-stage" and B is None:
             ces_back = CES(
                 seasonality=self.seasonality,
@@ -571,6 +598,12 @@ class CES:
             "NLOPT_LN_COBYLA": nlopt.LN_COBYLA,
         }
 
+        lower = np.full(len(B), -np.inf)
+        upper = np.full(len(B), np.inf)
+        if nlopt_settings["lb"] is not None:
+            lower = np.asarray(nlopt_settings["lb"], dtype=float)
+        if nlopt_settings["ub"] is not None:
+            upper = np.asarray(nlopt_settings["ub"], dtype=float)
         if len(B) == 0:
             # Nothing left to estimate: `a` (and `b`) supplied together with
             # backcast/complete initials and no xreg leaves an empty parameter
@@ -584,8 +617,8 @@ class CES:
                 algo_map.get(nlopt_settings["algorithm0"], nlopt.LN_BOBYQA), len(B)
             )
             opt1.set_min_objective(objective)
-            opt1.set_lower_bounds(np.full(len(B), -np.inf))
-            opt1.set_upper_bounds(np.full(len(B), np.inf))
+            opt1.set_lower_bounds(lower)
+            opt1.set_upper_bounds(upper)
             opt1.set_maxeval(maxeval0_used)
             opt1.set_xtol_rel(nlopt_settings["xtol_rel0"])
             opt1.set_xtol_abs(nlopt_settings["xtol_abs0"])
@@ -602,8 +635,8 @@ class CES:
                 algo_map.get(nlopt_settings["algorithm"], nlopt.LN_NELDERMEAD), len(B)
             )
             opt2.set_min_objective(objective)
-            opt2.set_lower_bounds(np.full(len(B), -np.inf))
-            opt2.set_upper_bounds(np.full(len(B), np.inf))
+            opt2.set_lower_bounds(lower)
+            opt2.set_upper_bounds(upper)
             opt2.set_maxeval(maxeval_used)
             opt2.set_xtol_rel(nlopt_settings["xtol_rel"])
             opt2.set_xtol_abs(nlopt_settings["xtol_abs"])
@@ -860,15 +893,17 @@ class CES:
             "residuals": pd.Series(np.asarray(errors, dtype=float)),
             "y_fitted": np.asarray(y_fitted, dtype=float).copy(),
             "scale": scale,
+            "model": model_name,
         }
         self._observations = {
             "obs_in_sample": obs_in_sample,
             "y_in_sample": np.asarray(y_in_sample, dtype=float),
             "y_holdout": y_holdout,
-            "y_na_values": y_na_values,
+            "y_na_values": np.asarray(y_na_values, dtype=bool)[:obs_in_sample],
             "ot_logical": ot_logical,
             "y_forecast_start": 1,
             "frequency": y_frequency,
+            "head_length": head_length,
         }
         self._general = {
             "h": h,
@@ -901,6 +936,8 @@ class CES:
             "damped": False,
             "model": model_name,
             "model_do": "estimate",
+            # R's cesChecker(): the branches of the methods of ADAM for CES
+            "ces_model": True,
         }
         self._components = {
             "components_number_ets": 0,
@@ -908,101 +945,20 @@ class CES:
             "components_number_ets_non_seasonal": 0,
             "components_number_arima": components_number,
         }
-        self._explanatory = {"xreg_model": xreg_model, "xreg_number": xreg_number}
+        self._explanatory = {
+            "xreg_model": xreg_model,
+            "xreg_number": xreg_number,
+            "xreg_names": xreg_names,
+            "xreg_data": xreg_data,
+        }
+        self._arima: Dict[str, Any] = {}
+        self._adam_estimated = {"B": self.coef, "other_parameter_estimate": False}
+        self._params_info = self._general["parameters_number"]
         self._constant = {"constant_required": False}
         self._occurrence = {"occurrence_model": False, "occurrence": "none"}
         self._adam_created = {"mat_wt": mat_wt, "mat_f": mat_f, "vec_g": vec_g}
 
         return self
-
-    def predict(
-        self,
-        h: Optional[int] = None,
-        X: Optional[NDArray] = None,
-        interval: Literal[
-            "none",
-            "prediction",
-            "simulated",
-            "approximate",
-            "semiparametric",
-            "nonparametric",
-            "empirical",
-        ] = "none",
-        level: Union[float, List[float]] = 0.95,
-        side: Literal["both", "upper", "lower"] = "both",
-        cumulative: bool = False,
-        nsim: int = 10000,
-        scenarios: bool = False,
-    ) -> ForecastResult:
-        """
-        Generate point forecasts and prediction intervals from the fitted CES model.
-
-        CES is forecast by ADAM's forecaster, as R's ``ces()`` returns an ``adam``
-        object forecast by ``forecast.adam()``. CES is a pure additive model, so
-        ``interval="prediction"`` resolves to the analytical (``"approximate"``)
-        interval with Normal quantiles.
-
-        Parameters
-        ----------
-        h : int or None
-            Forecast horizon. If None, uses the h from fit.
-        X : array-like or None
-            Future exogenous regressors.
-        interval : str, default="none"
-            ``"none"``, ``"prediction"``, ``"approximate"``, ``"simulated"``,
-            ``"semiparametric"``, ``"nonparametric"`` or ``"empirical"``, as in
-            :meth:`ADAM.predict`.
-        level : float or list of float, default=0.95
-            Confidence level(s) for intervals.
-        side : str, default="both"
-            ``"both"``, ``"upper"`` or ``"lower"``.
-        cumulative : bool, default=False
-            If True, forecast the sum over the horizon.
-        nsim : int, default=10000
-            Number of paths for ``interval="simulated"``.
-        scenarios : bool, default=False
-            Keep the simulated paths, as ``ADAM.predict``.
-
-        Returns
-        -------
-        ForecastResult
-            Forecast result with ``.mean``, ``.lower`` and ``.upper``.
-        """
-        if not hasattr(self, "_adam_cpp"):
-            raise RuntimeError("Model has not been fitted yet. Call fit() first.")
-
-        if h is None:
-            h = self._h if self._h > 0 else 1
-        self._general.update(
-            h=int(h),
-            cumulative=cumulative,
-            nsim=nsim,
-            scenarios=scenarios,
-            interval=interval,
-            level=level,
-        )
-
-        new_xreg = None
-        if X is not None and self._xreg_number > 0:
-            new_xreg = np.asarray(X, dtype=np.float64)[:h].reshape(h, -1)
-
-        return forecaster(
-            model_prepared=dict(self._prepared),
-            observations_dict=self._observations,
-            # Updated in place, as ADAM's: the simulated paths are kept there
-            general_dict=self._general,
-            occurrence_dict={"occurrence_model": False, "occurrence": "none"},
-            lags_dict=self._lags_model,
-            model_type_dict=self._model_type,
-            explanatory_checked={**self._explanatory, "new_xreg": new_xreg},
-            components_dict=self._components,
-            constants_checked={"constant_required": False},
-            params_info=self._general["parameters_number"],
-            adam_cpp=self._adam_cpp,
-            interval=interval,
-            level=level,
-            side=side,
-        )
 
     def point_lik(self, log: bool = True) -> NDArray:
         """Per-observation log-likelihood of the fitted model.
@@ -1071,12 +1027,24 @@ class CES:
         return self._profiles_recent_initial
 
     reapply = ADAM.reapply
+    _eigen_static_args = ADAM._eigen_static_args
+    _component_names_for_states = ADAM._component_names_for_states
     reforecast = ADAM.reforecast
     coefbootstrap = ADAM.coefbootstrap
     _variance_debiased = ADAM._variance_debiased
     plot = ADAM.plot
     scale_model = None
     is_combined = False
+    _gnorm_shape = ADAM._gnorm_shape
+    predict = ADAM.predict
+    _set_new_xreg = ADAM._set_new_xreg
+    _validate_prediction_inputs = ADAM._validate_prediction_inputs
+    _execute_prediction = ADAM._execute_prediction
+    _forecast_scale_model = ADAM._forecast_scale_model
+
+    def _prepare_prediction_data(self):
+        """The matrices of CES are prepared by its fit."""
+        return None
 
     def _nobs_observed(self) -> int:
         """The observed values, which the likelihood counts."""

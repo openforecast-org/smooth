@@ -621,3 +621,36 @@ def test_the_methods_of_adam_agree_with_r(seasonality, initial):
             atol=1e-10,
             err_msg=key,
         )
+
+
+@pytest.mark.parametrize(
+    "seasonality, initial", [("partial", "backcasting"), ("full", "optimal")]
+)
+def test_reapply_agrees_with_r(seasonality, initial):
+    """The refits of reapply() on the draws of the parameters: the moments of R's."""
+    from tests._r_bridge import r_dict
+
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r = r_dict(
+        f"{{set.seed(1); m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
+        f" initial='{initial}'); x <- reapply(m, nsim=2000);"
+        " list(m=as.vector(rowMeans(x$refitted)))}",
+        R_data={"y": y},
+    )
+    m = CES(seasonality=seasonality, lags=[12], initial=initial).fit(y)
+    refitted = np.asarray(m.reapply(nsim=2000, seed=1).refitted)
+    np.testing.assert_allclose(refitted.mean(axis=1), r["m"], rtol=2e-3)
+
+
+def test_the_refitting_methods_run_on_ces():
+    """reforecast(), coefbootstrap() and the confidence interval of predict()."""
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    m = CES(seasonality="partial", lags=[12]).fit(y)
+    forecast = m.reforecast(h=6, nsim=50, seed=1)
+    assert np.all(np.isfinite(np.asarray(forecast.mean, dtype=float)))
+    confidence = m.predict(h=6, interval="confidence", nsim=50, seed=1)
+    assert np.all(np.asarray(confidence.lower) <= np.asarray(confidence.upper))
+    boot = m.coefbootstrap(nsim=5, seed=1)
+    assert boot.vcov.shape == (len(m.coef), len(m.coef))

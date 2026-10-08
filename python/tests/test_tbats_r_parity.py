@@ -79,7 +79,7 @@ def test_the_selection_agrees_on_bjsales():
     fit = TBATS().fit(np.asarray(r["y"], dtype=float))
     assert fit.model_name == r["model"][0]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
-    np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
 
 
 def test_the_arma_selection_agrees_on_harmonics_with_an_ar():
@@ -96,8 +96,8 @@ def test_the_arma_selection_agrees_on_harmonics_with_an_ar():
     )
     assert fit.model_name == r["model"][0]
     assert fit.orders["ar"] == [1]
-    assert list(fit.ics) == r["ICnames"]
-    np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
+    assert list(fit.ICs) == r["ICnames"]
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
 
 
@@ -237,8 +237,8 @@ def test_the_fits_with_regressors_agree(case):
     assert fit.coef_names == r["names"]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
-    assert list(fit.ics) == r["ICnames"]
-    np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
+    assert list(fit.ICs) == r["ICnames"]
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
     if fit._forecast is not None:
         np.testing.assert_allclose(fit._forecast, r["forecast"], rtol=1e-10)
 

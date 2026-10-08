@@ -162,7 +162,7 @@ def test_the_distributions_are_fitted(air, distribution):
         assert fit.distribution_ == closest
         named = TBATS(distribution=closest, **arguments).fit(air)
         assert fit.loglik >= named.loglik - 1e-8
-        assert fit.ics[closest] == pytest.approx(fit.aicc)
+        assert fit.ICs[closest] == pytest.approx(fit.aicc)
 
 
 def test_a_provided_shape_is_not_estimated(air):
@@ -236,8 +236,8 @@ def test_the_arma_falls_back_to_none_when_it_does_not_help(air):
         lags=[1, 12], harmonics=[5], trend="additive", distribution="dnorm"
     ).fit(air)
     assert sum(fit.orders["ar"]) + sum(fit.orders["ma"]) == 0
-    assert any("+ARMA" in name for name in fit.ics)
-    assert min(fit.ics.values()) == pytest.approx(fit.aicc)
+    assert any("+ARMA" in name for name in fit.ICs)
+    assert min(fit.ICs.values()) == pytest.approx(fit.aicc)
 
 
 def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
@@ -464,7 +464,7 @@ def test_the_selection_keeps_the_relevant_regressor(xreg_data):
     X = X.assign(noise=np.random.default_rng(7).normal(size=len(y)))
     fit = TBATS(lags=[1, 12], regressors="select", h=12, holdout=True).fit(y, X)
     assert fit._xreg_names == ["x1"]
-    assert any("+X(x1)" in name for name in fit.ics)
+    assert any("+X(x1)" in name for name in fit.ICs)
     np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit._forecast)
 
 

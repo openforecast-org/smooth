@@ -118,7 +118,7 @@ held out:
    model = TBATS(lags=[1, 48, 336], h=336, holdout=True)
    model.fit(y)
    print(model)        # TBATS(lambda, {p,q}, phi, <48,k1>, <336,k2>), AICc ...
-   model.ics           # the information criteria of the candidate models
+   model.ICs           # the information criteria of the candidate models
 
 The name follows De Livera et al. (2011): TBATS(λ, {p,q}, φ, <m₁,k₁>, <m₂,k₂>),
 where λ is the Box-Cox parameter, p and q the AR and MA orders, φ the damping
@@ -197,7 +197,7 @@ The chosen distribution and its information criterion are in the model:
 .. code-block:: python
 
    model.distribution_   # "dnorm", "dlaplace" or "ds"
-   model.ics             # the candidates, then the chosen distribution
+   model.ICs             # the candidates, then the chosen distribution
 
 The two steps after the selection add to the time of the estimation, so a known
 distribution is better specified directly, e.g. ``distribution="dnorm"``. With a

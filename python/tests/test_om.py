@@ -386,8 +386,8 @@ class TestSelection:
     )
     def test_select_picks_min_ic(self, intermittent_y, model, lags, pool):
         m = OM(model=model, occurrence="odds-ratio", lags=lags).fit(intermittent_y)
-        assert set(m.ics) <= pool
-        assert m.model_type == min(m.ics, key=m.ics.get)
+        assert set(m.ICs) <= pool
+        assert m.model_type == min(m.ICs, key=m.ICs.get)
         refit = OM(model=m.model_type, occurrence="odds-ratio", lags=lags)
         assert refit.fit(intermittent_y).loglik == pytest.approx(m.loglik)
 

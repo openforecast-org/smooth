@@ -278,7 +278,7 @@ class TBATS:
         0.5 the S distribution), and the named distribution closest to the estimated
         shape on the log scale is then fitted on the selected structure (from the
         default starting values and from the estimates of ``"dgnorm"``, the higher
-        likelihood kept); its information criterion is added to ``ics``. With a loss
+        likelihood kept); its information criterion is added to ``ICs``. With a loss
         other than the likelihood, ``"auto"`` is ``"dlaplace"`` for ``"MAE"``,
         ``"ds"`` for ``"HAM"`` and ``"dnorm"`` otherwise, as in ``ADAM``. The
         distribution used is ``distribution_``.
@@ -570,7 +570,7 @@ class TBATS:
 
         self._best = best
         self._settings_used = settings
-        self.ics = ics
+        self.ICs = ics
         self.harmonics_ = list(harmonics)
         self.periods_ = periods
         self.trend_type_ = best["trend_type"]
@@ -2021,7 +2021,7 @@ class TBATS:
             "loglik": self.loglik,
             "aicc": self.aicc,
             "scale": self.scale,
-            "ics": self.ics,
+            "ICs": self.ICs,
         }
 
     def __repr__(self) -> str:

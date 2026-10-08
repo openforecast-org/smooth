@@ -65,9 +65,9 @@ def test_om_select_matches_r(model, lags, occurrence):
         np.asarray(r["y"], dtype=float)
     )
     _compare(py, r)
-    if r.get("ICnames") and getattr(py, "ics", None) is not None:
-        assert list(py.ics) == r["ICnames"]
-        np.testing.assert_allclose(list(py.ics.values()), r["ICs"], rtol=1e-12)
+    if r.get("ICnames") and getattr(py, "ICs", None) is not None:
+        assert list(py.ICs) == r["ICnames"]
+        np.testing.assert_allclose(list(py.ICs.values()), r["ICs"], rtol=1e-12)
 
 
 @pytest.mark.parametrize(

@@ -1290,17 +1290,6 @@ class ADAM:
             if self._general is not None:
                 self._general["other"] = self.other
 
-        # Set persistence parameters (pre-estimation values for provided params)
-        if self._persistence:
-            if "persistence_level" in self._persistence:
-                self.persistence_level_ = self._persistence["persistence_level"]
-            if "persistence_trend" in self._persistence:
-                self.persistence_trend_ = self._persistence["persistence_trend"]
-            if "persistence_seasonal" in self._persistence:
-                self.persistence_seasonal_ = self._persistence["persistence_seasonal"]
-            if "persistence_xreg" in self._persistence:
-                self.persistence_xreg_ = self._persistence["persistence_xreg"]
-
         # For combined models, preserve original model specification with ETS prefix;
         # ETSX when any model of the pool has regressors, as R
         if getattr(self, "_is_combined", False):
@@ -1437,40 +1426,60 @@ class ADAM:
         return self._prepared["states"]
 
     @property
-    def persistence_vector(self) -> Dict[str, Any]:
+    def persistence_vector(self) -> Dict[str, float]:
         """
-        Estimated smoothing parameters (R: $persistence).
-
-        Returns a dictionary containing the smoothing/persistence parameters
-        that control how quickly the model adapts to new observations. Higher
-        values mean faster adaptation (more weight on recent observations).
+        The smoothing parameters, estimated or provided (R: $persistence).
 
         Returns
         -------
-        Dict[str, Any]
-            Dictionary with keys ``persistence_level`` (alpha, 0-1),
-            ``persistence_trend`` (beta, 0-alpha, only if model has trend),
-            and ``persistence_seasonal`` (gamma, 0 to 1-alpha, only if model
-            has seasonality).
-
-        Raises
-        ------
-        ValueError
-            If the model has not been fitted yet.
-
-        See Also
-        --------
-        phi_ : Damping parameter for trend
+        Dict[str, float]
+            The elements of the persistence vector under R's names: ``alpha``,
+            ``beta`` for the trend, ``gamma`` (``gamma1``, ...) for the
+            seasonal components, ``psi`` (``psi1``, ...) for the ARIMA states and
+            ``delta1``, ... for the regressors, with the parts the model has.
 
         Examples
         --------
         >>> model = ADAM(model="AAA", lags=12)
         >>> model.fit(y)
-        >>> alpha = model.persistence_vector['persistence_level']
-        >>> gamma = model.persistence_vector['persistence_seasonal']
+        >>> alpha = model.persistence_vector["alpha"]
         """
         self._check_is_fitted()
-        return self._prepared.get("persistence", {})
+        persistence = self._prepared.get("persistence")
+        if isinstance(persistence, dict):
+            return {name: float(value) for name, value in persistence.items()}
+        values = np.ravel(np.asarray(persistence if persistence is not None else []))
+        components = self._components
+
+        def numbered(name: str, n: int) -> List[str]:
+            return [name] if n == 1 else [f"{name}{i}" for i in range(1, n + 1)]
+
+        names = ["alpha", "beta"][: components["components_number_ets_non_seasonal"]]
+        names += numbered("gamma", components["components_number_ets_seasonal"])
+        names += numbered("psi", components.get("components_number_arima", 0))
+        names += [f"delta{i}" for i in range(1, len(values) - len(names) + 1)]
+        return dict(zip(names, values.astype(float).tolist()))
+
+    @property
+    def persistence_level_(self) -> Optional[float]:
+        """The smoothing parameter of the level, alpha, or None."""
+        return self.persistence_vector.get("alpha")
+
+    @property
+    def persistence_trend_(self) -> Optional[float]:
+        """The smoothing parameter of the trend, beta, or None."""
+        return self.persistence_vector.get("beta")
+
+    @property
+    def persistence_seasonal_(self) -> List[float]:
+        """The smoothing parameters of the seasonal components, gamma."""
+        return [v for k, v in self.persistence_vector.items() if k[:5] == "gamma"]
+
+    @property
+    def persistence_xreg_(self) -> Optional[List[float]]:
+        """The smoothing parameters of the regressors, delta, or None."""
+        deltas = [v for k, v in self.persistence_vector.items() if k[:5] == "delta"]
+        return deltas or None
 
     @property
     def phi_(self) -> Optional[float]:

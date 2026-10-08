@@ -64,18 +64,18 @@ class TestSMAFit:
 
     def test_ics_present_when_auto(self, y60):
         m = SMA().fit(y60)
-        assert hasattr(m, "ICs_")
-        assert isinstance(m.ICs_, dict)
-        assert len(m.ICs_) > 0
+        assert hasattr(m, "ICs")
+        assert isinstance(m.ICs, dict)
+        assert len(m.ICs) > 0
 
     def test_ics_absent_when_fixed(self, y60):
         m = SMA(order=3).fit(y60)
-        assert not hasattr(m, "ICs_")
+        assert not hasattr(m, "ICs")
 
     def test_fast_false_auto(self, y60):
         m = SMA(fast=False).fit(y60)
         assert m.model.startswith("SMA(")
-        assert hasattr(m, "ICs_")
+        assert hasattr(m, "ICs")
 
     def test_order_too_large_raises(self, y60):
         with pytest.raises((ValueError, RuntimeError, Exception)):
@@ -83,12 +83,12 @@ class TestSMAFit:
 
     def test_ics_keys_are_integers(self, y60):
         m = SMA().fit(y60)
-        assert all(isinstance(k, int) for k in m.ICs_.keys())
+        assert all(isinstance(k, int) for k in m.ICs.keys())
 
     def test_ics_selected_order_is_best(self, y60):
         m = SMA(fast=False).fit(y60)
         selected = int(m.model.split("(")[1].rstrip(")"))
-        best_key = min(m.ICs_, key=m.ICs_.get)
+        best_key = min(m.ICs, key=m.ICs.get)
         assert selected == best_key
 
     def test_ic_choices(self, y60):

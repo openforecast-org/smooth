@@ -61,7 +61,7 @@ Automatically selected order:
    model = SMA(h=5)          # order=None → auto-select
    model.fit(y)
    print(model.model)        # e.g. "SMA(3)"
-   print(model.ICs_)         # {1: ic_1, 2: ic_2, ...} for evaluated orders
+   print(model.ICs)         # {1: ic_1, 2: ic_2, ...} for evaluated orders
 
 With holdout for validation:
 
@@ -86,7 +86,7 @@ When ``order`` is ``None``, ``SMA`` searches over orders
 - ``fast=False`` — **sequential scan** of every candidate order. Slower but
   guaranteed to find the global minimum within the search range.
 
-The IC values from the search are stored on the fitted object as ``ICs_``
+The IC values from the search are stored on the fitted object as ``ICs``
 (a dict keyed by order).
 
 References

@@ -1435,15 +1435,6 @@ class OM(ADAM):
         )
 
     def _set_om_fitted_attributes(self):
-        # Persistence trailing-underscore attrs (alpha/beta/gamma)
-        persistence = self._prepared.get("persistence", {}) or {}
-        if "alpha" in persistence:
-            self.persistence_level_ = persistence["alpha"]
-        if "beta" in persistence:
-            self.persistence_trend_ = persistence["beta"]
-        if "gamma" in persistence:
-            self.persistence_seasonal_ = persistence["gamma"]
-
         # Build the model name in oETS(...)[X] form
         e = self._model_type.get("error_type", "")
         t = self._model_type.get("trend_type", "")

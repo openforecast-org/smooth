@@ -56,7 +56,7 @@ a name is added or changed.
 | `es()` | `ES` | subclass of `ADAM` |
 | `msarima()` / `auto.msarima()` | `MSARIMA` / `AutoMSARIMA` | subclasses of `ADAM` |
 | `sma()` | `SMA` | subclass of `ADAM` |
-| `ces()` / `auto.ces()` | `CES` / `AutoCES` | standalone; `AutoCES.fit()` returns the selected `CES` |
+| `ces()` / `auto.ces()` | `CES` / `AutoCES` | own fit, `ADAM`'s methods (it keeps `ADAM`'s internal dicts and hooks, as R's `ces()` returns an `adam`); `AutoCES.fit()` returns the selected `CES` |
 | `om()` / `omg()` / `auto.om()` | `OM` / `OMG` / `AutoOM` | `OM` subclasses `ADAM`; `AutoOM.fit()` returns the selected `OM`/`OMG` |
 | `tbats()` | `TBATS` | standalone, reuses `ADAM`'s forecaster and diagnostics |
 | `sm()` + `implant()` | `sm()` / `model.sm()`, `model.scale_model = ...` | |

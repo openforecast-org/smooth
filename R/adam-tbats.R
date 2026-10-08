@@ -1541,8 +1541,10 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
 
     # The identified initials are counted whether they are optimised, backcast or solved
     nInitials <- 1 + struct$trendIn + 2*struct$nHarmonics + struct$armaLagMax;
-    nParamEstimated <- length(B)*(checked$modelDo=="estimate") + 1 + nInitials*initialsProfiled +
-        struct$nXreg*!xregEstimate;
+    # A reused model provides all of them but the scale, as in adam()
+    nParamModel <- length(B) + nInitials*initialsProfiled + struct$nXreg*!xregEstimate;
+    reused <- checked$modelDo=="use";
+    nParamEstimated <- 1 + nParamModel*!reused;
     # The likelihood of the occurrence model is added, as its parameters are
     logLikValue <- -lossValue(B, "likelihood") + occurrenceSpec$logLik;
 
@@ -1562,9 +1564,10 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                                        fitted$profile, checked$h)$forecast;
     }
 
-    return(list(B=B, BFull=BFull(B), nParamProvided=provided$number, initialProvided=provided$initial,
+    return(list(B=B, BFull=BFull(B), nParamProvided=provided$number+nParamModel*reused,
+                initialProvided=provided$initial,
                 res=res, lossValue=lossFinal,
-                logLik=structure(logLikValue, nobs=sum(!is.na(y)), df=nParamEstimated+occurrenceSpec$nParam,
+                logLik=structure(logLikValue, nobs=sum(!is.na(y)), df=nParamEstimated+occurrenceSpec$nParam*!reused,
                                  class="logLik"),
                 nParamEstimated=nParamEstimated, nInitials=nInitials*initialsProfiled,
                 struct=struct, armaSpec=armaSpec, elements=elements, fitted=fitted, states=states,
@@ -1693,10 +1696,11 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                                       c("nParamInternal","nParamXreg","nParamOccurrence",
                                                         "nParamScale","nParamAll")));
     parametersNumber[1,1] <- best$nParamEstimated - 1;
-    parametersNumber[1,3] <- occurrenceSpec$nParam;
+    parametersNumber[1,3] <- occurrenceSpec$nParam*(checked$modelDo=="estimate");
     parametersNumber[1,4] <- 1;
     parametersNumber[1,5] <- sum(parametersNumber[1,1:4]);
-    parametersNumber[2,1] <- length(best$B)*(checked$modelDo=="use") + best$nParamProvided;
+    parametersNumber[2,1] <- best$nParamProvided;
+    parametersNumber[2,3] <- occurrenceSpec$nParam*(checked$modelDo=="use");
     parametersNumber[2,5] <- sum(parametersNumber[2,1:4]);
 
     yInSample <- replace(checked$yInSample, is.na(best$y), NA);

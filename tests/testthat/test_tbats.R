@@ -560,7 +560,11 @@ test_that("the provided values are fixed and the rest estimated", {
     expect_false(any(c("alpha","phi","gamma1[12]","gamma2[12]","level") %in% names(model$B)));
     expect_true(all(c("beta","trend","sin1[12]") %in% names(model$B)));
     # The model reused keeps them
-    expect_equal(as.numeric(logLik(tbats(AirPassengers, model=model))), as.numeric(logLik(model)));
+    modelReused <- tbats(AirPassengers, model=model);
+    expect_equal(as.numeric(logLik(modelReused)), as.numeric(logLik(model)));
+    # All of its parameters but the scale are provided, as in adam()
+    expect_equal(nparam(modelReused), 1);
+    expect_equal(modelReused$nParam[2,5], nparam(model)-1+model$nParam[2,5]);
 })
 
 test_that("the provided values that need a selected structure are estimated with a warning", {

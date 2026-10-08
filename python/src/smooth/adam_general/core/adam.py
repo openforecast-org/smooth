@@ -463,7 +463,6 @@ class ADAM:
     - ``persistence_trend_``: Trend smoothing parameter (β)
     - ``persistence_seasonal_``: Seasonal smoothing parameter(s) (γ)
     - ``phi_``: Damping parameter (φ)
-    - ``initial_states_``: Estimated initial states
     - ``arma_parameters_``: AR/MA coefficients (if ARIMA)
 
     Additional fitted attributes:
@@ -944,7 +943,6 @@ class ADAM:
             - ``persistence_seasonal_``: γ (seasonal smoothing), list if multiple
             - ``phi_``: Damping parameter, range [0, 1]
             - ``arma_parameters_``: AR/MA coefficients (if ARIMA)
-            - ``initial_states_``: Initial state values
 
             **Model Components** (via properties):
 

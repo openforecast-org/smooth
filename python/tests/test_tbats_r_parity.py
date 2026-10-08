@@ -104,6 +104,21 @@ def test_the_fits_agree_on_air_passengers(case):
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
 
 
+@pytest.mark.parametrize("case", ["damped-arma", "provided-list", "additive"])
+def test_the_arma_parameters_agree(case):
+    r_arguments, python_arguments = CASES[case]
+    r = _r_fit(
+        "AirPassengers",
+        r_arguments,
+        ", arma=names(unlist(m$arma)), armaValues=unname(unlist(m$arma))",
+    )
+    fit = TBATS(lags=[1, 12], **python_arguments).fit(np.asarray(r["y"], dtype=float))
+    parts = fit.arma_parameters_ or {}
+    assert [f"{k}.{n}" for k in parts for n in parts[k]] == (r.get("arma") or [])
+    values = [v for k in parts for v in parts[k].values()]
+    np.testing.assert_allclose(values, r.get("armaValues") or [], rtol=1e-6)
+
+
 def test_the_selection_agrees_on_bjsales():
     r = _r_fit("BJsales", "", ", ICs=unname(m$ICs)")
     fit = TBATS().fit(np.asarray(r["y"], dtype=float))

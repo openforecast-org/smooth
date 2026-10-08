@@ -998,6 +998,17 @@ class TBATS:
         )
 
     @property
+    def arma_parameters_(self) -> Optional[Dict[str, Dict[str, float]]]:
+        """The AR and MA parameters, estimated or provided, as ADAM's (R's
+        ``$arma``): the parts the model has, or None without ARMA."""
+        self._check_fitted()
+        result: Dict[str, Dict[str, float]] = {}
+        for name in self._best["spec"]["names"]:
+            kind = "ar" if name.startswith("phi") else "ma"
+            result.setdefault(kind, {})[name] = float(self._best["B_full"][name])
+        return {kind: result[kind] for kind in ("ar", "ma") if kind in result} or None
+
+    @property
     def scale(self) -> float:
         """sigma^2 for dnorm, s for the other distributions."""
         self._check_fitted()

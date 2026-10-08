@@ -1745,7 +1745,8 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
     if(armaSpec$nParam>0){
         arPart <- best$BFull[grepl("^phi[0-9]", names(best$BFull))];
         maPart <- best$BFull[grepl("^theta", names(best$BFull))];
-        arma <- list(ar=if(length(arPart)>0) arPart, ma=if(length(maPart)>0) maPart);
+        # Only the parts the model has, as in adam()
+        arma <- Filter(length, list(ar=arPart, ma=maPart));
     }
     other <- if(best$distribution=="dgnorm") list(shape=best$elements$shape) else list();
 

@@ -1510,6 +1510,36 @@ class ADAM:
         return None
 
     @property
+    def arma_parameters_(self) -> Optional[Dict[str, Dict[str, float]]]:
+        """
+        The AR and MA parameters, estimated or provided (R: $arma).
+
+        Returns
+        -------
+        Optional[Dict[str, Dict[str, float]]]
+            ``{"ar": {"phi1[1]": ...}, "ma": {"theta1[1]": ...}}`` with the parts
+            the model has, or None without ARIMA.
+        """
+        self._check_is_fitted()
+        arima = self._arima or {}
+        if not arima.get("arima_model"):
+            return None
+        lags = self._lags_model.get("lags", [1]) or [1]
+        # The provided ones come lag by lag, the AR of the lag and then its MA
+        names = []
+        for lag, p, q in zip(lags, arima["ar_orders"], arima["ma_orders"]):
+            names += [f"phi{k}[{lag}]" for k in range(1, p + 1)]
+            names += [f"theta{k}[{lag}]" for k in range(1, q + 1)]
+        estimated = dict(zip(self.coef_names, self.coef))
+        provided = iter(arima.get("arma_parameters") or [])
+        result: Dict[str, Dict[str, float]] = {}
+        for name in names:
+            kind = "ar" if name.startswith("phi") else "ma"
+            value = estimated[name] if arima[f"{kind}_estimate"] else next(provided)
+            result.setdefault(kind, {})[name] = float(value)
+        return {kind: result[kind] for kind in ("ar", "ma") if kind in result} or None
+
+    @property
     def transition(self) -> NDArray:
         """
         State transition matrix F (R: $transition).

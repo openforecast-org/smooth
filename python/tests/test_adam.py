@@ -1352,3 +1352,37 @@ def test_adam_uses_the_filled_values_only_for_the_initialisation():
     # The multistep loss is over the windows with all their targets observed
     assert np.isfinite(ADAM(model="ANN", loss="TMSE", h=6).fit(y).loss_value)
     assert not np.all(np.isnan(model.rstudent()))
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize(
+    "arma_r, arma",
+    [("NULL", None), ("list(ma=c(0.5, 0.2))", {"ma": [0.5, 0.2]})],
+)
+def test_arma_parameters_are_those_of_r(arma_r, arma):
+    """``arma_parameters_`` is R's ``$arma``: the estimated and provided parts."""
+    import pathlib
+
+    import pandas as pd
+
+    from ._r_bridge import r_dict
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = np.log(pd.read_csv(path)["y"].values.astype(float))
+    expected = r_dict(
+        "{m <- adam(ts(y, frequency=12), 'NNN', orders=list(ar=c(0,1), i=c(1,1),"
+        f" ma=c(2,0)), lags=c(1,12), arma={arma_r});"
+        " list(names=names(unlist(m$arma)), values=unname(unlist(m$arma)))}",
+        R_data={"y": y},
+    )
+    model = ADAM(
+        model="NNN",
+        orders={"ar": [0, 1], "i": [1, 1], "ma": [2, 0]},
+        lags=[1, 12],
+        arma=arma,
+    ).fit(y)
+    parts = model.arma_parameters_
+    names = [f"{kind}.{name}" for kind in parts for name in parts[kind]]
+    values = [value for kind in parts for value in parts[kind].values()]
+    assert names == expected["names"]
+    np.testing.assert_allclose(values, expected["values"], rtol=1e-6)

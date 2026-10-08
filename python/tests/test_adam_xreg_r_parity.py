@@ -98,3 +98,20 @@ def test_the_outliers_agree(model, outliers):
         warnings.simplefilter("error")
         forecast = fit.predict(h=12).mean
     np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-8)
+
+
+def test_a_regressor_named_as_a_dummy_is_renamed():
+    """A regressor named outlier1 becomes x.outlier1, with a warning, as in R."""
+    r = r_dict(
+        "{ y <- AirPassengers; y[c(30, 140)] <- y[c(30, 140)]*1.4; set.seed(1);"
+        " d <- data.frame(y=as.numeric(y), outlier1=rnorm(144));"
+        " m <- suppressWarnings(adam(d, 'MAM', lags=12, outliers='use'));"
+        " list(y=d$y, x=d$outlier1, names=names(coef(m)), B=unname(coef(m))) }"
+    )
+    X = pd.DataFrame({"outlier1": r["x"]})
+    with pytest.warns(UserWarning, match="Renaming them to x.outlier1"):
+        fit = ADAM(model="MAM", lags=[12], outliers="use").fit(
+            np.asarray(r["y"], dtype=float), X
+        )
+    assert fit.coef_names == r["names"]
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)

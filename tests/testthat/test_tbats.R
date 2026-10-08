@@ -619,3 +619,17 @@ test_that("the dummies of the outliers are zero in the forecasts", {
                                   dimnames=list(NULL, names(testModel$initial$xreg))));
     expect_equal(testForecast$mean, forecast(testModel, h=12, newdata=zeros)$mean);
 })
+
+# A regressor named as a dummy of the outliers is renamed with a warning, with outliers only
+test_that("a regressor named as a dummy of the outliers is renamed", {
+    y <- AirPassengers;
+    y[c(30, 140)] <- y[c(30, 140)]*1.4;
+    x <- rnorm(144);
+    expect_warning(testModel <- tbats(y, outliers="use", xreg=cbind(outlier1=x)), "x.outlier1");
+    expect_true("x.outlier1" %in% testModel$xregNames);
+    d <- data.frame(y=as.numeric(y), outlier1=x);
+    expect_warning(testModel <- adam(d, "MAM", lags=12, outliers="use", formula=y~outlier1), "x.outlier1");
+    expect_true("x.outlier1" %in% names(coef(testModel)));
+    expect_no_warning(testModel <- adam(d, "MAM", lags=12));
+    expect_true("outlier1" %in% names(coef(testModel)));
+})

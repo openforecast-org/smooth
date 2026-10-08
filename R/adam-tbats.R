@@ -357,6 +357,18 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     yInSample <- as.vector(checked$yInSample);
     yInSample[checked$yNAValues[seq_along(yInSample)]] <- NA;
     xregSpec <- tbats_xreg(xreg, length(yInSample), checked$h, regressors);
+    # The regressors with the names of the dummies of the outliers are renamed
+    clashes <- grep(adam_outlierPattern, xregSpec$names, value=TRUE);
+    if(outliers!="ignore" && length(clashes)>0){
+        warning(paste0("The names of the regressors ", paste(clashes, collapse=", "),
+                       " are those of the dummies of the outliers. Renaming them to ",
+                       paste0("x.", clashes, collapse=", "), "."), call.=FALSE);
+        xregSpec$names[xregSpec$names %in% clashes] <- paste0("x.", xregSpec$names[xregSpec$names %in% clashes]);
+        colnames(xregSpec$data) <- xregSpec$names;
+        if(!is.null(xregSpec$future)){
+            colnames(xregSpec$future) <- xregSpec$names;
+        }
+    }
     yInSample[xregSpec$missing] <- NA;
     occurrenceSpec <- tbats_occurrence(occurrence, yInSample, checked$loss);
     # Under a name of its own: checked has occurrence elements of adam(), which $ matches

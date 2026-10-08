@@ -5919,12 +5919,15 @@ adam_forecastRegression <- function(object, h, newdata, occurrence, interval, le
 # The future values of the explanatory variables of an adam model for h steps ahead,
 # as a matrix with a column per variable: newdata, else the holdout, else the
 # variables forecast by adam() (adam_xregForecast) with a warning
+# The names of the dummies of the outliers: outlier1, outlier1Lag1, outlier1Lead1, ...
+adam_outlierPattern <- "^outlier[0-9]+(Lag1|Lead1)?$";
+
 adam_xregNewdata <- function(object, h, newdata){
     xregNumber <- length(object$initial$xreg);
     xregNames <- names(object$initial$xreg);
     # The dummies of the outliers (outlier1, outlier1Lag1, outlier1Lead1, ...) are zero in
     # the future: they are not forecast, and are added to newdata when it lacks them
-    outlierNames <- grep("^outlier[0-9]+(Lag1|Lead1)?$", xregNames, value=TRUE);
+    outlierNames <- grep(adam_outlierPattern, xregNames, value=TRUE);
     # The newdata is not provided
     if(is.null(newdata) && ((!is.null(object$holdout) && nrow(object$holdout)<h) ||
                             is.null(object$holdout))){

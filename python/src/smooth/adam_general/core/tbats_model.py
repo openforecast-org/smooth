@@ -501,6 +501,17 @@ class TBATS:
         # The outliers make the regressors used or selected, as in R's auto.adam()
         regressors = self.regressors if self.outliers == "ignore" else self.outliers
         xreg = st.xreg_spec(X, obs_in_sample, h, regressors)
+        # The regressors with the names of the dummies of the outliers are renamed
+        if self.outliers != "ignore" and xreg is not None:
+            clashes = [n for n in xreg["names"] if OUTLIER_NAMES.match(n)]
+            if clashes:
+                warnings.warn(
+                    f"The names of the regressors {', '.join(clashes)} are those of "
+                    "the dummies of the outliers. Renaming them to "
+                    f"{', '.join('x.' + c for c in clashes)}.",
+                    stacklevel=2,
+                )
+                xreg["names"] = [f"x.{n}" if n in clashes else n for n in xreg["names"]]
         if xreg is not None:
             y_in_sample = np.where(xreg["missing"], np.nan, y_in_sample)
 

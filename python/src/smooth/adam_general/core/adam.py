@@ -1086,6 +1086,17 @@ class ADAM:
         # The model as specified: the refit with the dummies of the outliers selects
         # it again, as R's auto.adam() re-evaluates its call
         model_spec = self.model
+        # The regressors with the names of the dummies of the outliers are renamed
+        if self.outliers != "ignore" and isinstance(X, pd.DataFrame):
+            clashes = [str(c) for c in X.columns if OUTLIER_NAMES.match(str(c))]
+            if clashes:
+                warnings.warn(
+                    f"The names of the regressors {', '.join(clashes)} are those of "
+                    "the dummies of the outliers. Renaming them to "
+                    f"{', '.join('x.' + c for c in clashes)}.",
+                    stacklevel=2,
+                )
+                X = X.rename(columns={c: f"x.{c}" for c in clashes})
 
         # Check parameters and prepare data
         self._check_parameters(y, X)

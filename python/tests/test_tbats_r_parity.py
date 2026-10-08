@@ -409,6 +409,22 @@ def test_the_fits_with_outliers_agree(case):
         np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-8)
 
 
+
+def test_a_regressor_named_as_a_dummy_is_renamed():
+    """A regressor named outlier1 becomes x.outlier1, with a warning, as in R."""
+    r = r_dict(
+        f"{{ {OUTLIERS_DATA} m <- suppressWarnings(tbats(y, outliers='use',"
+        " xreg=cbind(outlier1=xo[, 1]))); list(y=as.numeric(y), x=xo[, 1],"
+        " xregNames=m$xregNames, B=unname(m$B)) }"
+    )
+    X = pd.DataFrame({"outlier1": r["x"]})
+    with pytest.warns(UserWarning, match="Renaming them to x.outlier1"):
+        fit = TBATS(lags=[1, 12], outliers="use").fit(
+            np.asarray(r["y"], dtype=float), X
+        )
+    assert fit._xreg_names == r["xregNames"]
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+
 INTERMITTENT = (
     "set.seed(7); y <- ts(exp(2 + 0.4*sin(2*pi*(1:300)/7) + rnorm(300, 0, 0.3))*"
     "rbinom(300, 1, 0.7), frequency=7);"

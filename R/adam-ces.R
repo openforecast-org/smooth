@@ -430,8 +430,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         if(seasonality=="full"){
             rownames(matVt)[1:2] <- c("level", "potential")
             if(nSeasonal>1){
-                rownames(matVt)[-c(1:2)] <- c(paste0(rep(c("seasonal 1", "seasonal 2"),nSeasonal),"[",
-                                                     rep(lagsModelSeasonal,each=2),"]"), xregNames);
+                rownames(matVt)[-c(1:2)] <- c(paste0(rep(c("seasonal", "seasonalPotential"),nSeasonal),
+                                                     rep(1:nSeasonal,each=2)), xregNames);
                 matVt[1,1:lagsModelMax] <- mean(yInSample[1:lagsModelMax]);
                 matVt[2,1:lagsModelMax] <- matVt[1,1:lagsModelMax]/1.1;
                 for(i in 1:nSeasonal){
@@ -444,7 +444,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
             else{
                 matF[4,3] <- 1;
                 matWt[,4] <- 0;
-                rownames(matVt) <- c("level", "potential", "seasonal 1", "seasonal 2", xregNames);
+                rownames(matVt) <- c("level", "potential", "seasonal", "seasonalPotential", xregNames);
                 matVt[1,1:lagsModelMax] <- mean(yInSample[1:lagsModelMax]);
                 matVt[2,1:lagsModelMax] <- matVt[1,1:lagsModelMax]/1.1;
                 matVt[3,1:lagsModelMax] <- yDecomposedSeasonal[[1]][1:lagsModelMax];
@@ -454,8 +454,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         else if(seasonality=="partial"){
             rownames(matVt)[1:2] <- c("level", "potential")
             if(nSeasonal>1){
-                rownames(matVt)[-c(1:2)] <- c(paste0(rep(c("seasonal"),nSeasonal),"[",
-                                                     lagsModelSeasonal,"]"), xregNames);
+                rownames(matVt)[-c(1:2)] <- c(paste0("seasonal", 1:nSeasonal), xregNames);
                 matVt[1,1:lagsModelMax] <- mean(yInSample[1:lagsModelMax]);
                 matVt[2,1:lagsModelMax] <- matVt[1,1:lagsModelMax]/1.1;
                 for(i in 1:nSeasonal){
@@ -471,8 +470,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         }
         else if(seasonality=="simple"){
             if(nSeasonal>1){
-                rownames(matVt) <- c(paste0(rep(c("level.s", "potential.s"),nSeasonal),"[",
-                                            rep(lagsModelSeasonal,each=2),"]"), xregNames);
+                rownames(matVt) <- c(paste0(rep(c("seasonal", "seasonalPotential"),nSeasonal),
+                                            rep(1:nSeasonal,each=2)), xregNames);
                 matVt[(1:nSeasonal)*2-1,1:lagsModelMax] <- yInSample[1:lagsModelMax];
                 matVt[(1:nSeasonal)*2,1:lagsModelMax] <- matVt[(1:nSeasonal)*2-1,1:lagsModelMax]/1.1;
                 for(i in 1:nSeasonal){
@@ -481,7 +480,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                 }
             }
             else{
-                rownames(matVt) <- c("level.s", "potential.s", xregNames);
+                rownames(matVt) <- c("seasonal", "seasonalPotential", xregNames);
                 matVt[1,1:lagsModelMax] <- yInSample[1:lagsModelMax];
                 matVt[2,1:lagsModelMax] <- matVt[1,1:lagsModelMax]/1.1;
             }

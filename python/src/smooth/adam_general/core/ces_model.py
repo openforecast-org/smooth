@@ -537,6 +537,7 @@ class CES:
             xreg_model=xreg_model,
             xreg_number=xreg_number,
             xreg_names=xreg_names,
+            row_names=created["row_names"],
         )
         if B is None:
             B = B_initial
@@ -853,6 +854,7 @@ class CES:
             )
         self.time_elapsed_ = time.time() - start_time
         self._b_names = b_names
+        self._state_names = list(created["row_names"])
         self._y_actuals = y_actuals
         self._lags = lags
         self._obs_observed = obs_observed
@@ -1028,7 +1030,11 @@ class CES:
 
     reapply = ADAM.reapply
     _eigen_static_args = ADAM._eigen_static_args
-    _component_names_for_states = ADAM._component_names_for_states
+
+    def _component_names_for_states(self) -> list:
+        """The names of the states, as R's ces()."""
+        return list(self._state_names)
+
     reforecast = ADAM.reforecast
     coefbootstrap = ADAM.coefbootstrap
     _variance_debiased = ADAM._variance_debiased

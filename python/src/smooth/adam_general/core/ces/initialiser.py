@@ -21,6 +21,7 @@ def ces_initialiser(
     xreg_model=False,
     xreg_number=0,
     xreg_names=None,
+    row_names=None,
 ):
     """
     Create initial parameter vector B for CES optimization.
@@ -49,6 +50,9 @@ def ces_initialiser(
         Whether exogenous regressors are present.
     xreg_number : int
         Number of regressors.
+    row_names : list of str, optional
+        The names of the states (the rows of ``mat_vt``), which name the seasonal
+        initials, as R.
     xreg_names : list of str, optional
         Names of xreg variables.
 
@@ -107,17 +111,9 @@ def ces_initialiser(
         # The seasonal states, column by column as in R's matVt, named after the
         # state and the position in the lag, as R
         if seasonality != "none":
-            states = {
-                "simple": ["level.s", "potential.s"],
-                "partial": ["seasonal"],
-                "full": ["seasonal 1", "seasonal 2"],
-            }[seasonality]
-            rows = [
-                name if n_seasonal == 1 else f"{name}[{lag}]"
-                for lag in lags_model_seasonal
-                for name in states
-            ]
             first = 0 if seasonality == "simple" else 2
+            n_rows = n_seasonal * (1 if seasonality == "partial" else 2)
+            rows = row_names[first : first + n_rows]
             for col in range(lags_model_max):
                 for i, row in enumerate(rows):
                     B.append(mat_vt[first + i, col])

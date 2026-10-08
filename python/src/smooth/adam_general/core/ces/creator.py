@@ -122,8 +122,8 @@ def ces_creator(
         row_names[1] = "potential"
         if n_seasonal > 1:
             for i in range(n_seasonal):
-                row_names[2 + 2 * i] = f"seasonal 1[{lags_model_seasonal[i]}]"
-                row_names[2 + 2 * i + 1] = f"seasonal 2[{lags_model_seasonal[i]}]"
+                row_names[2 + 2 * i] = f"seasonal{i + 1}"
+                row_names[2 + 2 * i + 1] = f"seasonalPotential{i + 1}"
             # R: matVt[1,1:lagsModelMax] <- mean(yInSample[1:lagsModelMax])
             level_init = _mean_r(y_in_sample[:lags_model_max])
             mat_vt[0, :lags_model_max] = level_init
@@ -141,7 +141,7 @@ def ces_creator(
             # Single seasonal — R lines 418-426
             mat_f[3, 2] = 1  # R: matF[4,3] <- 1
             mat_wt[:, 3] = 0  # R: matWt[,4] <- 0
-            row_names = ["level", "potential", "seasonal 1", "seasonal 2"]
+            row_names = ["level", "potential", "seasonal", "seasonalPotential"]
             level_init = _mean_r(y_in_sample[:lags_model_max])
             mat_vt[0, :lags_model_max] = level_init
             mat_vt[1, :lags_model_max] = level_init / 1.1
@@ -153,7 +153,7 @@ def ces_creator(
         row_names[1] = "potential"
         if n_seasonal > 1:
             for i in range(n_seasonal):
-                row_names[2 + i] = f"seasonal[{lags_model_seasonal[i]}]"
+                row_names[2 + i] = f"seasonal{i + 1}"
             level_init = _mean_r(y_in_sample[:lags_model_max])
             mat_vt[0, :lags_model_max] = level_init
             mat_vt[1, :lags_model_max] = level_init / 1.1
@@ -171,8 +171,8 @@ def ces_creator(
     elif seasonality == "simple":
         if n_seasonal > 1:
             for i in range(n_seasonal):
-                row_names[2 * i] = f"level.s[{lags_model_seasonal[i]}]"
-                row_names[2 * i + 1] = f"potential.s[{lags_model_seasonal[i]}]"
+                row_names[2 * i] = f"seasonal{i + 1}"
+                row_names[2 * i + 1] = f"seasonalPotential{i + 1}"
             # R: matVt[(1:nSeasonal)*2-1, 1:lagsModelMax]
             for i in range(n_seasonal):
                 mat_vt[2 * i, :lags_model_max] = y_in_sample[:lags_model_max]
@@ -185,7 +185,7 @@ def ces_creator(
                 # R: matWt[, 2*i] <- 0
                 mat_wt[:, 2 * i + 1] = 0  # 0-based
         else:
-            row_names = ["level.s", "potential.s"]
+            row_names = ["seasonal", "seasonalPotential"]
             mat_vt[0, :lags_model_max] = y_in_sample[:lags_model_max]
             mat_vt[1, :lags_model_max] = mat_vt[0, :lags_model_max] / 1.1
 

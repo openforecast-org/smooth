@@ -120,6 +120,7 @@ for the sklearn-style fitted values (`persistence_*_`, `arma_parameters_`,
 | `sigma(m)` | `m.sigma` |
 | `m$parameters$a`, `$b` of `ces()` | `m.a_`, `m.b_` |
 | `m$lambda`, `m$harmonics`, `m$periods`, `m$trendType` of `tbats()` | `m.lambda_`, `m.harmonics_`, `m.periods_`, `m.trend_type_` |
+| state names of `ces()` (`level`, `potential`, `seasonal`, `seasonalPotential`, numbered by lag with several) and its initials in `B` (`seasonal_1`, `seasonal1_1`, ...) | the same in `m.states`' rows and `m.coef_names` |
 | `m$modelA`, `m$modelB` of `omg()` | `m.model_a`, `m.model_b` |
 | `forecast(m, h=)` | `m.predict(h=)` → `ForecastResult` with `.mean` / `.lower` / `.upper`; no forecast attribute |
 

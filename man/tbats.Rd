@@ -10,8 +10,9 @@ tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   occurrence = c("none", "auto", "fixed", "general", "odds-ratio",
   "inverse-odds-ratio", "direct"), distribution = c("auto", "dnorm",
   "dlaplace", "ds", "dgnorm"), loss = c("likelihood", "MSE", "MAE", "HAM",
-  "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"), ic = c("AICc", "AIC", "BIC",
-  "BICc"), h = 0, holdout = FALSE, persistence = NULL, phi = NULL,
+  "MSEh", "TMSE", "GTMSE", "MSCE", "GPL"), outliers = c("ignore", "use",
+  "select"), level = 0.99, ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
+  holdout = FALSE, persistence = NULL, phi = NULL,
   initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
   arma = NULL, bounds = c("admissible", "usual", "none"), silent = TRUE,
   model = NULL, ...)
@@ -98,6 +99,20 @@ of \code{actual}, \code{fitted} and \code{B}, as in \link[smooth]{adam}, which
 receives the observed values with demand and their fitted values in the space of the
 Box-Cox transformed data (lambda is then 1, as with the other losses than the
 likelihood).}
+
+\item{outliers}{What to do with the outliers, as in \link[smooth]{adam}:
+\code{"ignore"} them, \code{"use"} a dummy variable for each, or \code{"select"}
+among the dummies and their leads and lags. They are found on the residuals of the
+global model (the regression on the trend, the harmonics and the regressors, at the
+starting value of lambda and on the non-zero observations), outside the \code{level}
+quantiles of the distribution (of \code{"dgnorm"} with the shape estimated on the
+residuals for \code{"auto"}), so no fit is added. With \code{"select"},
+\link[greybox]{stepwise} chooses the dummies on these residuals. The dummies join the
+regressors in all the fits, with zeros over the horizon, and \code{regressors} becomes
+\code{"use"} or \code{"select"} (for the regressors of \code{xreg}), as in
+\link[smooth]{auto.adam}.}
+
+\item{level}{The confidence level of the detection of the outliers.}
 
 \item{ic}{The information criterion used in the selection.}
 

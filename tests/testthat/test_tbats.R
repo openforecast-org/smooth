@@ -579,3 +579,25 @@ test_that("the provided values that need a selected structure are estimated with
                    "ARMA parameters");
     expect_true(all(c("phi1[1]","theta1[1]") %in% names(model$B)));
 })
+
+# The outliers of the global model become regressors: the dummies of the shocks, zero
+# over the horizon, with the regressors used or selected as in auto.adam()
+test_that("tbats() finds the outliers on the global model", {
+    y <- AirPassengers;
+    y[c(30, 80)] <- y[c(30, 80)]*1.4;
+    testModel <- tbats(y, outliers="use", h=6);
+    expect_equal(testModel$xregNames, c("outlier1", "outlier2"));
+    expect_equal(which(testModel$data[, "outlier1"]==1), 30);
+    expect_equal(which(testModel$data[, "outlier2"]==1), 80);
+    expect_lt(AICc(testModel), AICc(tbats(y, h=6)));
+    testModel <- tbats(y, outliers="select", xreg=cbind(x=rnorm(144)), regressors="adapt");
+    expect_equal(testModel$regressors, "use");
+    expect_true(all(c("outlier1", "outlier2") %in% testModel$xregNames));
+    expect_null(tbats(y, outliers="ignore")$xregNames);
+})
+
+test_that("the unnamed regressors of tbats() are x1, x2, ...", {
+    testModel <- tbats(BJsales, lags=1, xreg=cbind(rnorm(150), rnorm(150)), trend="none",
+                       orders=list(ar=0, ma=0, select=FALSE));
+    expect_equal(testModel$xregNames, c("x1", "x2"));
+})

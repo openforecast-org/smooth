@@ -81,6 +81,9 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
         occurrence = "none"
 
     occurrence_model = occurrence not in ["none", "provided"]
+    # Without an occurrence the zeros are values, as in R: the observed values count
+    if occurrence == "none":
+        obs_nonzero = sum(val is not None and not np.isnan(val) for val in data_list)
     return {
         "occurrence": occurrence,
         "occurrence_model": occurrence_model,

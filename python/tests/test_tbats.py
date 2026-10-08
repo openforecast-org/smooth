@@ -783,3 +783,19 @@ def test_the_provided_values_that_need_a_selected_structure_warn(air):
             distribution="dnorm",
         ).fit(air)
     assert {"phi1[1]", "theta1[1]"} <= set(model.coef_names)
+
+
+def test_the_outliers_of_the_global_model_become_regressors(air):
+    """outliers="use" finds the shocks on the residuals of the global model and adds
+    their dummies, zero over the horizon; the refits keep them as regressors."""
+    y = air.copy()
+    y[[29, 79]] *= 1.4
+    fit = TBATS(lags=[1, 12], outliers="use", h=6).fit(y)
+    assert fit._xreg_names == ["outlier1", "outlier2"]
+    xreg = fit._best["struct"]["xreg"]
+    assert np.flatnonzero(xreg["data"][:, 0]).tolist() == [29]
+    assert np.flatnonzero(xreg["data"][:, 1]).tolist() == [79]
+    np.testing.assert_array_equal(xreg["future"], 0)
+    assert fit.aicc < TBATS(lags=[1, 12], h=6).fit(y).aicc
+    assert np.all(np.isfinite(fit.reforecast(h=6, nsim=10, seed=1).mean))
+    assert fit.coefbootstrap(nsim=2, seed=1).vcov.shape == (len(fit.coef),) * 2

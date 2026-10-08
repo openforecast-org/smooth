@@ -115,6 +115,18 @@
 #' receives the observed values with demand and their fitted values in the space of the
 #' Box-Cox transformed data (lambda is then 1, as with the other losses than the
 #' likelihood).
+#' @param outliers What to do with the outliers, as in \link[smooth]{adam}:
+#' \code{"ignore"} them, \code{"use"} a dummy variable for each, or \code{"select"}
+#' among the dummies and their leads and lags. They are found on the residuals of the
+#' global model (the regression on the trend, the harmonics and the regressors, at the
+#' starting value of lambda and on the non-zero observations), outside the \code{level}
+#' quantiles of the distribution (of \code{"dgnorm"} with the shape estimated on the
+#' residuals for \code{"auto"}), so no fit is added. With \code{"select"},
+#' \link[greybox]{stepwise} chooses the dummies on these residuals. The dummies join the
+#' regressors in all the fits, with zeros over the horizon, and \code{regressors} becomes
+#' \code{"use"} or \code{"select"} (for the regressors of \code{xreg}), as in
+#' \link[smooth]{auto.adam}.
+#' @param level The confidence level of the detection of the outliers.
 #' @param ic The information criterion used in the selection.
 #' @param h The forecast horizon.
 #' @param holdout If \code{TRUE}, the holdout of the size \code{h} is taken from
@@ -193,6 +205,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                   occurrence=c("none","auto","fixed","general","odds-ratio","inverse-odds-ratio","direct"),
                   distribution=c("auto","dnorm","dlaplace","ds","dgnorm"),
                   loss=c("likelihood","MSE","MAE","HAM","MSEh","TMSE","GTMSE","MSCE","GPL"),
+                  outliers=c("ignore","use","select"), level=0.99,
                   ic=c("AICc","AIC","BIC","BICc"), h=0, holdout=FALSE,
                   persistence=NULL, phi=NULL,
                   initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
@@ -218,6 +231,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     initial <- match.arg(initial);
     bounds <- match.arg(bounds);
     regressors <- match.arg(regressors);
+    outliers <- match.arg(outliers);
     # The Box-Cox parameter is kept apart: the checker returns LASSO's lambda
     lambdaProvided <- lambda;
     modelDo <- "estimate";
@@ -265,6 +279,12 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
         }
         ellipsis$B <- model$B;
         modelDo <- "use";
+        # The dummies of the outliers are regressors of the model
+        outliers <- "ignore";
+    }
+    # The outliers make the regressors used or selected, as in auto.adam()
+    if(outliers!="ignore"){
+        regressors <- outliers;
     }
     # The provided values, as adam() takes them: phi needs a preselected trend, and an unnamed
     # vector needs a preselected structure to be matched with it
@@ -385,6 +405,22 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     }
     harmonicTable <- tbats_harmonics(periods, harmonics);
 
+    # The dummies of the outliers of the global model join the regressors, in all the fits
+    outlierNames <- NULL;
+    if(outliers!="ignore"){
+        dummies <- tbats_outliers(yInSample, otLogical, any(trendTypes!="none"), harmonicTable, lambdaSpec,
+                                  xregSpecFit$data, distribution, level, outliers, ic, checked$h);
+        if(!is.null(dummies)){
+            outlierNames <- colnames(dummies);
+            obsInSample <- length(yInSample);
+            xregSpec <- list(data=cbind(xregSpec$data, dummies[1:obsInSample,,drop=FALSE]),
+                             future=if(checked$h>0) cbind(xregSpec$future, dummies[obsInSample+1:checked$h,,drop=FALSE]),
+                             names=c(xregSpec$names, outlierNames), number=xregSpec$number+length(outlierNames),
+                             regressors=regressors);
+            xregSpecFit <- tbats_xregSubset(xregSpec, if(regressors=="select") outlierNames else xregSpec$names);
+        }
+    }
+
     #### Fit the candidates and select ####
     # The trends are warm started from the model without it, with no trend smoothing
     candidates <- vector("list", length(trendTypes));
@@ -400,15 +436,18 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
     best <- candidates[[which.min(ICs)]];
 
     # The regressors selected by stepwise() on the errors of the best model, as in adam();
-    # the model with them is kept only if it beats the one without
-    if(regressors=="select" && !is.null(xregSpec)){
+    # the model with them is kept only if it beats the one without. The dummies of the
+    # outliers are already in it
+    xregNamesSelect <- setdiff(xregSpec$names, outlierNames);
+    if(regressors=="select" && length(xregNamesSelect)>0){
         shapeEstimated <- any(names(best$B)=="shape");
-        selected <- names(adam_xreg_selector(best$fitted$errors[otLogical], xregSpec$data[otLogical,,drop=FALSE],
+        selected <- names(adam_xreg_selector(best$fitted$errors[otLogical],
+                                             xregSpec$data[otLogical, xregNamesSelect, drop=FALSE],
                                              sum(otLogical), ic,
                                              length(best$B)+1-shapeEstimated, distribution, "none",
                                              best$elements$shape)$initialXreg);
-        xregSpecSelected <- tbats_xregSubset(xregSpec, make.names(selected));
-        if(!is.null(xregSpecSelected)){
+        if(length(selected)>0){
+            xregSpecSelected <- tbats_xregSubset(xregSpec, c(outlierNames, make.names(selected)));
             candidate <- tbats_fit(yInSample, best$trendType, harmonicTable, armaSpecFit, lambdaSpec,
                                    distribution, initial, checked, xregSpecSelected, best$B);
             icCandidate <- tbats_IC(candidate$logLik, ic);
@@ -416,7 +455,7 @@ tbats <- function(y, lags=c(1, frequency(y)), harmonics=NULL,
                 best <- candidate;
                 xregSpecFit <- xregSpecSelected;
             }
-            ICs[paste0(candidate$trendType, "+X(", paste(xregSpecSelected$names, collapse=","), ")")] <- icCandidate;
+            ICs[paste0(candidate$trendType, "+X(", paste(make.names(selected), collapse=","), ")")] <- icCandidate;
         }
     }
 
@@ -479,15 +518,15 @@ tbats_xreg <- function(xreg, obsInSample, h, regressors){
     if(is.null(xreg)){
         return(NULL);
     }
+    # The unnamed variables are x1, x2, ... (as.data.frame() would name them V1, V2, ...)
+    xregNames <- if(is.null(colnames(xreg))) paste0("x", seq_len(NCOL(xreg))) else colnames(xreg);
     xreg <- as.data.frame(xreg);
     if(!all(sapply(xreg, is.numeric))){
         stop("xreg should contain numeric variables only: convert the factors into dummy variables.",
              call.=FALSE);
     }
     xreg <- as.matrix(xreg);
-    if(is.null(colnames(xreg))){
-        colnames(xreg) <- paste0("x", seq_len(ncol(xreg)));
-    }
+    colnames(xreg) <- xregNames;
     colnames(xreg) <- make.names(colnames(xreg), unique=TRUE);
     if(nrow(xreg)<obsInSample){
         stop("xreg has fewer rows than the in-sample data.", call.=FALSE);
@@ -760,6 +799,45 @@ tbats_harmonicsSelect <- function(y, periods, trendIn, lambdaSpec, icFunction, i
         }
     }
     return(harmonics);
+}
+
+# The dummies of the outliers of the global model (NULL if none), with zeros over the
+# horizon: the observations whose residuals, at the starting value of lambda and on the
+# non-zero observations, standardised as rstandard() does, lie outside the level quantiles
+# of the distribution, as outlierdummy() finds them (dgnorm with the shape of alm() on
+# the residuals). With "select", stepwise() chooses among them and their leads and lags,
+# as in auto.adam(), on the residuals
+tbats_outliers <- function(y, otLogical, trendIn, harmonicTable, lambdaSpec, xregData,
+                           distribution, level, outliers, ic, h){
+    X <- tbats_design(length(y), trendIn, harmonicTable, xregData)[otLogical,,drop=FALSE];
+    lambda <- tbats_lambdaStart(y[otLogical], X, lambdaSpec);
+    residuals <- tbats_qrResid(tbats_qr(X), tbats_boxCox(y[otLogical], lambda));
+    obs <- length(residuals);
+    shape <- if(distribution=="dgnorm") alm(e~1, data.frame(e=residuals), distribution="dgnorm")$other$shape;
+    scale <- adam_scaleDebias(tbats_scale(residuals, distribution, shape, obs), distribution, obs, obs-ncol(X));
+    errors <- residuals / switch(distribution, "dnorm"=sqrt(scale), "ds"=scale^2, scale);
+    probabilities <- c((1-level)/2, (1+level)/2);
+    statistic <- switch(distribution,
+                        "dlaplace"=qlaplace(probabilities, 0, 1),
+                        "ds"=qs(probabilities, 0, 1),
+                        "dgnorm"=qgnorm(probabilities, 0, 1, shape),
+                        qnorm(probabilities, 0, 1));
+    ids <- which(otLogical)[errors<statistic[1] | errors>statistic[2]];
+    if(length(ids)==0){
+        return(NULL);
+    }
+    dummies <- matrix(0, length(y)+h, length(ids), dimnames=list(NULL, paste0("outlier", seq_along(ids))));
+    dummies[cbind(ids, seq_along(ids))] <- 1;
+    if(outliers=="select"){
+        dummies <- as.matrix(xregExpander(dummies, -1:1, gaps="zero"));
+        selected <- names(adam_xreg_selector(residuals, dummies[which(otLogical),,drop=FALSE], obs, ic,
+                                             ncol(X)+1, distribution, "none", shape)$initialXreg);
+        if(length(selected)==0){
+            return(NULL);
+        }
+        dummies <- dummies[, make.names(selected), drop=FALSE];
+    }
+    return(dummies);
 }
 
 #### ARMA ####

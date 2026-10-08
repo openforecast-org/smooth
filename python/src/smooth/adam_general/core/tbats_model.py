@@ -60,6 +60,7 @@ _NLOPT_DEFAULTS: Dict[str, Any] = {
 }
 BOUNDS_OPTIONS = ("admissible", "usual", "none")
 REGRESSORS_OPTIONS = ("use", "select", "adapt")
+OUTLIERS_OPTIONS = ("ignore", "use", "select")
 OCCURRENCE_OPTIONS = (
     "none",
     "auto",
@@ -296,6 +297,19 @@ class TBATS:
         other than the likelihood, ``"auto"`` is ``"dlaplace"`` for ``"MAE"``,
         ``"ds"`` for ``"HAM"`` and ``"dnorm"`` otherwise, as in ``ADAM``. The
         distribution used is ``distribution_``.
+    outliers : str, default="ignore"
+        What to do with the outliers, as ``ADAM``: ``"ignore"`` them, ``"use"`` a
+        dummy variable for each, or ``"select"`` among the dummies and their leads and
+        lags. They are found on the residuals of the global model (the regression on
+        the trend, the harmonics and the regressors, at the starting value of lambda
+        and on the non-zero observations), outside the ``outliers_level`` quantiles of
+        the distribution (of ``"dgnorm"`` with the shape estimated on the residuals for
+        ``"auto"``), so no fit is added. With ``"select"``, ``stepwise()`` chooses the
+        dummies on these residuals. The dummies join the regressors in all the fits,
+        with zeros over the horizon, and ``regressors`` becomes ``"use"`` or
+        ``"select"`` (for the regressors of ``X``), as in R's ``auto.adam()``.
+    outliers_level : float, default=0.99
+        The confidence level of the detection of the outliers (R's ``level``).
     loss, ic, h, holdout, bounds
         As in R's ``tbats()``; ``bounds="admissible"`` keeps the model stable.
     persistence : dict, array or None
@@ -350,6 +364,8 @@ class TBATS:
         occurrence: Any = "none",
         distribution: str = "auto",
         loss: Union[str, Callable[..., float]] = "likelihood",
+        outliers: str = "ignore",
+        outliers_level: float = 0.99,
         ic: str = "AICc",
         h: int = 0,
         holdout: bool = False,
@@ -373,6 +389,8 @@ class TBATS:
         default_orders = {"ar": 3, "ma": 3, "select": True}
         self._init_orders = default_orders if orders is None else orders
         self.regressors = _match(regressors, REGRESSORS_OPTIONS, "regressors")
+        self.outliers = _match(outliers, OUTLIERS_OPTIONS, "outliers")
+        self.outliers_level = outliers_level
         if isinstance(occurrence, str):
             _match(occurrence, OCCURRENCE_OPTIONS, "occurrence")
         self.occurrence = occurrence
@@ -479,7 +497,9 @@ class TBATS:
             _warn_missing(missing, obs_in_sample, stacklevel=3)
         self._index = index
 
-        xreg = st.xreg_spec(X, obs_in_sample, h, self.regressors)
+        # The outliers make the regressors used or selected, as in R's auto.adam()
+        regressors = self.regressors if self.outliers == "ignore" else self.outliers
+        xreg = st.xreg_spec(X, obs_in_sample, h, regressors)
         if xreg is not None:
             y_in_sample = np.where(xreg["missing"], np.nan, y_in_sample)
 
@@ -500,7 +520,7 @@ class TBATS:
             trend == "auto"
             or harmonics is None
             or bool(orders.get("select"))
-            or self.regressors == "select"
+            or regressors == "select"
         )
         if phi is not None and trend == "auto":
             warnings.warn(
@@ -538,7 +558,7 @@ class TBATS:
                 ),
                 (
                     "xreg",
-                    self.regressors == "select",
+                    regressors == "select",
                     "Initial values of the regressors cannot be used with their "
                     "selection.",
                 ),
@@ -585,7 +605,7 @@ class TBATS:
         }
         distribution = self._distribution_selection()
         # The regressors are selected on the errors of the model without them
-        xreg_fit = None if self.regressors == "select" else xreg
+        xreg_fit = None if regressors == "select" else xreg
 
         if harmonics is None:
             harmonics = st.harmonics_select(
@@ -610,6 +630,41 @@ class TBATS:
                 harmonics = [min(k, m) for k, m in zip(harmonics, k_max)]
         table = st.harmonics_table(periods, harmonics)
 
+        # The dummies of the outliers of the global model join the regressors, in all
+        # the fits
+        outlier_names: List[str] = []
+        if self.outliers != "ignore":
+            dummies = st.outlier_dummies(
+                y_in_sample,
+                ot,
+                any(t != "none" for t in trend_types),
+                table,
+                lam_spec,
+                None if xreg_fit is None else xreg_fit["data"],
+                distribution,
+                self.outliers_level,
+                self.outliers,
+                self.ic,
+                h,
+            )
+            if dummies is not None:
+                outlier_names = dummies["names"]
+                data = dummies["data"]
+                n = len(y_in_sample)
+                user = [] if xreg is None else [xreg]
+                future = [u["future"] for u in user] + [data[n:]]
+                names = [name for u in user for name in u["names"]] + outlier_names
+                xreg = {
+                    "data": np.column_stack([u["data"] for u in user] + [data[:n]]),
+                    "future": np.column_stack(future) if h > 0 else None,
+                    "names": names,
+                    "number": len(names),
+                    "regressors": regressors,
+                }
+                xreg_fit = st.xreg_subset(
+                    xreg, outlier_names if regressors == "select" else xreg["names"]
+                )
+
         # Fit the candidates and select. The trends are warm started from the model
         # without it, with no trend smoothing
         candidates: List[Dict[str, Any]] = []
@@ -633,10 +688,12 @@ class TBATS:
         }
         best = candidates[int(np.argmin(list(ics.values())))]
 
-        if self.regressors == "select" and xreg is not None:
+        if regressors == "select" and xreg is not None:
             best, xreg_fit = self._select_xreg(
                 best,
                 xreg,
+                outlier_names,
+                xreg_fit,
                 ics,
                 y_in_sample,
                 table,
@@ -710,6 +767,8 @@ class TBATS:
         self,
         best: Dict[str, Any],
         xreg: Dict[str, Any],
+        kept: List[str],
+        xreg_fit: Optional[Dict[str, Any]],
         ics: Dict[str, float],
         y: NDArray,
         table: Dict[str, NDArray],
@@ -721,20 +780,24 @@ class TBATS:
     ) -> Any:
         """The regressors selected by ``stepwise()`` on the errors of the best model
         without them, as R's ``adam_xreg_selector``: the model refitted with them is
-        kept if it improves the IC."""
+        kept if it improves the IC. The regressors in ``kept`` (the dummies of the
+        outliers) are in the model already, in ``xreg_fit``."""
+        names = [name for name in xreg["names"] if name not in kept]
+        if not names:
+            return best, xreg_fit
         shape_estimated = int("shape" in best["names"])
         selected = xreg_selector(
             best["fitted"]["errors"][ot],
-            xreg["data"][ot],
-            xreg["names"],
+            xreg["data"][ot][:, [xreg["names"].index(name) for name in names]],
+            names,
             self.ic,
             len(best["B"]) + 1 - shape_estimated,
             distribution,
             best["elements"]["shape"],
         )
-        subset = st.xreg_subset(xreg, selected)
-        if subset is None:
-            return best, None
+        if not selected:
+            return best, xreg_fit
+        subset = st.xreg_subset(xreg, kept + list(selected))
         candidate = ft.fit(
             y,
             best["trend_type"],
@@ -749,8 +812,8 @@ class TBATS:
         )
         ic_candidate = self._ic(candidate)
         improves = ic_candidate < min(ics.values())
-        ics[f"{candidate['trend_type']}+X({','.join(subset['names'])})"] = ic_candidate
-        return (candidate, subset) if improves else (best, None)
+        ics[f"{candidate['trend_type']}+X({','.join(selected)})"] = ic_candidate
+        return (candidate, subset) if improves else (best, xreg_fit)
 
     def _distribution_selection(self) -> str:
         """The distribution of the selection: ``"auto"`` selects with dgnorm, unless
@@ -800,7 +863,8 @@ class TBATS:
     def _ic(self, fitted: Dict[str, Any]) -> float:
         return st.ic_value(
             fitted["loglik"],
-            len(fitted["y"]),
+            # The observed values, as R's nobs of the log-likelihood
+            int(np.sum(~np.isnan(fitted["y"]))),
             fitted["n_param_estimated"] + fitted["n_param_occurrence"],
             self.ic,
         )

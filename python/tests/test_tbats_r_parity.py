@@ -339,6 +339,69 @@ def test_the_mean_by_quadrature_agrees(lam):
     )
 
 
+# AirPassengers with two shocks (observations 30 and 80), with gaps, with two
+# regressors of noise, and an intermittent series with two spikes
+OUTLIERS_DATA = (
+    "y <- AirPassengers; y[c(30, 80)] <- y[c(30, 80)]*1.4;"
+    " yg <- y; yg[c(10, 50)] <- NA;"
+    " set.seed(1); xo <- cbind(x1=rnorm(144), x2=rnorm(144));"
+    " set.seed(2); yi <- ts(rpois(120, 3)*rbinom(120, 1, 0.6), frequency=12);"
+    " yi[c(20, 70)] <- 40;"
+)
+# (series, regressors, R arguments, Python arguments) of the fits with outliers
+OUTLIERS_CASES = {
+    "use": ("y", None, "outliers='use'", dict(outliers="use")),
+    "select": ("y", None, "outliers='select'", dict(outliers="select")),
+    "gaps": (
+        "yg",
+        None,
+        "outliers='use', distribution='dnorm'",
+        dict(outliers="use", distribution="dnorm"),
+    ),
+    "adapt": (
+        "y",
+        "xo",
+        "outliers='select', distribution='dlaplace', regressors='adapt'",
+        dict(outliers="select", distribution="dlaplace", regressors="adapt"),
+    ),
+    "regressors": (
+        "yg",
+        "xo",
+        "outliers='use', distribution='dgnorm', regressors='select'",
+        dict(outliers="use", distribution="dgnorm", regressors="select"),
+    ),
+    "occurrence": (
+        "yi",
+        None,
+        "outliers='use', occurrence='auto'",
+        dict(outliers="use", occurrence="auto"),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(OUTLIERS_CASES))
+def test_the_fits_with_outliers_agree(case):
+    """The dummies of the outliers of the global model, their selection and the fit."""
+    y, X, r_arguments, arguments = OUTLIERS_CASES[case]
+    r = r_dict(
+        f"{{ {OUTLIERS_DATA} m <- suppressWarnings(tbats({y}, {r_arguments},"
+        f" xreg={X or 'NULL'})); list(y=as.numeric({y}), X={X or 'NULL'},"
+        " xregNames=m$xregNames, B=unname(m$B), names=names(m$B),"
+        " logLik=as.numeric(logLik(m)), ICs=unname(m$ICs), ICnames=names(m$ICs)) }"
+    )
+    y_values = np.array([np.nan if v == "NA" else v for v in r["y"]], dtype=float)
+    X_values = None if X is None else np.asarray(r["X"], dtype=float)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = TBATS(lags=[1, 12], **arguments).fit(y_values, X_values)
+    assert fit._xreg_names == r["xregNames"]
+    assert fit.coef_names == r["names"]
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+    assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
+    assert list(fit.ICs) == r["ICnames"]
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
+
+
 INTERMITTENT = (
     "set.seed(7); y <- ts(exp(2 + 0.4*sin(2*pi*(1:300)/7) + rnorm(300, 0, 0.3))*"
     "rbinom(300, 1, 0.7), frequency=7);"

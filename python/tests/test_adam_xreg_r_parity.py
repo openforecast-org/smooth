@@ -55,3 +55,20 @@ def test_the_fits_agree(case):
     np.testing.assert_allclose(fit.fitted, r["fitted"], rtol=1e-8)
     forecast = fit.predict(h=5, X=np.full((5, 1), 0.5)).mean
     np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-8)
+
+
+def test_a_series_of_zeros_and_ones_agrees():
+    """Without an occurrence model the zeros are values, as in R: a dummy variable
+    (forecast by ADAM when the future regressors are missing) is an ETS(ANN), not
+    the naive of a single non-zero observation."""
+    r = r_dict(
+        "{ x <- rep(0, 60); x[21] <- 1; m <- suppressWarnings(adam(x, h=3));"
+        " list(model=m$model, forecast=as.numeric(m$forecast)) }"
+    )
+    y = np.zeros(60)
+    y[20] = 1
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = ADAM().fit(y)
+    assert fit.model_name == r["model"][0]
+    np.testing.assert_allclose(fit.predict(h=3).mean, r["forecast"], rtol=1e-8)

@@ -18,7 +18,9 @@ from smooth.adam_general.core.utils.utils import (
     _pow_r,
     _sum_r,
     make_names,
+    scale_debias,
     scaler,
+    xreg_selector,
 )
 
 
@@ -438,6 +440,80 @@ def gapped(residuals: NDArray, ot_logical: NDArray) -> NDArray:
     result = np.zeros(len(ot_logical))
     result[ot_logical] = residuals
     return result
+
+
+def outlier_dummies(
+    y: NDArray,
+    ot_logical: NDArray,
+    trend_in: bool,
+    table: Dict[str, NDArray],
+    lam_spec: Dict[str, Any],
+    xreg_data: Optional[NDArray],
+    distribution: str,
+    level: float,
+    outliers: str,
+    ic: str,
+    h: int,
+) -> Optional[Dict[str, Any]]:
+    """The dummies of the outliers of the global model, as R's ``tbats_outliers``:
+    the observations whose residuals, at the starting value of lambda and on the
+    non-zero observations, standardised as ``rstandard()`` does, lie outside the
+    ``level`` quantiles of the distribution (dgnorm with the shape of ``ALM`` on
+    the residuals). With ``"select"``, ``stepwise()`` chooses among them and their
+    leads and lags, on the residuals. ``{"data", "names"}`` with zeros over the
+    horizon, or None."""
+    X = design(len(y), trend_in, table, xreg_data)[ot_logical]
+    lam = lambda_start(y[ot_logical], X, lam_spec)
+    residuals = QR(X).resid(box_cox(y[ot_logical], lam))
+    obs = len(residuals)
+    shape = None
+    if distribution == "dgnorm":
+        fitted = gb.ALM(distribution="dgnorm").fit(np.ones((obs, 1)), residuals)
+        shape = float(fitted.other_)
+    scale = scale_debias(
+        scale_value(residuals, distribution, shape), distribution, obs, obs - X.shape[1]
+    )
+    divisor = {"dnorm": math.sqrt(scale), "ds": scale**2}.get(distribution, scale)
+    errors = residuals / divisor
+    probabilities = [(1 - level) / 2, (1 + level) / 2]
+    if distribution == "dlaplace":
+        statistic = gb.qlaplace(probabilities, 0, 1)
+    elif distribution == "ds":
+        statistic = gb.qs(probabilities, 0, 1)
+    elif distribution == "dgnorm":
+        statistic = gb.qgnorm(probabilities, 0, 1, shape)
+    else:
+        statistic = gb.qnorm(probabilities, 0, 1)
+    statistic = np.asarray(statistic, dtype=float)
+    ids = np.flatnonzero(ot_logical)[(errors < statistic[0]) | (errors > statistic[1])]
+    if len(ids) == 0:
+        return None
+    data = np.zeros((len(y) + h, len(ids)))
+    data[ids, np.arange(len(ids))] = 1
+    names = [f"outlier{i + 1}" for i in range(len(ids))]
+    if outliers == "select":
+        # Each dummy with its lag and lead, in R's order
+        expanded = [
+            gb.xreg_expander(data[:, [k]], [-1, 0, 1], gaps="zero")
+            for k in range(data.shape[1])
+        ]
+        data = np.column_stack(expanded)
+        suffixes = ("", "Lag1", "Lead1")
+        names = [f"{name}{suffix}" for name in names for suffix in suffixes]
+        selected = xreg_selector(
+            residuals,
+            data[: len(y)][ot_logical],
+            names,
+            ic,
+            X.shape[1] + 1,
+            distribution,
+            shape,
+        )
+        if not selected:
+            return None
+        data = data[:, [names.index(name) for name in selected]]
+        names = list(selected)
+    return {"data": data, "names": names}
 
 
 def arma_select(

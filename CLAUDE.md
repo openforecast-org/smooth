@@ -86,6 +86,23 @@ Test files are in `tests/testthat/`: `test_adam.R`, `test_autoadam.R`,
 
 Run all tests with: `R -e "devtools::test()"`
 
+**Run the tests in proportion to what the change can break**, not the full suites after
+every change:
+
+- **Every change:** the tests of the files touched and the parity tests of that feature
+  (e.g. `devtools::test(filter="tbats")`, `pytest tests/test_tbats.py -k outliers`), a few
+  minutes.
+- **Before a commit that touches shared code** (`R/adam.R`, `R/autoadam.R`,
+  `R/adamGeneral.R`, `R/utils-adam.R`, `src/headers/`, Python's `adam.py`, `checker/`,
+  `creator/`, `estimator/`, `forecaster/`, `utils/`): the default suites, R (~8 min) and
+  Python (~3 min). A change confined to one model (TBATS, CES, ...) or to tests does not
+  need them.
+- **At milestones** (the end of a feature, before a merge into `master` or a release): the
+  full R-parity suite as well (`pytest tests/ -m r_parity`, ~30 min).
+
+The rule against dismissing failures holds at every level: a failure in a targeted run is
+investigated as one in a full run.
+
 ### CI/CD
 
 GitHub Actions workflows:

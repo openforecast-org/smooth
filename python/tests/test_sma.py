@@ -68,9 +68,10 @@ class TestSMAFit:
         assert isinstance(m.ICs, dict)
         assert len(m.ICs) > 0
 
-    def test_ics_absent_when_fixed(self, y60):
+    def test_ics_of_the_model_when_fixed(self, y60):
+        # A fixed order gives the criterion of the model, as R's sma()$ICs
         m = SMA(order=3).fit(y60)
-        assert not hasattr(m, "ICs")
+        assert m.ICs == pytest.approx(m.aicc)
 
     def test_fast_false_auto(self, y60):
         m = SMA(fast=False).fit(y60)

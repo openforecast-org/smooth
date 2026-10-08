@@ -441,6 +441,11 @@ class TBATS:
 
     # Set by fit()
     _best: Dict[str, Any]
+    # Set by sm() on a scale model, as ADAM's
+    is_scale_: bool
+    loglik_sm_: float
+    df_sm_: int
+    location_: "TBATS"
     harmonics_: List[int]
     trend_type_: str
     lambda_: float
@@ -900,8 +905,11 @@ class TBATS:
 
     @property
     def loglik(self) -> float:
-        """The log-likelihood of the data, with the Jacobian of the transform."""
+        """The log-likelihood of the data, with the Jacobian of the transform: that of
+        the scale model when one is attached (R's ``implant()``)."""
         self._check_fitted()
+        if self.scale_model is not None:
+            return float(self.scale_model.loglik_sm_)
         return float(self._best["loglik"])
 
     @property
@@ -919,7 +927,12 @@ class TBATS:
         """The number of estimated parameters, the scale, the identified initials
         and the parameters of the occurrence model included."""
         self._check_fitted()
-        return int(self._best["n_param_estimated"] + self._best["n_param_occurrence"])
+        best = self._best
+        n_param = int(best["n_param_estimated"] + best["n_param_occurrence"])
+        # The parameters of an attached scale model replace the scale (R's implant())
+        if self.scale_model is not None:
+            return n_param - 1 + int(self.scale_model.nparam)
+        return n_param
 
     @property
     def n_param(self) -> NParam:
@@ -1015,10 +1028,20 @@ class TBATS:
     @property
     def residuals(self) -> NDArray:
         """The errors in the space of the transformed data, NaN at the missing
-        values."""
+        values; those of the location model standardised by the scale for a scale
+        model (``sm()``), as R."""
         self._check_fitted()
         errors = self._best["fitted"]["errors"].copy()
         errors[np.isnan(self._y_in_sample)] = np.nan
+        if getattr(self, "is_scale_", False):
+            from smooth.adam_general.core.sm import _standardise_residuals
+
+            return _standardise_residuals(
+                self.location_.residuals,
+                np.asarray(self.fitted, dtype=float),
+                self.distribution_,
+                None,
+            )
         return errors
 
     @property
@@ -1156,8 +1179,17 @@ class TBATS:
     _multicov_empirical = ADAM._multicov_empirical
     _variance_debiased = ADAM._variance_debiased
     plot = ADAM.plot
-    scale_model = None
     is_combined = False
+
+    @property
+    def scale_model(self) -> Any:
+        """The attached scale model (``sm()``), or None, as ``ADAM``'s."""
+        return getattr(self, "_scale_model", None)
+
+    @scale_model.setter
+    def scale_model(self, value: Any) -> None:
+        """Attach a scale model, as ``ADAM``'s (R's ``implant()``)."""
+        ADAM.scale_model.fset(self, value)  # type: ignore[attr-defined]
 
     @property
     def _df_scale(self) -> float:
@@ -1171,9 +1203,8 @@ class TBATS:
         """The dgnorm shape, provided or estimated."""
         return float(self._best["elements"]["shape"])
 
-    def extract_scale(self) -> float:
-        """The scale of the distribution (R's ``extractScale``)."""
-        return self.scale
+    # The scale, or the fitted scale of an attached scale model (R's extractScale)
+    extract_scale = ADAM.extract_scale
 
     @property
     def sigma(self) -> float:
@@ -1369,9 +1400,30 @@ class TBATS:
     # Methods
     def point_lik(self, log: bool = True) -> NDArray:
         """The log-densities of the data: those of the transformed data and the
-        Jacobian, which sum to the log-likelihood."""
+        Jacobian, which sum to the log-likelihood. With a scale model, those of its
+        likelihood (R's ``pointLik.sm.adam``)."""
         self._check_fitted()
-        values = self._best["point_lik"](self._best["B"])
+        if self.scale_model is not None:
+            return self.scale_model.point_lik(log=log)
+        if getattr(self, "is_scale_", False):
+            from smooth.adam_general.core.sm import _log_density
+
+            location = self.location_
+            y = location._y_in_sample
+            observed = ~np.isnan(y)
+            errors = location.residuals[observed]
+            y_bc = st.box_cox(y[observed], location.lambda_)
+            values = np.zeros(len(y))
+            values[observed] = _log_density(
+                self.distribution_,
+                "A",
+                y_bc,
+                y_bc - errors,
+                np.asarray(self.fitted, dtype=float)[observed],
+                location._best["elements"]["shape"],
+            ) + (location.lambda_ - 1) * _log_r(y[observed])
+        else:
+            values = self._best["point_lik"](self._best["B"])
         return values if log else _exp_r(values)
 
     def vcov(
@@ -1538,7 +1590,11 @@ class TBATS:
         n_xreg = struct["n_xreg"]
         future = self._future_x(h, X)
         n_param = self.nparam
-        n_scale = int(self.loss == "likelihood")
+        # The parameters of the scale: those of an attached scale model, which
+        # replace it (R's implant() puts them in the scale column)
+        n_scale = int(self.loss == "likelihood") * (
+            1 if self.scale_model is None else int(self.scale_model.nparam)
+        )
         # The sizes: zero where there is no demand, and the scale divided by all the
         # observations, as ADAM's of an occurrence model, which the forecaster
         # de-biases by the non-zero ones
@@ -1548,6 +1604,14 @@ class TBATS:
         y_bc[np.isnan(self._y_in_sample)] = np.nan
         scale = scale_debias(
             self.scale, self.distribution_, int(ot.sum()), self._nobs_observed()
+        )
+        errors = self._best["fitted"]["errors"].copy()
+        errors[np.isnan(self._y_in_sample)] = np.nan
+        # The scale of each horizon from an attached scale model (R's sm())
+        scale_forecast = (
+            np.asarray(self.scale_model.predict(h=h).mean, dtype=np.float64)
+            if self.scale_model is not None and h > 0
+            else None
         )
 
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
@@ -1561,7 +1625,7 @@ class TBATS:
                 "loss": self.loss,
                 "other": {"shape": best["elements"]["shape"]},
                 "n_param": None,
-                "scale_forecast": None,
+                "scale_forecast": scale_forecast,
                 "seed": seed,
                 **general,
             }
@@ -1573,12 +1637,12 @@ class TBATS:
                     "transition": best["elements"]["mat_f"],
                     "persistence": best["elements"]["vec_g"],
                     "profiles_recent_table": best["fitted"]["profile"],
-                    "residuals": pd.Series(self.residuals),
+                    "residuals": pd.Series(errors),
                     # The prediction of the model at the missing values
                     "y_fitted": np.where(
                         np.isnan(y_bc),
                         np.ravel(best["fitted"]["fitted"]),
-                        y_bc - self.residuals,
+                        y_bc - errors,
                     ),
                     "scale": scale,
                 },
@@ -2186,6 +2250,67 @@ class TBATS:
         if parm is not None:
             result = result.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
         return result
+
+    def sm(self, X: Optional[Any] = None, **kwargs: Any) -> "TBATS":
+        """The model of the scale of the error term (R's ``sm()``): TBATS on the
+        transformed errors in the space of the Box-Cox transformed data (the squares
+        for ``"dnorm"``, the absolute values for ``"dlaplace"``, ...), with lambda 0,
+        estimated by the joint likelihood of this model's data.
+
+        It takes the arguments and defaults of ``TBATS`` (``X`` its regressors), but
+        the lags of this model and ``initial="optimal"``, as ``ADAM.sm()``. Attach the
+        result to :attr:`scale_model` (R's ``implant()``): the forecasts then have the
+        scale of each horizon. Not available with an occurrence model yet."""
+        from smooth.adam_general.core.sm import _log_density, _residual_transform
+
+        self._check_fitted()
+        if self.loss != "likelihood":
+            raise ValueError(
+                "sm() only works with models estimated via maximisation of "
+                f"likelihood. Yours was estimated via {self.loss}. Cannot proceed."
+            )
+        if self._occurrence["model"] is not None:
+            raise ValueError(
+                "sm() is not available yet for TBATS with an occurrence model."
+            )
+        distribution = self.distribution_
+        shape = self._best["elements"]["shape"]
+        observed = ~np.isnan(self._y_in_sample)
+        errors = self.residuals
+        y_bc = st.box_cox(self._y_in_sample, self.lambda_)
+        response = np.full(len(errors), np.nan)
+        response[observed] = _residual_transform(errors[observed], distribution, shape)
+
+        # The joint log-likelihood of the observed values given the scale, the
+        # exponent of the fitted values of the scale model in logs
+        y_sm = y_bc[observed]
+        mu_sm = y_sm - errors[observed]
+
+        def loss(actual: Any = None, fitted: Any = None, B: Any = None) -> float:
+            densities = _log_density(
+                distribution, "A", y_sm, mu_sm, _exp_r(np.asarray(fitted)), shape
+            )
+            return -float(_sum_r(densities))
+
+        arguments: Dict[str, Any] = {
+            "lags": self.lags,
+            "initial": "optimal",
+            "distribution": distribution,
+            "gnorm_shape": shape if distribution == "dgnorm" else None,
+            **kwargs,
+            "lambda_bc": 0,
+            "loss": loss,
+        }
+        scale_model = TBATS(**arguments).fit(response, X)
+
+        # The log-likelihood of the data, with the Jacobian of the transform and the
+        # parameters of both models (one scale)
+        jacobian = (self.lambda_ - 1) * _log_r(self._y_in_sample[observed])
+        scale_model.loglik_sm_ = scale_model.loglik + float(_sum_r(jacobian))
+        scale_model.df_sm_ = int(scale_model.nparam) + int(self.nparam) - 1
+        scale_model.is_scale_ = True
+        scale_model.location_ = self
+        return scale_model
 
     def _refit_kwargs(self) -> Dict[str, Any]:
         """The arguments refitting the model with its structure, starting from its

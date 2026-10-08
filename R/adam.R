@@ -7454,6 +7454,10 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
 
 #' @export
 pointLik.adam <- function(object, log=TRUE, ...){
+    # With a scale model, the likelihood is that of the scale model (sm()), as logLik()
+    if(is.scale(object$scale)){
+        return(pointLik(object$scale, log=log));
+    }
     distribution <- object$distribution;
     yInSample <- actuals(object);
     obsInSample <- nobs(object);

@@ -633,3 +633,24 @@ test_that("a regressor named as a dummy of the outliers is renamed", {
     expect_no_warning(testModel <- adam(d, "MAM", lags=12));
     expect_true("outlier1" %in% names(coef(testModel)));
 })
+
+# sm(): the scale of the error term modelled by TBATS on the transformed errors, by the
+# joint likelihood; implant() puts it in the model, whose forecasts then follow it
+test_that("sm() models the scale of tbats() with TBATS", {
+    set.seed(3);
+    times <- 1:(24*7*4);
+    sigma <- exp(0.6*sin(2*pi*times/24));
+    y <- ts(exp(5 + 0.3*sin(2*pi*times/24) + rnorm(length(times), 0, 0.05*sigma)), frequency=24);
+    testModel <- tbats(y, distribution="dnorm", orders=list(ar=0, ma=0, select=FALSE));
+    testScale <- sm(testModel);
+    expect_true(is.scale(testScale));
+    expect_s3_class(testScale, "adamTBATS");
+    testImplanted <- implant(testModel, testScale);
+    expect_gt(as.numeric(logLik(testImplanted)), as.numeric(logLik(testModel)));
+    expect_equal(sum(pointLik(testImplanted)), as.numeric(logLik(testImplanted)));
+    testForecast <- forecast(testImplanted, h=24, interval="prediction");
+    widths <- as.vector(testForecast$upper-testForecast$lower);
+    expect_gt(max(widths)/min(widths), 2);
+    yIntermittent <- ts(rpois(120, 2), frequency=12);
+    expect_error(sm(tbats(yIntermittent, occurrence="auto")), "occurrence");
+})

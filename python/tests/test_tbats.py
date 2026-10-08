@@ -799,3 +799,26 @@ def test_the_outliers_of_the_global_model_become_regressors(air):
     assert fit.aicc < TBATS(lags=[1, 12], h=6).fit(y).aicc
     assert np.all(np.isfinite(fit.reforecast(h=6, nsim=10, seed=1).mean))
     assert fit.coefbootstrap(nsim=2, seed=1).vcov.shape == (len(fit.coef),) * 2
+
+
+def test_the_scale_model_of_tbats():
+    """sm() models the scale by TBATS; attached, it raises the likelihood, its terms
+    sum to it, and the intervals follow the scale. Not with an occurrence model."""
+    rng = np.random.default_rng(3)
+    times = np.arange(1, 24 * 7 * 4 + 1)
+    sigma = np.exp(0.6 * np.sin(2 * np.pi * times / 24))
+    y = np.exp(5 + 0.3 * np.sin(2 * np.pi * times / 24) + rng.normal(0, 0.05 * sigma))
+    fit = TBATS(lags=[1, 24], distribution="dnorm", orders=ORDERS0).fit(y)
+    loglik = fit.loglik
+    scale = fit.sm()
+    assert scale.is_scale_ and isinstance(scale, TBATS)
+    fit.scale_model = scale
+    assert fit.loglik > loglik
+    assert np.sum(fit.point_lik()) == pytest.approx(fit.loglik)
+    widths = np.ravel(fit.predict(h=24, interval="prediction").upper) - np.ravel(
+        fit.predict(h=24, interval="prediction").lower
+    )
+    assert widths.max() / widths.min() > 2
+    counts = rng.poisson(2, 120).astype(float)
+    with pytest.raises(ValueError, match="occurrence"):
+        TBATS(lags=[1, 12], occurrence="auto").fit(counts).sm()

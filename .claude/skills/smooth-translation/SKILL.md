@@ -59,7 +59,7 @@ a name is added or changed.
 | `ces()` / `auto.ces()` | `CES` / `AutoCES` | own fit, `ADAM`'s methods (it keeps `ADAM`'s internal dicts and hooks, as R's `ces()` returns an `adam`); `AutoCES.fit()` returns the selected `CES` |
 | `om()` / `omg()` / `auto.om()` | `OM` / `OMG` / `AutoOM` | `OM` subclasses `ADAM`; `AutoOM.fit()` returns the selected `OM`/`OMG` |
 | `tbats()` | `TBATS` | standalone, reuses `ADAM`'s forecaster and diagnostics |
-| `sm()` + `implant()` | `sm()` / `model.sm()`, `model.scale_model = ...` | |
+| `sm()` + `implant()` | `sm()` / `model.sm()`, `model.scale_model = ...` | for `tbats()` (`sm.adamTBATS()`), `TBATS.sm()`: the scale model is a `TBATS` |
 | `msdecompose()`, `sim.*()` | `msdecompose`, `sim_*` | |
 
 R-only: `ssarima()`, `gum()`, `sparma()` (see the wiki's Roadmap).

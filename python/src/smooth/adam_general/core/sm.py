@@ -353,6 +353,13 @@ def sm(
         The fitted scale model, with ``is_scale_`` set.
     """
     from smooth.adam_general.core.adam import ADAM
+    from smooth.adam_general.core.tbats_model import TBATS
+
+    # The scale of TBATS is modelled by TBATS (R's sm.adamTBATS)
+    if isinstance(location, TBATS):
+        tbats_arguments = {"lags": lags, "orders": orders, "regressors": regressors}
+        tbats_arguments = {k: v for k, v in tbats_arguments.items() if v is not None}
+        return location.sm(X=X, **tbats_arguments, **kwargs)
 
     if getattr(location, "loss_", None) != "likelihood":
         raise ValueError(

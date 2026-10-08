@@ -425,6 +425,34 @@ def test_a_regressor_named_as_a_dummy_is_renamed():
     assert fit._xreg_names == r["xregNames"]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
 
+
+@pytest.mark.parametrize("distribution", ["dnorm", "dlaplace", "ds", "dgnorm"])
+def test_the_scale_model_agrees(distribution):
+    """sm(): the TBATS of the scale, the likelihood of the model with it attached,
+    and the intervals with the scale of each horizon, as R's sm() and implant()."""
+    r = r_dict(
+        "{ set.seed(3); times <- 1:(24*7*4); sigma <- exp(0.6*sin(2*pi*times/24));"
+        " y <- ts(exp(5 + 0.3*sin(2*pi*times/24) + rnorm(length(times), 0, 0.05*sigma)),"
+        f" frequency=24); m <- tbats(y, distribution='{distribution}',"
+        " orders=list(ar=0, ma=0, select=FALSE)); s <- sm(m); mi <- implant(m, s);"
+        " f <- forecast(mi, h=24, interval='prediction'); list(y=as.numeric(y),"
+        " model=s$model, B=unname(s$B), names=names(s$B), logLik=as.numeric(logLik(mi)),"
+        " nparam=nparam(mi), lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    fit = TBATS(lags=[1, 24], distribution=distribution, orders=ORDERS0).fit(
+        np.asarray(r["y"], dtype=float)
+    )
+    scale = fit.sm()
+    assert scale.model_name == r["model"][0]
+    assert scale.coef_names == r["names"]
+    np.testing.assert_allclose(scale.coef, r["B"], rtol=1e-6, atol=1e-8)
+    fit.scale_model = scale
+    assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
+    assert fit.nparam == r["nparam"][0]
+    forecast = fit.predict(h=24, interval="prediction")
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
 INTERMITTENT = (
     "set.seed(7); y <- ts(exp(2 + 0.4*sin(2*pi*(1:300)/7) + rnorm(300, 0, 0.3))*"
     "rbinom(300, 1, 0.7), frequency=7);"

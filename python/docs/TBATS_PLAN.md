@@ -630,6 +630,25 @@ its regressors. The forecasts need their future values, as for any regressor: th
 holdout, `newdata`, or else they are forecast by `adam()` with a warning (as in
 `auto.adam()`).
 
+## S. The scale model: `sm()` (October 2026)
+
+`sm.adamTBATS()` / `TBATS.sm()`, as `sm.adam()`: the location model in the space of the
+Box-Cox transformed data (`tbats_boxCoxObject()`), its errors transformed into the scale
+of each one (the square for `dnorm`, the absolute value for `dlaplace`, ...), and TBATS
+fitted to them with lambda 0 (a multiplicative model of the scale) and a custom loss, the
+joint log-likelihood of the location model's data given the scale. The arguments and
+defaults are `tbats()`'s, but the lags of the model and `initial="optimal"`: backcasting
+follows the logarithms of the transformed errors, which are biased for the log-scale (by
+about -1.27 for the squares of normal errors), and the loss cannot move the initials then.
+
+A custom loss of `tbats()` is minus its log-likelihood, as in `adam()`, so the selection of
+the harmonics, the trend and the ARMA of the scale model is by the joint likelihood. The
+logLik of the scale model adds the Jacobian of the location model's transform; `implant()`
+puts it in the model (the parameters of the scale model in its scale column), whose
+`pointLik()` is the scale model's, and whose forecasts take the scale model's for the
+variance of each horizon. With an occurrence model the joint likelihood needs the scale at
+the zeros, which the custom loss of `tbats()` does not see: not available yet.
+
 ## M. Later phases
 
 - multistep losses with an occurrence model (not available in `adam()` either);

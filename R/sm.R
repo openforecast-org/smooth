@@ -280,6 +280,91 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     return(adamModel);
 }
 
+#' @param object The model estimated with \code{tbats()}, for \code{sm()}: the scale of
+#' its error term is modelled by TBATS (with the arguments and defaults of
+#' \code{tbats()}, but the lags of \code{object} and \code{initial="optimal"}, as
+#' \code{sm.adam()}, by default) on the transformed errors in
+#' the space of the Box-Cox transformed data (the squares for \code{"dnorm"}, the
+#' absolute values for \code{"dlaplace"}, ...), with lambda 0, by the joint likelihood
+#' of the model's data. \link[greybox]{implant} puts it in \code{object}, whose
+#' forecasts then have the scale of each horizon. Not available with an occurrence
+#' model yet.
+#'
+#' @rdname tbats
+#' @export
+sm.adamTBATS <- function(object, lags=NULL, harmonics=NULL,
+                         trend=c("auto","none","additive","damped"),
+                         orders=list(ar=3, ma=3, select=TRUE),
+                         xreg=NULL, regressors=c("use","select","adapt"),
+                         ic=c("AICc","AIC","BIC","BICc"),
+                         persistence=NULL, phi=NULL,
+                         initial=c("optimal","backcasting","two-stage","complete"), arma=NULL,
+                         bounds=c("admissible","usual","none"), silent=TRUE, ...){
+    startTime <- Sys.time();
+    # The initials are optimised by default, as in sm.adam(): backcasting follows the
+    # transformed errors, whose logarithms are biased for the log-scale
+    initial <- match.arg(initial);
+    cl <- match.call();
+    if(object$loss!="likelihood"){
+        stop("sm() only works with models estimated via maximisation of likelihood. ",
+             "Yours was estimated via ", object$loss,". Cannot proceed.", call.=FALSE);
+    }
+    if(!is.null(object$occurrence)){
+        stop("sm() is not available yet for tbats() with an occurrence model.", call.=FALSE);
+    }
+    distribution <- object$distribution;
+    shape <- object$other$shape;
+
+    # The model in the space of the transformed data, where its distribution is
+    y <- actuals(object);
+    observed <- !is.na(as.vector(y));
+    objectBC <- tbats_boxCoxObject(object);
+    yBC <- as.vector(objectBC$data[,1]);
+    muBC <- as.vector(fitted(objectBC));
+    errors <- yBC - muBC;
+    # The scale of each error, as in sm.adam()
+    response <- switch(distribution,
+                       "dnorm"=errors^2,
+                       "dlaplace"=abs(errors),
+                       "ds"=0.5*abs(errors)^0.5,
+                       "dgnorm"=(shape*abs(errors)^shape)^(1/shape));
+
+    # The joint log-likelihood of the observed values given the scale, the exponent of
+    # the fitted values of the scale model in logs
+    ySM <- yBC[observed];
+    muSM <- muBC[observed];
+    lossFunction <- function(actual, fitted, B){
+        return(-sum(sm_logDensities(ySM, muSM, exp(fitted), distribution, "A", shape,
+                                    rep(TRUE, length(ySM)), FALSE)));
+    }
+    if(is.null(lags)){
+        lags <- object$lags;
+    }
+    scaleModel <- tbats(ts(response, start=start(y), frequency=frequency(y)), lags=lags,
+                        harmonics=harmonics, trend=trend, lambda=0, orders=orders, xreg=xreg,
+                        regressors=regressors, distribution=distribution, loss=lossFunction, ic=ic,
+                        persistence=persistence, phi=phi, initial=initial, arma=arma, bounds=bounds,
+                        silent=silent, shape=shape, ...);
+
+    # The log-likelihood of the data, with the Jacobian of the transform and the
+    # parameters of both models (one scale)
+    jacobian <- replace((object$lambda-1)*log(as.vector(y)), !observed, 0);
+    scaleModel$logLik <- structure(as.numeric(logLik(scaleModel)) + sum(jacobian), nobs=sum(observed),
+                                   df=nparam(scaleModel)+nparam(object)-1, class="logLik");
+    # The standardised residuals
+    scaleValues <- as.vector(fitted(scaleModel));
+    scaleModel$residuals[] <- errors / switch(distribution, "dnorm"=sqrt(scaleValues),
+                                              "ds"=scaleValues^2, scaleValues);
+    scaleModel$loss <- "likelihood";
+    # The data of the likelihood of the model, for pointLik()
+    scaleModel$location <- list(y=yBC, mu=muBC, Etype="A", other=shape, otLogical=observed,
+                                occurrenceModel=FALSE, jacobian=jacobian);
+    scaleModel$call <- cl;
+    scaleModel$timeElapsed <- Sys.time()-startTime;
+    class(scaleModel) <- c("sm.adam","adamTBATS","adam","smooth","scale");
+    return(scaleModel);
+}
+
 #' @export
 extractScale.smooth <- function(object, ...){
     # The scale model returns the scale itself (sigma^2 for dnorm, s for dlaplace etc)
@@ -437,6 +522,10 @@ pointLik.sm.adam <- function(object, log=TRUE, ...){
                                         as.vector(fitted(object))[observed], object$distribution,
                                         location$Etype, location$other, location$otLogical[observed],
                                         location$occurrenceModel);
+    # The Jacobian of the Box-Cox transform of tbats()
+    if(!is.null(location$jacobian)){
+        values[] <- values + location$jacobian;
+    }
     if(!log){
         values <- exp(values);
     }

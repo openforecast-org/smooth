@@ -863,14 +863,16 @@ def fit(
         + n_initials * initials_profiled
         + struct["n_xreg"] * (not xreg_estimate)
     )
-    # The likelihood of the occurrence model is added, as its parameters are
-    loglik = -loss_value(B, "likelihood") + occurrence["loglik"]
+    # The likelihood of the occurrence model is added, as its parameters are. A custom
+    # loss is minus the log-likelihood, as in ADAM
+    loss_likelihood = "custom" if s["loss"] == "custom" else "likelihood"
+    loglik = -loss_value(B, loss_likelihood) + occurrence["loglik"]
 
     fi = None
     if s["fi"] and len(B) > 0:
         fi = -np.asarray(
             _hessian_cpp(
-                lambda b: -loss_value(np.asarray(b), "likelihood"), B, s["step_size"]
+                lambda b: -loss_value(np.asarray(b), loss_likelihood), B, s["step_size"]
             )
         )
 

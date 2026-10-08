@@ -114,7 +114,7 @@
 #' of \code{actual}, \code{fitted} and \code{B}, as in \link[smooth]{adam}, which
 #' receives the observed values with demand and their fitted values in the space of the
 #' Box-Cox transformed data (lambda is then 1, as with the other losses than the
-#' likelihood).
+#' likelihood). Its log-likelihood is minus the loss, as in \link[smooth]{adam}.
 #' @param outliers What to do with the outliers, as in \link[smooth]{adam}:
 #' \code{"ignore"} them, \code{"use"} a dummy variable for each, or \code{"select"}
 #' among the dummies and their leads and lags. They are found on the residuals of the
@@ -1635,13 +1635,15 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     nParamModel <- length(B) + nInitials*initialsProfiled + struct$nXreg*!xregEstimate;
     reused <- checked$modelDo=="use";
     nParamEstimated <- 1 + nParamModel*!reused;
-    # The likelihood of the occurrence model is added, as its parameters are
-    logLikValue <- -lossValue(B, "likelihood") + occurrenceSpec$logLik;
+    # The likelihood of the occurrence model is added, as its parameters are. A custom loss
+    # is minus the log-likelihood, as in adam()
+    lossLikelihood <- if(checked$loss=="custom") "custom" else "likelihood";
+    logLikValue <- -lossValue(B, lossLikelihood) + occurrenceSpec$logLik;
 
     # The Hessian of the log-likelihood
     FI <- NA;
     if(isTRUE(checked$FI) && length(B)>0){
-        FI <- -hessianCpp(function(BNew) -lossValue(BNew, "likelihood"), B, h=checked$stepSize);
+        FI <- -hessianCpp(function(BNew) -lossValue(BNew, lossLikelihood), B, h=checked$stepSize);
         colnames(FI) <- rownames(FI) <- names(B);
     }
 
@@ -1896,7 +1898,10 @@ tbats_boxCoxObject <- function(object){
     otLogical <- tbats_sizes(y, object);
     # The missing values stay missing
     yBC <- replace(tbats_boxCoxSizes(y, lambda, otLogical), is.na(y), NA);
-    objectBC$scale <- adam_scaleDebias(object$scale, object$distribution, sum(otLogical), sum(!is.na(y)));
+    # A scale model (sm()) gives the scale of each observation instead
+    if(!is.scale(object$scale)){
+        objectBC$scale <- adam_scaleDebias(object$scale, object$distribution, sum(otLogical), sum(!is.na(y)));
+    }
     # The response only: the regressors stay as they are
     objectBC$data[,1] <- yBC;
     objectBC$fitted[] <- yBC - residuals(object);
@@ -2329,6 +2334,10 @@ predict.adamTBATS <- function(object, newdata=NULL, interval=c("none", "confiden
 # The log-densities of the data: those of the transformed data and the Jacobian
 #' @export
 pointLik.adamTBATS <- function(object, log=TRUE, ...){
+    # With a scale model, the likelihood is that of the scale model (sm()), as logLik()
+    if(is.scale(object$scale)){
+        return(pointLik(object$scale, log=log));
+    }
     y <- as.numeric(actuals(object));
     # The missing values are not in the likelihood: their values stay zero
     observed <- !is.na(y);

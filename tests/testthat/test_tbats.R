@@ -554,7 +554,7 @@ test_that("the provided values are fixed and the rest estimated", {
     model <- tbats(AirPassengers, harmonics=2, trend="damped", orders=orders0, lambda=0,
                    distribution="dnorm", persistence=list(level=0.3, seasonal=list(c(0.001, 0))),
                    phi=0.98, initial=list(level=4.7));
-    expect_equal(unname(model$persistence[["level"]]), 0.3);
+    expect_equal(unname(model$persistence[["alpha"]]), 0.3);
     expect_equal(model$phi, 0.98);
     expect_equal(unname(model$initial$level), 4.7);
     expect_false(any(c("alpha","phi","gamma1[12]","gamma2[12]","level") %in% names(model$B)));

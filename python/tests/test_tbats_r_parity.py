@@ -119,6 +119,21 @@ def test_the_arma_parameters_agree(case):
     np.testing.assert_allclose(values, r.get("armaValues") or [], rtol=1e-6)
 
 
+@pytest.mark.parametrize("case", ["damped-arma", "provided-list"])
+def test_the_persistence_agrees(case):
+    r_arguments, python_arguments = CASES[case]
+    r = _r_fit(
+        "AirPassengers",
+        r_arguments,
+        ", pNames=names(m$persistence), pValues=unname(m$persistence)",
+    )
+    fit = TBATS(lags=[1, 12], **python_arguments).fit(np.asarray(r["y"], dtype=float))
+    assert list(fit.persistence_vector) == r["pNames"]
+    np.testing.assert_allclose(
+        list(fit.persistence_vector.values()), r["pValues"], rtol=1e-6, atol=1e-10
+    )
+
+
 def test_the_selection_agrees_on_bjsales():
     r = _r_fit("BJsales", "", ", ICs=unname(m$ICs)")
     fit = TBATS().fit(np.asarray(r["y"], dtype=float))

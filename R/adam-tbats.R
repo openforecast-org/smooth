@@ -1734,8 +1734,16 @@ tbats_return <- function(best, checked, cl, startTime, periods, harmonics, ICs, 
                                      paste0("`", struct$xreg$names, "`", collapse="+")));
     }
 
+    # The names of adam(): alpha, beta, gamma1_j[m] and gamma2_j[m] for the two states of
+    # the harmonic j of the period m, psi for the ARMA and delta for the regressors
     persistence <- best$elements$vecG[,1];
-    names(persistence) <- struct$componentNames;
+    harmonicTable <- struct$harmonicTable;
+    names(persistence) <- c("alpha", if(struct$trendIn) "beta",
+                            if(struct$nHarmonics>0) paste0(rep(c("gamma1_","gamma2_"), struct$nHarmonics),
+                                                           rep(harmonicTable$j, each=2), "[",
+                                                           rep(round(harmonicTable$period, 4), each=2), "]"),
+                            if(struct$nArma==1) "psi" else if(struct$nArma>1) paste0("psi", seq_len(struct$nArma)),
+                            if(struct$nXreg>0) paste0("delta", seq_len(struct$nXreg)));
     matF <- best$elements$matF;
     dimnames(matF) <- list(struct$componentNames, struct$componentNames);
     matWt <- best$fitted$matWt;

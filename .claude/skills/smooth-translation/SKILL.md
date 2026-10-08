@@ -100,7 +100,7 @@ for the sklearn-style fitted values (`persistence_*_`, `arma_parameters_`,
 | `fitted(m)`, `residuals(m)`, `actuals(m)` | `m.fitted`, `m.residuals`, `m.actuals` |
 | `m$data`, `m$holdout` | `m.data`, `m.holdout_data` |
 | `m$states` | `m.states` (components in rows) |
-| `m$persistence` | `m.persistence_vector` (a dict under R's names); `m.persistence_level_`, `m.persistence_trend_`, `m.persistence_seasonal_`, `m.persistence_xreg_` |
+| `m$persistence` | `m.persistence_vector` (a dict under R's names: `alpha`, `beta`, `gamma`/`gamma1`... per seasonal lag, `gamma1_j[m]`/`gamma2_j[m]` for the harmonic j of the period m in TBATS, `psi`/`psi1`... for ARIMA, `delta1`... for the regressors); `m.persistence_level_`, `m.persistence_trend_`, `m.persistence_seasonal_`, `m.persistence_xreg_` |
 | `m$phi` | `m.phi_` |
 | `m$arma` | `m.arma_parameters_` |
 | `m$orders` | `m.orders` |

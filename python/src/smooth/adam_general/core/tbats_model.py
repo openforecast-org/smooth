@@ -963,10 +963,24 @@ class TBATS:
 
     @property
     def persistence_vector(self) -> Dict[str, float]:
-        """The persistence vector by component (R's ``$persistence``)."""
+        """The persistence vector (R's ``$persistence``) under ADAM's names:
+        ``alpha``, ``beta``, ``gamma1_j[m]`` and ``gamma2_j[m]`` for the two states of
+        the harmonic ``j`` of the period ``m``, ``psi`` for the ARMA states and
+        ``delta`` for the regressors."""
         self._check_fitted()
+        struct = self._best["struct"]
+        table = struct["table"]
+        n_arma = struct["n_arma"]
+        names = ["alpha"] + ["beta"] * struct["trend_in"]
+        names += [
+            f"gamma{k}_{j}[{st._period_label(p)}]"
+            for j, p in zip(table["j"], table["period"])
+            for k in (1, 2)
+        ]
+        names += ["psi"] if n_arma == 1 else [f"psi{i}" for i in range(1, n_arma + 1)]
+        names += [f"delta{i}" for i in range(1, struct["n_xreg"] + 1)]
         values = np.ravel(self._best["elements"]["vec_g"]).astype(float).tolist()
-        return dict(zip(self._component_names, values))
+        return dict(zip(names, values))
 
     @property
     def persistence_level_(self) -> float:

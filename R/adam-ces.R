@@ -1020,8 +1020,14 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
             b$estimateOriginal <- b$estimate;
             b$estimate <- TRUE;
         }
-        # initialTypeOriginal <- initialType;
-        # initialType <- "optimal";
+        # The initials of a reused model are provided, but stay in B when they were
+        # estimated: refit them as optimal, as adam() re-estimates the provided
+        # initials it finds in B
+        initialTypeOriginal <- initialType;
+        if(initialType=="provided" &&
+           any(names(B)=="level" | names(B)=="potential" | substr(names(B),1,8)=="seasonal")){
+            initialType <- "optimal";
+        }
         if(!is.null(initialValueProvided$xreg) && initialOriginal!="complete"){
             initialXregEstimateOriginal <- initialXregEstimate;
             initialXregEstimate <- TRUE;
@@ -1041,6 +1047,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
             b$estimate <- b$estimateOriginal;
         }
         bounds <- boundsOriginal
+        initialType <- initialTypeOriginal;
         if(!is.null(initialValueProvided$xreg) && initialOriginal!="complete"){
             initialXregEstimate <- initialXregEstimateOriginal;
         }

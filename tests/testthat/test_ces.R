@@ -37,6 +37,15 @@ test_that("vcov(type='opg') works for every CES seasonality", {
     }
 })
 
+# The refit of vcov(type="hessian") keeps the estimated initials in B: the Hessian
+# is the Fisher Information of the fit (with positive variances), not Inf for the initials
+test_that("vcov(type='hessian') is the inverse FI of the fit", {
+    m <- ces(AirPassengers, seasonality="partial", initial="optimal", FI=TRUE, stepSize=1e-8)
+    v <- suppressWarnings(vcov(m, type="hessian"))
+    expect_true(all(is.finite(diag(v))))
+    expect_equal(diag(v), abs(diag(suppressWarnings(solve(m$FI)))), ignore_attr=TRUE)
+})
+
 # The provided b must match the seasonality it belongs to: "partial" carries one
 # real coefficient, "full" a complex pair, "none"/"simple" none at all. A
 # wrong-shaped b used to reach the cost function and surface only as a 1e+300

@@ -581,7 +581,8 @@ def test_the_attributes_of_adam_agree_with_r(seasonality, initial):
 
 
 @pytest.mark.parametrize(
-    "seasonality, initial", [("partial", "optimal"), ("full", "backcasting")]
+    "seasonality, initial",
+    [("partial", "optimal"), ("full", "backcasting"), ("none", "optimal")],
 )
 def test_the_methods_of_adam_agree_with_r(seasonality, initial):
     """The methods of ADAM on CES (vcov, confint, diagnostics, multistep errors and
@@ -593,6 +594,7 @@ def test_the_methods_of_adam_agree_with_r(seasonality, initial):
     r = r_dict(
         f"{{m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
         f" initial='{initial}'); list(opg=as.vector(vcov(m)),"
+        " hs=as.vector(vcov(m, type='hessian')),"
         " ci=as.vector(as.matrix(confint(m))), rs=as.vector(rstandard(m)),"
         " rt=as.vector(rstudent(m)), mc=as.vector(multicov(m, h=4)),"
         " me=as.vector(multicov(m, type='empirical', h=4)),"
@@ -606,6 +608,7 @@ def test_the_methods_of_adam_agree_with_r(seasonality, initial):
 
     for python, key in (
         (m.vcov(), "opg"),
+        (m.vcov(type="hessian"), "hs"),
         (m.confint(), "ci"),
         (m.rstandard(), "rs"),
         (m.rstudent(), "rt"),

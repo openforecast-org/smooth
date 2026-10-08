@@ -64,3 +64,12 @@ test_that("gum() reports the likelihood at the fitted parameters, not the loss",
         expect_true(as.numeric(logLik(testModel)) < 0);
     }
 })
+
+# The refit of vcov(type="hessian") keeps the estimated initials in B: the Hessian
+# is the Fisher Information of the fit (with positive variances), not Inf for the initials
+test_that("vcov(type='hessian') of gum() is the inverse FI of the fit", {
+    m <- gum(AirPassengers, initial="optimal", FI=TRUE, stepSize=.Machine$double.eps^(1/4))
+    v <- suppressWarnings(vcov(m, type="hessian", stepSize=.Machine$double.eps^(1/4)))
+    expect_true(all(is.finite(diag(v))))
+    expect_equal(diag(v), abs(diag(suppressWarnings(solve(m$FI)))), ignore_attr=TRUE)
+})

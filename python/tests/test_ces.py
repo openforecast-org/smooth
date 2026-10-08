@@ -578,3 +578,46 @@ def test_the_attributes_of_adam_agree_with_r(seasonality, initial):
         "nParam"
     ][:4]
     assert m.sigma == pytest.approx(r["sigma"][0], rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    "seasonality, initial", [("partial", "optimal"), ("full", "backcasting")]
+)
+def test_the_methods_of_adam_agree_with_r(seasonality, initial):
+    """The methods of ADAM on CES (vcov, confint, diagnostics, multistep errors and
+    covariances) are those of R's adam methods on ces()."""
+    from tests._r_bridge import r_dict
+
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r = r_dict(
+        f"{{m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
+        f" initial='{initial}'); list(opg=as.vector(vcov(m)),"
+        " ci=as.vector(as.matrix(confint(m))), rs=as.vector(rstandard(m)),"
+        " rt=as.vector(rstudent(m)), mc=as.vector(multicov(m, h=4)),"
+        " me=as.vector(multicov(m, type='empirical', h=4)),"
+        " rm=as.vector(as.matrix(rmultistep(m, h=4))), sg=sigma(m))}",
+        R_data={"y": y},
+    )
+    m = CES(seasonality=seasonality, lags=[12], initial=initial).fit(y)
+
+    def as_float(values):
+        return np.array([float(str(v).replace("Inf", "inf")) for v in values])
+
+    for python, key in (
+        (m.vcov(), "opg"),
+        (m.confint(), "ci"),
+        (m.rstandard(), "rs"),
+        (m.rstudent(), "rt"),
+        (m.multicov(h=4), "mc"),
+        (m.multicov(type="empirical", h=4), "me"),
+        (m.rmultistep(h=4), "rm"),
+        ([m.sigma], "sg"),
+    ):
+        np.testing.assert_allclose(
+            np.ravel(np.asarray(python, dtype=float), order="F"),
+            as_float(r[key]),
+            rtol=1e-8,
+            atol=1e-10,
+            err_msg=key,
+        )

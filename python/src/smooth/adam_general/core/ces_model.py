@@ -18,6 +18,7 @@ from numpy.typing import NDArray
 
 from smooth.adam_general import _adamCore
 from smooth.adam_general._numDeriv import hessian as _hessian_cpp
+from smooth.adam_general.core.adam import ADAM
 from smooth.adam_general.core.ces.cost_function import ces_cf
 from smooth.adam_general.core.ces.creator import ces_creator
 from smooth.adam_general.core.ces.filler import ces_filler
@@ -30,7 +31,7 @@ from smooth.adam_general.core.forecaster.forecaster import forecaster
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 from smooth.adam_general.core.utils.n_param import NParam
-from smooth.adam_general.core.utils.utils import multistep_log_lik
+from smooth.adam_general.core.utils.utils import _sum_r, multistep_log_lik
 
 SEASONALITY_OPTIONS = Literal["none", "simple", "partial", "full"]
 LOSS_OPTIONS = Literal[
@@ -694,7 +695,7 @@ class CES:
         mat_vt = np.array(adam_fitted.states).T  # C++ returns (components, time)
 
         # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces()
-        scale = np.sum(errors[ot_logical] ** 2) / obs_observed
+        scale = _sum_r(errors[ot_logical] ** 2) / obs_observed
         # No errors at the missing values, where the fitted values are the predictions
         errors[~observed] = np.nan
 
@@ -793,22 +794,6 @@ class CES:
         self.bic = BIC(log_lik_value, nobs=obs_observed, df=n_param_estimated)
         self.bicc = BICc(log_lik_value, nobs=obs_observed, df=n_param_estimated)
 
-        # The Fisher Information: the Hessian of minus the log-likelihood, as ADAM's
-        fisher_information = None
-        if self.fi and len(B) > 0:
-            step = self.step_size
-            if step is None:
-                step = float(np.finfo(float).eps ** 0.25)
-            fisher_information = np.asarray(
-                _hessian_cpp(
-                    lambda par: float(
-                        ces_cf(B=np.asarray(par), **_pristine(ll_kwargs))
-                    ),
-                    np.asarray(B, dtype=float),
-                    step,
-                )
-            )
-
         # Store all results, under ADAM's names
         self.fitted = y_fitted
         self.residuals = errors
@@ -827,7 +812,12 @@ class CES:
         self.transition = mat_f
         self.measurement = mat_wt
         self.nparam = n_param_estimated
-        self.fisher_information_ = fisher_information
+        self._ll_kwargs = ll_kwargs
+        self.fisher_information_ = None
+        if self.fi and len(B) > 0:
+            self.fisher_information_ = self._fisher_information_matrix(
+                self.step_size or float(np.finfo(float).eps ** 0.25)
+            )
         self.time_elapsed_ = time.time() - start_time
         self._b_names = b_names
         self._y_actuals = y_actuals
@@ -855,6 +845,74 @@ class CES:
         self._y_frequency = y_frequency
         self._h = h
 
+        # The internals of ADAM that its methods read, as R's methods of adam() read
+        # the elements of the ces() models
+        seasonal_lags = [lag for lag in lags_model_all if lag != 1]
+        n_scale = int(self.loss == "likelihood")
+        self._prepared = {
+            # States without the extra backcasting head, as R stores them
+            "states": self.states,
+            "mat_vt": profiles_recent_initial,
+            "measurement": mat_wt,
+            "transition": mat_f,
+            "persistence": vec_g,
+            "profiles_recent_table": profiles_recent_table,
+            "residuals": pd.Series(np.asarray(errors, dtype=float)),
+            "y_fitted": np.asarray(y_fitted, dtype=float).copy(),
+            "scale": scale,
+        }
+        self._observations = {
+            "obs_in_sample": obs_in_sample,
+            "y_in_sample": np.asarray(y_in_sample, dtype=float),
+            "y_holdout": y_holdout,
+            "y_na_values": y_na_values,
+            "ot_logical": ot_logical,
+            "y_forecast_start": 1,
+            "frequency": y_frequency,
+        }
+        self._general = {
+            "h": h,
+            "holdout": self.holdout,
+            "distribution": "dnorm",
+            "distribution_new": "dnorm",
+            "loss": self.loss,
+            "ic": self.ic,
+            "bounds": self.bounds,
+            "other": {},
+            "n_param": None,
+            "scale_forecast": None,
+            "parameters_number": [
+                [n_param_estimated - n_scale, n_scale, n_param_estimated]
+            ],
+        }
+        self._lags_model = {
+            "lags": lags_model_all,
+            "lags_model_all": lags_model_all,
+            "lags_model_max": lags_model_max,
+            "lags_model_min": min(seasonal_lags) if seasonal_lags else np.inf,
+        }
+        self._model_type = {
+            "ets_model": False,
+            "arima_model": False,
+            "xreg_model": xreg_model,
+            "error_type": "A",
+            "trend_type": "N",
+            "season_type": "N",
+            "damped": False,
+            "model": model_name,
+            "model_do": "estimate",
+        }
+        self._components = {
+            "components_number_ets": 0,
+            "components_number_ets_seasonal": 0,
+            "components_number_ets_non_seasonal": 0,
+            "components_number_arima": components_number,
+        }
+        self._explanatory = {"xreg_model": xreg_model, "xreg_number": xreg_number}
+        self._constant = {"constant_required": False}
+        self._occurrence = {"occurrence_model": False, "occurrence": "none"}
+        self._adam_created = {"mat_wt": mat_wt, "mat_f": mat_f, "vec_g": vec_g}
+
         return self
 
     def predict(
@@ -874,6 +932,7 @@ class CES:
         side: Literal["both", "upper", "lower"] = "both",
         cumulative: bool = False,
         nsim: int = 10000,
+        scenarios: bool = False,
     ) -> ForecastResult:
         """
         Generate point forecasts and prediction intervals from the fitted CES model.
@@ -901,6 +960,8 @@ class CES:
             If True, forecast the sum over the horizon.
         nsim : int, default=10000
             Number of paths for ``interval="simulated"``.
+        scenarios : bool, default=False
+            Keep the simulated paths, as ``ADAM.predict``.
 
         Returns
         -------
@@ -912,73 +973,31 @@ class CES:
 
         if h is None:
             h = self._h if self._h > 0 else 1
+        self._general.update(
+            h=int(h),
+            cumulative=cumulative,
+            nsim=nsim,
+            scenarios=scenarios,
+            interval=interval,
+            level=level,
+        )
 
         new_xreg = None
         if X is not None and self._xreg_number > 0:
             new_xreg = np.asarray(X, dtype=np.float64)[:h].reshape(h, -1)
 
-        lags_max = self._lags_model_max
-        seasonal_lags = [lag for lag in self._lags_model_all if lag != 1]
-        # R's sigma() drops the scale from the parameter count under likelihood
-        n_scale = int(self.loss == "likelihood")
-        n_param = int(self.nparam)
-
         return forecaster(
-            model_prepared={
-                # States without the extra backcasting head, as R stores them
-                "states": self._mat_vt.T[:, -(self._obs_in_sample + lags_max) :],
-                "mat_vt": self._profiles_recent_initial,
-                "measurement": self._mat_wt,
-                "transition": self._mat_f,
-                "persistence": self._vec_g,
-                "profiles_recent_table": self._profiles_recent_table,
-                "residuals": pd.Series(np.asarray(self.residuals, dtype=float)),
-                "y_fitted": np.asarray(self.fitted, dtype=float).copy(),
-                "scale": self.scale,
-            },
-            observations_dict={
-                "obs_in_sample": self._obs_in_sample,
-                "y_in_sample": np.asarray(self._y_in_sample, dtype=float),
-                "y_forecast_start": 1,
-                "frequency": self._y_frequency,
-            },
-            general_dict={
-                "h": int(h),
-                "cumulative": cumulative,
-                "nsim": nsim,
-                "scenarios": False,
-                "distribution": "dnorm",
-                "loss": self.loss,
-                "other": {},
-                "n_param": None,
-                "scale_forecast": None,
-            },
+            model_prepared=dict(self._prepared),
+            observations_dict=self._observations,
+            # Updated in place, as ADAM's: the simulated paths are kept there
+            general_dict=self._general,
             occurrence_dict={"occurrence_model": False, "occurrence": "none"},
-            lags_dict={
-                "lags_model_all": self._lags_model_all,
-                "lags_model_max": lags_max,
-                "lags_model_min": min(seasonal_lags) if seasonal_lags else np.inf,
-                "lags": self._lags_model_all,
-            },
-            model_type_dict={
-                "ets_model": False,
-                "error_type": "A",
-                "trend_type": "N",
-                "season_type": "N",
-                "damped": False,
-            },
-            explanatory_checked={
-                "xreg_model": self._xreg_number > 0,
-                "xreg_number": self._xreg_number,
-                "new_xreg": new_xreg,
-            },
-            components_dict={
-                "components_number_ets": 0,
-                "components_number_ets_seasonal": 0,
-                "components_number_arima": self._components_number,
-            },
+            lags_dict=self._lags_model,
+            model_type_dict=self._model_type,
+            explanatory_checked={**self._explanatory, "new_xreg": new_xreg},
+            components_dict=self._components,
             constants_checked={"constant_required": False},
-            params_info=[[n_param - n_scale, n_scale, n_param]],
+            params_info=self._general["parameters_number"],
             adam_cpp=self._adam_cpp,
             interval=interval,
             level=level,
@@ -1029,6 +1048,96 @@ class CES:
     def _check_fitted(self) -> None:
         if not hasattr(self, "model_name"):
             raise RuntimeError("Model has not been fitted yet. Call fit() first.")
+
+    # The methods of ADAM, as R's methods of adam() take the ces() models: these need
+    # only the residuals, the scale and the distribution
+    _check_is_fitted = _check_fitted
+    rstandard = ADAM.rstandard
+    rstudent = ADAM.rstudent
+    outlierdummy = ADAM.outlierdummy
+    extract_scale = ADAM.extract_scale
+    extract_sigma = ADAM.extract_sigma
+    multicov = ADAM.multicov
+    rmultistep = ADAM.rmultistep
+    _multicov_analytical = ADAM._multicov_analytical
+    _multicov_simulated = ADAM._multicov_simulated
+    _multicov_empirical = ADAM._multicov_empirical
+    vcov = ADAM.vcov
+    confint = ADAM.confint
+    simulate = ADAM.simulate
+
+    def _simulate_state_head(self, lags_model_max):
+        """The profile the fit started from, R's ``$profileInitial`` of ces()."""
+        return self._profiles_recent_initial
+
+    reapply = ADAM.reapply
+    reforecast = ADAM.reforecast
+    coefbootstrap = ADAM.coefbootstrap
+    _variance_debiased = ADAM._variance_debiased
+    plot = ADAM.plot
+    scale_model = None
+    is_combined = False
+
+    def _nobs_observed(self) -> int:
+        """The observed values, which the likelihood counts."""
+        return int(self._obs_observed)
+
+    # The covariance of ADAM's vcov() for CES, as R's vcov.adam() does it for ces()
+    def _fisher_information_matrix(self, step_size=None):
+        """The Hessian of minus the log-likelihood at the estimates. R's vcov() takes
+        the step 1e-8 for CES, which is sensitive."""
+        step = 1e-8 if step_size is None else step_size
+        return np.asarray(
+            _hessian_cpp(
+                lambda b: float(ces_cf(B=np.asarray(b), **_pristine(self._ll_kwargs))),
+                np.asarray(self.coef, dtype=float),
+                step,
+            )
+        )
+
+    def _opg_covariance(self, step_size=None):
+        """The OPG covariance, as R's covarOPGces(): the log-densities of the data
+        at the perturbed parameters, with the scale of each refit."""
+        from smooth.adam_general.core.utils.utils import calculate_likelihood
+        from smooth.adam_general.core.utils.var_covar import covar_opg
+
+        observed = np.asarray(self._observations["ot_logical"], dtype=bool)
+
+        def point_lik_at(b):
+            result = ces_cf(
+                B=np.asarray(b, dtype=float),
+                **_pristine(self._ll_kwargs),
+                return_fitted=True,
+            )
+            if not isinstance(result, tuple):
+                return np.full(len(observed), np.nan)
+            fitted, errors = result
+            scale = _sum_r(errors[observed] ** 2) / np.sum(observed)
+            values = np.ravel(
+                calculate_likelihood(
+                    "dnorm", "A", fitted + errors, fitted.reshape(-1, 1), scale, None
+                )
+            )
+            values[~observed] = 0
+            return values
+
+        return covar_opg(
+            np.asarray(self.coef, dtype=float),
+            point_lik_at,
+            self.nobs,
+            self.loglik,
+            step_size,
+        )
+
+    def _clamp_confint_offsets(self, names, params, lo, hi):
+        """No bounds on the intervals of CES, as in R's confint.adam()."""
+        return None
+
+    @property
+    def _df_scale(self) -> float:
+        """The degrees of freedom of the scale (R's ``adam_dfScale``): the observed
+        values minus the parameters, without the scale under the likelihood."""
+        return float(self._obs_observed - self.nparam + int(self.loss == "likelihood"))
 
     @property
     def coef_names(self) -> List[str]:
@@ -1086,8 +1195,7 @@ class CES:
         self._check_fitted()
         residuals = np.asarray(self.residuals, dtype=float)
         residuals = residuals[np.isfinite(residuals)]
-        df = self._obs_observed - self.nparam + int(self.loss == "likelihood")
-        return float(np.sqrt(np.sum(residuals**2) / df))
+        return float(np.sqrt(np.sum(residuals**2) / self._df_scale))
 
     @property
     def profile(self) -> NDArray:

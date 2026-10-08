@@ -1000,7 +1000,7 @@ class ADAM:
         To see which models were tested::
 
             >>> model.fit(y)
-            >>> print(model.ic_selection)  # Dict of model names -> IC values
+            >>> print(model.ICs)  # Dict of model names -> IC values
 
         **Holdout Validation**:
 
@@ -3363,6 +3363,23 @@ class ADAM:
         """
         self._check_is_fitted()
         return list(self._lags_model.get("lags", [1]))
+
+    @property
+    def ICs(self) -> Union[float, Dict[Any, float]]:  # noqa: N802
+        """The information criteria (R: $ICs): of the models in the pool with a
+        selection or a combination, by name, and of the model otherwise. The
+        subclasses that select by their own criteria (``OM``, ``SMA``) set them."""
+        self._check_is_fitted()
+        if getattr(self, "_ICs", None) is not None:
+            return self._ICs
+        selected = getattr(self, "_adam_selected", None) or {}
+        if isinstance(selected.get("ic_selection"), dict):
+            return {k: float(v) for k, v in selected["ic_selection"].items()}
+        return float(self._ic_selection)
+
+    @ICs.setter
+    def ICs(self, value: Union[float, Dict[Any, float]]) -> None:  # noqa: N802
+        self._ICs = value
 
     @property
     def om_model(self):

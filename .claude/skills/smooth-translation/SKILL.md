@@ -96,7 +96,7 @@ for the sklearn-style fitted values (`persistence_*_`, `arma_parameters_`,
 | `nparam(m)`, `m$nParam` | `m.nparam` (the number), `m.n_param` (the `NParam` table) |
 | `nobs(m)` | `m.nobs` |
 | `AIC` / `AICc` / `BIC` / `BICc` | `m.aic` / `m.aicc` / `m.bic` / `m.bicc` |
-| `m$ICs` (selection, `auto.*`, `sma()`, `tbats()`) | `m.ICs` (`CES` from `AutoCES`, `SMA`, `OM`, `TBATS`; not yet on `ADAM`, which keeps them in `_ic_selection`) |
+| `m$ICs` | `m.ICs` (the pool by name after a selection or a combination, the model's otherwise; `CES` from `AutoCES`) |
 | `fitted(m)`, `residuals(m)`, `actuals(m)` | `m.fitted`, `m.residuals`, `m.actuals` |
 | `m$data`, `m$holdout` | `m.data`, `m.holdout_data` |
 | `m$states` | `m.states` (components in rows) |

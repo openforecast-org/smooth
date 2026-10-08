@@ -1386,3 +1386,31 @@ def test_arma_parameters_are_those_of_r(arma_r, arma):
     values = [value for kind in parts for value in parts[kind].values()]
     assert names == expected["names"]
     np.testing.assert_allclose(values, expected["values"], rtol=1e-6)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize("model", ["ZXZ", "CCN", "MNN"])
+def test_ics_are_those_of_r(model):
+    """``ICs`` is R's ``$ICs``: of the pool with a selection or a combination, of the
+    model otherwise."""
+    import pathlib
+
+    import pandas as pd
+
+    from ._r_bridge import r_dict
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r = r_dict(
+        f"{{m <- adam(ts(y, frequency=12), '{model}');"
+        " list(names=names(m$ICs), values=unname(m$ICs))}",
+        R_data={"y": y},
+    )
+    ics = ADAM(model=model, lags=[12]).fit(y).ICs
+    if r["names"]:
+        expected = dict(zip(r["names"], r["values"]))
+        assert set(ics) == set(expected)
+        for name, value in expected.items():
+            assert ics[name] == pytest.approx(value, rel=1e-8)
+    else:
+        assert ics == pytest.approx(r["values"][0], rel=1e-8)

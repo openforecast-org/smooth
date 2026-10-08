@@ -62,8 +62,19 @@ def test_ces_predict_keeps_the_seasonal_phase_past_one_cycle():
     )
     fitted_with_h = CES(seasonality="full", lags=[12], h=30).fit(y)
     fitted_alone = CES(seasonality="full", lags=[12]).fit(y)
+    # The forecast of the C++ core from the end of the sample, with the lookup
+    # table of the fit, which spans the horizon
+    m = fitted_with_h
+    start = m._head_geometry + m._obs_in_sample
+    forecast = m._adam_cpp.forecast(
+        matrixWt=np.asfortranarray(np.tile(m._mat_wt[-1:], (30, 1))),
+        matrixF=np.asfortranarray(m._mat_f),
+        indexLookupTable=np.asfortranarray(m._index_lookup_table[:, start : start + 30]),
+        profilesRecent=np.asfortranarray(m._profiles_recent_table.copy()),
+        horizon=30,
+    ).forecast
     np.testing.assert_allclose(
-        np.asarray(fitted_alone.predict(h=30).mean), fitted_with_h.forecast_, rtol=1e-12
+        np.asarray(fitted_alone.predict(h=30).mean), np.ravel(forecast), rtol=1e-12
     )
 
 

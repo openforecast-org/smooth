@@ -54,8 +54,9 @@ def ces_initialiser(
 
     Returns
     -------
-    np.ndarray
-        Initial parameter vector B (1-D).
+    tuple of (np.ndarray, list of str)
+        Initial parameter vector B (1-D) and the names of its elements, as R's
+        ``names(B)``.
     """
     B = []
     names = []
@@ -101,7 +102,7 @@ def ces_initialiser(
         if seasonality != "simple":
             # R: B <- c(B, matVt[1:2, 1])
             B.extend(mat_vt[0:2, 0].tolist())
-            names.extend(["level_0", "potential_0"])
+            names.extend(["level", "potential"])
 
         if seasonality == "simple":
             # R: B <- c(B, matVt[1:(nSeasonal*2), 1:lagsModelMax])
@@ -132,4 +133,4 @@ def ces_initialiser(
         else:
             names.extend([f"xreg_{i}" for i in range(xreg_number)])
 
-    return np.array(B, dtype=np.float64)
+    return np.array(B, dtype=np.float64), names

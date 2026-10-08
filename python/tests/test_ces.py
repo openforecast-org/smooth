@@ -295,11 +295,11 @@ class CESCaseTests:
 
     def test_scale(self):
         assert np.isclose(
-            self.m.scale_,
+            self.m.scale,
             self.ref["scale"],
             atol=self.atol_param,
             rtol=self.rtol_param,
-        ), f"scale: {self.m.scale_} vs R {self.ref['scale']}"
+        ), f"scale: {self.m.scale} vs R {self.ref['scale']}"
 
     def test_b_vector(self):
         r_B = np.array(self.ref["B"])
@@ -354,21 +354,22 @@ class CESCaseTests:
     def test_states_shape(self):
         r_nrow = self.ref["states_nrow"]
         r_ncol = self.ref["states_ncol"]
-        p_states = self.m.states
+        # Components in rows, as ADAM's; R's have them in columns
+        p_states = self.m.states.T
         assert p_states.shape == (r_nrow, r_ncol), (
             f"States shape: {p_states.shape} vs R ({r_nrow}, {r_ncol})"
         )
 
     def test_states_first_row(self):
         r_first = np.array(self.ref["states_first_row"])
-        p_first = self.m.states[0, :]
+        p_first = self.m.states[:, 0]
         assert np.allclose(
             p_first, r_first, atol=self.atol_fitted, rtol=self.rtol_fitted
         ), f"States first row: {p_first} vs R {r_first}"
 
     def test_states_last_row(self):
         r_last = np.array(self.ref["states_last_row"])
-        p_last = self.m.states[-1, :]
+        p_last = self.m.states[:, -1]
         assert np.allclose(
             p_last, r_last, atol=self.atol_fitted, rtol=self.rtol_fitted
         ), f"States last row: {p_last} vs R {r_last}"
@@ -475,13 +476,12 @@ class TestAutoCESAirPassengers:
             h=params["h"],
             holdout=params["holdout"],
             lags=params.get("lags"),
-        )
-        self.m.fit(self.y)
+        ).fit(self.y)
 
     def test_selected_seasonality(self):
-        assert self.m.best_model_.seasonality == self.ref["selected_seasonality"], (
+        assert self.m.seasonality == self.ref["selected_seasonality"], (
             "Selected:"
-            f" {self.m.best_model_.seasonality} vs R"
+            f" {self.m.seasonality} vs R"
             f" {self.ref['selected_seasonality']}"
         )
 
@@ -490,11 +490,11 @@ class TestAutoCESAirPassengers:
 
     def test_loglik(self):
         assert np.isclose(
-            self.m.best_model_.loglik, self.ref["logLik"], atol=ATOL_IC, rtol=RTOL_TIGHT
+            self.m.loglik, self.ref["logLik"], atol=ATOL_IC, rtol=RTOL_TIGHT
         )
 
     def test_aicc(self):
-        assert abs(self.m.best_model_.aicc - self.ref["aicc"]) < ATOL_IC
+        assert abs(self.m.aicc - self.ref["aicc"]) < ATOL_IC
 
     def test_forecast(self):
         h = self.ref["python_params"]["h"]
@@ -525,15 +525,14 @@ class TestAutoCESQuarterly:
             h=params["h"],
             holdout=params["holdout"],
             lags=params.get("lags"),
-        )
-        self.m.fit(self.y)
+        ).fit(self.y)
 
     def test_selected_seasonality(self):
-        assert self.m.best_model_.seasonality == self.ref["selected_seasonality"]
+        assert self.m.seasonality == self.ref["selected_seasonality"]
 
     def test_loglik(self):
         assert np.isclose(
-            self.m.best_model_.loglik,
+            self.m.loglik,
             self.ref["logLik"],
             atol=self.atol_ic,
             rtol=RTOL_TIGHT,
@@ -545,3 +544,34 @@ class TestAutoCESQuarterly:
         p_fc = fc.mean.values
         r_fc = np.array(self.ref["forecast"])
         assert np.allclose(p_fc, r_fc, atol=self.atol_fitted, rtol=self.rtol_fitted)
+
+
+@pytest.mark.parametrize(
+    "seasonality, initial", [("partial", "optimal"), ("none", "backcasting")]
+)
+def test_the_attributes_of_adam_agree_with_r(seasonality, initial):
+    """The Fisher Information, the names of B, nParam and sigma are R's."""
+    from tests._r_bridge import r_dict
+
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r = r_dict(
+        f"{{m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
+        f" initial='{initial}', FI=TRUE); list(FI=as.vector(m$FI),"
+        " names=names(m$B), nParam=as.vector(m$nParam[1,]), sigma=sigma(m))}",
+        R_data={"y": y},
+    )
+    m = CES(seasonality=seasonality, lags=[12], initial=initial, fi=True).fit(y)
+    np.testing.assert_allclose(
+        np.ravel(m.fisher_information_, order="F"), r["FI"], rtol=1e-10, atol=1e-10
+    )
+    # R leaves the names of the seasonal initials empty
+    named = [name != "" for name in r["names"]]
+    assert [n for n, k in zip(m.coef_names, named) if k] == [
+        n for n in r["names"] if n != ""
+    ]
+    estimated = m.n_param.estimated
+    assert [estimated[k] for k in ("internal", "xreg", "occurrence", "scale")] == r[
+        "nParam"
+    ][:4]
+    assert m.sigma == pytest.approx(r["sigma"][0], rel=1e-12)

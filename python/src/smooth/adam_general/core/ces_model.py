@@ -7,6 +7,7 @@ state-space filtering and forecasting.
 """
 
 import re
+import time
 import warnings
 from typing import Any, Dict, List, Literal, Optional, Union, cast
 
@@ -16,6 +17,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from smooth.adam_general import _adamCore
+from smooth.adam_general._numDeriv import hessian as _hessian_cpp
 from smooth.adam_general.core.ces.cost_function import ces_cf
 from smooth.adam_general.core.ces.creator import ces_creator
 from smooth.adam_general.core.ces.filler import ces_filler
@@ -27,6 +29,7 @@ from smooth.adam_general.core.creator.architector import (
 from smooth.adam_general.core.forecaster.forecaster import forecaster
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
+from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import multistep_log_lik
 
 SEASONALITY_OPTIONS = Literal["none", "simple", "partial", "full"]
@@ -45,6 +48,25 @@ _VALID_LOSSES = (
     "GPL",
 )
 _CES_NLOPT_WARNING_SHOWN = False
+
+# The settings of the two optimisers, as R's ces() takes them in the ellipsis: the
+# first (BOBYQA) with the suffix 0, the second (Nelder-Mead) without
+_NLOPT_DEFAULTS: Dict[str, Any] = {
+    "algorithm0": "NLOPT_LN_BOBYQA",
+    "algorithm": "NLOPT_LN_NELDERMEAD",
+    "maxeval0": None,
+    "maxeval": None,
+    "maxtime0": -1,
+    "maxtime": -1,
+    "xtol_rel0": 1e-8,
+    "xtol_abs0": 0,
+    "ftol_rel0": 0,
+    "ftol_abs0": 0,
+    "xtol_rel": 1e-6,
+    "xtol_abs": 1e-8,
+    "ftol_rel": 1e-8,
+    "ftol_abs": 0,
+}
 
 
 def _check_loss(loss):
@@ -154,36 +176,28 @@ class CES:
         Verbosity level.
     regressors : str, default="use"
         How to handle external regressors.
-    algorithm0 : str, default="NLOPT_LN_BOBYQA"
-        First-stage optimizer algorithm.
-    algorithm : str, default="NLOPT_LN_NELDERMEAD"
-        Second-stage optimizer algorithm.
-    maxeval : int or None
-        Maximum second-stage optimizer evaluations. None = 40*len(B).
-    maxeval0 : int or None
-        Maximum first-stage optimizer evaluations. None = maxeval default.
-    xtol_rel0 : float, default=1e-8
-        Relative tolerance for first-stage optimizer.
-    xtol_abs0 : float, default=0
-        Absolute tolerance for first-stage optimizer.
-    ftol_rel0 : float, default=0
-        Relative objective tolerance for first-stage optimizer.
-    ftol_abs0 : float, default=0
-        Absolute objective tolerance for first-stage optimizer.
-    xtol_rel : float, default=1e-6
-        Relative tolerance for second-stage optimizer.
-    xtol_abs : float, default=1e-8
-        Absolute tolerance for second-stage optimizer.
-    ftol_rel : float, default=1e-8
-        Relative objective tolerance for second-stage optimizer.
-    ftol_abs : float, default=0
-        Absolute objective tolerance for second-stage optimizer.
+    fi : bool, default=False
+        Whether to compute the Fisher Information of the parameters, as ``ADAM``
+        (R's ``FI=TRUE``), in ``fisher_information_``.
+    step_size : float or None
+        The step of the Hessian behind the Fisher Information, as ``ADAM``.
+    nlopt_kwargs : dict or None
+        The settings of the two optimisers, as ``ADAM``'s ``nlopt_kwargs`` and R's
+        ellipsis of ``ces()``: the first one (``"algorithm0"``, default
+        ``"NLOPT_LN_BOBYQA"``; ``"maxeval0"``, default as ``"maxeval"``;
+        ``"maxtime0"``, ``"xtol_rel0"`` 1e-8, ``"xtol_abs0"``, ``"ftol_rel0"``,
+        ``"ftol_abs0"`` 0) and the second one (``"algorithm"``, default
+        ``"NLOPT_LN_NELDERMEAD"``; ``"maxeval"``, default 40 per parameter;
+        ``"maxtime"``, ``"xtol_rel"`` 1e-6, ``"xtol_abs"`` 1e-8, ``"ftol_rel"``
+        1e-8, ``"ftol_abs"`` 0).
     """
 
     # Attributes set during .fit() (declared here so mypy can resolve them
     # when one CES instance reads another's fitted state, e.g. two-stage init).
-    B: NDArray
-    initial_states_: Dict[str, NDArray]
+    coef: NDArray
+    initial_value: Dict[str, NDArray]
+    # Set by AutoCES on the model it selects, as R's auto.ces()
+    ICs: Dict[str, float]
 
     def __init__(
         self,
@@ -199,20 +213,9 @@ class CES:
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
         verbose: int = 0,
         regressors: Literal["use", "select"] = "use",
-        algorithm0: str = "NLOPT_LN_BOBYQA",
-        algorithm: str = "NLOPT_LN_NELDERMEAD",
-        maxeval: Optional[int] = None,
-        maxeval0: Optional[int] = None,
-        maxtime: float = -1,
-        maxtime0: float = -1,
-        xtol_rel0: float = 1e-8,
-        xtol_abs0: float = 0,
-        ftol_rel0: float = 0,
-        ftol_abs0: float = 0,
-        xtol_rel: float = 1e-6,
-        xtol_abs: float = 1e-8,
-        ftol_rel: float = 1e-8,
-        ftol_abs: float = 0,
+        fi: bool = False,
+        step_size: Optional[float] = None,
+        nlopt_kwargs: Optional[Dict[str, Any]] = None,
         head_length: Optional[int] = None,
     ) -> None:
         # Validate seasonality
@@ -237,20 +240,16 @@ class CES:
         self.ic = ic
         self.verbose = verbose
         self.regressors = regressors
-        self.algorithm0 = algorithm0
-        self.algorithm = algorithm
-        self.maxeval = maxeval
-        self.maxeval0 = maxeval0
-        self.maxtime = maxtime
-        self.maxtime0 = maxtime0
-        self.xtol_rel0 = xtol_rel0
-        self.xtol_abs0 = xtol_abs0
-        self.ftol_rel0 = ftol_rel0
-        self.ftol_abs0 = ftol_abs0
-        self.xtol_rel = xtol_rel
-        self.xtol_abs = xtol_abs
-        self.ftol_rel = ftol_rel
-        self.ftol_abs = ftol_abs
+        self.fi = fi
+        self.step_size = step_size
+        self.nlopt_kwargs = nlopt_kwargs
+        unknown = set(nlopt_kwargs or {}) - set(_NLOPT_DEFAULTS)
+        if unknown:
+            raise ValueError(
+                f"Unknown nlopt_kwargs of CES: {', '.join(sorted(unknown))}. "
+                f"Accepted: {', '.join(_NLOPT_DEFAULTS)}."
+            )
+        self._nlopt = {**_NLOPT_DEFAULTS, **(nlopt_kwargs or {})}
 
     def fit(self, y: NDArray, X: Optional[NDArray] = None) -> "CES":
         """
@@ -268,11 +267,13 @@ class CES:
         self
         """
         _check_loss(self.loss)
+        start_time = time.time()
         y = np.asarray(y, dtype=np.float64).ravel()
+        nlopt_settings = self._nlopt
 
         # CES parity with R depends on the stage-1 BOBYQA trajectory.
         # ETS / ARIMA do not use this two-stage CES path, so keep the check local.
-        if self.algorithm0 == "NLOPT_LN_BOBYQA":
+        if nlopt_settings["algorithm0"] == "NLOPT_LN_BOBYQA":
             version_match = re.findall(r"\d+", getattr(nlopt, "__version__", ""))
             version_tuple = tuple(int(part) for part in version_match[:3])
             if version_tuple and version_tuple < (2, 10, 0):
@@ -307,6 +308,7 @@ class CES:
 
         # The missing values are gaps: filled for the initialisation only, skipped by
         # the fit and not in the loss, as in R's ces()
+        y_actuals = y[:obs_in_sample].copy()
         _, y_filled, y_na_values = _fill_missing(y, y, lags, obs_in_sample)
         y_in_sample = np.asarray(y_filled, dtype=float)[:obs_in_sample]
         observed = ~np.asarray(y_na_values, dtype=bool)[:obs_in_sample]
@@ -475,58 +477,49 @@ class CES:
                 holdout=self.holdout,
                 bounds=self.bounds,
                 verbose=0,
-                algorithm0=self.algorithm0,
-                algorithm=self.algorithm,
-                maxeval=self.maxeval,
-                maxeval0=self.maxeval0,
-                maxtime=self.maxtime,
-                maxtime0=self.maxtime0,
-                xtol_rel0=self.xtol_rel0,
-                xtol_abs0=self.xtol_abs0,
-                ftol_rel0=self.ftol_rel0,
-                ftol_abs0=self.ftol_abs0,
-                xtol_rel=self.xtol_rel,
-                xtol_abs=self.xtol_abs,
-                ftol_rel=self.ftol_rel,
-                ftol_abs=self.ftol_abs,
+                nlopt_kwargs=self.nlopt_kwargs,
             )
             ces_back.fit(y, X=X)
-            B = ces_back.B.copy()
+            B = ces_back.coef.copy()
 
             # Append initial state estimates — R lines 769-785
             if self.seasonality != "simple":
-                B = np.concatenate([B, ces_back.initial_states_["nonseasonal"]])
+                B = np.concatenate([B, ces_back.initial_value["nonseasonal"]])
             if self.seasonality != "none":
-                seasonal_init = ces_back.initial_states_.get("seasonal")
+                seasonal_init = ces_back.initial_value.get("seasonal")
                 if seasonal_init is not None:
                     B = np.concatenate([B, seasonal_init.ravel(order="F")])
-            if xreg_model and "xreg" in ces_back.initial_states_:
-                B = np.concatenate([B, ces_back.initial_states_["xreg"]])
+            if xreg_model and "xreg" in ces_back.initial_value:
+                B = np.concatenate([B, ces_back.initial_value["xreg"]])
 
-        # Build initial B if not from two-stage — R line 788-789
+        # The initial B, unless from two-stage, and the names of its elements --
+        # R line 788-789
+        B_initial, b_names = ces_initialiser(
+            a=a,
+            b=b,
+            seasonality=self.seasonality,
+            n_seasonal=n_seasonal,
+            lags_model_seasonal=lags_model_seasonal,
+            lags_model_max=lags_model_max,
+            mat_vt=mat_vt,
+            initial_type=initial_type,
+            components_number=components_number,
+            xreg_model=xreg_model,
+            xreg_number=xreg_number,
+            xreg_names=xreg_names,
+        )
         if B is None:
-            B = ces_initialiser(
-                a=a,
-                b=b,
-                seasonality=self.seasonality,
-                n_seasonal=n_seasonal,
-                lags_model_seasonal=lags_model_seasonal,
-                lags_model_max=lags_model_max,
-                mat_vt=mat_vt,
-                initial_type=initial_type,
-                components_number=components_number,
-                xreg_model=xreg_model,
-                xreg_number=xreg_number,
-                xreg_names=xreg_names,
-            )
+            B = B_initial
 
         # Maxeval — R lines 800-807
-        maxeval_used = self.maxeval
+        maxeval_used = nlopt_settings["maxeval"]
         if maxeval_used is None:
             maxeval_used = len(B) * 40
             if xreg_model:
                 maxeval_used = max(1000, len(B) * 100)
-        maxeval0_used = self.maxeval0 if self.maxeval0 is not None else maxeval_used
+        maxeval0_used = nlopt_settings["maxeval0"]
+        if maxeval0_used is None:
+            maxeval0_used = maxeval_used
 
         # CF arguments shared by both optimizer stages
         cf_kwargs = dict(
@@ -584,32 +577,36 @@ class CES:
             # ``invalid_argument`` -- so the optimiser is skipped entirely.
             cf_value = float(ces_cf(B=B, **cf_kwargs))
         else:
-            opt1 = nlopt.opt(algo_map.get(self.algorithm0, nlopt.LN_BOBYQA), len(B))
+            opt1 = nlopt.opt(
+                algo_map.get(nlopt_settings["algorithm0"], nlopt.LN_BOBYQA), len(B)
+            )
             opt1.set_min_objective(objective)
             opt1.set_lower_bounds(np.full(len(B), -np.inf))
             opt1.set_upper_bounds(np.full(len(B), np.inf))
             opt1.set_maxeval(maxeval0_used)
-            opt1.set_xtol_rel(self.xtol_rel0)
-            opt1.set_xtol_abs(self.xtol_abs0)
-            opt1.set_ftol_rel(self.ftol_rel0)
-            opt1.set_ftol_abs(self.ftol_abs0)
-            opt1.set_maxtime(self.maxtime0)
+            opt1.set_xtol_rel(nlopt_settings["xtol_rel0"])
+            opt1.set_xtol_abs(nlopt_settings["xtol_abs0"])
+            opt1.set_ftol_rel(nlopt_settings["ftol_rel0"])
+            opt1.set_ftol_abs(nlopt_settings["ftol_abs0"])
+            opt1.set_maxtime(nlopt_settings["maxtime0"])
             try:
                 B = opt1.optimize(B)
             except nlopt.RoundoffLimited:
                 B = B.copy()
 
             # Stage 2: Nelder-Mead — R lines 866-870
-            opt2 = nlopt.opt(algo_map.get(self.algorithm, nlopt.LN_NELDERMEAD), len(B))
+            opt2 = nlopt.opt(
+                algo_map.get(nlopt_settings["algorithm"], nlopt.LN_NELDERMEAD), len(B)
+            )
             opt2.set_min_objective(objective)
             opt2.set_lower_bounds(np.full(len(B), -np.inf))
             opt2.set_upper_bounds(np.full(len(B), np.inf))
             opt2.set_maxeval(maxeval_used)
-            opt2.set_xtol_rel(self.xtol_rel)
-            opt2.set_xtol_abs(self.xtol_abs)
-            opt2.set_ftol_rel(self.ftol_rel)
-            opt2.set_ftol_abs(self.ftol_abs)
-            opt2.set_maxtime(self.maxtime)
+            opt2.set_xtol_rel(nlopt_settings["xtol_rel"])
+            opt2.set_xtol_abs(nlopt_settings["xtol_abs"])
+            opt2.set_ftol_rel(nlopt_settings["ftol_rel"])
+            opt2.set_ftol_abs(nlopt_settings["ftol_abs"])
+            opt2.set_maxtime(nlopt_settings["maxtime"])
             try:
                 B = opt2.optimize(B)
             except nlopt.RoundoffLimited:
@@ -757,29 +754,6 @@ class CES:
             model_name += "X"
         model_name += f"({self.seasonality})"
 
-        # Point forecasts — R lines 1009-1017
-        if h > 0:
-            mat_wt_forecast = mat_wt[-h:]
-            if mat_wt_forecast.shape[0] < h:
-                mat_wt_forecast = np.tile(mat_wt[-1:], (h, 1))
-
-            # Build forecast index lookup
-            idx_start = head_length + obs_in_sample
-            idx_end = idx_start + h
-            ilt_forecast = index_lookup_table[:, idx_start:idx_end]
-
-            forecast_profiles = profiles_recent_table.copy()
-            y_forecast = adam_cpp.forecast(
-                matrixWt=np.asfortranarray(mat_wt_forecast, dtype=np.float64),
-                matrixF=np.asfortranarray(mat_f, dtype=np.float64),
-                indexLookupTable=np.asfortranarray(ilt_forecast, dtype=np.uint64),
-                profilesRecent=np.asfortranarray(forecast_profiles, dtype=np.float64),
-                horizon=int(h),
-            ).forecast
-            y_forecast = np.array(y_forecast).ravel()
-        else:
-            y_forecast = np.array([np.nan])
-
         # Log-likelihood. The reported value is a concentrated likelihood, never
         # -loss. For a fit-only loss it is the *Normal* likelihood re-evaluated
         # at the fitted parameters: CES is a Normal-error model throughout --
@@ -817,25 +791,46 @@ class CES:
         self.bic = BIC(log_lik_value, nobs=obs_observed, df=n_param_estimated)
         self.bicc = BICc(log_lik_value, nobs=obs_observed, df=n_param_estimated)
 
-        # Store all results
-        self.B = np.array(B)
+        # The Fisher Information: the Hessian of minus the log-likelihood, as ADAM's
+        fisher_information = None
+        if self.fi and len(B) > 0:
+            step = self.step_size
+            if step is None:
+                step = float(np.finfo(float).eps ** 0.25)
+            fisher_information = np.asarray(
+                _hessian_cpp(
+                    lambda par: float(
+                        ces_cf(B=np.asarray(par), **_pristine(ll_kwargs))
+                    ),
+                    np.asarray(B, dtype=float),
+                    step,
+                )
+            )
+
+        # Store all results, under ADAM's names
         self.fitted = y_fitted
         self.residuals = errors
-        self.states = mat_vt
-        self.forecast_ = y_forecast
+        # Components in rows, without the extra backcasting head, as ADAM's
+        self.states = mat_vt.T[:, -(obs_in_sample + lags_model_max) :]
         self.model_name = model_name
         self.a_ = a["value"]
         self.b_ = b["value"]
-        self.coef = B
+        self.coef = np.array(B)
         self.loglik = log_lik_value
         self.loss_value = cf_value
-        self.scale_ = scale
-        self.initial_states_ = initial_states
-        self.initial_type_ = initial_type
+        self.scale = scale
+        self.initial_value = initial_states
+        self.initial_type = initial_type
         self.persistence_vector = vec_g[:, 0]
-        self.transition_matrix = mat_f
-        self.measurement_matrix = mat_wt
-        self.n_param = n_param_estimated
+        self.transition = mat_f
+        self.measurement = mat_wt
+        self.nparam = n_param_estimated
+        self.fisher_information_ = fisher_information
+        self.time_elapsed_ = time.time() - start_time
+        self._b_names = b_names
+        self._y_actuals = y_actuals
+        self._lags = lags
+        self._obs_observed = obs_observed
 
         # Store internals for predict
         self._mat_vt = mat_vt
@@ -924,7 +919,7 @@ class CES:
         seasonal_lags = [lag for lag in self._lags_model_all if lag != 1]
         # R's sigma() drops the scale from the parameter count under likelihood
         n_scale = int(self.loss == "likelihood")
-        n_param = int(self.n_param)
+        n_param = int(self.nparam)
 
         return forecaster(
             model_prepared={
@@ -937,7 +932,7 @@ class CES:
                 "profiles_recent_table": self._profiles_recent_table,
                 "residuals": pd.Series(np.asarray(self.residuals, dtype=float)),
                 "y_fitted": np.asarray(self.fitted, dtype=float).copy(),
-                "scale": self.scale_,
+                "scale": self.scale,
             },
             observations_dict={
                 "obs_in_sample": self._obs_in_sample,
@@ -993,7 +988,7 @@ class CES:
 
         R's ``pointLik.adam`` for a ``ces()`` model: the Normal log-density of
         each in-sample observation around its fitted value with the variance
-        ``scale_``, zero at the missing values. With ``log=False`` the densities
+        ``scale``, zero at the missing values. With ``log=False`` the densities
         themselves are returned.
         """
         from smooth.adam_general.core.utils.utils import calculate_likelihood
@@ -1003,7 +998,7 @@ class CES:
         y = self.fitted + self.residuals
         lik_values = np.ravel(
             calculate_likelihood(
-                "dnorm", "A", y, self.fitted.reshape(-1, 1), self.scale_, None
+                "dnorm", "A", y, self.fitted.reshape(-1, 1), self.scale, None
             )
         )
         lik_values[np.isnan(self.residuals)] = 0
@@ -1024,9 +1019,108 @@ class CES:
             "AICc": self.aicc,
             "BIC": self.bic,
             "BICc": self.bicc,
-            "nParam": self.n_param,
-            "scale": self.scale_,
+            "nParam": self.nparam,
+            "scale": self.scale,
         }
+
+    # The properties of ADAM that CES has
+    def _check_fitted(self) -> None:
+        if not hasattr(self, "model_name"):
+            raise RuntimeError("Model has not been fitted yet. Call fit() first.")
+
+    @property
+    def coef_names(self) -> List[str]:
+        """The names of the parameters in ``coef``, as R's ``names(B)``."""
+        self._check_fitted()
+        return list(self._b_names)
+
+    @property
+    def b_value(self) -> NDArray:
+        """The parameter vector B (R's ``$B``), as ``coef``."""
+        return self.coef
+
+    @property
+    def n_param(self) -> NParam:
+        """The table of the numbers of parameters (R's ``$nParam``)."""
+        self._check_fitted()
+        xreg = self._xreg_number
+        n_param = NParam.from_dict(
+            {
+                "estimated": {
+                    "internal": int(self.nparam) - 1 - xreg,
+                    "xreg": xreg,
+                    "scale": 1,
+                }
+            }
+        )
+        n_param.update_totals()
+        return n_param
+
+    @property
+    def nobs(self) -> int:
+        """The number of in-sample observations."""
+        self._check_fitted()
+        return int(self._obs_in_sample)
+
+    @property
+    def loss_(self) -> str:
+        """The loss used (R's ``$loss``)."""
+        return self.loss
+
+    @property
+    def distribution_(self) -> str:
+        """The distribution of the error term (R's ``$distribution``): normal."""
+        return "dnorm"
+
+    @property
+    def error_type(self) -> str:
+        """The type of the error term: additive."""
+        return "A"
+
+    @property
+    def sigma(self) -> float:
+        """The standard error of the residuals, as R's ``sigma()``: over the observed
+        values minus the parameters, without the scale under the likelihood."""
+        self._check_fitted()
+        residuals = np.asarray(self.residuals, dtype=float)
+        residuals = residuals[np.isfinite(residuals)]
+        df = self._obs_observed - self.nparam + int(self.loss == "likelihood")
+        return float(np.sqrt(np.sum(residuals**2) / df))
+
+    @property
+    def profile(self) -> NDArray:
+        """The profile of the states at the end of the sample (R's ``$profile``)."""
+        self._check_fitted()
+        return self._profiles_recent_table
+
+    @property
+    def time_elapsed(self) -> float:
+        """The time of the fit in seconds (R's ``$timeElapsed``)."""
+        self._check_fitted()
+        return self.time_elapsed_
+
+    @property
+    def actuals(self) -> NDArray:
+        """The in-sample data, with their missing values."""
+        self._check_fitted()
+        return self._y_actuals
+
+    @property
+    def data(self) -> NDArray:
+        """The in-sample data (R's ``$data``), as ``actuals``."""
+        return self.actuals
+
+    @property
+    def holdout_data(self) -> Optional[NDArray]:
+        """The holdout data (R's ``$holdout``), or None."""
+        self._check_fitted()
+        return self._y_holdout
+
+    @property
+    def lags_used(self) -> List[int]:
+        """The lags of the model."""
+        self._check_fitted()
+        return list(self._lags)
 
 
 class AutoCES:
@@ -1084,9 +1178,10 @@ class AutoCES:
         self.verbose = verbose
         self._kwargs = kwargs
 
-    def fit(self, y: NDArray, X: Optional[NDArray] = None) -> "AutoCES":
+    def fit(self, y: NDArray, X: Optional[NDArray] = None) -> CES:
         """
-        Fit CES models for each seasonality type and select the best.
+        Fit CES models for each seasonality type and return the best, as R's
+        ``auto.ces()`` returns a ``ces`` object.
 
         Parameters
         ----------
@@ -1097,9 +1192,13 @@ class AutoCES:
 
         Returns
         -------
-        self
+        CES
+            The selected model, with the information criteria of all the
+            candidates in ``ICs`` and the time of the selection in
+            ``time_elapsed``.
         """
         _check_loss(self.loss)
+        start_time = time.time()
         y = np.asarray(y, dtype=np.float64).ravel()
 
         # Determine lags and frequency
@@ -1222,7 +1321,7 @@ class AutoCES:
                 ics[s] = ic_func(
                     model.loglik,
                     nobs=int(np.sum(~model._y_na_values[:obs_in_sample])),
-                    df=model.n_param,
+                    df=model.nparam,
                 )
             except Exception as e:
                 if self.verbose > 0:
@@ -1232,33 +1331,13 @@ class AutoCES:
         if not models:
             raise RuntimeError("All CES models failed to fit.")
 
-        # Select best — R line 170
+        # Select best — R lines 170-186
         best_key = min(ics, key=lambda k: ics[k])
-        self.best_model_ = models[best_key]
-        self.ICs = ics
-        self.models_ = models
-        self.model_name = self.best_model_.model_name
+        best = models[best_key]
+        best.ICs = ics
+        best.time_elapsed_ = time.time() - start_time
 
         if self.verbose > 0:
             print(f'\nThe best model is with seasonality = "{best_key}"')
 
-        return self
-
-    def predict(
-        self,
-        h: Optional[int] = None,
-        X: Optional[NDArray] = None,
-        **kwargs,
-    ) -> ForecastResult:
-        """Delegate prediction to the best model."""
-        if not hasattr(self, "best_model_"):
-            raise RuntimeError("AutoCES has not been fitted yet.")
-        return self.best_model_.predict(h=h, X=X, **kwargs)
-
-    def summary(self) -> Dict[str, Any]:
-        """Return a summary of the best model."""
-        if not hasattr(self, "best_model_"):
-            raise RuntimeError("AutoCES has not been fitted yet.")
-        result = self.best_model_.summary()
-        result["ICs"] = self.ICs
-        return result
+        return best

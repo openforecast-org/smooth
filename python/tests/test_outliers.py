@@ -251,36 +251,33 @@ class TestExpandOutlierDummies:
         assert E.shape == (3, 9)
 
     def test_lag_structure(self):
-        """The lag-1, t, lead+1 structure is correct for a unit dummy."""
+        """The dummy, its lag and its lead, in the order of R's xregExpander()."""
         # Single outlier at row 2 in a 5-row matrix
         D = np.zeros((5, 1))
         D[2, 0] = 1.0
         E = ADAM._expand_outlier_dummies(D)
         assert E.shape == (5, 3)
-        # lag-1 column: 1 at row 3 (the row AFTER the outlier in original)
-        # Wait - lag-1 means e[t-1], i.e. we shift the column forward by 1
-        # so the 1 appears one row later
-        np.testing.assert_array_equal(E[:, 0], [0, 0, 0, 1, 0])  # lag -1
-        np.testing.assert_array_equal(E[:, 1], [0, 0, 1, 0, 0])  # t
-        np.testing.assert_array_equal(E[:, 2], [0, 1, 0, 0, 0])  # lead +1
+        np.testing.assert_array_equal(E[:, 0], [0, 0, 1, 0, 0])  # t
+        np.testing.assert_array_equal(E[:, 1], [0, 0, 0, 1, 0])  # Lag1
+        np.testing.assert_array_equal(E[:, 2], [0, 1, 0, 0, 0])  # Lead1
 
     def test_boundary_lag(self):
-        """Lag at row 0 wraps correctly (no out-of-bounds)."""
+        """The lead of the first row is zero (gaps="zero")."""
         D = np.zeros((4, 1))
         D[0, 0] = 1.0
         E = ADAM._expand_outlier_dummies(D)
-        np.testing.assert_array_equal(E[:, 0], [0, 1, 0, 0])  # lag-1
-        np.testing.assert_array_equal(E[:, 1], [1, 0, 0, 0])  # t
-        np.testing.assert_array_equal(E[:, 2], [0, 0, 0, 0])  # lead+1 (0 at start)
+        np.testing.assert_array_equal(E[:, 0], [1, 0, 0, 0])  # t
+        np.testing.assert_array_equal(E[:, 1], [0, 1, 0, 0])  # Lag1
+        np.testing.assert_array_equal(E[:, 2], [0, 0, 0, 0])  # Lead1
 
     def test_boundary_lead(self):
-        """Lead at last row wraps correctly."""
+        """The lag of the last row is zero (gaps="zero")."""
         D = np.zeros((4, 1))
         D[3, 0] = 1.0
         E = ADAM._expand_outlier_dummies(D)
-        np.testing.assert_array_equal(E[:, 0], [0, 0, 0, 0])  # lag-1 (0 at end)
-        np.testing.assert_array_equal(E[:, 1], [0, 0, 0, 1])  # t
-        np.testing.assert_array_equal(E[:, 2], [0, 0, 1, 0])  # lead+1
+        np.testing.assert_array_equal(E[:, 0], [0, 0, 0, 1])  # t
+        np.testing.assert_array_equal(E[:, 1], [0, 0, 0, 0])  # Lag1
+        np.testing.assert_array_equal(E[:, 2], [0, 0, 1, 0])  # Lead1
 
 
 class TestADAMOutlierHandling:

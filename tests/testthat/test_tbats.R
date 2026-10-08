@@ -601,3 +601,21 @@ test_that("the unnamed regressors of tbats() are x1, x2, ...", {
                        orders=list(ar=0, ma=0, select=FALSE));
     expect_equal(testModel$xregNames, c("x1", "x2"));
 })
+
+# The dummies of the outliers are zero in the future: not forecast, and added to newdata
+test_that("the dummies of the outliers are zero in the forecasts", {
+    y <- AirPassengers;
+    y[c(30, 140)] <- y[c(30, 140)]*1.4;
+    testModel <- tbats(y, outliers="use");
+    expect_no_warning(testForecast <- forecast(testModel, h=12));
+    zeros <- matrix(0, 12, length(testModel$xregNames), dimnames=list(NULL, testModel$xregNames));
+    expect_equal(testForecast$mean, forecast(testModel, h=12, newdata=zeros)$mean);
+    x <- rnorm(156);
+    testModel <- tbats(y, outliers="use", xreg=cbind(x=x[1:144]));
+    expect_length(forecast(testModel, h=12, newdata=data.frame(x=x[145:156]))$mean, 12);
+    testModel <- adam(y, "MAM", outliers="use");
+    expect_no_warning(testForecast <- forecast(testModel, h=12));
+    zeros <- as.data.frame(matrix(0, 12, length(testModel$initial$xreg),
+                                  dimnames=list(NULL, names(testModel$initial$xreg))));
+    expect_equal(testForecast$mean, forecast(testModel, h=12, newdata=zeros)$mean);
+})

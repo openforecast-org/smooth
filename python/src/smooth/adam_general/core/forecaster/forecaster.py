@@ -6,7 +6,7 @@ import pandas as pd
 # Note: adam_cpp instance is passed to functions that need C++ integration
 # The adamCore object is created in architector() and passed through the pipeline
 from smooth.adam_general.core.utils.n_param import NParam
-from smooth.adam_general.core.utils.utils import observed_mask
+from smooth.adam_general.core.utils.utils import OUTLIER_NAMES, observed_mask
 
 from ._helpers import (
     _prepare_lookup_table,
@@ -271,19 +271,25 @@ def _forecast_measurement(model_prepared, explanatory_checked, components_dict, 
     new_xreg = explanatory_checked.get("new_xreg") if explanatory_checked else None
     if not explanatory_checked or not explanatory_checked.get("xreg_model"):
         return model_prepared
-    if new_xreg is None:
+    xreg_start = (
+        components_dict["components_number_ets"]
+        + components_dict["components_number_arima"]
+    )
+    # Without new values, the dummies of the outliers are zero in the future, as in R
+    names = explanatory_checked.get("xreg_names") or []
+    dummies = [xreg_start + i for i, n in enumerate(names) if OUTLIER_NAMES.match(n)]
+    if new_xreg is None and not dummies:
         return model_prepared
     measurement = model_prepared["measurement"]
     if measurement.shape[0] < h:
         mat_wt = np.tile(measurement[-1], (h, 1))
     else:
         mat_wt = measurement[-h:].copy()
-    xreg_start = (
-        components_dict["components_number_ets"]
-        + components_dict["components_number_arima"]
-    )
-    xreg_end = xreg_start + explanatory_checked["xreg_number"]
-    mat_wt[:, xreg_start:xreg_end] = new_xreg
+    if new_xreg is None:
+        mat_wt[:, dummies] = 0
+    else:
+        xreg_end = xreg_start + explanatory_checked["xreg_number"]
+        mat_wt[:, xreg_start:xreg_end] = new_xreg
     return {**model_prepared, "measurement_forecast": mat_wt}
 
 

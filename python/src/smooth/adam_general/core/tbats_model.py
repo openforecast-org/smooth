@@ -22,6 +22,7 @@ from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.reapply import ReapplyResult
 from smooth.adam_general.core.utils.reforecast import ReforecastResult
 from smooth.adam_general.core.utils.utils import (
+    OUTLIER_NAMES,
     _exp_r,
     _log_r,
     _sum_r,
@@ -1756,17 +1757,30 @@ class TBATS:
 
     def _future_x(self, h: int, X: Optional[Any]) -> Optional[NDArray]:
         """The future values of the regressors (R's ``adam_xregNewdata``): ``X``,
-        else the holdout, else the regressors forecast by ADAM with a warning."""
+        else the holdout, else the regressors forecast by ADAM with a warning. The
+        dummies of the outliers are zero: not forecast, and added to ``X`` when it
+        lacks them."""
         xreg = self._best["struct"]["xreg"]
         if xreg is None or h <= 0:
             return None
         names = xreg["names"]
+        dummies = [i for i, name in enumerate(names) if OUTLIER_NAMES.match(name)]
+        others = [i for i in range(len(names)) if i not in dummies]
         if X is not None:
             if isinstance(X, pd.DataFrame):
                 values = X.set_axis(st.make_names([str(c) for c in X.columns]), axis=1)
+                for i in dummies:
+                    if names[i] not in values:
+                        values[names[i]] = 0.0
                 values = values[names].to_numpy(dtype=float)
             else:
-                values = np.asarray(X, dtype=float).reshape(-1, len(names))
+                values = np.asarray(X, dtype=float)
+                if values.ndim == 1:
+                    values = values.reshape(-1, len(others) if dummies else len(names))
+                if dummies and values.shape[1] == len(others):
+                    full = np.zeros((values.shape[0], len(names)))
+                    full[:, others] = values
+                    values = full
             if values.shape[0] < h:
                 warnings.warn(
                     f"X has {values.shape[0]} observations, while {h} are needed. "
@@ -1788,19 +1802,19 @@ class TBATS:
             return holdout[:h].copy()
         from smooth.adam_general.core.adam import ADAM
 
-        warnings.warn(
-            "X is not provided. Predicting the explanatory variables based on what "
-            "I have in-sample.",
-            stacklevel=3,
-        )
+        if others:
+            warnings.warn(
+                "X is not provided. Predicting the explanatory variables based on "
+                "what I have in-sample.",
+                stacklevel=3,
+            )
         known = np.zeros((0, len(names))) if holdout is None else holdout
         h_needed = h - known.shape[0]
-        forecasts = np.column_stack(
-            [
-                np.asarray(ADAM().fit(column).predict(h=h_needed).mean, dtype=float)
-                for column in xreg["data"].T
-            ]
-        )
+        forecasts = np.zeros((h_needed, len(names)))
+        for i in others:
+            forecasts[:, i] = np.asarray(
+                ADAM().fit(xreg["data"][:, i]).predict(h=h_needed).mean, dtype=float
+            )
         return np.vstack([known, forecasts])
 
     def _pull_back(self, parameters: NDArray, point: NDArray) -> NDArray:

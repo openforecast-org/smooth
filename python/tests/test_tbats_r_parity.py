@@ -387,7 +387,8 @@ def test_the_fits_with_outliers_agree(case):
         f"{{ {OUTLIERS_DATA} m <- suppressWarnings(tbats({y}, {r_arguments},"
         f" xreg={X or 'NULL'})); list(y=as.numeric({y}), X={X or 'NULL'},"
         " xregNames=m$xregNames, B=unname(m$B), names=names(m$B),"
-        " logLik=as.numeric(logLik(m)), ICs=unname(m$ICs), ICnames=names(m$ICs)) }"
+        " logLik=as.numeric(logLik(m)), ICs=unname(m$ICs), ICnames=names(m$ICs),"
+        f" forecast={'NULL' if X else 'as.numeric(forecast(m, h=12)$mean)'}) }}"
     )
     y_values = np.array([np.nan if v == "NA" else v for v in r["y"]], dtype=float)
     X_values = None if X is None else np.asarray(r["X"], dtype=float)
@@ -400,6 +401,12 @@ def test_the_fits_with_outliers_agree(case):
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
     assert list(fit.ICs) == r["ICnames"]
     np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
+    # The dummies are zero in the future: no regressor to forecast, no warning
+    if X is None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            forecast = fit.predict(h=12).mean
+        np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-8)
 
 
 INTERMITTENT = (

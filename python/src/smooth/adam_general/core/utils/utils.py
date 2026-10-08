@@ -1089,6 +1089,11 @@ def xreg_selector(errors, xreg_data, names, ic, df, distribution, other=None):
     return list(model._feature_names or [])
 
 
+# The dummies of the outliers (outlier1, outlier1Lag1, outlier1Lead1, ...), as R names
+# them: zero in the future, as in R's adam_xregNewdata
+OUTLIER_NAMES = re.compile(r"^outlier[0-9]+(Lag1|Lead1)?$")
+
+
 def make_names(names: list) -> list:
     """R's ``make.names(unique=TRUE)``: the syntactic, unique names of the
     regressors, as R gives them to the variables of the model."""

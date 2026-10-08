@@ -686,7 +686,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         persistence=persistence, phi=phi, initial=initial, arma=arma,
                                         occurrence=occurrence,
                                         ic=ic, bounds=bounds, silent=silent,
-                                        smoother=ellipsis$smoother, ...)));
+                                        smoother=ellipsis$smoother, ...),
+                       # The data is substituted (for its name), so it is found where adam() was called
+                       envir=parent.frame()));
     }
 
     headLengthUser <- ellipsis$headLength;
@@ -5920,6 +5922,9 @@ adam_forecastRegression <- function(object, h, newdata, occurrence, interval, le
 adam_xregNewdata <- function(object, h, newdata){
     xregNumber <- length(object$initial$xreg);
     xregNames <- names(object$initial$xreg);
+    # The dummies of the outliers (outlier1, outlier1Lag1, outlier1Lead1, ...) are zero in
+    # the future: they are not forecast, and are added to newdata when it lacks them
+    outlierNames <- grep("^outlier[0-9]+(Lag1|Lead1)?$", xregNames, value=TRUE);
     # The newdata is not provided
     if(is.null(newdata) && ((!is.null(object$holdout) && nrow(object$holdout)<h) ||
                             is.null(object$holdout))){
@@ -5934,16 +5939,20 @@ adam_xregNewdata <- function(object, h, newdata){
             xreg <- tail(object$data,h);
         }
 
+        forecastNeeded <- any(!(xregNames %in% outlierNames));
         if(is.matrix(xreg)){
-            warning("The newdata is not provided.",
-                    "Predicting the explanatory variables based on what I have in-sample.",
-                    call.=FALSE);
-            xreg <- adam_xregForecast(object, xreg, hNeeded);
+            if(forecastNeeded){
+                warning("The newdata is not provided.",
+                        "Predicting the explanatory variables based on what I have in-sample.",
+                        call.=FALSE);
+            }
+            xreg <- adam_xregForecast(object, xreg, hNeeded, outlierNames);
         }
-        else{
+        else if(forecastNeeded){
             warning("The newdata is not provided. Using last h in-sample observations instead.",
                     call.=FALSE);
         }
+        xreg[nrow(xreg)-hNeeded+seq_len(hNeeded), outlierNames] <- 0;
     }
     # The newdata is not provided, but we have holdout
     else if(is.null(newdata) && !is.null(object$holdout) && nrow(object$holdout)>=h){
@@ -5955,6 +5964,12 @@ adam_xregNewdata <- function(object, h, newdata){
         if(!is.data.frame(newdata) && !is.matrix(newdata)){
             newdata <- as.data.frame(newdata);
             colnames(newdata) <- "xreg";
+        }
+        outliersMissing <- setdiff(outlierNames, colnames(newdata));
+        if(length(outliersMissing)>0){
+            newdata <- cbind(as.data.frame(newdata),
+                             matrix(0, nrow(newdata), length(outliersMissing),
+                                    dimnames=list(NULL, outliersMissing)));
         }
         if(nrow(newdata)<h){
             warning(paste0("The newdata has ",nrow(newdata)," observations, while ",h," are needed. ",
@@ -6027,12 +6042,12 @@ adam_xregNewdata <- function(object, h, newdata){
 }
 
 # The future values of the explanatory variables in a matrix xreg (the columns of the
-# data), when newdata is missing: each variable but the response forecast by adam() into
-# the last hNeeded rows
-adam_xregForecast <- function(object, xreg, hNeeded){
+# data), when newdata is missing: each variable but the response and the dummies of the
+# outliers forecast by adam() into the last hNeeded rows
+adam_xregForecast <- function(object, xreg, hNeeded, outlierNames=NULL){
     responseName <- all.vars(formula(object))[1];
     rows <- nrow(xreg)-hNeeded+seq_len(hNeeded);
-    for(variable in setdiff(colnames(xreg), responseName)){
+    for(variable in setdiff(colnames(xreg), c(responseName, outlierNames))){
         xreg[rows,variable] <- adam(object$data[,variable], h=hNeeded, silent=TRUE)$forecast;
     }
     return(xreg);

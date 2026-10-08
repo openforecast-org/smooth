@@ -24,6 +24,7 @@ from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.printing import decorate_occurrence_name
 from smooth.adam_general.core.utils.utils import (
+    OUTLIER_NAMES,
     SMOOTHER_DEFAULT,
     SmootherType,
     observed_mask,
@@ -1082,6 +1083,10 @@ class ADAM:
         # No need to call _setup_parameters as those parameters are now
         # instance attributes
 
+        # The model as specified: the refit with the dummies of the outliers selects
+        # it again, as R's auto.adam() re-evaluates its call
+        model_spec = self.model
+
         # Check parameters and prepare data
         self._check_parameters(y, X)
 
@@ -1148,8 +1153,6 @@ class ADAM:
         # Scale the demand-sizes fitted values by the occurrence probability
         # so the resulting ``fitted`` series is on the original (mixed) scale.
         if self._om_model is not None:
-            import pandas as pd
-
             p = self._occurrence["p_fitted"]
             yf = self._prepared["y_fitted"]
             if isinstance(yf, pd.Series):
@@ -1201,17 +1204,26 @@ class ADAM:
             if len(od.id) > 0:
                 dummies = od.outliers
                 assert dummies is not None  # non-empty od.id guarantees outliers
-                D = (
-                    self._expand_outlier_dummies(dummies)
-                    if _outliers == "select"
-                    else dummies
-                )
+                names = [f"outlier{i + 1}" for i in range(dummies.shape[1])]
+                D = dummies
+                if _outliers == "select":
+                    D = self._expand_outlier_dummies(dummies)
+                    names = [f"{n}{s}" for n in names for s in ("", "Lag1", "Lead1")]
                 h_eff = len(y) - self.nobs
                 if h_eff > 0:
                     D = np.vstack([D, np.zeros((h_eff, D.shape[1]))])
-                X_new = np.hstack([X, D]) if X is not None else D
+                # Named as R names them, next to the regressors of X
+                X_new = pd.DataFrame(D, columns=names)
+                if isinstance(X, pd.DataFrame):
+                    X_new = pd.concat([X.reset_index(drop=True), X_new], axis=1)
+                elif X is not None:
+                    values = np.asarray(X, dtype=float).reshape(len(D), -1)
+                    columns = [f"x{i + 1}" for i in range(values.shape[1])]
+                    X_old = pd.DataFrame(values, columns=columns)
+                    X_new = pd.concat([X_old, X_new], axis=1)
                 self.outliers = "ignore"
                 self.regressors = "select" if _outliers == "select" else "use"
+                self.model = model_spec
                 self.fit(y, X_new)
                 self._config["outliers"] = _outliers
                 return self  # _config already built by the recursive fit()
@@ -2602,7 +2614,8 @@ class ADAM:
     @staticmethod
     def _expand_outlier_dummies(D: NDArray) -> NDArray:
         """
-        Expand each outlier dummy column into three columns: lag-1, t, lead+1.
+        Expand each outlier dummy column into three columns: t, lag 1 and lead 1,
+        as R's ``xregExpander(-1:1, gaps="zero")``.
 
         Used by ``outliers="select"`` to allow the regressor selection
         mechanism to choose which temporal offset carries the outlier effect.
@@ -2616,16 +2629,14 @@ class ADAM:
         -------
         NDArray of shape (n, 3*m)
             Expanded matrix with columns ordered as
-            ``[lag_1, t, lead_1, lag_2, t_2, lead_2, ...]``.
+            ``[t_1, lag_1, lead_1, t_2, lag_2, lead_2, ...]``.
         """
-        n, m = D.shape
-        cols = []
-        for j in range(m):
-            col = D[:, j]
-            cols.append(np.concatenate([[0.0], col[:-1]]))  # lag -1
-            cols.append(col.copy())  # t
-            cols.append(np.concatenate([col[1:], [0.0]]))  # lead +1
-        return np.column_stack(cols)
+        return np.column_stack(
+            [
+                gb.xreg_expander(D[:, [j]], [-1, 0, 1], gaps="zero")
+                for j in range(D.shape[1])
+            ]
+        )
 
     @property
     def nobs(self) -> int:
@@ -3593,6 +3604,13 @@ class ADAM:
                 new_xreg = new_xreg.astype(float)
             if new_xreg.ndim == 1:
                 new_xreg = new_xreg.reshape(-1, 1)
+            # Zeros for the dummies of the outliers missing from X, as in R
+            names = list(self._explanatory.get("xreg_names") or [])
+            others = [i for i, n in enumerate(names) if not OUTLIER_NAMES.match(n)]
+            if len(others) < len(names) and new_xreg.shape[1] == len(others):
+                full = np.zeros((new_xreg.shape[0], len(names)))
+                full[:, others] = new_xreg
+                new_xreg = full
         self._set_new_xreg(new_xreg)
 
         # Validate prediction inputs and prepare data for forecasting
@@ -6447,18 +6465,24 @@ class ADAM:
             n_arima_fc = self._components["components_number_arima"]
             xreg_col_lo = n_ets_fc + n_arima_fc
             xreg_col_hi = xreg_col_lo + xreg_number
+            # The dummies of the outliers are zero in the future, as in R
+            names = list(self._explanatory.get("xreg_names") or [])
+            dummies = [i for i, n in enumerate(names) if OUTLIER_NAMES.match(n)]
+            others = [i for i in range(len(names)) if i not in dummies]
             if X is None:
                 xreg_in = np.asarray(self._explanatory["xreg_data"], dtype=float)
                 if xreg_in.shape[0] >= h:
-                    new_xreg = xreg_in[-h:, :]
+                    new_xreg = xreg_in[-h:, :].copy()
                 else:
                     new_xreg = np.tile(xreg_in[-1:], (h, 1))
-                warnings.warn(
-                    "newdata (X) not provided to reforecast for an xreg "
-                    "model; using the last h in-sample xreg rows as a "
-                    "fallback (matches R's behaviour).",
-                    stacklevel=2,
-                )
+                new_xreg[:, dummies] = 0
+                if others:
+                    warnings.warn(
+                        "newdata (X) not provided to reforecast for an xreg "
+                        "model; using the last h in-sample xreg rows as a "
+                        "fallback (matches R's behaviour).",
+                        stacklevel=2,
+                    )
             else:
                 new_xreg = np.asarray(X, dtype=float)
                 if new_xreg.dtype.kind not in ("f", "i", "u"):
@@ -6468,6 +6492,10 @@ class ADAM:
                     )
                 if new_xreg.ndim == 1:
                     new_xreg = new_xreg.reshape(-1, 1)
+                if dummies and new_xreg.shape[1] == len(others):
+                    full = np.zeros((new_xreg.shape[0], len(names)))
+                    full[:, others] = new_xreg
+                    new_xreg = full
                 columns = self._explanatory.get("xreg_columns")
                 if columns is not None and new_xreg.shape[1] != xreg_number:
                     new_xreg = new_xreg[:, columns]

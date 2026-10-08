@@ -104,25 +104,24 @@ def ces_initialiser(
             B.extend(mat_vt[0:2, 0].tolist())
             names.extend(["level", "potential"])
 
-        if seasonality == "simple":
-            # R: B <- c(B, matVt[1:(nSeasonal*2), 1:lagsModelMax])
-            # R stores column-major, so flatten by column
+        # The seasonal states, column by column as in R's matVt, named after the
+        # state and the position in the lag, as R
+        if seasonality != "none":
+            states = {
+                "simple": ["level.s", "potential.s"],
+                "partial": ["seasonal"],
+                "full": ["seasonal 1", "seasonal 2"],
+            }[seasonality]
+            rows = [
+                name if n_seasonal == 1 else f"{name}[{lag}]"
+                for lag in lags_model_seasonal
+                for name in states
+            ]
+            first = 0 if seasonality == "simple" else 2
             for col in range(lags_model_max):
-                for row in range(n_seasonal * 2):
-                    B.append(mat_vt[row, col])
-                    names.append(f"state_{row}_lag_{col}")
-        elif seasonality == "partial":
-            # R: B <- c(B, matVt[2+(1:nSeasonal), 1:lagsModelMax])
-            for col in range(lags_model_max):
-                for i in range(n_seasonal):
-                    B.append(mat_vt[2 + i, col])
-                    names.append(f"seasonal_{i}_lag_{col}")
-        elif seasonality == "full":
-            # R: B <- c(B, matVt[2+(1:(nSeasonal*2)), 1:lagsModelMax])
-            for col in range(lags_model_max):
-                for i in range(n_seasonal * 2):
-                    B.append(mat_vt[2 + i, col])
-                    names.append(f"seasonal_{i}_lag_{col}")
+                for i, row in enumerate(rows):
+                    B.append(mat_vt[first + i, col])
+                    names.append(f"{row}_{col + 1}")
 
     # --- Xreg initials --- R lines 742-744
     if xreg_model and initial_type != "complete":

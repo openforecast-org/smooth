@@ -547,7 +547,14 @@ class TestAutoCESQuarterly:
 
 
 @pytest.mark.parametrize(
-    "seasonality, initial", [("partial", "optimal"), ("none", "backcasting")]
+    "seasonality, initial",
+    [
+        ("partial", "optimal"),
+        ("none", "backcasting"),
+        ("full", "two-stage"),
+        ("simple", "optimal"),
+        ("simple", "two-stage"),
+    ],
 )
 def test_the_attributes_of_adam_agree_with_r(seasonality, initial):
     """The Fisher Information, the names of B, nParam and sigma are R's."""
@@ -565,11 +572,7 @@ def test_the_attributes_of_adam_agree_with_r(seasonality, initial):
     np.testing.assert_allclose(
         np.ravel(m.fisher_information_, order="F"), r["FI"], rtol=1e-10, atol=1e-10
     )
-    # R leaves the names of the seasonal initials empty
-    named = [name != "" for name in r["names"]]
-    assert [n for n, k in zip(m.coef_names, named) if k] == [
-        n for n in r["names"] if n != ""
-    ]
+    assert m.coef_names == r["names"]
     estimated = m.n_param.estimated
     assert [estimated[k] for k in ("internal", "xreg", "occurrence", "scale")] == r[
         "nParam"

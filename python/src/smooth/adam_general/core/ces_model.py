@@ -488,7 +488,9 @@ class CES:
             if self.seasonality != "none":
                 seasonal_init = ces_back.initial_value.get("seasonal")
                 if seasonal_init is not None:
-                    B = np.concatenate([B, seasonal_init.ravel(order="F")])
+                    # Time by time, the components of each, as R's as.vector() of
+                    # its components-by-time matrix
+                    B = np.concatenate([B, seasonal_init.ravel(order="C")])
             if xreg_model and "xreg" in ces_back.initial_value:
                 B = np.concatenate([B, ces_back.initial_value["xreg"]])
 

@@ -722,6 +722,13 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         #               updateX=updateX,persistenceX=persistenceX,transitionX=transitionX));
         # }
 
+        # The rows of the seasonal states and the names of their initials in B: the name
+        # of the state and the position in the lag, column by column as in matVt
+        seasonalRows <- switch(seasonality, "simple"=1:(nSeasonal*2), "partial"=2+(1:nSeasonal),
+                               "full"=2+(1:(nSeasonal*2)), NULL);
+        seasonalNames <- paste0(rownames(matVt)[seasonalRows], "_",
+                                rep(1:lagsModelMax, each=length(seasonalRows)));
+
         # Initialisation before the optimiser
         # if(any(initialType=="optimal",a$estimate,b$estimate)){
         initialiser <- function(...){
@@ -775,14 +782,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                 }
 
                 # Record seasonal indices
-                if(seasonality=="simple"){
-                    B <- c(B, matVt[1:(nSeasonal*2),1:lagsModelMax]);
-                }
-                else if(seasonality=="partial"){
-                    B <- c(B, matVt[2+(1:nSeasonal),1:lagsModelMax]);
-                }
-                else if(seasonality=="full"){
-                    B <- c(B, matVt[2+(1:(nSeasonal*2)),1:lagsModelMax]);
+                if(seasonality!="none"){
+                    B <- c(B, setNames(as.vector(matVt[seasonalRows,1:lagsModelMax]), seasonalNames));
                 }
             }
 
@@ -817,15 +818,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                 B <- c(B, cesBack$initial$nonseasonal);
             }
             if(seasonality!="none"){
-                BSeasonal <- as.vector(cesBack$initial$seasonal);
-                if(seasonality=="partial"){
-                    names(BSeasonal) <- paste0("seasonal_", c(1:lagsModelMax));
-                }
-                else{
-                    names(BSeasonal) <- paste0(rep(c("seasonal 1_","seasonal 2_"), times=lagsModelMax),
-                                               rep(c(1:lagsModelMax), each=2))
-                }
-                B <- c(B, BSeasonal);
+                B <- c(B, setNames(as.vector(cesBack$initial$seasonal), seasonalNames));
             }
             if(xregModel){
                 B <- c(B, cesBack$initial$xreg);

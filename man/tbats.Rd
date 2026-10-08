@@ -22,9 +22,9 @@ tbats(y, lags = c(1, frequency(y)), harmonics = NULL, trend = c("auto",
   trend = c("auto", "none", "additive", "damped"), orders = list(ar = 3, ma
   = 3, select = TRUE), xreg = NULL, regressors = c("use", "select",
   "adapt"), ic = c("AICc", "AIC", "BIC", "BICc"), persistence = NULL,
-  phi = NULL, initial = c("optimal", "backcasting", "two-stage",
-  "complete"), arma = NULL, bounds = c("admissible", "usual", "none"),
-  silent = TRUE, ...)
+  phi = NULL, initial = c("backcasting", "optimal", "two-stage",
+  "complete", "gradient"), arma = NULL, bounds = c("admissible", "usual",
+  "none"), silent = TRUE, ...)
 }
 \arguments{
 \item{y}{Vector or ts object, containing the data needed to be forecasted. The
@@ -185,13 +185,14 @@ will not estimate anything and will use all its parameters.}
 
 \item{object}{The model estimated with \code{tbats()}, for \code{sm()}: the scale of
 its error term is modelled by TBATS (with the arguments and defaults of
-\code{tbats()}, but the lags of \code{object} and \code{initial="optimal"}, as
-\code{sm.adam()}, by default) on the transformed errors in
-the space of the Box-Cox transformed data (the squares for \code{"dnorm"}, the
-absolute values for \code{"dlaplace"}, ...), with lambda 0, by the joint likelihood
+\code{tbats()}, but the lags of \code{object} by default) on the transformed errors
+in the space of the Box-Cox transformed data (the squares for \code{"dnorm"}, the
+absolute values for \code{"dlaplace"}, ..., divided by the exponent of the mean of
+their logarithm at a unit scale, so that their logarithms are unbiased for the
+log-scale), with lambda 0, by the joint likelihood
 of the model's data. \link[greybox]{implant} puts it in \code{object}, whose
-forecasts then have the scale of each horizon. Not available with an occurrence
-model yet.}
+forecasts then have the scale of each horizon. With an occurrence model, the scale
+model shares it, and the zeros take the differential entropy at their scale.}
 }
 \value{
 Object of class \code{c("adamTBATS","adam","smooth")} is returned with

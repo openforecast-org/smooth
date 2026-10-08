@@ -646,12 +646,10 @@ def CF(  # noqa: N802
                     int(np.sum(ot_zero)),
                     adam_fitted.fitted[ot_zero],
                 )
-                # NaN means something is wrong; a negative entropy (it should not
-                # be) becomes zero, so that occurrence does not distort the sizes
+                # NaN means something is wrong; a negative entropy (a small scale)
+                # stays: it is the likelihood of the zeros
                 if np.isnan(CFValueEntropy):
                     CFValueEntropy = np.inf
-                elif CFValueEntropy < 0:
-                    CFValueEntropy = 0.0
                 CFValue += CFValueEntropy
 
         elif general["loss"] == "MSE":

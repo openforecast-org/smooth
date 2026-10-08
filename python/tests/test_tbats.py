@@ -803,7 +803,7 @@ def test_the_outliers_of_the_global_model_become_regressors(air):
 
 def test_the_scale_model_of_tbats():
     """sm() models the scale by TBATS; attached, it raises the likelihood, its terms
-    sum to it, and the intervals follow the scale. Not with an occurrence model."""
+    sum to it, and the intervals follow the scale, with an occurrence model too."""
     rng = np.random.default_rng(3)
     times = np.arange(1, 24 * 7 * 4 + 1)
     sigma = np.exp(0.6 * np.sin(2 * np.pi * times / 24))
@@ -819,6 +819,11 @@ def test_the_scale_model_of_tbats():
         fit.predict(h=24, interval="prediction").lower
     )
     assert widths.max() / widths.min() > 2
-    counts = rng.poisson(2, 120).astype(float)
-    with pytest.raises(ValueError, match="occurrence"):
-        TBATS(lags=[1, 12], occurrence="auto").fit(counts).sm()
+    # With an occurrence model: the scale model shares it, the zeros take the entropy
+    sizes = np.exp(2 + 0.4 * np.sin(2 * np.pi * times / 24) + rng.normal(0, 0.05 * sigma))
+    intermittent = sizes * rng.binomial(1, 0.7, len(times))
+    fit = TBATS(lags=[1, 24], occurrence="odds-ratio", orders=ORDERS0).fit(intermittent)
+    loglik = fit.loglik
+    fit.scale_model = fit.sm()
+    assert fit.loglik > loglik
+    assert np.sum(fit.point_lik()) == pytest.approx(fit.loglik)

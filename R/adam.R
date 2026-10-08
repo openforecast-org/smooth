@@ -924,11 +924,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                     if(is.na(CFValueEntropy)){
                         CFValueEntropy[] <- Inf;
                     }
-                    # If it is negative (it shouldn't be), substitute with zero.
-                    # Otherwise occurrence screws the demand sizes model
-                    if(CFValueEntropy<0){
-                        CFValueEntropy[] <- 0;
-                    }
+                    # A negative entropy (a small scale) stays: it is the likelihood of the zeros
                     CFValue <- CFValue + CFValueEntropy;
                 }
             }
@@ -7539,7 +7535,7 @@ pointLik.adam <- function(object, log=TRUE, ...){
     }
 
     # If this is a mixture model, take the respective probabilities into account (differential entropy)
-    # As in the estimation, a negative entropy (it should not be) is set to zero
+    # A negative entropy (a small scale) stays, as in the estimation
     if(mixture){
         otZero <- !otLogical & observed;
         entropyValues <- rep(switch(distribution,
@@ -7559,9 +7555,6 @@ pointLik.adam <- function(object, log=TRUE, ...){
                                          "dgamma" = (1/scale + log(scale*yFitted[otZero]) +
                                                          log(gamma(1/scale)) + (1-1/scale)*digamma(1/scale))
         ), length.out=sum(otZero));
-        if(sum(entropyValues)<0){
-            entropyValues[] <- 0;
-        }
         likValues[otZero] <- -entropyValues;
 
         # The likelihood of the occurrence: of its model, or of the provided probabilities

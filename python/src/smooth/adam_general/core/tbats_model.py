@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy import special
 
 from smooth.adam_general.core.adam import ADAM
 from smooth.adam_general.core.checker.data_checks import _warn_missing
@@ -1406,22 +1407,42 @@ class TBATS:
         if self.scale_model is not None:
             return self.scale_model.point_lik(log=log)
         if getattr(self, "is_scale_", False):
-            from smooth.adam_general.core.sm import _log_density
+            from smooth.adam_general.core.sm import _differential_entropy, _log_density
 
             location = self.location_
+            lam = location.lambda_
+            shape = location._best["elements"]["shape"]
             y = location._y_in_sample
             observed = ~np.isnan(y)
-            errors = location.residuals[observed]
-            y_bc = st.box_cox(y[observed], location.lambda_)
+            ot = location._ot & observed
+            zero = observed & ~ot
+            y_bc = st.box_cox_sizes(y, lam, ot)
+            scale = np.asarray(self.fitted, dtype=float)
             values = np.zeros(len(y))
-            values[observed] = _log_density(
+            values[ot] = _log_density(
                 self.distribution_,
                 "A",
-                y_bc,
-                y_bc - errors,
-                np.asarray(self.fitted, dtype=float)[observed],
-                location._best["elements"]["shape"],
-            ) + (location.lambda_ - 1) * _log_r(y[observed])
+                y_bc[ot],
+                y_bc[ot] - location.residuals[ot],
+                scale[ot],
+                shape,
+            ) + (lam - 1) * _log_r(y[ot])
+            # The zeros: minus the entropy at their scale, with the Jacobian at the
+            # predicted size, and the occurrence model
+            if location._occurrence["model"] is not None:
+                p_fitted = location._occurrence["p_fitted"]
+                fitted_bc = location._best["fitted"]["fitted"]
+                sizes = st.box_cox_inverse(fitted_bc[zero], lam)
+                entropy = np.array(
+                    [
+                        _differential_entropy(self.distribution_, scale[[j]], shape)
+                        for j in np.flatnonzero(zero)
+                    ]
+                )
+                values[zero] = (
+                    -entropy + (lam - 1) * _log_r(sizes) + _log_r(1 - p_fitted[zero])
+                )
+                values[ot] += _log_r(p_fitted[ot])
         else:
             values = self._best["point_lik"](self._best["B"])
         return values if log else _exp_r(values)
@@ -1602,9 +1623,8 @@ class TBATS:
         # The missing values stay missing, as in R's tbats_boxCoxObject
         y_bc = st.box_cox_sizes(self._y_in_sample, self.lambda_, ot)
         y_bc[np.isnan(self._y_in_sample)] = np.nan
-        scale = scale_debias(
-            self.scale, self.distribution_, int(ot.sum()), self._nobs_observed()
-        )
+        # The scale, divided by all the observed values, as ADAM's
+        scale = self.scale
         errors = self._best["fitted"]["errors"].copy()
         errors[np.isnan(self._y_in_sample)] = np.nan
         # The scale of each horizon from an attached scale model (R's sm())
@@ -2002,7 +2022,6 @@ class TBATS:
         from smooth.adam_general.core.adam import _column_names_for_levels
         from smooth.adam_general.core.creator.architector import adam_profile_creator
         from smooth.adam_general.core.utils.distributions import generate_errors
-        from smooth.adam_general.core.utils.utils import scale_debias
 
         self._check_fitted()
         levels = list(np.atleast_1d(level).astype(float))
@@ -2120,7 +2139,6 @@ class TBATS:
         from smooth.adam_general._adam_general import adam_simulator
         from smooth.adam_general.core.creator.architector import adam_profile_creator
         from smooth.adam_general.core.utils.distributions import generate_errors
-        from smooth.adam_general.core.utils.utils import scale_debias
 
         self._check_fitted()
         best = self._best
@@ -2133,7 +2151,10 @@ class TBATS:
         obs_nonzero = int(self._ot.sum())
         df_scale = max(obs_nonzero - (self.nparam - n_scale), 1)
         rng = np.random.default_rng(seed)
-        scale = scale_debias(self.scale, self.distribution_, obs_nonzero, df_scale)
+        # The scale is divided by all the observed values
+        scale = scale_debias(
+            self.scale, self.distribution_, self._nobs_observed(), df_scale
+        )
         errors = np.reshape(
             generate_errors(
                 self.distribution_,
@@ -2257,11 +2278,18 @@ class TBATS:
         for ``"dnorm"``, the absolute values for ``"dlaplace"``, ...), with lambda 0,
         estimated by the joint likelihood of this model's data.
 
-        It takes the arguments and defaults of ``TBATS`` (``X`` its regressors), but
-        the lags of this model and ``initial="optimal"``, as ``ADAM.sm()``. Attach the
+        The transformed errors are divided by the exponent of the mean of their
+        logarithm at a unit scale, so that their logarithms are unbiased for the
+        log-scale. It takes the arguments and defaults of ``TBATS`` (``X`` its
+        regressors), but the lags of this model. Attach the
         result to :attr:`scale_model` (R's ``implant()``): the forecasts then have the
-        scale of each horizon. Not available with an occurrence model yet."""
-        from smooth.adam_general.core.sm import _log_density, _residual_transform
+        scale of each horizon. With an occurrence model, the scale model shares it,
+        and the zeros take the differential entropy at their scale."""
+        from smooth.adam_general.core.sm import (
+            _differential_entropy,
+            _log_density,
+            _residual_transform,
+        )
 
         self._check_fitted()
         if self.loss != "likelihood":
@@ -2269,43 +2297,75 @@ class TBATS:
                 "sm() only works with models estimated via maximisation of "
                 f"likelihood. Yours was estimated via {self.loss}. Cannot proceed."
             )
-        if self._occurrence["model"] is not None:
-            raise ValueError(
-                "sm() is not available yet for TBATS with an occurrence model."
-            )
         distribution = self.distribution_
         shape = self._best["elements"]["shape"]
-        observed = ~np.isnan(self._y_in_sample)
+        lam = self.lambda_
+        # The sizes and, with an occurrence model, the zeros and their predictions
+        y = self._y_in_sample
+        observed = ~np.isnan(y)
+        ot = self._ot & observed
+        zero = observed & ~ot
+        occurrence = self._occurrence["model"]
         errors = self.residuals
-        y_bc = st.box_cox(self._y_in_sample, self.lambda_)
+        y_bc = st.box_cox_sizes(y, lam, ot)
+        sizes = st.box_cox_inverse(self._best["fitted"]["fitted"], lam)
         response = np.full(len(errors), np.nan)
-        response[observed] = _residual_transform(errors[observed], distribution, shape)
+        response[ot] = _residual_transform(errors[ot], distribution, shape)
+        # The logarithm of the transformed error is biased for the log-scale by the
+        # mean of its logarithm at a unit scale (that of chi-squared with one degree of
+        # freedom for dnorm, -1.27): removed, so that the scale model in logs follows
+        # the scale, and its states (backcast, or updated by the errors in logs) are
+        # not off by a factor
+        log_bias = {
+            "dnorm": special.digamma(0.5) + math.log(2),
+            "dlaplace": special.digamma(1),
+            "ds": special.digamma(2) - math.log(2),
+        }.get(distribution)
+        if log_bias is None:
+            log_bias = (math.log(shape) + special.digamma(1 / shape)) / shape
+        response[ot] = response[ot] * _exp_r(np.array([-log_bias]))[0]
+        response[zero] = 0.0
 
         # The joint log-likelihood of the observed values given the scale, the
-        # exponent of the fitted values of the scale model in logs
-        y_sm = y_bc[observed]
-        mu_sm = y_sm - errors[observed]
+        # exponent of the fitted values of the scale model in logs: the densities of
+        # the sizes, and minus the entropy at the zeros of an occurrence model
+        y_sm = y_bc[ot]
+        mu_sm = y_sm - errors[ot]
+        ot_sm = ot[observed]
 
         def loss(actual: Any = None, fitted: Any = None, B: Any = None) -> float:
+            scale = _exp_r(np.asarray(fitted))
             densities = _log_density(
-                distribution, "A", y_sm, mu_sm, _exp_r(np.asarray(fitted)), shape
+                distribution, "A", y_sm, mu_sm, scale[ot_sm], shape
             )
-            return -float(_sum_r(densities))
+            entropy = _differential_entropy(distribution, scale[~ot_sm], shape)
+            return -float(_sum_r(densities)) + entropy
 
         arguments: Dict[str, Any] = {
             "lags": self.lags,
-            "initial": "optimal",
             "distribution": distribution,
             "gnorm_shape": shape if distribution == "dgnorm" else None,
             **kwargs,
             "lambda_bc": 0,
             "loss": loss,
         }
+        if occurrence is not None:
+            arguments["occurrence"] = (
+                self.occurrence if isinstance(occurrence, dict) else occurrence
+            )
         scale_model = TBATS(**arguments).fit(response, X)
+        # The scale model sees the zeros through the occurrence model, but it is the
+        # scale: its fitted values and forecasts are not multiplied by probabilities
+        if occurrence is not None:
+            scale_model._occurrence = {
+                **scale_model._occurrence,
+                "model": None,
+                "p_fitted": np.ones(len(y)),
+            }
 
-        # The log-likelihood of the data, with the Jacobian of the transform and the
-        # parameters of both models (one scale)
-        jacobian = (self.lambda_ - 1) * _log_r(self._y_in_sample[observed])
+        # The log-likelihood of the data, with the Jacobian of the transform (at the
+        # predicted sizes for the zeros) and the parameters of both models (one scale)
+        jacobian = (lam - 1) * _log_r(np.where(ot, y, sizes)[observed])
         scale_model.loglik_sm_ = scale_model.loglik + float(_sum_r(jacobian))
         scale_model.df_sm_ = int(scale_model.nparam) + int(self.nparam) - 1
         scale_model.is_scale_ = True

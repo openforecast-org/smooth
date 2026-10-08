@@ -376,11 +376,12 @@ test_that("the occurrence: the sizes on the non-zero observations, the forecasts
     forecasted <- forecast(fit, h=14, interval="prediction");
     expect_equal(as.numeric(forecasted$mean), tbats_boxCoxInverse(skeleton, fit$lambda)*pForecast);
     expect_equal(as.numeric(forecasted$mean), as.numeric(fit$forecast));
-    # The scale of the sizes is de-biased by the non-zero observations, as that of tbats
+    # The scale of the sizes, divided by all the observed values, is de-biased by the non-zero ones
     objectBC <- tbats_boxCoxObject(fit);
     expect_equal(adam_dfScale(objectBC), adam_dfScale(fit));
     expect_equal(adam_varianceDebiased(objectBC),
-                 fit$scale*sum(actuals(fit)!=0)/adam_dfScale(fit));
+                 adam_scaleVariance(fit$scale, fit$distribution, fit$other)*
+                     sum(!is.na(actuals(fit)))/adam_dfScale(fit));
     # The probability of no demand is above 0.5: the median and the lower bound are zero
     expect_true(all(forecast(fit, h=14, point="median")$mean==0));
     expect_true(all(forecasted$lower==0) && all(forecasted$upper>forecasted$mean));
@@ -651,6 +652,14 @@ test_that("sm() models the scale of tbats() with TBATS", {
     testForecast <- forecast(testImplanted, h=24, interval="prediction");
     widths <- as.vector(testForecast$upper-testForecast$lower);
     expect_gt(max(widths)/min(widths), 2);
-    yIntermittent <- ts(rpois(120, 2), frequency=12);
-    expect_error(sm(tbats(yIntermittent, occurrence="auto")), "occurrence");
+    # With an occurrence model: the scale model shares it, the zeros take the entropy
+    times <- 1:(7*60);
+    sigma <- 0.3*exp(0.5*sin(2*pi*times/7));
+    y <- ts(exp(2 + 0.4*sin(2*pi*times/7) + rnorm(length(times), 0, sigma))*
+                rbinom(length(times), 1, 0.7), frequency=7);
+    testModel <- tbats(y, occurrence="odds-ratio", orders=list(ar=0, ma=0, select=FALSE));
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    testImplanted <- implant(testModel, sm(testModel));
+    expect_gt(as.numeric(logLik(testImplanted)), as.numeric(logLik(testModel)));
+    expect_equal(sum(pointLik(testImplanted)), as.numeric(logLik(testImplanted)));
 })

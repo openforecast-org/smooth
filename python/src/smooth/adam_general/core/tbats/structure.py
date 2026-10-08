@@ -413,14 +413,28 @@ def arma_build(ar, ma, arma_lags, select: bool = False) -> Dict[str, Any]:
     }
 
 
-def scale_value(errors: NDArray, distribution: str, shape: Optional[float]) -> float:
-    """sigma^2 for dnorm, s for the others (the ADAM monograph)."""
-    return float(scaler(distribution, "A", errors, None, len(errors), shape))
+def scale_value(
+    errors: NDArray,
+    distribution: str,
+    shape: Optional[float],
+    obs: Optional[int] = None,
+) -> float:
+    """sigma^2 for dnorm, s for the others (the ADAM monograph), divided by ``obs``
+    (the observed values with the zeros of an occurrence model), the errors' number
+    by default."""
+    n = len(errors) if obs is None else obs
+    return float(scaler(distribution, "A", errors, None, n, shape))
 
 
-def loglik_value(errors: NDArray, distribution: str, shape: Optional[float]) -> float:
-    """The log-likelihood of the errors in the space of the transformed data."""
-    scale = scale_value(errors, distribution, shape)
+def loglik_value(
+    errors: NDArray,
+    distribution: str,
+    shape: Optional[float],
+    obs: Optional[int] = None,
+) -> float:
+    """The log-likelihood of the errors in the space of the transformed data, at the
+    scale divided by ``obs`` (R's ``tbats_logLik``)."""
+    scale = scale_value(errors, distribution, shape, obs)
     if distribution == "dnorm":
         values = gb.dnorm(errors, 0, math.sqrt(scale), log=True)
     elif distribution == "dlaplace":

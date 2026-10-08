@@ -637,17 +637,26 @@ Box-Cox transformed data (`tbats_boxCoxObject()`), its errors transformed into t
 of each one (the square for `dnorm`, the absolute value for `dlaplace`, ...), and TBATS
 fitted to them with lambda 0 (a multiplicative model of the scale) and a custom loss, the
 joint log-likelihood of the location model's data given the scale. The arguments and
-defaults are `tbats()`'s, but the lags of the model and `initial="optimal"`: backcasting
-follows the logarithms of the transformed errors, which are biased for the log-scale (by
-about -1.27 for the squares of normal errors), and the loss cannot move the initials then.
+defaults are `tbats()`'s, but the lags of the model. Backcasting follows the logarithms of
+the transformed errors, whose mean is not the log-scale (it is digamma(1/2)+log(2) = -1.27
+below it for the squares of normal errors, digamma(1) for the absolute Laplace errors,
+digamma(2)-log(2) for `ds`, (log(beta)+digamma(1/beta))/beta for `dgnorm`): the response is
+divided by the exponent of that bias, so that backcasting (the default, as in `tbats()`)
+starts from the log-scale, and it then improves on the constant scale for every distribution.
 
 A custom loss of `tbats()` is minus its log-likelihood, as in `adam()`, so the selection of
 the harmonics, the trend and the ARMA of the scale model is by the joint likelihood. The
 logLik of the scale model adds the Jacobian of the location model's transform; `implant()`
 puts it in the model (the parameters of the scale model in its scale column), whose
 `pointLik()` is the scale model's, and whose forecasts take the scale model's for the
-variance of each horizon. With an occurrence model the joint likelihood needs the scale at
-the zeros, which the custom loss of `tbats()` does not see: not available yet.
+variance of each horizon.
+
+With an occurrence model the scale model is fitted with it (so that the custom loss sees all
+the observed values) and the joint likelihood has the probabilities and, at the zeros, minus
+the differential entropy of the sizes at the scale of the scale model, in the space of the data
+(with the Jacobian at the predicted sizes), as the likelihood of `tbats()` itself, whose scale
+is then divided by all the observed values. The occurrence is stripped from the scale model
+after the fit, so its fitted values are the scale, not the scale times the probability.
 
 ## M. Later phases
 

@@ -224,7 +224,9 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     # Replace the logLik first: assigning the attribute before this line set it
     # on the object that the next statement then discarded, so the df never
     # reached the output and the ICs used nparam(scale) alone.
-    adamModel$logLik <- -adamModel$lossValue;
+    # The likelihood of the occurrence model is in the joint one, as in the location model
+    adamModel$logLik <- -adamModel$lossValue +
+        if(occurrenceModel) sum(as.vector(pointLik(occurrence))[observedSM]) else 0;
     # -1 is needed to remove the scale from the number of parameters
     attr(adamModel$logLik,"df") <- nVariables + nparam(object)-1;
     # object$nParam[1,5] <- object$nParam[1,5]-1;
@@ -282,13 +284,14 @@ sm.adam <- function(object, model="YYY", lags=NULL,
 
 #' @param object The model estimated with \code{tbats()}, for \code{sm()}: the scale of
 #' its error term is modelled by TBATS (with the arguments and defaults of
-#' \code{tbats()}, but the lags of \code{object} and \code{initial="optimal"}, as
-#' \code{sm.adam()}, by default) on the transformed errors in
-#' the space of the Box-Cox transformed data (the squares for \code{"dnorm"}, the
-#' absolute values for \code{"dlaplace"}, ...), with lambda 0, by the joint likelihood
+#' \code{tbats()}, but the lags of \code{object} by default) on the transformed errors
+#' in the space of the Box-Cox transformed data (the squares for \code{"dnorm"}, the
+#' absolute values for \code{"dlaplace"}, ..., divided by the exponent of the mean of
+#' their logarithm at a unit scale, so that their logarithms are unbiased for the
+#' log-scale), with lambda 0, by the joint likelihood
 #' of the model's data. \link[greybox]{implant} puts it in \code{object}, whose
-#' forecasts then have the scale of each horizon. Not available with an occurrence
-#' model yet.
+#' forecasts then have the scale of each horizon. With an occurrence model, the scale
+#' model shares it, and the zeros take the differential entropy at their scale.
 #'
 #' @rdname tbats
 #' @export
@@ -298,44 +301,55 @@ sm.adamTBATS <- function(object, lags=NULL, harmonics=NULL,
                          xreg=NULL, regressors=c("use","select","adapt"),
                          ic=c("AICc","AIC","BIC","BICc"),
                          persistence=NULL, phi=NULL,
-                         initial=c("optimal","backcasting","two-stage","complete"), arma=NULL,
+                         initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
                          bounds=c("admissible","usual","none"), silent=TRUE, ...){
     startTime <- Sys.time();
-    # The initials are optimised by default, as in sm.adam(): backcasting follows the
-    # transformed errors, whose logarithms are biased for the log-scale
-    initial <- match.arg(initial);
     cl <- match.call();
     if(object$loss!="likelihood"){
         stop("sm() only works with models estimated via maximisation of likelihood. ",
              "Yours was estimated via ", object$loss,". Cannot proceed.", call.=FALSE);
     }
-    if(!is.null(object$occurrence)){
-        stop("sm() is not available yet for tbats() with an occurrence model.", call.=FALSE);
-    }
     distribution <- object$distribution;
     shape <- object$other$shape;
 
-    # The model in the space of the transformed data, where its distribution is
+    # The model in the space of the transformed data, where its distribution is. With an
+    # occurrence model, the sizes, and their predictions at the zeros
     y <- actuals(object);
     observed <- !is.na(as.vector(y));
+    otLogical <- tbats_sizes(as.vector(y), object);
+    occurrenceModel <- !is.null(object$occurrence);
     objectBC <- tbats_boxCoxObject(object);
     yBC <- as.vector(objectBC$data[,1]);
     muBC <- as.vector(fitted(objectBC));
     errors <- yBC - muBC;
+    sizes <- as.vector(fitted(object))/tbats_pFitted(object);
+    muBC[!otLogical & observed] <- tbats_boxCox(sizes[!otLogical & observed], object$lambda);
     # The scale of each error, as in sm.adam()
     response <- switch(distribution,
                        "dnorm"=errors^2,
                        "dlaplace"=abs(errors),
                        "ds"=0.5*abs(errors)^0.5,
                        "dgnorm"=(shape*abs(errors)^shape)^(1/shape));
+    # The logarithm of the transformed error is biased for the log-scale by the mean of
+    # its logarithm at a unit scale (that of chi-squared with one degree of freedom for
+    # dnorm, -1.27): removed, so that the scale model in logs follows the scale, and its
+    # states (backcast, or updated by the errors in logs) are not off by a factor
+    logBias <- switch(distribution,
+                      "dnorm"=digamma(0.5)+log(2),
+                      "dlaplace"=digamma(1),
+                      "ds"=digamma(2)-log(2),
+                      "dgnorm"=(log(shape)+digamma(1/shape))/shape);
+    response[] <- response*exp(-logBias);
 
     # The joint log-likelihood of the observed values given the scale, the exponent of
-    # the fitted values of the scale model in logs
+    # the fitted values of the scale model in logs: the densities of the sizes, and minus
+    # the entropy at the zeros of an occurrence model
     ySM <- yBC[observed];
     muSM <- muBC[observed];
+    otSM <- otLogical[observed];
     lossFunction <- function(actual, fitted, B){
         return(-sum(sm_logDensities(ySM, muSM, exp(fitted), distribution, "A", shape,
-                                    rep(TRUE, length(ySM)), FALSE)));
+                                    otSM, occurrenceModel)));
     }
     if(is.null(lags)){
         lags <- object$lags;
@@ -344,11 +358,20 @@ sm.adamTBATS <- function(object, lags=NULL, harmonics=NULL,
                         harmonics=harmonics, trend=trend, lambda=0, orders=orders, xreg=xreg,
                         regressors=regressors, distribution=distribution, loss=lossFunction, ic=ic,
                         persistence=persistence, phi=phi, initial=initial, arma=arma, bounds=bounds,
+                        occurrence=if(occurrenceModel) object$occurrence else "none",
                         silent=silent, shape=shape, ...);
 
-    # The log-likelihood of the data, with the Jacobian of the transform and the
-    # parameters of both models (one scale)
-    jacobian <- replace((object$lambda-1)*log(as.vector(y)), !observed, 0);
+    # The scale model is fitted with the occurrence model, whose zeros it sees, but it is the
+    # scale: its fitted values and forecasts are not multiplied by the probabilities. The
+    # occurrence model stays in the likelihood
+    if(occurrenceModel){
+        scaleModel$fitted[] <- as.vector(fitted(scaleModel))/tbats_pFitted(scaleModel);
+        scaleModel$occurrence <- NULL;
+    }
+
+    # The log-likelihood of the data, with the Jacobian of the transform (at the predicted
+    # sizes for the zeros) and the parameters of both models (one scale)
+    jacobian <- replace((object$lambda-1)*log(ifelse(otLogical, as.vector(y), sizes)), !observed, 0);
     scaleModel$logLik <- structure(as.numeric(logLik(scaleModel)) + sum(jacobian), nobs=sum(observed),
                                    df=nparam(scaleModel)+nparam(object)-1, class="logLik");
     # The standardised residuals
@@ -357,8 +380,9 @@ sm.adamTBATS <- function(object, lags=NULL, harmonics=NULL,
                                               "ds"=scaleValues^2, scaleValues);
     scaleModel$loss <- "likelihood";
     # The data of the likelihood of the model, for pointLik()
-    scaleModel$location <- list(y=yBC, mu=muBC, Etype="A", other=shape, otLogical=observed,
-                                occurrenceModel=FALSE, jacobian=jacobian);
+    scaleModel$location <- list(y=yBC, mu=muBC, Etype="A", other=shape, otLogical=otLogical,
+                                occurrenceModel=occurrenceModel, jacobian=jacobian,
+                                occurrence=object$occurrence);
     scaleModel$call <- cl;
     scaleModel$timeElapsed <- Sys.time()-startTime;
     class(scaleModel) <- c("sm.adam","adamTBATS","adam","smooth","scale");
@@ -522,6 +546,12 @@ pointLik.sm.adam <- function(object, log=TRUE, ...){
                                         as.vector(fitted(object))[observed], object$distribution,
                                         location$Etype, location$other, location$otLogical[observed],
                                         location$occurrenceModel);
+    # The likelihood of the occurrence model, as in logLik()
+    if(location$occurrenceModel){
+        # [[ ]]: $ would match occurrenceModel partially
+        occurrence <- if(is.null(location[["occurrence"]])) object$occurrence else location[["occurrence"]];
+        values[observed] <- values[observed] + as.vector(pointLik(occurrence))[observed];
+    }
     # The Jacobian of the Box-Cox transform of tbats()
     if(!is.null(location$jacobian)){
         values[] <- values + location$jacobian;

@@ -475,8 +475,19 @@ def _finalise(
         )
         scale_model.model_name_sm_ = f"{scale_model.model_name} in logs"
 
-    # logLik is the loss (the location likelihood), not the scale model's own.
+    # logLik is the loss (the location likelihood), not the scale model's own, with
+    # the likelihood of the occurrence model, as in the location model
     scale_model.loglik_sm_ = -float(scale_model.loss_value)
+    occurrence = getattr(location, "_occurrence", {}) or {}
+    if occurrence.get("occurrence_model"):
+        y = np.asarray(location.actuals, dtype=np.float64).ravel()
+        observed = ~np.isnan(y)
+        p_fitted = np.asarray(occurrence["p_fitted"], dtype=np.float64).ravel()
+        demand = observed & (y != 0)
+        zero = observed & ~demand
+        scale_model.loglik_sm_ += float(
+            _sum_r(np.log(p_fitted[demand])) + _sum_r(np.log(1 - p_fitted[zero]))
+        )
     # -1 removes the scale from the location model's parameter count.
     scale_model.df_sm_ = int(scale_model.nparam) + int(location.nparam) - 1
 

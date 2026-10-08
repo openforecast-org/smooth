@@ -3035,12 +3035,50 @@ class ADAM:
         densities themselves are returned.
         """
         from smooth.adam_general.core.utils.utils import (
-            _sum_r,
             calculate_entropy,
             calculate_likelihood,
         )
 
         self._check_is_fitted()
+        # With a scale model, the likelihood is that of the scale model (R's sm())
+        if self.scale_model is not None:
+            return self.scale_model.point_lik(log=log)
+        if getattr(self, "is_scale_", False):
+            from smooth.adam_general.core.sm import _differential_entropy, _log_density
+
+            # The location model's values given the scale, as R's pointLik.sm.adam
+            location: Any = getattr(self, "location_")
+            y = np.asarray(location.actuals, dtype=float).ravel()
+            mu = np.asarray(location.fitted, dtype=float).ravel()
+            scale_values = np.asarray(self.fitted, dtype=float).ravel()
+            other_dict = getattr(location, "other", None)
+            other = (
+                other_dict.get("shape", other_dict.get("alpha"))
+                if isinstance(other_dict, dict)
+                else None
+            )
+            observed = ~np.isnan(y)
+            occurrence = location._occurrence
+            demand = observed & ((y != 0) | (not occurrence.get("occurrence_model")))
+            zero = observed & ~demand
+            values = np.zeros(len(y))
+            values[demand] = _log_density(
+                self.distribution_,
+                location.error_type,
+                y[demand],
+                mu[demand],
+                scale_values[demand],
+                other,
+            )
+            if occurrence.get("occurrence_model"):
+                p_fitted = np.asarray(occurrence["p_fitted"], dtype=float).ravel()
+                values[zero] = [
+                    -_differential_entropy(self.distribution_, scale_values[[j]], other)
+                    for j in np.flatnonzero(zero)
+                ]
+                values[demand] += np.log(p_fitted[demand])
+                values[zero] += np.log(1 - p_fitted[zero])
+            return values if log else np.exp(values)
         y = np.asarray(self.actuals, dtype=float).ravel()
         obs = len(y)
         distribution = self._general.get(
@@ -3104,7 +3142,7 @@ class ADAM:
                     for j in np.flatnonzero(zero)
                 ]
             )
-            lik_values[zero] = 0.0 if _sum_r(entropy) < 0 else -entropy
+            lik_values[zero] = -entropy
             # The fitted occurrence model (the occurrence entry holds its name
             # when ADAM fitted it)
             om_model = getattr(self, "_om_model", None)

@@ -44,6 +44,20 @@ LOSS_OPTIONS = (
 )
 IC_OPTIONS = ("AICc", "AIC", "BIC", "BICc")
 INITIAL_OPTIONS = ("backcasting", "optimal", "two-stage", "complete", "gradient")
+# The settings of the optimiser, the keys of ADAM's nlopt_kwargs
+_NLOPT_DEFAULTS: Dict[str, Any] = {
+    "B": None,
+    "lb": None,
+    "ub": None,
+    "maxeval": None,
+    "maxtime": -1,
+    "algorithm": "NLOPT_LN_NELDERMEAD",
+    "xtol_rel": 1e-6,
+    "xtol_abs": 1e-8,
+    "ftol_rel": 1e-8,
+    "ftol_abs": 0,
+    "print_level": 0,
+}
 BOUNDS_OPTIONS = ("admissible", "usual", "none")
 REGRESSORS_OPTIONS = ("use", "select", "adapt")
 OCCURRENCE_OPTIONS = (
@@ -313,13 +327,16 @@ class TBATS:
         not selected.
     verbose : int, default=0
         Not used yet (R's ``silent``).
-    B, lb, ub, maxeval, maxtime, algorithm : optional
-        The starting values, bounds and NLopt settings, as in R's ellipsis.
-    xtol_rel, xtol_abs, ftol_rel, ftol_abs, print_level : optional
-        The tolerances and the print level of NLopt.
-    n_iterations, head_length, fi, step_size, shape : optional
+    nlopt_kwargs : dict or None
+        The settings of the optimiser, as ``ADAM``'s: ``"B"``, ``"lb"``, ``"ub"``
+        (the starting values and bounds of the parameters, as R's ellipsis),
+        ``"maxeval"``, ``"maxtime"``, ``"algorithm"``, ``"xtol_rel"``,
+        ``"xtol_abs"``, ``"ftol_rel"``, ``"ftol_abs"`` and ``"print_level"``.
+    n_iterations, head_length, fi, step_size : optional
         The iterations and head of backcasting, the Fisher Information with its
-        step, and the shape of ``dgnorm`` (estimated if None).
+        step, as ``ADAM``.
+    gnorm_shape : float or None
+        The shape of ``dgnorm``, as ``ADAM``; estimated if None.
     """
 
     def __init__(
@@ -342,22 +359,12 @@ class TBATS:
         arma: Optional[Union[Dict[str, Any], List[float], NDArray]] = None,
         bounds: str = "admissible",
         verbose: int = 0,
-        B: Optional[NDArray] = None,
-        lb: Optional[NDArray] = None,
-        ub: Optional[NDArray] = None,
-        maxeval: Optional[int] = None,
-        maxtime: float = -1,
-        algorithm: str = "NLOPT_LN_NELDERMEAD",
-        xtol_rel: float = 1e-6,
-        xtol_abs: float = 1e-8,
-        ftol_rel: float = 1e-8,
-        ftol_abs: float = 0,
-        print_level: int = 0,
+        nlopt_kwargs: Optional[Dict[str, Any]] = None,
         n_iterations: Optional[int] = None,
         head_length: Optional[int] = None,
         fi: bool = False,
-        step_size: float = float(np.finfo(float).eps ** 0.25),
-        shape: Optional[float] = None,
+        step_size: Optional[float] = None,
+        gnorm_shape: Optional[float] = None,
     ) -> None:
         self.lags = [1.0] if lags is None else [float(lag) for lag in lags]
         self.harmonics = None if harmonics is None else [int(k) for k in harmonics]
@@ -398,22 +405,20 @@ class TBATS:
                 self.initial = "backcasting"
         self.bounds = _match(bounds, BOUNDS_OPTIONS, "bounds")
         self.verbose = verbose
-        self.B = B
-        self.lb = lb
-        self.ub = ub
-        self.maxeval = maxeval
-        self.maxtime = maxtime
-        self.algorithm = algorithm
-        self.xtol_rel = xtol_rel
-        self.xtol_abs = xtol_abs
-        self.ftol_rel = ftol_rel
-        self.ftol_abs = ftol_abs
-        self.print_level = print_level
+        self.nlopt_kwargs = nlopt_kwargs
+        unknown = set(nlopt_kwargs or {}) - set(_NLOPT_DEFAULTS)
+        if unknown:
+            raise ValueError(
+                f"Unknown nlopt_kwargs of TBATS: {', '.join(sorted(unknown))}. "
+                f"Accepted: {', '.join(_NLOPT_DEFAULTS)}."
+            )
         self.n_iterations = n_iterations
         self.head_length = head_length
         self.fi = fi
-        self.step_size = step_size
-        self.shape = shape
+        self.step_size = (
+            float(np.finfo(float).eps ** 0.25) if step_size is None else step_size
+        )
+        self.gnorm_shape = gnorm_shape
 
     # Set by fit()
     _best: Dict[str, Any]
@@ -437,23 +442,14 @@ class TBATS:
             "loss_function": self.loss_function,
             "bounds": self.bounds,
             "model_do": "estimate",
-            "B": self.B,
-            "lb": self.lb,
-            "ub": self.ub,
-            "maxeval": self.maxeval,
-            "maxtime": self.maxtime,
-            "algorithm": self.algorithm,
-            "xtol_rel": self.xtol_rel,
-            "xtol_abs": self.xtol_abs,
-            "ftol_rel": self.ftol_rel,
-            "ftol_abs": self.ftol_abs,
-            "print_level": self.print_level,
+            **_NLOPT_DEFAULTS,
+            **(self.nlopt_kwargs or {}),
             "n_iterations": n_iterations,
             "head_length": self.head_length,
             "fi": self.fi,
             "step_size": self.step_size,
-            "shape": 2.0 if self.shape is None else float(self.shape),
-            "shape_estimate": self.shape is None,
+            "shape": 2.0 if self.gnorm_shape is None else float(self.gnorm_shape),
+            "shape_estimate": self.gnorm_shape is None,
         }
 
     def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "TBATS":
@@ -967,8 +963,54 @@ class TBATS:
 
     @property
     def persistence_vector(self) -> Dict[str, float]:
+        """The persistence vector by component (R's ``$persistence``)."""
         self._check_fitted()
-        return dict(zip(self._component_names, self._best["elements"]["vec_g"]))
+        values = np.ravel(self._best["elements"]["vec_g"]).astype(float).tolist()
+        return dict(zip(self._component_names, values))
+
+    @property
+    def persistence_level_(self) -> float:
+        """The smoothing parameter of the level, alpha, as ADAM's."""
+        self._check_fitted()
+        return float(self._best["B_full"]["alpha"])
+
+    @property
+    def persistence_trend_(self) -> Optional[float]:
+        """The smoothing parameter of the trend, beta, or None."""
+        self._check_fitted()
+        beta = self._best["B_full"].get("beta")
+        return None if beta is None else float(beta)
+
+    @property
+    def persistence_seasonal_(self) -> List[List[float]]:
+        """The smoothing parameters of the harmonics, ``[gamma1, gamma2]`` per period
+        with harmonics, as ``persistence["seasonal"]`` takes them."""
+        self._check_fitted()
+        full = self._best["B_full"]
+        return [
+            [float(full[f"gamma{k}[{st._period_label(p)}]"]) for k in (1, 2)]
+            for p in self.periods_
+            if f"gamma1[{st._period_label(p)}]" in full
+        ]
+
+    @property
+    def persistence_xreg_(self) -> Optional[List[float]]:
+        """The smoothing parameters of the regressors, delta, or None."""
+        self._check_fitted()
+        deltas = [float(v) for k, v in self._best["B_full"].items() if k[:5] == "delta"]
+        return deltas or None
+
+    @property
+    def b_value(self) -> NDArray:
+        """The parameter vector B (R's ``$B``), as ``coef``."""
+        return self.coef
+
+    @property
+    def om_model(self) -> Any:
+        """The fitted occurrence model (OM / OMG), as ADAM's, or None."""
+        self._check_fitted()
+        model = self._occurrence["model"]
+        return None if isinstance(model, dict) else model
 
     @property
     def transition(self) -> NDArray:
@@ -2077,9 +2119,12 @@ class TBATS:
             ),
             "arma": self._provided["arma"],
             "bounds": self.bounds,
-            "B": B,
-            "lb": np.full(len(B), -np.inf),
-            "ub": np.full(len(B), np.inf),
+            "nlopt_kwargs": {
+                **(self.nlopt_kwargs or {}),
+                "B": B,
+                "lb": np.full(len(B), -np.inf),
+                "ub": np.full(len(B), np.inf),
+            },
         }
         if self._best["struct"]["n_xreg"] > 0:
             kwargs["regressors"] = (
@@ -2095,7 +2140,7 @@ class TBATS:
                 )
             kwargs["occurrence"] = model.occurrence
         if self.distribution_ == "dgnorm" and "shape" not in self.coef_names:
-            kwargs["shape"] = self._best["elements"]["shape"]
+            kwargs["gnorm_shape"] = self._best["elements"]["shape"]
         return kwargs
 
     def coefbootstrap(

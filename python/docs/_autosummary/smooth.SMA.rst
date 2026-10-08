@@ -48,6 +48,7 @@
    ~SMA.actuals
    ~SMA.aic
    ~SMA.aicc
+   ~SMA.arma_parameters_
    ~SMA.b_value
    ~SMA.bic
    ~SMA.bicc
@@ -77,7 +78,11 @@
    ~SMA.nparam
    ~SMA.om_model
    ~SMA.orders
+   ~SMA.persistence_level_
+   ~SMA.persistence_seasonal_
+   ~SMA.persistence_trend_
    ~SMA.persistence_vector
+   ~SMA.persistence_xreg_
    ~SMA.phi_
    ~SMA.profile
    ~SMA.residuals

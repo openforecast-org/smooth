@@ -136,7 +136,7 @@ class NParam:
         """Return formatted string representation like R's output."""
         # Column headers
         cols = ["internal", "xreg", "occurrence", "scale", "all"]
-        col_width = 10
+        col_width = 11
 
         # Build header
         header = " " * 10  # Row label space

@@ -42,44 +42,96 @@ Py   ADAM.fit() → parameters_checker → architector → creator → estimator
 
 ## Name map
 
+`adam()` in R and `ADAM` in Python set the names. Every other model reuses them for the
+same things; a name introduced once is used the same way everywhere. **Never create a
+new argument, attribute, property, method, class or returned key without asking**, and
+explain the alternatives (the names below that could carry it). Update this map whenever
+a name is added or changed.
+
+### Classes
+
+| R | Python | Notes |
+|---|---|---|
+| `adam()` / `auto.adam()` | `ADAM` / `AutoADAM` | `AutoADAM` is a subclass of `ADAM`; `fit()` returns itself |
+| `es()` | `ES` | subclass of `ADAM` |
+| `msarima()` / `auto.msarima()` | `MSARIMA` / `AutoMSARIMA` | subclasses of `ADAM` |
+| `sma()` | `SMA` | subclass of `ADAM` |
+| `ces()` / `auto.ces()` | `CES` / `AutoCES` | standalone; `AutoCES.fit()` returns the selected `CES` |
+| `om()` / `omg()` / `auto.om()` | `OM` / `OMG` / `AutoOM` | `OM` subclasses `ADAM`; `AutoOM.fit()` returns the selected `OM`/`OMG` |
+| `tbats()` | `TBATS` | standalone, reuses `ADAM`'s forecaster and diagnostics |
+| `sm()` + `implant()` | `sm()` / `model.sm()`, `model.scale_model = ...` | |
+| `msdecompose()`, `sim.*()` | `msdecompose`, `sim_*` | |
+
+R-only: `ssarima()`, `gum()`, `sparma()` (see the wiki's Roadmap).
+
 ### User arguments
 
 | R | Python |
 |---|---|
-| `model`, `lags`, `phi`, `persistence`, `initial`, `distribution`, `loss`, `ic`, `bounds`, `h`, `holdout`, `regressors` | same names |
-| `orders = list(ar=, i=, ma=)` | `orders={"ar": …}` **or** the scalar trio `ar_order`, `i_order`, `ma_order` |
-| `xreg` / `formula` | `X` (positional, on `fit`) |
-| `initialSeason`, `initialX` | folded into `initial`, which takes a dict of state values as well as a method name (`MSARIMA` also has `initial_X`) |
-| `lambda` (LASSO/RIDGE weight) | `lambda_param`, or `**{"lambda": …}`. `OM` / `OMG` use `reg_lambda` |
+| `model`, `lags`, `orders`, `persistence`, `phi`, `initial`, `arma`, `distribution`, `loss`, `ic`, `bounds`, `h`, `holdout`, `regressors`, `occurrence`, `outliers` | same names |
+| `orders = list(ar=, i=, ma=, select=)` | `orders={"ar": …}` **or** the scalar trio `ar_order`, `i_order`, `ma_order` (`ADAM`) |
+| `level` (of `outliers`) | `outliers_level` |
+| `xreg` / `formula` / `data` columns | `X` (on `fit`) |
+| `initialSeason`, `initialX` | folded into `initial` (a dict of state values as well as a method name; `ES` has `initial_season`, `initial_X`) |
+| `lambda` (LASSO/RIDGE weight) | `lambda_param` (or `**{"lambda": …}`) |
+| `lambda` of `tbats()` (Box-Cox) | `lambda_bc` |
+| `shape` in the ellipsis (dgnorm) | `gnorm_shape` |
+| `B`, `lb`, `ub`, `maxeval`, `maxtime`, `algorithm`, `xtol_rel`, `xtol_abs`, `ftol_rel`, `ftol_abs`, `print_level` in the ellipsis | keys of `nlopt_kwargs` (`CES` adds R's `algorithm0`, `maxeval0`, `maxtime0`, `xtol_rel0`, `xtol_abs0`, `ftol_rel0`, `ftol_abs0` of its first optimiser) |
+| `FI=TRUE`, `stepSize` in the ellipsis | `fi`, `step_size` |
+| `headLength`, `nIterations` in the ellipsis | `head_length`, `n_iterations` |
 | `silent` | `verbose` (inverted) |
-| `sm(object, …)` + `implant(model, scale)` | `model.sm(…)` then `model.scale_model = scale`; `= None` detaches |
+| `modelA`, `modelB`, `ordersA`, … of `omg()` | `model_a`, `model_b`, `orders_a`, … |
 
 ### Fitted attributes
 
-R exposes `model$x`; Python uses properties, with a trailing underscore only
-where the plain name would clash with a constructor argument.
+R exposes `model$x`; Python uses properties, with a trailing underscore only where the
+plain name would clash with a constructor argument (`phi_`, `loss_`, `distribution_`) or
+for the sklearn-style fitted values (`persistence_*_`, `arma_parameters_`,
+`fisher_information_`).
 
 | R | Python |
 |---|---|
-| `coef(m)` | `m.coef` |
+| `coef(m)`, `m$B` | `m.coef`, `m.b_value`; `m.coef_names` for `names(m$B)` |
 | `logLik(m)` | `m.loglik` |
-| `nparam(m)` | `m.nparam` (`m.n_param` on `CES`) |
+| `nparam(m)`, `m$nParam` | `m.nparam` (the number), `m.n_param` (the `NParam` table) |
 | `nobs(m)` | `m.nobs` |
 | `AIC` / `AICc` / `BIC` / `BICc` | `m.aic` / `m.aicc` / `m.bic` / `m.bicc` |
+| `m$ICs` (selection, `auto.*`, `sma()`, `tbats()`) | `m.ICs` (`CES` from `AutoCES`, `SMA`, `OM`, `TBATS`; not yet on `ADAM`, which keeps them in `_ic_selection`) |
 | `fitted(m)`, `residuals(m)`, `actuals(m)` | `m.fitted`, `m.residuals`, `m.actuals` |
-| `m$states` | `m.states` |
-| `m$persistence` | `m.persistence_vector` |
+| `m$data`, `m$holdout` | `m.data`, `m.holdout_data` |
+| `m$states` | `m.states` (components in rows) |
+| `m$persistence` | `m.persistence_vector` (a dict under R's names); `m.persistence_level_`, `m.persistence_trend_`, `m.persistence_seasonal_`, `m.persistence_xreg_` |
 | `m$phi` | `m.phi_` |
-| `m$initial` | `m.initial_value` |
+| `m$arma` | `m.arma_parameters_` |
+| `m$orders` | `m.orders` |
+| `m$initial`, `m$initialType` | `m.initial_value`, `m.initial_type` |
+| `m$transition`, `m$measurement` | `m.transition`, `m.measurement` |
+| `m$profile` | `m.profile` |
 | `m$scale` (number **or** scale model) | `m.scale` (always a float) and `m.scale_model` (model or `None`) |
 | `m$lossValue` | `m.loss_value` |
 | `m$loss`, `m$distribution` | `m.loss_`, `m.distribution_` |
 | `m$model` | `m.model_name` |
+| `m$lags` / `m$lagsAll` | `m.lags_used` |
+| `m$occurrence` (fitted model) | `m.om_model` |
+| `m$FI` | `m.fisher_information_` |
 | `m$timeElapsed` | `m.time_elapsed` |
+| `m$constant` | `m.constant_value` |
+| `errorType(m)` | `m.error_type` |
 | `sigma(m)` | `m.sigma` |
-| `extractScale(m)`, `extractSigma(m)` | `m.extract_scale()`, `m.extract_sigma()` |
-| `pointLik(m)` | `m.point_lik()` |
-| `forecast(m, h=)` | `m.predict(h=)` → `ForecastResult` with `.mean` / `.lower` / `.upper` |
+| `m$parameters$a`, `$b` of `ces()` | `m.a_`, `m.b_` |
+| `m$lambda`, `m$harmonics`, `m$periods`, `m$trendType` of `tbats()` | `m.lambda_`, `m.harmonics_`, `m.periods_`, `m.trend_type_` |
+| `m$modelA`, `m$modelB` of `omg()` | `m.model_a`, `m.model_b` |
+| `forecast(m, h=)` | `m.predict(h=)` → `ForecastResult` with `.mean` / `.lower` / `.upper`; no forecast attribute |
+
+### Methods
+
+| R | Python |
+|---|---|
+| `forecast()` | `predict()` |
+| `reforecast()`, `reapply()`, `simulate()` | same names |
+| `vcov()`, `confint()`, `coefbootstrap()`, `summary()`, `plot()` | same names |
+| `rstandard()`, `rstudent()`, `outlierdummy()`, `rmultistep()`, `multicov()` | same names |
+| `pointLik()`, `extractScale()`, `extractSigma()` | `point_lik()`, `extract_scale()`, `extract_sigma()` |
 
 R stores either a number or a model in the single `$scale` slot and
 disambiguates with `is.scale()`. Python keeps the two apart so the return type

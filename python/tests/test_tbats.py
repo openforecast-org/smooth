@@ -101,8 +101,7 @@ def test_backcasting_reproduces_a_noise_free_fractional_period():
         lambda_bc=1,
         orders=ORDERS0,
         distribution="dnorm",
-        B=np.array([0.1, 0.01, 0.01, 0.01]),
-        maxeval=1,
+        nlopt_kwargs={"B": np.array([0.1, 0.01, 0.01, 0.01]), "maxeval": 1},
     ).fit(y)
     assert np.max(np.abs(fit.residuals)) < 1e-8
 
@@ -123,8 +122,7 @@ def test_lambda_zero_is_the_model_of_the_logarithms(air):
         lambda_bc=1,
         orders=ORDERS0,
         distribution="dnorm",
-        B=fit_log.coef,
-        maxeval=1,
+        nlopt_kwargs={"B": fit_log.coef, "maxeval": 1},
     ).fit(np.log(air))
     assert fit_log.loglik == pytest.approx(
         fit_level.loglik - np.log(air).sum(), rel=1e-10
@@ -172,11 +170,11 @@ def test_a_provided_shape_is_not_estimated(air):
         trend="additive",
         orders=ORDERS0,
         distribution="dgnorm",
-        shape=1.5,
+        gnorm_shape=1.5,
     ).fit(air)
     assert "shape" not in fit.coef_names
     arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
-    assert TBATS(shape=0.9, **arguments).fit(air).distribution_ == "dlaplace"
+    assert TBATS(gnorm_shape=0.9, **arguments).fit(air).distribution_ == "dlaplace"
     assert TBATS(loss="MAE", **arguments).fit(air).distribution_ == "dlaplace"
 
 
@@ -383,7 +381,9 @@ def test_lambda_zero_with_a_regressor_is_the_model_of_the_logarithms(xreg_data):
         lags=[1, 12], harmonics=[1], trend="none", orders=ORDERS0, distribution="dnorm"
     )
     fit_log = TBATS(lambda_bc=0, **arguments).fit(y[:120], X[:120])
-    fit_level = TBATS(lambda_bc=1, B=fit_log.coef, maxeval=1, **arguments).fit(
+    fit_level = TBATS(
+        lambda_bc=1, nlopt_kwargs={"B": fit_log.coef, "maxeval": 1}, **arguments
+    ).fit(
         np.log(y[:120]), X[:120]
     )
     assert fit_log.loglik == pytest.approx(
@@ -607,8 +607,7 @@ def test_initial_gradient_solves_for_the_initials(air):
     assert gradient.point_lik().sum() == pytest.approx(gradient.loglik, rel=1e-12)
     at_backcast = TBATS(
         initial="gradient",
-        B=backcast.coef,
-        maxeval=1,
+        nlopt_kwargs={"B": backcast.coef, "maxeval": 1},
         **arguments,
     ).fit(air)
     assert at_backcast.loss_value <= backcast.loss_value
@@ -700,7 +699,8 @@ def test_a_start_a_hair_inside_a_bound_is_estimated_as_one_on_the_bound(air):
     on_bound[model.coef_names.index("lambda")] = 1.0
     B[model.coef_names.index("lambda")] = 1 - 2.65e-14
     np.testing.assert_array_equal(
-        TBATS(B=B, **kw).fit(air).coef, TBATS(B=on_bound, **kw).fit(air).coef
+        TBATS(nlopt_kwargs={"B": B}, **kw).fit(air).coef,
+        TBATS(nlopt_kwargs={"B": on_bound}, **kw).fit(air).coef,
     )
 
 

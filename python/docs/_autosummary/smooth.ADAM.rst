@@ -48,6 +48,7 @@
    ~ADAM.actuals
    ~ADAM.aic
    ~ADAM.aicc
+   ~ADAM.arma_parameters_
    ~ADAM.b_value
    ~ADAM.bic
    ~ADAM.bicc
@@ -77,7 +78,11 @@
    ~ADAM.nparam
    ~ADAM.om_model
    ~ADAM.orders
+   ~ADAM.persistence_level_
+   ~ADAM.persistence_seasonal_
+   ~ADAM.persistence_trend_
    ~ADAM.persistence_vector
+   ~ADAM.persistence_xreg_
    ~ADAM.phi_
    ~ADAM.profile
    ~ADAM.residuals

@@ -640,9 +640,6 @@ class ADAM:
         fi: bool = False,
         step_size: Optional[float] = None,
         # initial values for optimization parameters:
-        nlopt_initial: Optional[Dict[str, Any]] = None,
-        nlopt_upper: Optional[Dict[str, Any]] = None,
-        nlopt_lower: Optional[Dict[str, Any]] = None,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         # specific to losses or distributions
         gnorm_shape: Optional[float] = None,
@@ -747,12 +744,6 @@ class ADAM:
             Whether recent profiles (e.g., for exogenous variables) are provided.
         profiles_recent_table : Optional[Any], default=None
             Table containing recent profiles data.
-        nlopt_initial : Optional[Dict[str, Any]], default=None
-            Initial values for optimization parameters for NLopt solver.
-        nlopt_upper : Optional[Dict[str, Any]], default=None
-            Upper bounds for optimization parameters for NLopt solver.
-        nlopt_lower : Optional[Dict[str, Any]], default=None
-            Lower bounds for optimization parameters for NLopt solver.
         nlopt_kwargs : Optional[Dict[str, Any]], default=None
             Additional keyword arguments for optimization. Supported keys:
 
@@ -771,6 +762,11 @@ class ADAM:
               than ftol_rel * |CF|.
             - ``ftol_abs`` (float): Absolute tolerance on function value (default=0).
               Optimization stops when CF changes are smaller than ftol_abs.
+            - ``maxeval`` (int): Maximum number of evaluations of the cost
+              function (default: 40 per parameter, at least 1000 with
+              regressors, as R).
+            - ``maxtime`` (float): Maximum time of the optimisation in seconds
+              (default=-1, no limit).
             - ``algorithm`` (str): NLopt algorithm name
               (default="NLOPT_LN_NELDERMEAD"). Common alternatives:
               "NLOPT_LN_SBPLX" (Subplex), "NLOPT_LN_COBYLA" (COBYLA),
@@ -829,9 +825,6 @@ class ADAM:
         self.head_length = head_length
         self.arma = arma
         self.verbose = verbose
-        self.nlopt_initial = nlopt_initial
-        self.nlopt_upper = nlopt_upper
-        self.nlopt_lower = nlopt_lower
         self.nlopt_kwargs = nlopt_kwargs
         self.gnorm_shape = gnorm_shape
         if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
@@ -979,7 +972,7 @@ class ADAM:
 
         - Changing ``initial`` method
         - Adjusting bounds (``bounds="usual"`` vs ``bounds="admissible"``)
-        - Providing custom starting values via ``nlopt_initial`` parameter
+        - Providing custom starting values via ``nlopt_kwargs={"B": ...}``
 
         **Computational Complexity**:
 

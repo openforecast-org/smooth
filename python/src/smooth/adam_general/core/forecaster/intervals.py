@@ -58,23 +58,21 @@ def ensure_level_format(level, side):
 
 
 def _obs_observed(observations_dict):
-    """The observed in-sample values, which the scale is divided by: the missing
-    ones are not (R: ``adam_nobsObserved``)."""
-    missing = observations_dict.get("y_na_values")
-    n_missing = 0 if missing is None else int(np.sum(missing))
-    return observations_dict["obs_in_sample"] - n_missing
+    """The observed sizes, which the scale is divided by: the missing values are
+    not, and neither are the zeros of an occurrence model (R: ``adam_nobsObserved``)."""
+    return int(np.sum(observations_dict["ot_logical"]))
 
 
 def _df_scale(general, observations_dict, params_info):
     """Degrees of freedom for de-biasing the scale (R: ``adam_dfScale``).
 
-    The model passes its own as ``general["df_scale"]``. Otherwise: the non-zero
-    observations minus the parameters, without the scale ones under likelihood,
+    The model passes its own as ``general["df_scale"]``. Otherwise: the observed
+    sizes minus the parameters, without the scale ones under likelihood,
     with ``params_info[0]`` holding ``[..., n_scale, n_all]`` as ``sigma()`` reads it.
     """
     if general.get("df_scale") is not None:
         return general["df_scale"]
-    obs_df = observations_dict.get("obs_nonzero") or observations_dict["obs_in_sample"]
+    obs_df = _obs_observed(observations_dict)
     info = params_info[0]
     n_param = info[-1]
     if general.get("loss") == "likelihood" and len(info) > 1:

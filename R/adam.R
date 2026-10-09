@@ -825,9 +825,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         obsObserved <- sum(observed);
         if(!multisteps){
             if(loss=="likelihood"){
-                # Scale for different functions
+                # Scale for different functions: the maximum likelihood over the observed sizes
                 scale <- scaler(distribution, Etype, adamFitted$errors[otLogical],
-                                adamFitted$fitted[otLogical], obsObserved, other);
+                                adamFitted$fitted[otLogical], sum(otLogical), other);
 
                 # Calculate the likelihood
                 ## as.complex() is needed for failsafe in case of exotic models
@@ -894,39 +894,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                        scale=scale*abs(adamFitted$fitted[otLogical]), log=TRUE)
                 ));
 
-                # Differential entropy for the logLik of occurrence model, over the observed
-                # zeros: a missing observation is not a zero
-                otZero <- !otLogical & !yNAValues[1:obsInSample];
-                if(occurrenceModel || any(otZero)){
-                    CFValueEntropy <- switch(distribution,
-                                             "dnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5),
-                                             "dlnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5)-scale/2,
-                                             "dlogis" = obsZero*2,
-                                             "dlaplace" =,
-                                             "dllaplace" =,
-                                             "dalaplace" = obsZero*(1 + log(2*scale)),
-                                             "ds" =,
-                                             "dls" = obsZero*(2 + 2*log(2*scale)),
-                                             "dgnorm" =,
-                                             "dlgnorm" = obsZero*(1/other-log(other/(2*scale*gamma(1/other)))),
-                                             "dt" = obsZero*((scale+1)/2 *
-                                                                 (digamma((scale+1)/2)-digamma(scale/2)) +
-                                                                 log(sqrt(scale) * beta(scale/2,0.5))),
-                                             # "dinvgauss" = obsZero*(0.5*(log(pi/2)+1+suppressWarnings(log(scale)))));
-                                             # "dinvgauss" =0);
-                                             "dinvgauss" = 0.5*(obsZero*(log(pi/2)+1+suppressWarnings(log(scale)))-
-                                                                    sum(log(adamFitted$fitted[otZero]))),
-                                             "dgamma" = obsZero*(1/scale + log(gamma(1/scale)) +
-                                                                     (1-1/scale)*digamma(1/scale)) +
-                                                 sum(log(scale*adamFitted$fitted[otZero]))
-                    );
-                    # If the entropy is NA then something is wrong. It shouldn't be!
-                    if(is.na(CFValueEntropy)){
-                        CFValueEntropy[] <- Inf;
-                    }
-                    # A negative entropy (a small scale) stays: it is the likelihood of the zeros
-                    CFValue <- CFValue + CFValueEntropy;
-                }
+                # The zeros of an occurrence model are not in the likelihood of the sizes: their
+                # sizes are not observed, and integrate to one (the probabilities are added in
+                # logLik)
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsObserved;
@@ -2086,8 +2056,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             other <- abs(tail(B,1));
         }
         # which() is needed in order to overcome weird behaviour of zoo
-        scale <- scaler(distribution, Etype, errors[which(otLogical)], yFitted[which(otLogical)],
-                        sum(!yNAValues[1:obsInSample]), other);
+        # The sizes, not multiplied by the probabilities
+        scale <- scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
+                        sum(otLogical), other);
 
         # Record constant if it was estimated
         if(constantEstimate){
@@ -7534,29 +7505,9 @@ pointLik.adam <- function(object, log=TRUE, ...){
         likValues[otLogical] <- likValues[otLogical] - log(yInSample[otLogical]);
     }
 
-    # If this is a mixture model, take the respective probabilities into account (differential entropy)
-    # A negative entropy (a small scale) stays, as in the estimation
+    # If this is a mixture model, take the probabilities into account: the sizes of the
+    # zeros are not observed, so the zeros have only the likelihood of the occurrence
     if(mixture){
-        otZero <- !otLogical & observed;
-        entropyValues <- rep(switch(distribution,
-                                         "dnorm" = (log(sqrt(2*pi*scale))+0.5),
-                                         "dlnorm" = (log(sqrt(2*pi*scale))+0.5) -scale/2,
-                                         "dlogis" = 2,
-                                         "dlaplace" =,
-                                         "dllaplace" =,
-                                         "dalaplace" = (1 + log(2*scale)),
-                                         "dt" = ((scale+1)/2 * (digamma((scale+1)/2)-digamma(scale/2)) +
-                                                     log(sqrt(scale) * beta(scale/2,0.5))),
-                                         "ds" =,
-                                         "dls" = (2 + 2*log(2*scale)),
-                                         "dgnorm" =,
-                                         "dlgnorm" = 1/other-log(other/(2*scale*gamma(1/other))),
-                                         "dinvgauss" = 0.5*(log(pi/2)+1+log(scale)-log(yFitted[otZero])),
-                                         "dgamma" = (1/scale + log(scale*yFitted[otZero]) +
-                                                         log(gamma(1/scale)) + (1-1/scale)*digamma(1/scale))
-        ), length.out=sum(otZero));
-        likValues[otZero] <- -entropyValues;
-
         # The likelihood of the occurrence: of its model, or of the provided probabilities
         occurrenceLik <- if(object$occurrence$occurrence=="provided"){
             ifelse(otLogical, log(pOccurrence), log(1-pOccurrence));

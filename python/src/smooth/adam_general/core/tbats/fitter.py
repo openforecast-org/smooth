@@ -16,7 +16,6 @@ from smooth.adam_general.core.creator.architector import (
     adam_head_length,
     adam_profile_creator,
 )
-from smooth.adam_general.core.sm import _differential_entropy
 from smooth.adam_general.core.tbats import structure as st
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import (
@@ -445,12 +444,9 @@ def fit(
         else occurrence["ot_logical"]
     )
     obs_nonzero = int(ot_logical.sum())
-    # The observed zeros, whose sizes are not observed: the likelihood has their
-    # differential entropy in the space of the data, as ADAM's, and the scale is
-    # divided by all the observed values, its maximum likelihood then
+    # The sizes of the zeros are not observed: the zeros have only the likelihood
+    # of the occurrence, and the scale is divided by the observed sizes
     observed = ~np.isnan(y)
-    ot_zero = ~ot_logical & observed
-    obs_observed = int(observed.sum())
     X = st.design(obs, struct["trend_in"], table, xreg_data)[ot_logical]
     qr_x = st.QR(X)
     lam_start = st.lambda_start(y[ot_logical], X, lam_spec)
@@ -695,21 +691,9 @@ def fit(
                 value = math.log(np.linalg.det(adam_errors.T @ adam_errors / n))
         elif loss == "likelihood":
             value = (
-                -st.loglik_value(errors, distribution, elements["shape"], obs_observed)
+                -st.loglik_value(errors, distribution, elements["shape"], obs_nonzero)
                 - (elements["lambda"] - 1) * log_y
             )
-            # The zeros: minus the differential entropy of their sizes in the space
-            # of the data, with the Jacobian at the predicted size
-            if ot_zero.any():
-                sizes_bc = fitted["fitted"][ot_zero]
-                scale = st.scale_value(
-                    errors, distribution, elements["shape"], obs_observed
-                )
-                value += _differential_entropy(
-                    distribution, np.full(len(sizes_bc), scale), elements["shape"]
-                ) - (elements["lambda"] - 1) * _sum_r(
-                    _log_r(st.box_cox_inverse(sizes_bc, elements["lambda"]))
-                )
         elif loss == "MSE":
             value = _sum_r(errors**2) / obs_nonzero
         elif loss == "MAE":
@@ -735,7 +719,7 @@ def fit(
         elements = filler(b_full(np.asarray(B, dtype=float)), s["bounds"])
         fitted = fit_states(elements)
         errors = fitted["errors"][ot_logical]
-        scale = st.scale_value(errors, distribution, elements["shape"], obs_observed)
+        scale = st.scale_value(errors, distribution, elements["shape"], obs_nonzero)
         values = calculate_likelihood(
             distribution,
             "A",
@@ -752,14 +736,6 @@ def fit(
             p_fitted = occurrence["p_fitted"]
             result[observed] = _log_r(1 - p_fitted[observed])
             result[ot_logical] = _log_r(p_fitted[ot_logical])
-            # The zeros: minus the differential entropy of their sizes, with the
-            # Jacobian at the predicted size
-            entropy = _differential_entropy(
-                distribution, np.array([scale]), elements["shape"]
-            )
-            lam = elements["lambda"]
-            sizes_zero = st.box_cox_inverse(fitted["fitted"][ot_zero], lam)
-            result[ot_zero] += -entropy + (lam - 1) * _log_r(sizes_zero)
         result[ot_logical] += sizes
         return result
 
@@ -905,7 +881,7 @@ def fit(
         )
 
     scale = st.scale_value(
-        fitted["errors"][ot_logical], distribution, elements["shape"], obs_observed
+        fitted["errors"][ot_logical], distribution, elements["shape"], obs_nonzero
     )
     forecast_bc = None
     if s["h"] > 0:

@@ -7,7 +7,6 @@ from smooth.adam_general.core.utils.polynomials import arima_bounds_penalty
 from smooth.adam_general.core.utils.utils import (
     _log_r,
     _sum_r,
-    calculate_entropy,
     calculate_likelihood,
     calculate_multistep_loss,
     complete_windows,
@@ -614,7 +613,8 @@ def CF(  # noqa: N802
                 model_type_dict["error_type"],
                 adam_fitted.errors[observations_dict["ot_logical"]],
                 adam_fitted.fitted[observations_dict["ot_logical"]],
-                obs_observed,
+                # the maximum likelihood over the observed sizes
+                int(np.sum(observations_dict["ot_logical"])),
                 other,
             )
             # Aggregate through _sum_r: R accumulates sum() in a long double
@@ -633,24 +633,9 @@ def CF(  # noqa: N802
                 other,
             )
             CFValue = -_sum_r(np.asarray(ll, dtype=np.float64).ravel())
-            # Differential entropy for the logLik of occurrence model, over the
-            # observed zeros: a missing observation is not a zero
-            ot_zero = ~observations_dict["ot_logical"]
-            if observations_dict.get("y_na_values") is not None:
-                ot_zero = ot_zero & ~observations_dict["y_na_values"]
-            if observations_dict.get("occurrence_model", False) or any(ot_zero):
-                CFValueEntropy = calculate_entropy(
-                    general["distribution_new"],
-                    scale,
-                    other,
-                    int(np.sum(ot_zero)),
-                    adam_fitted.fitted[ot_zero],
-                )
-                # NaN means something is wrong; a negative entropy (a small scale)
-                # stays: it is the likelihood of the zeros
-                if np.isnan(CFValueEntropy):
-                    CFValueEntropy = np.inf
-                CFValue += CFValueEntropy
+            # The zeros of an occurrence model are not in the likelihood of the
+            # sizes: their sizes are not observed, and integrate to one (the
+            # probabilities are added in the log-likelihood)
 
         elif general["loss"] == "MSE":
             CFValue = _sum_r(adam_fitted.errors**2) / obs_observed

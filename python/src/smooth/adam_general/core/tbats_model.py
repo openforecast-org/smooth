@@ -1191,6 +1191,7 @@ class TBATS:
             ot,
         )
 
+    _gap_residuals = ADAM._gap_residuals
     rstandard = ADAM.rstandard
     rstudent = ADAM.rstudent
     outlierdummy = ADAM.outlierdummy

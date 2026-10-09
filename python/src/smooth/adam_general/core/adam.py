@@ -2375,8 +2375,8 @@ class ADAM:
             sizes &= np.asarray(self._ot, dtype=bool)
         if dist in ("dinvgauss", "dgamma"):
             return errors / np.mean(errors[sizes])
-        # Each error with its own variance, after the periods without an observed size
-        errors = errors / np.sqrt(self._gap_variance())
+        # Each error as the one-step one, after the periods without an observed size
+        errors = self._gap_residuals()
 
         # R's rstandard.adam standardises by extractScale(), de-biased in the
         # variance space. extract_scale() is a vector when a scale model is
@@ -2453,8 +2453,8 @@ class ADAM:
         # The missing values (NaN residuals) are not observations
         obs = self._nobs_observed()
         df = obs - self.nparam - 1
-        # Each error with its own variance, after the periods without an observed size
-        errors = self.residuals.copy().astype(float) / np.sqrt(self._gap_variance())
+        # Each error as the one-step one, after the periods without an observed size
+        errors = self._gap_residuals()
         dist = self.distribution_
 
         if dist == "dnorm":
@@ -2765,22 +2765,36 @@ class ADAM:
         zeros of an occurrence model, whose sizes are not observed."""
         return int(np.sum(self._observations["ot_logical"]))
 
-    def _gap_variance(self) -> NDArray:
-        """The variance of the errors at the observed sizes relative to the
-        one-step one, after the periods without an observed size (R's
-        ``adam_gapVarianceModel``): ones unless the model is pure additive with
-        the normal distribution."""
+    def _gap_variance(self, power: int = 2) -> NDArray:
+        """The variance (or with ``power=1`` the multiplier of the mean) of the
+        errors at the observed sizes relative to the one-step one, after the periods
+        without an observed size (R's ``adam_gapVarianceModel``): ones unless the
+        model is pure additive with the normal distribution, or a pure
+        multiplicative ADAM ETS with the log-normal one, additive in logs."""
         from smooth.adam_general.core.utils.var_covar import gap_variance
 
         ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
         model_type = self._model_type
+        error_type = model_type["error_type"]
+        trend_type = model_type["trend_type"]
+        season_type = model_type["season_type"]
         # A scale model (sm()) has its own residuals, standardised already
-        if (
-            self.distribution_ == "dnorm"
-            and model_type["error_type"] == "A"
-            and model_type["trend_type"] != "M"
-            and model_type["season_type"] != "M"
-            and not getattr(self, "is_scale_", False)
+        if not getattr(self, "is_scale_", False) and (
+            (
+                self.distribution_ == "dnorm"
+                and error_type == "A"
+                and trend_type != "M"
+                and season_type != "M"
+            )
+            or (
+                self.distribution_ == "dlnorm"
+                and self.ets == "adam"
+                and model_type["ets_model"]
+                and not self._arima.get("arima_model", False)
+                and error_type == "M"
+                and trend_type != "A"
+                and season_type != "A"
+            )
         ):
             return gap_variance(
                 self._lags_model["lags_model_all"],
@@ -2788,8 +2802,25 @@ class ADAM:
                 self._prepared["mat_f"],
                 self._prepared.get("vec_g", self._adam_created["vec_g"]),
                 ot_logical,
+                power,
             )
         return np.ones(len(ot_logical))
+
+    def _gap_residuals(self) -> NDArray:
+        """The residuals as the one-step ones after the periods without an
+        observed size (R's ``adam_gapResiduals``): ``e/sqrt(k)`` for the normal
+        distribution, and for the log-normal the ratio
+        ``exp((log(r) + s a/2)/sqrt(k) - s/2)``, logN(-s/2, s) as the one-step
+        error."""
+        errors = np.asarray(self.residuals, dtype=float)
+        gap = self._gap_variance()
+        if self.distribution_ == "dlnorm":
+            scale = self.extract_scale()
+            return np.exp(
+                (np.log(errors) + scale * self._gap_variance(1) / 2) / np.sqrt(gap)
+                - scale / 2
+            )
+        return errors / np.sqrt(gap)
 
     def _ic_occurrence_terms(self):
         """``(n_param_all, n_param_sizes, obs)`` for AICc/BICc.
@@ -2976,9 +3007,9 @@ class ADAM:
         self._check_is_fitted()
 
         residuals = np.asarray(self.residuals, dtype=float)
-        # Each error with its own variance, after the periods without an observed size
+        # Each error as the one-step one, after the periods without an observed size
         if not getattr(self, "_is_combined", False):
-            residuals = residuals / np.sqrt(self._gap_variance())
+            residuals = self._gap_residuals()
         residuals = residuals[np.isfinite(residuals)]
         # R's ``sigma.adam`` (R/adam.R:4687) divides by the non-zero sample minus
         # the parameters, without the scale ones under likelihood loss.
@@ -3154,9 +3185,11 @@ class ADAM:
                 e_type,
                 y[ot_logical],
                 y_fitted[ot_logical].reshape(-1, 1),
-                # The variance after the periods without an observed size
-                scale * self._gap_variance()[ot_logical].reshape(-1, 1),
+                scale,
                 other,
+                # The mean and the variance after the periods without an observed size
+                self._gap_variance(1)[ot_logical].reshape(-1, 1),
+                self._gap_variance()[ot_logical].reshape(-1, 1),
             ),
             dtype=float,
         ).ravel()
@@ -3870,6 +3903,8 @@ class ADAM:
             self._explanatory,
             self._params_info,
         ) = result
+        # The ETS form, as R's ets: the cost function and the preparator read it
+        self._general["ets"] = self.ets
 
     def _populate_from_alm(self, y, X):
         """Populate model attributes from the greybox.ALM early-exit object.
@@ -5183,7 +5218,7 @@ class ADAM:
             )
             if not isinstance(result, tuple):
                 return None
-            fitted, errors, gap = result
+            fitted, errors, gap, gap_mean = result
             fitted = np.asarray(fitted, dtype=float).ravel()
             errors = np.asarray(errors, dtype=float).ravel()
             if not np.all(np.isfinite(fitted)):
@@ -5193,10 +5228,12 @@ class ADAM:
             scale = scaler(
                 distribution,
                 e_type,
-                errors[ot_logical] / np.sqrt(gap[ot_logical]),
+                errors[ot_logical],
                 fitted[ot_logical],
                 int(np.sum(ot_logical)),
                 other_b,
+                gap_mean[ot_logical],
+                gap[ot_logical],
             )
             lik = np.asarray(
                 calculate_likelihood(
@@ -5204,8 +5241,10 @@ class ADAM:
                     e_type,
                     y[ot_logical],
                     fitted[ot_logical].reshape(-1, 1),
-                    scale * gap[ot_logical].reshape(-1, 1),
+                    scale,
                     other_b,
+                    gap_mean[ot_logical].reshape(-1, 1),
+                    gap[ot_logical].reshape(-1, 1),
                 ),
                 dtype=float,
             ).ravel()

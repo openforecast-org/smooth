@@ -538,7 +538,14 @@ def _process_arma_parameters(arima_checked, adam_estimated):
 
 
 def _calculate_scale_parameter(
-    general_dict, model_type_dict, errors, y_fitted, observations_dict, other, gap
+    general_dict,
+    model_type_dict,
+    errors,
+    y_fitted,
+    observations_dict,
+    other,
+    gap,
+    gap_mean,
 ):
     """
     Calculate scale parameter using scaler function.
@@ -557,9 +564,9 @@ def _calculate_scale_parameter(
         Dictionary with observation data and related information
     other : dict
         Additional parameters
-    gap : numpy.ndarray
-        The variance of the errors after the periods without an observed size
-        (:func:`gap_variance`), ones unless the model is pure additive with dnorm
+    gap, gap_mean : numpy.ndarray
+        The multipliers of the variance and of the mean of the errors after the
+        periods without an observed size (:func:`gap_variance`), ones elsewhere
 
     Returns
     -------
@@ -570,12 +577,14 @@ def _calculate_scale_parameter(
     scale = scaler(
         general_dict["distribution_new"],
         model_type_dict["error_type"],
-        np.ravel(errors)[ot_logical] / np.sqrt(gap[ot_logical]),
+        np.ravel(errors)[ot_logical],
         np.ravel(y_fitted)[ot_logical],
         # divided by the observed sizes: the missing values are not, and neither
         # are the zeros of an occurrence model
         int(np.sum(observations_dict["ot_logical"])),
         other,
+        gap_mean[ot_logical],
+        gap[ot_logical],
     )
 
     return scale
@@ -1118,22 +1127,44 @@ def preparator(
     arma_parameters_list = _process_arma_parameters(arima_checked, adam_estimated)
 
     # 12. Calculate scale parameter
-    gap = np.ones(len(observations_dict["ot_logical"]))
+    # The variance and the mean after the periods without an observed size, as in
+    # the estimation
+    gap = gap_mean = np.ones(len(observations_dict["ot_logical"]))
+    error_type = model_type_dict["error_type"]
+    trend_type = model_type_dict["trend_type"]
+    season_type = model_type_dict["season_type"]
     if (
         general_dict["distribution_new"] == "dnorm"
-        and model_type_dict["error_type"] == "A"
-        and model_type_dict["trend_type"] != "M"
-        and model_type_dict["season_type"] != "M"
+        and error_type == "A"
+        and trend_type != "M"
+        and season_type != "M"
+    ) or (
+        general_dict["distribution_new"] == "dlnorm"
+        and general_dict.get("ets") == "adam"
+        and model_type_dict["ets_model"]
+        and not arima_checked.get("arima_model", False)
+        and error_type == "M"
+        and trend_type != "A"
+        and season_type != "A"
     ):
-        gap = gap_variance(
+        gap_arguments = (
             lags_dict["lags_model_all"],
             matrices_dict["mat_wt"],
             matrices_dict["mat_f"],
             matrices_dict["vec_g"],
             observations_dict["ot_logical"],
         )
+        gap = gap_variance(*gap_arguments)
+        gap_mean = gap_variance(*gap_arguments, power=1)
     scale = _calculate_scale_parameter(
-        general_dict, model_type_dict, errors, y_fitted, observations_dict, other, gap
+        general_dict,
+        model_type_dict,
+        errors,
+        y_fitted,
+        observations_dict,
+        other,
+        gap,
+        gap_mean,
     )
 
     # 13. Process constant and other parameters

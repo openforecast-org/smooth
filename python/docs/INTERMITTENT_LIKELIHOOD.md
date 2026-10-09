@@ -1,0 +1,352 @@
+# The likelihood of intermittent demand and of the unobserved periods
+
+Technical report on the likelihood that `adam()`, `tbats()`, `sm()` and the other
+functions of smooth (R and Python) use when some sizes are not observed: the zeros of an
+occurrence model and the missing values. It explains why the differential entropy of the
+zeros was removed (section 3), how the variance of the error after the unobserved periods
+enters the likelihood of the pure additive models (section 4.1) and of the pure
+multiplicative ADAM ETS (section 4.2), what remains approximate or not implemented
+(sections 4.3 and 5), and where the code is (section 6).
+
+The notation follows Svetunkov & Boylan (2023), "iETS: State space model for intermittent
+demand forecasting" (the paper below), and the ADAM monograph (Svetunkov, 2023).
+
+## 1. The model
+
+The demand $y_t$ is the product of the occurrence $o_t$ and of the potential demand size
+$z_t$, which are independent (assumption 3 of the paper):
+
+$$
+y_t = o_t z_t, \qquad o_t \sim \text{Bernoulli}(p_t),
+$$
+
+$$
+z_t = w(\mathbf v_{t-\mathbf l}) + r(\mathbf v_{t-\mathbf l})\,\epsilon_t, \qquad
+\mathbf v_t = f(\mathbf v_{t-\mathbf l}) + g(\mathbf v_{t-\mathbf l})\,\epsilon_t .
+$$
+
+For iETS(M,N,N), the case of the paper, $z_t = l_{t-1}(1+\epsilon_t)$ and
+$l_t = l_{t-1}(1+\alpha\epsilon_t)$.
+
+$T$ is the number of observations, $T_1 = \sum_t o_t$ the number of the observed sizes and
+$T_0 = T - T_1$ the number of the zeros. $j_t$ is the number of periods since the previous
+observed size (the demand interval): $j_t = 1$ when $y_{t-1}$ was observed, and the first
+gap counts from the initial states. A missing value is an unobserved period too: everything
+below holds for the missing values as for the zeros, without the occurrence part.
+
+**The estimation (the paper's C.1, and the C++ fitter of smooth).** The states are updated
+only when the size is observed: at a zero (or a missing value) the error is set to zero and
+the states go on with the transition, $\hat{\mathbf v}_t = f(\hat{\mathbf v}_{t-\mathbf l})$.
+The fitted value at the next observed size is the prediction $j_t$ steps ahead from the
+states at the previous one, $\hat\mu_t$.
+
+## 2. The likelihood of the observed data
+
+### 2.1 The distribution of $y_t$
+
+$y_t$ is a mixture of a point mass at zero and a continuous density. Since $z_t$ is
+continuous, $P(z_t = 0) = 0$, and a zero can only come from $o_t = 0$:
+
+$$
+P(y_t = 0 \mid Y_{t-1}) = (1-p_t)\int_0^\infty f_z(z \mid Y_{t-1})\,dz = 1 - p_t,
+$$
+
+$$
+g(y_t \mid Y_{t-1}) = p_t\, f_z(y_t \mid Y_{t-1}) \quad \text{for } y_t > 0 .
+$$
+
+The size of a zero is integrated out, and the integral of a density is one: nothing about
+the distribution of the size is observed at a zero, so the size cannot contribute there.
+
+### 2.2 The likelihood of the sample
+
+The likelihood is the product of the conditional distributions of what is observed (the
+prediction-error decomposition). The paper's (B.3) is the *complete-data* likelihood
+$L_c(\theta,\lambda \mid Y, Z_0)$, with $Z_0 = \{z_t : o_t = 0\}$ the unobserved sizes; the
+observed-data likelihood integrates them out:
+
+$$
+L(\theta,\lambda \mid Y) = \int L_c(\theta,\lambda \mid Y, Z_0)\, dZ_0
+= \prod_{o_t=1} p_t \prod_{o_t=0}(1-p_t) \int \prod_{t=1}^T f_z(z_t \mid \mathbf v_{t-1})\, dZ_0 .
+$$
+
+* **The exact model.** The states between demands depend on the unobserved sizes.
+  Integrating them out one after the other gives, at each observed size, the $j_t$-steps
+  ahead density from the states at the previous one (the paper's B.4):
+
+  $$
+  \ell(\theta,\lambda \mid Y) = \sum_{o_t=1} \log f_z^{(j_t)}\!\left(z_t \mid \mathbf v_{t-j_t}\right) + \sum_{o_t=1}\log p_t + \sum_{o_t=0}\log(1-p_t).
+  $$
+
+* **With the one-step density** (what smooth did until the changes of section 4, and still
+  does for the models of section 4.3):
+
+  $$
+  \ell_b(\theta,\lambda \mid Y) = \sum_{o_t=1} \log f_z\!\left(z_t \mid \hat\mu_t\right) + \sum_{o_t=1}\log \hat p_t + \sum_{o_t=0}\log(1-\hat p_t).
+  $$
+
+In neither is there a term for the sizes at the zeros: the zeros enter through
+$\log(1-\hat p_t)$, and through $j_t$ in the exact one. The two parts separate, so the
+occurrence model is estimated on its own (as the paper notes).
+
+## 3. Why the differential entropy was removed
+
+### 3.1 The step from (B.5) to (B.6)
+
+The EM algorithm takes the expectation of the complete-data log-likelihood under the
+*current* parameters $\theta^{(k)}$ and maximises it over $\theta$, with $\theta^{(k)}$
+fixed:
+
+$$
+Q\!\left(\theta \mid \theta^{(k)}\right) = \sum_{o_t=1}\log f_z(z_t \mid \theta)
++ \sum_{o_t=0} \int f_z\!\left(z \mid \theta^{(k)}\right) \log f_z(z \mid \theta)\, dz
++ \sum_{o_t=1}\log p_t + \sum_{o_t=0}\log(1-p_t).
+$$
+
+This is (B.5) with its two parameter vectors written out. The term of each zero is a
+cross-entropy,
+
+$$
+\int f_z^{(k)} \log f_z\, dz = -H_z\!\left(\theta^{(k)}\right) - \mathrm{KL}\!\left(f_z^{(k)} \,\|\, f_z\right),
+$$
+
+equal to $-H_z(\theta)$ only at $\theta = \theta^{(k)}$. (B.6) writes $-H_z(\theta)$, which
+sets $\theta^{(k)} = \theta$ *before* the maximisation: the distribution of the missing
+sizes then moves with the parameters, and the objective is no longer EM's.
+
+At $\theta = \theta^{(k)}$ the gradient of the term of a zero is the mean of the score,
+which is zero:
+
+$$
+\int f_z \,\frac{\partial \log f_z}{\partial \theta}\, dz = \frac{\partial}{\partial \theta}\int f_z\, dz = 0 .
+$$
+
+So $\nabla Q = \nabla \ell_b$ at every step, and the fixed points of EM are the stationary
+points of $\ell_b$ (Dempster, Laird & Rubin, 1977). The gradient of $-H_z(\theta)$ is not
+zero, and that is the bias.
+
+A separate remark on the paper: with $H = -E(\log f)$, (29) and (B.6) should read
+$-\sum H_z(z_t)$; the code had the minus sign.
+
+### 3.2 The consequences
+
+* **The scale is shrunk by the share of the non-zero observations.** For the normal
+  distribution, EM iterates $\sigma^2_{(k+1)} = \left(\sum_{o_t=1} e_t^2 + T_0\sigma^2_{(k)}\right)/T$,
+  whose fixed point is $\hat\sigma^2 = \frac{1}{T_1}\sum_{o_t=1} e_t^2$, while (B.6) gives
+  $\hat\sigma^2 = \frac{1}{T}\sum_{o_t=1} e_t^2$. On ETS(A,N,N) with $\sigma^2 = 25$ and
+  $p = 0.4$ (persistence and initial level fixed at their true values, 40 series of 600
+  observations), `adam()` gave 11.26 and the scale of the observed sizes 28.13: a ratio of
+  exactly 0.40.
+* **The entropy can pull the location.** For the log-normal iETS(M,N,N),
+  $-H_z = -\log \hat l_{t-1} + \frac{\sigma^2}{2} - \frac12\log(2\pi e\sigma^2)$ grows without
+  bound as $\hat l_{t-1}\to 0$; for `dgamma` and `dinvgauss` the entropy contains the fitted
+  value too.
+* **The likelihood is unbounded with a dynamic scale.** With a scale model (`sm()`), the
+  zeros alone reward a scale going to zero (or to infinity for `dgamma`): `sm()` of a `dgamma`
+  model with an occurrence model diverged (a loss of $-9.1\times10^{16}$).
+* **The selection of the distribution is biased** (`tbats(distribution="auto")` chose `ds`
+  for `dnorm` on log-normal sizes).
+
+### 3.3 What changed
+
+The zeros have only $\log(1-\hat p_t)$ in the likelihood of `adam()`, `tbats()` and `sm()`
+(and in `pointLik()`), and the scale is the maximum likelihood over the observed sizes,
+divided by $T_1$; its de-biasing uses $T_1$ less the parameters. The scale models of `sm()`
+treat the zeros as missing values of their response, so that their states go on through
+them and their fitted values are the scale (they were the scale times the probability).
+
+## 4. The error after the unobserved periods
+
+After $j_t - 1$ unobserved periods, the states have gone on with zero errors while the true
+ones received $j_t - 1$ errors. The error at the next observed size is therefore the error
+$j_t$ steps ahead, not the one-step one, and its distribution is wider. Its first two
+moments are exact for the two classes below, because the drift of the states over the gap
+is linear in the errors.
+
+### 4.1 Pure additive models: the normal distribution, exactly
+
+For a pure additive model ($\mathbf F$, $\mathbf w$ and $\mathbf g$ constant, which covers
+ETS with additive components, ARIMA, the regressors, CES, GUM, SSARIMA, SPARMA and TBATS in
+the Box-Cox space), the error at the next observed size is
+
+$$
+e_t = \epsilon_t + \sum_{i=1}^{j_t-1} c_i\,\epsilon_{t-i}, \qquad c_i = \mathbf w'\mathbf F^{i-1}\mathbf g ,
+$$
+
+with the coefficients $c_i$ of the lags of each component (those of `covarAnal()`, used by the
+analytical intervals). Its mean is zero and its variance is $\sigma^2\kappa_t$ with
+
+$$
+\kappa_t = 1 + \sum_{i=1}^{j_t-1} c_i^2 .
+$$
+
+With the normal distribution, $e_t \sim \mathcal N(0, \sigma^2\kappa_t)$ exactly, so
+
+$$
+\ell = \sum_{o_t=1} \log \phi\!\left(e_t;\, 0,\, \sigma^2\kappa_t\right) + \text{occurrence terms},
+\qquad \hat\sigma^2 = \frac{1}{T_1}\sum_{o_t=1} \frac{e_t^2}{\kappa_t}.
+$$
+
+The standardised residuals divide each error by $\sqrt{\kappa_t}$. On a series of 300
+observations of ETS(A,N,N) with $\sigma^2 = 25$, $\alpha = 0.3$ and $p = 0.4$, the estimates
+are $\hat\sigma^2 = 25.7$ and $\hat\alpha = 0.32$. With the one-step density, the scale of
+the observed sizes in the simulation of section 3.2 was 28.1 for a true 25: the errors after
+the gaps inflate it.
+
+### 4.2 Pure multiplicative ADAM ETS: the log-normal distribution, exactly
+
+The ADAM form of ETS (`ets="adam"`) updates a multiplicative state by a power of $1+\epsilon_t$:
+$l_t = l_{t-1}b_{t-1}^{\phi}(1+\epsilon_t)^{\alpha}$, $b_t = b_{t-1}^{\phi}(1+\epsilon_t)^{\beta}$
+and $s_t = s_{t-m}(1+\epsilon_t)^{\gamma}$. With $u_t = \log(1+\epsilon_t)$, a model with all
+components multiplicative (or none) is exactly linear in logs,
+
+$$
+\log z_t = \mathbf w'\log\mathbf v_{t-\mathbf l} + u_t, \qquad
+\log\mathbf v_t = \mathbf F\log\mathbf v_{t-\mathbf l} + \mathbf g\,u_t ,
+$$
+
+with the same $\mathbf F$, $\mathbf w$ and $\mathbf g$ as the additive model: section 4.1
+applies to the logarithms, with the error $u_t$. The drift over a gap is
+$\sum_{i<j_t} c_i u_{t-i}$, and since the mean of $u_t$ is not zero it shifts the location:
+
+$$
+\log\frac{z_t}{\hat\mu_t} = u_t + \sum_{i=1}^{j_t-1} c_i\,u_{t-i},
+\qquad a_t = 1 + \sum_{i=1}^{j_t-1} c_i .
+$$
+
+With the log-normal distribution, $u_t \sim \mathcal N(-s/2,\, s)$, and the sum is normal:
+
+$$
+\log\frac{z_t}{\hat\mu_t} \sim \mathcal N\!\left(-\frac{s}{2}a_t,\; s\,\kappa_t\right),
+$$
+
+an exact density, with no approximation. The conventional form ($1+\alpha\epsilon_t$) is not
+linear in $u_t$, which is why section 4.2 is for `ets="adam"` only.
+
+**The scale.** With $u_t = \log(z_t/\hat\mu_t)$,
+
+$$
+\ell(s) = -\frac12\sum_{o_t=1}\log(s\kappa_t) - \sum_{o_t=1}\frac{\left(u_t + s a_t/2\right)^2}{2 s\kappa_t} + \dots,
+$$
+
+$$
+\frac{\partial\ell}{\partial s} = -\frac{T_1}{2s} + \frac{1}{2s^2}\sum_{o_t=1}\frac{u_t^2}{\kappa_t} - \frac18\sum_{o_t=1}\frac{a_t^2}{\kappa_t} = 0
+\;\Longleftrightarrow\;
+\left(\sum_{o_t=1}\frac{a_t^2}{\kappa_t}\right)s^2 + 4T_1 s - 4\sum_{o_t=1}\frac{u_t^2}{\kappa_t} = 0,
+$$
+
+whose positive root is the maximum likelihood estimate:
+
+$$
+\hat s = \frac{2\left(\sqrt{T_1^2 + \sum_{o_t=1}\frac{a_t^2}{\kappa_t}\sum_{o_t=1}\frac{u_t^2}{\kappa_t}} - T_1\right)}{\sum_{o_t=1} a_t^2/\kappa_t} .
+$$
+
+Without gaps ($a_t = \kappa_t = 1$) this is $\hat s = 2\left(\sqrt{1+m}-1\right)$ with
+$m = \frac{1}{T_1}\sum u_t^2$. smooth had $2\left(1-\sqrt{1-m}\right)$, the root of
+$s^2 - 4s + 4m = 0$, which is not the maximum of the likelihood: with $s = 0.5$ it gave
+0.684 against 0.503 (and 0.503 by direct optimisation). It is fixed for all the log-normal
+models.
+
+The residuals of the diagnostics are mapped to the one-step ones,
+$\exp\!\left(\frac{u_t + s a_t/2}{\sqrt{\kappa_t}} - \frac s2\right)$, which are
+$\log\mathcal N(-s/2, s)$ again.
+
+On ADAM ETS(M,N,N) with $s = 0.2$, $\alpha = 0.3$ and $p = 0.35$ (30 series of 300
+observations), the mean estimates are $\hat s = 0.205$ and $\hat\alpha = 0.431$, against
+$\hat s = 0.324$ and $\hat\alpha = 0.483$ before.
+
+### 4.3 The other models: not implemented
+
+For the other distributions and for the conventional multiplicative ETS, the error after a
+gap is the exact one-step error times a drift that is a sum of $j_t - 1$ independent terms,
+
+$$
+\frac{z_t}{\hat\mu_t} = (1+\epsilon_t)\,e^{S_t}, \qquad
+S_t = \sum_{i=1}^{j_t-1}\log\left(1+\alpha\epsilon_{t-i}\right)
+$$
+
+(for iETS(M,N,N)). The exact density of $S_t$ has no closed form (a product of gammas is not a
+gamma), but its mean and variance do, or come from a quadrature once per evaluation of the
+likelihood. Taking $S_t$ normal and mixing the exact one-step density over it with
+Gauss-Hermite nodes,
+
+$$
+\tilde f_z(z_t) = \sum_{k=1}^{K}\omega_k\, f_z\!\left(z_t \mid \hat\mu_t e^{d_k}\right),
+\qquad d_k = m_{j_t} + \sqrt{2v_{j_t}}\,x_k ,
+$$
+
+is exact at $j_t = 1$. Against the exact density of the gap (computed by FFT convolution on a
+grid of the gamma, log-normal and inverse Gaussian distributions, $\sigma^2$ from 0.05 to 1,
+$\alpha$ from 0.1 to 0.6, $j$ from 2 to 20), the Kullback-Leibler divergence per observation
+is at most:
+
+| approximation | gamma | log-normal | inverse Gaussian |
+|---|---|---|---|
+| one-step density | 2.36 | 5.05 | 31.5 |
+| the same family with mean 1 and variance $V_j$ | 1.21 | 0.084 | 0.78 |
+| log-normal with the moments of the logarithms | 0.089 | 0.0033 | 0.0065 |
+| exact one-step density mixed over a normal drift | **0.0007** | **0.0033** | **0.0038** |
+
+The mixed models (additive and multiplicative components together) are linear in neither
+space; their moments would need the propagation of the covariance of the states through the
+gap, a recursion which was left aside.
+
+## 5. The smoothing parameters after the gaps
+
+With the likelihood of section 4, the scale is unbiased, but the smoothing parameters are
+still biased upwards (the paper's Appendix C). The cause is in the update of the states, not
+in the likelihood: after a gap, the level is updated by $\alpha$ times an error that contains
+the whole drift of the gap, while the true level moved by all of it. In logs (section 4.2,
+ETS(M,N,N)), the change of the level since the last demand and the error at the observed size
+are
+
+$$
+\log\frac{l_t}{l_{t-j}} = S_t + \alpha u_t, \qquad \log\frac{z_t}{l_{t-j}} = S_t + u_t,
+$$
+
+with $\mathrm{Var}(S_t) = (j-1)\alpha^2 s$, so the regression of the first on the second has
+the gain
+
+$$
+\alpha_j = \frac{(j-1)\alpha^2 + \alpha}{(j-1)\alpha^2 + 1},
+$$
+
+which is $\alpha$ at $j = 1$ and tends to 1 as the gap grows. On iETS(M,N,N) with Gamma errors
+($\alpha = 0.3$, $\sigma^2 = 0.2$, $p = 0.35$, 40 series of 300 observations):
+
+| likelihood and update | mean $\hat\alpha$ (sd) | mean $\hat\sigma^2$ |
+|---|---|---|
+| one-step density | 0.447 (0.090) | 0.236 |
+| gap density | 0.420 (0.077) | 0.193 |
+| gap density and gap gain | **0.328 (0.060)** | 0.203 |
+
+The gain changes the fitted values and the forecasts (the C++ fitter), and it is not
+implemented: it is a proposal. The additive models have the analogous gain from the same
+sums of $c_i$.
+
+## 6. Implementation
+
+| | R | Python |
+|---|---|---|
+| zeros with $\log(1-p_t)$ only | cost function and `pointLik.adam()` in `R/adam.R`; `tbats_fit()` and `pointLik.adamTBATS()` in `R/adam-tbats.R`; `sm_logDensities()` in `R/sm.R` | `CF()` in `utils/cost_functions.py`; `ADAM.point_lik()`; `tbats/fitter.py`; `sm.py` |
+| observed sizes for the scale | `adam_nobsObserved()`, `adam_dfScale()` | `ADAM._nobs_observed()`, `ADAM._df_scale`, `forecaster/intervals.py` |
+| $\kappa_t$ and $a_t$ | `adam_gapVariance(..., power)` | `gap_variance(..., power)` in `utils/var_covar.py` |
+| the same for a fitted model | `adam_gapVarianceModel(object, power)` | `ADAM._gap_variance(power)`, and that of `CES` and `TBATS` |
+| residuals as the one-step ones | `adam_gapResiduals(object)` | `ADAM._gap_residuals()` |
+| the scale with $a_t$ and $\kappa_t$ | `adam_scaler(..., gapMean, gapVariance)` | `scaler(..., gap_mean, gap_variance)` |
+| the densities with $a_t$ and $\kappa_t$ | the cost functions and `pointLik.adam()` | `calculate_likelihood(..., gap_mean, gap_variance)` |
+
+The R/Python agreement is tested in `python/tests/test_missing_r_parity.py`
+(`test_the_gap_variance_agrees`), and the R tests are in `tests/testthat/test_adam.R` and
+`test_tbats.R`.
+
+## References
+
+* Dempster, A. P., Laird, N. M. & Rubin, D. B. (1977). Maximum likelihood from incomplete
+  data via the EM algorithm. *Journal of the Royal Statistical Society B*, 39(1), 1-38.
+* Hyndman, R. J., Koehler, A. B., Ord, J. K. & Snyder, R. D. (2008). *Forecasting with
+  Exponential Smoothing: The State Space Approach*. Springer.
+* Svetunkov, I. (2023). *Forecasting and Analytics with the Augmented Dynamic Adaptive Model
+  (ADAM)*. Chapman and Hall/CRC.
+* Svetunkov, I. & Boylan, J. E. (2023). iETS: State space model for intermittent demand
+  forecasting. *International Journal of Production Economics*, 265, 109013.

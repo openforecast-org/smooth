@@ -686,19 +686,23 @@ def _real_log(x):
     return np.log(np.abs(np.asarray(x, dtype=np.float64)))
 
 
-def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
+def calculate_likelihood(
+    distribution, Etype, y, y_fitted, scale, other, gap_mean=1.0, gap_variance=1.0
+):
     """Log-density of one observation, mirroring R's cost function.
 
     The densities come from greybox, so both languages evaluate the same code;
     only the parameterisation is spelled out here, following the switch in
     ``R/adam.R:790-862``. A multiplicative error scales the density's scale by
-    the fitted value.
+    the fitted value. ``gap_mean`` and ``gap_variance`` are the multipliers of the
+    mean and of the variance of the error after the periods without an observed
+    size (``gap_variance()``), for dnorm and dlnorm.
     """
     y = np.asarray(y, dtype=np.float64).reshape(-1, 1)
     mult = y_fitted if Etype == "M" else 1.0
 
     if distribution == "dnorm":
-        return gb.dnorm(y, y_fitted, np.sqrt(scale) * mult, log=True)
+        return gb.dnorm(y, y_fitted, np.sqrt(scale * gap_variance) * mult, log=True)
     if distribution == "dlaplace":
         return gb.dlaplace(y, y_fitted, scale * mult, log=True)
     if distribution == "ds":
@@ -722,7 +726,12 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
 
     # Log-domain: the density on the log scale plus the Jacobian -log(y).
     if distribution == "dlnorm":
-        return gb.dlnorm(y, _real_log(y_fitted) - scale / 2, np.sqrt(scale), log=True)
+        return gb.dlnorm(
+            y,
+            _real_log(y_fitted) - scale * gap_mean / 2,
+            np.sqrt(scale * gap_variance),
+            log=True,
+        )
     if distribution == "dllaplace":
         return gb.dlaplace(np.log(y), _real_log(y_fitted), scale, log=True) - np.log(y)
     if distribution == "dls":
@@ -898,7 +907,16 @@ def _sum_r(values, axis=None):
 # does not warn on double overflow. Suppress the warning, not the value: the
 # result is unchanged, so the fit stays bit-comparable with R.
 @np.errstate(over="ignore")
-def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
+def scaler(
+    distribution,
+    Etype,
+    errors,
+    y_fitted,
+    obs_in_sample,
+    other,
+    gap_mean=1.0,
+    gap_variance=1.0,
+):
     """
     Calculate scale parameter for the provided parameters.
 
@@ -909,6 +927,9 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
     - y_fitted (np.array): Array of fitted values
     - obs_in_sample (int): Number of observations in sample
     - other (float): Additional parameter for some distributions
+    - gap_mean, gap_variance (float or np.array): the multipliers of the mean and of
+      the variance of the errors after the periods without an observed size
+      (``gap_variance()``), ones elsewhere; used by dnorm and dlnorm
 
     Returns:
     float: The calculated scale parameter
@@ -928,7 +949,7 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         # between two parameterisations of the same fit -- ANN and MNN coincide
         # when alpha = 0 -- and flip the selected model. Mirrors R's
         # ``adam_scaler`` (R/utils-adam.R).
-        return _sum_r(errors**2) / obs_in_sample
+        return _sum_r(errors**2 / gap_variance) / obs_in_sample
 
     elif distribution == "dlaplace":
         return _sum_r(np.abs(errors)) / obs_in_sample
@@ -953,8 +974,12 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
             log_term = np.abs(complex_log(1 + errors / y_fitted))
         else:  # "M"
             log_term = np.abs(complex_log(1 + errors))
-        temp = 1 - np.sqrt(np.abs(1 - _sum_r(log_term**2) / obs_in_sample))
-        return 2 * np.abs(temp)
+        # The maximum likelihood of s for log(1+e) ~ N(-s a/2, s k), the root of
+        # sum(a^2/k) s^2 + 4 n s - 4 sum(u^2/k) = 0, as R's adam_scaler
+        gap_ratio = np.asarray(gap_mean, dtype=float) ** 2 / gap_variance
+        gap_sum = _sum_r(np.resize(gap_ratio, len(log_term)))
+        root = np.sqrt(obs_in_sample**2 + gap_sum * _sum_r(log_term**2 / gap_variance))
+        return 2 * (root - obs_in_sample) / gap_sum
 
     elif distribution == "dllaplace":
         if Etype == "A":

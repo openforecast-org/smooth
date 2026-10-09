@@ -297,8 +297,9 @@ def test_the_scale_model_over_gaps_agrees():
 
 # The variance of the error after the periods without an observed size (the zeros of
 # an occurrence model and the missing values) of the pure additive models with the
-# normal distribution: the likelihood, its terms, the scale and the standardised
-# residuals agree with R
+# normal distribution, and the variance and the mean of the pure multiplicative ADAM
+# ETS with the log-normal one: the likelihood, its terms, the scale and the
+# standardised residuals agree with R
 GAP_VARIANCE_DATA = (
     "set.seed(41); e <- rnorm(200, 0, 5); level <- 100 + cumsum(0.3*e);"
     " y <- (c(100, level[-200]) + e)*rbinom(200, 1, 0.5); y[c(50, 51)] <- NA;"
@@ -313,6 +314,20 @@ GAP_VARIANCE_CASES = {
         AIRPASSENGERS_GAPS,
         "adam(ts(y, frequency=12), 'AAA', distribution='dnorm')",
         lambda: ADAM(model="AAA", lags=[12], distribution="dnorm"),
+    ),
+    "adam ADAM ETS dlnorm occurrence": (
+        "set.seed(41); u <- rnorm(200, -0.1, sqrt(0.2));"
+        " l <- 10*exp(cumsum(c(0, 0.3*u[-200]))); y <- l*exp(u)*rbinom(200, 1, 0.4);"
+        " y[c(50, 51)] <- NA;",
+        "adam(y, 'MNN', occurrence='fixed', distribution='dlnorm', ets='adam')",
+        lambda: ADAM(
+            model="MNN", occurrence="fixed", distribution="dlnorm", ets="adam"
+        ),
+    ),
+    "adam ADAM ETS dlnorm missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
+        lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
     ),
     "ces missing": (
         AIRPASSENGERS_GAPS,

@@ -593,21 +593,34 @@ def CF(  # noqa: N802
     )
 
     ot_logical = observations_dict["ot_logical"]
-    # The variance of the errors after the periods without an observed size, of a
-    # pure additive model with the normal distribution (one elsewhere)
-    gap = np.ones(len(ot_logical))
+    # The variance and the mean of the errors after the periods without an observed
+    # size, of a pure additive model with the normal distribution and of a pure
+    # multiplicative ADAM ETS with the log-normal one, additive in logs (ones
+    # elsewhere)
+    gap = gap_mean = np.ones(len(ot_logical))
+    error_type = model_type_dict["error_type"]
+    trend_type = model_type_dict["trend_type"]
+    season_type = model_type_dict["season_type"]
     if (
         general["distribution_new"] == "dnorm"
-        and model_type_dict["error_type"] == "A"
-        and model_type_dict["trend_type"] != "M"
-        and model_type_dict["season_type"] != "M"
+        and error_type == "A"
+        and trend_type != "M"
+        and season_type != "M"
+    ) or (
+        general["distribution_new"] == "dlnorm"
+        and general.get("ets") == "adam"
+        and model_type_dict["ets_model"]
+        and not arima_checked.get("arima_model", False)
+        and error_type == "M"
+        and trend_type != "A"
+        and season_type != "A"
     ):
         # Imported here: var_covar imports this module
         from smooth.adam_general.core.utils.var_covar import gap_variance
 
-        gap = gap_variance(
-            lags_dict["lags_model_all"], mat_wt, mat_f, vec_g, ot_logical
-        )
+        lags_all = lags_dict["lags_model_all"]
+        gap = gap_variance(lags_all, mat_wt, mat_f, vec_g, ot_logical)
+        gap_mean = gap_variance(lags_all, mat_wt, mat_f, vec_g, ot_logical, power=1)
 
     # The in-sample fitted values, errors and gap variance at this B, returned
     # directly for the OPG covariance: the caller recomputes the concentrated scale
@@ -618,6 +631,7 @@ def CF(  # noqa: N802
             np.asarray(adam_fitted.fitted).ravel(),
             np.asarray(adam_fitted.errors).ravel(),
             gap,
+            gap_mean,
         )
 
     # The missing values are not in the loss: the errors are zero there, and the
@@ -630,11 +644,13 @@ def CF(  # noqa: N802
             scale = scaler(
                 general["distribution_new"],
                 model_type_dict["error_type"],
-                np.ravel(adam_fitted.errors)[ot_logical] / np.sqrt(gap[ot_logical]),
+                np.ravel(adam_fitted.errors)[ot_logical],
                 np.ravel(adam_fitted.fitted)[ot_logical],
                 # the maximum likelihood over the observed sizes
                 int(np.sum(ot_logical)),
                 other,
+                gap_mean[ot_logical],
+                gap[ot_logical],
             )
             # Aggregate through _sum_r: R accumulates sum() in a long double
             # register, and NumPy's default pairwise sum drifts by 1 ULP per
@@ -648,8 +664,10 @@ def CF(  # noqa: N802
                 model_type_dict["error_type"],
                 observations_dict["y_in_sample"][observations_dict["ot_logical"]],
                 adam_fitted.fitted[observations_dict["ot_logical"]],
-                scale * gap[ot_logical].reshape(-1, 1),
+                scale,
                 other,
+                gap_mean[ot_logical].reshape(-1, 1),
+                gap[ot_logical].reshape(-1, 1),
             )
             CFValue = -_sum_r(np.asarray(ll, dtype=np.float64).ravel())
             # The zeros of an occurrence model are not in the likelihood of the

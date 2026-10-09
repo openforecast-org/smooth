@@ -1075,3 +1075,28 @@ test_that("the gap variance of a pure additive model over the zeros and the miss
     expect_equal(var(rstandard(testModel)[otLogical]), 1, tolerance=0.1);
 })
 
+
+# The pure multiplicative ADAM ETS is additive in logs: after j-1 periods without an
+# observed size, log(1+e) is N(-s a/2, s k) with a = 1 + (j-1) alpha and k = 1 + (j-1) alpha^2
+# for ETS(M,N,N), and the scale is the maximum likelihood of that
+test_that("the gap variance and mean of the pure multiplicative ADAM ETS with dlnorm", {
+    set.seed(41);
+    u <- rnorm(300, -0.1, sqrt(0.2));
+    level <- 10*exp(cumsum(c(0, 0.3*u[-300])));
+    y <- level*exp(u)*rbinom(300, 1, 0.4);
+    testModel <- adam(y, "MNN", occurrence="fixed", distribution="dlnorm", ets="adam");
+    otLogical <- y!=0;
+    gaps <- diff(c(0, which(otLogical)));
+    alpha <- testModel$persistence[1];
+    expect_equal(adam_gapVarianceModel(testModel)[otLogical], 1 + (gaps-1)*alpha^2);
+    expect_equal(adam_gapVarianceModel(testModel, 1)[otLogical], 1 + (gaps-1)*alpha);
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    # The scale maximises the likelihood given the other parameters
+    logResiduals <- log(residuals(testModel)[otLogical]);
+    likelihood <- function(scale){
+        sum(dnorm(logResiduals, -scale*(1 + (gaps-1)*alpha)/2, sqrt(scale*(1 + (gaps-1)*alpha^2)),
+                  log=TRUE));
+    }
+    expect_equal(testModel$scale, optimize(likelihood, c(0.01, 2), maximum=TRUE)$maximum,
+                 tolerance=1e-4);
+})

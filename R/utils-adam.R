@@ -1504,9 +1504,10 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     return(list(B=B,Bl=Bl,Bu=Bu))
 }
 
-adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other){
+adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other,
+                        gapMean=1, gapVariance=1){
     return(switch(distribution,
-                  "dnorm"=sum(errors^2)/obsInSample,
+                  "dnorm"=sum(errors^2/gapVariance)/obsInSample,
                   "dlaplace"=sum(abs(errors))/obsInSample,
                   "ds"=sum(sqrt(abs(errors))) / (obsInSample*2),
                   "dgnorm"=(other*sum(abs(errors)^other)/obsInSample)^{1/other},
@@ -1517,10 +1518,14 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                   # Equivalent Python: abs(log((1+errors).astype(complex))). The
                   # outer abs() is the modulus of the complex log, replacing the
                   # earlier Re()/abs() of a real arg pattern.
-                  "dlnorm"=2*abs(switch(Etype,
-                                        "A"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors/yFitted)))^2)/
-                                                           obsInSample)),
-                                        "M"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors)))^2)/obsInSample)))),
+                  # The maximum likelihood of s for log(1+e) ~ N(-s a/2, s k), the root of
+                  # sum(a^2/k) s^2 + 4 n s - 4 sum(u^2/k) = 0, with a=k=1 unless the
+                  # observations follow periods without an observed size (adam_gapVariance())
+                  "dlnorm"={
+                      u <- abs(log(as.complex(1+switch(Etype, "A"=errors/yFitted, "M"=errors))));
+                      gapSum <- sum(rep_len(gapMean^2/gapVariance, length(u)));
+                      2*(sqrt(obsInSample^2 + gapSum*sum(u^2/gapVariance)) - obsInSample)/gapSum;
+                  },
                   "dllaplace"=switch(Etype,
                                      "A"=sum(abs(log(as.complex(1+errors/yFitted))))/obsInSample,
                                      "M"=sum(abs(log(as.complex(1+errors))))/obsInSample),
@@ -1660,35 +1665,57 @@ adam_accuracy <- function(holdout, forecast, inSample){
 # After j-1 periods without an observed size (the zeros of an occurrence model and the
 # missing values), the states have gone on with zero errors, and the error of a pure
 # additive model at the next observed size sums the one-step errors since then, with the
-# coefficients c_i of covarAnal(): its variance is 1 + sum(c_i^2, i<j). The first gap
+# coefficients c_i of covarAnal(): its variance is 1 + sum(c_i^2, i<j). With power=1,
+# 1 + sum(c_i, i<j), the multiplier of the mean of the error in that sum. The first gap
 # counts from the initial states
-adam_gapVariance <- function(lagsModelAll, matWt, matF, vecG, otLogical){
+adam_gapVariance <- function(lagsModelAll, matWt, matF, vecG, otLogical, power=2){
     indices <- which(otLogical);
     gaps <- diff(c(0, indices));
     gapVariance <- rep(1, length(otLogical));
     if(any(gaps>1)){
-        gapVariance[indices] <- diag(covarAnal(lagsModelAll, max(gaps), matWt[1,,drop=FALSE],
-                                               matF, vecG, 1))[gaps];
+        covarMat <- covarAnal(lagsModelAll, max(gaps), matWt[1,,drop=FALSE], matF, vecG, 1);
+        gapVariance[indices] <- switch(power, cumsum(covarMat[1,]), diag(covarMat))[gaps];
     }
     return(gapVariance);
 }
 
-# The gap variance of the observations of a fitted model (ones unless the model is pure
-# additive with the normal distribution), at its observed sizes
-adam_gapVarianceModel <- function(object){
+# The gap variance (or with power=1 the multiplier of the mean) of the observations of a
+# fitted model at its observed sizes: ones unless the model is pure additive with the
+# normal distribution, or a pure multiplicative ADAM ETS with the log-normal one
+adam_gapVarianceModel <- function(object, power=2){
     y <- as.vector(actuals(object));
     otLogical <- !is.na(y);
     if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
         otLogical[] <- otLogical & y!=0;
     }
     gapVariance <- rep(1, length(y));
-    # A scale model (sm()) has its own residuals, standardised already
-    if(object$distribution=="dnorm" && errorType(object)=="A" && !grepl("M", modelType(object)) &&
-       !is.scale(object)){
+    # A scale model (sm()) has its own residuals, standardised already. A pure multiplicative
+    # ADAM ETS is additive in logs
+    if(!is.scale(object) &&
+       (object$distribution=="dnorm" && errorType(object)=="A" && !grepl("M", modelType(object)) ||
+        object$distribution=="dlnorm" && adamETSChecker(object) && !arimaChecker(object) &&
+        errorType(object)=="M" && !grepl("A", modelType(object)) && modelType(object)!="NNN")){
         gapVariance[] <- adam_gapVariance(modelLags(object), object$measurement, object$transition,
-                                          matrix(object$persistence, ncol=1), otLogical);
+                                          matrix(object$persistence, ncol=1), otLogical, power);
     }
     return(gapVariance);
+}
+
+# The residuals of a fitted model as the one-step ones after the periods without an
+# observed size: e/sqrt(k) for the normal distribution, and for the log-normal the ratio
+# exp((log(r) + s a/2)/sqrt(k) - s/2), logN(-s/2, s) as the one-step error
+adam_gapResiduals <- function(object){
+    errors <- residuals(object);
+    gapVariance <- adam_gapVarianceModel(object);
+    if(object$distribution=="dlnorm"){
+        scale <- extractScale(object);
+        errors[] <- exp((log(errors) + scale*adam_gapVarianceModel(object, 1)/2)/sqrt(gapVariance) -
+                            scale/2);
+    }
+    else{
+        errors[] <- errors / sqrt(gapVariance);
+    }
+    return(errors);
 }
 
 # The observed sizes, which the scale is divided by: the missing values are not, and

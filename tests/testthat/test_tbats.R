@@ -376,12 +376,12 @@ test_that("the occurrence: the sizes on the non-zero observations, the forecasts
     forecasted <- forecast(fit, h=14, interval="prediction");
     expect_equal(as.numeric(forecasted$mean), tbats_boxCoxInverse(skeleton, fit$lambda)*pForecast);
     expect_equal(as.numeric(forecasted$mean), as.numeric(fit$forecast));
-    # The scale of the sizes, divided by all the observed values, is de-biased by the non-zero ones
+    # The scale of the sizes, divided by the observed sizes, is de-biased by them
     objectBC <- tbats_boxCoxObject(fit);
     expect_equal(adam_dfScale(objectBC), adam_dfScale(fit));
     expect_equal(adam_varianceDebiased(objectBC),
                  adam_scaleVariance(fit$scale, fit$distribution, fit$other)*
-                     sum(!is.na(actuals(fit)))/adam_dfScale(fit));
+                     sum(actuals(fit)!=0, na.rm=TRUE)/adam_dfScale(fit));
     # The probability of no demand is above 0.5: the median and the lower bound are zero
     expect_true(all(forecast(fit, h=14, point="median")$mean==0));
     expect_true(all(forecasted$lower==0) && all(forecasted$upper>forecasted$mean));

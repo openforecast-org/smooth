@@ -191,8 +191,9 @@ absolute values for \code{"dlaplace"}, ..., divided by the exponent of the mean 
 their logarithm at a unit scale, so that their logarithms are unbiased for the
 log-scale), with lambda 0, by the joint likelihood
 of the model's data. \link[greybox]{implant} puts it in \code{object}, whose
-forecasts then have the scale of each horizon. With an occurrence model, the scale
-model shares it, and the zeros take the differential entropy at their scale.}
+forecasts then have the scale of each horizon. With an occurrence model, the zeros,
+whose sizes are not observed, are missing values of the scale model and have only
+the likelihood of the occurrence.}
 }
 \value{
 Object of class \code{c("adamTBATS","adam","smooth")} is returned with

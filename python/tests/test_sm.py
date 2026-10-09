@@ -16,7 +16,6 @@ import pytest
 from smooth import ADAM
 from smooth.adam_general.core.sm import (
     SUPPORTED_DISTRIBUTIONS,
-    _differential_entropy,
     _log_density,
     sm,
 )
@@ -78,7 +77,10 @@ def test_scale_model_matches_r(case_id):
 
     residuals = np.asarray(scale_model.residuals, dtype=float).ravel()
     np.testing.assert_allclose(
-        residuals, np.array(ref["sm_residuals"], float), atol=1e-8
+        residuals,
+        # No residual where no size is observed: R writes NA
+        np.array([np.nan if v == "NA" else v for v in ref["sm_residuals"]], float),
+        atol=1e-8,
     )
 
 
@@ -122,12 +124,6 @@ def test_log_density_is_finite_and_shaped(distribution):
     out = _log_density(distribution, "A", y, mu, scale, 1.7)
     assert out.shape == y.shape
     assert np.all(np.isfinite(out))
-
-
-@pytest.mark.parametrize("distribution", SUPPORTED_DISTRIBUTIONS)
-def test_entropy_is_zero_without_zero_observations(distribution):
-    """No zero observations means no entropy contribution."""
-    assert _differential_entropy(distribution, np.array([]), 1.7) == 0.0
 
 
 IMPLANT_REFERENCE = json.loads((DATA / "sm_implant_reference.json").read_text())

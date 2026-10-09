@@ -2721,7 +2721,7 @@ class ADAM:
     def _df_scale(self) -> float:
         """Degrees of freedom for de-biasing the scale (R: ``adam_dfScale``).
 
-        The non-zero observations minus the parameters, without the scale ones
+        The observed sizes minus the parameters, without the scale ones
         when they were estimated by likelihood -- the scale model's parameters
         when one is attached, as ``implant()`` puts them in the scale column.
         """
@@ -2733,8 +2733,8 @@ class ADAM:
                 n_param -= float(self._n_param.estimated["scale"])
             else:
                 n_param -= 1.0
-        df = self._nobs_nonzero - n_param
-        return df if df > 0 else float(self._nobs_nonzero)
+        df = self._nobs_observed() - n_param
+        return df if df > 0 else float(self._nobs_observed())
 
     @property
     def _nobs_nonzero(self) -> int:
@@ -2750,9 +2750,10 @@ class ADAM:
         return int(np.count_nonzero(y[observed_mask(self._observations)]))
 
     def _nobs_observed(self) -> int:
-        """The observed in-sample values (R: ``adam_nobsObserved``): the missing
-        ones are not."""
-        return int(np.sum(observed_mask(self._observations)))
+        """The observed sizes, which the scale is divided by (R:
+        ``adam_nobsObserved``): the missing values are not, and neither are the
+        zeros of an occurrence model, whose sizes are not observed."""
+        return int(np.sum(self._observations["ot_logical"]))
 
     def _ic_occurrence_terms(self):
         """``(n_param_all, n_param_sizes, obs)`` for AICc/BICc.
@@ -3030,21 +3031,18 @@ class ADAM:
         in-sample observation under the fitted distribution and scale, so
         ``sum(point_lik())`` equals :attr:`loglik`. For an occurrence
         (intermittent) model the demand-size density is combined with the
-        occurrence Bernoulli contribution and the zero observations carry the
-        differential-entropy term, exactly as R does. With ``log=False`` the
-        densities themselves are returned.
+        occurrence Bernoulli contribution, and the zero observations, whose
+        sizes are not observed, have only the latter, as R. With ``log=False``
+        the densities themselves are returned.
         """
-        from smooth.adam_general.core.utils.utils import (
-            calculate_entropy,
-            calculate_likelihood,
-        )
+        from smooth.adam_general.core.utils.utils import calculate_likelihood
 
         self._check_is_fitted()
         # With a scale model, the likelihood is that of the scale model (R's sm())
         if self.scale_model is not None:
             return self.scale_model.point_lik(log=log)
         if getattr(self, "is_scale_", False):
-            from smooth.adam_general.core.sm import _differential_entropy, _log_density
+            from smooth.adam_general.core.sm import _log_density
 
             # The location model's values given the scale, as R's pointLik.sm.adam
             location: Any = getattr(self, "location_")
@@ -3061,6 +3059,9 @@ class ADAM:
             occurrence = location._occurrence
             demand = observed & ((y != 0) | (not occurrence.get("occurrence_model")))
             zero = observed & ~demand
+            if occurrence.get("occurrence_model"):
+                # The sizes: the fitted values are multiplied by the probabilities
+                mu = mu / np.asarray(occurrence["p_fitted"], dtype=float).ravel()
             values = np.zeros(len(y))
             values[demand] = _log_density(
                 self.distribution_,
@@ -3071,11 +3072,8 @@ class ADAM:
                 other,
             )
             if occurrence.get("occurrence_model"):
+                # The zeros have only the likelihood of the occurrence
                 p_fitted = np.asarray(occurrence["p_fitted"], dtype=float).ravel()
-                values[zero] = [
-                    -_differential_entropy(self.distribution_, scale_values[[j]], other)
-                    for j in np.flatnonzero(zero)
-                ]
                 values[demand] += np.log(p_fitted[demand])
                 values[zero] += np.log(1 - p_fitted[zero])
             return values if log else np.exp(values)
@@ -3124,25 +3122,8 @@ class ADAM:
         ).ravel()
 
         if occurrence_model:
-            # Differential entropy for the unobserved (zero) demand sizes, then
-            # add the occurrence-model Bernoulli contribution (mirrors R).
-            # One zero at a time: the entropy of dgamma and dinvgauss sums over the
-            # fitted values it is given. As in the estimation, a negative entropy
-            # (it should not be) is set to zero
-            zero = ~ot_logical & observed
-            entropy = np.array(
-                [
-                    float(
-                        np.ravel(
-                            calculate_entropy(
-                                distribution, scale, other, 1.0, y_fitted[j : j + 1]
-                            )
-                        )[0]
-                    )
-                    for j in np.flatnonzero(zero)
-                ]
-            )
-            lik_values[zero] = -entropy
+            # The zeros have only the occurrence-model Bernoulli contribution:
+            # their sizes are not observed (mirrors R)
             # The fitted occurrence model (the occurrence entry holds its name
             # when ADAM fitted it)
             om_model = getattr(self, "_om_model", None)
@@ -5174,7 +5155,7 @@ class ADAM:
                 e_type,
                 errors[ot_logical],
                 fitted[ot_logical],
-                obs,
+                int(np.sum(ot_logical)),
                 other_b,
             )
             lik = np.asarray(

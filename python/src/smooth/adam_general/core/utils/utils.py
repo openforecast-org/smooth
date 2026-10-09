@@ -6,7 +6,7 @@ import greybox as gb
 import numpy as np
 import pandas as pd
 from greybox import lowess as _greybox_lowess
-from scipy.special import beta, digamma, gamma
+from scipy.special import gamma
 
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
 
@@ -738,34 +738,6 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
         return gb.dgamma(y, shape=1 / scale, scale=scale * np.abs(y_fitted), log=True)
 
     raise ValueError(f"Unsupported distribution {distribution!r}.")
-
-
-def calculate_entropy(distribution, scale, other, obsZero, y_fitted):
-    if distribution == "dnorm":
-        return obsZero * (np.log(np.sqrt(2 * np.pi * scale)) + 0.5)
-    elif distribution == "dlnorm":
-        return obsZero * (np.log(np.sqrt(2 * np.pi * scale)) + 0.5) - scale / 2
-    elif distribution == "dlogis":
-        return obsZero * 2
-    elif distribution in ["dlaplace", "dllaplace", "dalaplace"]:
-        return obsZero * (1 + np.log(2 * scale))
-    elif distribution in ["ds", "dls"]:
-        return obsZero * (2 + 2 * np.log(2 * scale))
-    elif distribution in ["dgnorm", "dlgnorm"]:
-        return obsZero * (1 / other - np.log(other / (2 * scale * gamma(1 / other))))
-    elif distribution == "dt":
-        return obsZero * (
-            (scale + 1) / 2 * (digamma((scale + 1) / 2) - digamma(scale / 2))
-            + np.log(np.sqrt(scale) * beta(scale / 2, 0.5))
-        )
-    elif distribution == "dinvgauss":
-        return 0.5 * (
-            obsZero * (np.log(np.pi / 2) + 1 + np.log(scale)) - np.sum(np.log(y_fitted))
-        )
-    elif distribution == "dgamma":
-        return obsZero * (
-            1 / scale + np.log(gamma(1 / scale)) + (1 - 1 / scale) * digamma(1 / scale)
-        ) + np.sum(np.log(scale * y_fitted))
 
 
 def observed_mask(observations_dict):

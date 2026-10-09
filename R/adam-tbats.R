@@ -1372,12 +1372,9 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
     occurrenceSpec <- checked[["tbatsOccurrence"]];
     otLogical <- occurrenceSpec$otLogical;
     obsNonzero <- sum(otLogical);
-    # The observed zeros, whose sizes are not observed: the likelihood has their
-    # differential entropy in the space of the data, as adam()'s, and the scale is
-    # divided by all the observed values, its maximum likelihood then
+    # The sizes of the zeros are not observed: the zeros have only the likelihood of the
+    # occurrence, and the scale is divided by the observed sizes
     observed <- !is.na(y);
-    otZero <- !otLogical & observed;
-    obsObserved <- sum(observed);
     X <- tbats_design(obs, struct$trendIn, harmonicTable, xregSpec$data)[otLogical,,drop=FALSE];
     qrX <- tbats_qr(X);
     lambdaStart <- tbats_lambdaStart(y[otLogical], X, lambdaSpec);
@@ -1490,22 +1487,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         errors <- fitted$errors[otLogical];
         if(any(lossUsed==c("likelihood","MSE","MAE","HAM","custom"))){
             value <- switch(lossUsed,
-                            "likelihood"={
-                                value <- -tbats_logLik(errors, distribution, elements$shape, obsObserved) -
-                                    (elements$lambda-1)*logY;
-                                # The zeros: minus the differential entropy of their sizes in the
-                                # space of the data, with the Jacobian at the predicted size
-                                if(any(otZero)){
-                                    sizesBC <- fitted$fitted[otZero];
-                                    scaleValue <- tbats_scale(errors, distribution, elements$shape, obsObserved);
-                                    value <- value -
-                                        sum(sm_logDensities(sizesBC, sizesBC, rep(scaleValue, length(sizesBC)),
-                                                            distribution, "A", elements$shape,
-                                                            rep(FALSE, length(sizesBC)), TRUE)) -
-                                        (elements$lambda-1)*sum(log(tbats_boxCoxInverse(sizesBC, elements$lambda)));
-                                }
-                                value;
-                            },
+                            "likelihood"=-tbats_logLik(errors, distribution, elements$shape, obsNonzero) -
+                                (elements$lambda-1)*logY,
                             "MSE"=sum(errors^2)/obsNonzero,
                             "MAE"=sum(abs(errors))/obsNonzero,
                             "HAM"=sum(sqrt(abs(errors)))/obsNonzero,
@@ -1668,7 +1651,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         colnames(FI) <- rownames(FI) <- names(B);
     }
 
-    scale <- tbats_scale(fitted$errors[otLogical], distribution, elements$shape, obsObserved);
+    scale <- tbats_scale(fitted$errors[otLogical], distribution, elements$shape, obsNonzero);
     forecastBC <- NULL;
     if(checked$h>0){
         forecastBC <- adamCpp$forecast(tbats_matWt(elements$w, struct, checked$h, xregSpec$future),
@@ -1909,21 +1892,21 @@ tbats_boxCoxObject <- function(object){
     lambda <- object$lambda;
     objectBC <- object;
     class(objectBC) <- c("adam","smooth");
-    # The sizes: the occurrence is taken into account in the space of the data. They are
-    # zero where there is no demand, so that nobs(all=FALSE) and adam_dfScale() count the
-    # non-zero observations, and their scale is divided by all the observed values, as
-    # adam()'s of an occurrence model, which adam_varianceDebiased() multiplies by T/df.
-    # The missing values are NA, neither zeros nor observations
+    # The sizes: the occurrence is taken into account in the space of the data. The
+    # sizes of the zeros are not observed, so they are missing values there, as the
+    # missing ones: adam_nobsObserved() and adam_dfScale() count the observed sizes,
+    # which the scale is divided by
     objectBC$occurrence <- NULL;
     y <- as.numeric(actuals(object));
     otLogical <- tbats_sizes(y, object);
-    # The missing values stay missing
-    yBC <- replace(tbats_boxCoxSizes(y, lambda, otLogical), is.na(y), NA);
-    # The scale is divided by all the observed values, as adam()'s of an occurrence model
-    # (a scale model, sm(), gives the scale of each observation instead)
+    yBC <- replace(tbats_boxCoxSizes(y, lambda, otLogical), !otLogical, NA);
     # The response only: the regressors stay as they are
     objectBC$data[,1] <- yBC;
     objectBC$fitted[] <- yBC - residuals(object);
+    # At the zeros, the predicted sizes
+    otZero <- !otLogical & !is.na(y);
+    objectBC$fitted[otZero] <- tbats_boxCox(as.numeric(fitted(object))[otZero]/tbats_pFitted(object)[otZero],
+                                            lambda);
     objectBC$forecast[] <- tbats_boxCox(object$forecast, lambda);
     if(!is.null(object$holdout)){
         objectBC$holdout[,1] <- suppressWarnings(tbats_boxCox(object$holdout[,1], lambda));
@@ -2367,15 +2350,8 @@ pointLik.adamTBATS <- function(object, log=TRUE, ...){
     else{
         otLogical <- tbats_sizes(y, object);
         pFitted <- tbats_pFitted(object);
-        # The zeros: minus the differential entropy of their sizes in the space of the data,
-        # with the Jacobian at the predicted size
-        otZero <- !otLogical & observed;
-        sizes <- as.numeric(fitted(object))[otZero]/pFitted[otZero];
+        # The zeros have only the likelihood of the occurrence: their sizes are not observed
         likValues <- log(1-pFitted);
-        likValues[otZero] <- likValues[otZero] +
-            sm_logDensities(sizes, sizes, rep(object$scale, length(sizes)), object$distribution, "A",
-                            object$other$shape, rep(FALSE, length(sizes)), TRUE) +
-            (object$lambda-1)*log(sizes);
         likValues[otLogical] <- log(pFitted[otLogical]) +
             tbats_logDensities(as.numeric(residuals(object))[otLogical], object$distribution,
                                object$other$shape, object$scale) + (object$lambda-1)*log(y[otLogical]);

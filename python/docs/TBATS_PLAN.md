@@ -651,12 +651,12 @@ puts it in the model (the parameters of the scale model in its scale column), wh
 `pointLik()` is the scale model's, and whose forecasts take the scale model's for the
 variance of each horizon.
 
-With an occurrence model the scale model is fitted with it (so that the custom loss sees all
-the observed values) and the joint likelihood has the probabilities and, at the zeros, minus
-the differential entropy of the sizes at the scale of the scale model, in the space of the data
-(with the Jacobian at the predicted sizes), as the likelihood of `tbats()` itself, whose scale
-is then divided by all the observed values. The occurrence is stripped from the scale model
-after the fit, so its fitted values are the scale, not the scale times the probability.
+With an occurrence model, the sizes of the zeros are not observed: the zeros have only the
+likelihood of the occurrence, in `tbats()` as in `adam()`, and the scale is divided by the
+observed sizes (the differential entropy that `adam()` had at the zeros shrank the scale by the
+share of the non-zero observations, see the technical report on the likelihood of intermittent
+demand). In the scale model, the zeros are missing values of the response, so that its states go
+on through them and its fitted values are the scale, with no occurrence model in it.
 
 ## M. Later phases
 

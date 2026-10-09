@@ -59,12 +59,13 @@ class TestApproximateFormula:
         return m, fc
 
     def test_monotonicity(self, model_and_fc):
-        _, fc = model_and_fc
-        mean = fc.mean.values
+        # The intervals are of the sizes, around their forecast mean / p
+        m, fc = model_and_fc
+        sizes = fc.mean.values / np.asarray(m._occurrence["p_forecast"], dtype=float)
         lower = fc.lower.values.ravel()
         upper = fc.upper.values.ravel()
-        assert np.all(lower <= mean + 1e-10), "lower > mean"
-        assert np.all(mean <= upper + 1e-10), "mean > upper"
+        assert np.all(lower <= sizes + 1e-10), "lower > the forecast of the sizes"
+        assert np.all(sizes <= upper + 1e-10), "the forecast of the sizes > upper"
 
     def test_interval_label(self, model_and_fc):
         _, fc = model_and_fc
@@ -79,12 +80,13 @@ class TestApproximateFormula:
     def test_formula_matches_manual_calculation(self, model_and_fc, y):
         """The adjusted-level formula for approximate occurrence intervals.
 
-        R uses loc=compound_mean and adjusts the confidence level:
+        R takes the interval of the sizes, around their forecast mean / p, at the
+        adjusted confidence level (the zeros counted in the interval):
           conf_adj = max(0, (conf - (1-p)) / p)
           q_low = (1 - conf_adj) / 2
           q_up  = (1 + conf_adj) / 2
-          upper = compound_mean + N_ppf(q_up,  0, sigma)
-          lower = compound_mean + N_ppf(q_low, 0, sigma)
+          upper = mean / p + N_ppf(q_up,  0, sigma)
+          lower = mean / p + N_ppf(q_low, 0, sigma)
         """
         m, fc = model_and_fc
         p = m._occurrence["p_forecast"]  # already computed by predict()
@@ -114,9 +116,9 @@ class TestApproximateFormula:
         q_low = (1 - conf_adj) / 2
         q_up = (1 + conf_adj) / 2
 
-        mean = fc.mean.values
-        expected_upper = mean + stats.norm.ppf(q_up, loc=0, scale=sigma_h)
-        expected_lower = mean + stats.norm.ppf(q_low, loc=0, scale=sigma_h)
+        sizes = fc.mean.values / p_arr
+        expected_upper = sizes + stats.norm.ppf(q_up, loc=0, scale=sigma_h)
+        expected_lower = sizes + stats.norm.ppf(q_low, loc=0, scale=sigma_h)
 
         np.testing.assert_allclose(
             fc.upper.values.ravel(), expected_upper, rtol=1e-5, atol=1e-7,
@@ -141,10 +143,12 @@ class TestApproximateVsR:
     """
 
     @pytest.fixture(scope="class")
-    def fc(self, y):
-        m = ADAM(model="ANN", lags=[1], occurrence="odds-ratio")
-        m.fit(y)
-        return m.predict(h=10, interval="approximate", level=0.95)
+    def model(self, y):
+        return ADAM(model="ANN", lags=[1], occurrence="odds-ratio").fit(y)
+
+    @pytest.fixture(scope="class")
+    def fc(self, model):
+        return model.predict(h=10, interval="approximate", level=0.95)
 
     def test_upper_mean_ratio_plausible(self, fc, r_approx):
         ratio_py = np.mean(fc.upper.values.ravel() / fc.mean.values)
@@ -157,8 +161,10 @@ class TestApproximateVsR:
             f"Ratios differ more than 3×: Python={ratio_py:.3f}, R={ratio_r:.3f}"
         )
 
-    def test_lower_is_below_mean(self, fc):
-        assert np.all(fc.lower.values.ravel() <= fc.mean.values + 1e-10)
+    def test_lower_is_below_the_sizes(self, model, fc):
+        # The intervals are of the sizes, around their forecast mean / p
+        p = np.asarray(model._occurrence["p_forecast"], dtype=float)
+        assert np.all(fc.lower.values.ravel() <= fc.mean.values / p + 1e-10)
 
 
 # ---------------------------------------------------------------------------
@@ -224,22 +230,26 @@ class TestSimulated:
 
 class TestMultiplicativeOccurrence:
     @pytest.fixture(scope="class")
-    def fc(self, y):
+    def model_and_fc(self, y):
         m = ADAM(model="MNN", lags=[1], occurrence="odds-ratio")
         m.fit(y)
-        return m.predict(h=10, interval="prediction", level=0.95, nsim=5000)
+        return m, m.predict(h=10, interval="prediction", level=0.95, nsim=5000)
 
-    def test_no_nan(self, fc):
+    def test_no_nan(self, model_and_fc):
+        _, fc = model_and_fc
         assert not np.any(np.isnan(fc.mean.values))
         assert not np.any(np.isnan(fc.upper.values))
         assert not np.any(np.isnan(fc.lower.values))
 
-    def test_monotonicity(self, fc):
-        mean = fc.mean.values
-        assert np.all(fc.lower.values.ravel() <= mean + 1e-6)
-        assert np.all(mean <= fc.upper.values.ravel() + 1e-6)
+    def test_monotonicity(self, model_and_fc):
+        # The intervals are of the sizes, around their forecast mean / p
+        m, fc = model_and_fc
+        sizes = fc.mean.values / np.asarray(m._occurrence["p_forecast"], dtype=float)
+        assert np.all(fc.lower.values.ravel() <= sizes + 1e-6)
+        assert np.all(sizes <= fc.upper.values.ravel() + 1e-6)
 
-    def test_non_negative(self, fc):
+    def test_non_negative(self, model_and_fc):
+        _, fc = model_and_fc
         assert np.all(fc.mean.values >= -1e-10)
 
 

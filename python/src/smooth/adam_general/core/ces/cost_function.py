@@ -10,6 +10,7 @@ import numpy as np
 from smooth.adam_general._eigenCalc import smooth_eigens
 from smooth.adam_general.core.ces.filler import ces_filler
 from smooth.adam_general.core.utils.utils import (
+    _log_r,
     _sum_r,
     calculate_multistep_loss,
     complete_windows,
@@ -218,7 +219,7 @@ def ces_cf(
             y_ot = np.asarray(y_in_sample, dtype=float)[ot_logical]
             fitted_ot = fitted[ot_logical]
             cf_value = _sum_r(
-                _R_LN_SQRT_2PI + 0.5 * ((y_ot - fitted_ot) / scale) ** 2 + np.log(scale)
+                _R_LN_SQRT_2PI + 0.5 * ((y_ot - fitted_ot) / scale) ** 2 + _log_r(scale)
             )
         elif loss == "MSE":
             cf_value = _sum_r(errors**2) / obs_observed

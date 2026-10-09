@@ -5646,8 +5646,11 @@ predict.adam <- function(object, newdata=NULL, interval=c("none", "confidence", 
     model <- modelType(object);
     Etype <- errorType(object);
 
-    # The variance implied by the scale, de-biased
+    # The variance implied by the scale, de-biased, and the one of the observations after the
+    # periods without an observed size
     s2 <- adam_varianceDebiased(object);
+    s2Mean <- s2*adam_gapVarianceModel(object, 1);
+    s2 <- s2*adam_gapVarianceModel(object);
 
     # If this is a mixture model, produce forecasts for the occurrence
     if(!is.null(object$occurrence)){
@@ -5795,9 +5798,9 @@ predict.adam <- function(object, newdata=NULL, interval=c("none", "confidence", 
         }
     }
     else if(object$distribution=="dlnorm"){
-        # Take into account the logN restrictions
-        yLower[] <- qlnorm(levelLow, -(1-sqrt(abs(1-s2)))^2, sqrt(2*(1-sqrt(abs(1-s2)))));
-        yUpper[] <- qlnorm(levelUp, -(1-sqrt(abs(1-s2)))^2, sqrt(2*(1-sqrt(abs(1-s2)))));
+        # 1+e with the mean of one, s2 being the variance of log(1+e)
+        yLower[] <- qlnorm(levelLow, -s2Mean/2, sqrt(s2));
+        yUpper[] <- qlnorm(levelUp, -s2Mean/2, sqrt(s2));
     }
     else if(object$distribution=="dllaplace"){
         yLower[] <- exp(qlaplace(levelLow, 0, sqrt(s2/2)));
@@ -5841,13 +5844,16 @@ predict.adam <- function(object, newdata=NULL, interval=c("none", "confidence", 
         yUpper[is.na(yUpper)] <- 0;
     }
 
+    # The intervals of an occurrence model are of the sizes, around their fitted values
+    yCentre <- yForecast / pForecast;
+    yCentre[pForecast==0] <- 0;
     if(Etype=="A"){
-        yLower[] <- yForecast + yLower;
-        yUpper[] <- yForecast + yUpper;
+        yLower[] <- yCentre + yLower;
+        yUpper[] <- yCentre + yUpper;
     }
     else{
-        yLower[] <- yForecast * yLower;
-        yUpper[] <- yForecast * yUpper;
+        yLower[] <- yCentre * yLower;
+        yUpper[] <- yCentre * yUpper;
     }
 
     return(structure(list(mean=yForecast, lower=yLower, upper=yUpper, model=object,
@@ -6429,6 +6435,11 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     else{
         yForecast[] <- as.vector(adamForecast) * as.vector(pForecast);
     }
+    # The intervals of an occurrence model are of the sizes, around their forecasts
+    yCentre <- yForecast;
+    if(!cumulative){
+        yCentre[] <- as.vector(adamForecast);
+    }
 
     if(interval!="none"){
         # Fix just in case a silly user used 95 etc instead of 0.95
@@ -6524,12 +6535,12 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
         # This step is needed in order to make intervals similar between the different methods
         if(Etype=="A"){
-            yLower[] <- yLower - yForecast;
-            yUpper[] <- yUpper - yForecast;
+            yLower[] <- yLower - yCentre;
+            yUpper[] <- yUpper - yCentre;
         }
         else{
-            yLower[] <- yLower / yForecast;
-            yUpper[] <- yUpper / yForecast;
+            yLower[] <- yLower / yCentre;
+            yUpper[] <- yUpper / yCentre;
             # Substitute NaNs with zeroes - it means that both values were originally zeroes
             yLower[as.vector(is.nan(yLower))] <- 0;
             yUpper[as.vector(is.nan(yUpper))] <- 0;
@@ -6537,7 +6548,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     }
     else{
         #### Approximate and confidence interval ####
-        # Produce covariance matrix and use it
+        # Produce covariance matrix and use it. vcovMean is the mean of log(1+e) times -2 for
+        # the log-normal, when it differs from the variance
+        vcovMean <- NULL;
         if(any(interval=="approximate")){
             # The variance of the model implied by the scale, de-biased; with a scale
             # model it is replaced by its forecasts below
@@ -6546,15 +6559,31 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             if(is.scale(object$scale)){
                 s2Forecast <- adam_scaleModelVariance(object, h, newdata);
             }
+            # A pure multiplicative ADAM ETS with the log-normal is additive in logs: log(1+e) at
+            # the horizon j has the mean -s2*a_j/2 and the variance s2*k_j, as over the gaps
+            if(object$distribution=="dlnorm" && etsModel && adamETSChecker(object) &&
+               !arimaChecker(object) && Etype=="M" && Ttype!="A" && Stype!="A"){
+                covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, 1);
+                s2Horizon <- if(is.scale(object$scale)){s2Forecast}else{s2};
+                vcovMulti <- s2Horizon*diag(covarMat);
+                vcovMean <- s2Horizon*cumsum(covarMat[1,]);
+                if(cumulative){
+                    vcovMulti <- sum(vcovMulti);
+                }
+            }
             # IG and Lnorm can use approximations from the multiplications
-            if(etsModel && any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) && Etype=="M"){
-
-
+            else if(etsModel && any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) && Etype=="M"){
+                # The log-normal takes the variance of 1+e, s2 being the one of log(1+e)
+                if(object$distribution=="dlnorm"){
+                    s2[] <- exp(s2)-1;
+                    if(is.scale(object$scale)){
+                        s2Forecast[] <- exp(s2Forecast)-1;
+                    }
+                }
                 vcovMulti <- adamVarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, s2);
-                #print(vcovMulti)
                 if(is.scale(object$scale)){
-                    # Fix the matrix with the time varying variance
-                    vcovMulti[] <- vcovMulti / s2 * (sqrt(s2Forecast) %*% t(sqrt(s2Forecast)));
+                    # Fix the variances with the time varying ones
+                    vcovMulti[] <- vcovMulti / s2 * s2Forecast;
                 }
                 if(any(object$distribution==c("dlnorm","dls","dllaplace","dlgnorm"))){
                     vcovMulti[] <- log(1+vcovMulti);
@@ -6606,6 +6635,10 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                     }
                     else{
                         vcovMulti <- diag(t(adamErrors) %*% adamErrors / nWindows);
+                    }
+                    # The log-normal takes the variance of log(1+e), as at h=1
+                    if(object$distribution=="dlnorm"){
+                        vcovMulti[] <- log(1+vcovMulti);
                     }
                 }
                 # For nonparametric and cumulative...
@@ -6714,8 +6747,12 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 }
             }
             else if(object$distribution=="dlnorm"){
-                yLower[] <- qlnorm(levelLow, sqrt(abs(1-vcovMulti))-1, sqrt(vcovMulti));
-                yUpper[] <- qlnorm(levelUp, sqrt(abs(1-vcovMulti))-1, sqrt(vcovMulti));
+                # 1+e with the mean of one: vcovMulti is the variance of log(1+e)
+                if(is.null(vcovMean)){
+                    vcovMean <- vcovMulti;
+                }
+                yLower[] <- qlnorm(levelLow, -vcovMean/2, sqrt(vcovMulti));
+                yUpper[] <- qlnorm(levelUp, -vcovMean/2, sqrt(vcovMulti));
                 if(Etype=="A"){
                     yLower[] <- (yLower-1)*yForecast;
                     yUpper[] <-(yUpper-1)*yForecast;
@@ -6885,12 +6922,12 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
         # Do intervals around the forecasts...
         if(Etype=="A"){
-            yLower[] <- yForecast + yLower;
-            yUpper[] <- yForecast + yUpper;
+            yLower[] <- yCentre + yLower;
+            yUpper[] <- yCentre + yUpper;
         }
         else{
-            yLower[] <- yForecast*yLower;
-            yUpper[] <- yForecast*yUpper;
+            yLower[] <- yCentre*yLower;
+            yUpper[] <- yCentre*yUpper;
         }
 
         # Check what we have from the occurrence model

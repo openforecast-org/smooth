@@ -762,10 +762,13 @@ def forecaster(
         occurrence_dict, general_dict
     )
 
-    # 10. Apply occurrence probabilities and handle cumulative
+    # 10. Apply occurrence probabilities and handle cumulative. The intervals of an
+    # occurrence model are of the sizes, around their forecasts
+    y_sizes = y_forecast_values
     y_forecast_values = y_forecast_values * p_forecast
     if general_dict.get("cumulative"):
         y_forecast_values = np.sum(y_forecast_values)
+        y_sizes = y_forecast_values
     # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated.
     if occurrence_model and general_dict.get("cumulative", False):
         general_dict["interval"] = "simulated"
@@ -821,7 +824,7 @@ def forecaster(
                 general_dict["_scenarios_matrix"] = y_simulated
         elif resolved_interval == "approximate":
             y_lower, y_upper = generate_prediction_interval(
-                y_forecast_values,
+                y_sizes,
                 model_prepared,
                 general_dict,
                 observations_dict,
@@ -836,7 +839,7 @@ def forecaster(
                 warnings.warn('scenarios=True requires interval="simulated". Ignored.')
         elif resolved_interval in ("semiparametric", "empirical", "nonparametric"):
             y_lower, y_upper = generate_multistep_interval(
-                y_forecast_values,
+                y_sizes,
                 model_prepared,
                 general_dict,
                 observations_dict,

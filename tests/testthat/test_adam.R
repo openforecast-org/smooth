@@ -1100,3 +1100,37 @@ test_that("the gap variance and mean of the pure multiplicative ADAM ETS with dl
     expect_equal(testModel$scale, optimize(likelihood, c(0.01, 2), maximum=TRUE)$maximum,
                  tolerance=1e-4);
 })
+
+
+# The log-normal 1+e has the mean of one and the variance s of its log: the one-step
+# interval is qlnorm(-s/2, sqrt(s)) around the fitted values, and for the pure
+# multiplicative ADAM ETS the h-step one is qlnorm(-s a_h/2, sqrt(s k_h)) exactly
+test_that("the dlnorm intervals come from logN(-s/2, s)", {
+    set.seed(41);
+    u <- rnorm(300, -0.1, sqrt(0.2));
+    y <- 10*exp(cumsum(c(0, 0.3*u[-300])))*exp(u);
+    testModel <- adam(y, "MNN", distribution="dlnorm", ets="adam", h=5);
+    s2 <- adam_varianceDebiased(testModel);
+    testPredict <- predict(testModel, interval="prediction", level=0.9);
+    expect_equal(as.vector(testPredict$upper/fitted(testModel)), rep(qlnorm(0.95, -s2/2, sqrt(s2)), 300));
+    testForecast <- forecast(testModel, h=5, interval="approximate", level=0.9);
+    alpha <- testModel$persistence[1];
+    expect_equal(as.vector(testForecast$upper/testForecast$mean),
+                 qlnorm(0.95, -s2*(1+(0:4)*alpha)/2, sqrt(s2*(1+(0:4)*alpha^2))));
+})
+
+# The intervals of an occurrence model are of the sizes, so they are around the fitted
+# values of the sizes, not around their products with the probability
+test_that("the intervals of an occurrence model are around the sizes", {
+    set.seed(41);
+    y <- rnorm(300, 100, 10)*rbinom(300, 1, 0.4);
+    testModel <- adam(y, "ANN", occurrence="fixed", h=5);
+    p <- fitted(testModel$occurrence)[1];
+    s2 <- adam_varianceDebiased(testModel);
+    testPredict <- predict(testModel, interval="prediction", level=0.9);
+    expect_equal(as.vector(testPredict$upper - fitted(testModel)/p),
+                 rep(qnorm((1+(0.9-(1-p))/p)/2, 0, sqrt(s2)), 300));
+    testForecast <- forecast(testModel, h=1, interval="approximate", level=0.9);
+    expect_equal(as.vector(testForecast$upper - testForecast$mean/p),
+                 qnorm((1+(0.9-(1-p))/p)/2, 0, sqrt(s2)));
+})

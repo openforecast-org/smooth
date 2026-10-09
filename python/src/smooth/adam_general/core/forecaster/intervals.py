@@ -134,8 +134,30 @@ def generate_prediction_interval(
     # Skipping for now.
     # Will ask Ivan what this is
 
+    # The mean of log(1+e) times -2 for the log-normal, when it is not the variance
+    v_mean = None
     if scale_2d_override is not None:
         v_voc_multi = np.asarray(scale_2d_override, dtype=float).ravel()
+    elif (
+        general["distribution"] == "dlnorm"
+        and general.get("ets") == "adam"
+        and model_type_dict["ets_model"]
+        and not model_type_dict.get("arima_model", False)
+        and e_type == "M"
+        and model_type_dict["trend_type"] != "A"
+        and model_type_dict["season_type"] != "A"
+    ):
+        # A pure multiplicative ADAM ETS with the log-normal is additive in logs:
+        # log(1+e) at the horizon j has the mean -s2*a_j/2 and the variance s2*k_j,
+        # as over the gaps
+        covar = covar_anal(
+            lags_dict["lags_model_all"], general["h"], mat_wt, mat_f, vec_g, 1.0
+        )
+        s2_horizon = s2 if s2_forecast is None else s2_forecast
+        v_voc_multi = s2_horizon * np.diag(covar)
+        v_mean = s2_horizon * np.cumsum(covar[0])
+        if general.get("cumulative", False):
+            v_voc_multi = np.sum(v_voc_multi)
     elif (
         model_type_dict["ets_model"]
         and general["distribution"]
@@ -143,7 +165,12 @@ def generate_prediction_interval(
         and model_type_dict["error_type"] == "M"
     ):
         # Multiplicative-error variance under one of the log/positive
-        # distributions: compute the per-horizon analytic variance.
+        # distributions: compute the per-horizon analytic variance. The log-normal
+        # takes the variance of 1+e, s2 being the one of log(1+e)
+        if general["distribution"] == "dlnorm":
+            s2 = np.exp(s2) - 1
+            if s2_forecast is not None:
+                s2_forecast = np.exp(s2_forecast) - 1
         v_voc_multi = var_anal(
             lags_dict["lags_model_all"], general["h"], mat_wt[0], mat_f, vec_g, s2
         )
@@ -269,9 +296,8 @@ def generate_prediction_interval(
         y_upper[:] = gb.qalaplace(lu, loc, sd, alpha)
 
     elif distribution == "dlnorm":
-        # R's meanlog is sqrt(|1 - v|) - 1, not -v/2: the quantile is of the
-        # multiplicative error, whose median is pulled below 1 as v grows.
-        meanlog = np.sqrt(np.abs(1 - scale_2d)) - 1
+        # 1+e with the mean of one: scale_2d is the variance of log(1+e)
+        meanlog = -(scale_2d if v_mean is None else v_mean.reshape(-1, 1)) / 2
         sdlog = np.sqrt(scale_2d)
         y_lower_mult = gb.qlnorm(ll, meanlog, sdlog)
         y_upper_mult = gb.qlnorm(lu, meanlog, sdlog)
@@ -746,6 +772,9 @@ def generate_multistep_interval(
             vcov = float(np.sum(adam_errors.T @ adam_errors / n))
         else:
             vcov = np.diag(adam_errors.T @ adam_errors / n)
+        # The log-normal takes the variance of log(1+e), as at h=1
+        if distribution == "dlnorm":
+            vcov = np.log(1 + vcov)
         return generate_prediction_interval(
             predictions,
             prepared_model,

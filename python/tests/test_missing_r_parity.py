@@ -293,3 +293,60 @@ def test_the_scale_model_over_gaps_agrees():
     fit = sm(ADAM(model="MAM", lags=[12]).fit(_values(r["y"])))
     assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
     np.testing.assert_allclose(fit.coef, r["B"], atol=1e-8)
+
+
+# The variance of the error after the periods without an observed size (the zeros of
+# an occurrence model and the missing values) of the pure additive models with the
+# normal distribution: the likelihood, its terms, the scale and the standardised
+# residuals agree with R
+GAP_VARIANCE_DATA = (
+    "set.seed(41); e <- rnorm(200, 0, 5); level <- 100 + cumsum(0.3*e);"
+    " y <- (c(100, level[-200]) + e)*rbinom(200, 1, 0.5); y[c(50, 51)] <- NA;"
+)
+GAP_VARIANCE_CASES = {
+    "adam ANN occurrence": (
+        GAP_VARIANCE_DATA,
+        "adam(y, 'ANN', occurrence='fixed', distribution='dnorm')",
+        lambda: ADAM(model="ANN", occurrence="fixed", distribution="dnorm"),
+    ),
+    "adam AAA missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'AAA', distribution='dnorm')",
+        lambda: ADAM(model="AAA", lags=[12], distribution="dnorm"),
+    ),
+    "ces missing": (
+        AIRPASSENGERS_GAPS,
+        "ces(ts(y, frequency=12), seasonality='full')",
+        lambda: CES(seasonality="full", lags=[12]),
+    ),
+    "tbats missing": (
+        AIRPASSENGERS_GAPS,
+        "tbats(ts(y, frequency=12), distribution='dnorm', lambda=1, trend='none',"
+        " harmonics=2, orders=list(ar=0, ma=0, select=FALSE))",
+        lambda: TBATS(
+            lags=[1, 12],
+            distribution="dnorm",
+            lambda_bc=1,
+            trend="none",
+            harmonics=[2],
+            orders={"ar": 0, "ma": 0, "select": False},
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(GAP_VARIANCE_CASES))
+def test_the_gap_variance_agrees(case):
+    data, r_call, make = GAP_VARIANCE_CASES[case]
+    r = r_dict(
+        f"{{ {data} m <- suppressWarnings({r_call}); list(y=as.numeric(y),"
+        " ll=as.numeric(logLik(m)), scale=m$scale, pl=as.numeric(pointLik(m)),"
+        " rs=as.numeric(rstandard(m))) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    fit = make().fit(y)
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    assert fit.scale == pytest.approx(r["scale"][0], rel=1e-8)
+    np.testing.assert_allclose(fit.point_lik(), r["pl"], atol=1e-8)
+    rs = np.array([np.nan if v is None or v == "NA" else v for v in r["rs"]], float)
+    np.testing.assert_allclose(np.asarray(fit.rstandard(), float), rs, atol=1e-7)

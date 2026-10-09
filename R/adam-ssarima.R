@@ -422,12 +422,16 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                scale <- scaler(adamFitted$errors[otLogical], obsObserved);
+                # The variance of the errors after the missing values, as in adam()
+                gapVariance <- adam_gapVariance(lagsModelAll, elements$matWt, elements$matF, elements$vecG,
+                                                otLogical);
+                scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
+                                obsObserved);
 
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
                                       mean=adamFitted$fitted[otLogical],
-                                      sd=sqrt(scale), log=TRUE));
+                                      sd=sqrt(scale*gapVariance[otLogical]), log=TRUE));
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsObserved;
@@ -1104,7 +1108,9 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         profilesRecentInitial <- matVt[,1,drop=FALSE];
     }
 
-    scale <- scaler(adamFitted$errors[otLogical], sum(!yNAValues[1:obsInSample]));
+    gapVariance <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
+    scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
+                    sum(!yNAValues[1:obsInSample]));
 
     if(any(yClasses=="ts")){
         yForecast <- ts(rep(NA, max(1,h)), start=yForecastStart, frequency=yFrequency);

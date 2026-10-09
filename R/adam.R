@@ -825,8 +825,15 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         obsObserved <- sum(observed);
         if(!multisteps){
             if(loss=="likelihood"){
+                # The variance of the errors after the periods without an observed size, of a
+                # pure additive model with the normal distribution (one elsewhere)
+                gapVariance <- rep(1, obsInSample);
+                if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M"){
+                    gapVariance[] <- adam_gapVariance(lagsModelAll, adamElements$matWt, adamElements$matF,
+                                                      adamElements$vecG, otLogical);
+                }
                 # Scale for different functions: the maximum likelihood over the observed sizes
-                scale <- scaler(distribution, Etype, adamFitted$errors[otLogical],
+                scale <- scaler(distribution, Etype, adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
                                 adamFitted$fitted[otLogical], sum(otLogical), other);
 
                 # Calculate the likelihood
@@ -834,7 +841,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 CFValue <- -sum(switch(distribution,
                                        "dnorm"=switch(Etype,
                                                       "A"=dnorm(x=yInSample[otLogical], mean=adamFitted$fitted[otLogical],
-                                                                sd=sqrt(scale), log=TRUE),
+                                                                sd=sqrt(scale*gapVariance[otLogical]), log=TRUE),
                                                       "M"=dnorm(x=yInSample[otLogical], mean=adamFitted$fitted[otLogical],
                                                                 sd=sqrt(scale)*adamFitted$fitted[otLogical], log=TRUE)),
                                        "dlaplace"=switch(Etype,
@@ -2056,9 +2063,14 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             other <- abs(tail(B,1));
         }
         # which() is needed in order to overcome weird behaviour of zoo
-        # The sizes, not multiplied by the probabilities
-        scale <- scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
-                        sum(otLogical), other);
+        # The sizes, not multiplied by the probabilities, with the variance after the periods
+        # without an observed size, as in the estimation
+        gapVariance <- rep(1, obsInSample);
+        if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M"){
+            gapVariance[] <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
+        }
+        scale <- scaler(distribution, Etype, errors[which(otLogical)]/sqrt(gapVariance[which(otLogical)]),
+                        adamFitted$fitted[which(otLogical)], sum(otLogical), other);
 
         # Record constant if it was estimated
         if(constantEstimate){
@@ -4617,6 +4629,12 @@ sigma.adam <- function(object, ...){
         df[] <- nobs(object);
     }
 
+    errors <- residuals(object);
+    # Each error with its own variance, after the periods without an observed size
+    if(!inherits(object, "adamCombined")){
+        errors[] <- errors / sqrt(adam_gapVarianceModel(object));
+    }
+
     return(sqrt(switch(object$distribution,
                        "dnorm"=,
                        "dlaplace"=,
@@ -4624,7 +4642,7 @@ sigma.adam <- function(object, ...){
                        "dgnorm"=,
                        "dt"=,
                        "dlogis"=,
-                       "dalaplace"=sum(residuals(object)^2,na.rm=TRUE),
+                       "dalaplace"=sum(errors^2,na.rm=TRUE),
                        "dlnorm"=,
                        "dllaplace"=,
                        "dls"=sum(log(residuals(object))^2,na.rm=TRUE),
@@ -5369,12 +5387,14 @@ rstandard.adam <- function(model, ...){
         residsToGo <- which(actuals(model$occurrence)!=0 & !is.na(actuals(model)));
     }
     else{
-        residsToGo <- c(1:obs);
+        residsToGo <- which(!is.na(actuals(model)));
     }
 
     if(any(distribution==c("dinvgauss","dgamma"))){
         return(errors / mean(errors[residsToGo]));
     }
+    # Each error with its own variance, after the periods without an observed size
+    errors[] <- errors / sqrt(adam_gapVarianceModel(model));
 
     # The scale, de-biased in the variance space
     scale <- adam_scaleDebias(extractScale(model), distribution, adam_nobsObserved(model), adam_dfScale(model));
@@ -5408,13 +5428,15 @@ rstudent.adam <- function(model, ...){
     # The missing values are not observations
     df <- adam_nobsObserved(model) - nparam(model) - 1;
     rstudentised <- errors <- residuals(model);
+    # Each error with its own variance, after the periods without an observed size
+    errors[] <- errors / sqrt(adam_gapVarianceModel(model));
     # If this is an occurrence model, then only modify the non-zero obs
     # Also, if there are NAs in actuals, consider them as occurrence
     if(is.occurrence(model$occurrence)){
         residsToGo <- which(actuals(model$occurrence)!=0 & !is.na(actuals(model)));
     }
     else{
-        residsToGo <- c(1:obs);
+        residsToGo <- which(!is.na(actuals(model)));
     }
     if(any(model$distribution==c("dt","dnorm"))){
         errors[] <- errors - mean(errors, na.rm=TRUE);
@@ -7449,12 +7471,15 @@ pointLik.adam <- function(object, log=TRUE, ...){
                     "dgnorm"=,"dlgnorm"=object$other$shape,
                     "dt"=object$other$nu);
     Etype <- errorType(object);
+    # The variance of the errors after the periods without an observed size, as in the
+    # estimation
+    gapVariance <- adam_gapVarianceModel(object);
 
     likValues <- vector("numeric",obsInSample);
     likValues[otLogical] <- switch(distribution,
                                    "dnorm"=switch(Etype,
                                                   "A"=dnorm(x=yInSample[otLogical], mean=yFitted[otLogical],
-                                                            sd=sqrt(scale), log=TRUE),
+                                                            sd=sqrt(scale*gapVariance[otLogical]), log=TRUE),
                                                   "M"=dnorm(x=yInSample[otLogical], mean=yFitted[otLogical],
                                                             sd=sqrt(scale)*yFitted[otLogical], log=TRUE)),
                                    "dlaplace"=switch(Etype,

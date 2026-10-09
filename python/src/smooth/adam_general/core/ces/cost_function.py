@@ -5,8 +5,6 @@ Translates R/adam-ces.R CF() function (lines 486-563).
 Wraps ces_filler + adamCore.fit() + loss computation.
 """
 
-import math
-
 import numpy as np
 
 from smooth.adam_general._eigenCalc import smooth_eigens
@@ -16,6 +14,7 @@ from smooth.adam_general.core.utils.utils import (
     calculate_multistep_loss,
     complete_windows,
 )
+from smooth.adam_general.core.utils.var_covar import gap_variance
 
 _R_LN_SQRT_2PI = 0.918938533204672741780329736406
 
@@ -198,9 +197,12 @@ def ces_cf(
 
     errors = np.array(adam_fitted.errors).ravel()
     fitted = np.array(adam_fitted.fitted).ravel()
-    # The fitted values and the errors at B, as ADAM's CF returns them
+    # The variance of the errors after the missing values, as in ADAM
+    gap = gap_variance(lags_model_all, mat_wt_f, mat_f_f, vec_g_f, ot_logical)
+    # The fitted values, the errors and the gap variance at B, as ADAM's CF
+    # returns them
     if return_fitted:
-        return fitted, errors
+        return fitted, errors, gap
 
     # Compute loss — R lines 510-555. The missing values are not in the loss: the
     # errors are zero there, and the losses are divided by the observed values
@@ -208,14 +210,15 @@ def ces_cf(
     obs_observed = int(np.sum(ot_logical))
     if not multisteps:
         if loss == "likelihood":
-            # CES scaler: sqrt(sum(errors^2)/obs) — R line 482
+            # CES scaler: sum(errors^2)/obs, the variance — R line 482
             errors_ot = errors[ot_logical]
-            scale = math.sqrt(_sum_r(errors_ot**2) / obs_observed)
+            errors_std = errors_ot / np.sqrt(gap[ot_logical])
+            variance = _sum_r(errors_std**2) / obs_observed
+            scale = np.sqrt(variance * gap[ot_logical])
             y_ot = np.asarray(y_in_sample, dtype=float)[ot_logical]
             fitted_ot = fitted[ot_logical]
-            log_scale = math.log(scale)
             cf_value = _sum_r(
-                _R_LN_SQRT_2PI + 0.5 * ((y_ot - fitted_ot) / scale) ** 2 + log_scale
+                _R_LN_SQRT_2PI + 0.5 * ((y_ot - fitted_ot) / scale) ** 2 + np.log(scale)
             )
         elif loss == "MSE":
             cf_value = _sum_r(errors**2) / obs_observed

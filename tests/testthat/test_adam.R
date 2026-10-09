@@ -1055,3 +1055,23 @@ test_that("The multistep errors start from the states before their targets", {
                     B=fitMSE$B, maxeval=1);
     expect_equal(fitMSEh$lossValue, fitMSE$lossValue, tolerance=1e-10);
 });
+
+# After j-1 periods without an observed size, the error of a pure additive model with
+# the normal distribution is the (j)-steps-ahead one: for ETS(A,N,N) its variance is
+# sigma^2 (1 + (j-1) alpha^2), in the likelihood, the scale and the diagnostics
+test_that("the gap variance of a pure additive model over the zeros and the missing values", {
+    set.seed(41);
+    e <- rnorm(300, 0, 5);
+    level <- 100 + cumsum(0.3*e);
+    y <- (c(100, level[-300]) + e)*rbinom(300, 1, 0.5);
+    y[c(50, 51)] <- NA;
+    testModel <- suppressWarnings(adam(y, "ANN", occurrence="fixed", distribution="dnorm"));
+    otLogical <- !is.na(y) & y!=0;
+    gaps <- diff(c(0, which(otLogical)));
+    gapVariance <- adam_gapVarianceModel(testModel);
+    expect_equal(gapVariance[otLogical], 1 + (gaps-1)*testModel$persistence[1]^2);
+    expect_equal(testModel$scale, mean(residuals(testModel)[otLogical]^2/gapVariance[otLogical]));
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    expect_equal(var(rstandard(testModel)[otLogical]), 1, tolerance=0.1);
+})
+

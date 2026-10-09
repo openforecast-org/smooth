@@ -663,3 +663,21 @@ test_that("sm() models the scale of tbats() with TBATS", {
     expect_gt(as.numeric(logLik(testImplanted)), as.numeric(logLik(testModel)));
     expect_equal(sum(pointLik(testImplanted)), as.numeric(logLik(testImplanted)));
 })
+
+# TBATS with no seasonality, trend and ARMA on the data is ETS(A,N,N): over the zeros
+# and the missing values too, with the variance of the multistep error after them
+test_that("tbats() is adam()'s ETS(A,N,N) over the gaps", {
+    set.seed(41);
+    e <- rnorm(200, 0, 5);
+    level <- 100 + cumsum(0.3*e);
+    y <- (c(100, level[-200]) + e)*rbinom(200, 1, 0.6);
+    y[c(30, 31)] <- NA;
+    testADAM <- suppressWarnings(adam(y, "ANN", occurrence="fixed", distribution="dnorm"));
+    testTBATS <- suppressWarnings(tbats(y, lags=1, trend="none", lambda=1, distribution="dnorm",
+                                        orders=list(ar=0, ma=0, select=FALSE), occurrence="fixed"));
+    expect_equal(as.numeric(logLik(testTBATS)), as.numeric(logLik(testADAM)), tolerance=1e-6);
+    # Two optimisers from their own starting points: the same optimum of a flat likelihood
+    expect_equal(testTBATS$scale, testADAM$scale, tolerance=1e-3);
+    expect_equal(sum(pointLik(testTBATS)), as.numeric(logLik(testTBATS)));
+})
+

@@ -442,12 +442,15 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                scale <- scaler(adamFitted$errors, obsObserved);
+                # The variance of the errors after the missing values, as in adam()
+                gapVariance <- adam_gapVariance(lagsModelAll, matricesFilled$matWt, matricesFilled$matF, matricesFilled$vecG,
+                                                otLogical);
+                scale <- scaler(adamFitted$errors/sqrt(gapVariance), obsObserved);
 
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
                                       mean=adamFitted$fitted[otLogical],
-                                      sd=sqrt(scale), log=TRUE));
+                                      sd=sqrt(scale*gapVariance[otLogical]), log=TRUE));
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsObserved;
@@ -613,7 +616,9 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     matVt[] <- adamFitted$states;
 
     # Calculate final loss and logLik
-    scale <- scaler(adamFitted$errors, sum(!yNAValues[1:obsInSample]));
+    gapVariance <- adam_gapVariance(lagsModelAll, matricesFinal$matWt, matricesFinal$matF, matricesFinal$vecG,
+                                    otLogical);
+    scale <- scaler(adamFitted$errors/sqrt(gapVariance), sum(!yNAValues[1:obsInSample]));
 
     logLikValue <- logLikFunction(B);
 

@@ -219,6 +219,29 @@ def sigma(observations_dict, params_info, general, prepared_model, error_type=No
     return float(np.sqrt(ss / vals))
 
 
+def gap_variance(lags_model_all, mat_wt, mat_f, vec_g, ot_logical):
+    """The variance of the error at each observed size relative to the one-step
+    variance (R's ``adam_gapVariance``).
+
+    After ``j - 1`` periods without an observed size (the zeros of an occurrence
+    model and the missing values), the states have gone on with zero errors, and the
+    error of a pure additive model at the next observed size sums the one-step errors
+    since then, with the coefficients ``c_i`` of :func:`covar_anal`: its variance is
+    ``1 + sum(c_i^2, i < j)``. The first gap counts from the initial states.
+    """
+    ot = np.asarray(ot_logical, dtype=bool).ravel()
+    indices = np.flatnonzero(ot)
+    gaps = np.diff(np.concatenate([[-1], indices]))
+    result = np.ones(ot.size)
+    if np.any(gaps > 1):
+        measurement = np.atleast_2d(np.asarray(mat_wt, dtype=float))[:1]
+        kappa = np.diag(
+            covar_anal(lags_model_all, int(gaps.max()), measurement, mat_f, vec_g, 1.0)
+        )
+        result[indices] = kappa[gaps - 1]
+    return result
+
+
 def covar_anal(lags_model, h, measurement, transition, persistence, s2):
     """
     Returns analytical conditional h-steps ahead covariance matrix. Corrected Python

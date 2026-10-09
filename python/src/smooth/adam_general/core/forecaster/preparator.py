@@ -4,6 +4,7 @@ import pandas as pd
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import scaler
+from smooth.adam_general.core.utils.var_covar import gap_variance
 
 from ._helpers import _safe_create_index
 
@@ -537,7 +538,7 @@ def _process_arma_parameters(arima_checked, adam_estimated):
 
 
 def _calculate_scale_parameter(
-    general_dict, model_type_dict, errors, y_fitted, observations_dict, other
+    general_dict, model_type_dict, errors, y_fitted, observations_dict, other, gap
 ):
     """
     Calculate scale parameter using scaler function.
@@ -556,17 +557,21 @@ def _calculate_scale_parameter(
         Dictionary with observation data and related information
     other : dict
         Additional parameters
+    gap : numpy.ndarray
+        The variance of the errors after the periods without an observed size
+        (:func:`gap_variance`), ones unless the model is pure additive with dnorm
 
     Returns
     -------
     float
         Calculated scale parameter
     """
+    ot_logical = observations_dict["ot_logical"]
     scale = scaler(
         general_dict["distribution_new"],
         model_type_dict["error_type"],
-        errors[observations_dict["ot_logical"]],
-        y_fitted[observations_dict["ot_logical"]],
+        np.ravel(errors)[ot_logical] / np.sqrt(gap[ot_logical]),
+        np.ravel(y_fitted)[ot_logical],
         # divided by the observed sizes: the missing values are not, and neither
         # are the zeros of an occurrence model
         int(np.sum(observations_dict["ot_logical"])),
@@ -1113,8 +1118,22 @@ def preparator(
     arma_parameters_list = _process_arma_parameters(arima_checked, adam_estimated)
 
     # 12. Calculate scale parameter
+    gap = np.ones(len(observations_dict["ot_logical"]))
+    if (
+        general_dict["distribution_new"] == "dnorm"
+        and model_type_dict["error_type"] == "A"
+        and model_type_dict["trend_type"] != "M"
+        and model_type_dict["season_type"] != "M"
+    ):
+        gap = gap_variance(
+            lags_dict["lags_model_all"],
+            matrices_dict["mat_wt"],
+            matrices_dict["mat_f"],
+            matrices_dict["vec_g"],
+            observations_dict["ot_logical"],
+        )
     scale = _calculate_scale_parameter(
-        general_dict, model_type_dict, errors, y_fitted, observations_dict, other
+        general_dict, model_type_dict, errors, y_fitted, observations_dict, other, gap
     )
 
     # 13. Process constant and other parameters

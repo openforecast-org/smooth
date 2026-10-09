@@ -30,6 +30,7 @@ from smooth.adam_general.core.utils.utils import (
     scale_debias,
     xreg_selector,
 )
+from smooth.adam_general.core.utils.var_covar import gap_variance
 
 TREND_OPTIONS = ("auto", "none", "additive", "damped")
 DISTRIBUTION_OPTIONS = ("auto", "dnorm", "dlaplace", "ds", "dgnorm")
@@ -1173,6 +1174,23 @@ class TBATS:
     # The diagnostics of ADAM, which need only the residuals, the scale and the
     # distribution: the residuals are those of the transformed data
     _check_is_fitted = _check_fitted
+
+    def _gap_variance(self) -> NDArray:
+        """The variance of the errors at the observed sizes relative to the one-step
+        one, after the periods without an observed size (R's
+        ``adam_gapVarianceModel``): ones unless the distribution is normal."""
+        ot = self._ot & ~np.isnan(self._y_in_sample)
+        if self.distribution_ != "dnorm" or getattr(self, "is_scale_", False):
+            return np.ones(len(ot))
+        best = self._best
+        return gap_variance(
+            best["struct"]["lags_model_all"],
+            best["fitted"]["mat_wt"],
+            best["elements"]["mat_f"],
+            best["elements"]["vec_g"],
+            ot,
+        )
+
     rstandard = ADAM.rstandard
     rstudent = ADAM.rstudent
     outlierdummy = ADAM.outlierdummy

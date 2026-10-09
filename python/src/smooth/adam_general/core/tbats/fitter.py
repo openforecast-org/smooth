@@ -24,6 +24,7 @@ from smooth.adam_general.core.utils.utils import (
     calculate_likelihood,
     complete_windows,
 )
+from smooth.adam_general.core.utils.var_covar import gap_variance
 
 PENALTY = 1e100
 MULTISTEP_LOSSES = ("MSEh", "TMSE", "GTMSE", "MSCE", "GPL")
@@ -690,8 +691,24 @@ def fit(
             else:
                 value = math.log(np.linalg.det(adam_errors.T @ adam_errors / n))
         elif loss == "likelihood":
+            # The variance of the errors after the periods without an observed size,
+            # with the normal distribution, as R
+            gap = (
+                gap_variance(
+                    lags_all,
+                    fitted["mat_wt"],
+                    elements["mat_f"],
+                    elements["vec_g"],
+                    ot_logical,
+                )[ot_logical]
+                if distribution == "dnorm"
+                else np.ones(obs_nonzero)
+            )
             value = (
-                -st.loglik_value(errors, distribution, elements["shape"], obs_nonzero)
+                -st.loglik_value(
+                    errors / np.sqrt(gap), distribution, elements["shape"], obs_nonzero
+                )
+                + _sum_r(_log_r(gap)) / 2
                 - (elements["lambda"] - 1) * log_y
             )
         elif loss == "MSE":
@@ -718,7 +735,18 @@ def fit(
         model fixed: the final fit does not look at the bounds."""
         elements = filler(b_full(np.asarray(B, dtype=float)), s["bounds"])
         fitted = fit_states(elements)
-        errors = fitted["errors"][ot_logical]
+        gap = (
+            gap_variance(
+                lags_all,
+                fitted["mat_wt"],
+                elements["mat_f"],
+                elements["vec_g"],
+                ot_logical,
+            )[ot_logical]
+            if distribution == "dnorm"
+            else np.ones(obs_nonzero)
+        )
+        errors = fitted["errors"][ot_logical] / np.sqrt(gap)
         scale = st.scale_value(errors, distribution, elements["shape"], obs_nonzero)
         values = calculate_likelihood(
             distribution,
@@ -728,7 +756,11 @@ def fit(
             scale,
             elements["shape"],
         )
-        sizes = np.ravel(values) + (elements["lambda"] - 1) * _log_r(y[ot_logical])
+        sizes = (
+            np.ravel(values)
+            - _log_r(gap) / 2
+            + (elements["lambda"] - 1) * _log_r(y[ot_logical])
+        )
         # The occurrence, and the sizes where there is a demand; the missing values
         # are not in the likelihood, so theirs stay zero
         result = np.zeros(obs)
@@ -880,8 +912,18 @@ def fit(
             )
         )
 
+    gap = (
+        gap_variance(
+            lags_all, fitted["mat_wt"], elements["mat_f"], elements["vec_g"], ot_logical
+        )[ot_logical]
+        if distribution == "dnorm"
+        else np.ones(obs_nonzero)
+    )
     scale = st.scale_value(
-        fitted["errors"][ot_logical], distribution, elements["shape"], obs_nonzero
+        fitted["errors"][ot_logical] / np.sqrt(gap),
+        distribution,
+        elements["shape"],
+        obs_nonzero,
     )
     forecast_bc = None
     if s["h"] > 0:

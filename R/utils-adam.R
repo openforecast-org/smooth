@@ -1656,6 +1656,41 @@ adam_accuracy <- function(holdout, forecast, inSample){
                     inSample[!is.na(inSample)]));
 }
 
+# The variance of the error at each observed size relative to the one-step variance.
+# After j-1 periods without an observed size (the zeros of an occurrence model and the
+# missing values), the states have gone on with zero errors, and the error of a pure
+# additive model at the next observed size sums the one-step errors since then, with the
+# coefficients c_i of covarAnal(): its variance is 1 + sum(c_i^2, i<j). The first gap
+# counts from the initial states
+adam_gapVariance <- function(lagsModelAll, matWt, matF, vecG, otLogical){
+    indices <- which(otLogical);
+    gaps <- diff(c(0, indices));
+    gapVariance <- rep(1, length(otLogical));
+    if(any(gaps>1)){
+        gapVariance[indices] <- diag(covarAnal(lagsModelAll, max(gaps), matWt[1,,drop=FALSE],
+                                               matF, vecG, 1))[gaps];
+    }
+    return(gapVariance);
+}
+
+# The gap variance of the observations of a fitted model (ones unless the model is pure
+# additive with the normal distribution), at its observed sizes
+adam_gapVarianceModel <- function(object){
+    y <- as.vector(actuals(object));
+    otLogical <- !is.na(y);
+    if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
+        otLogical[] <- otLogical & y!=0;
+    }
+    gapVariance <- rep(1, length(y));
+    # A scale model (sm()) has its own residuals, standardised already
+    if(object$distribution=="dnorm" && errorType(object)=="A" && !grepl("M", modelType(object)) &&
+       !is.scale(object)){
+        gapVariance[] <- adam_gapVariance(modelLags(object), object$measurement, object$transition,
+                                          matrix(object$persistence, ncol=1), otLogical);
+    }
+    return(gapVariance);
+}
+
 # The observed sizes, which the scale is divided by: the missing values are not, and
 # neither are the zeros of an occurrence model, whose sizes are not observed
 adam_nobsObserved <- function(object){

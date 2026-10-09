@@ -30,6 +30,7 @@ from smooth.adam_general.core.creator.architector import (
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import _sum_r, multistep_log_lik
+from smooth.adam_general.core.utils.var_covar import gap_variance
 
 SEASONALITY_OPTIONS = Literal["none", "simple", "partial", "full"]
 LOSS_OPTIONS = Literal[
@@ -728,8 +729,11 @@ class CES:
         profiles_recent_table = np.array(adam_fitted.profile)
         mat_vt = np.array(adam_fitted.states).T  # C++ returns (components, time)
 
-        # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces()
-        scale = _sum_r(errors[ot_logical] ** 2) / obs_observed
+        # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces(), with the
+        # variance of the errors after the missing values
+        gap = gap_variance(lags_model_all, mat_wt, mat_f, vec_g, ot_logical)
+        errors_std = errors[ot_logical] / np.sqrt(gap[ot_logical])
+        scale = _sum_r(errors_std**2) / obs_observed
         # No errors at the missing values, where the fitted values are the predictions
         errors[~observed] = np.nan
 
@@ -975,13 +979,27 @@ class CES:
         if not hasattr(self, "model_name"):
             raise RuntimeError("Model has not been fitted yet.")
         y = self.fitted + self.residuals
+        # The variance after the missing values
+        scale = self.scale * self._gap_variance().reshape(-1, 1)
         lik_values = np.ravel(
             calculate_likelihood(
-                "dnorm", "A", y, self.fitted.reshape(-1, 1), self.scale, None
+                "dnorm", "A", y, self.fitted.reshape(-1, 1), scale, None
             )
         )
         lik_values[np.isnan(self.residuals)] = 0
         return lik_values if log else np.exp(lik_values)
+
+    def _gap_variance(self) -> NDArray:
+        """The variance of the errors at the observed values relative to the
+        one-step one, after the missing values (R's ``adam_gapVarianceModel``): CES
+        is pure additive with the normal distribution."""
+        return gap_variance(
+            self._ll_kwargs["lags_model_all"],
+            self.measurement,
+            self.transition,
+            self.persistence_vector,
+            ~np.isnan(self.residuals),
+        )
 
     def summary(self) -> Dict[str, Any]:
         """Return a summary of the fitted model."""
@@ -1085,11 +1103,18 @@ class CES:
             )
             if not isinstance(result, tuple):
                 return np.full(len(observed), np.nan)
-            fitted, errors = result
-            scale = _sum_r(errors[observed] ** 2) / np.sum(observed)
+            fitted, errors, gap = result
+            scale = _sum_r((errors[observed] / np.sqrt(gap[observed])) ** 2) / np.sum(
+                observed
+            )
             values = np.ravel(
                 calculate_likelihood(
-                    "dnorm", "A", fitted + errors, fitted.reshape(-1, 1), scale, None
+                    "dnorm",
+                    "A",
+                    fitted + errors,
+                    fitted.reshape(-1, 1),
+                    scale * gap.reshape(-1, 1),
+                    None,
                 )
             )
             values[~observed] = 0

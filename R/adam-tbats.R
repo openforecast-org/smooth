@@ -1487,8 +1487,16 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         errors <- fitted$errors[otLogical];
         if(any(lossUsed==c("likelihood","MSE","MAE","HAM","custom"))){
             value <- switch(lossUsed,
-                            "likelihood"=-tbats_logLik(errors, distribution, elements$shape, obsNonzero) -
-                                (elements$lambda-1)*logY,
+                            "likelihood"={
+                                # The variance of the errors after the periods without an observed
+                                # size, with the normal distribution, as adam()'s
+                                gapVariance <- if(distribution=="dnorm"){
+                                    adam_gapVariance(struct$lagsModelAll, fitted$matWt, elements$matF,
+                                                     elements$vecG, otLogical)[otLogical];
+                                } else 1;
+                                -tbats_logLik(errors/sqrt(gapVariance), distribution, elements$shape, obsNonzero) +
+                                    sum(log(gapVariance))/2 - (elements$lambda-1)*logY;
+                            },
                             "MSE"=sum(errors^2)/obsNonzero,
                             "MAE"=sum(abs(errors))/obsNonzero,
                             "HAM"=sum(sqrt(abs(errors)))/obsNonzero,
@@ -1651,7 +1659,10 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         colnames(FI) <- rownames(FI) <- names(B);
     }
 
-    scale <- tbats_scale(fitted$errors[otLogical], distribution, elements$shape, obsNonzero);
+    gapVariance <- if(distribution=="dnorm"){
+        adam_gapVariance(struct$lagsModelAll, fitted$matWt, elements$matF, elements$vecG, otLogical)[otLogical];
+    } else 1;
+    scale <- tbats_scale(fitted$errors[otLogical]/sqrt(gapVariance), distribution, elements$shape, obsNonzero);
     forecastBC <- NULL;
     if(checked$h>0){
         forecastBC <- adamCpp$forecast(tbats_matWt(elements$w, struct, checked$h, xregSpec$future),
@@ -2352,9 +2363,12 @@ pointLik.adamTBATS <- function(object, log=TRUE, ...){
         pFitted <- tbats_pFitted(object);
         # The zeros have only the likelihood of the occurrence: their sizes are not observed
         likValues <- log(1-pFitted);
+        # The variance of the errors after the periods without an observed size
+        gapVariance <- adam_gapVarianceModel(tbats_boxCoxObject(object))[otLogical];
         likValues[otLogical] <- log(pFitted[otLogical]) +
-            tbats_logDensities(as.numeric(residuals(object))[otLogical], object$distribution,
-                               object$other$shape, object$scale) + (object$lambda-1)*log(y[otLogical]);
+            tbats_logDensities(as.numeric(residuals(object))[otLogical]/sqrt(gapVariance), object$distribution,
+                               object$other$shape, object$scale) - log(gapVariance)/2 +
+            (object$lambda-1)*log(y[otLogical]);
     }
     likValues[!observed] <- 0;
     if(!log){

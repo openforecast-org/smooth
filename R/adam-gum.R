@@ -379,12 +379,16 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                scale <- scaler(adamFitted$errors[otLogical], obsObserved);
+                # The variance of the errors after the missing values, as in adam()
+                gapVariance <- adam_gapVariance(lagsModelAll, elements$matWt, elements$matF, elements$vecG,
+                                                otLogical);
+                scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
+                                obsObserved);
 
                 # Calculate the likelihood
                 CFValue <- -sum(dnorm(x=yInSample[otLogical],
                                       mean=adamFitted$fitted[otLogical],
-                                      sd=sqrt(scale), log=TRUE));
+                                      sd=sqrt(scale*gapVariance[otLogical]), log=TRUE));
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsObserved;
@@ -916,7 +920,9 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         profilesRecentInitial <- matVt[,1:lagsModelMax,drop=FALSE];
     }
 
-    scale <- scaler(adamFitted$errors[otLogical], sum(!yNAValues[1:obsInSample]));
+    gapVariance <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
+    scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
+                    sum(!yNAValues[1:obsInSample]));
 
     if(any(yClasses=="ts")){
         yForecast <- ts(rep(NA, max(1,h)), start=yForecastStart, frequency=yFrequency);

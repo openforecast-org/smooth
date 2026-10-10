@@ -277,15 +277,18 @@ covariance of the state entering period $t$.
 \begin{proposition}[The filter of the SSOE model]
 \label{prop:kalman}
 With $\vect a_1 = \vect x_0$ and $\vect P_1 = \vect 0$, the recursions
-\begin{align}
+\begin{equation}
+\begin{aligned}
 O_t = 1:&\quad v_t = z_t - \vect w'\vect a_t,\quad f_t = \vect w'\vect P_t\vect w + 1,\quad
-\vect k_t = (\vect F\vect P_t\vect w + \vect g)/f_t,\nonumber\\
+\vect k_t = (\vect F\vect P_t\vect w + \vect g)/f_t,\\
 &\quad \vect a_{t+1} = \vect F\vect a_t + \vect k_t v_t,\quad
 \vect P_{t+1} = \vect F\vect P_t\vect F' + \vect g\vect g' - \vect k_t\vect k_t' f_t,
-\label{eq:kalman}\\
+\\
 O_t = 0:&\quad \vect a_{t+1} = \vect F\vect a_t,\quad
-\vect P_{t+1} = \vect F\vect P_t\vect F' + \vect g\vect g',\nonumber
-\end{align}
+\vect P_{t+1} = \vect F\vect P_t\vect F' + \vect g\vect g',
+\end{aligned}
+\label{eq:kalman}
+\end{equation}
 give $z_t\mid Y_{t-1}\sim\mathcal N(\vect w'\vect a_t,\sigma^2 f_t)$ at the observed periods, and the
 observed-data log-likelihood of the sizes is
 \begin{equation}

@@ -539,7 +539,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                          FALSE, TRUE, xregModel, Etype, "N", "N",
                                          0, 0, 0, lagsModelAll, lagsModelMax,
                                          obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                         componentsNumberARIMA, lagsModelAll);
+                                         componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
         # The missing values are not in the loss: the errors are zero there, and the
         # losses are divided by the observed values, as in adam()
@@ -548,9 +548,8 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                # The variance of the errors after the missing values, as in adam()
-                gapVariance <- adam_gapVariance(lagsModelAll, matWt, elements$matF, elements$vecG,
-                                                otLogical);
+                # The variance of the errors after the missing values, of the filter as in adam()
+                gapVariance <- adamFitted$variances;
                 scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
                                 obsObserved);
 
@@ -1071,7 +1070,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                      FALSE, TRUE, xregModel, Etype, "N", "N",
                                      0, 0, 0, lagsModelAll, lagsModelMax,
                                      obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                     componentsNumberARIMA, lagsModelAll);
+                                     componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;
@@ -1087,7 +1086,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         profilesRecentInitial <- matVt[,1:lagsModelMax,drop=FALSE];
     }
 
-    gapVariance <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
+    gapVariance <- adamFitted$variances;
     scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
                     sum(!yNAValues[1:obsInSample]));
 

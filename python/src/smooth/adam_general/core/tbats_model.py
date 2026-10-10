@@ -30,7 +30,7 @@ from smooth.adam_general.core.utils.utils import (
     scale_debias,
     xreg_selector,
 )
-from smooth.adam_general.core.utils.var_covar import gap_variance
+from smooth.adam_general.core.utils.var_covar import filter_variances
 
 TREND_OPTIONS = ("auto", "none", "additive", "damped")
 DISTRIBUTION_OPTIONS = ("auto", "dnorm", "dlaplace", "ds", "dgnorm")
@@ -1175,20 +1175,32 @@ class TBATS:
     # distribution: the residuals are those of the transformed data
     _check_is_fitted = _check_fitted
 
-    def _gap_variance(self) -> NDArray:
+    def _gap_variance(self, power: int = 2, h: int = 0) -> Any:
         """The variance of the errors at the observed sizes relative to the one-step
         one, after the periods without an observed size (R's
-        ``adam_gapVarianceModel``): ones unless the distribution is normal."""
+        ``adam_gapVarianceModel``): those of the filter with the normal
+        distribution, ones otherwise. With ``h>0``, those of the h steps ahead, and
+        None for the other distributions or without such periods in the sample."""
         ot = self._ot & ~np.isnan(self._y_in_sample)
-        if self.distribution_ != "dnorm" or getattr(self, "is_scale_", False):
-            return np.ones(len(ot))
+        if getattr(self, "is_scale_", False) or self.distribution_ != "dnorm":
+            return None if h > 0 else np.ones(len(ot))
         best = self._best
-        return gap_variance(
+        if h == 0:
+            return np.asarray(best["fitted"]["variances"], dtype=float)
+        if ot.all():
+            return None
+        return filter_variances(
+            best["adam_cpp"],
             best["struct"]["lags_model_all"],
+            0,
             best["fitted"]["mat_wt"],
             best["elements"]["mat_f"],
             best["elements"]["vec_g"],
+            best["fitted"]["profile_initial"],
             ot,
+            h,
+            False,
+            power,
         )
 
     _gap_residuals = ADAM._gap_residuals
@@ -1655,6 +1667,9 @@ class TBATS:
                 "n_param": None,
                 "scale_forecast": scale_forecast,
                 "seed": seed,
+                # The variances of the filter at the h steps ahead, after the periods
+                # without an observed size in the sample (None without them)
+                "_filter_variances": self._gap_variance(h=h) if h else None,
                 **general,
             }
             result = forecaster(

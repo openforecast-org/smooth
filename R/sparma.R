@@ -433,7 +433,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                          FALSE, TRUE, FALSE, "A", "N", "N",
                                          0, 0, 0, lagsModelAll, lagsModelMax,
                                          obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                         componentsNumberARIMA, lagsModelAll);
+                                         componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
         # The missing values are not in the loss: the errors are zero there, and the
         # losses are divided by the observed values, as in adam()
@@ -442,9 +442,8 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                # The variance of the errors after the missing values, as in adam()
-                gapVariance <- adam_gapVariance(lagsModelAll, matricesFilled$matWt, matricesFilled$matF, matricesFilled$vecG,
-                                                otLogical);
+                # The variance of the errors after the missing values, of the filter as in adam()
+                gapVariance <- adamFitted$variances;
                 scale <- scaler(adamFitted$errors/sqrt(gapVariance), obsObserved);
 
                 # Calculate the likelihood
@@ -595,7 +594,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
                                      FALSE, TRUE, FALSE, "A", "N", "N",
                                      0, 0, 0, lagsModelAll, lagsModelMax,
                                      obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                     componentsNumberARIMA, lagsModelAll);
+                                     componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
     # Prepare fitted and error with ts / zoo
     if(any(yClasses=="ts")){
@@ -616,8 +615,7 @@ sparma <- function(data, orders=list(ar=c(1), ma=c(1)), constant=FALSE,
     matVt[] <- adamFitted$states;
 
     # Calculate final loss and logLik
-    gapVariance <- adam_gapVariance(lagsModelAll, matricesFinal$matWt, matricesFinal$matF, matricesFinal$vecG,
-                                    otLogical);
+    gapVariance <- adamFitted$variances;
     scale <- scaler(adamFitted$errors/sqrt(gapVariance), sum(!yNAValues[1:obsInSample]));
 
     logLikValue <- logLikFunction(B);

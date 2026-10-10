@@ -696,7 +696,7 @@ def calculate_likelihood(
     ``R/adam.R:790-862``. A multiplicative error scales the density's scale by
     the fitted value. ``gap_mean`` and ``gap_variance`` are the multipliers of the
     mean and of the variance of the error after the periods without an observed
-    size (``gap_variance()``), for dnorm and dlnorm.
+    size (the filter, ``filter_variances()``), for dnorm and dlnorm.
     """
     y = np.asarray(y, dtype=np.float64).reshape(-1, 1)
     mult = y_fitted if Etype == "M" else 1.0
@@ -1016,7 +1016,7 @@ def scaler(
     - other (float): Additional parameter for some distributions
     - gap_mean, gap_variance (float or np.array): the multipliers of the mean and of
       the variance of the errors after the periods without an observed size
-      (``gap_variance()``), ones elsewhere; used by dnorm and dlnorm
+      (the filter, ``filter_variances()``), ones elsewhere; used by dnorm and dlnorm
     - gap_drift (callable or None): the moments of the drift of the states of a
       pure multiplicative ETS over those periods at a scale (``gap_drift()``),
       which depend on the scale itself: the scale is then the fixed point of the

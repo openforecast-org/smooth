@@ -413,7 +413,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                                          FALSE, TRUE, xregModel, "A", "N", "N",
                                          0, 0, 0, lagsModelAll, lagsModelMax,
                                          obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                         componentsNumberARIMA, lagsModelAll);
+                                         componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
         # The missing values are not in the loss: the errors are zero there, and the
         # losses are divided by the observed values, as in adam()
@@ -422,9 +422,8 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                # The variance of the errors after the missing values, as in adam()
-                gapVariance <- adam_gapVariance(lagsModelAll, elements$matWt, elements$matF, elements$vecG,
-                                                otLogical);
+                # The variance of the errors after the missing values, of the filter as in adam()
+                gapVariance <- adamFitted$variances;
                 scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
                                 obsObserved);
 
@@ -1090,7 +1089,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                                      FALSE, TRUE, xregModel, "A", "N", "N",
                                      0, 0, 0, lagsModelAll, lagsModelMax,
                                      obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                     componentsNumberARIMA, lagsModelAll);
+                                     componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;
@@ -1108,7 +1107,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         profilesRecentInitial <- matVt[,1,drop=FALSE];
     }
 
-    gapVariance <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
+    gapVariance <- adamFitted$variances;
     scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
                     sum(!yNAValues[1:obsInSample]));
 

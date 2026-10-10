@@ -2778,8 +2778,7 @@ class ADAM:
         observed sizes (``gap_drift()``) of a pure multiplicative ETS with the
         Gamma, the Inverse Gaussian or the conventional log-normal (R's attribute
         "drift"), and None for the other models."""
-        from smooth.adam_general.core.creator import adam_profile_creator
-        from smooth.adam_general.core.utils.var_covar import gap_drift
+        from smooth.adam_general.core.utils.var_covar import filter_variances, gap_drift
 
         ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
         ones = np.ones(len(ot_logical))
@@ -2817,44 +2816,17 @@ class ADAM:
                 return None
             if ot_logical.all():
                 return None if h > 0 else ones
-            obs = len(ot_logical)
-            lags_model_max = int(self._lags_model["lags_model_max"])
-            head_length = max(
-                int(self._observations.get("head_length", lags_model_max)),
-                lags_model_max,
+            return filter_variances(
+                self._adam_cpp,
+                arguments[0],
+                self._observations.get("head_length", 0),
+                *arguments[1:4],
+                self._prepared["mat_vt"],
+                ot_logical,
+                h,
+                distribution == "dlnorm",
+                power,
             )
-            # The h periods after the sample are unobserved, with the last measurement
-            mat_wt = np.asarray(arguments[1], dtype=float)
-            rows = np.r_[np.arange(obs), np.repeat(obs - 1, h)]
-            lookup = adam_profile_creator(
-                lags_model_all=arguments[0],
-                lags_model_max=lags_model_max,
-                obs_all=obs + h,
-                head_length=head_length,
-            )["index_lookup_table"]
-            profile = np.asarray(self._prepared["mat_vt"], dtype=float)[
-                :, :lags_model_max
-            ]
-            filtered = self._adam_cpp.filter(
-                matrixVt=np.zeros((profile.shape[0], obs + h + head_length), order="F"),
-                matrixWt=np.asfortranarray(mat_wt[rows]),
-                matrixF=np.asfortranarray(arguments[2], dtype=float),
-                vectorG=np.asfortranarray(arguments[3], dtype=float).reshape(-1, 1),
-                indexLookupTable=np.asfortranarray(lookup, dtype=np.uint64),
-                profilesRecent=np.asfortranarray(profile),
-                vectorYt=np.ones(obs + h),
-                vectorOt=np.r_[ot_logical, np.zeros(h, dtype=bool)].astype(float),
-                backcast=False,
-                nIterations=1,
-                logs=distribution == "dlnorm",
-                scale=0.0,
-            )
-            values = np.ravel(
-                2 * np.asarray(filtered.innovationsScale)
-                if power == 1
-                else filtered.variances
-            )
-            return values[obs:] if h > 0 else values
         if h > 0:
             return None
         # The drift of the states of the other pure multiplicative ETS, without the

@@ -602,8 +602,10 @@ switch to it once the covariance has decayed below a tolerance, and complete dat
 In the lagged form of ADAM a state with lag $m$ is held in $m$ cells of its profile, of which one is
 used in each period, so the covariance is kept over the cells of the profile and the propagation and
 the update touch only the rows and the columns of the cells used in the period. For non-seasonal and
-monthly models the extra cost is negligible; for weekly or hourly seasonalities with dozens or
-hundreds of cells the update of the covariance dominates while it is non-zero. The variances $f_t$
+monthly models the extra cost is negligible. The number of cells is the sum of the lags of the
+states, so it grows quickly with high orders and long seasonal periods (an AR(60) has 1830 cells):
+there the update of the covariance dominates while it is non-zero, and it stays non-zero when the
+next unobserved period comes before it has decayed. The variances $f_t$
 and the derivatives $b_t$ do not depend on the data or on the initial states, so they can be
 recomputed for a fitted model by running the filter on its matrices and the pattern of the observed
 periods, without the data. The reset approximation needs only the coefficients $c_i$ up to the
@@ -631,9 +633,9 @@ still obtained by backcasting with the SSOE recursion, the covariance starts at 
 the filter departs from the recursion only at the unobserved periods and while the covariance is not
 zero, so the fits of complete data do not change to the last bit. It is used with every loss, so
 that the fitted values after the unobserved periods are the filtered predictions whatever the
-estimator. The other models of the package (CES, GUM, the state space ARIMA and TBATS) keep the reset
-approximation with the variance $\kappa_{j_t}$, and the approximate filter of
-Remark~\ref{rem:approxfilter} is not implemented.
+estimator. The other linear models of the package (CES, GUM, the state space ARIMA, the simple
+moving average and TBATS with the normal distribution, in the space of the transformed data) use the
+same filter, and the approximate filter of Remark~\ref{rem:approxfilter} is not implemented.
 
 % =============================================================================
 \section{Conclusions}

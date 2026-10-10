@@ -9,7 +9,7 @@ default (``r_parity`` marker).
 import numpy as np
 import pytest
 
-from smooth import ADAM, CES, MSARIMA, OM, OMG, TBATS
+from smooth import ADAM, CES, MSARIMA, OM, OMG, SMA, TBATS
 
 from ._r_bridge import r_dict
 
@@ -419,6 +419,29 @@ FILTER_INTERVAL_CASES = {
         AIRPASSENGERS_GAPS + " y[144] <- NA;",
         "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
         lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
+    ),
+    "ces none": (
+        AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
+        "ces(y, 'none')",
+        lambda: CES(seasonality="none"),
+    ),
+    "tbats dnorm": (
+        AIRPASSENGERS_GAPS + " y[144] <- NA;",
+        "tbats(ts(y, frequency=12), distribution='dnorm', lambda=1, trend='none',"
+        " harmonics=2, orders=list(ar=0, ma=0, select=FALSE))",
+        lambda: TBATS(
+            lags=[1, 12],
+            distribution="dnorm",
+            lambda_bc=1,
+            trend="none",
+            harmonics=[2],
+            orders={"ar": 0, "ma": 0, "select": False},
+        ),
+    ),
+    "sma": (
+        AIRPASSENGERS_GAPS + " y[144] <- NA;",
+        "sma(y, h=6, holdout=FALSE, silent=TRUE)",
+        lambda: SMA(h=6),
     ),
 }
 

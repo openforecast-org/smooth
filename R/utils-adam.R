@@ -1730,10 +1730,8 @@ adam_gapVarianceModel <- function(object, power=2, h=0){
     # or on the initial states, so no backcasting is needed for them
     if(distribution=="dnorm" && errorType(object)=="A" && !grepl("M", modelType(object)) ||
        distribution=="dlnorm" && adamETSChecker(object) && multiplicative){
-        # The models fitted without the filter (ces(), gum(), ssarima(), sparma(), cma() and tbats())
-        # have the unconditional ones of the recursion
-        if(is.null(object$adamCpp) ||
-           any(smoothType(object)==c("CES","GUM","SSARIMA","SpARMA","CMA","TBATS"))){
+        # The models fitted without the filter (cma()) have the unconditional ones of the recursion
+        if(is.null(object$adamCpp) || smoothType(object)=="CMA"){
             if(h>0){
                 return(NULL);
             }

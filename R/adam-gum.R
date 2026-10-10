@@ -370,7 +370,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                          FALSE, TRUE, xregModel, Etype, "N", "N",
                                          0, 0, 0, lagsModelAll, lagsModelMax,
                                          obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                         componentsNumberARIMA, lagsModelAll);
+                                         componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
         # The missing values are not in the loss: the errors are zero there, and the
         # losses are divided by the observed values, as in adam()
@@ -379,9 +379,8 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         if(!multisteps){
             if(loss=="likelihood"){
                 # Scale for different functions
-                # The variance of the errors after the missing values, as in adam()
-                gapVariance <- adam_gapVariance(lagsModelAll, elements$matWt, elements$matF, elements$vecG,
-                                                otLogical);
+                # The variance of the errors after the missing values, of the filter as in adam()
+                gapVariance <- adamFitted$variances;
                 scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
                                 obsObserved);
 
@@ -904,7 +903,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                      FALSE, TRUE, xregModel, Etype, "N", "N",
                                      0, 0, 0, lagsModelAll, lagsModelMax,
                                      obsInSample, loss, "dnorm", NULL, 0, FALSE, "n",
-                                     componentsNumberARIMA, lagsModelAll);
+                                     componentsNumberARIMA, lagsModelAll, filterLogs=FALSE);
 
     errors[] <- adamFitted$errors;
     yFitted[] <- adamFitted$fitted;
@@ -920,7 +919,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         profilesRecentInitial <- matVt[,1:lagsModelMax,drop=FALSE];
     }
 
-    gapVariance <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
+    gapVariance <- adamFitted$variances;
     scale <- scaler(adamFitted$errors[otLogical]/sqrt(gapVariance[otLogical]),
                     sum(!yNAValues[1:obsInSample]));
 

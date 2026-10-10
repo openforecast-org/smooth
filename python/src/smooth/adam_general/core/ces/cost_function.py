@@ -15,7 +15,6 @@ from smooth.adam_general.core.utils.utils import (
     calculate_multistep_loss,
     complete_windows,
 )
-from smooth.adam_general.core.utils.var_covar import gap_variance
 
 _R_LN_SQRT_2PI = 0.918938533204672741780329736406
 
@@ -194,12 +193,13 @@ def ces_cf(
         distribution="dnorm",
         horizon=h or 0,
         multisteps=multisteps,
+        filter_logs=False,
     )
 
     errors = np.array(adam_fitted.errors).ravel()
     fitted = np.array(adam_fitted.fitted).ravel()
-    # The variance of the errors after the missing values, as in ADAM
-    gap = gap_variance(lags_model_all, mat_wt_f, mat_f_f, vec_g_f, ot_logical)
+    # The variance of the errors after the missing values, of the filter as in ADAM
+    gap = np.ravel(adam_fitted.variances).astype(float)
     # The fitted values, the errors and the gap variance at B, as ADAM's CF
     # returns them
     if return_fitted:

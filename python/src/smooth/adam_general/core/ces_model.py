@@ -30,7 +30,6 @@ from smooth.adam_general.core.creator.architector import (
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import _sum_r, multistep_log_lik
-from smooth.adam_general.core.utils.var_covar import gap_variance
 
 SEASONALITY_OPTIONS = Literal["none", "simple", "partial", "full"]
 LOSS_OPTIONS = Literal[
@@ -722,6 +721,7 @@ class CES:
             o_type="n",
             loss=self.loss,
             distribution="dnorm",
+            filter_logs=False,
         )
 
         errors = np.array(adam_fitted.errors).ravel()
@@ -730,8 +730,8 @@ class CES:
         mat_vt = np.array(adam_fitted.states).T  # C++ returns (components, time)
 
         # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces(), with the
-        # variance of the errors after the missing values
-        gap = gap_variance(lags_model_all, mat_wt, mat_f, vec_g, ot_logical)
+        # variance of the errors after the missing values, of the filter
+        gap = np.ravel(adam_fitted.variances).astype(float)
         errors_std = errors[ot_logical] / np.sqrt(gap[ot_logical])
         scale = _sum_r(errors_std**2) / obs_observed
         # No errors at the missing values, where the fitted values are the predictions
@@ -893,6 +893,8 @@ class CES:
             "states": self.states,
             "mat_vt": profiles_recent_initial,
             "measurement": mat_wt,
+            "mat_wt": mat_wt,
+            "mat_f": mat_f,
             "transition": mat_f,
             "persistence": vec_g,
             "profiles_recent_table": profiles_recent_table,
@@ -980,7 +982,7 @@ class CES:
             raise RuntimeError("Model has not been fitted yet.")
         y = self.fitted + self.residuals
         # The variance after the missing values
-        scale = self.scale * self._gap_variance().reshape(-1, 1)
+        scale = self.scale * cast(Any, self)._gap_variance().reshape(-1, 1)
         lik_values = np.ravel(
             calculate_likelihood(
                 "dnorm", "A", y, self.fitted.reshape(-1, 1), scale, None
@@ -988,21 +990,6 @@ class CES:
         )
         lik_values[np.isnan(self.residuals)] = 0
         return lik_values if log else np.exp(lik_values)
-
-    def _gap_variance(self, power: int = 2, h: int = 0) -> Any:
-        """The variance of the errors at the observed values relative to the
-        one-step one, after the missing values (R's ``adam_gapVarianceModel``): CES
-        is pure additive with the normal distribution, fitted without the filter, so
-        with the unconditional variance and None for the h steps ahead."""
-        if h > 0:
-            return None
-        return gap_variance(
-            self._ll_kwargs["lags_model_all"],
-            self.measurement,
-            self.transition,
-            self.persistence_vector,
-            ~np.isnan(self.residuals),
-        )
 
     def summary(self) -> Dict[str, Any]:
         """Return a summary of the fitted model."""
@@ -1068,6 +1055,7 @@ class CES:
     _set_new_xreg = ADAM._set_new_xreg
     _validate_prediction_inputs = ADAM._validate_prediction_inputs
     _execute_prediction = ADAM._execute_prediction
+    _gap_variance = ADAM._gap_variance
     _forecast_scale_model = ADAM._forecast_scale_model
 
     def _prepare_prediction_data(self):

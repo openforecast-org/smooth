@@ -567,7 +567,8 @@ def _calculate_scale_parameter(
         Additional parameters
     gap, gap_mean : numpy.ndarray
         The multipliers of the variance and of the mean of the errors after the
-        periods without an observed size (:func:`gap_variance`), ones elsewhere
+        periods without an observed size (the filter, :func:`filter_variances`),
+        ones elsewhere
     drift_at : callable or None
         The moments of the drift of the states over those periods at a scale
         (:func:`gap_drift`), for the pure multiplicative ETS it applies to

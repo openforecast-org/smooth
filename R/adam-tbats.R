@@ -1470,7 +1470,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
                                      elements$shape, checked$h,
                                      any(checked$loss==c("MSEh","TMSE","GTMSE","MSCE","GPL")), "n",
                                      struct$nComponents-struct$nETS-struct$nXreg,
-                                     struct$lagsModelAll, struct$nXreg);
+                                     struct$lagsModelAll, struct$nXreg,
+                                     if(distribution=="dnorm") FALSE else NULL);
         fitted$matWt <- matWt;
         fitted$yBC <- yBC;
         return(fitted);
@@ -1489,11 +1490,8 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
             value <- switch(lossUsed,
                             "likelihood"={
                                 # The variance of the errors after the periods without an observed
-                                # size, with the normal distribution, as adam()'s
-                                gapVariance <- if(distribution=="dnorm"){
-                                    adam_gapVariance(struct$lagsModelAll, fitted$matWt, elements$matF,
-                                                     elements$vecG, otLogical)[otLogical];
-                                } else 1;
+                                # size, of the filter with the normal distribution, as adam()'s
+                                gapVariance <- if(distribution=="dnorm") fitted$variances[otLogical] else 1;
                                 -tbats_logLik(errors/sqrt(gapVariance), distribution, elements$shape, obsNonzero) +
                                     sum(log(gapVariance))/2 - (elements$lambda-1)*logY;
                             },
@@ -1659,9 +1657,7 @@ tbats_fit <- function(y, trendType, harmonicTable, armaSpec, lambdaSpec, distrib
         colnames(FI) <- rownames(FI) <- names(B);
     }
 
-    gapVariance <- if(distribution=="dnorm"){
-        adam_gapVariance(struct$lagsModelAll, fitted$matWt, elements$matF, elements$vecG, otLogical)[otLogical];
-    } else 1;
+    gapVariance <- if(distribution=="dnorm") fitted$variances[otLogical] else 1;
     scale <- tbats_scale(fitted$errors[otLogical]/sqrt(gapVariance), distribution, elements$shape, obsNonzero);
     forecastBC <- NULL;
     if(checked$h>0){

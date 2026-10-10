@@ -24,7 +24,6 @@ from smooth.adam_general.core.utils.utils import (
     calculate_likelihood,
     complete_windows,
 )
-from smooth.adam_general.core.utils.var_covar import gap_variance
 
 PENALTY = 1e100
 MULTISTEP_LOSSES = ("MSEh", "TMSE", "GTMSE", "MSCE", "GPL")
@@ -646,11 +645,18 @@ def fit(
             other=elements["shape"],
             horizon=s["h"],
             multisteps=s["loss"] in MULTISTEP_LOSSES,
+            filter_logs=False if distribution == "dnorm" else None,
+        )
+        # The variances of the errors after the periods without an observed size, of
+        # the filter with the normal distribution, as R
+        variances = (
+            np.ravel(fitted.variances) if distribution == "dnorm" else np.ones(obs)
         )
         return {
             "states": np.asarray(fitted.states),
             "fitted": np.ravel(fitted.fitted),
             "errors": np.ravel(fitted.errors),
+            "variances": variances,
             "profile": np.asarray(fitted.profile),
             "y_bc": y_bc,
             "profile_initial": np.asarray(fitted.profileInitial),
@@ -692,18 +698,8 @@ def fit(
                 value = math.log(np.linalg.det(adam_errors.T @ adam_errors / n))
         elif loss == "likelihood":
             # The variance of the errors after the periods without an observed size,
-            # with the normal distribution, as R
-            gap = (
-                gap_variance(
-                    lags_all,
-                    fitted["mat_wt"],
-                    elements["mat_f"],
-                    elements["vec_g"],
-                    ot_logical,
-                )[ot_logical]
-                if distribution == "dnorm"
-                else np.ones(obs_nonzero)
-            )
+            # of the filter with the normal distribution, as R
+            gap = fitted["variances"][ot_logical]
             value = (
                 -st.loglik_value(
                     errors / np.sqrt(gap), distribution, elements["shape"], obs_nonzero
@@ -735,17 +731,7 @@ def fit(
         model fixed: the final fit does not look at the bounds."""
         elements = filler(b_full(np.asarray(B, dtype=float)), s["bounds"])
         fitted = fit_states(elements)
-        gap = (
-            gap_variance(
-                lags_all,
-                fitted["mat_wt"],
-                elements["mat_f"],
-                elements["vec_g"],
-                ot_logical,
-            )[ot_logical]
-            if distribution == "dnorm"
-            else np.ones(obs_nonzero)
-        )
+        gap = fitted["variances"][ot_logical]
         errors = fitted["errors"][ot_logical] / np.sqrt(gap)
         scale = st.scale_value(errors, distribution, elements["shape"], obs_nonzero)
         values = calculate_likelihood(
@@ -912,13 +898,7 @@ def fit(
             )
         )
 
-    gap = (
-        gap_variance(
-            lags_all, fitted["mat_wt"], elements["mat_f"], elements["vec_g"], ot_logical
-        )[ot_logical]
-        if distribution == "dnorm"
-        else np.ones(obs_nonzero)
-    )
+    gap = fitted["variances"][ot_logical]
     scale = st.scale_value(
         fitted["errors"][ot_logical] / np.sqrt(gap),
         distribution,

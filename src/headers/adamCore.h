@@ -4,6 +4,7 @@
 #include "olsCore.h"
 #include "adamGradient.h"
 #include "arimaBounds.h"
+#include <algorithm>
 
 // ============================================================================
 // STRUCTURE DEFINITIONS
@@ -950,37 +951,45 @@ public:
             vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), 'n');
             // The mean of the error in the linear model
             double mu = fs.logs ? -fs.scale/2 : 0;
-            arma::vec meansNew = fs.means;
-            arma::vec meansScaleNew = fs.meansScale;
-            arma::mat covarianceNew = fs.covariance;
+            // The gain uses the covariance before its propagation
+            arma::vec gain(fs.cells.n_elem, arma::fill::zeros);
             if(fs.covarianceActive) {
-                covarianceNew.rows(c) = matrixF * fs.covariance.rows(c);
-                covarianceNew.cols(c) = covarianceNew.cols(c) * matrixF.t();
+                gain = covarW;
+                gain(c) = matrixF * covarW(c);
             }
-            covarianceNew(c, c) += gEff * gEff.t();
-            meansNew(c) = matrixF * xc + gEff * mu;
-            meansScaleNew(c) = matrixF * xsc - gEff * 0.5;
+            gain(c) += gEff;
+            gain /= f;
+            fs.means(c) = matrixF * xc + gEff * mu;
+            fs.meansScale(c) = matrixF * xsc - gEff * 0.5;
+            // A zero covariance stays zero at an observed value: the gain is the persistence.
+            // Otherwise it is propagated over the cells used in the period and updated in place
+            if(fs.covarianceActive || !observed) {
+                if(fs.covarianceActive) {
+                    fs.covariance.rows(c) = matrixF * fs.covariance.rows(c);
+                    fs.covariance.cols(c) = fs.covariance.cols(c) * matrixF.t();
+                }
+                fs.covariance(c, c) += gEff * gEff.t();
+                if(observed) {
+                    // The rank-one downdate, column by column
+                    for(arma::uword j=0; j<gain.n_elem; j++) {
+                        if(gain(j) != 0) {
+                            fs.covariance.col(j) -= (gain(j) * f) * gain;
+                        }
+                    }
+                }
+                // The covariance that has vanished leaves the means to the gain of the model
+                const double *values = fs.covariance.memptr();
+                fs.covarianceActive = std::any_of(values, values + fs.covariance.n_elem,
+                                                  [](double value) { return std::abs(value) > 1e-15; });
+                if(!fs.covarianceActive) {
+                    fs.covariance.zeros();
+                }
+            }
             if(observed) {
                 double z = fs.logs ? std::log(vectorYt(idx)) : vectorYt(idx);
                 double v = z - (fs.logs ? std::log(vecYfit(idx)) : vecYfit(idx)) - mu;
-                arma::vec gain(fs.cells.n_elem, arma::fill::zeros);
-                if(fs.covarianceActive) {
-                    gain = covarW;
-                    gain(c) = matrixF * covarW(c);
-                }
-                gain(c) += gEff;
-                gain /= f;
-                meansNew += gain * v;
-                meansScaleNew += gain * bScale;
-                covarianceNew -= gain * gain.t() * f;
-            }
-            fs.means = meansNew;
-            fs.meansScale = meansScaleNew;
-            fs.covariance = covarianceNew;
-            // The covariance that has vanished leaves the means to the gain of the model
-            fs.covarianceActive = arma::abs(fs.covariance).max() > 1e-15;
-            if(!fs.covarianceActive) {
-                fs.covariance.zeros();
+                fs.means += gain * v;
+                fs.meansScale += gain * bScale;
             }
             for(arma::uword k=0; k<fs.cells.n_elem; k++) {
                 profilesRecent(fs.cells(k)) = cellNative(fs.cells(k), fs.means(k));

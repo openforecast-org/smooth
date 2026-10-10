@@ -220,30 +220,59 @@ def sigma(observations_dict, params_info, general, prepared_model, error_type=No
     return float(np.sqrt(ss / vals))
 
 
-def gap_variance(lags_model_all, mat_wt, mat_f, vec_g, ot_logical, power=2):
-    """The variance of the error at each observed size relative to the one-step
-    variance (R's ``adam_gapVariance``).
+def filter_variances(
+    adam_cpp,
+    lags_model_all,
+    head_length,
+    mat_wt,
+    mat_f,
+    vec_g,
+    profile,
+    ot_logical,
+    h=0,
+    logs=False,
+    power=2,
+):
+    """The variances of the errors relative to the one-step one (or with ``power=1``
+    the multipliers of their means in logs) from the filter of ``adam_cpp.filter``
+    over the periods without an observed value (R's ``adam_gapVarianceModel``). They
+    do not depend on the data or on the initial states, so the filter runs on ones
+    from ``profile`` without backcasting. With ``h>0``, the h periods after the
+    sample are unobserved, with the last measurement, and their values are
+    returned: those of the forecast."""
+    # Imported here: the creator imports this module
+    from smooth.adam_general.core.creator import adam_profile_creator
 
-    After ``j - 1`` periods without an observed size (the zeros of an occurrence
-    model and the missing values), the states have gone on with zero errors, and the
-    error of a pure additive model at the next observed size sums the one-step errors
-    since then, with the coefficients ``c_i`` of :func:`covar_anal`: its variance is
-    ``1 + sum(c_i^2, i < j)``. With ``power=1``, ``1 + sum(c_i, i < j)``, the
-    multiplier of the mean of the error in that sum. The first gap counts from the
-    initial states.
-    """
     ot = np.asarray(ot_logical, dtype=bool).ravel()
-    indices = np.flatnonzero(ot)
-    gaps = np.diff(np.concatenate([[-1], indices]))
-    result = np.ones(ot.size)
-    if np.any(gaps > 1):
-        measurement = np.atleast_2d(np.asarray(mat_wt, dtype=float))[:1]
-        covar_mat = covar_anal(
-            lags_model_all, int(gaps.max()), measurement, mat_f, vec_g, 1.0
-        )
-        values = np.cumsum(covar_mat[0]) if power == 1 else np.diag(covar_mat)
-        result[indices] = values[gaps - 1]
-    return result
+    obs = ot.size
+    lags_model_max = int(np.max(lags_model_all))
+    head_length = max(int(head_length), lags_model_max)
+    rows = np.r_[np.arange(obs), np.repeat(obs - 1, h)]
+    lookup = adam_profile_creator(
+        lags_model_all=lags_model_all,
+        lags_model_max=lags_model_max,
+        obs_all=obs + h,
+        head_length=head_length,
+    )["index_lookup_table"]
+    profile = np.asarray(profile, dtype=float)[:, :lags_model_max]
+    filtered = adam_cpp.filter(
+        matrixVt=np.zeros((profile.shape[0], obs + h + head_length), order="F"),
+        matrixWt=np.asfortranarray(np.asarray(mat_wt, dtype=float)[rows]),
+        matrixF=np.asfortranarray(mat_f, dtype=float),
+        vectorG=np.asfortranarray(vec_g, dtype=float).reshape(-1, 1),
+        indexLookupTable=np.asfortranarray(lookup, dtype=np.uint64),
+        profilesRecent=np.asfortranarray(profile),
+        vectorYt=np.ones(obs + h),
+        vectorOt=np.r_[ot, np.zeros(h, dtype=bool)].astype(float),
+        backcast=False,
+        nIterations=1,
+        logs=bool(logs),
+        scale=0.0,
+    )
+    values = np.ravel(
+        2 * np.asarray(filtered.innovationsScale) if power == 1 else filtered.variances
+    )
+    return values[obs:] if h > 0 else values
 
 
 # The Gauss-Legendre rule with 32 nodes on (0,1), for the moments of a function of the

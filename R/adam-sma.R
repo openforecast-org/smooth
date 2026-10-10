@@ -151,8 +151,13 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
 
     componentsNumberETS <- componentsNumberETSSeasonal <- componentsNumberETSNonSeasonal <- xregNumber <- 0;
     constantRequired <- FALSE;
-    ot <- yInSample;
-    ot[] <- 1;
+    # The missing values are gaps: filled for the initial profile, skipped by the filter
+    yNAValues <- is.na(yInSample);
+    ot <- (!yNAValues)*1;
+    obsObserved <- sum(ot);
+    if(any(yNAValues)){
+        yInSample[] <- naFillCpp(as.numeric(yInSample), 10);
+    }
 
 
     CreatorSMA <- function(order){
@@ -184,22 +189,25 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
         adamCpp$headLength <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample)$flag;
 
         #### Fitter and the losses calculation ####
-        adamFitted <- adamCpp$fit(matVt, matWt,
-                                  matF, vecG,
-                                  indexLookupTable, profilesRecentTable,
-                                  yInSample, ot,
-                                  TRUE, 2, "n");
+        # The filter over the missing values, as in adam()
+        adamFitted <- adamCpp$filter(matVt, matWt,
+                                     matF, vecG,
+                                     indexLookupTable, profilesRecentTable,
+                                     yInSample, ot,
+                                     TRUE, 2, FALSE, 0);
 
-        # Get scale, cf, logLik and IC
-        scale <- sum(adamFitted$errors^2)/obsInSample;
-        cfObjective <- sum(dnorm(x=yInSample, mean=adamFitted$fitted, sd=sqrt(scale), log=TRUE));
+        # Get scale, cf, logLik and IC over the observed values
+        observed <- !yNAValues;
+        scale <- sum(adamFitted$errors[observed]^2/adamFitted$variances[observed])/obsObserved;
+        cfObjective <- sum(dnorm(x=yInSample[observed], mean=adamFitted$fitted[observed],
+                                 sd=sqrt(scale*adamFitted$variances[observed]), log=TRUE));
 
         # SMA is AR(order) with fixed coefficients 1/order. They sum to 1 (a unit
         # root), so the model is non-stationary and all `order` initial states
         # persist and are identifiable (rank(X) = order, verified by the probe).
         # df = order (backcast initials) + 1 (scale). This grows with the order,
         # so higher orders are penalised in the IC-based order selection.
-        logLik <- structure(cfObjective, nobs=obsInSample, df=order+1, class="logLik");
+        logLik <- structure(cfObjective, nobs=obsObserved, df=order+1, class="logLik");
         ICValue <- icFunction(logLik);
 
         return(ICValue);
@@ -210,7 +218,7 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
     if(orderSelect){
         # df = order + 1, so cap the order to keep the AICc small-sample
         # correction (denominator obs - df - 1) well defined and positive.
-        maxOrder <- min(200, max(1, obsInSample-3));
+        maxOrder <- min(200, max(1, obsObserved-3));
         ICs <- rep(NA,maxOrder);
         if(fast){
             # The lowest bound

@@ -43,6 +43,16 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("profile", &FitResult::profile)
         .def_readonly("profileInitial", &FitResult::profileInitial);
 
+    // Bind FilterResult struct
+    py::class_<FilterResult>(m, "FilterResult")
+        .def_readonly("states", &FilterResult::states)
+        .def_readonly("fitted", &FilterResult::fitted)
+        .def_readonly("errors", &FilterResult::errors)
+        .def_readonly("profile", &FilterResult::profile)
+        .def_readonly("profileInitial", &FilterResult::profileInitial)
+        .def_readonly("variances", &FilterResult::variances)
+        .def_readonly("innovationsScale", &FilterResult::innovationsScale);
+
     // Bind OmFitGeneralResult struct
     py::class_<OmFitGeneralResult>(m, "OmFitGeneralResult")
         .def_readonly("statesA",  &OmFitGeneralResult::statesA)
@@ -122,6 +132,19 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("backcast"),
             py::arg("nIterations"),
             py::arg("O") = 'n')
+        .def("filter", &adamCore::filter,
+            py::arg("matrixVt"),
+            py::arg("matrixWt"),
+            py::arg("matrixF"),
+            py::arg("vectorG"),
+            py::arg("indexLookupTable"),
+            py::arg("profilesRecent"),
+            py::arg("vectorYt"),
+            py::arg("vectorOt"),
+            py::arg("backcast"),
+            py::arg("nIterations"),
+            py::arg("logs"),
+            py::arg("scale"))
         .def("omfitGeneral", &adamCore::omfitGeneral,
             py::arg("matrixVtA"),
             py::arg("matrixWtA"),

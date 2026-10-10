@@ -2765,23 +2765,27 @@ class ADAM:
         zeros of an occurrence model, whose sizes are not observed."""
         return int(np.sum(self._observations["ot_logical"]))
 
-    def _gap_variance(self, power: int = 2, drift: bool = False) -> Any:
+    def _gap_variance(self, power: int = 2, drift: bool = False, h: int = 0) -> Any:
         """The variance (or with ``power=1`` the multiplier of the mean) of the
         errors at the observed sizes relative to the one-step one, after the periods
         without an observed size (R's ``adam_gapVarianceModel``): ones unless the
         model is pure additive with the normal distribution, or a pure
-        multiplicative ETS with the log-normal one (exactly for ADAM ETS, through
-        the drift of the states for the conventional one). With ``drift=True``, the
-        moments of the drift at the observed sizes (``gap_drift()``) of a pure
-        multiplicative ETS with the Gamma, the Inverse Gaussian or the conventional
-        log-normal (R's attribute "drift"), and None for the other models."""
-        from smooth.adam_general.core.utils.var_covar import gap_drift, gap_variance
+        multiplicative ETS with the log-normal one (exactly through the filter of
+        ``adam_cpp.filter`` for ADAM ETS, through the drift of the states for the
+        conventional one). With ``h>0``, the values of the h steps ahead after the
+        sample of the first two, and None for the other models or without such
+        periods in the sample. With ``drift=True``, the moments of the drift at the
+        observed sizes (``gap_drift()``) of a pure multiplicative ETS with the
+        Gamma, the Inverse Gaussian or the conventional log-normal (R's attribute
+        "drift"), and None for the other models."""
+        from smooth.adam_general.core.creator import adam_profile_creator
+        from smooth.adam_general.core.utils.var_covar import gap_drift
 
         ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
         ones = np.ones(len(ot_logical))
         # A scale model (sm()) has its own residuals, standardised already
         if getattr(self, "is_scale_", False):
-            return None if drift else ones
+            return None if drift or h > 0 else ones
         model_type = self._model_type
         error_type = model_type["error_type"]
         distribution = self.distribution_
@@ -2799,14 +2803,60 @@ class ADAM:
             self._prepared.get("vec_g", self._adam_created["vec_g"]),
             ot_logical,
         )
-        # A pure multiplicative ADAM ETS is additive in logs
+        # The filter of the linear Gaussian models, in logs for a pure multiplicative
+        # ADAM ETS. Its variances and the derivatives of its innovations in the scale
+        # do not depend on the data or on the initial states, so no backcasting is
+        # needed for them
         if (
             distribution == "dnorm"
             and error_type == "A"
             and model_type["trend_type"] != "M"
             and model_type["season_type"] != "M"
         ) or (distribution == "dlnorm" and self.ets == "adam" and multiplicative):
-            return None if drift else gap_variance(*arguments, power)
+            if drift:
+                return None
+            if ot_logical.all():
+                return None if h > 0 else ones
+            obs = len(ot_logical)
+            lags_model_max = int(self._lags_model["lags_model_max"])
+            head_length = max(
+                int(self._observations.get("head_length", lags_model_max)),
+                lags_model_max,
+            )
+            # The h periods after the sample are unobserved, with the last measurement
+            mat_wt = np.asarray(arguments[1], dtype=float)
+            rows = np.r_[np.arange(obs), np.repeat(obs - 1, h)]
+            lookup = adam_profile_creator(
+                lags_model_all=arguments[0],
+                lags_model_max=lags_model_max,
+                obs_all=obs + h,
+                head_length=head_length,
+            )["index_lookup_table"]
+            profile = np.asarray(self._prepared["mat_vt"], dtype=float)[
+                :, :lags_model_max
+            ]
+            filtered = self._adam_cpp.filter(
+                matrixVt=np.zeros((profile.shape[0], obs + h + head_length), order="F"),
+                matrixWt=np.asfortranarray(mat_wt[rows]),
+                matrixF=np.asfortranarray(arguments[2], dtype=float),
+                vectorG=np.asfortranarray(arguments[3], dtype=float).reshape(-1, 1),
+                indexLookupTable=np.asfortranarray(lookup, dtype=np.uint64),
+                profilesRecent=np.asfortranarray(profile),
+                vectorYt=np.ones(obs + h),
+                vectorOt=np.r_[ot_logical, np.zeros(h, dtype=bool)].astype(float),
+                backcast=False,
+                nIterations=1,
+                logs=distribution == "dlnorm",
+                scale=0.0,
+            )
+            values = np.ravel(
+                2 * np.asarray(filtered.innovationsScale)
+                if power == 1
+                else filtered.variances
+            )
+            return values[obs:] if h > 0 else values
+        if h > 0:
+            return None
         # The drift of the states of the other pure multiplicative ETS, without the
         # adaptive regressors
         if (
@@ -5037,6 +5087,11 @@ class ADAM:
         # The df for de-biasing the scale, after implanting: `params_info` is a
         # snapshot taken at estimation time and holds the pre-implant count.
         self._general["df_scale"] = self._df_scale
+        # The variances and the means of the filter at the h steps ahead, after the
+        # periods without an observed value in the sample (None without them)
+        h = int(self._general.get("h", 0) or 0)
+        for key, power in (("_filter_variances", 2), ("_filter_mean", 1)):
+            self._general[key] = self._gap_variance(power=power, h=h) if h else None
 
         # Standard single-model prediction
         self._forecast_results = forecaster(

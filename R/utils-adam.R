@@ -1707,9 +1707,10 @@ adam_gapVariance <- function(lagsModelAll, matWt, matF, vecG, otLogical, power=2
 }
 
 # The gap variance (or with power=1 the multiplier of the mean) of the observations of a
-# fitted model at its observed sizes: ones unless the model is pure additive with the
+# fitted model at its observed sizes (with h>0, at the h periods after the sample, or NULL
+# without the filter): ones unless the model is pure additive with the
 # normal distribution, or a pure multiplicative ADAM ETS with the log-normal one
-adam_gapVarianceModel <- function(object, power=2){
+adam_gapVarianceModel <- function(object, power=2, h=0){
     y <- as.vector(actuals(object));
     otLogical <- !is.na(y);
     if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
@@ -1718,16 +1719,53 @@ adam_gapVarianceModel <- function(object, power=2){
     gapVariance <- rep(1, length(y));
     # A scale model (sm()) has its own residuals, standardised already
     if(is.scale(object)){
-        return(gapVariance);
+        return(if(h>0){NULL}else{gapVariance});
     }
     distribution <- object$distribution;
     multiplicative <- errorType(object)=="M" && !grepl("A", modelType(object)) && modelType(object)!="NNN" &&
         !arimaChecker(object);
-    # A pure multiplicative ADAM ETS is additive in logs
+    # The filter of the linear Gaussian models (adamCore$filter()): a pure additive model with the
+    # normal distribution, and a pure multiplicative ADAM ETS with the log-normal one, in logs.
+    # Its variances and the derivatives of its innovations in the scale do not depend on the data
+    # or on the initial states, so no backcasting is needed for them
     if(distribution=="dnorm" && errorType(object)=="A" && !grepl("M", modelType(object)) ||
        distribution=="dlnorm" && adamETSChecker(object) && multiplicative){
-        gapVariance[] <- adam_gapVariance(modelLags(object), object$measurement, object$transition,
-                                          matrix(object$persistence, ncol=1), otLogical, power);
+        # The models fitted without the filter (ces(), gum(), ssarima(), sparma(), cma() and tbats())
+        # have the unconditional ones of the recursion
+        if(is.null(object$adamCpp) ||
+           any(smoothType(object)==c("CES","GUM","SSARIMA","SpARMA","CMA","TBATS"))){
+            if(h>0){
+                return(NULL);
+            }
+            gapVariance[] <- adam_gapVariance(modelLags(object), object$measurement, object$transition,
+                                              matrix(object$persistence, ncol=1), otLogical, power);
+            return(gapVariance);
+        }
+        if(!any(!otLogical)){
+            return(if(h>0){NULL}else{gapVariance});
+        }
+        lagsModelAll <- modelLags(object);
+        lagsModelMax <- max(lagsModelAll);
+        headLength <- max(c(object$headLength, lagsModelMax));
+        obsInSample <- length(y);
+        # With h>0, the h periods after the sample are unobserved: the values there give the
+        # forecast, with the last measurement
+        matWt <- object$measurement[c(1:obsInSample, rep(obsInSample, h)),,drop=FALSE];
+        indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
+                                               headLength=headLength)$lookup;
+        filtered <- object$adamCpp$filter(matrix(0, nrow(object$profileInitial), obsInSample+h+headLength),
+                                          matWt, object$transition, matrix(object$persistence, ncol=1),
+                                          indexLookupTable, object$profileInitial,
+                                          rep(1, obsInSample+h), c(otLogical, rep(FALSE, h))*1, FALSE, 1,
+                                          distribution=="dlnorm", 0);
+        values <- switch(power, 2*filtered$innovationsScale, filtered$variances);
+        if(h>0){
+            return(tail(values, h));
+        }
+        gapVariance[] <- values;
+    }
+    else if(h>0){
+        return(NULL);
     }
     # The drift of the states of the other pure multiplicative ETS (adam_gapDrift()), without
     # the adaptive regressors: the multipliers for the log-normal, and the moments of the drift

@@ -563,6 +563,29 @@ def CF(  # noqa: N802
     else:
         backcast_value = initials_checked["initial_type"] in ["complete", "backcasting"]
 
+    # The filter of the states over the periods without an observed value, for the
+    # linear Gaussian models: pure additive with the normal distribution, and the
+    # pure multiplicative ADAM ETS with the log-normal one, in logs
+    error_type = model_type_dict["error_type"]
+    trend_type = model_type_dict["trend_type"]
+    season_type = model_type_dict["season_type"]
+    filter_logs = None
+    if (
+        general["distribution_new"] == "dnorm"
+        and error_type == "A"
+        and trend_type != "M"
+        and season_type != "M"
+    ) or (
+        general["distribution_new"] == "dlnorm"
+        and general.get("ets") == "adam"
+        and model_type_dict["ets_model"]
+        and not arima_checked.get("arima_model", False)
+        and error_type == "M"
+        and trend_type != "A"
+        and season_type != "A"
+    ):
+        filter_logs = general["distribution_new"] == "dlnorm"
+
     # Call adam_cpp.fit() (or the gradient initial-state solve) via the shared
     # dispatcher — parity with R's adam_fitOrGradient. Parameters that were passed
     # to adam_fitter are now stored in adam_cpp (E, T, S, etc.).
@@ -591,6 +614,7 @@ def CF(  # noqa: N802
         horizon=general.get("h", 0),
         multisteps=general["multisteps"],
         xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
+        filter_logs=filter_logs,
     )
 
     ot_logical = observations_dict["ot_logical"]
@@ -600,29 +624,9 @@ def CF(  # noqa: N802
     # elsewhere)
     gap = np.ones(len(ot_logical))
     gap_mean = np.ones(len(ot_logical))
-    error_type = model_type_dict["error_type"]
-    trend_type = model_type_dict["trend_type"]
-    season_type = model_type_dict["season_type"]
-    if (
-        general["distribution_new"] == "dnorm"
-        and error_type == "A"
-        and trend_type != "M"
-        and season_type != "M"
-    ) or (
-        general["distribution_new"] == "dlnorm"
-        and general.get("ets") == "adam"
-        and model_type_dict["ets_model"]
-        and not arima_checked.get("arima_model", False)
-        and error_type == "M"
-        and trend_type != "A"
-        and season_type != "A"
-    ):
-        # Imported here: var_covar imports this module
-        from smooth.adam_general.core.utils.var_covar import gap_variance
-
-        lags_all = lags_dict["lags_model_all"]
-        gap = gap_variance(lags_all, mat_wt, mat_f, vec_g, ot_logical)
-        gap_mean = gap_variance(lags_all, mat_wt, mat_f, vec_g, ot_logical, power=1)
+    if filter_logs is not None:
+        gap = np.ravel(adam_fitted.variances).astype(float)
+        gap_mean = 2 * np.ravel(adam_fitted.innovationsScale).astype(float)
     # The drift of the states of the other pure multiplicative ETS over those periods,
     # whose moments depend on the scale (the conventional ETS with the log-normal, and
     # the Gamma and the Inverse Gaussian)

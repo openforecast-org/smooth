@@ -989,10 +989,13 @@ class CES:
         lik_values[np.isnan(self.residuals)] = 0
         return lik_values if log else np.exp(lik_values)
 
-    def _gap_variance(self) -> NDArray:
+    def _gap_variance(self, power: int = 2, h: int = 0) -> Any:
         """The variance of the errors at the observed values relative to the
         one-step one, after the missing values (R's ``adam_gapVarianceModel``): CES
-        is pure additive with the normal distribution."""
+        is pure additive with the normal distribution, fitted without the filter, so
+        with the unconditional variance and None for the h steps ahead."""
+        if h > 0:
+            return None
         return gap_variance(
             self._ll_kwargs["lags_model_all"],
             self.measurement,

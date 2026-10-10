@@ -664,20 +664,28 @@ test_that("sm() models the scale of tbats() with TBATS", {
     expect_equal(sum(pointLik(testImplanted)), as.numeric(logLik(testImplanted)));
 })
 
-# TBATS with no seasonality, trend and ARMA on the data is ETS(A,N,N): over the zeros
-# and the missing values too, with the variance of the multistep error after them
-test_that("tbats() is adam()'s ETS(A,N,N) over the gaps", {
+# TBATS with no seasonality, trend and ARMA on the data is ETS(A,N,N). Over the zeros and
+# the missing values it is fitted without the filter of adam(), with the variance of the
+# multistep error after them
+test_that("tbats() is adam()'s ETS(A,N,N), and takes the gaps", {
     set.seed(41);
     e <- rnorm(200, 0, 5);
     level <- 100 + cumsum(0.3*e);
-    y <- (c(100, level[-200]) + e)*rbinom(200, 1, 0.6);
-    y[c(30, 31)] <- NA;
-    testADAM <- suppressWarnings(adam(y, "ANN", occurrence="fixed", distribution="dnorm"));
-    testTBATS <- suppressWarnings(tbats(y, lags=1, trend="none", lambda=1, distribution="dnorm",
-                                        orders=list(ar=0, ma=0, select=FALSE), occurrence="fixed"));
+    y <- c(100, level[-200]) + e;
+    testADAM <- adam(y, "ANN", distribution="dnorm");
+    testTBATS <- tbats(y, lags=1, trend="none", lambda=1, distribution="dnorm",
+                       orders=list(ar=0, ma=0, select=FALSE));
     expect_equal(as.numeric(logLik(testTBATS)), as.numeric(logLik(testADAM)), tolerance=1e-6);
     # Two optimisers from their own starting points: the same optimum of a flat likelihood
     expect_equal(testTBATS$scale, testADAM$scale, tolerance=1e-3);
+    y <- y*rbinom(200, 1, 0.6);
+    y[c(30, 31)] <- NA;
+    testTBATS <- suppressWarnings(tbats(y, lags=1, trend="none", lambda=1, distribution="dnorm",
+                                        orders=list(ar=0, ma=0, select=FALSE), occurrence="fixed"));
+    otLogical <- !is.na(y) & y!=0;
+    gaps <- diff(c(0, which(otLogical)));
+    gapVariance <- adam_gapVarianceModel(testTBATS)[otLogical];
+    expect_equal(gapVariance, 1 + (gaps-1)*testTBATS$persistence[1]^2);
     expect_equal(sum(pointLik(testTBATS)), as.numeric(logLik(testTBATS)));
 })
 

@@ -4,7 +4,7 @@ import pandas as pd
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import scaler
-from smooth.adam_general.core.utils.var_covar import gap_drift, gap_variance
+from smooth.adam_general.core.utils.var_covar import gap_drift
 
 from ._helpers import _safe_create_index
 
@@ -1059,6 +1059,27 @@ def preparator(
     ):
         other = abs(float(adam_estimated["B"][-1]))
 
+    # The filter over the periods without an observed value, as in the estimation
+    error_type = model_type_dict["error_type"]
+    trend_type = model_type_dict["trend_type"]
+    season_type = model_type_dict["season_type"]
+    filter_logs = None
+    if (
+        general_dict["distribution_new"] == "dnorm"
+        and error_type == "A"
+        and trend_type != "M"
+        and season_type != "M"
+    ) or (
+        general_dict["distribution_new"] == "dlnorm"
+        and general_dict.get("ets") == "adam"
+        and model_type_dict["ets_model"]
+        and not arima_checked.get("arima_model", False)
+        and error_type == "M"
+        and trend_type != "A"
+        and season_type != "A"
+    ):
+        filter_logs = general_dict["distribution_new"] == "dlnorm"
+
     # Call the fit (or gradient initial-state solve) with the prepared inputs.
     # For initial="gradient" the dispatcher re-solves the initials from the seed
     # profile and fits with backcast=False; otherwise it is the ordinary fit.
@@ -1089,6 +1110,7 @@ def preparator(
         horizon=general_dict.get("h", 0),
         multisteps=general_dict.get("multisteps", False),
         xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
+        filter_logs=filter_logs,
     )
     # The gradient solve overwrites the head of mat_vt in place; mirror the
     # solved initials back into matrices_dict so downstream initial-value
@@ -1135,32 +1157,9 @@ def preparator(
     # The variance and the mean after the periods without an observed size, as in
     # the estimation
     gap = gap_mean = np.ones(len(observations_dict["ot_logical"]))
-    error_type = model_type_dict["error_type"]
-    trend_type = model_type_dict["trend_type"]
-    season_type = model_type_dict["season_type"]
-    if (
-        general_dict["distribution_new"] == "dnorm"
-        and error_type == "A"
-        and trend_type != "M"
-        and season_type != "M"
-    ) or (
-        general_dict["distribution_new"] == "dlnorm"
-        and general_dict.get("ets") == "adam"
-        and model_type_dict["ets_model"]
-        and not arima_checked.get("arima_model", False)
-        and error_type == "M"
-        and trend_type != "A"
-        and season_type != "A"
-    ):
-        gap_arguments = (
-            lags_dict["lags_model_all"],
-            matrices_dict["mat_wt"],
-            matrices_dict["mat_f"],
-            matrices_dict["vec_g"],
-            observations_dict["ot_logical"],
-        )
-        gap = gap_variance(*gap_arguments)
-        gap_mean = gap_variance(*gap_arguments, power=1)
+    if filter_logs is not None:
+        gap = np.ravel(adam_fitted.variances).astype(float)
+        gap_mean = 2 * np.ravel(adam_fitted.innovationsScale).astype(float)
     # The drift of the states of the other pure multiplicative ETS, as in the estimation
     drift_at = None
     distribution = general_dict["distribution_new"]

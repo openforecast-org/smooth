@@ -1056,45 +1056,66 @@ test_that("The multistep errors start from the states before their targets", {
     expect_equal(fitMSEh$lossValue, fitMSE$lossValue, tolerance=1e-10);
 });
 
-# After j-1 periods without an observed size, the error of a pure additive model with
-# the normal distribution is the (j)-steps-ahead one: for ETS(A,N,N) its variance is
-# sigma^2 (1 + (j-1) alpha^2), in the likelihood, the scale and the diagnostics
-test_that("the gap variance of a pure additive model over the zeros and the missing values", {
+# Over the periods without an observed size, the states of a pure additive model with the
+# normal distribution are filtered: for ETS(A,N,N) the variance of the level relative to
+# sigma^2 grows by alpha^2 over them and becomes P (1-alpha)^2 / (P+1) at an observed size,
+# and the variance of the error is sigma^2 (P+1), in the likelihood, the scale, the
+# diagnostics and the forecasts
+test_that("the filter of a pure additive model over the zeros and the missing values", {
     set.seed(41);
     e <- rnorm(300, 0, 5);
     level <- 100 + cumsum(0.3*e);
     y <- (c(100, level[-300]) + e)*rbinom(300, 1, 0.5);
-    y[c(50, 51)] <- NA;
+    y[c(50, 51, 299, 300)] <- NA;
     testModel <- suppressWarnings(adam(y, "ANN", occurrence="fixed", distribution="dnorm"));
     otLogical <- !is.na(y) & y!=0;
-    gaps <- diff(c(0, which(otLogical)));
-    gapVariance <- adam_gapVarianceModel(testModel);
-    expect_equal(gapVariance[otLogical], 1 + (gaps-1)*testModel$persistence[1]^2);
-    expect_equal(testModel$scale, mean(residuals(testModel)[otLogical]^2/gapVariance[otLogical]));
+    alpha <- testModel$persistence[1];
+    gapVariance <- rep(1, 303);
+    P <- 0;
+    for(t in 1:303){
+        gapVariance[t] <- P + 1;
+        P <- if(t<=300 && otLogical[t]){P*(1-alpha)^2/(P+1)}else{P+alpha^2};
+    }
+    expect_equal(adam_gapVarianceModel(testModel), gapVariance[1:300]);
+    expect_equal(testModel$scale, mean(residuals(testModel)[otLogical]^2/gapVariance[1:300][otLogical]));
     expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
     expect_equal(var(rstandard(testModel)[otLogical]), 1, tolerance=0.1);
+    # The h steps after the sample are unobserved too
+    s2 <- adam_varianceDebiased(testModel);
+    testForecast <- forecast(testModel, h=3, interval="approximate", level=0.9, occurrence=rep(1, 3));
+    expect_equal(as.vector(testForecast$upper - testForecast$mean),
+                 qnorm(0.95, 0, sqrt(s2*gapVariance[301:303])));
 })
 
 
-# The pure multiplicative ADAM ETS is additive in logs: after j-1 periods without an
-# observed size, log(1+e) is N(-s a/2, s k) with a = 1 + (j-1) alpha and k = 1 + (j-1) alpha^2
-# for ETS(M,N,N), and the scale is the maximum likelihood of that
-test_that("the gap variance and mean of the pure multiplicative ADAM ETS with dlnorm", {
+# The pure multiplicative ADAM ETS is additive in logs, where its states are filtered: for
+# ETS(M,N,N), log(1+e) is N(-s a/2, s k), with k = P+1 as for ETS(A,N,N) and a = 1 - 2x, x
+# being the derivative of the mean of the log of the level in the scale, which decreases
+# by alpha/2 over the periods without an observed size and is corrected by the gain
+# (P+alpha)/k at the observed ones, and the scale is the maximum likelihood of that
+test_that("the filter of the pure multiplicative ADAM ETS with dlnorm", {
     set.seed(41);
     u <- rnorm(300, -0.1, sqrt(0.2));
     level <- 10*exp(cumsum(c(0, 0.3*u[-300])));
     y <- level*exp(u)*rbinom(300, 1, 0.4);
     testModel <- adam(y, "MNN", occurrence="fixed", distribution="dlnorm", ets="adam");
     otLogical <- y!=0;
-    gaps <- diff(c(0, which(otLogical)));
     alpha <- testModel$persistence[1];
-    expect_equal(adam_gapVarianceModel(testModel)[otLogical], 1 + (gaps-1)*alpha^2);
-    expect_equal(adam_gapVarianceModel(testModel, 1)[otLogical], 1 + (gaps-1)*alpha);
+    gapVariance <- gapMean <- rep(1, 300);
+    P <- x <- 0;
+    for(t in 1:300){
+        gapVariance[t] <- P + 1;
+        gapMean[t] <- 1 - 2*x;
+        x <- x - alpha/2 + otLogical[t]*(P+alpha)/(P+1)*(0.5-x);
+        P <- if(otLogical[t]){P*(1-alpha)^2/(P+1)}else{P+alpha^2};
+    }
+    expect_equal(adam_gapVarianceModel(testModel), gapVariance);
+    expect_equal(adam_gapVarianceModel(testModel, 1), gapMean);
     expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
     # The scale maximises the likelihood given the other parameters
     logResiduals <- log(residuals(testModel)[otLogical]);
     likelihood <- function(scale){
-        sum(dnorm(logResiduals, -scale*(1 + (gaps-1)*alpha)/2, sqrt(scale*(1 + (gaps-1)*alpha^2)),
+        sum(dnorm(logResiduals, -scale*gapMean[otLogical]/2, sqrt(scale*gapVariance[otLogical]),
                   log=TRUE));
     }
     expect_equal(testModel$scale, optimize(likelihood, c(0.01, 2), maximum=TRUE)$maximum,

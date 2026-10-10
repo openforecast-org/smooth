@@ -398,3 +398,45 @@ def test_the_gap_variance_agrees(case):
     np.testing.assert_allclose(fit.point_lik(), r["pl"], atol=1e-8)
     rs = np.array([np.nan if v is None or v == "NA" else v for v in r["rs"]], float)
     np.testing.assert_allclose(np.asarray(fit.rstandard(), float), rs, atol=1e-7)
+
+
+# The intervals after the periods without an observed value in the sample, from the
+# filter with the h steps ahead unobserved: of a pure additive model with the normal
+# distribution and of a pure multiplicative ADAM ETS with the log-normal one, with
+# missing values inside and at the end of the sample
+FILTER_INTERVAL_CASES = {
+    "adam AAdN dnorm": (
+        AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
+        "adam(ts(y, frequency=12), 'AAdN', distribution='dnorm')",
+        lambda: ADAM(model="AAdN", lags=[12], distribution="dnorm"),
+    ),
+    "adam AAA dnorm MSE": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'AAA', distribution='dnorm', loss='MSE')",
+        lambda: ADAM(model="AAA", lags=[12], distribution="dnorm", loss="MSE"),
+    ),
+    "adam ADAM ETS MMdM dlnorm": (
+        AIRPASSENGERS_GAPS + " y[144] <- NA;",
+        "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
+        lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(FILTER_INTERVAL_CASES))
+def test_the_intervals_after_gaps_agree(case):
+    data, r_call, make = FILTER_INTERVAL_CASES[case]
+    r = r_dict(
+        f"{{ {data} m <- suppressWarnings({r_call});"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9);"
+        " list(y=as.numeric(y), ll=as.numeric(logLik(m)),"
+        " pl=as.numeric(pointLik(m)), lower=as.numeric(f$lower),"
+        " upper=as.numeric(f$upper)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    fit = make().fit(y)
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    np.testing.assert_allclose(fit.point_lik(), r["pl"], atol=1e-8)
+    forecast = fit.predict(h=6, interval="approximate", level=0.9)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)

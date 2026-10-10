@@ -31,6 +31,36 @@ struct FitResult {
     arma::mat profileInitial;
 };
 
+// Result structure for the filter (filter()): the fitter's fields, and for each period the
+// variance of the one-step error relative to sigma^2 (or to s in logs) and, in logs, the
+// derivative of the innovation in the scale s
+struct FilterResult {
+    arma::mat states;
+    arma::vec fitted;
+    arma::vec errors;
+    arma::mat profile;
+    arma::mat profileInitial;
+    arma::vec variances;
+    arma::vec innovationsScale;
+};
+
+// The state of the filter over the profile cells the model uses: the means of the states
+// (in logs for the ETS components of a pure multiplicative ADAM ETS), their derivative in
+// the scale, and the covariance of the states relative to sigma^2 (or s)
+struct FilterState {
+    bool logs;
+    double scale;
+    arma::uvec cells;
+    arma::uvec compact;
+    arma::vec means;
+    arma::vec meansScale;
+    arma::mat covariance;
+    bool linear = false;
+    bool covarianceActive = false;
+    arma::vec variances;
+    arma::vec innovationsScale;
+};
+
 // Result structure for the general occurrence model fitter (two parallel models)
 struct OmFitGeneralResult {
     arma::mat statesA;
@@ -786,6 +816,52 @@ public:
                   arma::vec const &vectorYt, arma::vec const &vectorOt,
                   bool const &backcast, unsigned int const &nIterations,
                   char const &O = 'n') {
+        return fitImpl(matrixVt, matrixWt, matrixF, vectorG, indexLookupTable, profilesRecent,
+                       vectorYt, vectorOt, backcast, nIterations, O, nullptr);
+    }
+
+    // The filter of a linear Gaussian model with periods without an observed value (vectorOt
+    // zero or NaN): a pure additive model, or a pure multiplicative ADAM ETS in logs (logs=true,
+    // with the log-normal error log(1+e) ~ N(-scale/2, scale)). The backcasting passes are those
+    // of fit(); the last forward pass carries the covariance of the states, which is zero until
+    // the first period without an observed value (the pass is then fit()'s own), builds up over
+    // such periods and sets the gain of the update. It returns, for each period, the variance of
+    // the one-step error relative to sigma^2 (or to scale) and, in logs, the derivative of the
+    // innovation in the scale: neither depends on the data.
+    FilterResult filter(arma::mat matrixVt, arma::mat const &matrixWt,
+                        arma::mat &matrixF, arma::vec const &vectorG,
+                        arma::umat const &indexLookupTable, arma::mat profilesRecent,
+                        arma::vec const &vectorYt, arma::vec const &vectorOt,
+                        bool const &backcast, unsigned int const &nIterations,
+                        bool const &logs, double const &scale) {
+        FilterState state;
+        state.logs = logs;
+        state.scale = scale;
+        state.cells = arma::unique(arma::vectorise(indexLookupTable));
+        state.compact = arma::uvec(profilesRecent.n_elem, arma::fill::zeros);
+        for(arma::uword k=0; k<state.cells.n_elem; k++) {
+            state.compact(state.cells(k)) = k;
+        }
+        FitResult fitted = fitImpl(matrixVt, matrixWt, matrixF, vectorG, indexLookupTable,
+                                   profilesRecent, vectorYt, vectorOt, backcast, nIterations,
+                                   'n', &state);
+        FilterResult result;
+        result.states = fitted.states;
+        result.fitted = fitted.fitted;
+        result.errors = fitted.errors;
+        result.profile = fitted.profile;
+        result.profileInitial = fitted.profileInitial;
+        result.variances = state.variances;
+        result.innovationsScale = state.innovationsScale;
+        return result;
+    }
+
+    FitResult fitImpl(arma::mat matrixVt, arma::mat const &matrixWt,
+                      arma::mat &matrixF, arma::vec const &vectorG,
+                      arma::umat const &indexLookupTable, arma::mat profilesRecent,
+                      arma::vec const &vectorYt, arma::vec const &vectorOt,
+                      bool const &backcast, unsigned int const &nIterations,
+                      char const &O, FilterState *filterState) {
         /* # matrixVt should have a length of obs + lagsModelMax.
          * # matrixWt is a matrix with nrows = obs
          * # vecG should be a vector
@@ -813,9 +889,113 @@ public:
         // The head steps all measure with the same regressor row; hoist it out of the loops
         const arma::rowvec wHead = matrixWt.row(0);
 
+        // The filter on the last forward pass (filter()); the passes are counted at their heads
+        unsigned int pass = 0;
+        const unsigned int lastPass = backcast ? nIterations : 1;
+        if(filterState != nullptr) {
+            filterState->variances = arma::vec(obs, arma::fill::ones);
+            filterState->innovationsScale = arma::vec(obs);
+            filterState->innovationsScale.fill(filterState->logs ? 0.5 : 0.0);
+        }
+
+        // The ETS components are in logs in the filter of a pure multiplicative ADAM ETS
+        auto cellNative = [&](arma::uword cell, double value) {
+            return (filterState->logs && (cell % nComponents) < nETS) ? std::exp(value) : value;
+        };
+        auto cellLinear = [&](arma::uword cell, double value) {
+            return (filterState->logs && (cell % nComponents) < nETS) ? std::log(value) : value;
+        };
+
+        // One step of the filter, from its first period without an observed value on
+        auto filterStep = [&](int i) {
+            FilterState &fs = *filterState;
+            int idx = i - H;
+            arma::uvec cellsNow = indexLookupTable.col(i);
+            arma::uvec c = fs.compact(cellsNow);
+            arma::rowvec w = matrixWt.row(idx);
+            bool observed = vectorOt(idx) != 0 && !std::isnan(vectorOt(idx));
+            // The persistence of the linear model: the adaptive regressors move by delta/x
+            arma::vec gEff = vectorG;
+            for(unsigned int r=nETS+nArima; r<nETS+nArima+nXreg; r++) {
+                gEff(r) = (w(r) != 0 && std::isfinite(1/w(r))) ? vectorG(r)/w(r) : 0;
+            }
+            if(!fs.linear) {
+                fs.means = arma::vec(fs.cells.n_elem);
+                for(arma::uword k=0; k<fs.cells.n_elem; k++) {
+                    fs.means(k) = cellLinear(fs.cells(k), profilesRecent(fs.cells(k)));
+                }
+                fs.meansScale = arma::vec(fs.cells.n_elem, arma::fill::zeros);
+                fs.covariance = arma::mat(fs.cells.n_elem, fs.cells.n_elem, arma::fill::zeros);
+                fs.linear = true;
+            }
+            arma::vec xc = fs.means(c);
+            arma::vec xsc = fs.meansScale(c);
+            // The variance of the one-step error and the derivative of the innovation in the scale
+            arma::vec covarW;
+            double f = 1;
+            if(fs.covarianceActive) {
+                covarW = fs.covariance.cols(c) * w.t();
+                f = arma::as_scalar(w * covarW(c)) + 1;
+            }
+            double bScale = fs.logs ? 0.5 - arma::as_scalar(w * xsc) : 0;
+            fs.variances(idx) = f;
+            fs.innovationsScale(idx) = bScale;
+            // The fitted value and the error as the fitter defines them
+            arma::vec native(xc.n_elem);
+            for(arma::uword k=0; k<xc.n_elem; k++) {
+                native(k) = cellNative(cellsNow(k), xc(k));
+            }
+            vecYfit(idx) = adamWvalue(native, w, E, T, S, nETS, nNonSeasonal, nSeasonal, nArima,
+                                      nXreg, nComponents, constant);
+            vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), 'n');
+            // The mean of the error in the linear model
+            double mu = fs.logs ? -fs.scale/2 : 0;
+            arma::vec meansNew = fs.means;
+            arma::vec meansScaleNew = fs.meansScale;
+            arma::mat covarianceNew = fs.covariance;
+            if(fs.covarianceActive) {
+                covarianceNew.rows(c) = matrixF * fs.covariance.rows(c);
+                covarianceNew.cols(c) = covarianceNew.cols(c) * matrixF.t();
+            }
+            covarianceNew(c, c) += gEff * gEff.t();
+            meansNew(c) = matrixF * xc + gEff * mu;
+            meansScaleNew(c) = matrixF * xsc - gEff * 0.5;
+            if(observed) {
+                double z = fs.logs ? std::log(vectorYt(idx)) : vectorYt(idx);
+                double v = z - (fs.logs ? std::log(vecYfit(idx)) : vecYfit(idx)) - mu;
+                arma::vec gain(fs.cells.n_elem, arma::fill::zeros);
+                if(fs.covarianceActive) {
+                    gain = covarW;
+                    gain(c) = matrixF * covarW(c);
+                }
+                gain(c) += gEff;
+                gain /= f;
+                meansNew += gain * v;
+                meansScaleNew += gain * bScale;
+                covarianceNew -= gain * gain.t() * f;
+            }
+            fs.means = meansNew;
+            fs.meansScale = meansScaleNew;
+            fs.covariance = covarianceNew;
+            // The covariance that has vanished leaves the means to the gain of the model
+            fs.covarianceActive = arma::abs(fs.covariance).max() > 1e-15;
+            if(!fs.covarianceActive) {
+                fs.covariance.zeros();
+            }
+            for(arma::uword k=0; k<fs.cells.n_elem; k++) {
+                profilesRecent(fs.cells(k)) = cellNative(fs.cells(k), fs.means(k));
+            }
+            matrixVt.col(i) = profilesRecent(cellsNow);
+        };
+
         // What to do in the forward pass
         auto forwardStep = [&](int i) {
             int idx = i - H;
+            if(filterState != nullptr && pass == lastPass &&
+               (filterState->linear || vectorOt(idx) == 0 || std::isnan(vectorOt(idx)))) {
+                filterStep(i);
+                return;
+            }
             /* # Measurement equation and the error term */
             vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
                     matrixWt.row(idx), E, T, S,
@@ -919,10 +1099,20 @@ public:
             }
         };
 
+        // Count the forward passes at their heads, for the filter on the last one
+        auto headFillFwdCounted = [&]() {
+            pass++;
+            headFillFwd();
+        };
+        auto headForwardStepCounted = [&]() {
+            pass++;
+            headForwardStep();
+        };
+
         // Do the fit!
         fitLoopImpl(obs, H, backcast, nIterations,
-                    forwardStep, backwardStep, headFillFwd, headFillBwd, trendReversal,
-                    headForwardStep, useHeadFilter, tailTurn);
+                    forwardStep, backwardStep, headFillFwdCounted, headFillBwd, trendReversal,
+                    headForwardStepCounted, useHeadFilter, tailTurn);
 
         FitResult result;
         result.states = matrixVt;

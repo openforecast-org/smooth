@@ -156,6 +156,11 @@ def generate_prediction_interval(
         s2_horizon = s2 if s2_forecast is None else s2_forecast
         v_voc_multi = s2_horizon * np.diag(covar)
         v_mean = s2_horizon * np.cumsum(covar[0])
+        # After the periods without an observed size, those of the filter, with the
+        # uncertainty of the states at the end of the sample
+        if general.get("_filter_variances") is not None:
+            v_voc_multi = s2_horizon * general["_filter_variances"]
+            v_mean = s2_horizon * general["_filter_mean"]
         if general.get("cumulative", False):
             v_voc_multi = np.sum(v_voc_multi)
     elif (
@@ -199,9 +204,15 @@ def generate_prediction_interval(
             root = np.sqrt(s2_forecast)
             v_voc_multi = v_voc_multi / s2 * np.outer(root, root)
 
-        # Variance of the cumulative sum vs. per-horizon diagonal variances.
+        # Variance of the cumulative sum vs. per-horizon diagonal variances: after
+        # the periods without an observed value, those of the filter, with the
+        # uncertainty of the states at the end of the sample
         if general.get("cumulative", False):
             v_voc_multi = np.sum(v_voc_multi)
+        elif general.get("_filter_variances") is not None:
+            v_voc_multi = (s2 if s2_forecast is None else s2_forecast) * general[
+                "_filter_variances"
+            ]
         else:
             v_voc_multi = np.diag(v_voc_multi)
 

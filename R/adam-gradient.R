@@ -185,7 +185,8 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                                obsInSample, loss, distribution="dnorm", other=NULL,
                                horizon=0, multisteps=FALSE, oType="n",
                                componentsNumberARIMA=0, lagsModelAll=lagsModel,
-                               xregNumber=0){
+                               xregNumber=0, filterLogs=NULL){
+    backcast <- any(initialType == c("complete", "backcasting", "gradient"));
     if(any(initialType == "gradient")){
         # Occurrence models profile their own losses over the probability
         # residuals; occurrence "fixed" ('f') has no estimated initials and
@@ -217,13 +218,18 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                 # nIterations must be 1 here: with no backward pass, a second
                 # iteration would re-run headFillFwd on the profile already
                 # mutated by the first forward pass and diverge.
-                return(adamCpp$fit(matVt, matWt, matF, vecG, indexLookupTable, solved,
-                                   yInSample, ot, FALSE, 1, oType))
+                profile <- solved;
+                backcast <- FALSE;
+                nIterations <- 1;
             }
         }
     }
+    # The filter of the linear Gaussian models over the periods without an observed value
+    # (adamCore$filter(), in logs for the pure multiplicative ADAM ETS) instead of the fitter
+    if(!is.null(filterLogs)){
+        return(adamCpp$filter(matVt, matWt, matF, vecG, indexLookupTable, profile,
+                              yInSample, ot, backcast, nIterations, filterLogs, 0));
+    }
     return(adamCpp$fit(matVt, matWt, matF, vecG, indexLookupTable, profile,
-                       yInSample, ot,
-                       any(initialType == c("complete", "backcasting", "gradient")),
-                       nIterations, oType))
+                       yInSample, ot, backcast, nIterations, oType))
 }

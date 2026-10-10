@@ -236,6 +236,7 @@ def adam_fit_or_gradient(
     horizon=0,
     multisteps=False,
     xreg_number=0,
+    filter_logs=None,
 ):
     """Fit dispatcher mirroring ``adam_fitOrGradient``.
 
@@ -247,11 +248,15 @@ def adam_fit_or_gradient(
     models (including custom loss functions) fall back to backcasting.
 
     ``mat_vt`` is mutated in place (its head columns are overwritten with the
-    solved profile) and the C++ fit result is returned.
+    solved profile) and the C++ fit result is returned. With ``filter_logs`` not
+    None, the filter of the linear Gaussian models over the periods without an
+    observed value (``adam_cpp.filter``, in logs for the pure multiplicative ADAM
+    ETS) runs instead of the fitter.
     """
     is_gradient = initial_type == "gradient" or (
         isinstance(initial_type, (list, tuple)) and "gradient" in initial_type
     )
+    backcast = True if is_gradient else backcast_value
     if is_gradient:
         # Occurrence models profile their own losses over the probability
         # residuals; occurrence "fixed" ('f') has no estimated initials and
@@ -310,21 +315,26 @@ def adam_fit_or_gradient(
                 # n_iterations must be 1 here: with no backward pass, a second
                 # iteration would re-run the head fill on the profile already
                 # mutated by the first forward pass and diverge.
-                return adam_cpp.fit(
-                    matrixVt=mat_vt,
-                    matrixWt=mat_wt,
-                    matrixF=mat_f,
-                    vectorG=vec_g,
-                    indexLookupTable=index_lookup_table,
-                    profilesRecent=np.asfortranarray(solved),
-                    vectorYt=y_in_sample,
-                    vectorOt=ot,
-                    backcast=False,
-                    nIterations=1,
-                    O=o_type,
-                )
+                profiles_recent_table = np.asfortranarray(solved)
+                backcast = False
+                n_iterations = 1
     # Fallback (non-gradient, or gradient out of scope / solve failed). R joins
     # gradient to the backcast group here: any(c("complete","backcasting","gradient")).
+    if filter_logs is not None:
+        return adam_cpp.filter(
+            matrixVt=mat_vt,
+            matrixWt=mat_wt,
+            matrixF=mat_f,
+            vectorG=vec_g,
+            indexLookupTable=index_lookup_table,
+            profilesRecent=profiles_recent_table,
+            vectorYt=y_in_sample,
+            vectorOt=ot,
+            backcast=backcast,
+            nIterations=n_iterations,
+            logs=filter_logs,
+            scale=0.0,
+        )
     return adam_cpp.fit(
         matrixVt=mat_vt,
         matrixWt=mat_wt,
@@ -334,7 +344,7 @@ def adam_fit_or_gradient(
         profilesRecent=profiles_recent_table,
         vectorYt=y_in_sample,
         vectorOt=ot,
-        backcast=True if is_gradient else backcast_value,
+        backcast=backcast,
         nIterations=n_iterations,
         O=o_type,
     )

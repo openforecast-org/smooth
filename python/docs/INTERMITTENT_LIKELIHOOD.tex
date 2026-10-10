@@ -560,6 +560,7 @@ remark addresses both.
 \end{remark}
 
 \begin{remark}[An approximate filter]
+\label{rem:approxfilter}
 The reset approximation can be lifted as in Section~\ref{sec:linear}: carry a covariance
 $\vect P_t$ of the logarithms of the states, propagate it over the unobserved periods with
 $\boldsymbol\Sigma_L$, use $d_t\sim\mathcal N(m_t, \vect w'\vect P_t\vect w)$ in \eqref{eq:mixture},
@@ -577,10 +578,12 @@ A forecast $h$ steps ahead from the end of the sample is the prediction after an
 of $h-1$ periods, so the results above give the predictive distributions. For the linear Gaussian
 models the variance is $\sigma^2(\vect w'\vect F^{h-1}\vect P_{T+1}\vect F'^{\,h-1}\vect w +
 \kappa_h)$: the state covariance at the end of the sample, zero for complete data, adds to the usual
-multistep variance when the last periods were unobserved. For the pure multiplicative ADAM ETS with
-the log-normal distribution, Proposition~\ref{prop:lognormal} gives the exact interval
-$z_{T+h}/\hat\mu_{T+h}\sim\log\mathcal N(-s a_h/2, s\kappa_h)$ around the point forecast with zero
-errors, when $\vect P_{T+1} = \vect 0$.
+multistep variance when the last periods were unobserved. Both terms come out of the filter
+\eqref{eq:kalman} itself, run past the end of the sample with $O_{T+1} = \dots = O_{T+h} = 0$: the
+variance is $\sigma^2 f_{T+h}$. For the pure multiplicative ADAM ETS with the log-normal
+distribution, the same run of the filter of Proposition~\ref{prop:lognormal} gives the exact interval
+$z_{T+h}/\hat\mu_{T+h}\sim\log\mathcal N(-s b_{T+h}, s f_{T+h})$ around the point forecast with zero
+errors, which is $\log\mathcal N(-s a_h/2, s\kappa_h)$ when $\vect P_{T+1} = \vect 0$.
 
 For a model with an occurrence part, an interval of the demand with coverage $c$ that counts the
 zeros as covered is an interval of the sizes with coverage $(c - (1-p_t))/p_t$, so its bounds are
@@ -593,13 +596,21 @@ places the upper bound well below the corresponding quantile of the demand.
 \label{sec:computation}
 
 \paragraph{Cost.} The filter \eqref{eq:kalman} costs $O(n^2)$ operations per period for $n$
-states, against $O(n)$ for the SSOE recursion, but only while $\vect P_t\neq\vect 0$: it can switch
-to the SSOE recursion whenever the covariance has decayed below a tolerance. The reset
-approximation needs only the coefficients $c_i$ up to the longest interval, which are those of the
-analytical multistep variance of ADAM \citep{ADAM}, computed once per evaluation of
-the likelihood. The quadrature of Section~\ref{sec:approximate} adds 32 evaluations of the quantile
-function per iteration of the scale and per evaluation, and the mixture 16 evaluations of the
-one-step density per observation that follows an interval.
+states, against $O(n)$ for the SSOE recursion, but only while $\vect P_t\neq\vect 0$: by
+Corollary~\ref{cor:complete} it is the SSOE recursion whenever the covariance is zero, so it can
+switch to it once the covariance has decayed below a tolerance, and complete data cost nothing more.
+In the lagged form of ADAM a state with lag $m$ is held in $m$ cells of its profile, of which one is
+used in each period, so the covariance is kept over the cells of the profile and the propagation and
+the update touch only the rows and the columns of the cells used in the period. For non-seasonal and
+monthly models the extra cost is negligible; for weekly or hourly seasonalities with dozens or
+hundreds of cells the update of the covariance dominates while it is non-zero. The variances $f_t$
+and the derivatives $b_t$ do not depend on the data or on the initial states, so they can be
+recomputed for a fitted model by running the filter on its matrices and the pattern of the observed
+periods, without the data. The reset approximation needs only the coefficients $c_i$ up to the
+longest interval, which are those of the analytical multistep variance of ADAM \citep{ADAM}, computed
+once per evaluation of the likelihood. The quadrature of Section~\ref{sec:approximate} adds 32
+evaluations of the quantile function per iteration of the scale and per evaluation, and the mixture
+16 evaluations of the one-step density per observation that follows an interval.
 
 \paragraph{Reproducibility.} The quadrature rules are fixed sets of numbers, so that two
 implementations evaluate the same likelihood. The coefficients $c_i$ are computed by one routine in
@@ -608,15 +619,21 @@ same order in both.
 
 \paragraph{Implementation.} The \texttt{smooth} package (R and Python) implements, on its
 development branch: the observed-data likelihood without the entropy (Proposition~\ref{prop:observed});
-the reset approximation with the variance $\kappa_{j_t}$ for the pure additive models with the
-normal distribution and the exact gap density of the pure multiplicative ADAM ETS with the
-log-normal one, with the scale \eqref{eq:lognormalscalereset}; the mixture \eqref{eq:mixture} with
-the moment equations of Proposition~\ref{prop:moments} for the other pure multiplicative models; the
-corrected scale of the log-normal distribution (Corollary~\ref{cor:lognormalscale}); and the
-prediction intervals of Section~\ref{sec:intervals}. The filter \eqref{eq:kalman}, with the gain it
-implies, is not implemented: it changes the fitted states, and with them the fitter of the package.
-% TODO: decide whether the paper presents the filter as the method and the reset as its
-% approximation, and implement the filter before the evaluation.
+the filter \eqref{eq:kalman} for the pure additive models with the normal distribution (ETS, ARIMA
+and regression in ADAM), and in logs (Proposition~\ref{prop:lognormal}) for the pure multiplicative
+ADAM ETS with the log-normal distribution, with the scales \eqref{eq:kalmanlik} and
+\eqref{eq:lognormalscale}; the mixture \eqref{eq:mixture} with the moment equations of
+Proposition~\ref{prop:moments} for the other pure multiplicative models; the corrected scale of the
+log-normal distribution (Corollary~\ref{cor:lognormalscale}); and the prediction intervals of
+Section~\ref{sec:intervals}. The filter is one routine of the C++ core shared by the two languages.
+It takes the place of the fitter of the package in the last forward pass: the initial states are
+still obtained by backcasting with the SSOE recursion, the covariance starts at zero after them, and
+the filter departs from the recursion only at the unobserved periods and while the covariance is not
+zero, so the fits of complete data do not change to the last bit. It is used with every loss, so
+that the fitted values after the unobserved periods are the filtered predictions whatever the
+estimator. The other models of the package (CES, GUM, the state space ARIMA and TBATS) keep the reset
+approximation with the variance $\kappa_{j_t}$, and the approximate filter of
+Remark~\ref{rem:approxfilter} is not implemented.
 
 % =============================================================================
 \section{Conclusions}

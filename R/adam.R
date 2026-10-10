@@ -810,6 +810,15 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # print(profilesRecentTable)
 
         #### Fitter and the losses calculation ####
+        # The filter of the states over the periods without an observed value, for the linear
+        # Gaussian models: pure additive with the normal distribution, and the pure
+        # multiplicative ADAM ETS with the log-normal one, in logs
+        filterLogs <- NULL;
+        if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M" ||
+           distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
+           Etype=="M" && Ttype!="A" && Stype!="A"){
+            filterLogs <- distribution=="dlnorm";
+        }
         adamFitted <- adam_fitOrGradient(adamElements$matVt, adamElements$matWt,
                                          adamElements$matF, adamElements$vecG,
                                          indexLookupTable, profilesRecentTable,
@@ -817,7 +826,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
+                                         filterLogs);
 
         # The missing values are not in the loss: the errors are zero there, and the
         # losses are divided by the observed values
@@ -829,13 +839,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 # size, of a pure additive model with the normal distribution and of a pure
                 # multiplicative ADAM ETS with the log-normal one, additive in logs (ones elsewhere)
                 gapVariance <- gapMean <- rep(1, obsInSample);
-                if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M" ||
-                   distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
-                   Etype=="M" && Ttype!="A" && Stype!="A"){
-                    gapVariance[] <- adam_gapVariance(lagsModelAll, adamElements$matWt, adamElements$matF,
-                                                      adamElements$vecG, otLogical);
-                    gapMean[] <- adam_gapVariance(lagsModelAll, adamElements$matWt, adamElements$matF,
-                                                  adamElements$vecG, otLogical, power=1);
+                if(!is.null(filterLogs)){
+                    gapVariance[] <- adamFitted$variances;
+                    gapMean[] <- 2*adamFitted$innovationsScale;
                 }
                 # The drift of the states of the other pure multiplicative ETS over those periods,
                 # whose moments depend on the scale (the conventional ETS with the log-normal, and
@@ -1921,14 +1927,30 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             other <- abs(tail(B,1));
         }
 
-        # Fit the model to the data
+        # If the distribution is default, change it according to the error term
+        if(distribution=="default"){
+            distribution[] <- switch(loss,
+                                     "likelihood"= switch(Etype, "A"= "dnorm", "M"= "dgamma"),
+                                     "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"= "dlaplace",
+                                     "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"= "ds",
+                                     "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
+        }
+
+        # Fit the model to the data, with the filter as in the estimation
+        filterLogs <- NULL;
+        if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M" ||
+           distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
+           Etype=="M" && Ttype!="A" && Stype!="A"){
+            filterLogs <- distribution=="dlnorm";
+        }
         adamFitted <- adam_fitOrGradient(matVt, matWt, matF, vecG,
                                          indexLookupTable, profilesRecentTable,
                                          yInSample, ot, initialType, nIterations, adamCpp,
                                          etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
                                          componentsNumberETS, componentsNumberETSSeasonal,
                                          componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber);
+                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
+                                         filterLogs);
 
         matVt[] <- adamFitted$states;
 
@@ -2023,15 +2045,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
         }
 
-        # If the distribution is default, change it according to the error term
-        if(distribution=="default"){
-            distribution[] <- switch(loss,
-                                     "likelihood"= switch(Etype, "A"= "dnorm", "M"= "dgamma"),
-                                     "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"= "dlaplace",
-                                     "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"= "ds",
-                                     "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
-        }
-
         #### Initial values to return ####
         initialCollected <- adam_initial_collector(
             matVt, etsModel, modelIsTrendy, modelIsSeasonal,
@@ -2095,11 +2108,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # The sizes, not multiplied by the probabilities, with the variance and the mean after
         # the periods without an observed size, as in the estimation
         gapVariance <- gapMean <- rep(1, obsInSample);
-        if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M" ||
-           distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
-           Etype=="M" && Ttype!="A" && Stype!="A"){
-            gapVariance[] <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
-            gapMean[] <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical, power=1);
+        if(!is.null(filterLogs)){
+            gapVariance[] <- adamFitted$variances;
+            gapMean[] <- 2*adamFitted$innovationsScale;
         }
         gapDrift <- NULL;
         if((any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
@@ -6598,6 +6609,13 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 s2Horizon <- if(is.scale(object$scale)){s2Forecast}else{s2};
                 vcovMulti <- s2Horizon*diag(covarMat);
                 vcovMean <- s2Horizon*cumsum(covarMat[1,]);
+                # After the periods without an observed size, those of the filter, with the
+                # uncertainty of the states at the end of the sample
+                filterVariances <- adam_gapVarianceModel(object, 2, h);
+                if(!is.null(filterVariances)){
+                    vcovMulti <- s2Horizon*filterVariances;
+                    vcovMean <- s2Horizon*adam_gapVarianceModel(object, 1, h);
+                }
                 if(cumulative){
                     vcovMulti <- sum(vcovMulti);
                 }
@@ -6632,9 +6650,15 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                     vcovMulti[] <- vcovMulti / s2 * (sqrt(s2Forecast) %*% t(sqrt(s2Forecast)));
                 }
 
-                # Do either the variance of sum, or a diagonal
+                # Do either the variance of sum, or a diagonal: after the periods without an
+                # observed value, that of the filter, with the uncertainty of the states at the
+                # end of the sample
+                filterVariances <- if(cumulative){NULL}else{adam_gapVarianceModel(object, 2, h)};
                 if(cumulative){
                     vcovMulti <- sum(vcovMulti);
+                }
+                else if(!is.null(filterVariances)){
+                    vcovMulti <- (if(is.scale(object$scale)){s2Forecast}else{s2}) * filterVariances;
                 }
                 else{
                     vcovMulti <- diag(vcovMulti);

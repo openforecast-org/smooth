@@ -606,6 +606,58 @@ The shape is noisy: `dgnorm` alone is the worst on the points, and the choice by
 picks it with shapes near zero (0.106 on H223), whose forecasts are far off. The timings of
 section P are with `dnorm`.
 
+## R. Outliers: `outliers = c("ignore", "use", "select")` (October 2026)
+
+As in `adam()` (through `auto.adam()`), but found without a fit: on the residuals of the
+global model, once the harmonics are chosen (`tbats_outliers()` / `outlier_dummies()`):
+
+1. the regression on the intercept, the trend (if any trend is a candidate), the
+   harmonics and the regressors that are used, on the non-zero observations, at the
+   starting value of lambda;
+2. its residuals standardised as `rstandard()` does (the scale de-biased with the
+   columns of the design; `dgnorm` with the shape of `alm()` on the residuals, for
+   `"auto"` too), and those outside the `level` quantiles of the distribution flagged,
+   as `outlierdummy()` does;
+3. `"select"`: each dummy with its lag and lead (`xregExpander(-1:1, gaps="zero")`), and
+   `stepwise()` (`adam_xreg_selector`) chooses among them on the residuals, with the
+   columns of the design and the scale as degrees of freedom.
+
+The dummies (`outlier1`, `outlier1Lag1`, `outlier1Lead1`, ...) join the regressors of all
+the fits, zero over the horizon, and `regressors` becomes `outliers`, as `auto.adam()`
+does: `"use"`, or `"select"` for the regressors of `xreg`, whose selection keeps the
+dummies (an adaptive dummy makes no sense). A model reused with `model=` has them among
+its regressors. The forecasts need their future values, as for any regressor: the
+holdout, `newdata`, or else they are forecast by `adam()` with a warning (as in
+`auto.adam()`).
+
+## S. The scale model: `sm()` (October 2026)
+
+`sm.adamTBATS()` / `TBATS.sm()`, as `sm.adam()`: the location model in the space of the
+Box-Cox transformed data (`tbats_boxCoxObject()`), its errors transformed into the scale
+of each one (the square for `dnorm`, the absolute value for `dlaplace`, ...), and TBATS
+fitted to them with lambda 0 (a multiplicative model of the scale) and a custom loss, the
+joint log-likelihood of the location model's data given the scale. The arguments and
+defaults are `tbats()`'s, but the lags of the model. Backcasting follows the logarithms of
+the transformed errors, whose mean is not the log-scale (it is digamma(1/2)+log(2) = -1.27
+below it for the squares of normal errors, digamma(1) for the absolute Laplace errors,
+digamma(2)-log(2) for `ds`, (log(beta)+digamma(1/beta))/beta for `dgnorm`): the response is
+divided by the exponent of that bias, so that backcasting (the default, as in `tbats()`)
+starts from the log-scale, and it then improves on the constant scale for every distribution.
+
+A custom loss of `tbats()` is minus its log-likelihood, as in `adam()`, so the selection of
+the harmonics, the trend and the ARMA of the scale model is by the joint likelihood. The
+logLik of the scale model adds the Jacobian of the location model's transform; `implant()`
+puts it in the model (the parameters of the scale model in its scale column), whose
+`pointLik()` is the scale model's, and whose forecasts take the scale model's for the
+variance of each horizon.
+
+With an occurrence model, the sizes of the zeros are not observed: the zeros have only the
+likelihood of the occurrence, in `tbats()` as in `adam()`, and the scale is divided by the
+observed sizes (the differential entropy that `adam()` had at the zeros shrank the scale by the
+share of the non-zero observations, see the technical report on the likelihood of intermittent
+demand). In the scale model, the zeros are missing values of the response, so that its states go
+on through them and its fitted values are the scale, with no occurrence model in it.
+
 ## M. Later phases
 
 - multistep losses with an occurrence model (not available in `adam()` either);

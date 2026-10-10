@@ -179,10 +179,10 @@ print(model.a_, model.b_)       # complex smoothing parameters
 fc = model.predict(h=6)
 print(fc.mean)
 
-# AutoCES — select the best seasonality type by information criterion
-auto = AutoCES(lags=[1, 12], h=6, holdout=True, ic="AICc")
-auto.fit(y)
-print(auto.best_model_.model_name)
+# AutoCES — select the best seasonality type by information criterion; fit()
+# returns the selected CES, with the criteria of all the candidates in ICs
+best = AutoCES(lags=[1, 12], h=6, holdout=True, ic="AICc").fit(y)
+print(best.model_name, best.ICs)
 ```
 
 > **Note**: strict R-parity in the two-stage NLopt path requires

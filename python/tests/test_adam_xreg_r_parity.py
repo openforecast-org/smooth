@@ -55,3 +55,63 @@ def test_the_fits_agree(case):
     np.testing.assert_allclose(fit.fitted, r["fitted"], rtol=1e-8)
     forecast = fit.predict(h=5, X=np.full((5, 1), 0.5)).mean
     np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-8)
+
+
+def test_a_series_of_zeros_and_ones_agrees():
+    """Without an occurrence model the zeros are values, as in R: a dummy variable
+    (forecast by ADAM when the future regressors are missing) is an ETS(ANN), not
+    the naive of a single non-zero observation."""
+    r = r_dict(
+        "{ x <- rep(0, 60); x[21] <- 1; m <- suppressWarnings(adam(x, h=3));"
+        " list(model=m$model, forecast=as.numeric(m$forecast)) }"
+    )
+    y = np.zeros(60)
+    y[20] = 1
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = ADAM().fit(y)
+    assert fit.model_name == r["model"][0]
+    np.testing.assert_allclose(fit.predict(h=3).mean, r["forecast"], rtol=1e-8)
+
+
+@pytest.mark.parametrize("model, outliers", [("MAM", "use"), ("MAM", "select")])
+def test_the_outliers_agree(model, outliers):
+    """The dummies of the outliers, named and ordered as R's (with the leads and lags
+    of "select"), the model refitted with them as specified, and their zeros in the
+    forecasts."""
+    r = r_dict(
+        "{ y <- AirPassengers; y[c(30, 140)] <- y[c(30, 140)]*1.4;"
+        f" m <- adam(y, '{model}', outliers='{outliers}');"
+        " list(y=as.numeric(y), model=m$model, B=unname(coef(m)), names=names(coef(m)),"
+        " logLik=as.numeric(logLik(m)), forecast=as.numeric(forecast(m, h=12)$mean)) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = ADAM(model=model, lags=[12], outliers=outliers).fit(
+            np.asarray(r["y"], dtype=float)
+        )
+    assert fit.model_name == r["model"][0]
+    assert fit.coef_names == r["names"]
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+    assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        forecast = fit.predict(h=12).mean
+    np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-8)
+
+
+def test_a_regressor_named_as_a_dummy_is_renamed():
+    """A regressor named outlier1 becomes x.outlier1, with a warning, as in R."""
+    r = r_dict(
+        "{ y <- AirPassengers; y[c(30, 140)] <- y[c(30, 140)]*1.4; set.seed(1);"
+        " d <- data.frame(y=as.numeric(y), outlier1=rnorm(144));"
+        " m <- suppressWarnings(adam(d, 'MAM', lags=12, outliers='use'));"
+        " list(y=d$y, x=d$outlier1, names=names(coef(m)), B=unname(coef(m))) }"
+    )
+    X = pd.DataFrame({"outlier1": r["x"]})
+    with pytest.warns(UserWarning, match="Renaming them to x.outlier1"):
+        fit = ADAM(model="MAM", lags=[12], outliers="use").fit(
+            np.asarray(r["y"], dtype=float), X
+        )
+    assert fit.coef_names == r["names"]
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)

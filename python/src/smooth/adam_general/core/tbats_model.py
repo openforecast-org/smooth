@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy import special
 
 from smooth.adam_general.core.adam import ADAM
 from smooth.adam_general.core.checker.data_checks import _warn_missing
@@ -18,9 +19,11 @@ from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.simulate.result import SimulateResult
 from smooth.adam_general.core.tbats import fitter as ft
 from smooth.adam_general.core.tbats import structure as st
+from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.reapply import ReapplyResult
 from smooth.adam_general.core.utils.reforecast import ReforecastResult
 from smooth.adam_general.core.utils.utils import (
+    OUTLIER_NAMES,
     _exp_r,
     _log_r,
     _sum_r,
@@ -43,8 +46,23 @@ LOSS_OPTIONS = (
 )
 IC_OPTIONS = ("AICc", "AIC", "BIC", "BICc")
 INITIAL_OPTIONS = ("backcasting", "optimal", "two-stage", "complete", "gradient")
+# The settings of the optimiser, the keys of ADAM's nlopt_kwargs
+_NLOPT_DEFAULTS: Dict[str, Any] = {
+    "B": None,
+    "lb": None,
+    "ub": None,
+    "maxeval": None,
+    "maxtime": -1,
+    "algorithm": "NLOPT_LN_NELDERMEAD",
+    "xtol_rel": 1e-6,
+    "xtol_abs": 1e-8,
+    "ftol_rel": 1e-8,
+    "ftol_abs": 0,
+    "print_level": 0,
+}
 BOUNDS_OPTIONS = ("admissible", "usual", "none")
 REGRESSORS_OPTIONS = ("use", "select", "adapt")
+OUTLIERS_OPTIONS = ("ignore", "use", "select")
 OCCURRENCE_OPTIONS = (
     "none",
     "auto",
@@ -277,21 +295,64 @@ class TBATS:
         0.5 the S distribution), and the named distribution closest to the estimated
         shape on the log scale is then fitted on the selected structure (from the
         default starting values and from the estimates of ``"dgnorm"``, the higher
-        likelihood kept); its information criterion is added to ``ics``. With a loss
+        likelihood kept); its information criterion is added to ``ICs``. With a loss
         other than the likelihood, ``"auto"`` is ``"dlaplace"`` for ``"MAE"``,
         ``"ds"`` for ``"HAM"`` and ``"dnorm"`` otherwise, as in ``ADAM``. The
         distribution used is ``distribution_``.
-    loss, ic, h, holdout, initial, bounds
+    outliers : str, default="ignore"
+        What to do with the outliers, as ``ADAM``: ``"ignore"`` them, ``"use"`` a
+        dummy variable for each, or ``"select"`` among the dummies and their leads and
+        lags. They are found on the residuals of the global model (the regression on
+        the trend, the harmonics and the regressors, at the starting value of lambda
+        and on the non-zero observations), outside the ``outliers_level`` quantiles of
+        the distribution (of ``"dgnorm"`` with the shape estimated on the residuals for
+        ``"auto"``), so no fit is added. With ``"select"``, ``stepwise()`` chooses the
+        dummies on these residuals. The dummies join the regressors in all the fits,
+        with zeros over the horizon, and ``regressors`` becomes ``"use"`` or
+        ``"select"`` (for the regressors of ``X``), as in R's ``auto.adam()``.
+    outliers_level : float, default=0.99
+        The confidence level of the detection of the outliers (R's ``level``).
+    loss, ic, h, holdout, bounds
         As in R's ``tbats()``; ``bounds="admissible"`` keeps the model stable.
+    persistence : dict, array or None
+        The smoothing parameters, as in ``ADAM``: a vector (level, trend, a pair
+        gamma1, gamma2 per period of ``lags`` above 1, the smoothing parameters of the
+        regressors with ``regressors="adapt"``), used only when the structure is not
+        selected, or a dict with ``"level"``, ``"trend"``, ``"seasonal"`` (a list
+        with one pair ``[gamma1, gamma2]`` per period) and ``"xreg"`` (or ``"alpha"``,
+        ``"beta"``, ``"gamma"``), where only the provided elements are fixed. The
+        values for the components that the model does not have are ignored.
+    phi : float or None
+        The damping parameter, used with ``trend="damped"``. With ``trend="auto"``,
+        it is estimated with a warning, as in ``ADAM``.
+    initial : str, dict or array, default="backcasting"
+        The initialisation, as in R's ``tbats()``, or the initial states in the space
+        of the Box-Cox transformed data (meaningful with a provided ``lambda_bc``): a
+        vector (level, trend, then for each period the sine coefficients of its
+        harmonics followed by their cosine coefficients, the ARMA states, the
+        coefficients of the regressors), used only when the structure is not
+        selected, or a dict with ``"level"``, ``"trend"``, ``"seasonal"`` (a list
+        with one array of the sine and then the cosine coefficients per period, which
+        needs ``harmonics``), ``"arma"`` and ``"xreg"`` (an array, or a dict by
+        name). The states not provided are estimated, with ``"optimal"``
+        initialisation, and ``initial_type`` is ``"provided"``.
+    arma : dict, array or None
+        The parameters of the ARMA, as in ``ADAM``: a dict with ``"ar"`` and
+        ``"ma"`` (either can be left out to estimate it), or a vector with the AR and
+        then the MA parameters of each lag, lag by lag. If provided, the orders are
+        not selected.
     verbose : int, default=0
         Not used yet (R's ``silent``).
-    B, lb, ub, maxeval, maxtime, algorithm : optional
-        The starting values, bounds and NLopt settings, as in R's ellipsis.
-    xtol_rel, xtol_abs, ftol_rel, ftol_abs, print_level : optional
-        The tolerances and the print level of NLopt.
-    n_iterations, head_length, fi, step_size, shape : optional
+    nlopt_kwargs : dict or None
+        The settings of the optimiser, as ``ADAM``'s: ``"B"``, ``"lb"``, ``"ub"``
+        (the starting values and bounds of the parameters, as R's ellipsis),
+        ``"maxeval"``, ``"maxtime"``, ``"algorithm"``, ``"xtol_rel"``,
+        ``"xtol_abs"``, ``"ftol_rel"``, ``"ftol_abs"`` and ``"print_level"``.
+    n_iterations, head_length, fi, step_size : optional
         The iterations and head of backcasting, the Fisher Information with its
-        step, and the shape of ``dgnorm`` (estimated if None).
+        step, as ``ADAM``.
+    gnorm_shape : float or None
+        The shape of ``dgnorm``, as ``ADAM``; estimated if None.
     """
 
     def __init__(
@@ -305,35 +366,33 @@ class TBATS:
         occurrence: Any = "none",
         distribution: str = "auto",
         loss: Union[str, Callable[..., float]] = "likelihood",
+        outliers: str = "ignore",
+        outliers_level: float = 0.99,
         ic: str = "AICc",
         h: int = 0,
         holdout: bool = False,
-        initial: str = "backcasting",
+        persistence: Optional[Union[Dict[str, Any], List[float], NDArray]] = None,
+        phi: Optional[float] = None,
+        initial: Union[str, Dict[str, Any], List[float], NDArray] = "backcasting",
+        arma: Optional[Union[Dict[str, Any], List[float], NDArray]] = None,
         bounds: str = "admissible",
         verbose: int = 0,
-        B: Optional[NDArray] = None,
-        lb: Optional[NDArray] = None,
-        ub: Optional[NDArray] = None,
-        maxeval: Optional[int] = None,
-        maxtime: float = -1,
-        algorithm: str = "NLOPT_LN_NELDERMEAD",
-        xtol_rel: float = 1e-6,
-        xtol_abs: float = 1e-8,
-        ftol_rel: float = 1e-8,
-        ftol_abs: float = 0,
-        print_level: int = 0,
+        nlopt_kwargs: Optional[Dict[str, Any]] = None,
         n_iterations: Optional[int] = None,
         head_length: Optional[int] = None,
         fi: bool = False,
-        step_size: float = float(np.finfo(float).eps ** 0.25),
-        shape: Optional[float] = None,
+        step_size: Optional[float] = None,
+        gnorm_shape: Optional[float] = None,
     ) -> None:
         self.lags = [1.0] if lags is None else [float(lag) for lag in lags]
         self.harmonics = None if harmonics is None else [int(k) for k in harmonics]
         self.trend = _match(trend, TREND_OPTIONS, "trend")
         self.lambda_bc = lambda_bc
-        self.orders = {"ar": 3, "ma": 3, "select": True} if orders is None else orders
+        default_orders = {"ar": 3, "ma": 3, "select": True}
+        self._init_orders = default_orders if orders is None else orders
         self.regressors = _match(regressors, REGRESSORS_OPTIONS, "regressors")
+        self.outliers = _match(outliers, OUTLIERS_OPTIONS, "outliers")
+        self.outliers_level = outliers_level
         if isinstance(occurrence, str):
             _match(occurrence, OCCURRENCE_OPTIONS, "occurrence")
         self.occurrence = occurrence
@@ -344,36 +403,50 @@ class TBATS:
         self.ic = _match(ic, IC_OPTIONS, "ic")
         self.h = int(h)
         self.holdout = holdout
-        self.initial = _match(initial, INITIAL_OPTIONS, "initial")
+        self.persistence = persistence
+        self.phi = phi
+        self.initial = initial
+        self.arma = arma
+        # The provided initials are estimated where they are missing, as in ADAM
+        self._initial_method = (
+            _match(initial, INITIAL_OPTIONS, "initial")
+            if isinstance(initial, str)
+            else "optimal"
+        )
         # The gradient solve cannot take a custom loss: the initials are backcast
-        if self.initial == "gradient" and self.loss == "custom":
+        if self._initial_method == "gradient" and self.loss == "custom":
             warnings.warn(
                 'initial="gradient" is not available for custom loss functions. '
                 'Switching to initial="backcasting".',
                 stacklevel=2,
             )
-            self.initial = "backcasting"
+            self._initial_method = "backcasting"
+            if isinstance(self.initial, str):
+                self.initial = "backcasting"
         self.bounds = _match(bounds, BOUNDS_OPTIONS, "bounds")
         self.verbose = verbose
-        self.B = B
-        self.lb = lb
-        self.ub = ub
-        self.maxeval = maxeval
-        self.maxtime = maxtime
-        self.algorithm = algorithm
-        self.xtol_rel = xtol_rel
-        self.xtol_abs = xtol_abs
-        self.ftol_rel = ftol_rel
-        self.ftol_abs = ftol_abs
-        self.print_level = print_level
+        self.nlopt_kwargs = nlopt_kwargs
+        unknown = set(nlopt_kwargs or {}) - set(_NLOPT_DEFAULTS)
+        if unknown:
+            raise ValueError(
+                f"Unknown nlopt_kwargs of TBATS: {', '.join(sorted(unknown))}. "
+                f"Accepted: {', '.join(_NLOPT_DEFAULTS)}."
+            )
         self.n_iterations = n_iterations
         self.head_length = head_length
         self.fi = fi
-        self.step_size = step_size
-        self.shape = shape
+        self.step_size = (
+            float(np.finfo(float).eps ** 0.25) if step_size is None else step_size
+        )
+        self.gnorm_shape = gnorm_shape
 
     # Set by fit()
     _best: Dict[str, Any]
+    # Set by sm() on a scale model, as ADAM's
+    is_scale_: bool
+    loglik_sm_: float
+    df_sm_: int
+    location_: "TBATS"
     harmonics_: List[int]
     trend_type_: str
     lambda_: float
@@ -384,7 +457,9 @@ class TBATS:
         n_iterations = self.n_iterations
         if n_iterations is None:
             n_iterations = (
-                2 if self.initial in ("backcasting", "complete", "gradient") else 1
+                2
+                if self._initial_method in ("backcasting", "complete", "gradient")
+                else 1
             )
         return {
             "h": self.h,
@@ -392,23 +467,14 @@ class TBATS:
             "loss_function": self.loss_function,
             "bounds": self.bounds,
             "model_do": "estimate",
-            "B": self.B,
-            "lb": self.lb,
-            "ub": self.ub,
-            "maxeval": self.maxeval,
-            "maxtime": self.maxtime,
-            "algorithm": self.algorithm,
-            "xtol_rel": self.xtol_rel,
-            "xtol_abs": self.xtol_abs,
-            "ftol_rel": self.ftol_rel,
-            "ftol_abs": self.ftol_abs,
-            "print_level": self.print_level,
+            **_NLOPT_DEFAULTS,
+            **(self.nlopt_kwargs or {}),
             "n_iterations": n_iterations,
             "head_length": self.head_length,
             "fi": self.fi,
             "step_size": self.step_size,
-            "shape": 2.0 if self.shape is None else float(self.shape),
-            "shape_estimate": self.shape is None,
+            "shape": 2.0 if self.gnorm_shape is None else float(self.gnorm_shape),
+            "shape_estimate": self.gnorm_shape is None,
         }
 
     def fit(self, y: Union[NDArray, pd.Series], X: Optional[Any] = None) -> "TBATS":
@@ -438,7 +504,20 @@ class TBATS:
             _warn_missing(missing, obs_in_sample, stacklevel=3)
         self._index = index
 
-        xreg = st.xreg_spec(X, obs_in_sample, h, self.regressors)
+        # The outliers make the regressors used or selected, as in R's auto.adam()
+        regressors = self.regressors if self.outliers == "ignore" else self.outliers
+        xreg = st.xreg_spec(X, obs_in_sample, h, regressors)
+        # The regressors with the names of the dummies of the outliers are renamed
+        if self.outliers != "ignore" and xreg is not None:
+            clashes = [n for n in xreg["names"] if OUTLIER_NAMES.match(n)]
+            if clashes:
+                warnings.warn(
+                    f"The names of the regressors {', '.join(clashes)} are those of "
+                    "the dummies of the outliers. Renaming them to "
+                    f"{', '.join('x.' + c for c in clashes)}.",
+                    stacklevel=2,
+                )
+                xreg["names"] = [f"x.{n}" if n in clashes else n for n in xreg["names"]]
         if xreg is not None:
             y_in_sample = np.where(xreg["missing"], np.nan, y_in_sample)
 
@@ -450,13 +529,101 @@ class TBATS:
 
         periods = sorted({lag for lag in lags if lag > 1})
         lam_spec = st.lambda_spec(self.lambda_bc, y_in_sample[ot], self.loss)
-        spec = st.arma_spec(self.orders, lags)
+        # The provided values, as ADAM takes them: phi needs a preselected trend, and
+        # an unnamed vector needs a preselected structure to be matched with it
+        orders = dict(self._init_orders)
+        persistence, phi, arma = self.persistence, self.phi, self.arma
+        initial = None if isinstance(self.initial, str) else self.initial
+        selection = (
+            trend == "auto"
+            or harmonics is None
+            or bool(orders.get("select"))
+            or regressors == "select"
+        )
+        if phi is not None and trend == "auto":
+            warnings.warn(
+                "Predefined phi can only be used with a preselected trend. Changing "
+                "to estimation.",
+                stacklevel=2,
+            )
+            phi = None
+        if persistence is not None and not isinstance(persistence, dict) and selection:
+            warnings.warn(
+                "Predefined persistence vector can only be used with a preselected "
+                "structure.\nChanging to estimation of persistence values.",
+                stacklevel=2,
+            )
+            persistence = None
+        if initial is not None and not isinstance(initial, dict) and selection:
+            warnings.warn(
+                "Predefined initials vector can only be used with a preselected "
+                "structure.\nChanging to estimation of initials.",
+                stacklevel=2,
+            )
+            initial = None
+        if isinstance(initial, dict):
+            initial = dict(initial)
+            for key, unknown, message in (
+                (
+                    "seasonal",
+                    harmonics is None,
+                    "Initial seasonal coefficients need the harmonics to be provided.",
+                ),
+                (
+                    "arma",
+                    bool(orders.get("select")) and arma is None,
+                    "Initial ARMA states need the orders to be preselected.",
+                ),
+                (
+                    "xreg",
+                    regressors == "select",
+                    "Initial values of the regressors cannot be used with their "
+                    "selection.",
+                ),
+            ):
+                if initial.get(key) is not None and unknown:
+                    warnings.warn(f"{message} Estimating them.", stacklevel=2)
+                    initial.pop(key)
+        # The ARMA parameters fix its orders
+        if arma is not None:
+            orders["select"] = False
+        spec = st.arma_spec(orders, lags)
+        # The provided AR or MA parameters of a wrong number are estimated, as in ADAM
+        if arma is not None:
+            kinds: Dict[str, Any] = (
+                dict(arma) if isinstance(arma, dict) else {"arma": arma}
+            )
+            needed = {
+                "ar": int(np.sum(spec["ar_orders"])),
+                "ma": int(np.sum(spec["ma_orders"])),
+                "arma": spec["n_param"],
+            }
+            for kind in [k for k in needed if kinds.get(k) is not None]:
+                count = len(np.atleast_1d(kinds[kind]))
+                if count != needed[kind]:
+                    warnings.warn(
+                        f"The number of provided {kind.upper()} parameters is {count}, "
+                        f"while the orders imply {needed[kind]}. Estimating them.",
+                        stacklevel=2,
+                    )
+                    kinds[kind] = None
+            arma = kinds if isinstance(arma, dict) else kinds["arma"]
+        self._provided = {
+            "persistence": persistence,
+            "phi": phi,
+            "arma": arma,
+            "initial": initial,
+        }
         spec_fit = st.arma_build([0], [0], [1]) if spec["select"] else spec
         trend_types = ["none", "additive", "damped"] if trend == "auto" else [trend]
-        settings = {**self._settings(), "occurrence": occurrence}
+        settings = {
+            **self._settings(),
+            "occurrence": occurrence,
+            "provided": self._provided,
+        }
         distribution = self._distribution_selection()
         # The regressors are selected on the errors of the model without them
-        xreg_fit = None if self.regressors == "select" else xreg
+        xreg_fit = None if regressors == "select" else xreg
 
         if harmonics is None:
             harmonics = st.harmonics_select(
@@ -473,8 +640,6 @@ class TBATS:
                 raise ValueError("harmonics should have one value per lag above 1.")
             k_max = [math.ceil(p / 2) - 1 for p in periods]
             if any(k > m for k, m in zip(harmonics, k_max)):
-                import warnings
-
                 warnings.warn(
                     "The number of harmonics has to be below half of the period. "
                     "Reducing it.",
@@ -482,6 +647,41 @@ class TBATS:
                 )
                 harmonics = [min(k, m) for k, m in zip(harmonics, k_max)]
         table = st.harmonics_table(periods, harmonics)
+
+        # The dummies of the outliers of the global model join the regressors, in all
+        # the fits
+        outlier_names: List[str] = []
+        if self.outliers != "ignore":
+            dummies = st.outlier_dummies(
+                y_in_sample,
+                ot,
+                any(t != "none" for t in trend_types),
+                table,
+                lam_spec,
+                None if xreg_fit is None else xreg_fit["data"],
+                distribution,
+                self.outliers_level,
+                self.outliers,
+                self.ic,
+                h,
+            )
+            if dummies is not None:
+                outlier_names = dummies["names"]
+                data = dummies["data"]
+                n = len(y_in_sample)
+                user = [] if xreg is None else [xreg]
+                future = [u["future"] for u in user] + [data[n:]]
+                names = [name for u in user for name in u["names"]] + outlier_names
+                xreg = {
+                    "data": np.column_stack([u["data"] for u in user] + [data[:n]]),
+                    "future": np.column_stack(future) if h > 0 else None,
+                    "names": names,
+                    "number": len(names),
+                    "regressors": regressors,
+                }
+                xreg_fit = st.xreg_subset(
+                    xreg, outlier_names if regressors == "select" else xreg["names"]
+                )
 
         # Fit the candidates and select. The trends are warm started from the model
         # without it, with no trend smoothing
@@ -495,7 +695,7 @@ class TBATS:
                     spec_fit,
                     lam_spec,
                     distribution,
-                    self.initial,
+                    self._initial_method,
                     settings,
                     xreg_fit,
                     {**_named_b(candidates[0]), "beta": 0.0} if candidates else None,
@@ -506,10 +706,12 @@ class TBATS:
         }
         best = candidates[int(np.argmin(list(ics.values())))]
 
-        if self.regressors == "select" and xreg is not None:
+        if regressors == "select" and xreg is not None:
             best, xreg_fit = self._select_xreg(
                 best,
                 xreg,
+                outlier_names,
+                xreg_fit,
                 ics,
                 y_in_sample,
                 table,
@@ -550,7 +752,7 @@ class TBATS:
                     spec_best,
                     lam_spec,
                     distribution,
-                    self.initial,
+                    self._initial_method,
                     settings,
                     xreg_fit,
                     {**_named_b(best), **no_arma},
@@ -568,7 +770,7 @@ class TBATS:
 
         self._best = best
         self._settings_used = settings
-        self.ics = ics
+        self.ICs = ics
         self.harmonics_ = list(harmonics)
         self.periods_ = periods
         self.trend_type_ = best["trend_type"]
@@ -576,13 +778,15 @@ class TBATS:
         self._y_in_sample = y_in_sample
         self._occurrence = occurrence
         self._ot = ot
-        self.time_elapsed = time.time() - start_time
+        self.time_elapsed_ = time.time() - start_time
         return self
 
     def _select_xreg(
         self,
         best: Dict[str, Any],
         xreg: Dict[str, Any],
+        kept: List[str],
+        xreg_fit: Optional[Dict[str, Any]],
         ics: Dict[str, float],
         y: NDArray,
         table: Dict[str, NDArray],
@@ -594,20 +798,24 @@ class TBATS:
     ) -> Any:
         """The regressors selected by ``stepwise()`` on the errors of the best model
         without them, as R's ``adam_xreg_selector``: the model refitted with them is
-        kept if it improves the IC."""
+        kept if it improves the IC. The regressors in ``kept`` (the dummies of the
+        outliers) are in the model already, in ``xreg_fit``."""
+        names = [name for name in xreg["names"] if name not in kept]
+        if not names:
+            return best, xreg_fit
         shape_estimated = int("shape" in best["names"])
         selected = xreg_selector(
             best["fitted"]["errors"][ot],
-            xreg["data"][ot],
-            xreg["names"],
+            xreg["data"][ot][:, [xreg["names"].index(name) for name in names]],
+            names,
             self.ic,
             len(best["B"]) + 1 - shape_estimated,
             distribution,
             best["elements"]["shape"],
         )
-        subset = st.xreg_subset(xreg, selected)
-        if subset is None:
-            return best, None
+        if not selected:
+            return best, xreg_fit
+        subset = st.xreg_subset(xreg, kept + list(selected))
         candidate = ft.fit(
             y,
             best["trend_type"],
@@ -615,15 +823,15 @@ class TBATS:
             spec,
             lam_spec,
             distribution,
-            self.initial,
+            self._initial_method,
             settings,
             subset,
             _named_b(best),
         )
         ic_candidate = self._ic(candidate)
         improves = ic_candidate < min(ics.values())
-        ics[f"{candidate['trend_type']}+X({','.join(subset['names'])})"] = ic_candidate
-        return (candidate, subset) if improves else (best, None)
+        ics[f"{candidate['trend_type']}+X({','.join(selected)})"] = ic_candidate
+        return (candidate, subset) if improves else (best, xreg_fit)
 
     def _distribution_selection(self) -> str:
         """The distribution of the selection: ``"auto"`` selects with dgnorm, unless
@@ -662,7 +870,7 @@ class TBATS:
                 best["spec"],
                 lam_spec,
                 distribution,
-                self.initial,
+                self._initial_method,
                 {**settings, **bounds, "B": start},
                 xreg,
             )
@@ -673,7 +881,8 @@ class TBATS:
     def _ic(self, fitted: Dict[str, Any]) -> float:
         return st.ic_value(
             fitted["loglik"],
-            len(fitted["y"]),
+            # The observed values, as R's nobs of the log-likelihood
+            int(np.sum(~np.isnan(fitted["y"]))),
             fitted["n_param_estimated"] + fitted["n_param_occurrence"],
             self.ic,
         )
@@ -697,8 +906,11 @@ class TBATS:
 
     @property
     def loglik(self) -> float:
-        """The log-likelihood of the data, with the Jacobian of the transform."""
+        """The log-likelihood of the data, with the Jacobian of the transform: that of
+        the scale model when one is attached (R's ``implant()``)."""
         self._check_fitted()
+        if self.scale_model is not None:
+            return float(self.scale_model.loglik_sm_)
         return float(self._best["loglik"])
 
     @property
@@ -716,7 +928,52 @@ class TBATS:
         """The number of estimated parameters, the scale, the identified initials
         and the parameters of the occurrence model included."""
         self._check_fitted()
-        return int(self._best["n_param_estimated"] + self._best["n_param_occurrence"])
+        best = self._best
+        n_param = int(best["n_param_estimated"] + best["n_param_occurrence"])
+        # The parameters of an attached scale model replace the scale (R's implant())
+        if self.scale_model is not None:
+            return n_param - 1 + int(self.scale_model.nparam)
+        return n_param
+
+    @property
+    def n_param(self) -> NParam:
+        """The table of the numbers of parameters, as ADAM's (R's ``$nParam``): the
+        scale apart from the internal ones."""
+        self._check_fitted()
+        n_param = NParam.from_dict(
+            {
+                "estimated": {
+                    "internal": int(self._best["n_param_estimated"]) - 1,
+                    "occurrence": int(self._best["n_param_occurrence"]),
+                    "scale": 1,
+                },
+                "provided": {"internal": int(self._best["n_param_provided"])},
+            }
+        )
+        n_param.update_totals()
+        return n_param
+
+    @property
+    def profile(self) -> NDArray:
+        """The profile of the states at the end of the sample, from which the
+        forecasts start (R's ``$profile``)."""
+        self._check_fitted()
+        return np.asarray(self._best["fitted"]["profile"])
+
+    @property
+    def initial_type(self) -> str:
+        """The initialisation used (R's ``$initialType``): ``"provided"`` when some
+        initial states are."""
+        self._check_fitted()
+        if self._best["initial_provided"]:
+            return "provided"
+        return str(self._best["initial_type"])
+
+    @property
+    def time_elapsed(self) -> float:
+        """The time of the fit in seconds (R's ``$timeElapsed``)."""
+        self._check_fitted()
+        return self.time_elapsed_
 
     @property
     def aic(self) -> float:
@@ -772,10 +1029,20 @@ class TBATS:
     @property
     def residuals(self) -> NDArray:
         """The errors in the space of the transformed data, NaN at the missing
-        values."""
+        values; those of the location model standardised by the scale for a scale
+        model (``sm()``), as R."""
         self._check_fitted()
         errors = self._best["fitted"]["errors"].copy()
         errors[np.isnan(self._y_in_sample)] = np.nan
+        if getattr(self, "is_scale_", False):
+            from smooth.adam_general.core.sm import _standardise_residuals
+
+            return _standardise_residuals(
+                self.location_.residuals,
+                np.asarray(self.fitted, dtype=float),
+                self.distribution_,
+                None,
+            )
         return errors
 
     @property
@@ -790,14 +1057,74 @@ class TBATS:
         return self._best["states"].copy()
 
     @property
-    def component_names(self) -> List[str]:
+    def _component_names(self) -> List[str]:
         self._check_fitted()
         return list(self._best["struct"]["component_names"])
 
     @property
     def persistence_vector(self) -> Dict[str, float]:
+        """The persistence vector (R's ``$persistence``) under ADAM's names:
+        ``alpha``, ``beta``, ``gamma1_j[m]`` and ``gamma2_j[m]`` for the two states of
+        the harmonic ``j`` of the period ``m``, ``psi`` for the ARMA states and
+        ``delta`` for the regressors."""
         self._check_fitted()
-        return dict(zip(self.component_names, self._best["elements"]["vec_g"]))
+        struct = self._best["struct"]
+        table = struct["table"]
+        n_arma = struct["n_arma"]
+        names = ["alpha"] + ["beta"] * struct["trend_in"]
+        names += [
+            f"gamma{k}_{j}[{st._period_label(p)}]"
+            for j, p in zip(table["j"], table["period"])
+            for k in (1, 2)
+        ]
+        names += ["psi"] if n_arma == 1 else [f"psi{i}" for i in range(1, n_arma + 1)]
+        names += [f"delta{i}" for i in range(1, struct["n_xreg"] + 1)]
+        values = np.ravel(self._best["elements"]["vec_g"]).astype(float).tolist()
+        return dict(zip(names, values))
+
+    @property
+    def persistence_level_(self) -> float:
+        """The smoothing parameter of the level, alpha, as ADAM's."""
+        self._check_fitted()
+        return float(self._best["B_full"]["alpha"])
+
+    @property
+    def persistence_trend_(self) -> Optional[float]:
+        """The smoothing parameter of the trend, beta, or None."""
+        self._check_fitted()
+        beta = self._best["B_full"].get("beta")
+        return None if beta is None else float(beta)
+
+    @property
+    def persistence_seasonal_(self) -> List[List[float]]:
+        """The smoothing parameters of the harmonics, ``[gamma1, gamma2]`` per period
+        with harmonics, as ``persistence["seasonal"]`` takes them."""
+        self._check_fitted()
+        full = self._best["B_full"]
+        return [
+            [float(full[f"gamma{k}[{st._period_label(p)}]"]) for k in (1, 2)]
+            for p in self.periods_
+            if f"gamma1[{st._period_label(p)}]" in full
+        ]
+
+    @property
+    def persistence_xreg_(self) -> Optional[List[float]]:
+        """The smoothing parameters of the regressors, delta, or None."""
+        self._check_fitted()
+        deltas = [float(v) for k, v in self._best["B_full"].items() if k[:5] == "delta"]
+        return deltas or None
+
+    @property
+    def b_value(self) -> NDArray:
+        """The parameter vector B (R's ``$B``), as ``coef``."""
+        return self.coef
+
+    @property
+    def om_model(self) -> Any:
+        """The fitted occurrence model (OM / OMG), as ADAM's, or None."""
+        self._check_fitted()
+        model = self._occurrence["model"]
+        return None if isinstance(model, dict) else model
 
     @property
     def transition(self) -> NDArray:
@@ -811,7 +1138,7 @@ class TBATS:
         return self._best["fitted"]["mat_wt"].copy()
 
     @property
-    def xreg_names_(self) -> List[str]:
+    def _xreg_names(self) -> List[str]:
         """The names of the regressors in the model (after the selection)."""
         self._check_fitted()
         xreg = self._best["struct"]["xreg"]
@@ -825,6 +1152,17 @@ class TBATS:
             if self._best["struct"]["damped"]
             else 1.0
         )
+
+    @property
+    def arma_parameters_(self) -> Optional[Dict[str, Dict[str, float]]]:
+        """The AR and MA parameters, estimated or provided, as ADAM's (R's
+        ``$arma``): the parts the model has, or None without ARMA."""
+        self._check_fitted()
+        result: Dict[str, Dict[str, float]] = {}
+        for name in self._best["spec"]["names"]:
+            kind = "ar" if name.startswith("phi") else "ma"
+            result.setdefault(kind, {})[name] = float(self._best["B_full"][name])
+        return {kind: result[kind] for kind in ("ar", "ma") if kind in result} or None
 
     @property
     def scale(self) -> float:
@@ -842,8 +1180,17 @@ class TBATS:
     _multicov_empirical = ADAM._multicov_empirical
     _variance_debiased = ADAM._variance_debiased
     plot = ADAM.plot
-    scale_model = None
     is_combined = False
+
+    @property
+    def scale_model(self) -> Any:
+        """The attached scale model (``sm()``), or None, as ``ADAM``'s."""
+        return getattr(self, "_scale_model", None)
+
+    @scale_model.setter
+    def scale_model(self, value: Any) -> None:
+        """Attach a scale model, as ``ADAM``'s (R's ``implant()``)."""
+        ADAM.scale_model.fset(self, value)  # type: ignore[attr-defined]
 
     @property
     def _df_scale(self) -> float:
@@ -857,9 +1204,8 @@ class TBATS:
         """The dgnorm shape, provided or estimated."""
         return float(self._best["elements"]["shape"])
 
-    def extract_scale(self) -> float:
-        """The scale of the distribution (R's ``extractScale``)."""
-        return self.scale
+    # The scale, or the fitted scale of an attached scale model (R's extractScale)
+    extract_scale = ADAM.extract_scale
 
     @property
     def sigma(self) -> float:
@@ -896,7 +1242,7 @@ class TBATS:
     @property
     def _auto_forecast(self) -> Any:
         """The forecast of the fit, for the plot of the series."""
-        forecast = self.forecast_
+        forecast = self._forecast
         return None if forecast is None else SimpleNamespace(mean=forecast)
 
     def rmultistep(self, h: int = 10) -> pd.DataFrame:
@@ -975,14 +1321,14 @@ class TBATS:
         return self.loss
 
     @property
-    def orders_(self) -> Dict[str, Any]:
-        """The ARMA orders and their lags."""
+    def orders(self) -> Dict[str, List[int]]:
+        """The ARMA orders as ADAM's, with no integration (R's ``$orders``)."""
         self._check_fitted()
         spec = self._best["spec"]
         return {
             "ar": spec["ar_orders"].tolist(),
+            "i": [0] * len(spec["lags"]),
             "ma": spec["ma_orders"].tolist(),
-            "lags": spec["lags"].tolist(),
         }
 
     @property
@@ -1008,7 +1354,7 @@ class TBATS:
             result["arma"] = np.asarray(read["arma"])
         if struct["n_xreg"] > 0:
             result["xreg"] = dict(
-                zip(self.xreg_names_, np.asarray(read["states"]["xreg"], dtype=float))
+                zip(self._xreg_names, np.asarray(read["states"]["xreg"], dtype=float))
             )
         return result
 
@@ -1038,13 +1384,13 @@ class TBATS:
         )
 
     @property
-    def fi_(self) -> Optional[NDArray]:
+    def fisher_information_(self) -> Optional[NDArray]:
         """The observed Fisher Information (with ``fi=True``)."""
         self._check_fitted()
         return self._best["fi"]
 
     @property
-    def forecast_(self) -> Optional[NDArray]:
+    def _forecast(self) -> Optional[NDArray]:
         """The forecasts of the fit for ``h`` steps ahead."""
         self._check_fitted()
         if self._best["forecast_bc"] is None:
@@ -1055,9 +1401,39 @@ class TBATS:
     # Methods
     def point_lik(self, log: bool = True) -> NDArray:
         """The log-densities of the data: those of the transformed data and the
-        Jacobian, which sum to the log-likelihood."""
+        Jacobian, which sum to the log-likelihood. With a scale model, those of its
+        likelihood (R's ``pointLik.sm.adam``)."""
         self._check_fitted()
-        values = self._best["point_lik"](self._best["B"])
+        if self.scale_model is not None:
+            return self.scale_model.point_lik(log=log)
+        if getattr(self, "is_scale_", False):
+            from smooth.adam_general.core.sm import _log_density
+
+            location = self.location_
+            lam = location.lambda_
+            shape = location._best["elements"]["shape"]
+            y = location._y_in_sample
+            observed = ~np.isnan(y)
+            ot = location._ot & observed
+            zero = observed & ~ot
+            y_bc = st.box_cox_sizes(y, lam, ot)
+            scale = np.asarray(self.fitted, dtype=float)
+            values = np.zeros(len(y))
+            values[ot] = _log_density(
+                self.distribution_,
+                "A",
+                y_bc[ot],
+                y_bc[ot] - location.residuals[ot],
+                scale[ot],
+                shape,
+            ) + (lam - 1) * _log_r(y[ot])
+            # The occurrence model: the zeros have only its likelihood
+            if location._occurrence["model"] is not None:
+                p_fitted = location._occurrence["p_fitted"]
+                values[zero] = _log_r(1 - p_fitted[zero])
+                values[ot] += _log_r(p_fitted[ot])
+        else:
+            values = self._best["point_lik"](self._best["B"])
         return values if log else _exp_r(values)
 
     def vcov(
@@ -1224,7 +1600,11 @@ class TBATS:
         n_xreg = struct["n_xreg"]
         future = self._future_x(h, X)
         n_param = self.nparam
-        n_scale = int(self.loss == "likelihood")
+        # The parameters of the scale: those of an attached scale model, which
+        # replace it (R's implant() puts them in the scale column)
+        n_scale = int(self.loss == "likelihood") * (
+            1 if self.scale_model is None else int(self.scale_model.nparam)
+        )
         # The sizes: zero where there is no demand, and the scale divided by all the
         # observations, as ADAM's of an occurrence model, which the forecaster
         # de-biases by the non-zero ones
@@ -1232,8 +1612,15 @@ class TBATS:
         # The missing values stay missing, as in R's tbats_boxCoxObject
         y_bc = st.box_cox_sizes(self._y_in_sample, self.lambda_, ot)
         y_bc[np.isnan(self._y_in_sample)] = np.nan
-        scale = scale_debias(
-            self.scale, self.distribution_, int(ot.sum()), self._nobs_observed()
+        # The scale, divided by all the observed values, as ADAM's
+        scale = self.scale
+        errors = self._best["fitted"]["errors"].copy()
+        errors[np.isnan(self._y_in_sample)] = np.nan
+        # The scale of each horizon from an attached scale model (R's sm())
+        scale_forecast = (
+            np.asarray(self.scale_model.predict(h=h).mean, dtype=np.float64)
+            if self.scale_model is not None and h > 0
+            else None
         )
 
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
@@ -1247,7 +1634,7 @@ class TBATS:
                 "loss": self.loss,
                 "other": {"shape": best["elements"]["shape"]},
                 "n_param": None,
-                "scale_forecast": None,
+                "scale_forecast": scale_forecast,
                 "seed": seed,
                 **general,
             }
@@ -1259,18 +1646,19 @@ class TBATS:
                     "transition": best["elements"]["mat_f"],
                     "persistence": best["elements"]["vec_g"],
                     "profiles_recent_table": best["fitted"]["profile"],
-                    "residuals": pd.Series(self.residuals),
+                    "residuals": pd.Series(errors),
                     # The prediction of the model at the missing values
                     "y_fitted": np.where(
                         np.isnan(y_bc),
                         np.ravel(best["fitted"]["fitted"]),
-                        y_bc - self.residuals,
+                        y_bc - errors,
                     ),
                     "scale": scale,
                 },
                 observations_dict={
                     "obs_in_sample": self.nobs,
                     "obs_nonzero": int(ot.sum()),
+                    "ot_logical": ot & ~np.isnan(self._y_in_sample),
                     "y_na_values": np.isnan(self._y_in_sample),
                     "y_in_sample": y_bc,
                     "y_forecast_start": self._forecast_start(),
@@ -1454,17 +1842,30 @@ class TBATS:
 
     def _future_x(self, h: int, X: Optional[Any]) -> Optional[NDArray]:
         """The future values of the regressors (R's ``adam_xregNewdata``): ``X``,
-        else the holdout, else the regressors forecast by ADAM with a warning."""
+        else the holdout, else the regressors forecast by ADAM with a warning. The
+        dummies of the outliers are zero: not forecast, and added to ``X`` when it
+        lacks them."""
         xreg = self._best["struct"]["xreg"]
         if xreg is None or h <= 0:
             return None
         names = xreg["names"]
+        dummies = [i for i, name in enumerate(names) if OUTLIER_NAMES.match(name)]
+        others = [i for i in range(len(names)) if i not in dummies]
         if X is not None:
             if isinstance(X, pd.DataFrame):
                 values = X.set_axis(st.make_names([str(c) for c in X.columns]), axis=1)
+                for i in dummies:
+                    if names[i] not in values:
+                        values[names[i]] = 0.0
                 values = values[names].to_numpy(dtype=float)
             else:
-                values = np.asarray(X, dtype=float).reshape(-1, len(names))
+                values = np.asarray(X, dtype=float)
+                if values.ndim == 1:
+                    values = values.reshape(-1, len(others) if dummies else len(names))
+                if dummies and values.shape[1] == len(others):
+                    full = np.zeros((values.shape[0], len(names)))
+                    full[:, others] = values
+                    values = full
             if values.shape[0] < h:
                 warnings.warn(
                     f"X has {values.shape[0]} observations, while {h} are needed. "
@@ -1486,19 +1887,19 @@ class TBATS:
             return holdout[:h].copy()
         from smooth.adam_general.core.adam import ADAM
 
-        warnings.warn(
-            "X is not provided. Predicting the explanatory variables based on what "
-            "I have in-sample.",
-            stacklevel=3,
-        )
+        if others:
+            warnings.warn(
+                "X is not provided. Predicting the explanatory variables based on "
+                "what I have in-sample.",
+                stacklevel=3,
+            )
         known = np.zeros((0, len(names))) if holdout is None else holdout
         h_needed = h - known.shape[0]
-        forecasts = np.column_stack(
-            [
-                np.asarray(ADAM().fit(column).predict(h=h_needed).mean, dtype=float)
-                for column in xreg["data"].T
-            ]
-        )
+        forecasts = np.zeros((h_needed, len(names)))
+        for i in others:
+            forecasts[:, i] = np.asarray(
+                ADAM().fit(xreg["data"][:, i]).predict(h=h_needed).mean, dtype=float
+            )
         return np.vstack([known, forecasts])
 
     def _pull_back(self, parameters: NDArray, point: NDArray) -> NDArray:
@@ -1547,7 +1948,7 @@ class TBATS:
         refits = self._best["refitter"](draws)
         obs = self.nobs
         lag_max = self._best["struct"]["lags_model_max"]
-        names = self.component_names
+        names = self._component_names
         lambdas = refits["lambda"]
         fitted_bc = refits["fitted"]
         columns = [f"nsim{i}" for i in range(1, nsim + 1)]
@@ -1611,7 +2012,6 @@ class TBATS:
         from smooth.adam_general.core.adam import _column_names_for_levels
         from smooth.adam_general.core.creator.architector import adam_profile_creator
         from smooth.adam_general.core.utils.distributions import generate_errors
-        from smooth.adam_general.core.utils.utils import scale_debias
 
         self._check_fitted()
         levels = list(np.atleast_1d(level).astype(float))
@@ -1729,7 +2129,6 @@ class TBATS:
         from smooth.adam_general._adam_general import adam_simulator
         from smooth.adam_general.core.creator.architector import adam_profile_creator
         from smooth.adam_general.core.utils.distributions import generate_errors
-        from smooth.adam_general.core.utils.utils import scale_debias
 
         self._check_fitted()
         best = self._best
@@ -1742,6 +2141,7 @@ class TBATS:
         obs_nonzero = int(self._ot.sum())
         df_scale = max(obs_nonzero - (self.nparam - n_scale), 1)
         rng = np.random.default_rng(seed)
+        # The scale is divided by the observed sizes
         scale = scale_debias(self.scale, self.distribution_, obs_nonzero, df_scale)
         errors = np.reshape(
             generate_errors(
@@ -1860,6 +2260,95 @@ class TBATS:
             result = result.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
         return result
 
+    def sm(self, X: Optional[Any] = None, **kwargs: Any) -> "TBATS":
+        """The model of the scale of the error term (R's ``sm()``): TBATS on the
+        transformed errors in the space of the Box-Cox transformed data (the squares
+        for ``"dnorm"``, the absolute values for ``"dlaplace"``, ...), with lambda 0,
+        estimated by the joint likelihood of this model's data.
+
+        The transformed errors are divided by the exponent of the mean of their
+        logarithm at a unit scale, so that their logarithms are unbiased for the
+        log-scale. It takes the arguments and defaults of ``TBATS`` (``X`` its
+        regressors), but the lags of this model. Attach the
+        result to :attr:`scale_model` (R's ``implant()``): the forecasts then have the
+        scale of each horizon. With an occurrence model, the zeros, whose sizes are
+        not observed, are gaps of the scale model and have only the likelihood of
+        the occurrence."""
+        from smooth.adam_general.core.sm import _log_density, _residual_transform
+
+        self._check_fitted()
+        if self.loss != "likelihood":
+            raise ValueError(
+                "sm() only works with models estimated via maximisation of "
+                f"likelihood. Yours was estimated via {self.loss}. Cannot proceed."
+            )
+        distribution = self.distribution_
+        shape = self._best["elements"]["shape"]
+        lam = self.lambda_
+        # The sizes: the zeros of an occurrence model are missing values of the
+        # response, gaps of the scale model, as the missing ones
+        y = self._y_in_sample
+        observed = ~np.isnan(y)
+        ot = self._ot & observed
+        zero = observed & ~ot
+        errors = self.residuals
+        y_bc = st.box_cox_sizes(y, lam, ot)
+        response = np.full(len(errors), np.nan)
+        response[ot] = _residual_transform(errors[ot], distribution, shape)
+        # The logarithm of the transformed error is biased for the log-scale by the
+        # mean of its logarithm at a unit scale (that of chi-squared with one degree of
+        # freedom for dnorm, -1.27): removed, so that the scale model in logs follows
+        # the scale, and its states (backcast, or updated by the errors in logs) are
+        # not off by a factor
+        log_bias = {
+            "dnorm": special.digamma(0.5) + math.log(2),
+            "dlaplace": special.digamma(1),
+            "ds": special.digamma(2) - math.log(2),
+        }.get(distribution)
+        if log_bias is None:
+            log_bias = (math.log(shape) + special.digamma(1 / shape)) / shape
+        response[ot] = response[ot] * _exp_r(np.array([-log_bias]))[0]
+
+        # The joint log-likelihood of the observed values given the scale, the
+        # exponent of the fitted values of the scale model in logs: the densities of
+        # the sizes (TBATS hands the custom loss the sizes; the zeros of an
+        # occurrence model have only its likelihood)
+        y_sm = y_bc[ot]
+        mu_sm = y_sm - errors[ot]
+
+        def loss(actual: Any = None, fitted: Any = None, B: Any = None) -> float:
+            scale = _exp_r(np.asarray(fitted))
+            densities = _log_density(distribution, "A", y_sm, mu_sm, scale, shape)
+            return -float(_sum_r(densities))
+
+        arguments: Dict[str, Any] = {
+            "lags": self.lags,
+            "distribution": distribution,
+            "gnorm_shape": shape if distribution == "dgnorm" else None,
+            **kwargs,
+            "lambda_bc": 0,
+            "loss": loss,
+        }
+        # The zeros of an occurrence model are the missing values of the response
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Data contains NAs")
+            warnings.filterwarnings("ignore", message="More than half")
+            scale_model = TBATS(**arguments).fit(response, X)
+
+        # The log-likelihood of the data: the sizes with the Jacobian of their
+        # transform, the occurrence, and the parameters of both models (one scale)
+        jacobian = (lam - 1) * _log_r(y[ot])
+        scale_model.loglik_sm_ = scale_model.loglik + float(_sum_r(jacobian))
+        if self._occurrence["model"] is not None:
+            p_fitted = self._occurrence["p_fitted"]
+            scale_model.loglik_sm_ += float(
+                _sum_r(_log_r(p_fitted[ot])) + _sum_r(_log_r(1 - p_fitted[zero]))
+            )
+        scale_model.df_sm_ = int(scale_model.nparam) + int(self.nparam) - 1
+        scale_model.is_scale_ = True
+        scale_model.location_ = self
+        return scale_model
+
     def _refit_kwargs(self) -> Dict[str, Any]:
         """The arguments refitting the model with its structure, starting from its
         parameters without bounds (R's ``tbats_refitCall``)."""
@@ -1885,11 +2374,22 @@ class TBATS:
             },
             "distribution": self.distribution_,
             "loss": self.loss_function if self.loss == "custom" else self.loss,
-            "initial": self.initial,
+            # The provided values, as they were applied
+            "persistence": self._provided["persistence"],
+            "phi": self._provided["phi"],
+            "initial": (
+                self._initial_method
+                if self._provided["initial"] is None
+                else self._provided["initial"]
+            ),
+            "arma": self._provided["arma"],
             "bounds": self.bounds,
-            "B": B,
-            "lb": np.full(len(B), -np.inf),
-            "ub": np.full(len(B), np.inf),
+            "nlopt_kwargs": {
+                **(self.nlopt_kwargs or {}),
+                "B": B,
+                "lb": np.full(len(B), -np.inf),
+                "ub": np.full(len(B), np.inf),
+            },
         }
         if self._best["struct"]["n_xreg"] > 0:
             kwargs["regressors"] = (
@@ -1905,7 +2405,7 @@ class TBATS:
                 )
             kwargs["occurrence"] = model.occurrence
         if self.distribution_ == "dgnorm" and "shape" not in self.coef_names:
-            kwargs["shape"] = self._best["elements"]["shape"]
+            kwargs["gnorm_shape"] = self._best["elements"]["shape"]
         return kwargs
 
     def coefbootstrap(
@@ -1933,7 +2433,7 @@ class TBATS:
             self.nobs,
             nsim,
             obs_minimum,
-            self.initial in ("backcasting", "complete", "gradient"),
+            self._initial_method in ("backcasting", "complete", "gradient"),
             np.random.default_rng(seed),
         )
         xreg = self._best["struct"]["xreg"]
@@ -1983,7 +2483,7 @@ class TBATS:
             "loglik": self.loglik,
             "aicc": self.aicc,
             "scale": self.scale,
-            "ics": self.ics,
+            "ICs": self.ICs,
         }
 
     def __repr__(self) -> str:

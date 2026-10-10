@@ -686,7 +686,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         persistence=persistence, phi=phi, initial=initial, arma=arma,
                                         occurrence=occurrence,
                                         ic=ic, bounds=bounds, silent=silent,
-                                        smoother=ellipsis$smoother, ...)));
+                                        smoother=ellipsis$smoother, ...),
+                       # The data is substituted (for its name), so it is found where adam() was called
+                       envir=parent.frame()));
     }
 
     headLengthUser <- ellipsis$headLength;
@@ -823,9 +825,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         obsObserved <- sum(observed);
         if(!multisteps){
             if(loss=="likelihood"){
-                # Scale for different functions
+                # Scale for different functions: the maximum likelihood over the observed sizes
                 scale <- scaler(distribution, Etype, adamFitted$errors[otLogical],
-                                adamFitted$fitted[otLogical], obsObserved, other);
+                                adamFitted$fitted[otLogical], sum(otLogical), other);
 
                 # Calculate the likelihood
                 ## as.complex() is needed for failsafe in case of exotic models
@@ -892,43 +894,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                        scale=scale*abs(adamFitted$fitted[otLogical]), log=TRUE)
                 ));
 
-                # Differential entropy for the logLik of occurrence model, over the observed
-                # zeros: a missing observation is not a zero
-                otZero <- !otLogical & !yNAValues[1:obsInSample];
-                if(occurrenceModel || any(otZero)){
-                    CFValueEntropy <- switch(distribution,
-                                             "dnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5),
-                                             "dlnorm" = obsZero*(log(sqrt(2*pi*scale))+0.5)-scale/2,
-                                             "dlogis" = obsZero*2,
-                                             "dlaplace" =,
-                                             "dllaplace" =,
-                                             "dalaplace" = obsZero*(1 + log(2*scale)),
-                                             "ds" =,
-                                             "dls" = obsZero*(2 + 2*log(2*scale)),
-                                             "dgnorm" =,
-                                             "dlgnorm" = obsZero*(1/other-log(other/(2*scale*gamma(1/other)))),
-                                             "dt" = obsZero*((scale+1)/2 *
-                                                                 (digamma((scale+1)/2)-digamma(scale/2)) +
-                                                                 log(sqrt(scale) * beta(scale/2,0.5))),
-                                             # "dinvgauss" = obsZero*(0.5*(log(pi/2)+1+suppressWarnings(log(scale)))));
-                                             # "dinvgauss" =0);
-                                             "dinvgauss" = 0.5*(obsZero*(log(pi/2)+1+suppressWarnings(log(scale)))-
-                                                                    sum(log(adamFitted$fitted[otZero]))),
-                                             "dgamma" = obsZero*(1/scale + log(gamma(1/scale)) +
-                                                                     (1-1/scale)*digamma(1/scale)) +
-                                                 sum(log(scale*adamFitted$fitted[otZero]))
-                    );
-                    # If the entropy is NA then something is wrong. It shouldn't be!
-                    if(is.na(CFValueEntropy)){
-                        CFValueEntropy[] <- Inf;
-                    }
-                    # If it is negative (it shouldn't be), substitute with zero.
-                    # Otherwise occurrence screws the demand sizes model
-                    if(CFValueEntropy<0){
-                        CFValueEntropy[] <- 0;
-                    }
-                    CFValue <- CFValue + CFValueEntropy;
-                }
+                # The zeros of an occurrence model are not in the likelihood of the sizes: their
+                # sizes are not observed, and integrate to one (the probabilities are added in
+                # logLik)
             }
             else if(loss=="MSE"){
                 CFValue <- sum(adamFitted$errors^2)/obsObserved;
@@ -2088,8 +2056,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             other <- abs(tail(B,1));
         }
         # which() is needed in order to overcome weird behaviour of zoo
-        scale <- scaler(distribution, Etype, errors[which(otLogical)], yFitted[which(otLogical)],
-                        sum(!yNAValues[1:obsInSample]), other);
+        # The sizes, not multiplied by the probabilities
+        scale <- scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
+                        sum(otLogical), other);
 
         # Record constant if it was estimated
         if(constantEstimate){
@@ -4409,6 +4378,32 @@ eigenBounds <- function(object, persistence, variableNumber=1){
     return(c(lowerBound, upperBound));
 }
 
+# The bounds of a smoothing parameter of CES with the other parameters at their
+# values: the range of the values of a grid on [-5, 5] (and the value itself) at
+# which the model is stable. As eigenBounds(), but each parameter moves both the
+# transition and the persistence, so both are rebuilt from the parameters: each
+# complex (alpha_0, alpha_1) and (beta_0, beta_1) gives a pair of states, after the
+# level and potential for beta, and the real beta of the partial seasonality one
+cesBounds <- function(object, parameters, variableNumber){
+    parametersNames <- names(parameters);
+    real <- which(grepl("^(alpha|beta)_0", parametersNames));
+    imaginary <- which(grepl("^(alpha|beta)_1", parametersNames));
+    partial <- which(grepl("^beta($|\\[)", parametersNames));
+    rows <- 2*seq_along(real) + 2*!any(startsWith(parametersNames, "alpha"));
+    persistence <- as.matrix(object$persistence);
+    stable <- function(value){
+        parameters[variableNumber] <- value;
+        object$transition[cbind(rows-1, rows)] <- parameters[imaginary]-1;
+        object$transition[cbind(rows, rows)] <- 1-parameters[real];
+        persistence[rows-1,] <- parameters[real]-parameters[imaginary];
+        persistence[rows,] <- parameters[real]+parameters[imaginary];
+        persistence[2+seq_along(partial),] <- parameters[partial];
+        return(!eigenValues(object, persistence));
+    }
+    grid <- -5+0.01*(0:1000);
+    return(range(parameters[variableNumber], grid[vapply(grid, stable, logical(1))]));
+}
+
 # The bounds of the ARMA parameters among parametersNames, each within its factor
 # with the others at their values (src/headers/arimaBounds.h). The parameters of
 # the factors that are not stationary / invertible are left out
@@ -5891,9 +5886,15 @@ adam_forecastRegression <- function(object, h, newdata, occurrence, interval, le
 # The future values of the explanatory variables of an adam model for h steps ahead,
 # as a matrix with a column per variable: newdata, else the holdout, else the
 # variables forecast by adam() (adam_xregForecast) with a warning
+# The names of the dummies of the outliers: outlier1, outlier1Lag1, outlier1Lead1, ...
+adam_outlierPattern <- "^outlier[0-9]+(Lag1|Lead1)?$";
+
 adam_xregNewdata <- function(object, h, newdata){
     xregNumber <- length(object$initial$xreg);
     xregNames <- names(object$initial$xreg);
+    # The dummies of the outliers (outlier1, outlier1Lag1, outlier1Lead1, ...) are zero in
+    # the future: they are not forecast, and are added to newdata when it lacks them
+    outlierNames <- grep(adam_outlierPattern, xregNames, value=TRUE);
     # The newdata is not provided
     if(is.null(newdata) && ((!is.null(object$holdout) && nrow(object$holdout)<h) ||
                             is.null(object$holdout))){
@@ -5908,16 +5909,20 @@ adam_xregNewdata <- function(object, h, newdata){
             xreg <- tail(object$data,h);
         }
 
+        forecastNeeded <- any(!(xregNames %in% outlierNames));
         if(is.matrix(xreg)){
-            warning("The newdata is not provided.",
-                    "Predicting the explanatory variables based on what I have in-sample.",
-                    call.=FALSE);
-            xreg <- adam_xregForecast(object, xreg, hNeeded);
+            if(forecastNeeded){
+                warning("The newdata is not provided.",
+                        "Predicting the explanatory variables based on what I have in-sample.",
+                        call.=FALSE);
+            }
+            xreg <- adam_xregForecast(object, xreg, hNeeded, outlierNames);
         }
-        else{
+        else if(forecastNeeded){
             warning("The newdata is not provided. Using last h in-sample observations instead.",
                     call.=FALSE);
         }
+        xreg[nrow(xreg)-hNeeded+seq_len(hNeeded), outlierNames] <- 0;
     }
     # The newdata is not provided, but we have holdout
     else if(is.null(newdata) && !is.null(object$holdout) && nrow(object$holdout)>=h){
@@ -5929,6 +5934,12 @@ adam_xregNewdata <- function(object, h, newdata){
         if(!is.data.frame(newdata) && !is.matrix(newdata)){
             newdata <- as.data.frame(newdata);
             colnames(newdata) <- "xreg";
+        }
+        outliersMissing <- setdiff(outlierNames, colnames(newdata));
+        if(length(outliersMissing)>0){
+            newdata <- cbind(as.data.frame(newdata),
+                             matrix(0, nrow(newdata), length(outliersMissing),
+                                    dimnames=list(NULL, outliersMissing)));
         }
         if(nrow(newdata)<h){
             warning(paste0("The newdata has ",nrow(newdata)," observations, while ",h," are needed. ",
@@ -6001,12 +6012,12 @@ adam_xregNewdata <- function(object, h, newdata){
 }
 
 # The future values of the explanatory variables in a matrix xreg (the columns of the
-# data), when newdata is missing: each variable but the response forecast by adam() into
-# the last hNeeded rows
-adam_xregForecast <- function(object, xreg, hNeeded){
+# data), when newdata is missing: each variable but the response and the dummies of the
+# outliers forecast by adam() into the last hNeeded rows
+adam_xregForecast <- function(object, xreg, hNeeded, outlierNames=NULL){
     responseName <- all.vars(formula(object))[1];
     rows <- nrow(xreg)-hNeeded+seq_len(hNeeded);
-    for(variable in setdiff(colnames(xreg), responseName)){
+    for(variable in setdiff(colnames(xreg), c(responseName, outlierNames))){
         xreg[rows,variable] <- adam(object$data[,variable], h=hNeeded, silent=TRUE)$forecast;
     }
     return(xreg);
@@ -7410,6 +7421,10 @@ multicov.adam <- function(object, type=c("analytical","empirical","simulated"), 
 
 #' @export
 pointLik.adam <- function(object, log=TRUE, ...){
+    # With a scale model, the likelihood is that of the scale model (sm()), as logLik()
+    if(is.scale(object$scale)){
+        return(pointLik(object$scale, log=log));
+    }
     distribution <- object$distribution;
     yInSample <- actuals(object);
     obsInSample <- nobs(object);
@@ -7490,32 +7505,9 @@ pointLik.adam <- function(object, log=TRUE, ...){
         likValues[otLogical] <- likValues[otLogical] - log(yInSample[otLogical]);
     }
 
-    # If this is a mixture model, take the respective probabilities into account (differential entropy)
-    # As in the estimation, a negative entropy (it should not be) is set to zero
+    # If this is a mixture model, take the probabilities into account: the sizes of the
+    # zeros are not observed, so the zeros have only the likelihood of the occurrence
     if(mixture){
-        otZero <- !otLogical & observed;
-        entropyValues <- rep(switch(distribution,
-                                         "dnorm" = (log(sqrt(2*pi*scale))+0.5),
-                                         "dlnorm" = (log(sqrt(2*pi*scale))+0.5) -scale/2,
-                                         "dlogis" = 2,
-                                         "dlaplace" =,
-                                         "dllaplace" =,
-                                         "dalaplace" = (1 + log(2*scale)),
-                                         "dt" = ((scale+1)/2 * (digamma((scale+1)/2)-digamma(scale/2)) +
-                                                     log(sqrt(scale) * beta(scale/2,0.5))),
-                                         "ds" =,
-                                         "dls" = (2 + 2*log(2*scale)),
-                                         "dgnorm" =,
-                                         "dlgnorm" = 1/other-log(other/(2*scale*gamma(1/other))),
-                                         "dinvgauss" = 0.5*(log(pi/2)+1+log(scale)-log(yFitted[otZero])),
-                                         "dgamma" = (1/scale + log(scale*yFitted[otZero]) +
-                                                         log(gamma(1/scale)) + (1-1/scale)*digamma(1/scale))
-        ), length.out=sum(otZero));
-        if(sum(entropyValues)<0){
-            entropyValues[] <- 0;
-        }
-        likValues[otZero] <- -entropyValues;
-
         # The likelihood of the occurrence: of its model, or of the provided probabilities
         occurrenceLik <- if(object$occurrence$occurrence=="provided"){
             ifelse(otLogical, log(pOccurrence), log(1-pOccurrence));

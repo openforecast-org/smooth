@@ -48,6 +48,7 @@
    ~OM.actuals
    ~OM.aic
    ~OM.aicc
+   ~OM.arma_parameters_
    ~OM.b_value
    ~OM.bic
    ~OM.bicc
@@ -79,7 +80,11 @@
    ~OM.occurrence_char
    ~OM.om_model
    ~OM.orders
+   ~OM.persistence_level_
+   ~OM.persistence_seasonal_
+   ~OM.persistence_trend_
    ~OM.persistence_vector
+   ~OM.persistence_xreg_
    ~OM.phi_
    ~OM.profile
    ~OM.residuals

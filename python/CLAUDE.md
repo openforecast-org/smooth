@@ -430,6 +430,14 @@ Feature work happens on topic branches off it. The `Python` branch is historical
 
 ## R / Python API Parity
 
+**Names follow ADAM, and new ones need asking.** `ADAM` takes the names of R's `adam()`
+where it can; every other class (`ES`, `CES`, `MSARIMA`, `SMA`, `OM`, `OMG`, `TBATS`,
+the `Auto*` classes, `sm`) reuses `ADAM`'s names for the same things — constructor
+arguments, fitted attributes, methods — and a name introduced once is used the same way
+everywhere. Never create a new argument, attribute, property, method, class or returned
+key without asking first and explaining the alternatives (the existing names that could
+carry it). The R↔Python map is in the `smooth-translation` skill; keep it current.
+
 The Python implementation must match R's public API as closely as possible. **Parameters, defaults, return types, attributes, and output structure should be equivalent** unless a language difference makes strict parity impossible (e.g. R uses `...` / `formula`, Python uses `X=` / keyword args).
 
 When adding or removing parameters from any class (`ADAM`, `OM`, `OMG`, `AutoOM`, `AutoADAM`, etc.), **check the corresponding R function signature first**. If Python has parameters or return-type behaviour that R does not (or vice-versa), flag the discrepancy explicitly before implementing. In particular:

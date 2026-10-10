@@ -76,7 +76,7 @@ class SMA(ADAM):
     ----------
     model : str
         Model name, e.g. ``"SMA(3)"``.
-    ICs_ : dict
+    ICs : dict
         IC values for each evaluated order (only present after auto-selection).
         Keys are order integers, values are IC floats.
 
@@ -102,7 +102,7 @@ class SMA(ADAM):
         >>> model = SMA(h=5)
         >>> model.fit(y)
         >>> print(model.model)   # e.g. "SMA(3)"
-        >>> print(model.ICs_)
+        >>> print(model.ICs)
 
     References
     ----------
@@ -205,7 +205,7 @@ class SMA(ADAM):
 
         self.model = f"SMA({order})"
         if self._ICs_array is not None:
-            self.ICs_ = {
+            self.ICs = {
                 i + 1: v for i, v in enumerate(self._ICs_array) if not np.isnan(v)
             }
 

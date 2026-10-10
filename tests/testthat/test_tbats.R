@@ -376,11 +376,12 @@ test_that("the occurrence: the sizes on the non-zero observations, the forecasts
     forecasted <- forecast(fit, h=14, interval="prediction");
     expect_equal(as.numeric(forecasted$mean), tbats_boxCoxInverse(skeleton, fit$lambda)*pForecast);
     expect_equal(as.numeric(forecasted$mean), as.numeric(fit$forecast));
-    # The scale of the sizes is de-biased by the non-zero observations, as that of tbats
+    # The scale of the sizes, divided by the observed sizes, is de-biased by them
     objectBC <- tbats_boxCoxObject(fit);
     expect_equal(adam_dfScale(objectBC), adam_dfScale(fit));
     expect_equal(adam_varianceDebiased(objectBC),
-                 fit$scale*sum(actuals(fit)!=0)/adam_dfScale(fit));
+                 adam_scaleVariance(fit$scale, fit$distribution, fit$other)*
+                     sum(actuals(fit)!=0, na.rm=TRUE)/adam_dfScale(fit));
     # The probability of no demand is above 0.5: the median and the lower bound are zero
     expect_true(all(forecast(fit, h=14, point="median")$mean==0));
     expect_true(all(forecasted$lower==0) && all(forecasted$upper>forecasted$mean));
@@ -524,4 +525,141 @@ test_that("a start a hair inside a bound is estimated as one on the bound", {
     B["lambda"] <- 1-2.65e-14;
     expect_equal(do.call(tbats, c(arguments, list(B=B)))$B, do.call(tbats, c(arguments, list(B=BBound)))$B,
                  tolerance=0);
+})
+
+test_that("the values taken from a fit and provided reproduce its loss", {
+    arguments <- list(AirPassengers, lags=c(1,6,12), harmonics=c(1,2), trend="damped",
+                      orders=list(ar=1, ma=1, select=FALSE), lambda=0, distribution="dnorm",
+                      initial="optimal", h=12, holdout=TRUE);
+    model <- do.call(tbats, arguments);
+    seasonal <- model$initial$seasonal;
+    persistence <- list(level=model$B[["alpha"]], trend=model$B[["beta"]],
+                        seasonal=lapply(c(6,12), function(period){
+                            return(unname(model$B[paste0(c("gamma1[","gamma2["), period, "]")]));
+                        }));
+    initial <- list(level=model$initial$level, trend=model$initial$trend,
+                    seasonal=lapply(split(seasonal, seasonal$period), function(rows){
+                        return(c(rows$sin, rows$cos));
+                    }),
+                    arma=model$initial$arma);
+    arguments$initial <- initial;
+    modelProvided <- do.call(tbats, c(arguments, list(persistence=persistence, phi=model$B[["phi"]],
+                                                    arma=list(ar=model$B[["phi1[1]"]], ma=model$B[["theta1[1]"]]))));
+    expect_equal(modelProvided$lossValue, model$lossValue, tolerance=1e-10);
+    expect_length(modelProvided$B, 0);
+    expect_equal(nparam(modelProvided), 1);
+    expect_equal(modelProvided$initialType, "provided");
+})
+
+test_that("the provided values are fixed and the rest estimated", {
+    model <- tbats(AirPassengers, harmonics=2, trend="damped", orders=orders0, lambda=0,
+                   distribution="dnorm", persistence=list(level=0.3, seasonal=list(c(0.001, 0))),
+                   phi=0.98, initial=list(level=4.7));
+    expect_equal(unname(model$persistence[["alpha"]]), 0.3);
+    expect_equal(model$phi, 0.98);
+    expect_equal(unname(model$initial$level), 4.7);
+    expect_false(any(c("alpha","phi","gamma1[12]","gamma2[12]","level") %in% names(model$B)));
+    expect_true(all(c("beta","trend","sin1[12]") %in% names(model$B)));
+    # The model reused keeps them
+    modelReused <- tbats(AirPassengers, model=model);
+    expect_equal(as.numeric(logLik(modelReused)), as.numeric(logLik(model)));
+    # All of its parameters but the scale are provided, as in adam()
+    expect_equal(nparam(modelReused), 1);
+    expect_equal(modelReused$nParam[2,5], nparam(model)-1+model$nParam[2,5]);
+})
+
+test_that("the provided values that need a selected structure are estimated with a warning", {
+    expect_warning(model <- tbats(AirPassengers, phi=0.9, orders=orders0, distribution="dnorm"),
+                   "Predefined phi");
+    expect_warning(tbats(AirPassengers, persistence=c(0.1, 0.1), orders=orders0, distribution="dnorm"),
+                   "Predefined persistence");
+    expect_warning(tbats(AirPassengers, initial=c(4.7, 0), orders=orders0, distribution="dnorm"),
+                   "Predefined initials");
+    expect_warning(model <- tbats(AirPassengers, orders=list(ar=1, ma=1, select=FALSE), arma=0.5,
+                                  trend="none", harmonics=2, distribution="dnorm"),
+                   "ARMA parameters");
+    expect_true(all(c("phi1[1]","theta1[1]") %in% names(model$B)));
+})
+
+# The outliers of the global model become regressors: the dummies of the shocks, zero
+# over the horizon, with the regressors used or selected as in auto.adam()
+test_that("tbats() finds the outliers on the global model", {
+    y <- AirPassengers;
+    y[c(30, 80)] <- y[c(30, 80)]*1.4;
+    testModel <- tbats(y, outliers="use", h=6);
+    expect_equal(testModel$xregNames, c("outlier1", "outlier2"));
+    expect_equal(which(testModel$data[, "outlier1"]==1), 30);
+    expect_equal(which(testModel$data[, "outlier2"]==1), 80);
+    expect_lt(AICc(testModel), AICc(tbats(y, h=6)));
+    testModel <- tbats(y, outliers="select", xreg=cbind(x=rnorm(144)), regressors="adapt");
+    expect_equal(testModel$regressors, "use");
+    expect_true(all(c("outlier1", "outlier2") %in% testModel$xregNames));
+    expect_null(tbats(y, outliers="ignore")$xregNames);
+})
+
+test_that("the unnamed regressors of tbats() are x1, x2, ...", {
+    testModel <- tbats(BJsales, lags=1, xreg=cbind(rnorm(150), rnorm(150)), trend="none",
+                       orders=list(ar=0, ma=0, select=FALSE));
+    expect_equal(testModel$xregNames, c("x1", "x2"));
+})
+
+# The dummies of the outliers are zero in the future: not forecast, and added to newdata
+test_that("the dummies of the outliers are zero in the forecasts", {
+    y <- AirPassengers;
+    y[c(30, 140)] <- y[c(30, 140)]*1.4;
+    testModel <- tbats(y, outliers="use");
+    expect_no_warning(testForecast <- forecast(testModel, h=12));
+    zeros <- matrix(0, 12, length(testModel$xregNames), dimnames=list(NULL, testModel$xregNames));
+    expect_equal(testForecast$mean, forecast(testModel, h=12, newdata=zeros)$mean);
+    x <- rnorm(156);
+    testModel <- tbats(y, outliers="use", xreg=cbind(x=x[1:144]));
+    expect_length(forecast(testModel, h=12, newdata=data.frame(x=x[145:156]))$mean, 12);
+    testModel <- adam(y, "MAM", outliers="use");
+    expect_no_warning(testForecast <- forecast(testModel, h=12));
+    zeros <- as.data.frame(matrix(0, 12, length(testModel$initial$xreg),
+                                  dimnames=list(NULL, names(testModel$initial$xreg))));
+    expect_equal(testForecast$mean, forecast(testModel, h=12, newdata=zeros)$mean);
+})
+
+# A regressor named as a dummy of the outliers is renamed with a warning, with outliers only
+test_that("a regressor named as a dummy of the outliers is renamed", {
+    y <- AirPassengers;
+    y[c(30, 140)] <- y[c(30, 140)]*1.4;
+    x <- rnorm(144);
+    expect_warning(testModel <- tbats(y, outliers="use", xreg=cbind(outlier1=x)), "x.outlier1");
+    expect_true("x.outlier1" %in% testModel$xregNames);
+    d <- data.frame(y=as.numeric(y), outlier1=x);
+    expect_warning(testModel <- adam(d, "MAM", lags=12, outliers="use", formula=y~outlier1), "x.outlier1");
+    expect_true("x.outlier1" %in% names(coef(testModel)));
+    expect_no_warning(testModel <- adam(d, "MAM", lags=12));
+    expect_true("outlier1" %in% names(coef(testModel)));
+})
+
+# sm(): the scale of the error term modelled by TBATS on the transformed errors, by the
+# joint likelihood; implant() puts it in the model, whose forecasts then follow it
+test_that("sm() models the scale of tbats() with TBATS", {
+    set.seed(3);
+    times <- 1:(24*7*4);
+    sigma <- exp(0.6*sin(2*pi*times/24));
+    y <- ts(exp(5 + 0.3*sin(2*pi*times/24) + rnorm(length(times), 0, 0.05*sigma)), frequency=24);
+    testModel <- tbats(y, distribution="dnorm", orders=list(ar=0, ma=0, select=FALSE));
+    testScale <- sm(testModel);
+    expect_true(is.scale(testScale));
+    expect_s3_class(testScale, "adamTBATS");
+    testImplanted <- implant(testModel, testScale);
+    expect_gt(as.numeric(logLik(testImplanted)), as.numeric(logLik(testModel)));
+    expect_equal(sum(pointLik(testImplanted)), as.numeric(logLik(testImplanted)));
+    testForecast <- forecast(testImplanted, h=24, interval="prediction");
+    widths <- as.vector(testForecast$upper-testForecast$lower);
+    expect_gt(max(widths)/min(widths), 2);
+    # With an occurrence model: the scale model shares it, the zeros take the entropy
+    times <- 1:(7*60);
+    sigma <- 0.3*exp(0.5*sin(2*pi*times/7));
+    y <- ts(exp(2 + 0.4*sin(2*pi*times/7) + rnorm(length(times), 0, sigma))*
+                rbinom(length(times), 1, 0.7), frequency=7);
+    testModel <- tbats(y, occurrence="odds-ratio", orders=list(ar=0, ma=0, select=FALSE));
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    testImplanted <- implant(testModel, sm(testModel));
+    expect_gt(as.numeric(logLik(testImplanted)), as.numeric(logLik(testModel)));
+    expect_equal(sum(pointLik(testImplanted)), as.numeric(logLik(testImplanted)));
 })

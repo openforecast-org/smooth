@@ -1556,16 +1556,16 @@ adam_scaleDebias <- function(scale, distribution, obs, df){
     return(scale*(obs/df)^(1/adam_scalePower(distribution)));
 }
 
-# Degrees of freedom for de-biasing the scale: the non-zero observations minus the
+# Degrees of freedom for de-biasing the scale: the observed sizes minus the
 # parameters, without the scale ones when they were estimated by likelihood.
 adam_dfScale <- function(object){
     nParam <- nparam(object);
     if(!is.null(object$loss) && object$loss=="likelihood"){
         nParam[] <- nParam - object$nParam[1,4];
     }
-    df <- nobs(object, all=FALSE) - nParam;
+    df <- adam_nobsObserved(object) - nParam;
     if(df<=0){
-        df[] <- nobs(object, all=FALSE);
+        df[] <- adam_nobsObserved(object);
     }
     return(df);
 }
@@ -1656,9 +1656,16 @@ adam_accuracy <- function(holdout, forecast, inSample){
                     inSample[!is.na(inSample)]));
 }
 
-# The observed values, which the scale is divided by: the missing ones are not
+# The observed sizes, which the scale is divided by: the missing values are not, and
+# neither are the zeros of an occurrence model, whose sizes are not observed
 adam_nobsObserved <- function(object){
-    return(sum(!is.na(actuals(object))));
+    y <- as.vector(actuals(object));
+    observed <- !is.na(y);
+    # An occurrence model (om(), with its type in $occurrence) has no sizes
+    if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[observed]!=1)){
+        observed[] <- observed & y!=0;
+    }
+    return(sum(observed));
 }
 
 # The de-biased variance from the scale model's forecasts

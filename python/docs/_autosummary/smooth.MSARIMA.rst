@@ -48,6 +48,7 @@
    ~MSARIMA.actuals
    ~MSARIMA.aic
    ~MSARIMA.aicc
+   ~MSARIMA.arma_parameters_
    ~MSARIMA.b_value
    ~MSARIMA.bic
    ~MSARIMA.bicc
@@ -77,7 +78,11 @@
    ~MSARIMA.nparam
    ~MSARIMA.om_model
    ~MSARIMA.orders
+   ~MSARIMA.persistence_level_
+   ~MSARIMA.persistence_seasonal_
+   ~MSARIMA.persistence_trend_
    ~MSARIMA.persistence_vector
+   ~MSARIMA.persistence_xreg_
    ~MSARIMA.phi_
    ~MSARIMA.profile
    ~MSARIMA.residuals

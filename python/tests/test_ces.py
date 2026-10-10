@@ -295,11 +295,11 @@ class CESCaseTests:
 
     def test_scale(self):
         assert np.isclose(
-            self.m.scale_,
+            self.m.scale,
             self.ref["scale"],
             atol=self.atol_param,
             rtol=self.rtol_param,
-        ), f"scale: {self.m.scale_} vs R {self.ref['scale']}"
+        ), f"scale: {self.m.scale} vs R {self.ref['scale']}"
 
     def test_b_vector(self):
         r_B = np.array(self.ref["B"])
@@ -354,21 +354,22 @@ class CESCaseTests:
     def test_states_shape(self):
         r_nrow = self.ref["states_nrow"]
         r_ncol = self.ref["states_ncol"]
-        p_states = self.m.states
+        # Components in rows, as ADAM's; R's have them in columns
+        p_states = self.m.states.T
         assert p_states.shape == (r_nrow, r_ncol), (
             f"States shape: {p_states.shape} vs R ({r_nrow}, {r_ncol})"
         )
 
     def test_states_first_row(self):
         r_first = np.array(self.ref["states_first_row"])
-        p_first = self.m.states[0, :]
+        p_first = self.m.states[:, 0]
         assert np.allclose(
             p_first, r_first, atol=self.atol_fitted, rtol=self.rtol_fitted
         ), f"States first row: {p_first} vs R {r_first}"
 
     def test_states_last_row(self):
         r_last = np.array(self.ref["states_last_row"])
-        p_last = self.m.states[-1, :]
+        p_last = self.m.states[:, -1]
         assert np.allclose(
             p_last, r_last, atol=self.atol_fitted, rtol=self.rtol_fitted
         ), f"States last row: {p_last} vs R {r_last}"
@@ -475,14 +476,11 @@ class TestAutoCESAirPassengers:
             h=params["h"],
             holdout=params["holdout"],
             lags=params.get("lags"),
-        )
-        self.m.fit(self.y)
+        ).fit(self.y)
 
     def test_selected_seasonality(self):
-        assert self.m.best_model_.seasonality == self.ref["selected_seasonality"], (
-            "Selected:"
-            f" {self.m.best_model_.seasonality} vs R"
-            f" {self.ref['selected_seasonality']}"
+        assert self.m.seasonality == self.ref["selected_seasonality"], (
+            f"Selected: {self.m.seasonality} vs R {self.ref['selected_seasonality']}"
         )
 
     def test_model_name(self):
@@ -490,11 +488,11 @@ class TestAutoCESAirPassengers:
 
     def test_loglik(self):
         assert np.isclose(
-            self.m.best_model_.loglik, self.ref["logLik"], atol=ATOL_IC, rtol=RTOL_TIGHT
+            self.m.loglik, self.ref["logLik"], atol=ATOL_IC, rtol=RTOL_TIGHT
         )
 
     def test_aicc(self):
-        assert abs(self.m.best_model_.aicc - self.ref["aicc"]) < ATOL_IC
+        assert abs(self.m.aicc - self.ref["aicc"]) < ATOL_IC
 
     def test_forecast(self):
         h = self.ref["python_params"]["h"]
@@ -525,15 +523,14 @@ class TestAutoCESQuarterly:
             h=params["h"],
             holdout=params["holdout"],
             lags=params.get("lags"),
-        )
-        self.m.fit(self.y)
+        ).fit(self.y)
 
     def test_selected_seasonality(self):
-        assert self.m.best_model_.seasonality == self.ref["selected_seasonality"]
+        assert self.m.seasonality == self.ref["selected_seasonality"]
 
     def test_loglik(self):
         assert np.isclose(
-            self.m.best_model_.loglik,
+            self.m.loglik,
             self.ref["logLik"],
             atol=self.atol_ic,
             rtol=RTOL_TIGHT,
@@ -545,3 +542,124 @@ class TestAutoCESQuarterly:
         p_fc = fc.mean.values
         r_fc = np.array(self.ref["forecast"])
         assert np.allclose(p_fc, r_fc, atol=self.atol_fitted, rtol=self.rtol_fitted)
+
+
+@pytest.mark.parametrize(
+    "seasonality, initial",
+    [
+        ("partial", "optimal"),
+        ("none", "backcasting"),
+        ("full", "two-stage"),
+        ("simple", "optimal"),
+        ("simple", "two-stage"),
+    ],
+)
+def test_the_attributes_of_adam_agree_with_r(seasonality, initial):
+    """The Fisher Information, the names of B, nParam and sigma are R's."""
+    from tests._r_bridge import r_dict
+
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r = r_dict(
+        f"{{m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
+        f" initial='{initial}', FI=TRUE); list(FI=as.vector(m$FI),"
+        " names=names(m$B), nParam=as.vector(m$nParam[1,]), sigma=sigma(m))}",
+        R_data={"y": y},
+    )
+    m = CES(seasonality=seasonality, lags=[12], initial=initial, fi=True).fit(y)
+    np.testing.assert_allclose(
+        np.ravel(m.fisher_information_, order="F"), r["FI"], rtol=1e-10, atol=1e-10
+    )
+    assert m.coef_names == r["names"]
+    estimated = m.n_param.estimated
+    assert [estimated[k] for k in ("internal", "xreg", "occurrence", "scale")] == r[
+        "nParam"
+    ][:4]
+    assert m.sigma == pytest.approx(r["sigma"][0], rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    "seasonality, initial",
+    [("partial", "optimal"), ("full", "backcasting"), ("none", "optimal")],
+)
+def test_the_methods_of_adam_agree_with_r(seasonality, initial):
+    """The methods of ADAM on CES (vcov, confint, diagnostics, multistep errors and
+    covariances) are those of R's adam methods on ces()."""
+    from tests._r_bridge import r_dict
+
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r = r_dict(
+        f"{{m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
+        f" initial='{initial}'); list(opg=as.vector(vcov(m)),"
+        " hs=as.vector(vcov(m, type='hessian')),"
+        " ci=as.vector(as.matrix(confint(m))), rs=as.vector(rstandard(m)),"
+        " rt=as.vector(rstudent(m)), mc=as.vector(multicov(m, h=4)),"
+        " me=as.vector(multicov(m, type='empirical', h=4)),"
+        " rm=as.vector(as.matrix(rmultistep(m, h=4))), sg=sigma(m))}",
+        R_data={"y": y},
+    )
+    m = CES(seasonality=seasonality, lags=[12], initial=initial).fit(y)
+
+    def as_float(values):
+        return np.array([float(str(v).replace("Inf", "inf")) for v in values])
+
+    for python, key in (
+        (m.vcov(), "opg"),
+        (m.vcov(type="hessian"), "hs"),
+        (m.confint(), "ci"),
+        (m.rstandard(), "rs"),
+        (m.rstudent(), "rt"),
+        (m.multicov(h=4), "mc"),
+        (m.multicov(type="empirical", h=4), "me"),
+        (m.rmultistep(h=4), "rm"),
+        ([m.sigma], "sg"),
+    ):
+        np.testing.assert_allclose(
+            np.ravel(np.asarray(python, dtype=float), order="F"),
+            as_float(r[key]),
+            rtol=1e-8,
+            atol=1e-10,
+            err_msg=key,
+        )
+
+
+@pytest.mark.parametrize(
+    "seasonality, initial, a",
+    [
+        ("partial", "backcasting", None),
+        ("full", "optimal", None),
+        ("none", "optimal", None),
+        ("simple", "optimal", None),
+        ("full", "optimal", 1.35 + 1.01j),
+    ],
+)
+def test_reapply_agrees_with_r(seasonality, initial, a):
+    """The refits of reapply() on the draws of the parameters: the moments of R's."""
+    from tests._r_bridge import r_dict
+
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    r_a = "NULL" if a is None else f"complex(real={a.real}, imaginary={a.imag})"
+    r = r_dict(
+        f"{{set.seed(1); m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
+        f" initial='{initial}', a={r_a}); x <- reapply(m, nsim=2000);"
+        " list(m=as.vector(rowMeans(x$refitted)))}",
+        R_data={"y": y},
+    )
+    m = CES(seasonality=seasonality, lags=[12], initial=initial, a=a).fit(y)
+    refitted = np.asarray(m.reapply(nsim=2000, seed=1).refitted)
+    np.testing.assert_allclose(refitted.mean(axis=1), r["m"], rtol=2e-3)
+
+
+def test_the_refitting_methods_run_on_ces():
+    """reforecast(), coefbootstrap() and the confidence interval of predict()."""
+    path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    m = CES(seasonality="partial", lags=[12]).fit(y)
+    forecast = m.reforecast(h=6, nsim=50, seed=1)
+    assert np.all(np.isfinite(np.asarray(forecast.mean, dtype=float)))
+    confidence = m.predict(h=6, interval="confidence", nsim=50, seed=1)
+    assert np.all(np.asarray(confidence.lower) <= np.asarray(confidence.upper))
+    boot = m.coefbootstrap(nsim=5, seed=1)
+    assert boot.vcov.shape == (len(m.coef), len(m.coef))

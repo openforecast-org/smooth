@@ -43,6 +43,7 @@
    ~OMG.bicc
    ~OMG.coef
    ~OMG.coef_names
+   ~OMG.data
    ~OMG.distribution_
    ~OMG.fisher_information_
    ~OMG.fitted
@@ -53,6 +54,7 @@
    ~OMG.loss_value
    ~OMG.model
    ~OMG.model_name
+   ~OMG.n_param
    ~OMG.nobs
    ~OMG.nparam
    ~OMG.occurrence

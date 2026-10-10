@@ -57,6 +57,7 @@ def ces_cf(
     multisteps,
     adam_cpp,
     initial_value=None,
+    return_fitted=False,
 ):
     """
     CES cost function evaluated during optimization.
@@ -84,8 +85,9 @@ def ces_cf(
 
     Returns
     -------
-    float
-        Cost function value.
+    float or tuple
+        Cost function value, or the fitted values and the errors with
+        ``return_fitted=True``.
     """
     # Copy matrices to avoid in-place mutation across calls
     mat_f_copy = mat_f.copy()
@@ -196,6 +198,9 @@ def ces_cf(
 
     errors = np.array(adam_fitted.errors).ravel()
     fitted = np.array(adam_fitted.fitted).ravel()
+    # The fitted values and the errors at B, as ADAM's CF returns them
+    if return_fitted:
+        return fitted, errors
 
     # Compute loss — R lines 510-555. The missing values are not in the loss: the
     # errors are zero there, and the losses are divided by the observed values

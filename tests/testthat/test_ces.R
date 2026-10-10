@@ -37,6 +37,15 @@ test_that("vcov(type='opg') works for every CES seasonality", {
     }
 })
 
+# The refit of vcov(type="hessian") keeps the estimated initials in B: the Hessian
+# is the Fisher Information of the fit (with positive variances), not Inf for the initials
+test_that("vcov(type='hessian') is the inverse FI of the fit", {
+    m <- ces(AirPassengers, seasonality="partial", initial="optimal", FI=TRUE, stepSize=1e-8)
+    v <- suppressWarnings(vcov(m, type="hessian"))
+    expect_true(all(is.finite(diag(v))))
+    expect_equal(diag(v), abs(diag(suppressWarnings(solve(m$FI)))), ignore_attr=TRUE)
+})
+
 # The provided b must match the seasonality it belongs to: "partial" carries one
 # real coefficient, "full" a complex pair, "none"/"simple" none at all. A
 # wrong-shaped b used to reach the cost function and surface only as a 1e+300
@@ -76,4 +85,16 @@ test_that("ces() takes the missing values for gaps", {
     expect_equal(as.numeric(logLik(testModel)), sum(pointLik(testModel)));
     expect_true(all(is.na(residuals(testModel)[is.na(y)])));
     expect_true(all(is.finite(forecast(testModel, h=12, interval="prediction")$upper)));
+})
+
+# reapply() bounds each smoothing parameter with the others at their values, the
+# transition and the persistence rebuilt from them, and keeps a provided a fixed
+test_that("reapply() of ces() keeps the draws in the stable region", {
+    m <- ces(AirPassengers, seasonality="none");
+    set.seed(1);
+    x <- suppressWarnings(reapply(m, nsim=100));
+    expect_lt(max(abs(x$refitted)), 2*max(AirPassengers));
+    m <- ces(AirPassengers, seasonality="partial", a=complex(real=1.35, imaginary=1.01));
+    x <- suppressWarnings(reapply(m, nsim=10));
+    expect_equal(unname(x$persistence[1:2,]), matrix(m$persistence[1:2], 2, 10));
 })

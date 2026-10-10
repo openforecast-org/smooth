@@ -855,8 +855,13 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
             measurementEstimateOriginal <- measurementEstimate;
             measurementEstimate <- TRUE;
         }
-        # initialTypeOriginal <- initialType;
-        # initialType <- "optimal";
+        # The initials of a reused model are provided, but stay in B when they were
+        # estimated: refit them as optimal, as adam() re-estimates the provided
+        # initials it finds in B
+        initialTypeOriginal <- initialType;
+        if(initialType=="provided" && any(substr(names(B),1,2)=="vt")){
+            initialType <- "optimal";
+        }
         if(!is.null(initialValueProvided$xreg) && initialOriginal!="complete"){
             initialXregEstimateOriginal <- initialXregEstimate;
             initialXregEstimate <- TRUE;
@@ -875,7 +880,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
         if(any(substr(names(B),1,1)=="w")){
             measurementEstimate <- measurementEstimateOriginal;
         }
-        # initialType <- initialTypeOriginal;
+        initialType <- initialTypeOriginal;
         if(!is.null(initialValueProvided$xreg) && initialOriginal!="complete"){
             initialXregEstimate <- initialXregEstimateOriginal;
         }

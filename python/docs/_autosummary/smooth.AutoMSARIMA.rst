@@ -48,6 +48,7 @@
    ~AutoMSARIMA.actuals
    ~AutoMSARIMA.aic
    ~AutoMSARIMA.aicc
+   ~AutoMSARIMA.arma_parameters_
    ~AutoMSARIMA.b_value
    ~AutoMSARIMA.bic
    ~AutoMSARIMA.bicc
@@ -77,7 +78,11 @@
    ~AutoMSARIMA.nparam
    ~AutoMSARIMA.om_model
    ~AutoMSARIMA.orders
+   ~AutoMSARIMA.persistence_level_
+   ~AutoMSARIMA.persistence_seasonal_
+   ~AutoMSARIMA.persistence_trend_
    ~AutoMSARIMA.persistence_vector
+   ~AutoMSARIMA.persistence_xreg_
    ~AutoMSARIMA.phi_
    ~AutoMSARIMA.profile
    ~AutoMSARIMA.residuals

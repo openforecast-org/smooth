@@ -1,4 +1,4 @@
-﻿smooth.ADAM.sm
+smooth.ADAM.sm
 ==============
 
 .. currentmodule:: smooth

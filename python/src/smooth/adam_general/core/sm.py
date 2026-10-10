@@ -17,7 +17,6 @@ from typing import Any, Callable, Dict, Optional
 import greybox as gb
 import numpy as np
 from numpy.typing import NDArray
-from scipy import special
 
 from smooth.adam_general.core.utils.cost_functions import _sum_r
 
@@ -180,47 +179,6 @@ def _log_density(
     raise ValueError(f"sm() does not support distribution {distribution!r}.")
 
 
-def _differential_entropy(
-    distribution: str, scale_zero: NDArray, other: Optional[float]
-) -> float:
-    """Entropy contributed by the zero observations of an occurrence model.
-
-    ``scale_zero`` is the scale model's fitted values at the zero observations,
-    so the sum already runs over them -- unlike ``adam()``, where the scale is a
-    scalar and the term carries an explicit ``obsZero`` multiplier.
-    """
-    s = np.asarray(scale_zero, dtype=np.float64)
-    if s.size == 0:
-        return 0.0
-    # The scale is sigma^2 for dnorm and dlnorm
-    if distribution == "dnorm":
-        return float(_sum_r(np.log(np.sqrt(2.0 * np.pi * s)) + 0.5))
-    if distribution == "dlnorm":
-        return float(_sum_r(np.log(np.sqrt(2.0 * np.pi * s)) + 0.5 - s / 2.0))
-    if distribution == "dgnorm":
-        if other is None:
-            raise ValueError("dgnorm needs a shape; the model carries none.")
-        return float(
-            _sum_r(1.0 / other - np.log(other / (2.0 * s * special.gamma(1.0 / other))))
-        )
-    if distribution == "dinvgauss":
-        return float(_sum_r(0.5 * (np.log(np.pi / 2.0) + 1.0 + np.log(s))))
-    if distribution == "dgamma":
-        return float(
-            _sum_r(
-                1.0 / s
-                + np.log(s)
-                + special.gammaln(1.0 / s)
-                + (1.0 - 1.0 / s) * special.digamma(1.0 / s)
-            )
-        )
-    if distribution == "dlaplace":
-        return float(_sum_r(1.0 + np.log(2.0 * s)))
-    if distribution == "ds":
-        return float(_sum_r(2.0 + 2.0 * np.log(2.0 * s)))
-    return 0.0
-
-
 def make_scale_loss(
     distribution: str,
     error_type: str,
@@ -229,7 +187,6 @@ def make_scale_loss(
     ot_logical: NDArray,
     other: Optional[float],
     log_model: bool,
-    occurrence_model: bool,
 ) -> Callable[..., float]:
     """Build the custom loss ``sm()`` hands to ``ADAM``.
 
@@ -238,12 +195,12 @@ def make_scale_loss(
     the location model's negative log-likelihood, evaluated at the scale the
     scale model currently proposes.
     """
-    # ADAM hands the custom loss the observed values only: its data are those too
-    y = np.asarray(y_in_sample, dtype=np.float64).ravel()
-    observed = ~np.isnan(y)
-    y = y[observed]
-    mu = np.asarray(y_fitted, dtype=np.float64).ravel()[observed]
-    ot = np.asarray(ot_logical, dtype=bool).ravel()[observed]
+    # The zeros of an occurrence model are missing values of the response, as the
+    # missing ones: ADAM hands the custom loss the observed values only, so its
+    # data are the sizes
+    ot = np.asarray(ot_logical, dtype=bool).ravel()
+    y = np.asarray(y_in_sample, dtype=np.float64).ravel()[ot]
+    mu = np.asarray(y_fitted, dtype=np.float64).ravel()[ot]
 
     def loss(actual: Any = None, fitted: Any = None, B: Any = None, **_: Any) -> float:
         scale = np.asarray(fitted, dtype=np.float64).ravel()
@@ -251,11 +208,8 @@ def make_scale_loss(
             scale = np.exp(scale)
 
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            ll = _log_density(distribution, error_type, y[ot], mu[ot], scale[ot], other)
-            cf = -float(_sum_r(ll))
-            if occurrence_model:
-                cf += _differential_entropy(distribution, scale[~ot], other)
-        return cf
+            ll = _log_density(distribution, error_type, y, mu, scale, other)
+        return -float(_sum_r(ll))
 
     return loss
 
@@ -299,18 +253,22 @@ def build_scale_response(
     # The missing values are gaps, as in the location model
     ot &= ~np.isnan(y_in)
 
-    # Assign into the non-zero positions only. Transforming the whole vector
-    # would recycle a shorter right-hand side across the sample for occurrence
-    # models -- the defect fixed in R/sm.R alongside this port.
-    response = e.copy()
+    # Assign into the non-zero positions only, missing where there is no size: the
+    # zeros of an occurrence model are gaps of the scale model, as the missing values
+    response = np.full(e.size, np.nan)
     response[ot] = _residual_transform(e[ot], distribution, other)
+    # The sizes: the fitted values of the location model are multiplied by the
+    # probabilities
+    y_fitted = np.asarray(location.fitted, dtype=np.float64).ravel()
+    if occurrence_model:
+        y_fitted = y_fitted / np.asarray(occ["p_fitted"], dtype=np.float64).ravel()
 
     return {
         "response": response,
         "ot_logical": ot,
         "occurrence_model": occurrence_model,
         "y_in_sample": y_in,
-        "y_fitted": np.asarray(location.fitted, dtype=np.float64).ravel(),
+        "y_fitted": y_fitted,
     }
 
 
@@ -353,6 +311,13 @@ def sm(
         The fitted scale model, with ``is_scale_`` set.
     """
     from smooth.adam_general.core.adam import ADAM
+    from smooth.adam_general.core.tbats_model import TBATS
+
+    # The scale of TBATS is modelled by TBATS (R's sm.adamTBATS)
+    if isinstance(location, TBATS):
+        tbats_arguments = {"lags": lags, "orders": orders, "regressors": regressors}
+        tbats_arguments = {k: v for k, v in tbats_arguments.items() if v is not None}
+        return location.sm(X=X, **tbats_arguments, **kwargs)
 
     if getattr(location, "loss_", None) != "likelihood":
         raise ValueError(
@@ -420,7 +385,6 @@ def sm(
         info["ot_logical"],
         other,
         log_model,
-        info["occurrence_model"],
     )
 
     args: Dict[str, Any] = {
@@ -438,16 +402,14 @@ def sm(
         args["orders"] = orders
     if distribution in ("dgnorm", "dlgnorm") and other is not None:
         args["gnorm_shape"] = other
-    # Reuse the location model's *fitted* occurrence model, as R does
-    # (newCall$occurrence <- object$occurrence): the scale model shares that
-    # occurrence rather than estimating a second one on the transformed
-    # residuals, which are a different series with different zeroes.
-    if info["occurrence_model"] and getattr(location, "om_model", None) is not None:
-        args["occurrence"] = location.om_model
     args.update(kwargs)
 
     scale_model = ADAM(**args)
-    scale_model.fit(response, X)
+    # The zeros of an occurrence model are the missing values of the response
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Data contains NAs")
+        warnings.filterwarnings("ignore", message="More than half")
+        scale_model.fit(response, X)
 
     _finalise(scale_model, location, distribution, other, log_model)
     return scale_model
@@ -468,8 +430,19 @@ def _finalise(
         )
         scale_model.model_name_sm_ = f"{scale_model.model_name} in logs"
 
-    # logLik is the loss (the location likelihood), not the scale model's own.
+    # logLik is the loss (the location likelihood), not the scale model's own, with
+    # the likelihood of the occurrence model, as in the location model
     scale_model.loglik_sm_ = -float(scale_model.loss_value)
+    occurrence = getattr(location, "_occurrence", {}) or {}
+    if occurrence.get("occurrence_model"):
+        y = np.asarray(location.actuals, dtype=np.float64).ravel()
+        observed = ~np.isnan(y)
+        p_fitted = np.asarray(occurrence["p_fitted"], dtype=np.float64).ravel()
+        demand = observed & (y != 0)
+        zero = observed & ~demand
+        scale_model.loglik_sm_ += float(
+            _sum_r(np.log(p_fitted[demand])) + _sum_r(np.log(1 - p_fitted[zero]))
+        )
     # -1 removes the scale from the location model's parameter count.
     scale_model.df_sm_ = int(scale_model.nparam) + int(location.nparam) - 1
 

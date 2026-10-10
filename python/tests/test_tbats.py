@@ -101,8 +101,7 @@ def test_backcasting_reproduces_a_noise_free_fractional_period():
         lambda_bc=1,
         orders=ORDERS0,
         distribution="dnorm",
-        B=np.array([0.1, 0.01, 0.01, 0.01]),
-        maxeval=1,
+        nlopt_kwargs={"B": np.array([0.1, 0.01, 0.01, 0.01]), "maxeval": 1},
     ).fit(y)
     assert np.max(np.abs(fit.residuals)) < 1e-8
 
@@ -123,8 +122,7 @@ def test_lambda_zero_is_the_model_of_the_logarithms(air):
         lambda_bc=1,
         orders=ORDERS0,
         distribution="dnorm",
-        B=fit_log.coef,
-        maxeval=1,
+        nlopt_kwargs={"B": fit_log.coef, "maxeval": 1},
     ).fit(np.log(air))
     assert fit_log.loglik == pytest.approx(
         fit_level.loglik - np.log(air).sum(), rel=1e-10
@@ -162,7 +160,7 @@ def test_the_distributions_are_fitted(air, distribution):
         assert fit.distribution_ == closest
         named = TBATS(distribution=closest, **arguments).fit(air)
         assert fit.loglik >= named.loglik - 1e-8
-        assert fit.ics[closest] == pytest.approx(fit.aicc)
+        assert fit.ICs[closest] == pytest.approx(fit.aicc)
 
 
 def test_a_provided_shape_is_not_estimated(air):
@@ -172,11 +170,11 @@ def test_a_provided_shape_is_not_estimated(air):
         trend="additive",
         orders=ORDERS0,
         distribution="dgnorm",
-        shape=1.5,
+        gnorm_shape=1.5,
     ).fit(air)
     assert "shape" not in fit.coef_names
     arguments = dict(lags=[1, 12], harmonics=[5], trend="additive", orders=ORDERS0)
-    assert TBATS(shape=0.9, **arguments).fit(air).distribution_ == "dlaplace"
+    assert TBATS(gnorm_shape=0.9, **arguments).fit(air).distribution_ == "dlaplace"
     assert TBATS(loss="MAE", **arguments).fit(air).distribution_ == "dlaplace"
 
 
@@ -235,9 +233,9 @@ def test_the_arma_falls_back_to_none_when_it_does_not_help(air):
     fit = TBATS(
         lags=[1, 12], harmonics=[5], trend="additive", distribution="dnorm"
     ).fit(air)
-    assert sum(fit.orders_["ar"]) + sum(fit.orders_["ma"]) == 0
-    assert any("+ARMA" in name for name in fit.ics)
-    assert min(fit.ics.values()) == pytest.approx(fit.aicc)
+    assert sum(fit.orders["ar"]) + sum(fit.orders["ma"]) == 0
+    assert any("+ARMA" in name for name in fit.ICs)
+    assert min(fit.ICs.values()) == pytest.approx(fit.aicc)
 
 
 def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
@@ -250,14 +248,14 @@ def test_the_forecasts_are_the_transformed_forecasts_of_adam(air):
         holdout=True,
     ).fit(air)
     forecast = fit.predict(h=12, interval="prediction")
-    np.testing.assert_allclose(np.asarray(forecast.mean), fit.forecast_, rtol=1e-10)
+    np.testing.assert_allclose(np.asarray(forecast.mean), fit._forecast, rtol=1e-10)
     lower = np.asarray(forecast.lower).ravel()
     upper = np.asarray(forecast.upper).ravel()
     mean = np.asarray(forecast.mean)
     assert np.all((lower < mean) & (mean < upper))
     # The cumulative forecasts come from the paths in the space of the data
     np.testing.assert_allclose(
-        fit.predict(h=12, cumulative=True).mean, fit.forecast_.sum(), rtol=1e-10
+        fit.predict(h=12, cumulative=True).mean, fit._forecast.sum(), rtol=1e-10
     )
     cumulative = fit.predict(
         h=12, cumulative=True, interval="prediction", point="mean", seed=41
@@ -383,7 +381,9 @@ def test_lambda_zero_with_a_regressor_is_the_model_of_the_logarithms(xreg_data):
         lags=[1, 12], harmonics=[1], trend="none", orders=ORDERS0, distribution="dnorm"
     )
     fit_log = TBATS(lambda_bc=0, **arguments).fit(y[:120], X[:120])
-    fit_level = TBATS(lambda_bc=1, B=fit_log.coef, maxeval=1, **arguments).fit(
+    fit_level = TBATS(
+        lambda_bc=1, nlopt_kwargs={"B": fit_log.coef, "maxeval": 1}, **arguments
+    ).fit(
         np.log(y[:120]), X[:120]
     )
     assert fit_log.loglik == pytest.approx(
@@ -396,7 +396,7 @@ def test_the_regressors_are_estimated_and_used_in_the_forecasts(xreg_fit, xreg_d
     assert xreg_fit.model_name.startswith("TBATSX")
     assert list(xreg_fit.initial_value["xreg"]) == ["x1", "x2"]
     assert xreg_fit.initial_value["xreg"]["x1"] == pytest.approx(5, abs=0.5)
-    forecast = xreg_fit.forecast_
+    forecast = xreg_fit._forecast
     np.testing.assert_allclose(np.asarray(xreg_fit.predict(h=12).mean), forecast)
     future = X.to_numpy()[120:]
     np.testing.assert_allclose(
@@ -419,7 +419,7 @@ def test_the_intervals_follow_the_future_regressors(xreg_fit, xreg_data):
     for interval in ("approximate", "simulated", "complete"):
         forecast = xreg_fit.predict(h=12, X=future, interval=interval, nsim=200)
         mean = np.asarray(forecast.mean)
-        assert np.all(mean > xreg_fit.forecast_ + 40)
+        assert np.all(mean > xreg_fit._forecast + 40)
         lower, upper = np.ravel(forecast.lower), np.ravel(forecast.upper)
         assert np.all((lower < mean) & (mean < upper))
 
@@ -463,9 +463,9 @@ def test_the_selection_keeps_the_relevant_regressor(xreg_data):
     y, X = xreg_data
     X = X.assign(noise=np.random.default_rng(7).normal(size=len(y)))
     fit = TBATS(lags=[1, 12], regressors="select", h=12, holdout=True).fit(y, X)
-    assert fit.xreg_names_ == ["x1"]
-    assert any("+X(x1)" in name for name in fit.ics)
-    np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit.forecast_)
+    assert fit._xreg_names == ["x1"]
+    assert any("+X(x1)" in name for name in fit.ICs)
+    np.testing.assert_allclose(np.asarray(fit.predict(h=12).mean), fit._forecast)
 
 
 def test_the_point_forecasts(air):
@@ -517,7 +517,7 @@ def test_the_occurrence_mixture(intermittent):
     forecasted = fit.predict(h=14, interval="prediction")
     sizes = st.box_cox_inverse(fit._best["forecast_bc"], fit.lambda_)
     np.testing.assert_allclose(forecasted.mean, sizes * p_forecast)
-    np.testing.assert_allclose(forecasted.mean, fit.forecast_)
+    np.testing.assert_allclose(forecasted.mean, fit._forecast)
     # The probability of no demand is above 0.5: the median and the lower bound are 0
     assert np.all(fit.predict(h=14, point="median").mean == 0)
     assert np.all(forecasted.lower.to_numpy() == 0)
@@ -607,8 +607,7 @@ def test_initial_gradient_solves_for_the_initials(air):
     assert gradient.point_lik().sum() == pytest.approx(gradient.loglik, rel=1e-12)
     at_backcast = TBATS(
         initial="gradient",
-        B=backcast.coef,
-        maxeval=1,
+        nlopt_kwargs={"B": backcast.coef, "maxeval": 1},
         **arguments,
     ).fit(air)
     assert at_backcast.loss_value <= backcast.loss_value
@@ -700,5 +699,131 @@ def test_a_start_a_hair_inside_a_bound_is_estimated_as_one_on_the_bound(air):
     on_bound[model.coef_names.index("lambda")] = 1.0
     B[model.coef_names.index("lambda")] = 1 - 2.65e-14
     np.testing.assert_array_equal(
-        TBATS(B=B, **kw).fit(air).coef, TBATS(B=on_bound, **kw).fit(air).coef
+        TBATS(nlopt_kwargs={"B": B}, **kw).fit(air).coef,
+        TBATS(nlopt_kwargs={"B": on_bound}, **kw).fit(air).coef,
     )
+
+
+def test_the_values_taken_from_a_fit_and_provided_reproduce_its_loss(air):
+    arguments = dict(
+        lags=[1, 6, 12],
+        harmonics=[1, 2],
+        trend="damped",
+        orders=ARMA11,
+        lambda_bc=0,
+        distribution="dnorm",
+        h=12,
+        holdout=True,
+    )
+    model = TBATS(initial="optimal", **arguments).fit(air)
+    B = dict(zip(model.coef_names, model.coef))
+    seasonal = model.initial_value["seasonal"]
+    provided = TBATS(
+        persistence={
+            "level": B["alpha"],
+            "trend": B["beta"],
+            "seasonal": [[B[f"gamma1[{p}]"], B[f"gamma2[{p}]"]] for p in (6, 12)],
+        },
+        phi=B["phi"],
+        arma={"ar": B["phi1[1]"], "ma": B["theta1[1]"]},
+        initial={
+            "level": model.initial_value["level"],
+            "trend": model.initial_value["trend"],
+            "seasonal": [
+                np.r_[rows["sin"], rows["cos"]] for _, rows in seasonal.groupby("period")
+            ],
+            "arma": model.initial_value["arma"],
+        },
+        **arguments,
+    ).fit(air)
+    assert provided.loss_value == pytest.approx(model.loss_value, rel=1e-10)
+    assert provided.coef_names == []
+    assert provided.nparam == 1
+    assert provided.initial_type == "provided"
+
+
+def test_the_provided_values_are_fixed_and_the_rest_estimated(air):
+    model = TBATS(
+        lags=[1, 12],
+        harmonics=[2],
+        trend="damped",
+        orders=ORDERS0,
+        lambda_bc=0,
+        distribution="dnorm",
+        persistence={"level": 0.3, "seasonal": [[0.001, 0]]},
+        phi=0.98,
+        initial={"level": 4.7},
+    ).fit(air)
+    assert model.phi_ == 0.98
+    assert model.initial_value["level"] == 4.7
+    for name in ("alpha", "phi", "gamma1[12]", "gamma2[12]", "level"):
+        assert name not in model.coef_names
+    for name in ("beta", "trend", "sin1[12]"):
+        assert name in model.coef_names
+    # The refits keep them
+    assert model.reapply(nsim=3).refitted.shape == (len(air), 3)
+
+
+def test_the_provided_values_that_need_a_selected_structure_warn(air):
+    arguments = dict(lags=[1, 12], orders=ORDERS0, distribution="dnorm")
+    for extra, message in (
+        (dict(phi=0.9), "Predefined phi"),
+        (dict(persistence=[0.1, 0.1]), "Predefined persistence"),
+        (dict(initial=[4.7, 0]), "Predefined initials"),
+    ):
+        with pytest.warns(UserWarning, match=message):
+            TBATS(**arguments, **extra).fit(air)
+    with pytest.warns(UserWarning, match="ARMA parameters"):
+        model = TBATS(
+            lags=[1, 12],
+            harmonics=[2],
+            trend="none",
+            orders=ARMA11,
+            arma=[0.5],
+            distribution="dnorm",
+        ).fit(air)
+    assert {"phi1[1]", "theta1[1]"} <= set(model.coef_names)
+
+
+def test_the_outliers_of_the_global_model_become_regressors(air):
+    """outliers="use" finds the shocks on the residuals of the global model and adds
+    their dummies, zero over the horizon; the refits keep them as regressors."""
+    y = air.copy()
+    y[[29, 79]] *= 1.4
+    fit = TBATS(lags=[1, 12], outliers="use", h=6).fit(y)
+    assert fit._xreg_names == ["outlier1", "outlier2"]
+    xreg = fit._best["struct"]["xreg"]
+    assert np.flatnonzero(xreg["data"][:, 0]).tolist() == [29]
+    assert np.flatnonzero(xreg["data"][:, 1]).tolist() == [79]
+    np.testing.assert_array_equal(xreg["future"], 0)
+    assert fit.aicc < TBATS(lags=[1, 12], h=6).fit(y).aicc
+    assert np.all(np.isfinite(fit.reforecast(h=6, nsim=10, seed=1).mean))
+    assert fit.coefbootstrap(nsim=2, seed=1).vcov.shape == (len(fit.coef),) * 2
+
+
+def test_the_scale_model_of_tbats():
+    """sm() models the scale by TBATS; attached, it raises the likelihood, its terms
+    sum to it, and the intervals follow the scale, with an occurrence model too."""
+    rng = np.random.default_rng(3)
+    times = np.arange(1, 24 * 7 * 4 + 1)
+    sigma = np.exp(0.6 * np.sin(2 * np.pi * times / 24))
+    y = np.exp(5 + 0.3 * np.sin(2 * np.pi * times / 24) + rng.normal(0, 0.05 * sigma))
+    fit = TBATS(lags=[1, 24], distribution="dnorm", orders=ORDERS0).fit(y)
+    loglik = fit.loglik
+    scale = fit.sm()
+    assert scale.is_scale_ and isinstance(scale, TBATS)
+    fit.scale_model = scale
+    assert fit.loglik > loglik
+    assert np.sum(fit.point_lik()) == pytest.approx(fit.loglik)
+    widths = np.ravel(fit.predict(h=24, interval="prediction").upper) - np.ravel(
+        fit.predict(h=24, interval="prediction").lower
+    )
+    assert widths.max() / widths.min() > 2
+    # With an occurrence model: the scale model shares it, the zeros take the entropy
+    sizes = np.exp(2 + 0.4 * np.sin(2 * np.pi * times / 24) + rng.normal(0, 0.05 * sigma))
+    intermittent = sizes * rng.binomial(1, 0.7, len(times))
+    fit = TBATS(lags=[1, 24], occurrence="odds-ratio", orders=ORDERS0).fit(intermittent)
+    loglik = fit.loglik
+    fit.scale_model = fit.sm()
+    assert fit.loglik > loglik
+    assert np.sum(fit.point_lik()) == pytest.approx(fit.loglik)

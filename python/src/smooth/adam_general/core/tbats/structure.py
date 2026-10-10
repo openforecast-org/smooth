@@ -18,7 +18,9 @@ from smooth.adam_general.core.utils.utils import (
     _pow_r,
     _sum_r,
     make_names,
+    scale_debias,
     scaler,
+    xreg_selector,
 )
 
 
@@ -411,14 +413,28 @@ def arma_build(ar, ma, arma_lags, select: bool = False) -> Dict[str, Any]:
     }
 
 
-def scale_value(errors: NDArray, distribution: str, shape: Optional[float]) -> float:
-    """sigma^2 for dnorm, s for the others (the ADAM monograph)."""
-    return float(scaler(distribution, "A", errors, None, len(errors), shape))
+def scale_value(
+    errors: NDArray,
+    distribution: str,
+    shape: Optional[float],
+    obs: Optional[int] = None,
+) -> float:
+    """sigma^2 for dnorm, s for the others (the ADAM monograph), divided by ``obs``
+    (the observed values with the zeros of an occurrence model), the errors' number
+    by default."""
+    n = len(errors) if obs is None else obs
+    return float(scaler(distribution, "A", errors, None, n, shape))
 
 
-def loglik_value(errors: NDArray, distribution: str, shape: Optional[float]) -> float:
-    """The log-likelihood of the errors in the space of the transformed data."""
-    scale = scale_value(errors, distribution, shape)
+def loglik_value(
+    errors: NDArray,
+    distribution: str,
+    shape: Optional[float],
+    obs: Optional[int] = None,
+) -> float:
+    """The log-likelihood of the errors in the space of the transformed data, at the
+    scale divided by ``obs`` (R's ``tbats_logLik``)."""
+    scale = scale_value(errors, distribution, shape, obs)
     if distribution == "dnorm":
         values = gb.dnorm(errors, 0, math.sqrt(scale), log=True)
     elif distribution == "dlaplace":
@@ -438,6 +454,80 @@ def gapped(residuals: NDArray, ot_logical: NDArray) -> NDArray:
     result = np.zeros(len(ot_logical))
     result[ot_logical] = residuals
     return result
+
+
+def outlier_dummies(
+    y: NDArray,
+    ot_logical: NDArray,
+    trend_in: bool,
+    table: Dict[str, NDArray],
+    lam_spec: Dict[str, Any],
+    xreg_data: Optional[NDArray],
+    distribution: str,
+    level: float,
+    outliers: str,
+    ic: str,
+    h: int,
+) -> Optional[Dict[str, Any]]:
+    """The dummies of the outliers of the global model, as R's ``tbats_outliers``:
+    the observations whose residuals, at the starting value of lambda and on the
+    non-zero observations, standardised as ``rstandard()`` does, lie outside the
+    ``level`` quantiles of the distribution (dgnorm with the shape of ``ALM`` on
+    the residuals). With ``"select"``, ``stepwise()`` chooses among them and their
+    leads and lags, on the residuals. ``{"data", "names"}`` with zeros over the
+    horizon, or None."""
+    X = design(len(y), trend_in, table, xreg_data)[ot_logical]
+    lam = lambda_start(y[ot_logical], X, lam_spec)
+    residuals = QR(X).resid(box_cox(y[ot_logical], lam))
+    obs = len(residuals)
+    shape = None
+    if distribution == "dgnorm":
+        fitted = gb.ALM(distribution="dgnorm").fit(np.ones((obs, 1)), residuals)
+        shape = float(fitted.other_)
+    scale = scale_debias(
+        scale_value(residuals, distribution, shape), distribution, obs, obs - X.shape[1]
+    )
+    divisor = {"dnorm": math.sqrt(scale), "ds": scale**2}.get(distribution, scale)
+    errors = residuals / divisor
+    probabilities = [(1 - level) / 2, (1 + level) / 2]
+    if distribution == "dlaplace":
+        statistic = gb.qlaplace(probabilities, 0, 1)
+    elif distribution == "ds":
+        statistic = gb.qs(probabilities, 0, 1)
+    elif distribution == "dgnorm":
+        statistic = gb.qgnorm(probabilities, 0, 1, shape)
+    else:
+        statistic = gb.qnorm(probabilities, 0, 1)
+    statistic = np.asarray(statistic, dtype=float)
+    ids = np.flatnonzero(ot_logical)[(errors < statistic[0]) | (errors > statistic[1])]
+    if len(ids) == 0:
+        return None
+    data = np.zeros((len(y) + h, len(ids)))
+    data[ids, np.arange(len(ids))] = 1
+    names = [f"outlier{i + 1}" for i in range(len(ids))]
+    if outliers == "select":
+        # Each dummy with its lag and lead, in R's order
+        expanded = [
+            gb.xreg_expander(data[:, [k]], [-1, 0, 1], gaps="zero")
+            for k in range(data.shape[1])
+        ]
+        data = np.column_stack(expanded)
+        suffixes = ("", "Lag1", "Lead1")
+        names = [f"{name}{suffix}" for name in names for suffix in suffixes]
+        selected = xreg_selector(
+            residuals,
+            data[: len(y)][ot_logical],
+            names,
+            ic,
+            X.shape[1] + 1,
+            distribution,
+            shape,
+        )
+        if not selected:
+            return None
+        data = data[:, [names.index(name) for name in selected]]
+        names = list(selected)
+    return {"data": data, "names": names}
 
 
 def arma_select(
@@ -633,3 +723,140 @@ def initials_read(mat_vt: NDArray, struct: Dict[str, Any]) -> Dict[str, Any]:
             struct["arma_rows"][-1], lag_max - struct["arma_lag_max"] : lag_max
         ]
     return {"states": states, "arma": arma}
+
+
+# The provided parameters
+_PERSISTENCE_ALIASES = {"alpha": "level", "beta": "trend", "gamma": "seasonal"}
+
+
+def provided_values(
+    provided: Dict[str, Any], struct: Dict[str, Any], spec: Dict[str, Any]
+) -> Dict[str, Any]:
+    """The parameters and initial states provided by the user for a structure, as in
+    ADAM (see R's ``tbats_provided``): persistence, phi and the ARMA on the names of
+    B, the initials as the states in the space of the transformed data, which replace
+    the global ones (and the B entries they make redundant)."""
+    periods = struct["periods"]
+    rows_period = [np.flatnonzero(struct["table"]["period"] == p) for p in periods]
+    k = 1 + int(struct["trend_in"])
+    n_xreg = struct["n_xreg"]
+    xreg_names = list(struct["xreg"]["names"]) if n_xreg > 0 else []
+
+    def split_periods(values: NDArray, sizes: List[int]) -> List[NDArray]:
+        """The values per period after the level and trend of an unnamed vector."""
+        ends = k + np.cumsum(sizes, dtype=int)
+        return [values[end - size : end] for end, size in zip(ends, sizes)]
+
+    values: Dict[str, float] = {}
+    persistence = provided.get("persistence")
+    if persistence is not None and not isinstance(persistence, dict):
+        vector = np.atleast_1d(np.asarray(persistence, dtype=float))
+        persistence = {
+            "level": vector[0],
+            "trend": vector[1] if struct["trend_in"] else None,
+            "seasonal": split_periods(vector, [2] * len(periods)),
+            "xreg": vector[k + 2 * len(periods) :],
+        }
+    persistence = {
+        _PERSISTENCE_ALIASES.get(key, key): value
+        for key, value in (persistence or {}).items()
+    }
+    if persistence.get("level") is not None:
+        values["alpha"] = float(persistence["level"])
+    if persistence.get("trend") is not None and struct["trend_in"]:
+        values["beta"] = float(persistence["trend"])
+    for period, rows, pair in zip(
+        periods, rows_period, persistence.get("seasonal") or []
+    ):
+        if len(rows) > 0:
+            label = _period_label(period)
+            values[f"gamma1[{label}]"], values[f"gamma2[{label}]"] = map(float, pair)
+    deltas = np.atleast_1d(np.asarray(persistence.get("xreg", []), dtype=float))
+    if len(deltas) > 0 and struct["xreg_adapt"]:
+        values.update({f"delta{j + 1}": float(v) for j, v in enumerate(deltas)})
+    if provided.get("phi") is not None and struct["damped"]:
+        values["phi"] = float(provided["phi"])
+    arma = provided.get("arma")
+    if arma is not None and spec["n_param"] > 0:
+        kinds = arma if isinstance(arma, dict) else {"arma": arma}
+        for kind, prefix in (("ar", "phi"), ("ma", "theta"), ("arma", "")):
+            if kinds.get(kind) is not None:
+                names = [n for n in spec["names"] if n.startswith(prefix)]
+                parameters = np.atleast_1d(np.asarray(kinds[kind], dtype=float))
+                values.update(zip(names, parameters.tolist()))
+
+    # The initials, NaN where they are estimated
+    initial = provided.get("initial")
+    sizes = [2 * len(rows) for rows in rows_period]
+    if initial is not None and not isinstance(initial, dict):
+        vector = np.atleast_1d(np.asarray(initial, dtype=float))
+        start = k + sum(sizes)
+        initial = {
+            "level": vector[0],
+            "trend": vector[1] if struct["trend_in"] else None,
+            "seasonal": split_periods(vector, sizes),
+            "arma": vector[start : start + struct["arma_lag_max"]],
+            "xreg": vector[
+                start + struct["arma_lag_max"] : start + struct["arma_lag_max"] + n_xreg
+            ],
+        }
+    initial = initial or {}
+    n_h = struct["n_harmonics"]
+    states: Dict[str, Any] = {
+        "level": np.nan,
+        "trend": np.nan,
+        "sin": np.full(n_h, np.nan),
+        "cos": np.full(n_h, np.nan),
+        "xreg": np.full(n_xreg, np.nan),
+    }
+    if initial.get("level") is not None:
+        states["level"] = float(initial["level"])
+    if initial.get("trend") is not None and struct["trend_in"]:
+        states["trend"] = float(initial["trend"])
+    for period, rows, size, coefficients in zip(
+        periods, rows_period, sizes, initial.get("seasonal") or []
+    ):
+        coefficients = np.asarray(coefficients, dtype=float)
+        if len(coefficients) != size:
+            raise ValueError(
+                f"The initial seasonal coefficients of the period {period:g} should be "
+                f"{size} values: the sines and then the cosines of its harmonics."
+            )
+        states["sin"][rows] = coefficients[: len(rows)]
+        states["cos"][rows] = coefficients[len(rows) :]
+    xreg = initial.get("xreg")
+    if isinstance(xreg, dict):
+        xreg = [xreg[name] for name in xreg_names]
+    xreg = np.atleast_1d(np.asarray([] if xreg is None else xreg, dtype=float))
+    if len(xreg) > 0:
+        states["xreg"][:] = xreg
+    arma_states = np.atleast_1d(np.asarray(initial.get("arma", []), dtype=float))
+    arma_initial = (
+        arma_states if len(arma_states) > 0 and struct["arma_lag_max"] > 0 else None
+    )
+    labels = harmonic_labels(struct["table"])
+    drop = (
+        (["level"] if not np.isnan(states["level"]) else [])
+        + (["trend"] if not np.isnan(states["trend"]) else [])
+        + [f"sin{x}" for x, v in zip(labels, states["sin"]) if not np.isnan(v)]
+        + [f"cos{x}" for x, v in zip(labels, states["cos"]) if not np.isnan(v)]
+        + (
+            [f"ARMAState{j}" for j in range(1, struct["arma_lag_max"] + 1)]
+            if arma_initial is not None
+            else []
+        )
+        + [name for name, v in zip(xreg_names, states["xreg"]) if not np.isnan(v)]
+    )
+    known = sum(
+        int(np.sum(~np.isnan(np.atleast_1d(value)))) for value in states.values()
+    )
+    return {
+        "B": values,
+        "states": states,
+        "arma": arma_initial,
+        "drop": drop,
+        "number": len(values)
+        + known
+        + (0 if arma_initial is None else len(arma_initial)),
+        "initial": len(drop) > 0,
+    }

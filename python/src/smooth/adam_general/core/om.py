@@ -1097,7 +1097,7 @@ class OM(ADAM):
         """The ETS model of the occurrence selected by the information criterion, as
         R's om() does with adam_selector(): the pool and the branch and bound of ADAM,
         with each candidate estimated by the occurrence model's own estimator. The
-        information criteria of the candidates are kept in ``ics``."""
+        information criteria of the candidates are kept in ``ICs``."""
         from smooth.adam_general.core.estimator.selector import selector
 
         selected = selector(
@@ -1125,7 +1125,7 @@ class OM(ADAM):
         self._model_type = {**best["model_type_dict"], "model_do": "estimate"}
         self._phi_internal = dict(best["phi_dict"])
         self._fit_occurrence()
-        self.ics = dict(selected["ic_selection"])
+        self.ICs = dict(selected["ic_selection"])
 
     def _estimate_candidate(self, model_type_dict, phi_dict, **_kwargs):
         """One candidate of the selection (R's omEstimatorWrapper): the occurrence
@@ -1435,15 +1435,6 @@ class OM(ADAM):
         )
 
     def _set_om_fitted_attributes(self):
-        # Persistence trailing-underscore attrs (alpha/beta/gamma)
-        persistence = self._prepared.get("persistence", {}) or {}
-        if "alpha" in persistence:
-            self.persistence_level_ = persistence["alpha"]
-        if "beta" in persistence:
-            self.persistence_trend_ = persistence["beta"]
-        if "gamma" in persistence:
-            self.persistence_seasonal_ = persistence["gamma"]
-
         # Build the model name in oETS(...)[X] form
         e = self._model_type.get("error_type", "")
         t = self._model_type.get("trend_type", "")

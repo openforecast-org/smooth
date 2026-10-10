@@ -31,6 +31,7 @@ from smooth.adam_general.core.om import (
     om_preparator,
 )
 from smooth.adam_general.core.utils.ic import ic_function
+from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.omg_cost import omg_cf, omg_link_function
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
@@ -355,6 +356,11 @@ class OMG:
         return np.where(np.isnan(y), np.nan, (y != 0).astype(float))
 
     @property
+    def data(self) -> NDArray:
+        """The data as provided, with the sizes of the demand (R's ``$data``)."""
+        return np.asarray(self._y_raw, dtype=float)
+
+    @property
     def coef(self) -> NDArray:
         return self._B_joint
 
@@ -430,6 +436,13 @@ class OMG:
         # the length of the joint optimised vector. The occurrence model is
         # Bernoulli, so there is no scale parameter to exclude.
         return int(self._log_lik_dict["df"])
+
+    @property
+    def n_param(self) -> NParam:
+        """The table of the numbers of parameters (R's ``$nParam``): no scale."""
+        n_param = NParam.from_dict({"estimated": {"internal": self.nparam, "scale": 0}})
+        n_param.update_totals()
+        return n_param
 
     @property
     def aic(self) -> float:

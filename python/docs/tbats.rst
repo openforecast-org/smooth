@@ -118,7 +118,7 @@ held out:
    model = TBATS(lags=[1, 48, 336], h=336, holdout=True)
    model.fit(y)
    print(model)        # TBATS(lambda, {p,q}, phi, <48,k1>, <336,k2>), AICc ...
-   model.ics           # the information criteria of the candidate models
+   model.ICs           # the information criteria of the candidate models
 
 The name follows De Livera et al. (2011): TBATS(λ, {p,q}, φ, <m₁,k₁>, <m₂,k₂>),
 where λ is the Box-Cox parameter, p and q the AR and MA orders, φ the damping
@@ -197,7 +197,7 @@ The chosen distribution and its information criterion are in the model:
 .. code-block:: python
 
    model.distribution_   # "dnorm", "dlaplace" or "ds"
-   model.ics             # the candidates, then the chosen distribution
+   model.ICs             # the candidates, then the chosen distribution
 
 The two steps after the selection add to the time of the estimation, so a known
 distribution is better specified directly, e.g. ``distribution="dnorm"``. With a
@@ -221,6 +221,38 @@ options are:
 - ``"gradient"`` - the initial states are solved for exactly, by least squares,
   for each set of the other parameters. This is slower than backcasting on long
   series with many harmonics, because the solve involves all the states.
+
+Provided parameters
+-------------------
+
+As in ``ADAM``, the smoothing parameters (``persistence``), the damping parameter
+(``phi``), the ARMA parameters (``arma``) and the initial states (``initial``) can be
+provided, and only the rest is estimated. The dicts name the parts that are fixed;
+the seasonal elements have one entry per period of ``lags``: the pair gamma1, gamma2
+of the smoothing parameters, and the sine and then the cosine coefficients of the
+harmonics of the initial seasonality. The initial states are in the space of the
+Box-Cox transformed data, so they are meaningful with a provided ``lambda_bc``:
+
+.. code-block:: python
+
+    model = TBATS(
+        lags=[1, 12],
+        harmonics=[2],
+        trend="damped",
+        lambda_bc=0,
+        orders={"ar": 1, "ma": 0, "select": False},
+        persistence={"level": 0.3, "seasonal": [[0.001, 0]]},
+        phi=0.98,
+        arma={"ar": 0.5},
+        initial={"level": 4.7},
+    ).fit(y)
+    model.initial_type  # "provided"
+
+The vectors without names are matched with the parameters by their positions, so
+they need a structure that is not selected (the trend, the harmonics and the ARMA
+orders provided), and ``phi`` needs a provided damped trend: otherwise, they are
+estimated with a warning. Providing ``arma`` switches off the selection of the ARMA
+orders.
 
 Explanatory variables and intermittent demand
 ---------------------------------------------

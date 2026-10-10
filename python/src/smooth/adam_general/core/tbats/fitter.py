@@ -444,6 +444,9 @@ def fit(
         else occurrence["ot_logical"]
     )
     obs_nonzero = int(ot_logical.sum())
+    # The sizes of the zeros are not observed: the zeros have only the likelihood
+    # of the occurrence, and the scale is divided by the observed sizes
+    observed = ~np.isnan(y)
     X = st.design(obs, struct["trend_in"], table, xreg_data)[ot_logical]
     qr_x = st.QR(X)
     lam_start = st.lambda_start(y[ot_logical], X, lam_spec)
@@ -547,12 +550,42 @@ def fit(
         s["bounds"],
         xreg_estimate,
     )
-    names = b_list["names"]
+    names_all = b_list["names"]
     filler = Filler(
-        names, struct, spec, lam_spec, other, initial_estimate, adam_cpp, xreg_estimate
+        names_all,
+        struct,
+        spec,
+        lam_spec,
+        other,
+        initial_estimate,
+        adam_cpp,
+        xreg_estimate,
     )
+    # The provided values: in the full vector (the starting gammas around them), out
+    # of B
+    fixed = st.provided_values(s.get("provided") or {}, struct, spec)
+    positions = [names_all.index(name) for name in fixed["B"]]
+    b_all = b_list["B"].copy()
+    b_all[positions] = list(fixed["B"].values())
     if s["bounds"] == "admissible" and struct["n_harmonics"] > 0:
-        b_list["B"] = gamma_start(b_list["B"], names, filler)
+        b_all = gamma_start(b_all, names_all, filler)
+        b_all[positions] = list(fixed["B"].values())
+    estimated = np.array(
+        [n not in fixed["B"] and n not in fixed["drop"] for n in names_all],
+        dtype=bool,
+    )
+    names = [n for n, e in zip(names_all, estimated) if e]
+    b_list = {
+        "B": b_all[estimated],
+        "lb": b_list["lb"][estimated],
+        "ub": b_list["ub"][estimated],
+    }
+
+    def b_full(B: NDArray) -> NDArray:
+        """The full vector for the parameters of B, the provided ones included."""
+        full = b_all.copy()
+        full[estimated] = B
+        return full
 
     # The cost function
     def fit_inputs(elements: Dict[str, Any]) -> Dict[str, Any]:
@@ -571,6 +604,14 @@ def fit(
                 states[key] = states[key] + deviations[key]
             arma_initial = deviations["arma"]
         states["xreg"] = states["xreg"] + elements["xreg_deviations"]
+        for key, value in fixed["states"].items():
+            known = ~np.isnan(value)
+            if np.ndim(value) == 0:
+                states[key] = value if known else states[key]
+            else:
+                states[key] = np.where(known, value, states[key])
+        if fixed["arma"] is not None:
+            arma_initial = fixed["arma"]
         return {
             "y_bc": y_bc,
             "profile": st.profile(states, arma_initial, struct, elements["phi"]),
@@ -616,7 +657,7 @@ def fit(
         }
 
     def loss_value(B: NDArray, loss: str) -> float:
-        elements = filler(B, s["bounds"])
+        elements = filler(b_full(B), s["bounds"])
         if elements["penalty"] > 0:
             return float(elements["penalty"])
         fitted = fit_states(elements)
@@ -650,7 +691,7 @@ def fit(
                 value = math.log(np.linalg.det(adam_errors.T @ adam_errors / n))
         elif loss == "likelihood":
             value = (
-                -st.loglik_value(errors, distribution, elements["shape"])
+                -st.loglik_value(errors, distribution, elements["shape"], obs_nonzero)
                 - (elements["lambda"] - 1) * log_y
             )
         elif loss == "MSE":
@@ -658,10 +699,11 @@ def fit(
         elif loss == "MAE":
             value = _sum_r(np.abs(errors)) / obs_nonzero
         elif loss == "custom":
-            # On the observed values with demand, in the transformed space
+            # On the observed values in the transformed space (zero where there is
+            # no demand), as ADAM's
             value = s["loss_function"](
-                actual=fitted["y_bc"][ot_logical],
-                fitted=fitted["fitted"][ot_logical],
+                actual=fitted["y_bc"][observed],
+                fitted=fitted["fitted"][observed],
                 B=B,
             )
         else:
@@ -674,9 +716,10 @@ def fit(
     def point_lik(B: NDArray) -> NDArray:
         """The log-densities of the data at any parameters, as a refit with the
         model fixed: the final fit does not look at the bounds."""
-        elements = filler(np.asarray(B, dtype=float), s["bounds"])
-        errors = fit_states(elements)["errors"][ot_logical]
-        scale = st.scale_value(errors, distribution, elements["shape"])
+        elements = filler(b_full(np.asarray(B, dtype=float)), s["bounds"])
+        fitted = fit_states(elements)
+        errors = fitted["errors"][ot_logical]
+        scale = st.scale_value(errors, distribution, elements["shape"], obs_nonzero)
         values = calculate_likelihood(
             distribution,
             "A",
@@ -691,7 +734,6 @@ def fit(
         result = np.zeros(obs)
         if occurrence["model"] is not None:
             p_fitted = occurrence["p_fitted"]
-            observed = ~np.isnan(y)
             result[observed] = _log_r(1 - p_fitted[observed])
             result[ot_logical] = _log_r(p_fitted[ot_logical])
         result[ot_logical] += sizes
@@ -699,7 +741,9 @@ def fit(
 
     def in_bounds(B: NDArray) -> bool:
         """Whether the parameters satisfy the bounds, for the draws of reapply."""
-        return bool(filler(np.asarray(B, dtype=float), s["bounds"])["penalty"] == 0)
+        return bool(
+            filler(b_full(np.asarray(B, dtype=float)), s["bounds"])["penalty"] == 0
+        )
 
     # The refits at the draws of the parameters (rows), for reapply: the C++ refitter
     # over all of them at once, each with its own matrices, initial profile and, with
@@ -711,7 +755,7 @@ def fit(
     def refitter(draws: NDArray) -> Dict[str, Any]:
         refits = []
         for draw in np.atleast_2d(draws):
-            elements = filler(np.asarray(draw, dtype=float), s["bounds"])
+            elements = filler(b_full(np.asarray(draw, dtype=float)), s["bounds"])
             refits.append({**elements, **fit_inputs(elements)})
         nsim = len(refits)
         # The missing values are skipped, as in the fit
@@ -795,7 +839,7 @@ def fit(
     loss_final = cf(B)
 
     # The final fit
-    elements = filler(B, s["bounds"])
+    elements = filler(b_full(B), s["bounds"])
     fitted = fit_states(elements)
     states = fitted["states"]
     if head["geometry"] > struct["lags_model_max"]:
@@ -823,19 +867,21 @@ def fit(
         + n_initials * initials_profiled
         + struct["n_xreg"] * (not xreg_estimate)
     )
-    # The likelihood of the occurrence model is added, as its parameters are
-    loglik = -loss_value(B, "likelihood") + occurrence["loglik"]
+    # The likelihood of the occurrence model is added, as its parameters are. A custom
+    # loss is minus the log-likelihood, as in ADAM
+    loss_likelihood = "custom" if s["loss"] == "custom" else "likelihood"
+    loglik = -loss_value(B, loss_likelihood) + occurrence["loglik"]
 
     fi = None
     if s["fi"] and len(B) > 0:
         fi = -np.asarray(
             _hessian_cpp(
-                lambda b: -loss_value(np.asarray(b), "likelihood"), B, s["step_size"]
+                lambda b: -loss_value(np.asarray(b), loss_likelihood), B, s["step_size"]
             )
         )
 
     scale = st.scale_value(
-        fitted["errors"][ot_logical], distribution, elements["shape"]
+        fitted["errors"][ot_logical], distribution, elements["shape"], obs_nonzero
     )
     forecast_bc = None
     if s["h"] > 0:
@@ -858,6 +904,9 @@ def fit(
     return {
         "names": names,
         "B": B,
+        "B_full": dict(zip(names_all, b_full(B))),
+        "n_param_provided": fixed["number"],
+        "initial_provided": fixed["initial"],
         "res": res,
         "loss_value": loss_final,
         "loglik": loglik,

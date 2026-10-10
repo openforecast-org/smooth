@@ -1,6 +1,6 @@
-smooth.TBATS.fi\_
+smooth.TBATS.data
 =================
 
 .. currentmodule:: smooth
 
-.. autoproperty:: TBATS.fi_
+.. autoproperty:: TBATS.data

@@ -103,6 +103,22 @@ auto.adam <- function(data, model="ZXZ", lags=c(frequency(data)),
         else{
             responseName <- all.vars(formula)[1];
         }
+        # The regressors with the names of the dummies of the outliers are renamed
+        clashes <- setdiff(grep(adam_outlierPattern, colnames(data), value=TRUE), responseName);
+        if(outliers!="ignore" && length(clashes)>0){
+            warning(paste0("The names of the regressors ", paste(clashes, collapse=", "),
+                           " are those of the dummies of the outliers. Renaming them to ",
+                           paste0("x.", clashes, collapse=", "), "."), call.=FALSE);
+            colnames(data)[colnames(data) %in% clashes] <- paste0("x.", colnames(data)[colnames(data) %in% clashes]);
+            if(!is.null(formula)){
+                formulaText <- paste(deparse(formula), collapse="");
+                for(clash in clashes){
+                    formulaText <- gsub(paste0("(?<![.\\w])", clash, "(?![.\\w])"), paste0("x.", clash),
+                                        formulaText, perl=TRUE);
+                }
+                formula <- as.formula(formulaText);
+            }
+        }
     }
 
     #### Create logical, determining, what we are dealing with ####

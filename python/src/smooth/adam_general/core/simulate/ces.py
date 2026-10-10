@@ -9,9 +9,9 @@ conditions on the real / imaginary plane.
 The CES state-space layout matches R/simces.R:160-197:
 
 * ``none`` → 2 states (level, potential), lag 1
-* ``simple`` → 2 states (seasonal level / potential), lag ``frequency``
+* ``simple`` → 2 states (``seasonal``, ``seasonalPotential``), lag ``frequency``
 * ``partial`` → 3 states (level, potential, seasonal)
-* ``full`` → 4 states (level, potential, seasonal level / potential)
+* ``full`` → 4 states (level, potential, seasonal, seasonalPotential)
 
 The ``E="A"`` simulator is used regardless of ``seasonality`` because
 CES is an additive-error model.

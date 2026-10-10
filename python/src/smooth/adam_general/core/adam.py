@@ -24,6 +24,7 @@ from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.printing import decorate_occurrence_name
 from smooth.adam_general.core.utils.utils import (
+    OUTLIER_NAMES,
     SMOOTHER_DEFAULT,
     SmootherType,
     observed_mask,
@@ -110,9 +111,10 @@ def _adam_refit_one_replicate(
     bind everything else with :func:`functools.partial` and pass the
     integer index as the call site.
     """
+    from smooth.adam_general.core.ces_model import CES as _CES
     from smooth.adam_general.core.om import OM as _OM
 
-    refit_cls = _OM if refit_cls_name == "OM" else ADAM
+    refit_cls = {"OM": _OM, "CES": _CES}.get(refit_cls_name, ADAM)
     y_boot = actuals[idx_matrix[i]]
     try:
         if include_model_kwarg:
@@ -463,7 +465,6 @@ class ADAM:
     - ``persistence_trend_``: Trend smoothing parameter (β)
     - ``persistence_seasonal_``: Seasonal smoothing parameter(s) (γ)
     - ``phi_``: Damping parameter (φ)
-    - ``initial_states_``: Estimated initial states
     - ``arma_parameters_``: AR/MA coefficients (if ARIMA)
 
     Additional fitted attributes:
@@ -641,9 +642,6 @@ class ADAM:
         fi: bool = False,
         step_size: Optional[float] = None,
         # initial values for optimization parameters:
-        nlopt_initial: Optional[Dict[str, Any]] = None,
-        nlopt_upper: Optional[Dict[str, Any]] = None,
-        nlopt_lower: Optional[Dict[str, Any]] = None,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         # specific to losses or distributions
         gnorm_shape: Optional[float] = None,
@@ -748,12 +746,6 @@ class ADAM:
             Whether recent profiles (e.g., for exogenous variables) are provided.
         profiles_recent_table : Optional[Any], default=None
             Table containing recent profiles data.
-        nlopt_initial : Optional[Dict[str, Any]], default=None
-            Initial values for optimization parameters for NLopt solver.
-        nlopt_upper : Optional[Dict[str, Any]], default=None
-            Upper bounds for optimization parameters for NLopt solver.
-        nlopt_lower : Optional[Dict[str, Any]], default=None
-            Lower bounds for optimization parameters for NLopt solver.
         nlopt_kwargs : Optional[Dict[str, Any]], default=None
             Additional keyword arguments for optimization. Supported keys:
 
@@ -772,6 +764,11 @@ class ADAM:
               than ftol_rel * |CF|.
             - ``ftol_abs`` (float): Absolute tolerance on function value (default=0).
               Optimization stops when CF changes are smaller than ftol_abs.
+            - ``maxeval`` (int): Maximum number of evaluations of the cost
+              function (default: 40 per parameter, at least 1000 with
+              regressors, as R).
+            - ``maxtime`` (float): Maximum time of the optimisation in seconds
+              (default=-1, no limit).
             - ``algorithm`` (str): NLopt algorithm name
               (default="NLOPT_LN_NELDERMEAD"). Common alternatives:
               "NLOPT_LN_SBPLX" (Subplex), "NLOPT_LN_COBYLA" (COBYLA),
@@ -830,9 +827,6 @@ class ADAM:
         self.head_length = head_length
         self.arma = arma
         self.verbose = verbose
-        self.nlopt_initial = nlopt_initial
-        self.nlopt_upper = nlopt_upper
-        self.nlopt_lower = nlopt_lower
         self.nlopt_kwargs = nlopt_kwargs
         self.gnorm_shape = gnorm_shape
         if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
@@ -944,7 +938,6 @@ class ADAM:
             - ``persistence_seasonal_``: γ (seasonal smoothing), list if multiple
             - ``phi_``: Damping parameter, range [0, 1]
             - ``arma_parameters_``: AR/MA coefficients (if ARIMA)
-            - ``initial_states_``: Initial state values
 
             **Model Components** (via properties):
 
@@ -981,7 +974,7 @@ class ADAM:
 
         - Changing ``initial`` method
         - Adjusting bounds (``bounds="usual"`` vs ``bounds="admissible"``)
-        - Providing custom starting values via ``nlopt_initial`` parameter
+        - Providing custom starting values via ``nlopt_kwargs={"B": ...}``
 
         **Computational Complexity**:
 
@@ -1009,7 +1002,7 @@ class ADAM:
         To see which models were tested::
 
             >>> model.fit(y)
-            >>> print(model.ic_selection)  # Dict of model names -> IC values
+            >>> print(model.ICs)  # Dict of model names -> IC values
 
         **Holdout Validation**:
 
@@ -1090,6 +1083,21 @@ class ADAM:
         # No need to call _setup_parameters as those parameters are now
         # instance attributes
 
+        # The model as specified: the refit with the dummies of the outliers selects
+        # it again, as R's auto.adam() re-evaluates its call
+        model_spec = self.model
+        # The regressors with the names of the dummies of the outliers are renamed
+        if self.outliers != "ignore" and isinstance(X, pd.DataFrame):
+            clashes = [str(c) for c in X.columns if OUTLIER_NAMES.match(str(c))]
+            if clashes:
+                warnings.warn(
+                    f"The names of the regressors {', '.join(clashes)} are those of "
+                    "the dummies of the outliers. Renaming them to "
+                    f"{', '.join('x.' + c for c in clashes)}.",
+                    stacklevel=2,
+                )
+                X = X.rename(columns={c: f"x.{c}" for c in clashes})
+
         # Check parameters and prepare data
         self._check_parameters(y, X)
 
@@ -1156,8 +1164,6 @@ class ADAM:
         # Scale the demand-sizes fitted values by the occurrence probability
         # so the resulting ``fitted`` series is on the original (mixed) scale.
         if self._om_model is not None:
-            import pandas as pd
-
             p = self._occurrence["p_fitted"]
             yf = self._prepared["y_fitted"]
             if isinstance(yf, pd.Series):
@@ -1209,17 +1215,26 @@ class ADAM:
             if len(od.id) > 0:
                 dummies = od.outliers
                 assert dummies is not None  # non-empty od.id guarantees outliers
-                D = (
-                    self._expand_outlier_dummies(dummies)
-                    if _outliers == "select"
-                    else dummies
-                )
+                names = [f"outlier{i + 1}" for i in range(dummies.shape[1])]
+                D = dummies
+                if _outliers == "select":
+                    D = self._expand_outlier_dummies(dummies)
+                    names = [f"{n}{s}" for n in names for s in ("", "Lag1", "Lead1")]
                 h_eff = len(y) - self.nobs
                 if h_eff > 0:
                     D = np.vstack([D, np.zeros((h_eff, D.shape[1]))])
-                X_new = np.hstack([X, D]) if X is not None else D
+                # Named as R names them, next to the regressors of X
+                X_new = pd.DataFrame(D, columns=names)
+                if isinstance(X, pd.DataFrame):
+                    X_new = pd.concat([X.reset_index(drop=True), X_new], axis=1)
+                elif X is not None:
+                    values = np.asarray(X, dtype=float).reshape(len(D), -1)
+                    columns = [f"x{i + 1}" for i in range(values.shape[1])]
+                    X_old = pd.DataFrame(values, columns=columns)
+                    X_new = pd.concat([X_old, X_new], axis=1)
                 self.outliers = "ignore"
                 self.regressors = "select" if _outliers == "select" else "use"
+                self.model = model_spec
                 self.fit(y, X_new)
                 self._config["outliers"] = _outliers
                 return self  # _config already built by the recursive fit()
@@ -1291,17 +1306,6 @@ class ADAM:
             # no shape and returned NaN for every dgnorm/dlgnorm horizon.
             if self._general is not None:
                 self._general["other"] = self.other
-
-        # Set persistence parameters (pre-estimation values for provided params)
-        if self._persistence:
-            if "persistence_level" in self._persistence:
-                self.persistence_level_ = self._persistence["persistence_level"]
-            if "persistence_trend" in self._persistence:
-                self.persistence_trend_ = self._persistence["persistence_trend"]
-            if "persistence_seasonal" in self._persistence:
-                self.persistence_seasonal_ = self._persistence["persistence_seasonal"]
-            if "persistence_xreg" in self._persistence:
-                self.persistence_xreg_ = self._persistence["persistence_xreg"]
 
         # For combined models, preserve original model specification with ETS prefix;
         # ETSX when any model of the pool has regressors, as R
@@ -1439,40 +1443,60 @@ class ADAM:
         return self._prepared["states"]
 
     @property
-    def persistence_vector(self) -> Dict[str, Any]:
+    def persistence_vector(self) -> Dict[str, float]:
         """
-        Estimated smoothing parameters (R: $persistence).
-
-        Returns a dictionary containing the smoothing/persistence parameters
-        that control how quickly the model adapts to new observations. Higher
-        values mean faster adaptation (more weight on recent observations).
+        The smoothing parameters, estimated or provided (R: $persistence).
 
         Returns
         -------
-        Dict[str, Any]
-            Dictionary with keys ``persistence_level`` (alpha, 0-1),
-            ``persistence_trend`` (beta, 0-alpha, only if model has trend),
-            and ``persistence_seasonal`` (gamma, 0 to 1-alpha, only if model
-            has seasonality).
-
-        Raises
-        ------
-        ValueError
-            If the model has not been fitted yet.
-
-        See Also
-        --------
-        phi_ : Damping parameter for trend
+        Dict[str, float]
+            The elements of the persistence vector under R's names: ``alpha``,
+            ``beta`` for the trend, ``gamma`` (``gamma1``, ...) for the
+            seasonal components, ``psi`` (``psi1``, ...) for the ARIMA states and
+            ``delta1``, ... for the regressors, with the parts the model has.
 
         Examples
         --------
         >>> model = ADAM(model="AAA", lags=12)
         >>> model.fit(y)
-        >>> alpha = model.persistence_vector['persistence_level']
-        >>> gamma = model.persistence_vector['persistence_seasonal']
+        >>> alpha = model.persistence_vector["alpha"]
         """
         self._check_is_fitted()
-        return self._prepared.get("persistence", {})
+        persistence = self._prepared.get("persistence")
+        if isinstance(persistence, dict):
+            return {name: float(value) for name, value in persistence.items()}
+        values = np.ravel(np.asarray(persistence if persistence is not None else []))
+        components = self._components
+
+        def numbered(name: str, n: int) -> List[str]:
+            return [name] if n == 1 else [f"{name}{i}" for i in range(1, n + 1)]
+
+        names = ["alpha", "beta"][: components["components_number_ets_non_seasonal"]]
+        names += numbered("gamma", components["components_number_ets_seasonal"])
+        names += numbered("psi", components.get("components_number_arima", 0))
+        names += [f"delta{i}" for i in range(1, len(values) - len(names) + 1)]
+        return dict(zip(names, values.astype(float).tolist()))
+
+    @property
+    def persistence_level_(self) -> Optional[float]:
+        """The smoothing parameter of the level, alpha, or None."""
+        return self.persistence_vector.get("alpha")
+
+    @property
+    def persistence_trend_(self) -> Optional[float]:
+        """The smoothing parameter of the trend, beta, or None."""
+        return self.persistence_vector.get("beta")
+
+    @property
+    def persistence_seasonal_(self) -> List[float]:
+        """The smoothing parameters of the seasonal components, gamma."""
+        return [v for k, v in self.persistence_vector.items() if k[:5] == "gamma"]
+
+    @property
+    def persistence_xreg_(self) -> Optional[List[float]]:
+        """The smoothing parameters of the regressors, delta, or None."""
+        deltas = [v for k, v in self.persistence_vector.items() if k[:5] == "delta"]
+        return deltas or None
 
     @property
     def phi_(self) -> Optional[float]:
@@ -1510,6 +1534,36 @@ class ADAM:
         if self._model_type.get("damped", False):
             return self._prepared.get("phi", 1.0)
         return None
+
+    @property
+    def arma_parameters_(self) -> Optional[Dict[str, Dict[str, float]]]:
+        """
+        The AR and MA parameters, estimated or provided (R: $arma).
+
+        Returns
+        -------
+        Optional[Dict[str, Dict[str, float]]]
+            ``{"ar": {"phi1[1]": ...}, "ma": {"theta1[1]": ...}}`` with the parts
+            the model has, or None without ARIMA.
+        """
+        self._check_is_fitted()
+        arima = self._arima or {}
+        if not arima.get("arima_model"):
+            return None
+        lags = self._lags_model.get("lags", [1]) or [1]
+        # The provided ones come lag by lag, the AR of the lag and then its MA
+        names = []
+        for lag, p, q in zip(lags, arima["ar_orders"], arima["ma_orders"]):
+            names += [f"phi{k}[{lag}]" for k in range(1, p + 1)]
+            names += [f"theta{k}[{lag}]" for k in range(1, q + 1)]
+        estimated = dict(zip(self.coef_names, self.coef))
+        provided = iter(arima.get("arma_parameters") or [])
+        result: Dict[str, Dict[str, float]] = {}
+        for name in names:
+            kind = "ar" if name.startswith("phi") else "ma"
+            value = estimated[name] if arima[f"{kind}_estimate"] else next(provided)
+            result.setdefault(kind, {})[name] = float(value)
+        return {kind: result[kind] for kind in ("ar", "ma") if kind in result} or None
 
     @property
     def transition(self) -> NDArray:
@@ -2571,7 +2625,8 @@ class ADAM:
     @staticmethod
     def _expand_outlier_dummies(D: NDArray) -> NDArray:
         """
-        Expand each outlier dummy column into three columns: lag-1, t, lead+1.
+        Expand each outlier dummy column into three columns: t, lag 1 and lead 1,
+        as R's ``xregExpander(-1:1, gaps="zero")``.
 
         Used by ``outliers="select"`` to allow the regressor selection
         mechanism to choose which temporal offset carries the outlier effect.
@@ -2585,16 +2640,14 @@ class ADAM:
         -------
         NDArray of shape (n, 3*m)
             Expanded matrix with columns ordered as
-            ``[lag_1, t, lead_1, lag_2, t_2, lead_2, ...]``.
+            ``[t_1, lag_1, lead_1, t_2, lag_2, lead_2, ...]``.
         """
-        n, m = D.shape
-        cols = []
-        for j in range(m):
-            col = D[:, j]
-            cols.append(np.concatenate([[0.0], col[:-1]]))  # lag -1
-            cols.append(col.copy())  # t
-            cols.append(np.concatenate([col[1:], [0.0]]))  # lead +1
-        return np.column_stack(cols)
+        return np.column_stack(
+            [
+                gb.xreg_expander(D[:, [j]], [-1, 0, 1], gaps="zero")
+                for j in range(D.shape[1])
+            ]
+        )
 
     @property
     def nobs(self) -> int:
@@ -2668,7 +2721,7 @@ class ADAM:
     def _df_scale(self) -> float:
         """Degrees of freedom for de-biasing the scale (R: ``adam_dfScale``).
 
-        The non-zero observations minus the parameters, without the scale ones
+        The observed sizes minus the parameters, without the scale ones
         when they were estimated by likelihood -- the scale model's parameters
         when one is attached, as ``implant()`` puts them in the scale column.
         """
@@ -2680,8 +2733,8 @@ class ADAM:
                 n_param -= float(self._n_param.estimated["scale"])
             else:
                 n_param -= 1.0
-        df = self._nobs_nonzero - n_param
-        return df if df > 0 else float(self._nobs_nonzero)
+        df = self._nobs_observed() - n_param
+        return df if df > 0 else float(self._nobs_observed())
 
     @property
     def _nobs_nonzero(self) -> int:
@@ -2697,9 +2750,10 @@ class ADAM:
         return int(np.count_nonzero(y[observed_mask(self._observations)]))
 
     def _nobs_observed(self) -> int:
-        """The observed in-sample values (R: ``adam_nobsObserved``): the missing
-        ones are not."""
-        return int(np.sum(observed_mask(self._observations)))
+        """The observed sizes, which the scale is divided by (R:
+        ``adam_nobsObserved``): the missing values are not, and neither are the
+        zeros of an occurrence model, whose sizes are not observed."""
+        return int(np.sum(self._observations["ot_logical"]))
 
     def _ic_occurrence_terms(self):
         """``(n_param_all, n_param_sizes, obs)`` for AICc/BICc.
@@ -2977,17 +3031,52 @@ class ADAM:
         in-sample observation under the fitted distribution and scale, so
         ``sum(point_lik())`` equals :attr:`loglik`. For an occurrence
         (intermittent) model the demand-size density is combined with the
-        occurrence Bernoulli contribution and the zero observations carry the
-        differential-entropy term, exactly as R does. With ``log=False`` the
-        densities themselves are returned.
+        occurrence Bernoulli contribution, and the zero observations, whose
+        sizes are not observed, have only the latter, as R. With ``log=False``
+        the densities themselves are returned.
         """
-        from smooth.adam_general.core.utils.utils import (
-            _sum_r,
-            calculate_entropy,
-            calculate_likelihood,
-        )
+        from smooth.adam_general.core.utils.utils import calculate_likelihood
 
         self._check_is_fitted()
+        # With a scale model, the likelihood is that of the scale model (R's sm())
+        if self.scale_model is not None:
+            return self.scale_model.point_lik(log=log)
+        if getattr(self, "is_scale_", False):
+            from smooth.adam_general.core.sm import _log_density
+
+            # The location model's values given the scale, as R's pointLik.sm.adam
+            location: Any = getattr(self, "location_")
+            y = np.asarray(location.actuals, dtype=float).ravel()
+            mu = np.asarray(location.fitted, dtype=float).ravel()
+            scale_values = np.asarray(self.fitted, dtype=float).ravel()
+            other_dict = getattr(location, "other", None)
+            other = (
+                other_dict.get("shape", other_dict.get("alpha"))
+                if isinstance(other_dict, dict)
+                else None
+            )
+            observed = ~np.isnan(y)
+            occurrence = location._occurrence
+            demand = observed & ((y != 0) | (not occurrence.get("occurrence_model")))
+            zero = observed & ~demand
+            if occurrence.get("occurrence_model"):
+                # The sizes: the fitted values are multiplied by the probabilities
+                mu = mu / np.asarray(occurrence["p_fitted"], dtype=float).ravel()
+            values = np.zeros(len(y))
+            values[demand] = _log_density(
+                self.distribution_,
+                location.error_type,
+                y[demand],
+                mu[demand],
+                scale_values[demand],
+                other,
+            )
+            if occurrence.get("occurrence_model"):
+                # The zeros have only the likelihood of the occurrence
+                p_fitted = np.asarray(occurrence["p_fitted"], dtype=float).ravel()
+                values[demand] += np.log(p_fitted[demand])
+                values[zero] += np.log(1 - p_fitted[zero])
+            return values if log else np.exp(values)
         y = np.asarray(self.actuals, dtype=float).ravel()
         obs = len(y)
         distribution = self._general.get(
@@ -3033,25 +3122,8 @@ class ADAM:
         ).ravel()
 
         if occurrence_model:
-            # Differential entropy for the unobserved (zero) demand sizes, then
-            # add the occurrence-model Bernoulli contribution (mirrors R).
-            # One zero at a time: the entropy of dgamma and dinvgauss sums over the
-            # fitted values it is given. As in the estimation, a negative entropy
-            # (it should not be) is set to zero
-            zero = ~ot_logical & observed
-            entropy = np.array(
-                [
-                    float(
-                        np.ravel(
-                            calculate_entropy(
-                                distribution, scale, other, 1.0, y_fitted[j : j + 1]
-                            )
-                        )[0]
-                    )
-                    for j in np.flatnonzero(zero)
-                ]
-            )
-            lik_values[zero] = 0.0 if _sum_r(entropy) < 0 else -entropy
+            # The zeros have only the occurrence-model Bernoulli contribution:
+            # their sizes are not observed (mirrors R)
             # The fitted occurrence model (the occurrence entry holds its name
             # when ADAM fitted it)
             om_model = getattr(self, "_om_model", None)
@@ -3335,6 +3407,23 @@ class ADAM:
         return list(self._lags_model.get("lags", [1]))
 
     @property
+    def ICs(self) -> Union[float, Dict[Any, float]]:  # noqa: N802
+        """The information criteria (R: $ICs): of the models in the pool with a
+        selection or a combination, by name, and of the model otherwise. The
+        subclasses that select by their own criteria (``OM``, ``SMA``) set them."""
+        self._check_is_fitted()
+        if getattr(self, "_ICs", None) is not None:
+            return self._ICs
+        selected = getattr(self, "_adam_selected", None) or {}
+        if isinstance(selected.get("ic_selection"), dict):
+            return {k: float(v) for k, v in selected["ic_selection"].items()}
+        return float(self._ic_selection)
+
+    @ICs.setter
+    def ICs(self, value: Union[float, Dict[Any, float]]) -> None:  # noqa: N802
+        self._ICs = value
+
+    @property
     def om_model(self):
         """Fitted occurrence model (OM / OMG / AutoOM), or None."""
         self._check_is_fitted()
@@ -3545,6 +3634,13 @@ class ADAM:
                 new_xreg = new_xreg.astype(float)
             if new_xreg.ndim == 1:
                 new_xreg = new_xreg.reshape(-1, 1)
+            # Zeros for the dummies of the outliers missing from X, as in R
+            names = list(self._explanatory.get("xreg_names") or [])
+            others = [i for i, n in enumerate(names) if not OUTLIER_NAMES.match(n)]
+            if len(others) < len(names) and new_xreg.shape[1] == len(others):
+                full = np.zeros((new_xreg.shape[0], len(names)))
+                full[:, others] = new_xreg
+                new_xreg = full
         self._set_new_xreg(new_xreg)
 
         # Validate prediction inputs and prepare data for forecasting
@@ -5059,7 +5155,7 @@ class ADAM:
                 e_type,
                 errors[ot_logical],
                 fitted[ot_logical],
-                obs,
+                int(np.sum(ot_logical)),
                 other_b,
             )
             lik = np.asarray(
@@ -5510,7 +5606,7 @@ class ADAM:
         )
         original_coef_names = list(self.coef_names)
         k = len(original_coef_names)
-        model_spec = self._model_type.get("model", self.model)
+        model_spec = self._model_type.get("model") or self.model
 
         # R's sampler picks variable-length contiguous windows for
         # time-series models. ``size`` is honoured only on the
@@ -5547,7 +5643,12 @@ class ADAM:
         # inherit) use the plain ADAM path.
         from smooth.adam_general.core.om import OM
 
-        if isinstance(self, OM):
+        if self._model_type.get("ces_model", False):
+            # CES is refitted with its own arguments, as R's ces() with its call
+            refit_cls_name = "CES"
+            refit_kwargs = {key: value for key, value in self._config.items()}
+            include_model_kwarg = False
+        elif isinstance(self, OM):
             refit_cls_name = "OM"
             refit_kwargs = {key: value for key, value in self._config.items()}
             include_model_kwarg = False  # already inside ``_config``
@@ -5744,6 +5845,24 @@ class ADAM:
             _clip_ets_multiplicative_states(random_parameters, idx, self._model_type)
         _clip_deltas(random_parameters, idx)
 
+        # 3c. The smoothing parameters of CES (R/reapply.R): the bounds of each
+        # with the others at their values, as R's cesBounds()
+        ces_model = self._model_type.get("ces_model", False)
+        if ces_model:
+            from smooth.adam_general.core.utils.bounds import ces_bounds
+
+            vec_g_eig = np.asarray(self._adam_created["vec_g"], dtype=float).ravel()
+            for nm in [n for n in coef_names if n.startswith(("alpha_", "beta"))]:
+                lo, hi = ces_bounds(
+                    coef, coef_names, idx[nm], vec_g_eig, **self._eigen_static_args()
+                )
+                np.clip(
+                    random_parameters[:, idx[nm]],
+                    lo,
+                    hi,
+                    out=random_parameters[:, idx[nm]],
+                )
+
         # 3b. Stationarity and invertibility of the ARMA factors (R/reapply.R)
         arima_model = self._model_type.get("arima_model", False)
         non_zero_ari = np.atleast_2d(np.asarray(self._arima.get("non_zero_ari", [])))
@@ -5835,6 +5954,30 @@ class ADAM:
                 arr_f[1, 1, :] = phi_vals
                 arr_wt[:, 1, :] = phi_vals[np.newaxis, :]
                 k += 1
+
+        # 5d. The transition and persistence of CES (R/reapply.R): each complex
+        # parameter (alpha_0, alpha_1), and (beta_0, beta_1) of the full seasonality,
+        # gives a pair of states; the real beta of the partial one is a persistence
+        if ces_model:
+            pairs = [("alpha_0", "alpha_1"), ("beta_0", "beta_1")]
+            row = 0
+            for first, second in pairs:
+                # The seasonal states follow the level and potential, also with a
+                # provided a
+                row = 2 if first == "beta_0" else row
+                names0 = [n for n in coef_names if n.startswith(first)]
+                names1 = [n for n in coef_names if n.startswith(second)]
+                for name0, name1 in zip(names0, names1):
+                    draws0 = random_parameters[:, idx[name0]]
+                    draws1 = random_parameters[:, idx[name1]]
+                    arr_f[row, row + 1, :] = draws1 - 1
+                    arr_f[row + 1, row + 1, :] = 1 - draws0
+                    mat_g[row, :] = draws0 - draws1
+                    mat_g[row + 1, :] = draws0 + draws1
+                    row += 2
+            betas = [n for n in coef_names if n == "beta" or n.startswith("beta[")]
+            for i, name in enumerate(betas):
+                mat_g[2 + i, :] = random_parameters[:, idx[name]]
 
         # 5b. ARIMA polynomial fill into arr_f and mat_g (R/reapply.R:554-634).
         # For each parameter draw, call ``polynomialise`` to expand the
@@ -5948,8 +6091,12 @@ class ADAM:
                 ]
             k += len(delta_names)
 
-        # 6. Fill the profile array (R/reapply.R:637-674).
+        # 6. Fill the profile array (R/reapply.R:637-674), from the profile the fit
+        # started from (R's $profileInitial) where it differs from the states
         profiles_recent_array = _build_profiles_array(arr_vt_seed, L, nsim)
+        head = self._simulate_state_head(L)
+        if head is not None:
+            profiles_recent_array[:, :L, :] = np.asarray(head, dtype=float)[:, :L, None]
         j = 0
         if ets_model:
             j += 1
@@ -5985,8 +6132,11 @@ class ADAM:
                         )
                     j += 1
                 k += sum(len(v) for v in groups.values())
-        # The rows after ETS, whichever of its initials were estimated
+        # The rows after ETS, whichever of its initials were estimated; those after
+        # the states of CES, whose initials R does not draw
         j = self._components["components_number_ets"] if ets_model else 0
+        if ces_model:
+            j = self._components["components_number_arima"]
 
         # 6b. ARIMA profile fill (R/reapply.R). The estimated initials (none for
         # backcasting / complete) are held by the last ARIMA state.
@@ -6152,7 +6302,7 @@ class ADAM:
             states=new_states,
             refitted=refitted_df,
             fitted=fitted_series,
-            model=str(self._prepared.get("model", self.model)),
+            model=str(self._prepared.get("model") or self.model),
             transition=arr_f_out,
             measurement=arr_wt_out,
             persistence=persistence_df,
@@ -6345,18 +6495,24 @@ class ADAM:
             n_arima_fc = self._components["components_number_arima"]
             xreg_col_lo = n_ets_fc + n_arima_fc
             xreg_col_hi = xreg_col_lo + xreg_number
+            # The dummies of the outliers are zero in the future, as in R
+            names = list(self._explanatory.get("xreg_names") or [])
+            dummies = [i for i, n in enumerate(names) if OUTLIER_NAMES.match(n)]
+            others = [i for i in range(len(names)) if i not in dummies]
             if X is None:
                 xreg_in = np.asarray(self._explanatory["xreg_data"], dtype=float)
                 if xreg_in.shape[0] >= h:
-                    new_xreg = xreg_in[-h:, :]
+                    new_xreg = xreg_in[-h:, :].copy()
                 else:
                     new_xreg = np.tile(xreg_in[-1:], (h, 1))
-                warnings.warn(
-                    "newdata (X) not provided to reforecast for an xreg "
-                    "model; using the last h in-sample xreg rows as a "
-                    "fallback (matches R's behaviour).",
-                    stacklevel=2,
-                )
+                new_xreg[:, dummies] = 0
+                if others:
+                    warnings.warn(
+                        "newdata (X) not provided to reforecast for an xreg "
+                        "model; using the last h in-sample xreg rows as a "
+                        "fallback (matches R's behaviour).",
+                        stacklevel=2,
+                    )
             else:
                 new_xreg = np.asarray(X, dtype=float)
                 if new_xreg.dtype.kind not in ("f", "i", "u"):
@@ -6366,6 +6522,10 @@ class ADAM:
                     )
                 if new_xreg.ndim == 1:
                     new_xreg = new_xreg.reshape(-1, 1)
+                if dummies and new_xreg.shape[1] == len(others):
+                    full = np.zeros((new_xreg.shape[0], len(names)))
+                    full[:, others] = new_xreg
+                    new_xreg = full
                 columns = self._explanatory.get("xreg_columns")
                 if columns is not None and new_xreg.shape[1] != xreg_number:
                     new_xreg = new_xreg[:, columns]

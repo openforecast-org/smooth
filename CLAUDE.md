@@ -13,6 +13,8 @@ Do not create summaries of what you do. Do not create additional files/documents
 
 **Always ask before introducing a new function** (exported or internal, in R, Python or C++), and say what it would do and where it would live. Look first for an existing one that does the job, in this repository and in its dependencies (e.g. greybox for anything about distributions: a change to a density belongs in greybox, not as a patch in smooth).
 
+**Never create a new name without asking.** The same applies to every user-visible object: an argument, a fitted attribute or property, a method, a class, a key of a returned dict or list element. Before creating one, ask, and explain the alternatives: the existing name that already carries it (in this function, in `adam()` / `ADAM`, or in another model), and why none of them fits. A new name is justified only when the object is genuinely new to the package. The R and Python names of the arguments, attributes, methods and classes that exist in both languages are listed in the name map of the `smooth-translation` skill (`.claude/skills/smooth-translation/SKILL.md`): `adam()` in R and `ADAM` in Python set the names, every other model reuses them, and a name introduced once is used the same way everywhere. Update the map whenever a name is added or changed.
+
 **Never expose the Claude session URL (or any session identifier) in commits.** Do not add a `Claude-Session:` trailer, a `https://claude.ai/code/session_...` link, or any equivalent session reference to commit messages, PR descriptions, code, or files. These leak a private session handle and are a security concern. Commit messages must contain only the change description (a `Co-Authored-By:` line is fine if attribution is wanted); nothing that points back to a Claude session.
 
 **Never dismiss a failing test.** Do not write off a failure as "pre-existing", "stale reference", "tolerance too tight", "flat-surface optimiser-floor effect", or "unrelated to my changes". A failing test is a real signal that something is wrong, even when the diff is tiny or the immediate task did not touch the failing code path. Report every failure clearly with the actual numbers, and if the current task cannot accommodate fixing them, log them as a follow-up and revisit them once the current task is done. Comparing failure sets across commits ("the same tests failed before") does not make the failures acceptable — it only narrows where to look. The goal is zero failing tests, not unchanged failing-test counts.
@@ -83,6 +85,23 @@ Test files are in `tests/testthat/`: `test_adam.R`, `test_autoadam.R`,
 `test_tbats.R`.
 
 Run all tests with: `R -e "devtools::test()"`
+
+**Run the tests in proportion to what the change can break**, not the full suites after
+every change:
+
+- **Every change:** the tests of the files touched and the parity tests of that feature
+  (e.g. `devtools::test(filter="tbats")`, `pytest tests/test_tbats.py -k outliers`), a few
+  minutes.
+- **Before a commit that touches shared code** (`R/adam.R`, `R/autoadam.R`,
+  `R/adamGeneral.R`, `R/utils-adam.R`, `src/headers/`, Python's `adam.py`, `checker/`,
+  `creator/`, `estimator/`, `forecaster/`, `utils/`): the default suites, R (~8 min) and
+  Python (~3 min). A change confined to one model (TBATS, CES, ...) or to tests does not
+  need them.
+- **At milestones** (the end of a feature, before a merge into `master` or a release): the
+  full R-parity suite as well (`pytest tests/ -m r_parity`, ~30 min).
+
+The rule against dismissing failures holds at every level: a failure in a targeted run is
+investigated as one in a full run.
 
 ### CI/CD
 

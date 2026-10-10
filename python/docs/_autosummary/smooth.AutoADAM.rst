@@ -48,6 +48,7 @@
    ~AutoADAM.actuals
    ~AutoADAM.aic
    ~AutoADAM.aicc
+   ~AutoADAM.arma_parameters_
    ~AutoADAM.b_value
    ~AutoADAM.bic
    ~AutoADAM.bicc
@@ -77,7 +78,11 @@
    ~AutoADAM.nparam
    ~AutoADAM.om_model
    ~AutoADAM.orders
+   ~AutoADAM.persistence_level_
+   ~AutoADAM.persistence_seasonal_
+   ~AutoADAM.persistence_trend_
    ~AutoADAM.persistence_vector
+   ~AutoADAM.persistence_xreg_
    ~AutoADAM.phi_
    ~AutoADAM.profile
    ~AutoADAM.residuals

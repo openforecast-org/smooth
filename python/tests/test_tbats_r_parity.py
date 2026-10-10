@@ -51,6 +51,36 @@ CASES = {
         " bounds='usual'",
         dict(harmonics=[4], trend="additive", orders=ORDERS0, bounds="usual"),
     ),
+    "provided-list": (
+        "harmonics=3, trend='damped', orders=list(ar=1, ma=1, select=FALSE),"
+        " lambda=0, persistence=list(level=0.4, seasonal=list(c(0.001, 0))),"
+        " phi=0.98, arma=list(ar=0.3), initial=list(level=4.7,"
+        " seasonal=list(c(0.1, 0, 0, -0.05, 0, 0)))",
+        dict(
+            harmonics=[3],
+            trend="damped",
+            orders=ARMA11,
+            lambda_bc=0,
+            persistence={"level": 0.4, "seasonal": [[0.001, 0]]},
+            phi=0.98,
+            arma={"ar": 0.3},
+            initial={"level": 4.7, "seasonal": [[0.1, 0, 0, -0.05, 0, 0]]},
+        ),
+    ),
+    "provided-vector": (
+        "harmonics=2, trend='additive', orders=list(ar=1, ma=0, select=FALSE),"
+        " lambda=0, persistence=c(0.3, 0.01, 0.001, 0), arma=0.5,"
+        " initial=c(4.7, 0.01, 0.1, 0, -0.05, 0, 0)",
+        dict(
+            harmonics=[2],
+            trend="additive",
+            orders={"ar": 1, "ma": 0, "select": False},
+            lambda_bc=0,
+            persistence=[0.3, 0.01, 0.001, 0],
+            arma=[0.5],
+            initial=[4.7, 0.01, 0.1, 0, -0.05, 0, 0],
+        ),
+    ),
 }
 
 
@@ -74,12 +104,42 @@ def test_the_fits_agree_on_air_passengers(case):
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
 
 
+@pytest.mark.parametrize("case", ["damped-arma", "provided-list", "additive"])
+def test_the_arma_parameters_agree(case):
+    r_arguments, python_arguments = CASES[case]
+    r = _r_fit(
+        "AirPassengers",
+        r_arguments,
+        ", arma=names(unlist(m$arma)), armaValues=unname(unlist(m$arma))",
+    )
+    fit = TBATS(lags=[1, 12], **python_arguments).fit(np.asarray(r["y"], dtype=float))
+    parts = fit.arma_parameters_ or {}
+    assert [f"{k}.{n}" for k in parts for n in parts[k]] == (r.get("arma") or [])
+    values = [v for k in parts for v in parts[k].values()]
+    np.testing.assert_allclose(values, r.get("armaValues") or [], rtol=1e-6)
+
+
+@pytest.mark.parametrize("case", ["damped-arma", "provided-list"])
+def test_the_persistence_agrees(case):
+    r_arguments, python_arguments = CASES[case]
+    r = _r_fit(
+        "AirPassengers",
+        r_arguments,
+        ", pNames=names(m$persistence), pValues=unname(m$persistence)",
+    )
+    fit = TBATS(lags=[1, 12], **python_arguments).fit(np.asarray(r["y"], dtype=float))
+    assert list(fit.persistence_vector) == r["pNames"]
+    np.testing.assert_allclose(
+        list(fit.persistence_vector.values()), r["pValues"], rtol=1e-6, atol=1e-10
+    )
+
+
 def test_the_selection_agrees_on_bjsales():
     r = _r_fit("BJsales", "", ", ICs=unname(m$ICs)")
     fit = TBATS().fit(np.asarray(r["y"], dtype=float))
     assert fit.model_name == r["model"][0]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
-    np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
 
 
 def test_the_arma_selection_agrees_on_harmonics_with_an_ar():
@@ -95,9 +155,9 @@ def test_the_arma_selection_agrees_on_harmonics_with_an_ar():
         np.asarray(r["y"], dtype=float)
     )
     assert fit.model_name == r["model"][0]
-    assert fit.orders_["ar"] == [1]
-    assert list(fit.ics) == r["ICnames"]
-    np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
+    assert fit.orders["ar"] == [1]
+    assert list(fit.ICs) == r["ICnames"]
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
 
 
@@ -237,10 +297,10 @@ def test_the_fits_with_regressors_agree(case):
     assert fit.coef_names == r["names"]
     np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
-    assert list(fit.ics) == r["ICnames"]
-    np.testing.assert_allclose(list(fit.ics.values()), r["ICs"], rtol=1e-10)
-    if fit.forecast_ is not None:
-        np.testing.assert_allclose(fit.forecast_, r["forecast"], rtol=1e-10)
+    assert list(fit.ICs) == r["ICnames"]
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
+    if fit._forecast is not None:
+        np.testing.assert_allclose(fit._forecast, r["forecast"], rtol=1e-10)
 
 
 def test_the_intervals_with_new_regressors_agree():
@@ -278,6 +338,120 @@ def test_the_mean_by_quadrature_agrees(lam):
         fit.predict(h=24, point="mean").mean, r["mean"], rtol=1e-10
     )
 
+
+# AirPassengers with two shocks (observations 30 and 80), with gaps, with two
+# regressors of noise, and an intermittent series with two spikes
+OUTLIERS_DATA = (
+    "y <- AirPassengers; y[c(30, 80)] <- y[c(30, 80)]*1.4;"
+    " yg <- y; yg[c(10, 50)] <- NA;"
+    " set.seed(1); xo <- cbind(x1=rnorm(144), x2=rnorm(144));"
+    " set.seed(2); yi <- ts(rpois(120, 3)*rbinom(120, 1, 0.6), frequency=12);"
+    " yi[c(20, 70)] <- 40;"
+)
+# (series, regressors, R arguments, Python arguments) of the fits with outliers
+OUTLIERS_CASES = {
+    "use": ("y", None, "outliers='use'", dict(outliers="use")),
+    "select": ("y", None, "outliers='select'", dict(outliers="select")),
+    "gaps": (
+        "yg",
+        None,
+        "outliers='use', distribution='dnorm'",
+        dict(outliers="use", distribution="dnorm"),
+    ),
+    "adapt": (
+        "y",
+        "xo",
+        "outliers='select', distribution='dlaplace', regressors='adapt'",
+        dict(outliers="select", distribution="dlaplace", regressors="adapt"),
+    ),
+    "regressors": (
+        "yg",
+        "xo",
+        "outliers='use', distribution='dgnorm', regressors='select'",
+        dict(outliers="use", distribution="dgnorm", regressors="select"),
+    ),
+    "occurrence": (
+        "yi",
+        None,
+        "outliers='use', occurrence='auto'",
+        dict(outliers="use", occurrence="auto"),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(OUTLIERS_CASES))
+def test_the_fits_with_outliers_agree(case):
+    """The dummies of the outliers of the global model, their selection and the fit."""
+    y, X, r_arguments, arguments = OUTLIERS_CASES[case]
+    r = r_dict(
+        f"{{ {OUTLIERS_DATA} m <- suppressWarnings(tbats({y}, {r_arguments},"
+        f" xreg={X or 'NULL'})); list(y=as.numeric({y}), X={X or 'NULL'},"
+        " xregNames=m$xregNames, B=unname(m$B), names=names(m$B),"
+        " logLik=as.numeric(logLik(m)), ICs=unname(m$ICs), ICnames=names(m$ICs),"
+        f" forecast={'NULL' if X else 'as.numeric(forecast(m, h=12)$mean)'}) }}"
+    )
+    y_values = np.array([np.nan if v == "NA" else v for v in r["y"]], dtype=float)
+    X_values = None if X is None else np.asarray(r["X"], dtype=float)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = TBATS(lags=[1, 12], **arguments).fit(y_values, X_values)
+    assert fit._xreg_names == r["xregNames"]
+    assert fit.coef_names == r["names"]
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+    assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
+    assert list(fit.ICs) == r["ICnames"]
+    np.testing.assert_allclose(list(fit.ICs.values()), r["ICs"], rtol=1e-10)
+    # The dummies are zero in the future: no regressor to forecast, no warning
+    if X is None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            forecast = fit.predict(h=12).mean
+        np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-8)
+
+
+
+def test_a_regressor_named_as_a_dummy_is_renamed():
+    """A regressor named outlier1 becomes x.outlier1, with a warning, as in R."""
+    r = r_dict(
+        f"{{ {OUTLIERS_DATA} m <- suppressWarnings(tbats(y, outliers='use',"
+        " xreg=cbind(outlier1=xo[, 1]))); list(y=as.numeric(y), x=xo[, 1],"
+        " xregNames=m$xregNames, B=unname(m$B)) }"
+    )
+    X = pd.DataFrame({"outlier1": r["x"]})
+    with pytest.warns(UserWarning, match="Renaming them to x.outlier1"):
+        fit = TBATS(lags=[1, 12], outliers="use").fit(
+            np.asarray(r["y"], dtype=float), X
+        )
+    assert fit._xreg_names == r["xregNames"]
+    np.testing.assert_allclose(fit.coef, r["B"], rtol=1e-6, atol=1e-8)
+
+
+@pytest.mark.parametrize("distribution", ["dnorm", "dlaplace", "ds", "dgnorm"])
+def test_the_scale_model_agrees(distribution):
+    """sm(): the TBATS of the scale, the likelihood of the model with it attached,
+    and the intervals with the scale of each horizon, as R's sm() and implant()."""
+    r = r_dict(
+        "{ set.seed(3); times <- 1:(24*7*4); sigma <- exp(0.6*sin(2*pi*times/24));"
+        " y <- ts(exp(5 + 0.3*sin(2*pi*times/24) + rnorm(length(times), 0, 0.05*sigma)),"
+        f" frequency=24); m <- tbats(y, distribution='{distribution}',"
+        " orders=list(ar=0, ma=0, select=FALSE)); s <- sm(m); mi <- implant(m, s);"
+        " f <- forecast(mi, h=24, interval='prediction'); list(y=as.numeric(y),"
+        " model=s$model, B=unname(s$B), names=names(s$B), logLik=as.numeric(logLik(mi)),"
+        " nparam=nparam(mi), lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    fit = TBATS(lags=[1, 24], distribution=distribution, orders=ORDERS0).fit(
+        np.asarray(r["y"], dtype=float)
+    )
+    scale = fit.sm()
+    assert scale.model_name == r["model"][0]
+    assert scale.coef_names == r["names"]
+    np.testing.assert_allclose(scale.coef, r["B"], rtol=1e-6, atol=1e-8)
+    fit.scale_model = scale
+    assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-10)
+    assert fit.nparam == r["nparam"][0]
+    forecast = fit.predict(h=24, interval="prediction")
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
 
 INTERMITTENT = (
     "set.seed(7); y <- ts(exp(2 + 0.4*sin(2*pi*(1:300)/7) + rnorm(300, 0, 0.3))*"
@@ -375,8 +549,8 @@ def test_the_fits_with_missing_regressors_agree(case):
     # No fitted values without the regressors
     assert np.all(np.isnan(fit.fitted[[14, 59]]))
     np.testing.assert_allclose(np.nan_to_num(fit.fitted), r["fitted"], rtol=1e-8)
-    if fit.forecast_ is not None:
-        np.testing.assert_allclose(fit.forecast_, r["forecast"], rtol=1e-10)
+    if fit._forecast is not None:
+        np.testing.assert_allclose(fit._forecast, r["forecast"], rtol=1e-10)
 
 
 def test_the_cumulative_skeletons_agree():

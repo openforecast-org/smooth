@@ -130,7 +130,7 @@ def _make_fig(mpl_figure, **kwargs):
 def _state_labels(model):
     """Derive human-readable labels for each row of model.states: the names of the
     components where the model has them (TBATS), as R's column names."""
-    names = getattr(model, "component_names", None)
+    names = getattr(model, "_component_names", None)
     if names is not None:
         return list(names)
     comp = model._components

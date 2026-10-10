@@ -48,6 +48,7 @@
    ~ES.actuals
    ~ES.aic
    ~ES.aicc
+   ~ES.arma_parameters_
    ~ES.b_value
    ~ES.bic
    ~ES.bicc
@@ -77,7 +78,11 @@
    ~ES.nparam
    ~ES.om_model
    ~ES.orders
+   ~ES.persistence_level_
+   ~ES.persistence_seasonal_
+   ~ES.persistence_trend_
    ~ES.persistence_vector
+   ~ES.persistence_xreg_
    ~ES.phi_
    ~ES.profile
    ~ES.residuals

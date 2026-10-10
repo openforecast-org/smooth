@@ -60,10 +60,7 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `nlopt_initial` | `dict \| None` | `None` | Initial values for NLopt optimizer |
-| `nlopt_upper` | `dict \| None` | `None` | Upper bounds for optimizer |
-| `nlopt_lower` | `dict \| None` | `None` | Lower bounds for optimizer |
-| `nlopt_kwargs` | `dict \| None` | `None` | Extra NLopt options: `print_level`, `xtol_rel`, `xtol_abs`, `ftol_rel`, `ftol_abs`, `algorithm` |
+| `nlopt_kwargs` | `dict \| None` | `None` | All the settings of the optimiser, as R's ellipsis: `B`, `lb`, `ub` (starting values and bounds of the parameters), `maxeval`, `maxtime`, `algorithm`, `xtol_rel`, `xtol_abs`, `ftol_rel`, `ftol_abs`, `print_level` |
 
 ### Other
 

@@ -174,7 +174,7 @@ sim.ces <- function(seasonality=c("none","simple","partial","full"),
         lagsModel <- c(lagsModelMax,lagsModelMax);
         componentsNumber <- 2;
         b$number <- 0;
-        componentsNames <- c("seasonal level","seasonal potential");
+        componentsNames <- c("seasonal","seasonalPotential");
         matWt <- matrix(c(1,0),obs,2,byrow=TRUE);
     }
     else if(seasonality=="partial"){
@@ -192,7 +192,7 @@ sim.ces <- function(seasonality=c("none","simple","partial","full"),
         lagsModel <- c(1,1,lagsModelMax,lagsModelMax);
         componentsNumber <- 4;
         b$number <- 2;
-        componentsNames <- c("level","potential","seasonal level","seasonal potential");
+        componentsNames <- c("level","potential","seasonal","seasonalPotential");
         matWt <- matrix(c(1,0,1,0),obs,4,byrow=TRUE);
     }
 

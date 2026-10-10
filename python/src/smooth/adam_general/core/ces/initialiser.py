@@ -21,6 +21,7 @@ def ces_initialiser(
     xreg_model=False,
     xreg_number=0,
     xreg_names=None,
+    row_names=None,
 ):
     """
     Create initial parameter vector B for CES optimization.
@@ -49,13 +50,17 @@ def ces_initialiser(
         Whether exogenous regressors are present.
     xreg_number : int
         Number of regressors.
+    row_names : list of str, optional
+        The names of the states (the rows of ``mat_vt``), which name the seasonal
+        initials, as R.
     xreg_names : list of str, optional
         Names of xreg variables.
 
     Returns
     -------
-    np.ndarray
-        Initial parameter vector B (1-D).
+    tuple of (np.ndarray, list of str)
+        Initial parameter vector B (1-D) and the names of its elements, as R's
+        ``names(B)``.
     """
     B = []
     names = []
@@ -101,27 +106,18 @@ def ces_initialiser(
         if seasonality != "simple":
             # R: B <- c(B, matVt[1:2, 1])
             B.extend(mat_vt[0:2, 0].tolist())
-            names.extend(["level_0", "potential_0"])
+            names.extend(["level", "potential"])
 
-        if seasonality == "simple":
-            # R: B <- c(B, matVt[1:(nSeasonal*2), 1:lagsModelMax])
-            # R stores column-major, so flatten by column
+        # The seasonal states, column by column as in R's matVt, named after the
+        # state and the position in the lag, as R
+        if seasonality != "none":
+            first = 0 if seasonality == "simple" else 2
+            n_rows = n_seasonal * (1 if seasonality == "partial" else 2)
+            rows = row_names[first : first + n_rows]
             for col in range(lags_model_max):
-                for row in range(n_seasonal * 2):
-                    B.append(mat_vt[row, col])
-                    names.append(f"state_{row}_lag_{col}")
-        elif seasonality == "partial":
-            # R: B <- c(B, matVt[2+(1:nSeasonal), 1:lagsModelMax])
-            for col in range(lags_model_max):
-                for i in range(n_seasonal):
-                    B.append(mat_vt[2 + i, col])
-                    names.append(f"seasonal_{i}_lag_{col}")
-        elif seasonality == "full":
-            # R: B <- c(B, matVt[2+(1:(nSeasonal*2)), 1:lagsModelMax])
-            for col in range(lags_model_max):
-                for i in range(n_seasonal * 2):
-                    B.append(mat_vt[2 + i, col])
-                    names.append(f"seasonal_{i}_lag_{col}")
+                for i, row in enumerate(rows):
+                    B.append(mat_vt[first + i, col])
+                    names.append(f"{row}_{col + 1}")
 
     # --- Xreg initials --- R lines 742-744
     if xreg_model and initial_type != "complete":
@@ -132,4 +128,4 @@ def ces_initialiser(
         else:
             names.extend([f"xreg_{i}" for i in range(xreg_number)])
 
-    return np.array(B, dtype=np.float64)
+    return np.array(B, dtype=np.float64), names

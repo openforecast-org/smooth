@@ -304,6 +304,12 @@ GAP_VARIANCE_DATA = (
     "set.seed(41); e <- rnorm(200, 0, 5); level <- 100 + cumsum(0.3*e);"
     " y <- (c(100, level[-200]) + e)*rbinom(200, 1, 0.5); y[c(50, 51)] <- NA;"
 )
+# ETS(M,N,N) with Gamma errors and a probability of occurrence of 0.35
+GAP_DRIFT_DATA = (
+    "set.seed(41); e <- rgamma(300, shape=5, scale=0.2);"
+    " y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e*rbinom(300, 1, 0.35);"
+)
+
 GAP_VARIANCE_CASES = {
     "adam ANN occurrence": (
         GAP_VARIANCE_DATA,
@@ -328,6 +334,33 @@ GAP_VARIANCE_CASES = {
         AIRPASSENGERS_GAPS,
         "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
         lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
+    ),
+    "adam MNN dgamma occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dgamma')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dgamma"),
+    ),
+    "adam MNN dinvgauss occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dinvgauss')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dinvgauss"),
+    ),
+    "adam MNN conventional dlnorm occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dlnorm')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dlnorm"),
+    ),
+    "adam ADAM ETS MMdN dinvgauss occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MMdN', occurrence='fixed', distribution='dinvgauss', ets='adam')",
+        lambda: ADAM(
+            model="MMdN", occurrence="fixed", distribution="dinvgauss", ets="adam"
+        ),
+    ),
+    "adam MNM dgamma missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'MNM', distribution='dgamma')",
+        lambda: ADAM(model="MNM", lags=[12], distribution="dgamma"),
     ),
     "ces missing": (
         AIRPASSENGERS_GAPS,

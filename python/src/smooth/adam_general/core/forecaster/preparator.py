@@ -4,7 +4,7 @@ import pandas as pd
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import scaler
-from smooth.adam_general.core.utils.var_covar import gap_variance
+from smooth.adam_general.core.utils.var_covar import gap_drift, gap_variance
 
 from ._helpers import _safe_create_index
 
@@ -546,6 +546,7 @@ def _calculate_scale_parameter(
     other,
     gap,
     gap_mean,
+    drift_at=None,
 ):
     """
     Calculate scale parameter using scaler function.
@@ -567,6 +568,9 @@ def _calculate_scale_parameter(
     gap, gap_mean : numpy.ndarray
         The multipliers of the variance and of the mean of the errors after the
         periods without an observed size (:func:`gap_variance`), ones elsewhere
+    drift_at : callable or None
+        The moments of the drift of the states over those periods at a scale
+        (:func:`gap_drift`), for the pure multiplicative ETS it applies to
 
     Returns
     -------
@@ -585,6 +589,7 @@ def _calculate_scale_parameter(
         other,
         gap_mean[ot_logical],
         gap[ot_logical],
+        drift_at,
     )
 
     return scale
@@ -1156,6 +1161,38 @@ def preparator(
         )
         gap = gap_variance(*gap_arguments)
         gap_mean = gap_variance(*gap_arguments, power=1)
+    # The drift of the states of the other pure multiplicative ETS, as in the estimation
+    drift_at = None
+    distribution = general_dict["distribution_new"]
+    adam_ets = general_dict.get("ets") == "adam"
+    if (
+        (
+            distribution in ("dgamma", "dinvgauss")
+            or (distribution == "dlnorm" and not adam_ets)
+        )
+        and model_type_dict["ets_model"]
+        and not arima_checked.get("arima_model", False)
+        and not (
+            explanatory_checked.get("xreg_model", False)
+            and explanatory_checked.get("regressors") == "adapt"
+        )
+        and error_type == "M"
+        and trend_type != "A"
+        and season_type != "A"
+    ):
+
+        def drift_at(scale):
+            return gap_drift(
+                lags_dict["lags_model_all"],
+                matrices_dict["mat_wt"],
+                matrices_dict["mat_f"],
+                matrices_dict["vec_g"],
+                observations_dict["ot_logical"],
+                distribution,
+                adam_ets,
+                scale,
+            )
+
     scale = _calculate_scale_parameter(
         general_dict,
         model_type_dict,
@@ -1165,6 +1202,7 @@ def preparator(
         other,
         gap,
         gap_mean,
+        drift_at,
     )
 
     # 13. Process constant and other parameters

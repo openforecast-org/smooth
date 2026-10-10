@@ -837,9 +837,27 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                     gapMean[] <- adam_gapVariance(lagsModelAll, adamElements$matWt, adamElements$matF,
                                                   adamElements$vecG, otLogical, power=1);
                 }
+                # The drift of the states of the other pure multiplicative ETS over those periods,
+                # whose moments depend on the scale (the conventional ETS with the log-normal, and
+                # the Gamma and the Inverse Gaussian)
+                gapDrift <- NULL;
+                if((any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
+                   etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
+                   Etype=="M" && Ttype!="A" && Stype!="A"){
+                    gapDrift <- function(scale){
+                        return(adam_gapDrift(lagsModelAll, adamElements$matWt, adamElements$matF,
+                                             adamElements$vecG, otLogical, distribution, adamETS, scale));
+                    }
+                }
                 # Scale for different functions: the maximum likelihood over the observed sizes
                 scale <- scaler(distribution, Etype, adamFitted$errors[otLogical], adamFitted$fitted[otLogical],
-                                sum(otLogical), other, gapMean[otLogical], gapVariance[otLogical]);
+                                sum(otLogical), other, gapMean[otLogical], gapVariance[otLogical], gapDrift);
+                if(!is.null(gapDrift)){
+                    drift <- gapDrift(scale);
+                    # The log-normal drift of the log-normal: log(1+e) + log(D) is N(-s/2 + m, s + v)
+                    gapMean[otLogical] <- 1 - 2*drift$mean/scale;
+                    gapVariance[otLogical] <- 1 + drift$variance/scale;
+                }
 
                 # Calculate the likelihood
                 ## as.complex() is needed for failsafe in case of exotic models
@@ -906,6 +924,11 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                        "dgamma"=dgamma(x=yInSample[otLogical], shape=1/scale,
                                                        scale=scale*abs(adamFitted$fitted[otLogical]), log=TRUE)
                 ));
+                # The Gamma and the Inverse Gaussian mixed over the drift after those periods
+                if(!is.null(gapDrift) && distribution!="dlnorm"){
+                    CFValue[] <- -sum(adam_gapLogDensity(yInSample[otLogical], adamFitted$fitted[otLogical],
+                                                         scale, distribution, drift$mean, drift$variance));
+                }
 
                 # The zeros of an occurrence model are not in the likelihood of the sizes: their
                 # sizes are not observed, and integrate to one (the probabilities are added in
@@ -2078,8 +2101,16 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             gapVariance[] <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical);
             gapMean[] <- adam_gapVariance(lagsModelAll, matWt, matF, vecG, otLogical, power=1);
         }
+        gapDrift <- NULL;
+        if((any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
+           etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
+           Etype=="M" && Ttype!="A" && Stype!="A"){
+            gapDrift <- function(scale){
+                return(adam_gapDrift(lagsModelAll, matWt, matF, vecG, otLogical, distribution, adamETS, scale));
+            }
+        }
         scale <- scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
-                        sum(otLogical), other, gapMean[which(otLogical)], gapVariance[which(otLogical)]);
+                        sum(otLogical), other, gapMean[which(otLogical)], gapVariance[which(otLogical)], gapDrift);
 
         # Record constant if it was estimated
         if(constantEstimate){
@@ -7575,6 +7606,12 @@ pointLik.adam <- function(object, log=TRUE, ...){
     );
     if(any(distribution==c("dllaplace","dls","dlgnorm"))){
         likValues[otLogical] <- likValues[otLogical] - log(yInSample[otLogical]);
+    }
+    # The Gamma and the Inverse Gaussian mixed over the drift after those periods
+    if(!is.null(attr(gapVariance, "drift")) && distribution!="dlnorm"){
+        likValues[otLogical] <- adam_gapLogDensity(yInSample[otLogical], yFitted[otLogical], scale, distribution,
+                                                   attr(gapVariance, "drift")$mean,
+                                                   attr(gapVariance, "drift")$variance);
     }
 
     # If this is a mixture model, take the probabilities into account: the sizes of the

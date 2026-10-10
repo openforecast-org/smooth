@@ -1134,3 +1134,51 @@ test_that("the intervals of an occurrence model are around the sizes", {
     expect_equal(as.vector(testForecast$upper - testForecast$mean/p),
                  qnorm((1+(0.9-(1-p))/p)/2, 0, sqrt(s2)));
 })
+
+
+# The analytical covariance of the multistep errors of ETS(A,N,N) has 1 + (i-1) alpha^2 on
+# the diagonal and alpha + (i-1) alpha^2 above it, from the C++ shared with Python
+test_that("covarAnal() of ETS(A,N,N) is the closed form", {
+    covarMat <- covarAnal(1, 5, matrix(1), matrix(1), 0.3, 2);
+    expect_equal(diag(covarMat), 2*(1 + (0:4)*0.09));
+    expect_equal(covarMat[1,-1], rep(2*0.3, 4));
+    expect_equal(covarMat[3,5], 2*(0.3 + 2*0.09));
+})
+
+# After j-1 periods without an observed size, the drift of the level of the conventional
+# ETS(M,N,N) is the product of (1 + alpha e) over them: the moments of its logarithm are
+# those of the simulated ones, and the fixed point of the moment equations gives the scale
+test_that("the drift of the states of the pure multiplicative ETS after the gaps", {
+    set.seed(41);
+    otLogical <- c(TRUE, TRUE, FALSE, FALSE, FALSE, TRUE);
+    drift <- adam_gapDrift(1, matrix(1), matrix(1), 0.3, otLogical, "dgamma", FALSE, 0.2);
+    expect_equal(drift$mean[1:2], c(0, 0));
+    logDrift <- rowSums(log(1 + 0.3*(matrix(rgamma(3e5, shape=5, scale=0.2), ncol=3) - 1)));
+    expect_equal(drift$mean[3], mean(logDrift), tolerance=1e-2);
+    expect_equal(drift$variance[3], var(logDrift), tolerance=1e-2);
+
+    # The scale of errors (1+e) D - 1 is s
+    gaps <- rgeom(1e5, 0.35) + 1;
+    otLogical <- rep(FALSE, sum(gaps));
+    otLogical[cumsum(gaps)] <- TRUE;
+    driftValues <- sapply(gaps, function(j){prod(1 + 0.3*(rgamma(j-1, shape=5, scale=0.2) - 1))});
+    errors <- rgamma(1e5, shape=5, scale=0.2)*driftValues - 1;
+    gapDrift <- function(scale){adam_gapDrift(1, matrix(1), matrix(1), 0.3, otLogical, "dgamma", FALSE, scale)};
+    expect_equal(adam_scaler("dgamma", "M", errors, NULL, 1e5, NULL, gapDrift=gapDrift), 0.2, tolerance=2e-2);
+})
+
+# The Gamma, the Inverse Gaussian and the conventional log-normal after the periods without
+# an observed size: the point likelihoods sum to the log-likelihood, and the fits without
+# such periods are those of the one-step density
+test_that("the likelihood of the pure multiplicative ETS with the drift after the gaps", {
+    set.seed(41);
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e*rbinom(300, 1, 0.35);
+    for(distribution in c("dgamma","dinvgauss","dlnorm")){
+        testModel <- adam(y, "MNN", occurrence="fixed", distribution=distribution);
+        expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    }
+    testModel <- adam(AirPassengers, "MNN", distribution="dgamma");
+    # residuals() of the Gamma are the ratios 1+e
+    expect_equal(testModel$scale, mean((residuals(testModel)-1)^2));
+})

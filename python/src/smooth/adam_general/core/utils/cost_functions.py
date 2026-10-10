@@ -10,6 +10,7 @@ from smooth.adam_general.core.utils.utils import (
     calculate_likelihood,
     calculate_multistep_loss,
     complete_windows,
+    gap_log_density,
     multistep_log_lik,
     observed_mask,
     scaler,
@@ -597,7 +598,8 @@ def CF(  # noqa: N802
     # size, of a pure additive model with the normal distribution and of a pure
     # multiplicative ADAM ETS with the log-normal one, additive in logs (ones
     # elsewhere)
-    gap = gap_mean = np.ones(len(ot_logical))
+    gap = np.ones(len(ot_logical))
+    gap_mean = np.ones(len(ot_logical))
     error_type = model_type_dict["error_type"]
     trend_type = model_type_dict["trend_type"]
     season_type = model_type_dict["season_type"]
@@ -621,6 +623,41 @@ def CF(  # noqa: N802
         lags_all = lags_dict["lags_model_all"]
         gap = gap_variance(lags_all, mat_wt, mat_f, vec_g, ot_logical)
         gap_mean = gap_variance(lags_all, mat_wt, mat_f, vec_g, ot_logical, power=1)
+    # The drift of the states of the other pure multiplicative ETS over those periods,
+    # whose moments depend on the scale (the conventional ETS with the log-normal, and
+    # the Gamma and the Inverse Gaussian)
+    drift_at = None
+    distribution = general["distribution_new"]
+    adam_ets = general.get("ets") == "adam"
+    if (
+        (
+            distribution in ("dgamma", "dinvgauss")
+            or (distribution == "dlnorm" and not adam_ets)
+        )
+        and model_type_dict["ets_model"]
+        and not arima_checked.get("arima_model", False)
+        and not (
+            explanatory_checked.get("xreg_model", False)
+            and explanatory_checked.get("regressors") == "adapt"
+        )
+        and error_type == "M"
+        and trend_type != "A"
+        and season_type != "A"
+    ):
+        # Imported here: var_covar imports this module
+        from smooth.adam_general.core.utils.var_covar import gap_drift
+
+        def drift_at(scale):
+            return gap_drift(
+                lags_dict["lags_model_all"],
+                mat_wt,
+                mat_f,
+                vec_g,
+                ot_logical,
+                distribution,
+                adam_ets,
+                scale,
+            )
 
     # The in-sample fitted values, errors and gap variance at this B, returned
     # directly for the OPG covariance: the caller recomputes the concentrated scale
@@ -632,6 +669,7 @@ def CF(  # noqa: N802
             np.asarray(adam_fitted.errors).ravel(),
             gap,
             gap_mean,
+            drift_at,
         )
 
     # The missing values are not in the loss: the errors are zero there, and the
@@ -651,7 +689,14 @@ def CF(  # noqa: N802
                 other,
                 gap_mean[ot_logical],
                 gap[ot_logical],
+                drift_at,
             )
+            if drift_at is not None:
+                drift_mean, drift_variance = drift_at(scale)
+                # The log-normal drift of the log-normal: log(1+e) + log(D) is
+                # N(-s/2 + m, s + v)
+                gap_mean[ot_logical] = 1 - 2 * drift_mean / scale
+                gap[ot_logical] = 1 + drift_variance / scale
             # Aggregate through _sum_r: R accumulates sum() in a long double
             # register, and NumPy's default pairwise sum drifts by 1 ULP per
             # call against it, which through NLopt's deterministic simplex
@@ -669,6 +714,16 @@ def CF(  # noqa: N802
                 gap_mean[ot_logical].reshape(-1, 1),
                 gap[ot_logical].reshape(-1, 1),
             )
+            # The Gamma and the Inverse Gaussian mixed over the drift after the gaps
+            if drift_at is not None and general["distribution_new"] != "dlnorm":
+                ll = gap_log_density(
+                    observations_dict["y_in_sample"][ot_logical],
+                    np.ravel(adam_fitted.fitted)[ot_logical],
+                    scale,
+                    general["distribution_new"],
+                    drift_mean,
+                    drift_variance,
+                )
             CFValue = -_sum_r(np.asarray(ll, dtype=np.float64).ravel())
             # The zeros of an occurrence model are not in the likelihood of the
             # sizes: their sizes are not observed, and integrate to one (the

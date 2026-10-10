@@ -749,6 +749,92 @@ def calculate_likelihood(
     raise ValueError(f"Unsupported distribution {distribution!r}.")
 
 
+# The Gauss-Hermite rule with 16 nodes, for the mean over a normal variable: x_q with
+# the weights w_q/sqrt(pi), the same numbers as R's adam_gaussHermite
+_GAUSS_HERMITE_NODES = np.array(
+    [
+        -4.688738939305819,
+        -3.869447904860123,
+        -3.176999161979956,
+        -2.5462021578474814,
+        -1.9517879909162539,
+        -1.3802585391988809,
+        -0.8229514491446559,
+        -0.27348104613815244,
+        0.27348104613815244,
+        0.8229514491446559,
+        1.3802585391988809,
+        1.9517879909162539,
+        2.5462021578474814,
+        3.176999161979956,
+        3.869447904860123,
+        4.688738939305819,
+    ]
+)
+_GAUSS_HERMITE_WEIGHTS = np.array(
+    [
+        1.4978147231618314e-10,
+        1.3094732162868187e-07,
+        1.5300032162487316e-05,
+        0.0005259849265739094,
+        0.007266937601184743,
+        0.04728475235401403,
+        0.15833837275094964,
+        0.28656852123801213,
+        0.28656852123801213,
+        0.15833837275094964,
+        0.04728475235401403,
+        0.007266937601184743,
+        0.0005259849265739094,
+        1.5300032162487316e-05,
+        1.3094732162868187e-07,
+        1.4978147231618314e-10,
+    ]
+)
+
+
+def gap_log_density(y, mu, scale, distribution, drift_mean, drift_variance):
+    """The log-density of the observed sizes after the periods without an observed
+    size, with the Gamma or the Inverse Gaussian distribution, as R's
+    ``adam_gapLogDensity()``: the one-step density at ``mu*exp(d)``, mixed over the
+    normal drift ``d`` with the Gauss-Hermite rule. The sizes right after another
+    one take the one-step density."""
+    y = np.asarray(y, dtype=float).ravel()
+    mu = np.asarray(mu, dtype=float).ravel()
+    drift_mean = np.asarray(drift_mean, dtype=float).ravel()
+    drift_variance = np.asarray(drift_variance, dtype=float).ravel()
+
+    def log_density(y, mu):
+        if distribution == "dgamma":
+            values = gb.dgamma(y, shape=1 / scale, scale=scale * np.abs(mu), log=True)
+        else:
+            values = gb.dinvgauss(y, np.abs(mu), np.abs(scale / mu), log=True)
+        return np.asarray(values, dtype=float)
+
+    values = log_density(y, mu)
+    # A NaN drift (from parameters outside the region where 1+g e is positive) stays NaN
+    gapped = np.isnan(drift_variance) | (drift_variance > 0)
+    if np.any(gapped):
+        drift = (
+            drift_mean[gapped, None]
+            + np.sqrt(2 * drift_variance[gapped])[:, None]
+            * _GAUSS_HERMITE_NODES[None, :]
+        )
+        nodes_number = len(_GAUSS_HERMITE_NODES)
+        densities = (
+            log_density(
+                np.repeat(y[gapped, None], nodes_number, axis=1).ravel(order="F"),
+                (mu[gapped, None] * _exp_r(drift)).ravel(order="F"),
+            ).reshape(-1, nodes_number, order="F")
+            + _log_r(_GAUSS_HERMITE_WEIGHTS)[None, :]
+        )
+        densities_max = np.max(densities, axis=1)
+        values[gapped] = densities_max + _log_r(
+            _sum_r(_exp_r(densities - densities_max[:, None]), axis=1)
+        )
+    return values
+
+
 def observed_mask(observations_dict):
     """The observed in-sample values: the missing ones (``y_na_values``) are not."""
     n = observations_dict["obs_in_sample"]
@@ -916,6 +1002,7 @@ def scaler(
     other,
     gap_mean=1.0,
     gap_variance=1.0,
+    gap_drift=None,
 ):
     """
     Calculate scale parameter for the provided parameters.
@@ -930,10 +1017,50 @@ def scaler(
     - gap_mean, gap_variance (float or np.array): the multipliers of the mean and of
       the variance of the errors after the periods without an observed size
       (``gap_variance()``), ones elsewhere; used by dnorm and dlnorm
+    - gap_drift (callable or None): the moments of the drift of the states of a
+      pure multiplicative ETS over those periods at a scale (``gap_drift()``),
+      which depend on the scale itself: the scale is then the fixed point of the
+      moment equations, from the one-step scale (R's ``adam_scaler()``)
 
     Returns:
     float: The calculated scale parameter
     """
+    if gap_drift is not None:
+        scale = scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other)
+        errors = np.asarray(errors, dtype=float)
+        for _ in range(100):
+            drift_mean, drift_variance = gap_drift(scale)
+            # E(D), E(D^2) and E(1/D) of the log-normal drift D
+            expected_drift = _exp_r(drift_mean + drift_variance / 2)
+            expected_square = _exp_r(2 * drift_mean + 2 * drift_variance)
+            expected_inverse = _exp_r(-drift_mean + drift_variance / 2)
+            if distribution == "dlnorm":
+                # log(1+e) + log(D) is N(-s/2 + m, s + v)
+                scale_new = scaler(
+                    distribution,
+                    Etype,
+                    errors,
+                    y_fitted,
+                    obs_in_sample,
+                    other,
+                    1 - 2 * drift_mean / scale,
+                    1 + drift_variance / scale,
+                )
+            elif distribution == "dgamma":
+                # E(e^2) = (1+s) E(D^2) - 2 E(D) + 1
+                scale_new = (
+                    _sum_r(errors**2) - _sum_r(expected_square - 2 * expected_drift + 1)
+                ) / _sum_r(expected_square)
+            else:
+                # E(e^2/(1+e)) = E(D) - 2 + (1+s) E(1/D)
+                scale_new = (
+                    _sum_r(errors**2 / (1 + errors))
+                    - _sum_r(expected_drift - 2 + expected_inverse)
+                ) / _sum_r(expected_inverse)
+            if not np.isfinite(scale_new) or abs(scale_new - scale) <= 1e-10 * scale:
+                return scale_new
+            scale = scale_new
+        return scale
 
     # Helper: take ``log`` of a possibly-negative input via complex extension.
     # ``log(as.complex(z))`` for z < 0 yields ``log|z| + iπ``; downstream the

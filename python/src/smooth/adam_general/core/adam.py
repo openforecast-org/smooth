@@ -2765,46 +2765,68 @@ class ADAM:
         zeros of an occurrence model, whose sizes are not observed."""
         return int(np.sum(self._observations["ot_logical"]))
 
-    def _gap_variance(self, power: int = 2) -> NDArray:
+    def _gap_variance(self, power: int = 2, drift: bool = False) -> Any:
         """The variance (or with ``power=1`` the multiplier of the mean) of the
         errors at the observed sizes relative to the one-step one, after the periods
         without an observed size (R's ``adam_gapVarianceModel``): ones unless the
         model is pure additive with the normal distribution, or a pure
-        multiplicative ADAM ETS with the log-normal one, additive in logs."""
-        from smooth.adam_general.core.utils.var_covar import gap_variance
+        multiplicative ETS with the log-normal one (exactly for ADAM ETS, through
+        the drift of the states for the conventional one). With ``drift=True``, the
+        moments of the drift at the observed sizes (``gap_drift()``) of a pure
+        multiplicative ETS with the Gamma, the Inverse Gaussian or the conventional
+        log-normal (R's attribute "drift"), and None for the other models."""
+        from smooth.adam_general.core.utils.var_covar import gap_drift, gap_variance
 
         ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
+        ones = np.ones(len(ot_logical))
+        # A scale model (sm()) has its own residuals, standardised already
+        if getattr(self, "is_scale_", False):
+            return None if drift else ones
         model_type = self._model_type
         error_type = model_type["error_type"]
-        trend_type = model_type["trend_type"]
-        season_type = model_type["season_type"]
-        # A scale model (sm()) has its own residuals, standardised already
-        if not getattr(self, "is_scale_", False) and (
-            (
-                self.distribution_ == "dnorm"
-                and error_type == "A"
-                and trend_type != "M"
-                and season_type != "M"
-            )
-            or (
-                self.distribution_ == "dlnorm"
-                and self.ets == "adam"
-                and model_type["ets_model"]
-                and not self._arima.get("arima_model", False)
-                and error_type == "M"
-                and trend_type != "A"
-                and season_type != "A"
+        distribution = self.distribution_
+        multiplicative = (
+            error_type == "M"
+            and model_type["trend_type"] != "A"
+            and model_type["season_type"] != "A"
+            and model_type["ets_model"]
+            and not self._arima.get("arima_model", False)
+        )
+        arguments = (
+            self._lags_model["lags_model_all"],
+            self._prepared["mat_wt"],
+            self._prepared["mat_f"],
+            self._prepared.get("vec_g", self._adam_created["vec_g"]),
+            ot_logical,
+        )
+        # A pure multiplicative ADAM ETS is additive in logs
+        if (
+            distribution == "dnorm"
+            and error_type == "A"
+            and model_type["trend_type"] != "M"
+            and model_type["season_type"] != "M"
+        ) or (distribution == "dlnorm" and self.ets == "adam" and multiplicative):
+            return None if drift else gap_variance(*arguments, power)
+        # The drift of the states of the other pure multiplicative ETS, without the
+        # adaptive regressors
+        if (
+            distribution in ("dgamma", "dinvgauss", "dlnorm")
+            and multiplicative
+            and not (
+                self._explanatory.get("xreg_model", False)
+                and self._explanatory.get("regressors") == "adapt"
             )
         ):
-            return gap_variance(
-                self._lags_model["lags_model_all"],
-                self._prepared["mat_wt"],
-                self._prepared["mat_f"],
-                self._prepared.get("vec_g", self._adam_created["vec_g"]),
-                ot_logical,
-                power,
-            )
-        return np.ones(len(ot_logical))
+            scale = self.scale
+            moments = gap_drift(*arguments, distribution, self.ets == "adam", scale)
+            if drift:
+                return moments
+            if distribution == "dlnorm":
+                ones[ot_logical] = (
+                    1 - 2 * moments[0] / scale if power == 1 else 1 + moments[1] / scale
+                )
+            return ones
+        return None if drift else ones
 
     def _gap_residuals(self) -> NDArray:
         """The residuals as the one-step ones after the periods without an
@@ -3105,7 +3127,10 @@ class ADAM:
         sizes are not observed, have only the latter, as R. With ``log=False``
         the densities themselves are returned.
         """
-        from smooth.adam_general.core.utils.utils import calculate_likelihood
+        from smooth.adam_general.core.utils.utils import (
+            calculate_likelihood,
+            gap_log_density,
+        )
 
         self._check_is_fitted()
         # With a scale model, the likelihood is that of the scale model (R's sm())
@@ -3193,6 +3218,12 @@ class ADAM:
             ),
             dtype=float,
         ).ravel()
+        # The Gamma and the Inverse Gaussian mixed over the drift after those periods
+        drift = self._gap_variance(drift=True)
+        if drift is not None and distribution != "dlnorm":
+            lik_values[ot_logical] = gap_log_density(
+                y[ot_logical], y_fitted[ot_logical], scale, distribution, *drift
+            )
 
         if occurrence_model:
             # The zeros have only the occurrence-model Bernoulli contribution:
@@ -5170,7 +5201,11 @@ class ADAM:
         (intermittent) models, which R also routes to the Hessian.
         """
         from smooth.adam_general.core.utils.cost_functions import CF
-        from smooth.adam_general.core.utils.utils import calculate_likelihood, scaler
+        from smooth.adam_general.core.utils.utils import (
+            calculate_likelihood,
+            gap_log_density,
+            scaler,
+        )
         from smooth.adam_general.core.utils.var_covar import covar_opg
 
         if self._general.get("loss") != "likelihood":
@@ -5218,7 +5253,7 @@ class ADAM:
             )
             if not isinstance(result, tuple):
                 return None
-            fitted, errors, gap, gap_mean = result
+            fitted, errors, gap, gap_mean, drift_at = result
             fitted = np.asarray(fitted, dtype=float).ravel()
             errors = np.asarray(errors, dtype=float).ravel()
             if not np.all(np.isfinite(fitted)):
@@ -5234,7 +5269,13 @@ class ADAM:
                 other_b,
                 gap_mean[ot_logical],
                 gap[ot_logical],
+                drift_at,
             )
+            # The drift after the periods without an observed size, as in CF
+            drift = None if drift_at is None else drift_at(scale)
+            if drift is not None and distribution == "dlnorm":
+                gap_mean[ot_logical] = 1 - 2 * drift[0] / scale
+                gap[ot_logical] = 1 + drift[1] / scale
             lik = np.asarray(
                 calculate_likelihood(
                     distribution,
@@ -5248,6 +5289,10 @@ class ADAM:
                 ),
                 dtype=float,
             ).ravel()
+            if drift is not None and distribution != "dlnorm":
+                lik = gap_log_density(
+                    y[ot_logical], fitted[ot_logical], scale, distribution, *drift
+                )
             vec = np.zeros(obs, dtype=float)
             vec[ot_logical] = lik
             if not np.all(np.isfinite(vec)):

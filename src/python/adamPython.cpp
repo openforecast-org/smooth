@@ -10,11 +10,21 @@
 #include <carma>
 
 #include "../headers/adamCore.h"
+#include "../headers/covarAnalCore.h"
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(_adamCore, m) {
     m.doc() = "Python bindings for adamCore class";
+
+    // The analytical covariance matrix of the multistep errors (R's covarAnalCpp())
+    m.def("covar_anal_cpp",
+          [](const arma::vec& lagsModel, const unsigned int h, const arma::mat& measurement,
+             const arma::mat& transition, const arma::vec& persistence, const double s2) {
+              return covarAnalCore(lagsModel, h, measurement.row(0), transition, persistence, s2);
+          },
+          py::arg("lags_model"), py::arg("h"), py::arg("measurement"), py::arg("transition"),
+          py::arg("persistence"), py::arg("s2"));
 
     // Bind PolyResult struct
     py::class_<PolyResult>(m, "PolyResult")

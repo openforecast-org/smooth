@@ -566,8 +566,26 @@ $\vect P_t$ of the logarithms of the states, propagate it over the unobserved pe
 $\boldsymbol\Sigma_L$, use $d_t\sim\mathcal N(m_t, \vect w'\vect P_t\vect w)$ in \eqref{eq:mixture},
 and update the states with the linear projection of the logarithm of the state on $\log z_t$, which
 reduces to the conventional update when $\vect P_t = \vect 0$. This is a moment-matching filter in the
-spirit of the extended and unscented filters \citep{DurbinKoopman2012}.
-% TODO: write the update explicitly and check that it reduces to the SSOE update at P = 0.
+spirit of the extended and unscented filters \citep{DurbinKoopman2012}. Explicitly, with
+$\vect a_t$ and $\vect P_t$ the mean and the covariance of $\vect x_{t-1}$ (in logs), $\mu_u$ and
+$\sigma_u^2$ the mean and the variance of $u_t$, and $\eta_k(u) = \log(1 + g_k(e^u - 1))$ the
+innovations of the conventional ETS: at an observed value,
+\[
+f_t = \vect w'\vect P_t\vect w + \sigma_u^2,\quad
+\hat{\vect x} = \vect a_t + \vect P_t\vect w\,\frac{\log z_t - \vect w'\vect a_t - \mu_u}{f_t},\quad
+\hat u = \log z_t - \vect w'\hat{\vect x},
+\]
+\[
+\vect a_{t+1} = \vect F\hat{\vect x} + \boldsymbol\eta(\hat u),\quad
+\vect P_{t+1} = (\vect F - \vect g\vect w')\left(\vect P_t - \frac{\vect P_t\vect w\vect w'\vect P_t}{f_t}\right)
+(\vect F - \vect g\vect w')',
+\]
+the innovations being linearised at $\epsilon_t = 0$ for the covariance; at an unobserved one
+$\vect a_{t+1} = \vect F\vect a_t + \E\boldsymbol\eta$ and
+$\vect P_{t+1} = \vect F\vect P_t\vect F' + \Var\boldsymbol\eta$. With $\vect P_t = \vect 0$,
+$\hat{\vect x} = \vect a_t$, $\hat u = \log(1+\epsilon_t)$ is the error of the recursion and
+$\vect P_{t+1} = \vect 0$, so the filter is the SSOE recursion; for the ETS of ADAM, $\boldsymbol\eta(u) =
+\vect g u$ and the update is that of Proposition~\ref{prop:kalman}.
 \end{remark}
 
 % =============================================================================
@@ -635,7 +653,22 @@ zero, so the fits of complete data do not change to the last bit. It is used wit
 that the fitted values after the unobserved periods are the filtered predictions whatever the
 estimator. The other linear models of the package (CES, GUM, the state space ARIMA, the simple
 moving average and TBATS with the normal distribution, in the space of the transformed data) use the
-same filter, and the approximate filter of Remark~\ref{rem:approxfilter} is not implemented.
+same filter. The approximate filter of Remark~\ref{rem:approxfilter} is implemented for the pure
+multiplicative ETS with the Gamma and the Inverse Gaussian distributions, in logs, with the moments of
+$u_t = \log(1+\epsilon_t)$ and of the innovations of the states from the quadrature of
+Section~\ref{sec:approximate}: for the ETS of ADAM the innovations are $\vect g u_t$, so the filter is
+that of Proposition~\ref{prop:lognormal} and the drift is $\mathcal N(\mu_u (m_t-1), \sigma_u^2
+(f_t-1))$ with $m_t = 2b_t$; for the conventional ETS, whose innovations $\log(1+g_k\epsilon_t)$ are
+not linear in $u_t$, the states take their posterior at an observed value and move by the innovations
+at the error it implies, with the covariance linearised at $\epsilon_t = 0$, so that it does not depend
+on the data and the filter is the recursion when the covariance is zero; the drift is then
+$\mathcal N(0, f_t - \sigma_u^2)$, and the filter depends on the scale through the moments, so it runs
+inside the fixed point of the scale. The pure additive models with the Laplace, the S and the
+Generalised Normal distributions take the variances of the filter, keeping the error in its family with
+the scale $s f_t^{1/p}$ ($p$ such that the variance is proportional to $s^p$): the convolution of these
+kinked densities with the normal uncertainty of the states is poorly integrated by the Gauss--Hermite
+rule, and the error of the approximation is small (a Kullback--Leibler divergence below 0.05 for the
+Laplace at $f_t = 4$).
 
 % =============================================================================
 \section{Conclusions}

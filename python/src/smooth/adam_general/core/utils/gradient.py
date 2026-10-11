@@ -237,6 +237,7 @@ def adam_fit_or_gradient(
     multisteps=False,
     xreg_number=0,
     filter_logs=None,
+    filter_noise=None,
 ):
     """Fit dispatcher mirroring ``adam_fitOrGradient``.
 
@@ -249,9 +250,10 @@ def adam_fit_or_gradient(
 
     ``mat_vt`` is mutated in place (its head columns are overwritten with the
     solved profile) and the C++ fit result is returned. With ``filter_logs`` not
-    None, the filter of the linear Gaussian models over the periods without an
-    observed value (``adam_cpp.filter``, in logs for the pure multiplicative ADAM
-    ETS) runs instead of the fitter.
+    None, the filter over the periods without an observed value
+    (``adam_cpp.filter``, in logs for the pure multiplicative ETS, with the moments
+    of the errors in ``filter_noise`` for the conventional one) runs instead of the
+    fitter.
     """
     is_gradient = initial_type == "gradient" or (
         isinstance(initial_type, (list, tuple)) and "gradient" in initial_type
@@ -334,6 +336,16 @@ def adam_fit_or_gradient(
             nIterations=n_iterations,
             logs=filter_logs,
             scale=0.0,
+            noiseMean=(
+                np.empty(0)
+                if filter_noise is None
+                else np.asarray(filter_noise[0], dtype=float)
+            ),
+            noiseCovariance=(
+                np.empty((0, 0))
+                if filter_noise is None
+                else np.asfortranarray(filter_noise[1], dtype=float)
+            ),
         )
     return adam_cpp.fit(
         matrixVt=mat_vt,

@@ -1064,29 +1064,43 @@ def preparator(
     error_type = model_type_dict["error_type"]
     trend_type = model_type_dict["trend_type"]
     season_type = model_type_dict["season_type"]
-    filter_logs = None
-    if (
-        general_dict["distribution_new"] == "dnorm"
-        and error_type == "A"
-        and trend_type != "M"
-        and season_type != "M"
-    ) or (
-        general_dict["distribution_new"] == "dlnorm"
-        and general_dict.get("ets") == "adam"
-        and model_type_dict["ets_model"]
+    distribution = general_dict["distribution_new"]
+    adam_ets = general_dict.get("ets") == "adam"
+    multiplicative = (
+        model_type_dict["ets_model"]
         and not arima_checked.get("arima_model", False)
         and error_type == "M"
         and trend_type != "A"
         and season_type != "A"
+    )
+    gap_drifting = (
+        multiplicative
+        and (
+            distribution in ("dgamma", "dinvgauss")
+            or (distribution == "dlnorm" and not adam_ets)
+        )
+        and not (
+            explanatory_checked.get("xreg_model", False)
+            and explanatory_checked.get("regressors") == "adapt"
+        )
+    )
+    filter_logs = None
+    if (
+        distribution in ("dnorm", "dlaplace", "ds", "dgnorm")
+        and error_type == "A"
+        and trend_type != "M"
+        and season_type != "M"
     ):
-        filter_logs = general_dict["distribution_new"] == "dlnorm"
+        filter_logs = False
+    elif gap_drifting or (multiplicative and distribution == "dlnorm" and adam_ets):
+        filter_logs = True
 
     # Call the fit (or gradient initial-state solve) with the prepared inputs.
     # For initial="gradient" the dispatcher re-solves the initials from the seed
     # profile and fits with backcast=False; otherwise it is the ordinary fit.
     # Note: E, T, S, nNonSeasonal, nSeasonal, nArima, nXreg, constant are set
     # during adamCore construction.
-    adam_fitted = adam_fit_or_gradient(
+    fit_arguments = dict(
         adam_cpp=adam_cpp,
         mat_vt=mat_vt,
         mat_wt=mat_wt,
@@ -1113,6 +1127,45 @@ def preparator(
         xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
         filter_logs=filter_logs,
     )
+    adam_fitted = adam_fit_or_gradient(**fit_arguments)
+    # The drift of the states of the other pure multiplicative ETS, as in the
+    # estimation: the scale is found here, so that the filter of the conventional
+    # ETS, which runs with the moments of the errors at the scale, gives the states,
+    # the fitted values and the errors
+    ot_logical = np.asarray(observations_dict["ot_logical"], dtype=bool)
+    drift_at = None
+    if gap_drifting:
+
+        def drift_at(scale):
+            nonlocal adam_fitted
+            moments = gap_drift(
+                vec_g,
+                ot_logical,
+                distribution,
+                adam_ets,
+                scale,
+                adam_fitted if adam_ets else None,
+            )
+            if adam_ets or np.all(ot_logical):
+                return moments[:2]
+            adam_fitted = adam_fit_or_gradient(**fit_arguments, filter_noise=moments[2])
+            moments = gap_drift(
+                vec_g, ot_logical, distribution, False, scale, adam_fitted, moments[2]
+            )
+            return moments[0], moments[1], np.ravel(adam_fitted.errors)[ot_logical]
+
+        scale = scaler(
+            distribution,
+            error_type,
+            np.ravel(adam_fitted.errors)[ot_logical],
+            np.ravel(adam_fitted.fitted)[ot_logical],
+            int(np.sum(ot_logical)),
+            other,
+            1.0,
+            1.0,
+            drift_at,
+        )
+        drift_at(scale)
     # The gradient solve overwrites the head of mat_vt in place; mirror the
     # solved initials back into matrices_dict so downstream initial-value
     # extraction reports them (not the discarded seed).
@@ -1158,52 +1211,21 @@ def preparator(
     # The variance and the mean after the periods without an observed size, as in
     # the estimation
     gap = gap_mean = np.ones(len(observations_dict["ot_logical"]))
-    if filter_logs is not None:
+    if filter_logs is False or (filter_logs and distribution == "dlnorm" and adam_ets):
         gap = np.ravel(adam_fitted.variances).astype(float)
         gap_mean = 2 * np.ravel(adam_fitted.innovationsScale).astype(float)
-    # The drift of the states of the other pure multiplicative ETS, as in the estimation
-    drift_at = None
-    distribution = general_dict["distribution_new"]
-    adam_ets = general_dict.get("ets") == "adam"
-    if (
-        (
-            distribution in ("dgamma", "dinvgauss")
-            or (distribution == "dlnorm" and not adam_ets)
+    if not gap_drifting:
+        scale = _calculate_scale_parameter(
+            general_dict,
+            model_type_dict,
+            errors,
+            y_fitted,
+            observations_dict,
+            other,
+            gap,
+            gap_mean,
+            None,
         )
-        and model_type_dict["ets_model"]
-        and not arima_checked.get("arima_model", False)
-        and not (
-            explanatory_checked.get("xreg_model", False)
-            and explanatory_checked.get("regressors") == "adapt"
-        )
-        and error_type == "M"
-        and trend_type != "A"
-        and season_type != "A"
-    ):
-
-        def drift_at(scale):
-            return gap_drift(
-                lags_dict["lags_model_all"],
-                matrices_dict["mat_wt"],
-                matrices_dict["mat_f"],
-                matrices_dict["vec_g"],
-                observations_dict["ot_logical"],
-                distribution,
-                adam_ets,
-                scale,
-            )
-
-    scale = _calculate_scale_parameter(
-        general_dict,
-        model_type_dict,
-        errors,
-        y_fitted,
-        observations_dict,
-        other,
-        gap,
-        gap_mean,
-        drift_at,
-    )
 
     # 13. Process constant and other parameters
     constant_value, other_returned = _process_other_parameters(

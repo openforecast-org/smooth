@@ -810,24 +810,32 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # print(profilesRecentTable)
 
         #### Fitter and the losses calculation ####
-        # The filter of the states over the periods without an observed value, for the linear
-        # Gaussian models: pure additive with the normal distribution, and the pure
-        # multiplicative ADAM ETS with the log-normal one, in logs
+        # The filter of the states over the periods without an observed value: of the pure additive
+        # models with the normal, the Laplace, the S and the Generalised Normal distributions, and in
+        # logs of the pure multiplicative ETS with the log-normal (ADAM ETS), and with the Gamma, the
+        # Inverse Gaussian and the conventional log-normal without the adaptive regressors, whose
+        # drift of the states it gives
+        gapDrifting <- (any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
+            etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
+            Etype=="M" && Ttype!="A" && Stype!="A";
         filterLogs <- NULL;
-        if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M" ||
-           distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
-           Etype=="M" && Ttype!="A" && Stype!="A"){
-            filterLogs <- distribution=="dlnorm";
+        if(any(distribution==c("dnorm","dlaplace","ds","dgnorm")) && Etype=="A" && Ttype!="M" && Stype!="M"){
+            filterLogs <- FALSE;
         }
-        adamFitted <- adam_fitOrGradient(adamElements$matVt, adamElements$matWt,
-                                         adamElements$matF, adamElements$vecG,
-                                         indexLookupTable, profilesRecentTable,
-                                         yInSample, ot, initialType, nIterations, adamCpp,
-                                         etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
-                                         componentsNumberETS, componentsNumberETSSeasonal,
-                                         componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
-                                         filterLogs);
+        else if(gapDrifting || distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
+                Etype=="M" && Ttype!="A" && Stype!="A"){
+            filterLogs <- TRUE;
+        }
+        fitArguments <- list(adamElements$matVt, adamElements$matWt,
+                             adamElements$matF, adamElements$vecG,
+                             indexLookupTable, profilesRecentTable,
+                             yInSample, ot, initialType, nIterations, adamCpp,
+                             etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                             componentsNumberETS, componentsNumberETSSeasonal,
+                             componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
+                             loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
+                             filterLogs);
+        adamFitted <- do.call(adam_fitOrGradient, fitArguments);
 
         # The missing values are not in the loss: the errors are zero there, and the
         # losses are divided by the observed values
@@ -839,20 +847,26 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 # size, of a pure additive model with the normal distribution and of a pure
                 # multiplicative ADAM ETS with the log-normal one, additive in logs (ones elsewhere)
                 gapVariance <- gapMean <- rep(1, obsInSample);
-                if(!is.null(filterLogs)){
+                # (and of the other additive distributions, whose scale is s gapVariance^(1/p)). The
+                # drift of the states of the other pure multiplicative ETS in logs, whose moments depend
+                # on the scale, and whose filter in the conventional ETS runs with the moments of the
+                # errors at the scale
+                gapDrift <- NULL;
+                if(isFALSE(filterLogs) || distribution=="dlnorm" && adamETS && isTRUE(filterLogs)){
                     gapVariance[] <- adamFitted$variances;
                     gapMean[] <- 2*adamFitted$innovationsScale;
                 }
-                # The drift of the states of the other pure multiplicative ETS over those periods,
-                # whose moments depend on the scale (the conventional ETS with the log-normal, and
-                # the Gamma and the Inverse Gaussian)
-                gapDrift <- NULL;
-                if((any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
-                   etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
-                   Etype=="M" && Ttype!="A" && Stype!="A"){
+                else if(gapDrifting){
                     gapDrift <- function(scale){
-                        return(adam_gapDrift(lagsModelAll, adamElements$matWt, adamElements$matF,
-                                             adamElements$vecG, otLogical, distribution, adamETS, scale));
+                        drift <- adam_gapDrift(adamElements$vecG, otLogical, distribution, adamETS, scale,
+                                               if(adamETS) adamFitted);
+                        if(!adamETS && any(!otLogical)){
+                            adamFitted <<- do.call(adam_fitOrGradient, c(fitArguments, list(filterNoise=drift$noise)));
+                            drift <- adam_gapDrift(adamElements$vecG, otLogical, distribution, FALSE, scale,
+                                                   adamFitted, drift$noise);
+                            drift$errors <- adamFitted$errors[otLogical];
+                        }
+                        return(drift);
                     }
                 }
                 # Scale for different functions: the maximum likelihood over the observed sizes
@@ -861,8 +875,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 if(!is.null(gapDrift)){
                     drift <- gapDrift(scale);
                     # The log-normal drift of the log-normal: log(1+e) + log(D) is N(-s/2 + m, s + v)
-                    gapMean[otLogical] <- 1 - 2*drift$mean/scale;
-                    gapVariance[otLogical] <- 1 + drift$variance/scale;
+                    if(distribution=="dlnorm"){
+                        gapMean[otLogical] <- 1 - 2*drift$mean/scale;
+                        gapVariance[otLogical] <- 1 + drift$variance/scale;
+                    }
                 }
 
                 # Calculate the likelihood
@@ -875,17 +891,17 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                                 sd=sqrt(scale)*adamFitted$fitted[otLogical], log=TRUE)),
                                        "dlaplace"=switch(Etype,
                                                          "A"=dlaplace(q=yInSample[otLogical], mu=adamFitted$fitted[otLogical],
-                                                                      scale=scale, log=TRUE),
+                                                                      scale=scale*sqrt(gapVariance[otLogical]), log=TRUE),
                                                          "M"=dlaplace(q=yInSample[otLogical], mu=adamFitted$fitted[otLogical],
                                                                       scale=scale*adamFitted$fitted[otLogical], log=TRUE)),
                                        "ds"=switch(Etype,
                                                    "A"=ds(q=yInSample[otLogical],mu=adamFitted$fitted[otLogical],
-                                                          scale=scale, log=TRUE),
+                                                          scale=scale*gapVariance[otLogical]^(1/4), log=TRUE),
                                                    "M"=ds(q=yInSample[otLogical],mu=adamFitted$fitted[otLogical],
                                                           scale=scale*sqrt(adamFitted$fitted[otLogical]), log=TRUE)),
                                        "dgnorm"=switch(Etype,
                                                        "A"=dgnorm(q=yInSample[otLogical],mu=adamFitted$fitted[otLogical],
-                                                                  scale=scale, shape=other, log=TRUE),
+                                                                  scale=scale*sqrt(gapVariance[otLogical]), shape=other, log=TRUE),
                                                        # suppressWarnings is needed, because the check is done for scalar alpha
                                                        "M"=suppressWarnings(dgnorm(q=yInSample[otLogical],
                                                                                    mu=adamFitted$fitted[otLogical],
@@ -1937,20 +1953,44 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         }
 
         # Fit the model to the data, with the filter as in the estimation
+        gapDrifting <- (any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
+            etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
+            Etype=="M" && Ttype!="A" && Stype!="A";
         filterLogs <- NULL;
-        if(distribution=="dnorm" && Etype=="A" && Ttype!="M" && Stype!="M" ||
-           distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
-           Etype=="M" && Ttype!="A" && Stype!="A"){
-            filterLogs <- distribution=="dlnorm";
+        if(any(distribution==c("dnorm","dlaplace","ds","dgnorm")) && Etype=="A" && Ttype!="M" && Stype!="M"){
+            filterLogs <- FALSE;
         }
-        adamFitted <- adam_fitOrGradient(matVt, matWt, matF, vecG,
-                                         indexLookupTable, profilesRecentTable,
-                                         yInSample, ot, initialType, nIterations, adamCpp,
-                                         etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
-                                         componentsNumberETS, componentsNumberETSSeasonal,
-                                         componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
-                                         filterLogs);
+        else if(gapDrifting || distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
+                Etype=="M" && Ttype!="A" && Stype!="A"){
+            filterLogs <- TRUE;
+        }
+        fitArguments <- list(matVt, matWt, matF, vecG,
+                             indexLookupTable, profilesRecentTable,
+                             yInSample, ot, initialType, nIterations, adamCpp,
+                             etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                             componentsNumberETS, componentsNumberETSSeasonal,
+                             componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
+                             loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
+                             filterLogs);
+        adamFitted <- do.call(adam_fitOrGradient, fitArguments);
+        # The drift of the states of the other pure multiplicative ETS, as in the estimation: the
+        # scale is found here, so that the filter of the conventional ETS, which runs with the
+        # moments of the errors at the scale, gives the states, the fitted values and the errors
+        gapDrift <- NULL;
+        if(gapDrifting){
+            gapDrift <- function(scale){
+                drift <- adam_gapDrift(vecG, otLogical, distribution, adamETS, scale, if(adamETS) adamFitted);
+                if(!adamETS && any(!otLogical)){
+                    adamFitted <<- do.call(adam_fitOrGradient, c(fitArguments, list(filterNoise=drift$noise)));
+                    drift <- adam_gapDrift(vecG, otLogical, distribution, FALSE, scale, adamFitted, drift$noise);
+                    drift$errors <- adamFitted$errors[otLogical];
+                }
+                return(drift);
+            }
+            scale <- scaler(distribution, Etype, adamFitted$errors[otLogical], adamFitted$fitted[otLogical],
+                            sum(otLogical), other, 1, 1, gapDrift);
+            gapDrift(scale);
+        }
 
         matVt[] <- adamFitted$states;
 
@@ -2108,20 +2148,14 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # The sizes, not multiplied by the probabilities, with the variance and the mean after
         # the periods without an observed size, as in the estimation
         gapVariance <- gapMean <- rep(1, obsInSample);
-        if(!is.null(filterLogs)){
+        if(isFALSE(filterLogs) || distribution=="dlnorm" && adamETS && isTRUE(filterLogs)){
             gapVariance[] <- adamFitted$variances;
             gapMean[] <- 2*adamFitted$innovationsScale;
         }
-        gapDrift <- NULL;
-        if((any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
-           etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
-           Etype=="M" && Ttype!="A" && Stype!="A"){
-            gapDrift <- function(scale){
-                return(adam_gapDrift(lagsModelAll, matWt, matF, vecG, otLogical, distribution, adamETS, scale));
-            }
+        if(!gapDrifting){
+            scale <- scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
+                            sum(otLogical), other, gapMean[which(otLogical)], gapVariance[which(otLogical)], gapDrift);
         }
-        scale <- scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
-                        sum(otLogical), other, gapMean[which(otLogical)], gapVariance[which(otLogical)], gapDrift);
 
         # Record constant if it was estimated
         if(constantEstimate){
@@ -7586,17 +7620,17 @@ pointLik.adam <- function(object, log=TRUE, ...){
                                                             sd=sqrt(scale)*yFitted[otLogical], log=TRUE)),
                                    "dlaplace"=switch(Etype,
                                                      "A"=dlaplace(q=yInSample[otLogical], mu=yFitted[otLogical],
-                                                                  scale=scale, log=TRUE),
+                                                                  scale=scale*sqrt(gapVariance[otLogical]), log=TRUE),
                                                      "M"=dlaplace(q=yInSample[otLogical], mu=yFitted[otLogical],
                                                                   scale=scale*yFitted[otLogical], log=TRUE)),
                                    "ds"=switch(Etype,
                                                "A"=ds(q=yInSample[otLogical],mu=yFitted[otLogical],
-                                                      scale=scale, log=TRUE),
+                                                      scale=scale*gapVariance[otLogical]^(1/4), log=TRUE),
                                                "M"=ds(q=yInSample[otLogical],mu=yFitted[otLogical],
                                                       scale=scale*sqrt(yFitted[otLogical]), log=TRUE)),
                                    "dgnorm"=switch(Etype,
                                                    "A"=dgnorm(q=yInSample[otLogical], mu=yFitted[otLogical],
-                                                              scale=scale, shape=other, log=TRUE),
+                                                              scale=scale*sqrt(gapVariance[otLogical]), shape=other, log=TRUE),
                                                    "M"=suppressWarnings(dgnorm(q=yInSample[otLogical], mu=yFitted[otLogical],
                                                                                scale=scale*yFitted[otLogical], shape=other,
                                                                                log=TRUE))),

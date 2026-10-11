@@ -696,26 +696,34 @@ def calculate_likelihood(
     ``R/adam.R:790-862``. A multiplicative error scales the density's scale by
     the fitted value. ``gap_mean`` and ``gap_variance`` are the multipliers of the
     mean and of the variance of the error after the periods without an observed
-    size (the filter, ``filter_variances()``), for dnorm and dlnorm.
+    size (the filter, ``filter_variances()``), for dnorm and dlnorm, and for the
+    Laplace, S and Generalised Normal distributions with an additive error, whose
+    scale is then ``s gap_variance^(1/p)``, p of ``scale_power()``.
     """
     y = np.asarray(y, dtype=np.float64).reshape(-1, 1)
     mult = y_fitted if Etype == "M" else 1.0
+    gap_root = np.sqrt(gap_variance) if Etype == "A" else 1.0
 
     if distribution == "dnorm":
         return gb.dnorm(y, y_fitted, np.sqrt(scale * gap_variance) * mult, log=True)
     if distribution == "dlaplace":
-        return gb.dlaplace(y, y_fitted, scale * mult, log=True)
+        return gb.dlaplace(y, y_fitted, scale * mult * gap_root, log=True)
     if distribution == "ds":
         # R scales by sqrt(fitted) here, not by fitted.
         return gb.ds(
             y,
             y_fitted,
-            scale * (np.sqrt(np.abs(y_fitted)) if Etype == "M" else 1.0),
+            scale
+            * (
+                np.sqrt(np.abs(y_fitted))
+                if Etype == "M"
+                else _pow_r(np.asarray(gap_variance, dtype=float), 0.25)
+            ),
             log=True,
         )
     if distribution == "dgnorm":
         beta = other if other is not None else 2.0
-        return gb.dgnorm(y, y_fitted, scale * mult, beta, log=True)
+        return gb.dgnorm(y, y_fitted, scale * mult * gap_root, beta, log=True)
     if distribution == "dalaplace":
         return gb.dalaplace(y, y_fitted, scale * mult, other, log=True)
     if distribution == "dlogis":
@@ -797,8 +805,8 @@ def gap_log_density(y, mu, scale, distribution, drift_mean, drift_variance):
     """The log-density of the observed sizes after the periods without an observed
     size, with the Gamma or the Inverse Gaussian distribution, as R's
     ``adam_gapLogDensity()``: the one-step density at ``mu*exp(d)``, mixed over the
-    normal drift ``d`` with the Gauss-Hermite rule. The sizes right after another
-    one take the one-step density."""
+    normal drift ``d`` with the Gauss-Hermite rule. The sizes without the uncertainty
+    of the drift take the one-step density at its mean."""
     y = np.asarray(y, dtype=float).ravel()
     mu = np.asarray(mu, dtype=float).ravel()
     drift_mean = np.asarray(drift_mean, dtype=float).ravel()
@@ -811,7 +819,7 @@ def gap_log_density(y, mu, scale, distribution, drift_mean, drift_variance):
             values = gb.dinvgauss(y, np.abs(mu), np.abs(scale / mu), log=True)
         return np.asarray(values, dtype=float)
 
-    values = log_density(y, mu)
+    values = log_density(y, mu * _exp_r(drift_mean))
     # A NaN drift (from parameters outside the region where 1+g e is positive) stays NaN
     gapped = np.isnan(drift_variance) | (drift_variance > 0)
     if np.any(gapped):
@@ -1029,7 +1037,12 @@ def scaler(
         scale = scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other)
         errors = np.asarray(errors, dtype=float)
         for _ in range(100):
-            drift_mean, drift_variance = gap_drift(scale)
+            drift = gap_drift(scale)
+            drift_mean, drift_variance = drift[0], drift[1]
+            # The filter of the conventional ETS depends on the scale, and so do its
+            # errors
+            if len(drift) > 2:
+                errors = np.asarray(drift[2], dtype=float)
             # E(D), E(D^2) and E(1/D) of the log-normal drift D
             expected_drift = _exp_r(drift_mean + drift_variance / 2)
             expected_square = _exp_r(2 * drift_mean + 2 * drift_variance)
@@ -1078,17 +1091,21 @@ def scaler(
         # ``adam_scaler`` (R/utils-adam.R).
         return _sum_r(errors**2 / gap_variance) / obs_in_sample
 
+    # After the periods without an observed size, the variance of the error is
+    # gap_variance times the one-step one: the scale s gap_variance^(1/p)
     elif distribution == "dlaplace":
-        return _sum_r(np.abs(errors)) / obs_in_sample
+        return _sum_r(np.abs(errors) / np.sqrt(gap_variance)) / obs_in_sample
 
     elif distribution == "ds":
-        return _sum_r(np.sqrt(np.abs(errors))) / (obs_in_sample * 2)
+        gap_quarter = _pow_r(np.asarray(gap_variance, dtype=float), 0.25)
+        return _sum_r(np.sqrt(np.abs(errors)) / gap_quarter) / (obs_in_sample * 2)
 
     elif distribution == "dgnorm":
         beta = other if other is not None else 2.0
-        return (beta * _sum_r(_pow_r(np.abs(errors), beta)) / obs_in_sample) ** (
-            1 / beta
-        )
+        gap_power = _pow_r(np.asarray(gap_variance, dtype=float), beta / 2)
+        return (
+            beta * _sum_r(_pow_r(np.abs(errors), beta) / gap_power) / obs_in_sample
+        ) ** (1 / beta)
 
     elif distribution == "dalaplace":
         return _sum_r(errors * (other - (errors <= 0) * 1)) / obs_in_sample

@@ -144,7 +144,9 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("backcast"),
             py::arg("nIterations"),
             py::arg("logs"),
-            py::arg("scale"))
+            py::arg("scale"),
+            py::arg("noiseMean") = arma::vec(),
+            py::arg("noiseCovariance") = arma::mat())
         .def("omfitGeneral", &adamCore::omfitGeneral,
             py::arg("matrixVtA"),
             py::arg("matrixWtA"),

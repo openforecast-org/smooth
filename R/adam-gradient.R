@@ -185,7 +185,7 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
                                obsInSample, loss, distribution="dnorm", other=NULL,
                                horizon=0, multisteps=FALSE, oType="n",
                                componentsNumberARIMA=0, lagsModelAll=lagsModel,
-                               xregNumber=0, filterLogs=NULL){
+                               xregNumber=0, filterLogs=NULL, filterNoise=NULL){
     backcast <- any(initialType == c("complete", "backcasting", "gradient"));
     if(any(initialType == "gradient")){
         # Occurrence models profile their own losses over the probability
@@ -224,11 +224,14 @@ adam_fitOrGradient <- function(matVt, matWt, matF, vecG, indexLookupTable, profi
             }
         }
     }
-    # The filter of the linear Gaussian models over the periods without an observed value
-    # (adamCore$filter(), in logs for the pure multiplicative ADAM ETS) instead of the fitter
+    # The filter over the periods without an observed value (adamCore$filter(), in logs for the
+    # pure multiplicative ETS, with the moments of the errors in filterNoise for the conventional
+    # one) instead of the fitter
     if(!is.null(filterLogs)){
         return(adamCpp$filter(matVt, matWt, matF, vecG, indexLookupTable, profile,
-                              yInSample, ot, backcast, nIterations, filterLogs, 0));
+                              yInSample, ot, backcast, nIterations, filterLogs, 0,
+                              if(is.null(filterNoise)) numeric(0) else filterNoise$mean,
+                              if(is.null(filterNoise)) matrix(0, 0, 0) else filterNoise$covariance));
     }
     return(adamCpp$fit(matVt, matWt, matF, vecG, indexLookupTable, profile,
                        yInSample, ot, backcast, nIterations, oType))

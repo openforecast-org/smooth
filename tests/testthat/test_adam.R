@@ -1166,25 +1166,40 @@ test_that("covarAnal() of ETS(A,N,N) is the closed form", {
     expect_equal(covarMat[3,5], 2*(0.3 + 2*0.09));
 })
 
-# After j-1 periods without an observed size, the drift of the level of the conventional
-# ETS(M,N,N) is the product of (1 + alpha e) over them: the moments of its logarithm are
-# those of the simulated ones, and the fixed point of the moment equations gives the scale
+# The moments of the errors in logs of the conventional ETS(M,N,N), u = log(1+e) and
+# log(1 + alpha e), are those of the simulated ones. Over j-1 periods without an observed size
+# after an observed one, its filter moves the level by them, so the variance of its drift at the
+# next observed size is (j-1) times that of log(1 + alpha e); and the fixed point of the moment
+# equations with such a drift gives the scale
 test_that("the drift of the states of the pure multiplicative ETS after the gaps", {
     set.seed(41);
-    otLogical <- c(TRUE, TRUE, FALSE, FALSE, FALSE, TRUE);
-    drift <- adam_gapDrift(1, matrix(1), matrix(1), 0.3, otLogical, "dgamma", FALSE, 0.2);
-    expect_equal(drift$mean[1:2], c(0, 0));
-    logDrift <- rowSums(log(1 + 0.3*(matrix(rgamma(3e5, shape=5, scale=0.2), ncol=3) - 1)));
-    expect_equal(drift$mean[3], mean(logDrift), tolerance=1e-2);
-    expect_equal(drift$variance[3], var(logDrift), tolerance=1e-2);
+    noise <- adam_gapDrift(c(0.3), c(TRUE, TRUE), "dgamma", FALSE, 0.2)$noise;
+    errors <- rgamma(3e5, shape=5, scale=0.2);
+    innovations <- cbind(log(errors), log(1 + 0.3*(errors - 1)));
+    expect_equal(noise$mean, colMeans(innovations), tolerance=1e-2);
+    expect_equal(noise$covariance, cov(innovations), tolerance=1e-2);
 
-    # The scale of errors (1+e) D - 1 is s
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e;
+    y[c(50, 51, 52)] <- 0;
+    y[200:300] <- y[200:300]*rbinom(101, 1, 0.5);
+    testModel <- adam(y, "MNN", occurrence="fixed", distribution="dgamma");
+    otLogical <- y!=0;
+    noise <- adam_gapDrift(testModel$persistence, otLogical, "dgamma", FALSE, testModel$scale)$noise;
+    drift <- attr(adam_gapVarianceModel(testModel), "drift");
+    expect_equal(drift$variance[1:49], rep(0, 49));
+    expect_equal(drift$variance[50], 3*noise$covariance[2,2]);
+
+    # The scale of errors (1+e) D - 1 is s, with the drift D of the simulated innovations
     gaps <- rgeom(1e5, 0.35) + 1;
     otLogical <- rep(FALSE, sum(gaps));
     otLogical[cumsum(gaps)] <- TRUE;
     driftValues <- sapply(gaps, function(j){prod(1 + 0.3*(rgamma(j-1, shape=5, scale=0.2) - 1))});
     errors <- rgamma(1e5, shape=5, scale=0.2)*driftValues - 1;
-    gapDrift <- function(scale){adam_gapDrift(1, matrix(1), matrix(1), 0.3, otLogical, "dgamma", FALSE, scale)};
+    gapDrift <- function(scale){
+        noise <- adam_gapDrift(c(0.3), otLogical, "dgamma", FALSE, scale)$noise;
+        return(list(mean=(gaps-1)*noise$mean[2], variance=(gaps-1)*noise$covariance[2,2]));
+    }
     expect_equal(adam_scaler("dgamma", "M", errors, NULL, 1e5, NULL, gapDrift=gapDrift), 0.2, tolerance=2e-2);
 })
 
@@ -1199,7 +1214,30 @@ test_that("the likelihood of the pure multiplicative ETS with the drift after th
         testModel <- adam(y, "MNN", occurrence="fixed", distribution=distribution);
         expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
     }
+    # ADAM ETS, whose filter runs in logs with the errors of mean zero and the variance one
+    for(distribution in c("dgamma","dinvgauss")){
+        testModel <- adam(y, "MNN", occurrence="fixed", distribution=distribution, ets="adam");
+        expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    }
     testModel <- adam(AirPassengers, "MNN", distribution="dgamma");
     # residuals() of the Gamma are the ratios 1+e
     expect_equal(testModel$scale, mean((residuals(testModel)-1)^2));
+})
+
+# The pure additive models with the Laplace, the S and the Generalised Normal distributions
+# take the variances of the filter after the periods without an observed size, with the scale
+# s k^(1/p) of the variance k times the one-step one, p of adam_scalePower()
+test_that("the filter of the pure additive models with the other distributions", {
+    set.seed(41);
+    y <- (100 + cumsum(rnorm(300, 0, 3)) + rlaplace(300, 0, 3))*rbinom(300, 1, 0.4);
+    otLogical <- y!=0;
+    for(distribution in c("dlaplace","ds","dgnorm")){
+        testModel <- adam(y, "ANN", occurrence="fixed", distribution=distribution);
+        gapVariance <- adam_gapVarianceModel(testModel);
+        expect_true(all(gapVariance[otLogical] >= 1) && any(gapVariance[otLogical] > 1));
+        expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    }
+    testModel <- adam(y, "ANN", occurrence="fixed", distribution="dlaplace");
+    gapVariance <- adam_gapVarianceModel(testModel)[otLogical];
+    expect_equal(testModel$scale, mean(abs(residuals(testModel)[otLogical])/sqrt(gapVariance)));
 })

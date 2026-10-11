@@ -232,14 +232,16 @@ def filter_variances(
     h=0,
     logs=False,
     power=2,
+    noise=None,
 ):
     """The variances of the errors relative to the one-step one (or with ``power=1``
     the multipliers of their means in logs) from the filter of ``adam_cpp.filter``
     over the periods without an observed value (R's ``adam_gapVarianceModel``). They
     do not depend on the data or on the initial states, so the filter runs on ones
-    from ``profile`` without backcasting. With ``h>0``, the h periods after the
-    sample are unobserved, with the last measurement, and their values are
-    returned: those of the forecast."""
+    from ``profile`` without backcasting; the conventional ETS needs the moments of
+    its errors at the scale (``noise`` of :func:`gap_drift`). With ``h>0``, the h
+    periods after the sample are unobserved, with the last measurement, and their
+    values are returned: those of the forecast."""
     # Imported here: the creator imports this module
     from smooth.adam_general.core.creator import adam_profile_creator
 
@@ -268,6 +270,12 @@ def filter_variances(
         nIterations=1,
         logs=bool(logs),
         scale=0.0,
+        noiseMean=np.empty(0) if noise is None else np.asarray(noise[0], dtype=float),
+        noiseCovariance=(
+            np.empty((0, 0))
+            if noise is None
+            else np.asfortranarray(noise[1], dtype=float)
+        ),
     )
     values = np.ravel(
         2 * np.asarray(filtered.innovationsScale) if power == 1 else filtered.variances
@@ -352,85 +360,68 @@ _GAUSS_LEGENDRE_WEIGHTS = np.array(
 
 
 def gap_drift(
-    lags_model_all, mat_wt, mat_f, vec_g, ot_logical, distribution, adam_ets, scale
+    vec_g, ot_logical, distribution, adam_ets, scale, filtered=None, noise=None
 ):
-    """The mean and the variance of the logarithm of the drift of the states of a pure
-    multiplicative ETS over the periods without an observed size, at the observed
-    sizes (zeros at those right after another one), as R's ``adam_gapDrift()``.
+    """The moments of the errors of a pure multiplicative ETS in logs at the scale,
+    and the drift of its states after the periods without an observed size, as R's
+    ``adam_gapDrift()``.
 
-    The drift is the sum of ``c_(i,k) L_k`` over the lags ``i`` before the
-    observation and the components ``k``, where ``c_(i,k)`` are the coefficients of
-    :func:`covar_anal` for the persistence of the component ``k`` alone, and
-    ``L_k = log(1+g_k e)`` for the conventional ETS and ``g_k log(1+e)`` for ADAM
-    ETS. The moments of ``L_k`` come from the quantiles of ``1+e`` at the
-    Gauss-Legendre nodes, for the scale.
+    The noise of ``adam_cpp.filter`` is the mean and the covariance of
+    ``u = log(1+e)`` and of the innovations of the states, ``g u`` for ADAM ETS and
+    ``log(1 + g e)`` for the conventional one, from the quantiles of ``1+e`` at the
+    Gauss-Legendre nodes. With the filter, the mean and the variance of the
+    logarithm of the drift of the states at the observed sizes are
+    ``N(mu (m-1), v (f-1))`` for ADAM ETS, whose filter runs with the error of mean
+    zero and the variance one (``f`` and ``m`` being its variances and multipliers
+    of the mean, and ``mu`` and ``v`` those of ``u``), and ``N(0, f - v)`` for the
+    conventional one, whose filter runs with these moments. Returns the mean, the
+    variance and the noise.
     """
     from smooth.adam_general.core.utils.utils import _log_r, _sum_r
 
-    vec_g = np.asarray(vec_g, dtype=float).ravel()
-    gaps = np.diff(np.concatenate(([0], np.flatnonzero(ot_logical) + 1)))
-    components = np.flatnonzero(vec_g != 0)
-    drift_mean = np.zeros(len(gaps))
-    drift_variance = np.zeros(len(gaps))
-    if np.all(gaps == 1) or len(components) == 0:
-        return drift_mean, drift_variance
-    gap_max = int(np.max(gaps))
-    coefficients = np.column_stack(
-        [
-            covar_anal(
-                lags_model_all,
-                gap_max,
-                np.atleast_2d(mat_wt)[:1],
-                mat_f,
-                np.eye(len(vec_g))[:, k],
-                1.0,
-            )[0, 1:]
-            for k in components
-        ]
-    )
-
-    # The innovations of the components at the quantiles of 1+e
-    nodes = _GAUSS_LEGENDRE_NODES
-    if distribution == "dgamma":
-        quantiles = gb.qgamma(nodes, shape=1 / scale, scale=scale)
-    elif distribution == "dinvgauss":
-        quantiles = gb.qinvgauss(nodes, 1.0, scale)
-    else:
-        quantiles = gb.qlnorm(nodes, -scale / 2, np.sqrt(scale))
-    quantiles = np.asarray(quantiles, dtype=float)
-    gains = vec_g[components]
-    if adam_ets:
-        innovations = _log_r(quantiles)[:, None] * gains[None, :]
-    else:
-        innovations = _log_r(1 + (quantiles - 1)[:, None] * gains[None, :])
-
-    # Their means and covariances, and the moments of the drift after j-1 periods,
-    # j = 1..gap_max, by the sums of R
-    weights = _GAUSS_LEGENDRE_WEIGHTS
-    innovations_mean = _sum_r(weights[:, None] * innovations, axis=0)
-    n_components = len(components)
-    pairs = [(k, m) for m in range(n_components) for k in range(n_components)]
-    innovations_covar = np.array(
-        [
-            _sum_r(weights * innovations[:, k] * innovations[:, m])
-            - innovations_mean[k] * innovations_mean[m]
-            for k, m in pairs
-        ]
-    )
-    step_mean = _sum_r(coefficients * innovations_mean[None, :], axis=1)
-    first = [k for k, _ in pairs]
-    second = [m for _, m in pairs]
-    step_variance = _sum_r(
-        coefficients[:, first] * coefficients[:, second] * innovations_covar[None, :],
-        axis=1,
-    )
-    cumulative_mean = np.concatenate(
-        ([0.0], np.cumsum(step_mean, dtype=np.longdouble).astype(float))
-    )
-    cumulative_variance = np.concatenate(
-        ([0.0], np.cumsum(step_variance, dtype=np.longdouble).astype(float))
-    )
-    return cumulative_mean[gaps - 1], cumulative_variance[gaps - 1]
+    ot = np.asarray(ot_logical, dtype=bool).ravel()
+    if noise is None:
+        vec_g = np.asarray(vec_g, dtype=float).ravel()
+        nodes = _GAUSS_LEGENDRE_NODES
+        if distribution == "dgamma":
+            quantiles = gb.qgamma(nodes, shape=1 / scale, scale=scale)
+        elif distribution == "dinvgauss":
+            quantiles = gb.qinvgauss(nodes, 1.0, scale)
+        else:
+            quantiles = gb.qlnorm(nodes, -scale / 2, np.sqrt(scale))
+        quantiles = np.asarray(quantiles, dtype=float)
+        errors = _log_r(quantiles)
+        if adam_ets:
+            states = errors[:, None] * vec_g[None, :]
+        else:
+            states = _log_r(1 + (quantiles - 1)[:, None] * vec_g[None, :])
+        innovations = np.column_stack([errors, states])
+        # Their means and covariances by the sums of R
+        weights = _GAUSS_LEGENDRE_WEIGHTS
+        noise_mean = _sum_r(weights[:, None] * innovations, axis=0)
+        n = innovations.shape[1]
+        noise_covariance = np.array(
+            [
+                [
+                    _sum_r(weights * innovations[:, i] * innovations[:, j])
+                    - noise_mean[i] * noise_mean[j]
+                    for j in range(n)
+                ]
+                for i in range(n)
+            ]
+        )
+        noise = (noise_mean, noise_covariance)
+    mean = np.zeros(int(ot.sum()))
+    variance = np.zeros(int(ot.sum()))
+    if filtered is not None:
+        variances = np.ravel(filtered.variances)[ot]
+        if adam_ets:
+            multipliers = 2 * np.ravel(filtered.innovationsScale)[ot]
+            mean = noise[0][0] * (multipliers - 1)
+            variance = noise[1][0, 0] * (variances - 1)
+        else:
+            variance = variances - noise[1][0, 0]
+    return mean, variance, noise
 
 
 def covar_anal(lags_model, h, measurement, transition, persistence, s2):

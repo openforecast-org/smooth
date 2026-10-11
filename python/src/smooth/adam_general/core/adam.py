@@ -1,6 +1,7 @@
 import time
 import warnings
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import greybox as gb
@@ -2795,60 +2796,77 @@ class ADAM:
             and model_type["ets_model"]
             and not self._arima.get("arima_model", False)
         )
-        arguments = (
-            self._lags_model["lags_model_all"],
-            self._prepared["mat_wt"],
-            self._prepared["mat_f"],
-            self._prepared.get("vec_g", self._adam_created["vec_g"]),
-            ot_logical,
+        trend_type = model_type["trend_type"]
+        season_type = model_type["season_type"]
+        adam_ets = getattr(self, "ets", None) == "adam"
+        additive = (
+            error_type == "A"
+            and trend_type != "M"
+            and season_type != "M"
+            and distribution in ("dnorm", "dlaplace", "ds", "dgnorm")
         )
-        # The filter of the linear Gaussian models, in logs for a pure multiplicative
-        # ADAM ETS. Its variances and the derivatives of its innovations in the scale
-        # do not depend on the data or on the initial states, so no backcasting is
-        # needed for them
-        if (
-            distribution == "dnorm"
-            and error_type == "A"
-            and model_type["trend_type"] != "M"
-            and model_type["season_type"] != "M"
-        ) or (distribution == "dlnorm" and self.ets == "adam" and multiplicative):
-            if drift:
-                return None
-            if ot_logical.all():
-                return None if h > 0 else ones
-            return filter_variances(
-                self._adam_cpp,
-                arguments[0],
-                self._observations.get("head_length", 0),
-                *arguments[1:4],
-                self._prepared["mat_vt"],
-                ot_logical,
-                h,
-                distribution == "dlnorm",
-                power,
-            )
-        if h > 0:
-            return None
         # The drift of the states of the other pure multiplicative ETS, without the
         # adaptive regressors
-        if (
-            distribution in ("dgamma", "dinvgauss", "dlnorm")
-            and multiplicative
+        drifting = (
+            multiplicative
+            and (
+                distribution in ("dgamma", "dinvgauss")
+                or (distribution == "dlnorm" and not adam_ets)
+            )
             and not (
                 self._explanatory.get("xreg_model", False)
                 and self._explanatory.get("regressors") == "adapt"
             )
+        )
+        gaussian = additive or (
+            multiplicative and distribution == "dlnorm" and adam_ets
+        )
+        if (
+            not (gaussian or drifting)
+            or (h > 0 and not gaussian)
+            or (drift and not drifting)
+            or ot_logical.all()
         ):
-            scale = self.scale
-            moments = gap_drift(*arguments, distribution, self.ets == "adam", scale)
-            if drift:
-                return moments
-            if distribution == "dlnorm":
-                ones[ot_logical] = (
-                    1 - 2 * moments[0] / scale if power == 1 else 1 + moments[1] / scale
-                )
-            return ones
-        return None if drift else ones
+            return None if drift or h > 0 else ones
+        # The filter, in logs for the multiplicative models. Its variances and the
+        # derivatives of its innovations in the scale do not depend on the data or on
+        # the initial states, so no backcasting is needed for them; the conventional
+        # ETS needs the moments of its errors at the scale
+        vec_g = self._prepared.get("vec_g", self._adam_created["vec_g"])
+        scale = self.scale
+        noise = (
+            gap_drift(vec_g, ot_logical, distribution, False, scale)[2]
+            if drifting and not adam_ets
+            else None
+        )
+        arguments = (
+            self._adam_cpp,
+            self._lags_model["lags_model_all"],
+            self._observations.get("head_length", 0),
+            self._prepared["mat_wt"],
+            self._prepared["mat_f"],
+            vec_g,
+            self._prepared["mat_vt"],
+            ot_logical,
+            h,
+            multiplicative,
+        )
+        if gaussian:
+            return filter_variances(*arguments, power)
+        filtered = SimpleNamespace(
+            variances=filter_variances(*arguments, 2, noise),
+            innovationsScale=filter_variances(*arguments, 1, noise) / 2,
+        )
+        moments = gap_drift(
+            vec_g, ot_logical, distribution, adam_ets, scale, filtered, noise
+        )
+        if drift:
+            return moments[:2]
+        if distribution == "dlnorm":
+            ones[ot_logical] = (
+                1 - 2 * moments[0] / scale if power == 1 else 1 + moments[1] / scale
+            )
+        return ones
 
     def _gap_residuals(self) -> NDArray:
         """The residuals as the one-step ones after the periods without an
@@ -5318,7 +5336,7 @@ class ADAM:
             ).ravel()
             if drift is not None and distribution != "dlnorm":
                 lik = gap_log_density(
-                    y[ot_logical], fitted[ot_logical], scale, distribution, *drift
+                    y[ot_logical], fitted[ot_logical], scale, distribution, *drift[:2]
                 )
             vec = np.zeros(obs, dtype=float)
             vec[ot_logical] = lik

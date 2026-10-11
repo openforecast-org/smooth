@@ -563,33 +563,50 @@ def CF(  # noqa: N802
     else:
         backcast_value = initials_checked["initial_type"] in ["complete", "backcasting"]
 
-    # The filter of the states over the periods without an observed value, for the
-    # linear Gaussian models: pure additive with the normal distribution, and the
-    # pure multiplicative ADAM ETS with the log-normal one, in logs
+    # The filter of the states over the periods without an observed value: of the
+    # pure additive models with the normal, the Laplace, the S and the Generalised
+    # Normal distributions, and in logs of the pure multiplicative ETS with the
+    # log-normal (ADAM ETS), and with the Gamma, the Inverse Gaussian and the
+    # conventional log-normal without the adaptive regressors, whose drift of the
+    # states it gives
     error_type = model_type_dict["error_type"]
     trend_type = model_type_dict["trend_type"]
     season_type = model_type_dict["season_type"]
-    filter_logs = None
-    if (
-        general["distribution_new"] == "dnorm"
-        and error_type == "A"
-        and trend_type != "M"
-        and season_type != "M"
-    ) or (
-        general["distribution_new"] == "dlnorm"
-        and general.get("ets") == "adam"
-        and model_type_dict["ets_model"]
+    distribution = general["distribution_new"]
+    adam_ets = general.get("ets") == "adam"
+    multiplicative = (
+        model_type_dict["ets_model"]
         and not arima_checked.get("arima_model", False)
         and error_type == "M"
         and trend_type != "A"
         and season_type != "A"
+    )
+    gap_drifting = (
+        multiplicative
+        and (
+            distribution in ("dgamma", "dinvgauss")
+            or (distribution == "dlnorm" and not adam_ets)
+        )
+        and not (
+            explanatory_checked.get("xreg_model", False)
+            and explanatory_checked.get("regressors") == "adapt"
+        )
+    )
+    filter_logs = None
+    if (
+        distribution in ("dnorm", "dlaplace", "ds", "dgnorm")
+        and error_type == "A"
+        and trend_type != "M"
+        and season_type != "M"
     ):
-        filter_logs = general["distribution_new"] == "dlnorm"
+        filter_logs = False
+    elif gap_drifting or (multiplicative and distribution == "dlnorm" and adam_ets):
+        filter_logs = True
 
     # Call adam_cpp.fit() (or the gradient initial-state solve) via the shared
     # dispatcher — parity with R's adam_fitOrGradient. Parameters that were passed
     # to adam_fitter are now stored in adam_cpp (E, T, S, etc.).
-    adam_fitted = adam_fit_or_gradient(
+    fit_arguments = dict(
         adam_cpp=adam_cpp,
         mat_vt=mat_vt,
         mat_wt=mat_wt,
@@ -616,51 +633,56 @@ def CF(  # noqa: N802
         xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
         filter_logs=filter_logs,
     )
+    adam_fitted = adam_fit_or_gradient(**fit_arguments)
 
     ot_logical = observations_dict["ot_logical"]
     # The variance and the mean of the errors after the periods without an observed
     # size, of a pure additive model with the normal distribution and of a pure
-    # multiplicative ADAM ETS with the log-normal one, additive in logs (ones
-    # elsewhere)
+    # multiplicative ADAM ETS with the log-normal one, additive in logs (and of the
+    # other additive distributions, whose scale is s gap^(1/p); ones elsewhere)
     gap = np.ones(len(ot_logical))
     gap_mean = np.ones(len(ot_logical))
-    if filter_logs is not None:
+    # The drift of the states of the other pure multiplicative ETS in logs, whose
+    # moments depend on the scale, and whose filter in the conventional ETS runs with
+    # the moments of the errors at the scale
+    drift_at = None
+    if filter_logs is False or (filter_logs and distribution == "dlnorm" and adam_ets):
         gap = np.ravel(adam_fitted.variances).astype(float)
         gap_mean = 2 * np.ravel(adam_fitted.innovationsScale).astype(float)
-    # The drift of the states of the other pure multiplicative ETS over those periods,
-    # whose moments depend on the scale (the conventional ETS with the log-normal, and
-    # the Gamma and the Inverse Gaussian)
-    drift_at = None
-    distribution = general["distribution_new"]
-    adam_ets = general.get("ets") == "adam"
-    if (
-        (
-            distribution in ("dgamma", "dinvgauss")
-            or (distribution == "dlnorm" and not adam_ets)
-        )
-        and model_type_dict["ets_model"]
-        and not arima_checked.get("arima_model", False)
-        and not (
-            explanatory_checked.get("xreg_model", False)
-            and explanatory_checked.get("regressors") == "adapt"
-        )
-        and error_type == "M"
-        and trend_type != "A"
-        and season_type != "A"
-    ):
+    elif gap_drifting:
         # Imported here: var_covar imports this module
         from smooth.adam_general.core.utils.var_covar import gap_drift
 
         def drift_at(scale):
-            return gap_drift(
-                lags_dict["lags_model_all"],
-                mat_wt,
-                mat_f,
+            nonlocal adam_fitted
+            moments = gap_drift(
                 vec_g,
                 ot_logical,
                 distribution,
                 adam_ets,
                 scale,
+                adam_fitted if adam_ets else None,
+            )
+            if adam_ets or np.all(ot_logical):
+                return moments[:2]
+            adam_fitted = adam_fit_or_gradient(**fit_arguments, filter_noise=moments[2])
+            moments = gap_drift(
+                vec_g, ot_logical, distribution, False, scale, adam_fitted, moments[2]
+            )
+            return moments[0], moments[1], np.ravel(adam_fitted.errors)[ot_logical]
+
+        # The fitted values of the conventional ETS at its scale
+        if return_fitted and not adam_ets and not np.all(ot_logical):
+            scaler(
+                distribution,
+                error_type,
+                np.ravel(adam_fitted.errors)[ot_logical],
+                np.ravel(adam_fitted.fitted)[ot_logical],
+                int(np.sum(ot_logical)),
+                other,
+                1.0,
+                1.0,
+                drift_at,
             )
 
     # The in-sample fitted values, errors and gap variance at this B, returned
@@ -696,11 +718,12 @@ def CF(  # noqa: N802
                 drift_at,
             )
             if drift_at is not None:
-                drift_mean, drift_variance = drift_at(scale)
+                drift_mean, drift_variance = drift_at(scale)[:2]
                 # The log-normal drift of the log-normal: log(1+e) + log(D) is
                 # N(-s/2 + m, s + v)
-                gap_mean[ot_logical] = 1 - 2 * drift_mean / scale
-                gap[ot_logical] = 1 + drift_variance / scale
+                if general["distribution_new"] == "dlnorm":
+                    gap_mean[ot_logical] = 1 - 2 * drift_mean / scale
+                    gap[ot_logical] = 1 + drift_variance / scale
             # Aggregate through _sum_r: R accumulates sum() in a long double
             # register, and NumPy's default pairwise sum drifts by 1 ULP per
             # call against it, which through NLopt's deterministic simplex

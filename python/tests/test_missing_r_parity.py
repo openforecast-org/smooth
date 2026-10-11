@@ -357,6 +357,26 @@ GAP_VARIANCE_CASES = {
             model="MMdN", occurrence="fixed", distribution="dinvgauss", ets="adam"
         ),
     ),
+    "adam ANN dlaplace occurrence": (
+        GAP_VARIANCE_DATA,
+        "adam(y, 'ANN', occurrence='fixed', distribution='dlaplace')",
+        lambda: ADAM(model="ANN", occurrence="fixed", distribution="dlaplace"),
+    ),
+    "adam ANN ds occurrence": (
+        GAP_VARIANCE_DATA,
+        "adam(y, 'ANN', occurrence='fixed', distribution='ds')",
+        lambda: ADAM(model="ANN", occurrence="fixed", distribution="ds"),
+    ),
+    "adam AAN dgnorm missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'AAN', distribution='dgnorm')",
+        lambda: ADAM(model="AAN", lags=[12], distribution="dgnorm"),
+    ),
+    "adam MNN dgamma ADAM ETS occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dgamma', ets='adam')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dgamma", ets="adam"),
+    ),
     "adam MNM dgamma missing": (
         AIRPASSENGERS_GAPS,
         "adam(ts(y, frequency=12), 'MNM', distribution='dgamma')",

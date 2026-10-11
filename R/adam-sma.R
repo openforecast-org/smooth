@@ -194,7 +194,7 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
                                      matF, vecG,
                                      indexLookupTable, profilesRecentTable,
                                      yInSample, ot,
-                                     TRUE, 2, FALSE, 0);
+                                     TRUE, 2, FALSE, 0, numeric(0), matrix(0, 0, 0));
 
         # Get scale, cf, logLik and IC over the observed values
         observed <- !yNAValues;

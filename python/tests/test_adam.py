@@ -1454,6 +1454,28 @@ def test_cumulative_and_scale_forecasts_after_the_last_observed_value():
             )
 
 
+def test_cumulative_intervals_of_multiplicative_models_are_simulated():
+    """The variance of a sum of the multiplicative errors needs the covariances of
+    the horizons, so their cumulative intervals are simulated, as R, with the mean
+    of the simulated sums as the forecast."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) * (1 + np.arange(72) * 0.02)
+    model = ADAM(model="MNM", lags=[12]).fit(y)
+    arguments = {"h": 4, "cumulative": True, "nsim": 20000, "seed": 41}
+    approximate = model.predict(interval="approximate", **arguments)
+    simulated = model.predict(interval="simulated", **arguments)
+    assert approximate.interval == "simulated"
+    np.testing.assert_allclose(np.ravel(approximate.lower), np.ravel(simulated.lower))
+    np.testing.assert_allclose(
+        np.ravel(approximate.mean), np.sum(model.predict(h=4).mean), rtol=1e-3
+    )
+    additive = ADAM(model="ANN").fit(y)
+    assert additive.predict(h=4, interval="approximate", cumulative=True).interval == (
+        "approximate"
+    )
+
+
 def test_simulated_skeleton_after_missing_values_inside_and_at_the_end():
     """The profile at the last observed value, with the corrections of the filter
     after the missing values inside the sample, gives the forecasts from the end."""

@@ -6518,8 +6518,13 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         # hFinal is the number of elements we will have in the final forecast
         hFinal <- 1;
         # In case of occurrence model use simulations - the cumulative probability is a bitch
-        # (not for the one of the missing values only, whose probability is one)
-        if(occurrenceModel && any(pForecast<1)){
+        # (not for the one of the missing values only, whose probability is one). So do the
+        # multiplicative models: the variance of the sum of their errors needs the covariances
+        # of the horizons, which their analytical variances do not have
+        if((occurrenceModel && any(pForecast<1)) ||
+           (interval=="approximate" &&
+            (any(c(Etype,Ttype,Stype)=="M") ||
+             any(object$distribution==c("dlnorm","dinvgauss","dgamma","dls","dllaplace","dlgnorm"))))){
             interval[] <- "simulated";
         }
     }

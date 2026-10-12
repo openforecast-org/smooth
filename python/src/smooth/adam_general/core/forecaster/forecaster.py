@@ -886,9 +886,25 @@ def forecaster(
         )
         y_sizes = y_forecast_values
     # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated
-    # (not for the occurrence of the missing values only, whose probability is one)
+    # (not for the occurrence of the missing values only, whose probability is one).
+    # So do the multiplicative models: the variance of the sum of their errors needs
+    # the covariances of the horizons, which their analytical variances do not have
     occurrence_model = occurrence_model and np.any(np.asarray(p_forecast) < 1)
-    if occurrence_model and general_dict.get("cumulative", False):
+    multiplicative = "M" in (
+        model_type_dict["error_type"],
+        model_type_dict["trend_type"],
+        model_type_dict["season_type"],
+    ) or (general_dict.get("distribution_new") or general_dict["distribution"]) in (
+        "dlnorm",
+        "dinvgauss",
+        "dgamma",
+        "dls",
+        "dllaplace",
+        "dlgnorm",
+    )
+    if general_dict.get("cumulative", False) and (
+        occurrence_model or (multiplicative and resolved_interval == "approximate")
+    ):
         general_dict["interval"] = "simulated"
         resolved_interval = "simulated"
 
@@ -921,7 +937,7 @@ def forecaster(
                 y_lower, y_upper, y_simulated = _cached_sim
             else:
                 nsim = general_dict.get("nsim", 10000)
-                y_lower, y_upper, y_simulated, _ = generate_simulation_interval(
+                y_lower, y_upper, y_simulated, y_mean = generate_simulation_interval(
                     y_forecast_values,
                     model_prepared,
                     general_dict,
@@ -938,6 +954,9 @@ def forecaster(
                     nsim=nsim,
                     p_forecast=p_forecast if occurrence_model else None,
                 )
+                # The cumulative forecast is the mean of the simulated sums, as in R
+                if general_dict.get("cumulative", False):
+                    y_forecast_values = y_mean
             if general_dict.get("scenarios", False):
                 general_dict["_scenarios_matrix"] = y_simulated
         elif resolved_interval == "approximate":

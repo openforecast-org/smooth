@@ -1340,3 +1340,18 @@ test_that("the mean of ADAM ETS with a multiplicative error", {
     expect_equal(forecast(testModel, h=6, interval="prediction", nsim=10)$interval, "simulated");
 })
 
+
+# The variance of a sum of the multiplicative errors needs the covariances of the horizons
+test_that("the cumulative intervals of the multiplicative models are simulated", {
+    testModel <- adam(AirPassengers, "MNM", lags=12, h=4, holdout=FALSE);
+    set.seed(41);
+    testForecast <- forecast(testModel, h=4, interval="approximate", cumulative=TRUE, nsim=20000);
+    expect_equal(testForecast$interval, "simulated");
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=4, interval="simulated", cumulative=TRUE, nsim=20000);
+    expect_equal(testForecast$lower, testSimulated$lower);
+    expect_equal(as.vector(testForecast$mean), sum(forecast(testModel, h=4)$mean), tolerance=1e-3);
+    testModel <- adam(AirPassengers, "ANN", h=4, holdout=FALSE);
+    expect_equal(forecast(testModel, h=4, interval="approximate", cumulative=TRUE)$interval,
+                 "approximate");
+})

@@ -4,7 +4,6 @@
 #include "olsCore.h"
 #include "adamGradient.h"
 #include "arimaBounds.h"
-#include <algorithm>
 
 // ============================================================================
 // STRUCTURE DEFINITIONS
@@ -55,7 +54,10 @@ struct FilterState {
     arma::uvec compact;
     arma::vec means;
     arma::vec meansScale;
+    // The covariance, or with lowRank its factor U, P = U U', with a column per innovation since
+    // it appeared: cheaper while those are fewer than the cells
     arma::mat covariance;
+    bool lowRank = false;
     bool linear = false;
     bool covarianceActive = false;
     arma::vec variances;
@@ -64,6 +66,8 @@ struct FilterState {
     // when they do not come from a single source (empty otherwise)
     arma::vec noiseMean;
     arma::mat noiseCovariance;
+    // The root of the covariance of the innovations of the states, for the factor
+    arma::mat noiseRoot;
 };
 
 // Result structure for the general occurrence model fitter (two parallel models)
@@ -850,6 +854,23 @@ public:
         for(arma::uword k=0; k<state.cells.n_elem; k++) {
             state.compact(state.cells(k)) = k;
         }
+        // The factor of the covariance has a column per innovation over the periods without an
+        // observed value (one with a single source of error, one per component otherwise), and
+        // costs about four times their number per cell in each period, the whole covariance the
+        // number of cells
+        arma::uword gaps = 0;
+        for(arma::uword j=0; j<vectorOt.n_elem; j++) {
+            gaps += (vectorOt(j) == 0 || std::isnan(vectorOt(j)));
+        }
+        state.lowRank = 4 * gaps * (noiseMean.n_elem == 0 ? 1 : nComponents) <= state.cells.n_elem;
+        if(state.lowRank && noiseMean.n_elem > 0) {
+            arma::vec values;
+            arma::mat vectors;
+            arma::eig_sym(values, vectors, noiseCovariance.submat(1, 1, nComponents, nComponents));
+            // The rounding below zero of the eigenvalues of a covariance
+            values.elem(arma::find(values < 0)).zeros();
+            state.noiseRoot = vectors * arma::diagmat(arma::sqrt(values));
+        }
         FitResult fitted = fitImpl(matrixVt, matrixWt, matrixF, vectorG, indexLookupTable,
                                    profilesRecent, vectorYt, vectorOt, backcast, nIterations,
                                    'n', &state);
@@ -935,7 +956,8 @@ public:
                     fs.means(k) = cellLinear(fs.cells(k), profilesRecent(fs.cells(k)));
                 }
                 fs.meansScale = arma::vec(fs.cells.n_elem, arma::fill::zeros);
-                fs.covariance = arma::mat(fs.cells.n_elem, fs.cells.n_elem, arma::fill::zeros);
+                fs.covariance = arma::mat(fs.cells.n_elem, fs.lowRank ? 0 : fs.cells.n_elem,
+                                          arma::fill::zeros);
                 fs.linear = true;
             }
             arma::vec xc = fs.means(c);
@@ -945,12 +967,37 @@ public:
             bool single = fs.noiseMean.n_elem == 0;
             double mu = single ? (fs.logs ? -fs.scale/2 : 0) : fs.noiseMean(0);
             // The variance of the one-step error and the derivative of the innovation in the scale
-            arma::vec covarW;
+            arma::vec covarW, a;
             double f = single ? 1 : fs.noiseCovariance(0, 0);
             if(fs.covarianceActive) {
-                covarW = fs.covariance.cols(c) * w.t();
+                if(fs.lowRank) {
+                    a = fs.covariance.rows(c).t() * w.t();
+                    covarW = fs.covariance * a;
+                }
+                else {
+                    covarW = fs.covariance.cols(c) * w.t();
+                }
                 f += arma::as_scalar(w * covarW(c));
             }
+            // The covariance moved over the cells used in the period by a transition
+            auto propagate = [&](arma::mat const &transition) {
+                fs.covariance.rows(c) = transition * fs.covariance.rows(c);
+                if(!fs.lowRank) {
+                    fs.covariance.cols(c) = fs.covariance.cols(c) * transition.t();
+                }
+            };
+            // The innovations of the period on its cells, of the root (for the factor) or the
+            // covariance (for the whole covariance) provided
+            auto innovate = [&](arma::mat const &root, arma::mat const &covariance) {
+                if(fs.lowRank) {
+                    arma::mat columns(fs.cells.n_elem, root.n_cols, arma::fill::zeros);
+                    columns.rows(c) = root;
+                    fs.covariance = arma::join_rows(fs.covariance, columns);
+                }
+                else {
+                    fs.covariance(c, c) += covariance;
+                }
+            };
             double bScale = fs.logs && single ? 0.5 - arma::as_scalar(w * xsc) : 0;
             fs.variances(idx) = f;
             fs.innovationsScale(idx) = bScale;
@@ -980,11 +1027,24 @@ public:
                 // Otherwise it is propagated over the cells used in the period and updated in place
                 if(fs.covarianceActive || !observed) {
                     if(fs.covarianceActive) {
-                        fs.covariance.rows(c) = matrixF * fs.covariance.rows(c);
-                        fs.covariance.cols(c) = fs.covariance.cols(c) * matrixF.t();
+                        propagate(matrixF);
                     }
-                    fs.covariance(c, c) += gEff * gEff.t();
-                    if(observed) {
+                    if(!observed || !fs.lowRank) {
+                        innovate(gEff, gEff * gEff.t());
+                    }
+                    if(observed && fs.lowRank) {
+                        // The factor M = [U, g] of the covariance without the direction b = (a, 1)
+                        // the value reveals, f = b'b: the columns but the last of M H, with H the
+                        // Householder reflection of b to the last axis, v = b + sqrt(f) e, so
+                        // M H = M - M v v' / (f + sqrt(f)), with M v = f gain + sqrt(f) g
+                        double root = std::sqrt(f);
+                        arma::vec direction = f * gain;
+                        direction(c) += root * gEff;
+                        for(arma::uword j=0; j<a.n_elem; j++) {
+                            fs.covariance.col(j) -= (a(j) / (f + root)) * direction;
+                        }
+                    }
+                    else if(observed) {
                         // The rank-one downdate, column by column
                         for(arma::uword j=0; j<gain.n_elem; j++) {
                             if(gain(j) != 0) {
@@ -1009,9 +1069,19 @@ public:
                 if(observed) {
                     if(fs.covarianceActive) {
                         fs.means += covarW * (v / f);
-                        for(arma::uword j=0; j<covarW.n_elem; j++) {
-                            if(covarW(j) != 0) {
-                                fs.covariance.col(j) -= (covarW(j) / f) * covarW;
+                        double s = arma::dot(a, a);
+                        if(fs.lowRank && s > 0) {
+                            // U (I - beta a a') is the factor of U (I - a a'/f) U'
+                            double beta = (1 - std::sqrt((f - s) / f)) / s;
+                            for(arma::uword j=0; j<a.n_elem; j++) {
+                                fs.covariance.col(j) -= (beta * a(j)) * covarW;
+                            }
+                        }
+                        else if(!fs.lowRank) {
+                            for(arma::uword j=0; j<covarW.n_elem; j++) {
+                                if(covarW(j) != 0) {
+                                    fs.covariance.col(j) -= (covarW(j) / f) * covarW;
+                                }
                             }
                         }
                     }
@@ -1023,28 +1093,26 @@ public:
                     }
                     fs.means(c) = matrixF * xPost + innovation;
                     if(fs.covarianceActive) {
-                        arma::mat transition = matrixF - gEff * w;
-                        fs.covariance.rows(c) = transition * fs.covariance.rows(c);
-                        fs.covariance.cols(c) = fs.covariance.cols(c) * transition.t();
+                        propagate(matrixF - gEff * w);
                     }
                 }
                 else {
                     unsigned int n = gEff.n_elem;
                     fs.means(c) = matrixF * xc + fs.noiseMean.subvec(1, n);
                     if(fs.covarianceActive) {
-                        fs.covariance.rows(c) = matrixF * fs.covariance.rows(c);
-                        fs.covariance.cols(c) = fs.covariance.cols(c) * matrixF.t();
+                        propagate(matrixF);
                     }
-                    fs.covariance(c, c) += fs.noiseCovariance.submat(1, 1, n, n);
+                    innovate(fs.noiseRoot, fs.noiseCovariance.submat(1, 1, n, n));
                 }
             }
-            // The covariance that has vanished leaves the means to the innovations of the model
+            // The covariance that has vanished leaves the means to the innovations of the model.
+            // It is positive semi-definite, so it has vanished with its diagonal (with its trace,
+            // the sum of the squares of the factor)
             if(fs.covarianceActive || !observed) {
-                const double *values = fs.covariance.memptr();
-                fs.covarianceActive = std::any_of(values, values + fs.covariance.n_elem,
-                                                  [](double value) { return std::abs(value) > 1e-15; });
+                fs.covarianceActive = fs.lowRank ? arma::accu(arma::square(fs.covariance)) > 1e-15 :
+                    arma::any(arma::abs(fs.covariance.diag()) > 1e-15);
                 if(!fs.covarianceActive) {
-                    fs.covariance.zeros();
+                    fs.covariance.zeros(fs.cells.n_elem, fs.lowRank ? 0 : fs.cells.n_elem);
                 }
             }
             for(arma::uword k=0; k<fs.cells.n_elem; k++) {

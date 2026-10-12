@@ -22,7 +22,7 @@ from smooth.adam_general.core.forecaster import forecaster, preparator
 from smooth.adam_general.core.forecaster.intervals import ensure_level_format
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
-from smooth.adam_general.core.utils.n_param import NParam
+from smooth.adam_general.core.utils.n_param import NParam, count_xreg_params
 from smooth.adam_general.core.utils.printing import decorate_occurrence_name
 from smooth.adam_general.core.utils.utils import (
     OUTLIER_NAMES,
@@ -4294,14 +4294,13 @@ class ADAM:
     def _apply_selected_regressors(self, estimated):
         """Make the regressors selected by the estimator those of the model, and
         count them in the parameters."""
-        from smooth.adam_general.core.utils.n_param import count_xreg_params
-
         self._explanatory, self._persistence, self._initials = self._xreg_dicts(
             estimated
         )
         self._model_type["xreg_model"] = bool(self._explanatory["xreg_model"])
+        # A combination keeps the weighted count of its models
         n_param = self._general.get("n_param")
-        if n_param is not None:
+        if n_param is not None and not getattr(self, "_is_combined", False):
             n_estimated, n_provided = count_xreg_params(self._explanatory)
             if self._initials.get("initial_type") == "complete":
                 n_estimated, n_provided = 0, n_provided + n_estimated
@@ -4477,6 +4476,7 @@ class ADAM:
         obs_in_sample = self._observations["obs_in_sample"]
         y_fitted_combined = np.zeros(obs_in_sample)
         n_param_weighted = 0.0
+        xreg_weighted = 0.0
 
         # Store ALL models for later forecasting (filtering happens at predict-time)
         self._prepared_models = []
@@ -4583,6 +4583,8 @@ class ADAM:
             n_param_weighted += (
                 result["adam_estimated"]["n_param_estimated"] * original_weight
             )
+            if initials.get("initial_type") != "complete":
+                xreg_weighted += count_xreg_params(explanatory)[0] * original_weight
 
             # Store for later forecasting
             # (using ORIGINAL weight - filtering at predict-time)
@@ -4611,9 +4613,10 @@ class ADAM:
             np.array(self._observations["y_in_sample"]) - y_fitted_combined
         )
 
-        # Create NParam with weighted average internal params + scale
+        # Create NParam with weighted average internal and xreg params + scale
         n_param = NParam()
-        n_param.estimated["internal"] = n_param_weighted
+        n_param.estimated["internal"] = n_param_weighted - xreg_weighted
+        n_param.estimated["xreg"] = xreg_weighted
         # The distribution scale is always estimated (concentrated likelihood).
         n_param.estimated["scale"] = 1
         n_param.update_totals()
@@ -5151,6 +5154,11 @@ class ADAM:
             # The table of the model as fitted alone: its parameters, with the
             # regressors, the occurrence and the scale of the combination
             n_param = copy.deepcopy(self._n_param)
+            n_param.estimated["xreg"] = (
+                count_xreg_params(model_info["explanatory_dict"])[0]
+                if self._initials.get("initial_type") != "complete"
+                else 0
+            )
             n_param.estimated["internal"] = n_est - n_param.estimated["xreg"]
             n_param.update_totals()
             general["n_param"] = n_param

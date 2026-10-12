@@ -41,6 +41,20 @@ test_that("ADAM ETS(CCC) on BJsales", {
     expect_match(modelType(testModel), "CCN")
 })
 
+# The occurrence and the regressors are counted once in a combination
+test_that("ADAM combination counts the occurrence and the regressors once", {
+    skip_on_cran()
+    set.seed(41);
+    y <- rgamma(120, shape=5, scale=2) * rbinom(120, 1, 0.6);
+    testCombined <- adam(y, "CNN", occurrence="fixed");
+    expect_equal(nparam(testCombined), sum(sapply(testCombined$models, nparam) * testCombined$ICw));
+    xregData <- data.frame(y=as.numeric(BJsales), x=rnorm(150), z=rnorm(150));
+    testCombined <- adam(xregData, "CNN", regressors="select");
+    expect_equal(nparam(testCombined), sum(sapply(testCombined$models, nparam) * testCombined$ICw));
+    expect_equal(testCombined$nParam[1,2],
+                 sum(sapply(testCombined$models, function(x){x$nParam[1,2]}) * testCombined$ICw));
+})
+
 # ADAM forecasts with approximated interval
 test_that("ADAM forecast with simulated interval", {
     skip_on_cran()

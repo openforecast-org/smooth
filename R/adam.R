@@ -3129,8 +3129,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             modelReturned$residuals[yNAValues[1:obsInSample]] <- NA;
         }
         modelReturned$forecast <- ts(yForecastCombined,start=yForecastStart, frequency=yFrequency);
-        # Weighted estimated parameters minus scale
-        parametersNumberOverall[1,1] <- (sapply(modelReturned$models, nparam)-(loss=="likelihood")*1) %*% adamSelected$icWeights;
+        # Weighted estimated internal and xreg parameters. The occurrence and the scale are
+        # common to the models and stay in their columns
+        parametersNumberOverall[1,1:2] <- sapply(modelReturned$models,
+                                                 function(x){x$nParam[1,1:2]}) %*% adamSelected$icWeights;
         parametersNumberOverall[1,5] <- sum(parametersNumberOverall[1,1:4]);
         parametersNumberOverall[2,5] <- sum(parametersNumberOverall[2,1:4]);
         modelReturned$nParam <- parametersNumberOverall;

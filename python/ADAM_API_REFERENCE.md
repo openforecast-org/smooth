@@ -272,7 +272,7 @@ Attaching a scale model is an assignment, not a method: `model.scale_model = mod
 | `_validate_prediction_inputs()` | Verify model is fitted and has required components |
 | `_prepare_prediction_data()` | Call `preparator()` to set up matrices for forecasting |
 | `_execute_prediction(interval, level, side)` | Run `forecaster()` or delegate to `_execute_prediction_combined()` |
-| `_execute_prediction_combined(interval, level, side)` | Run `forecaster_combined()` for IC-weighted combined forecasts |
+| `_execute_prediction_combined(interval, level, side)` | Forecast each model of the combination with `_execute_prediction()` and average with the IC weights |
 | `_format_prediction_results()` | Return stored `_forecast_results` (not called by current public API) |
 
 ### Selection Helpers (legacy/placeholder)

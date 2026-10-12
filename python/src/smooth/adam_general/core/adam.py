@@ -5126,26 +5126,64 @@ class ADAM:
         """
         Execute combined forecasting using IC-weighted model averaging.
 
-        Generates forecasts from all models with non-zero IC weights and
-        combines them using Akaike weights.
+        As R's ``forecast.adamCombined``: each model with an IC weight of at least
+        0.01 (the weights renormalised) is forecast as a single model, and the
+        means and the bounds are averaged with the weights.
 
         Returns
         -------
         ForecastResult
             IC-weighted combined forecast results.
         """
-        from smooth.adam_general.core.forecaster import forecaster_combined
+        import copy
 
-        self._forecast_results = forecaster_combined(
-            prepared_models=self._prepared_models,
-            ic_weights=self._ic_weights,
-            observations_dict=self._observations,
-            general_dict=self._general,
-            occurrence_dict=self._occurrence,
-            params_info=self._params_info,
-            interval=interval,
+        models = [m for m in self._prepared_models if m["weight"] >= 0.01]
+        total = sum(m["weight"] for m in models)
+        mean, lower, upper = 0.0, 0.0, 0.0
+        for model_info in models:
+            weight = model_info["weight"] / total
+            prepared = model_info["prepared"]
+            n_est = model_info["n_param_estimated"]
+
+            general = copy.deepcopy(self._general)
+            general["distribution"] = prepared["distribution"]
+            general["distribution_new"] = prepared["distribution"]
+            # The table of the model as fitted alone: its parameters, with the
+            # regressors, the occurrence and the scale of the combination
+            n_param = copy.deepcopy(self._n_param)
+            n_param.estimated["internal"] = n_est - n_param.estimated["xreg"]
+            n_param.update_totals()
+            general["n_param"] = n_param
+
+            member = copy.copy(self)
+            member.__dict__.update(
+                _is_combined=False,
+                _general=general,
+                _n_param=n_param,
+                _params_info=[[n_est, 1, n_est + 1], [0]],
+                _prepared=prepared,
+                _model_type=model_info["model_type_dict"],
+                _components=model_info["components_dict"],
+                _lags_model=model_info["lags_dict"],
+                _observations=model_info["observations_dict"],
+                _adam_created=model_info["adam_created"],
+                _explanatory=model_info["explanatory_dict"],
+                _adam_cpp=model_info["result"]["adam_estimated"]["adam_cpp"],
+            )
+            forecast = member._execute_prediction(interval, level, side)
+            mean = mean + forecast.mean.fillna(0) * weight
+            if forecast.lower is not None:
+                lower = lower + forecast.lower.fillna(0) * weight
+            if forecast.upper is not None:
+                upper = upper + forecast.upper.fillna(0) * weight
+
+        self._forecast_results = ForecastResult(
+            mean=mean.rename("mean"),
+            lower=lower if isinstance(lower, pd.DataFrame) else None,
+            upper=upper if isinstance(upper, pd.DataFrame) else None,
             level=level,
             side=side,
+            interval=interval,
         )
         return self._forecast_results
 

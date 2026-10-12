@@ -495,3 +495,36 @@ def test_the_intervals_after_gaps_agree(case):
     forecast = fit.predict(h=6, interval="approximate", level=0.9)
     np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
     np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The combinations after the periods without an observed value: each model forecast
+# as a single one (with the filter and from the last observed size), as R's
+# forecast.adamCombined
+COMBINATION_CASES = {
+    "adam ACN": (
+        AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
+        "adam(ts(y, frequency=12), 'ACN', distribution='dnorm')",
+        lambda: ADAM(model="ACN", lags=[12], distribution="dnorm"),
+    ),
+    "adam CNN trailing zeros": (
+        GAP_DRIFT_DATA + " y[295:300] <- 0;",
+        "adam(y, 'CNN', occurrence='fixed')",
+        lambda: ADAM(model="CNN", occurrence="fixed"),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(COMBINATION_CASES))
+def test_the_combination_after_gaps_agrees(case):
+    data, r_call, make = COMBINATION_CASES[case]
+    r = r_dict(
+        f"{{ {data} m <- suppressWarnings({r_call});"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9);"
+        " list(y=as.numeric(y), mean=as.numeric(f$mean),"
+        " lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    forecast = make().fit(y).predict(h=6, interval="approximate", level=0.9)
+    np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)

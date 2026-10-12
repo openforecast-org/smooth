@@ -6381,9 +6381,13 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     # If this is "prediction", do simulations for multiplicative components
     if(interval=="prediction"){
-        # Simulate stuff for the ETS only
+        # Simulate stuff for the ETS only, and for ADAM ETS with a multiplicative error, whose states
+        # move by (1+e)^g and drift below the skeleton (but the pure multiplicative one with the
+        # log-normal distribution, exact in logs)
         if((etsModel || xregNumber>0) &&
-           (Ttype=="M" || (Stype=="M" & h>lagsModelMin))){
+           (Ttype=="M" || (Stype=="M" & h>lagsModelMin) ||
+            (etsModel && adamETSChecker(object) && Etype=="M" &&
+             !(object$distribution=="dlnorm" && !arimaChecker(object) && Ttype!="A" && Stype!="A")))){
             interval <- "simulated";
         }
         else{
@@ -7123,7 +7127,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     # The mean or the median beyond the steps where the skeleton is it
     if(point!="skeleton"){
         stepsExact <- adam_skeletonSteps(object, point, Etype, Ttype, Stype, componentsNumberARIMA>0,
-                                         lagsModelMin, any(pForecast<1));
+                                         lagsModelMin, any(pForecast<1), !tail(otLogical, 1));
         if(stepsExact<hFinal || (cumulative && stepsExact<h)){
             yForecastSkeleton <- as.vector(yForecast);
             yForecast[] <- adam_pointForecast(object, point, h, newdata, occurrence, interval, cumulative,
@@ -7153,7 +7157,7 @@ adam_logModel <- function(object){
 # until its first lag, as for the choice of the simulated interval. The median: an
 # additive model with a symmetric distribution. Neither with an intermittent median.
 adam_skeletonSteps <- function(object, point, Etype, Ttype, Stype, arimaModel, lagsModelMin,
-                               intermittent){
+                               intermittent, gapped=FALSE){
     if(adam_logModel(object) || object$distribution=="dalaplace"){
         return(0);
     }
@@ -7163,6 +7167,17 @@ adam_skeletonSteps <- function(object, point, Etype, Ttype, Stype, arimaModel, l
     }
     if(Etype=="M" && arimaModel){
         return(0);
+    }
+    # ADAM ETS moves its multiplicative components by (1+e)^g, whose mean is below one: with a
+    # multiplicative error the skeleton is the mean at the first step only, and with any
+    # multiplicative component not after the periods without an observed size at the end
+    if(adamETSChecker(object) && any(c(Etype,Ttype,Stype)=="M")){
+        if(gapped){
+            return(0);
+        }
+        if(Etype=="M"){
+            return(1);
+        }
     }
     if(Ttype=="M"){
         return(1);

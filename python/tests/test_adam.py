@@ -1468,3 +1468,26 @@ def test_simulated_skeleton_after_missing_values_inside_and_at_the_end():
         np.ravel(model.predict(h=4).mean),
         rtol=1e-12,
     )
+
+
+def test_mean_of_adam_ets_with_a_multiplicative_error():
+    """ADAM ETS moves the level by (1+e)^alpha, whose mean is below one: the mean
+    drifts below the skeleton after the first step, and the prediction interval is
+    simulated, as R."""
+    from scipy.special import gammaln
+
+    rng = np.random.default_rng(41)
+    e = rng.gamma(5, 0.2, 300)
+    y = 10 * np.cumprod(np.concatenate([[1], 1 + 0.3 * (e[:-1] - 1)])) * e
+    model = ADAM(model="MNN", distribution="dgamma", ets="adam").fit(y)
+    scale = model.scale
+    alpha = model.persistence_level_
+    drift = np.exp(
+        gammaln(1 / scale + alpha) + alpha * np.log(scale) - gammaln(1 / scale)
+    )
+    skeleton = np.ravel(model.predict(h=6).mean)
+    mean = np.ravel(model.predict(h=6, point="mean", nsim=100000, seed=41).mean)
+    assert mean[0] == pytest.approx(skeleton[0], rel=1e-12)
+    np.testing.assert_allclose(mean, skeleton * drift ** np.arange(6), rtol=1e-2)
+    assert model.predict(h=6, interval="prediction", nsim=10).interval == "simulated"
+

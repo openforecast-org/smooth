@@ -1316,3 +1316,21 @@ test_that("the cumulative forecasts and the scale models after the last observed
                  as.vector(forecast(testModel, h=4)$mean));
 })
 
+# ADAM ETS moves the level by (1+e)^alpha, whose mean is below one: the mean drifts below the
+# skeleton after the first step, and the prediction interval is simulated
+test_that("the mean of ADAM ETS with a multiplicative error", {
+    set.seed(41);
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e;
+    testModel <- adam(y, "MNN", distribution="dgamma", ets="adam");
+    scaleValue <- adam_scaleSimulation(testModel, testModel$scale);
+    alpha <- testModel$persistence[1];
+    drift <- exp(lgamma(1/scaleValue+alpha) + alpha*log(scaleValue) - lgamma(1/scaleValue));
+    skeleton <- as.vector(forecast(testModel, h=6)$mean);
+    set.seed(41);
+    testForecast <- forecast(testModel, h=6, point="mean", nsim=100000);
+    expect_equal(as.vector(testForecast$mean)[1], skeleton[1]);
+    expect_equal(as.vector(testForecast$mean), skeleton*drift^(0:5), tolerance=3e-3);
+    expect_equal(forecast(testModel, h=6, interval="prediction", nsim=10)$interval, "simulated");
+})
+

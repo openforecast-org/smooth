@@ -171,14 +171,30 @@ def _determine_forecast_interval(
     """
     # If this is "prediction", do simulations for multiplicative components
     if general_dict["interval"] == "prediction":
-        # Simulate stuff for the ETS only
+        # Simulate stuff for the ETS only, and for ADAM ETS with a multiplicative error,
+        # whose states move by (1+e)^g and drift below the skeleton (but the pure
+        # multiplicative one with the log-normal distribution, exact in logs)
+        trend_type = model_type_dict["trend_type"]
+        season_type = model_type_dict["season_type"]
+        distribution = (
+            general_dict.get("distribution_new") or general_dict["distribution"]
+        )
+        log_normal_exact = (
+            distribution == "dlnorm"
+            and not model_type_dict.get("arima_model", False)
+            and trend_type != "A"
+            and season_type != "A"
+        )
         if (
             model_type_dict["ets_model"] or explanatory_checked["xreg_number"] > 0
         ) and (
-            model_type_dict["trend_type"] == "M"
+            trend_type == "M"
+            or (season_type == "M" and general_dict["h"] > lags_dict["lags_model_min"])
             or (
-                model_type_dict["season_type"] == "M"
-                and general_dict["h"] > lags_dict["lags_model_min"]
+                model_type_dict["ets_model"]
+                and general_dict.get("ets") == "adam"
+                and model_type_dict["error_type"] == "M"
+                and not log_normal_exact
             )
         ):
             general_dict["interval"] = "simulated"
@@ -995,13 +1011,25 @@ def forecaster(
 SYMMETRIC_DISTRIBUTIONS = ("dnorm", "dlaplace", "ds", "dgnorm", "dlogis", "dt")
 
 
-def _skeleton_steps(point, model_type_dict, components_dict, lags_dict, distribution):
+def _skeleton_steps(
+    point,
+    model_type_dict,
+    components_dict,
+    lags_dict,
+    distribution,
+    adam_ets=False,
+    gapped=False,
+):
     """The number of the first steps where the skeleton is the mean (median) of the
     forecast distribution (R's ``adam_skeletonSteps``). The mean: wherever the model
     is linear in the errors or they multiply additive components and the mean of the
     error is its neutral value; with a multiplicative trend only at the first step,
-    and with a multiplicative seasonality until its first lag. The median: an
-    additive model with a symmetric distribution."""
+    and with a multiplicative seasonality until its first lag. ADAM ETS moves its
+    multiplicative components by (1+e)^g, whose mean is below one: with a
+    multiplicative error the skeleton is the mean at the first step only, and with
+    any multiplicative component not after the periods without an observed size at
+    the end of the sample (``gapped``). The median: an additive model with a
+    symmetric distribution."""
     if distribution == "dalaplace":
         return 0
     e_type = model_type_dict["error_type"]
@@ -1012,6 +1040,11 @@ def _skeleton_steps(point, model_type_dict, components_dict, lags_dict, distribu
         return np.inf if additive and distribution in SYMMETRIC_DISTRIBUTIONS else 0
     if e_type == "M" and components_dict.get("components_number_arima", 0) > 0:
         return 0
+    if adam_ets and "M" in (e_type, t_type, s_type):
+        if gapped:
+            return 0
+        if e_type == "M":
+            return 1
     if t_type == "M":
         return 1
     if s_type == "M":
@@ -1047,6 +1080,8 @@ def _forecast_point(arguments):
         arguments["components_dict"],
         arguments["lags_dict"],
         distribution,
+        general_dict.get("ets") == "adam",
+        not np.ravel(arguments["observations_dict"]["ot_logical"])[-1],
     )
     if point == "median" and intermittent:
         steps = 0

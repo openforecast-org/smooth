@@ -590,3 +590,26 @@ def test_the_shifted_forecasts_agree(case):
     np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
     np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
     np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The probabilities of occurrence provided for the horizon, in place of those of the
+# occurrence model in this forecast only, as R's forecast(occurrence=)
+@pytest.mark.parametrize("probabilities", ["rep(0.5, 6)", "c(1, 0, 1, 0.3, 1, 1)"])
+def test_the_provided_occurrence_agrees(probabilities):
+    r = r_dict(
+        f"{{ {GAP_DRIFT_DATA} p <- {probabilities};"
+        " m <- suppressWarnings(adam(y, 'MNN', occurrence='fixed', distribution='dgamma'));"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9, occurrence=p);"
+        " list(y=y, p=p, mean=as.numeric(f$mean), lower=as.numeric(f$lower),"
+        " upper=as.numeric(f$upper)) }"
+    )
+    fit = ADAM(model="MNN", occurrence="fixed", distribution="dgamma").fit(
+        np.array(r["y"], float)
+    )
+    forecast = fit.predict(
+        h=6, interval="approximate", level=0.9, occurrence=np.array(r["p"], float)
+    )
+    assert fit._occurrence["occurrence"] == "fixed"
+    np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)

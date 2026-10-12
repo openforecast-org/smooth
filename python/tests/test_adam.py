@@ -1491,3 +1491,20 @@ def test_mean_of_adam_ets_with_a_multiplicative_error():
     np.testing.assert_allclose(mean, skeleton * drift ** np.arange(6), rtol=1e-2)
     assert model.predict(h=6, interval="prediction", nsim=10).interval == "simulated"
 
+
+
+def test_provided_occurrence_of_the_horizon():
+    """The probabilities provided to predict() multiply the forecasts of the sizes
+    in that forecast only: the occurrence of the model is kept."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    )
+    y[::5] = 0
+    model = ADAM(model="MNN", occurrence="fixed").fit(y)
+    before = np.ravel(model.predict(h=4).mean)
+    sizes = np.ravel(model.predict(h=4, occurrence=np.ones(4)).mean)
+    probabilities = np.array([1, 0, 0.5, 1])
+    forecast = model.predict(h=4, occurrence=probabilities)
+    np.testing.assert_allclose(np.ravel(forecast.mean), sizes * probabilities)
+    assert model._occurrence["occurrence"] == "fixed"
+    np.testing.assert_allclose(np.ravel(model.predict(h=4).mean), before)

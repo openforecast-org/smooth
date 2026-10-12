@@ -3735,9 +3735,6 @@ class ADAM:
         self._general["point"] = point
         self._general["seed"] = seed
 
-        if occurrence is not None:
-            self._occurrence["occurrence"] = occurrence
-
         # A pure regression is a greybox ALM, forecasted by ALM.predict()
         # (R: forecast.alm())
         if getattr(self, "_alm_model", None) is not None:
@@ -3797,18 +3794,28 @@ class ADAM:
         # and interval adjustment (R: forecast.adam lines 6134-6172, 6204-6210).
         p_forecast_arr = None
         om_model = getattr(self, "_om_model", None)
-        if om_model is not None:
+        if occurrence is not None:
+            p_forecast_arr = np.ravel(np.asarray(occurrence, dtype=float))
+        elif om_model is not None:
             occ_fc = om_model.predict(h=h)
             p_forecast_arr = np.asarray(occ_fc.mean.values, dtype=float)
             # Store in occurrence_dict so _process_occurrence_forecast can use it
             self._occurrence["p_forecast"] = p_forecast_arr
 
-        # Execute the prediction (forecaster handles p scaling + interval adjustment)
-        predictions = self._execute_prediction(
-            interval=interval,
-            level=level,
-            side=side,
-        )
+        # Execute the prediction (forecaster handles p scaling + interval adjustment).
+        # The probabilities provided for the horizon replace those of the occurrence
+        # model in this forecast only, as R's occurrence
+        occurrence_type = self._occurrence["occurrence"]
+        if occurrence is not None:
+            self._occurrence["occurrence"] = p_forecast_arr
+        try:
+            predictions = self._execute_prediction(
+                interval=interval,
+                level=level,
+                side=side,
+            )
+        finally:
+            self._occurrence["occurrence"] = occurrence_type
 
         # Post-interval NaN patch: when an occurrence forecast is present
         # and the upper bound came back as NaN (sparse occurrence at long

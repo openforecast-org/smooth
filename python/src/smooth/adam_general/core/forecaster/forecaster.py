@@ -102,7 +102,9 @@ def _check_fitted_values(model_prepared, occurrence_dict, observations_dict):
 
     # Fix cases when we have zeroes in the provided occurrence. At the missing
     # values the fitted is the prediction of the model
-    if occurrence_dict["occurrence"] == "provided":
+    if isinstance(occurrence_dict["occurrence"], str) and (
+        occurrence_dict["occurrence"] == "provided"
+    ):
         zero = ~occurrence_dict["ot_logical"] & observed_mask(observations_dict)
         model_prepared["y_fitted"][zero] = (
             model_prepared["y_fitted"][zero] * occurrence_dict["p_fitted"][zero]
@@ -373,15 +375,10 @@ def _process_occurrence_forecast(occurrence_dict, general_dict):
     """
     # Initialize occurrence model flag
     occurrence_model = False
-    # If the occurrence values are provided for the holdout
-    if occurrence_dict.get("occurrence") is not None and isinstance(
-        occurrence_dict["occurrence"], bool
-    ):
-        p_forecast = occurrence_dict["occurrence"] * 1
-    elif occurrence_dict.get("occurrence") is not None and isinstance(
-        occurrence_dict["occurrence"], (int, float)
-    ):
-        p_forecast = occurrence_dict["occurrence"]
+    # If the occurrence values are provided for the holdout (in place of the type)
+    provided = occurrence_dict.get("occurrence")
+    if provided is not None and not isinstance(provided, str):
+        p_forecast = np.ravel(np.asarray(provided, dtype=float))
     else:
         # If this is a mixture model, produce forecasts for the occurrence
         if occurrence_dict.get("occurrence_model"):
@@ -808,9 +805,16 @@ def forecaster(
             },
             observations_dict,
             general_shifted,
+            # The probabilities of the horizon (provided in place of the type, or of
+            # the occurrence model) after ones over those periods
             {
                 **occurrence_dict,
-                "p_forecast": np.concatenate([np.ones(trailing), p_forecast]),
+                **{
+                    key: np.concatenate([np.ones(trailing), p_forecast])
+                    for key in ("p_forecast", "occurrence")
+                    if key == "p_forecast"
+                    or not isinstance(occurrence_dict.get(key), (str, type(None)))
+                },
             },
             lags_dict,
             model_type_dict,

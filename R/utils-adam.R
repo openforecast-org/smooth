@@ -1736,8 +1736,9 @@ adam_gapVarianceModel <- function(object, power=2, h=0){
     additive <- errorType(object)=="A" && !grepl("M", modelType(object)) &&
         any(distribution==c("dnorm","dlaplace","ds","dgnorm"));
     # The drift of the states of the other pure multiplicative ETS, without the adaptive regressors
+    # and without a scale model (implant()), whose likelihood takes the errors without it
     drifting <- multiplicative && (any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
-        !grepl("{D}", object$model, fixed=TRUE);
+        !grepl("{D}", object$model, fixed=TRUE) && !is.scale(object$scale);
     gaussian <- additive || multiplicative && distribution=="dlnorm" && adamETS;
     if(!(gaussian || drifting) || h>0 && !gaussian){
         return(if(h>0){NULL}else{gapVariance});

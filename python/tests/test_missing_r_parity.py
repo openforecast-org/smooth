@@ -375,7 +375,9 @@ GAP_VARIANCE_CASES = {
     "adam MNN dgamma ADAM ETS occurrence": (
         GAP_DRIFT_DATA,
         "adam(y, 'MNN', occurrence='fixed', distribution='dgamma', ets='adam')",
-        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dgamma", ets="adam"),
+        lambda: ADAM(
+            model="MNN", occurrence="fixed", distribution="dgamma", ets="adam"
+        ),
     ),
     "adam MNM dgamma missing": (
         AIRPASSENGERS_GAPS,
@@ -439,6 +441,11 @@ FILTER_INTERVAL_CASES = {
         AIRPASSENGERS_GAPS + " y[144] <- NA;",
         "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
         lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
+    ),
+    "adam MNM dgamma missing values inside and at the end": (
+        AIRPASSENGERS_GAPS + " y[142:144] <- NA;",
+        "adam(ts(y, frequency=12), 'MNM', distribution='dgamma')",
+        lambda: ADAM(model="MNM", lags=[12], distribution="dgamma"),
     ),
     "adam MNN dgamma trailing zeros": (
         GAP_DRIFT_DATA + " y[295:300] <- 0;",
@@ -525,6 +532,61 @@ def test_the_combination_after_gaps_agrees(case):
     )
     y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
     forecast = make().fit(y).predict(h=6, interval="approximate", level=0.9)
+    np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The cumulative forecasts and those of a model with a scale model after the periods
+# without an observed value at the end of the sample, from the last observed one, as
+# R's forecast.adam
+SHIFT_ADAM = (
+    "adam(ts(y, frequency=12), 'AAN', distribution='dnorm')",
+    lambda: ADAM(model="AAN", lags=[12], distribution="dnorm"),
+    "model='MNN'",
+    {"model": "MNN"},
+)
+SHIFT_TBATS = (
+    "tbats(ts(y, frequency=12), distribution='dnorm', lambda=1, trend='none',"
+    " harmonics=2, orders=list(ar=0, ma=0, select=FALSE))",
+    lambda: TBATS(
+        lags=[1, 12],
+        distribution="dnorm",
+        lambda_bc=1,
+        trend="none",
+        harmonics=[2],
+        orders={"ar": 0, "ma": 0, "select": False},
+    ),
+    "",
+    {},
+)
+SHIFT_CASES = {
+    "cumulative approximate": (SHIFT_ADAM, "approximate", True, False),
+    "cumulative semiparametric": (SHIFT_ADAM, "semiparametric", True, False),
+    "scale model": (SHIFT_ADAM, "approximate", False, True),
+    "scale model cumulative": (SHIFT_ADAM, "approximate", True, True),
+    "tbats cumulative": (SHIFT_TBATS, "approximate", True, False),
+    "tbats scale model": (SHIFT_TBATS, "approximate", False, True),
+}
+
+
+@pytest.mark.parametrize("case", list(SHIFT_CASES))
+def test_the_shifted_forecasts_agree(case):
+    (r_call, make, r_scale, py_scale), interval, cumulative, scale = SHIFT_CASES[case]
+    implant = f"m <- implant(m, suppressWarnings(sm(m, {r_scale})));" if scale else ""
+    r = r_dict(
+        f"{{ {AIRPASSENGERS_GAPS} y[142:144] <- NA;"
+        f" m <- suppressWarnings({r_call}); {implant}"
+        f" f <- forecast(m, h=4, interval='{interval}', level=0.9,"
+        f" cumulative={'TRUE' if cumulative else 'FALSE'});"
+        " list(y=as.numeric(y), mean=as.numeric(f$mean),"
+        " lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    fit = make().fit(y)
+    if scale:
+        fit.scale_model = fit.sm(**py_scale)
+    forecast = fit.predict(h=4, interval=interval, level=0.9, cumulative=cumulative)
     np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
     np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
     np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)

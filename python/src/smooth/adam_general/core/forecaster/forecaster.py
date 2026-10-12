@@ -733,31 +733,37 @@ def forecaster(
     )
 
     # 6b. With the k last periods of the sample without an observed size, the
-    # forecast of the pure multiplicative ETS with the drift of the states over them,
-    # and the simulated one of any model, start from the last observed size, as h+k
-    # steps ahead, as R's forecast.adam: the uncertainty of the states over those
-    # periods is then that of the k first steps
+    # forecast of the pure multiplicative ETS with the drift of the states over them
+    # (and of the models with a scale model), and the simulated and the cumulative
+    # ones of any model, start from the last observed size, as h+k steps ahead, as
+    # R's forecast.adam: the uncertainty of the states over those periods is then
+    # that of the k first steps
     trailing = int(general_dict.get("_gap_trailing", 0) or 0)
-    if (
-        trailing
-        and not general_dict.get("cumulative", False)
-        and (
-            general_dict.get("_gap_drifting", False)
-            or general_dict["interval"] == "simulated"
-        )
+    cumulative = general_dict.get("cumulative", False)
+    if trailing and (
+        cumulative
+        or general_dict.get("_gap_drifting", False)
+        or general_dict["interval"] == "simulated"
     ):
         h = general_dict["h"]
         obs = observations_dict["obs_in_sample"]
         states = np.asarray(model_prepared["states"])
         origin = states.shape[1] - trailing
         # The profile at the origin: the latest state of each component at its
-        # position in the lag
+        # position in the lag. The cells not updated after the origin keep it in the
+        # profile at the end (with the corrections of the filter at the observed
+        # sizes, which the states do not record), and the ETS seasonal states, which
+        # the periods without an observed size carry over, are those after it
         profile = np.array(model_prepared["profiles_recent_table"], dtype=float)
+        ets_non_seasonal = (
+            components_dict["components_number_ets"]
+            - components_dict["components_number_ets_seasonal"]
+        )
         for i, lag in enumerate(np.ravel(lags_dict["lags_model_all"]).astype(int)):
-            positions = np.arange(1, lag + 1)
-            profile[i, :lag] = states[
-                i, origin - 1 - (obs - trailing - positions) % lag
-            ]
+            columns = origin - 1 - (obs - trailing - np.arange(1, lag + 1)) % lag
+            updated = (lag == 1) | (columns + lag < states.shape[1])
+            seasonal = ets_non_seasonal <= i < components_dict["components_number_ets"]
+            profile[i, :lag][updated] = states[i, columns[updated] + seasonal * lag]
         _, mat_wt, _, _ = _prepare_matrices_for_forecast(
             model_prepared, observations_dict, lags_dict, general_dict
         )
@@ -765,11 +771,18 @@ def forecaster(
             [np.asarray(model_prepared["measurement"])[obs - trailing : obs], mat_wt]
         )
         p_forecast, _ = _process_occurrence_forecast(occurrence_dict, general_dict)
+        # The variances and the means of the filter (of the steps after the sample)
+        # at the last h steps
         general_shifted = {
             **general_dict,
             "h": h + trailing,
             "_gap_trailing": 0,
             "_gap_shift": trailing,
+            **{
+                key: np.concatenate([np.ones(trailing), np.ravel(general_dict[key])])
+                for key in ("_filter_variances", "_filter_mean")
+                if general_dict.get(key) is not None
+            },
         }
         result = forecaster(
             {
@@ -794,9 +807,11 @@ def forecaster(
             level=level,
             side=side,
         )
-        # The forecast of the h steps after the sample
+        # The forecast of the h steps after the sample (the cumulative one sums them)
         _prepare_forecast_index(observations_dict, general_dict)
         index = observations_dict["y_forecast_index"]
+        if cumulative:
+            index, trailing = index[:1], 0
         if general_shifted.get("_scenarios_matrix") is not None:
             general_dict["_scenarios_matrix"] = np.asarray(
                 general_shifted["_scenarios_matrix"]
@@ -855,9 +870,14 @@ def forecaster(
     y_sizes = y_forecast_values
     y_forecast_values = y_forecast_values * p_forecast
     if general_dict.get("cumulative"):
-        y_forecast_values = np.sum(y_forecast_values)
+        # The h steps after the sample, with the origin k periods before its end
+        y_forecast_values = np.sum(
+            y_forecast_values[int(general_dict.get("_gap_shift", 0) or 0) :]
+        )
         y_sizes = y_forecast_values
-    # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated.
+    # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated
+    # (not for the occurrence of the missing values only, whose probability is one)
+    occurrence_model = occurrence_model and np.any(np.asarray(p_forecast) < 1)
     if occurrence_model and general_dict.get("cumulative", False):
         general_dict["interval"] = "simulated"
         resolved_interval = "simulated"

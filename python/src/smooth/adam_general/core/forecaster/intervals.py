@@ -92,7 +92,7 @@ def _scale_model_variance(general, observations_dict, params_info):
     if scale_forecast is None:
         return None
 
-    sf = np.asarray(scale_forecast, dtype=np.float64).ravel()
+    sf = np.asarray(scale_forecast, dtype=np.float64).ravel()[-general["h"] :]
     variance = scale_variance(sf, general["distribution"], general.get("other"))
     obs = _obs_observed(observations_dict)
     return variance * obs / _df_scale(general, observations_dict, params_info)
@@ -128,6 +128,9 @@ def generate_prediction_interval(
         / _df_scale(general, observations_dict, params_info)
     )
     s2_forecast = _scale_model_variance(general, observations_dict, params_info)
+    # The cumulative forecast sums the h steps after the sample, with the origin k
+    # periods before its end
+    shift = int(general.get("_gap_shift", 0) or 0)
 
     # lines 8015 to 8022
     # line 8404 -> I dont get the (is.scale(object$scale))
@@ -162,7 +165,7 @@ def generate_prediction_interval(
             v_voc_multi = s2_horizon * general["_filter_variances"]
             v_mean = s2_horizon * general["_filter_mean"]
         if general.get("cumulative", False):
-            v_voc_multi = np.sum(v_voc_multi)
+            v_voc_multi = np.sum(v_voc_multi[shift:])
     elif (
         model_type_dict["ets_model"]
         and general["distribution"]
@@ -192,7 +195,7 @@ def generate_prediction_interval(
         # Cumulative forecasts in this branch are not strictly correct —
         # we fall back to summing the per-horizon variances.
         if general.get("cumulative", False):
-            v_voc_multi = np.sum(v_voc_multi)
+            v_voc_multi = np.sum(v_voc_multi[shift:])
     else:
         v_voc_multi = covar_anal(
             lags_dict["lags_model_all"], general["h"], mat_wt, mat_f, vec_g, s2
@@ -208,7 +211,7 @@ def generate_prediction_interval(
         # the periods without an observed value, those of the filter, with the
         # uncertainty of the states at the end of the sample
         if general.get("cumulative", False):
-            v_voc_multi = np.sum(v_voc_multi)
+            v_voc_multi = np.sum(v_voc_multi[shift:, shift:])
         elif general.get("_filter_variances") is not None:
             v_voc_multi = (s2 if s2_forecast is None else s2_forecast) * general[
                 "_filter_variances"
@@ -494,7 +497,7 @@ def generate_simulation_interval(
         # One draw per (horizon, replication); the h scales tile across nsim so
         # that reshaping column-major puts the right scale on the right horizon.
         scale_value = np.tile(
-            np.asarray(scale_forecast, dtype=np.float64).ravel(), nsim
+            np.asarray(scale_forecast, dtype=np.float64).ravel()[-h:], nsim
         )
     scale_value = scale_debias(
         scale_value, general_dict["distribution"], obs_in_sample, df
@@ -615,8 +618,11 @@ def generate_simulation_interval(
     # 9. Handle cumulative forecasts
     n_levels = len(level_low)
     if general_dict.get("cumulative", False):
-        y_forecast_sim = np.mean(np.sum(y_simulated, axis=0))
-        cum_sums = np.sum(y_simulated, axis=0)
+        # The h steps after the sample, with the origin k periods before its end
+        cum_sums = np.sum(
+            y_simulated[int(general_dict.get("_gap_shift", 0) or 0) :], axis=0
+        )
+        y_forecast_sim = np.mean(cum_sums)
         y_lower = np.nanquantile(cum_sums, level_low).reshape(1, n_levels)
         y_upper = np.nanquantile(cum_sums, level_up).reshape(1, n_levels)
     else:
@@ -748,6 +754,9 @@ def generate_multistep_interval(
     e_type = model_type_dict["error_type"]
     distribution = general_dict["distribution"]
     cumulative = general_dict.get("cumulative", False)
+    # The cumulative forecast sums the h steps after the sample, with the origin k
+    # periods before its end
+    shift = int(general_dict.get("_gap_shift", 0) or 0)
 
     mat_wt = np.asfortranarray(prepared_model["measurement"], dtype=np.float64)
     mat_f = np.asfortranarray(prepared_model["transition"], dtype=np.float64)
@@ -785,7 +794,7 @@ def generate_multistep_interval(
 
     if interval_type == "semiparametric":
         if cumulative:
-            vcov = float(np.sum(adam_errors.T @ adam_errors / n))
+            vcov = float(np.sum((adam_errors.T @ adam_errors / n)[shift:, shift:]))
         else:
             vcov = np.diag(adam_errors.T @ adam_errors / n)
         # The log-normal takes the variance of log(1+e), as at h=1
@@ -809,7 +818,7 @@ def generate_multistep_interval(
     yf = np.atleast_1d(np.asarray(predictions, dtype=float))
 
     if cumulative:
-        cum_errors = np.sum(adam_errors, axis=1)
+        cum_errors = np.sum(adam_errors[:, shift:], axis=1)
         y_lower = np.array([[np.quantile(cum_errors, q) for q in level_low]])
         y_upper = np.array([[np.quantile(cum_errors, q) for q in level_up]])
     elif interval_type == "empirical" or h == 1:

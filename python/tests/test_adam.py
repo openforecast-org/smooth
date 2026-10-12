@@ -1430,3 +1430,41 @@ def test_simulated_forecasts_after_the_last_observed_value():
     np.testing.assert_allclose(
         np.ravel(simulated.upper), np.ravel(approximate.upper), rtol=1e-2
     )
+
+
+def test_cumulative_and_scale_forecasts_after_the_last_observed_value():
+    """The cumulative forecasts and those with a scale model start from the last
+    observed value too, as R: the analytical bounds agree with the simulated ones."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) + np.arange(72) * 2.0
+    y[-4:] = np.nan
+    model = ADAM(model="AAN", distribution="dnorm").fit(y)
+    for scale_model in (False, True):
+        if scale_model:
+            model.scale_model = model.sm(model="MNN")
+        for cumulative in (True, False):
+            arguments = {"h": 3, "level": 0.9, "cumulative": cumulative}
+            approximate = model.predict(interval="approximate", **arguments)
+            simulated = model.predict(
+                interval="simulated", nsim=50000, seed=41, **arguments
+            )
+            np.testing.assert_allclose(
+                np.ravel(simulated.upper), np.ravel(approximate.upper), rtol=1e-2
+            )
+
+
+def test_simulated_skeleton_after_missing_values_inside_and_at_the_end():
+    """The profile at the last observed value, with the corrections of the filter
+    after the missing values inside the sample, gives the forecasts from the end."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) + np.arange(72) * 2.0
+    y[[10, 40, 64]] = np.nan
+    y[-3:] = np.nan
+    model = ADAM(model="ANA", lags=[12], distribution="dnorm").fit(y)
+    np.testing.assert_allclose(
+        np.ravel(model.predict(h=4, interval="simulated", nsim=10).mean),
+        np.ravel(model.predict(h=4).mean),
+        rtol=1e-12,
+    )

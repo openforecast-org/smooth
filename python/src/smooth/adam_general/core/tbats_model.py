@@ -1656,10 +1656,14 @@ class TBATS:
 
         observed = np.flatnonzero(ot & ~np.isnan(self._y_in_sample))
         trailing = len(ot) - (observed[-1] + 1 if observed.size else 0)
-        if not 0 < trailing < len(ot) - int(struct["lags_model_max"]) or (
-            self.scale_model is not None
-        ):
+        if not 0 < trailing < len(ot) - int(struct["lags_model_max"]):
             trailing = 0
+        # With a scale model the forecasts start there too, with its fitted scale
+        # over those periods
+        if trailing and scale_forecast is not None:
+            scale_forecast = np.concatenate(
+                [np.ravel(self.scale_model.fitted)[-trailing:], scale_forecast]
+            )
 
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
             """ADAM's forecaster in the space of the transformed data."""
@@ -1678,8 +1682,10 @@ class TBATS:
                 # without an observed size in the sample (None without them)
                 "_filter_variances": self._gap_variance(h=h) if h else None,
                 # The last periods without an observed size, from which the simulated
-                # forecasts start, as R's forecast.adam
+                # and the cumulative forecasts (and all with a scale model) start, as
+                # R's forecast.adam
                 "_gap_trailing": trailing,
+                "_gap_drifting": bool(trailing) and scale_forecast is not None,
                 **general,
             }
             result = forecaster(

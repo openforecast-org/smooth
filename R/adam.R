@@ -6393,23 +6393,32 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     # With the k last periods of the sample without an observed size, the forecast of the pure
     # multiplicative ETS with the drift of the states over them (adam_gapVarianceModel()), and the
-    # simulated one of any model, start from the last observed size, as h+k steps ahead: the
-    # uncertainty of the states over those periods is then that of the k first steps
+    # simulated and the cumulative ones of any model (and all with a scale model), start from the
+    # last observed size, as h+k steps ahead: the uncertainty of the states over those periods is
+    # then that of the k first steps
     yActuals <- as.vector(actuals(object));
     otLogical <- !is.na(yActuals);
     if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
         otLogical[] <- otLogical & yActuals!=0;
     }
     trailing <- obsInSample - max(c(0, which(otLogical)));
-    if(trailing>0 && trailing<obsInSample-lagsModelMax && !is.scale(object$scale) && !cumulative &&
-       (interval=="simulated" || !is.null(attr(adam_gapVarianceModel(object), "drift")))){
+    if(trailing>0 && trailing<obsInSample-lagsModelMax &&
+       (cumulative || interval=="simulated" || is.scale(object$scale) ||
+        !is.null(attr(adam_gapVarianceModel(object), "drift")))){
         originStates <- obsStates - trailing;
         matVt <- t(object$states[originStates-(lagsModelMax:1)+1,,drop=FALSE]);
-        # The profile at the origin: the latest state of each component at its position in the lag
+        # The profile at the origin: the latest state of each component at its position in the
+        # lag. The cells not updated after the origin keep it in the profile at the end (with the
+        # corrections of the filter at the observed sizes, which the states do not record), and
+        # the ETS seasonal states, which the periods without an observed size carry over, are
+        # those after it
         for(i in 1:length(lagsModelAll)){
             positions <- 1:lagsModelAll[i];
-            profilesRecentTable[i,positions] <- object$states[originStates -
-                                                                  (obsInSample-trailing-positions) %% lagsModelAll[i], i];
+            rows <- originStates - (obsInSample-trailing-positions) %% lagsModelAll[i];
+            updated <- lagsModelAll[i]==1 | rows+lagsModelAll[i]<=obsStates;
+            seasonal <- i>componentsNumberETSNonSeasonal && i<=componentsNumberETS;
+            profilesRecentTable[i,positions[updated]] <-
+                object$states[rows[updated] + seasonal*lagsModelAll[i], i];
         }
         indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
                                                lags(object), c(yIndex,yForecastIndex),
@@ -6513,7 +6522,8 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         # hFinal is the number of elements we will have in the final forecast
         hFinal <- 1;
         # In case of occurrence model use simulations - the cumulative probability is a bitch
-        if(occurrenceModel){
+        # (not for the one of the missing values only, whose probability is one)
+        if(occurrenceModel && any(pForecast<1)){
             interval[] <- "simulated";
         }
     }
@@ -6559,7 +6569,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
         # If this is an occurrence model, then take probability into account in the level.
         # This correction is only needed for approximate, because the others contain zeroes
-        if(occurrenceModel && interval=="approximate"){
+        if(occurrenceModel && interval=="approximate" && !cumulative){
             levelNew[] <- (levelNew-(1-as.vector(pForecast)))/as.vector(pForecast);
             levelNew[levelNew<0] <- 0;
         }
@@ -6584,10 +6594,12 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         arrVt <- array(NA, c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired, hModel+lagsModelMax, nsim));
         arrVt[,1:lagsModelMax,] <- rep(matVt,nsim);
 
-        # The scale, or the scale model's forecasts, de-biased for the simulations
+        # The scale, or the scale model's forecasts (after its fitted values over the k last
+        # periods), de-biased for the simulations
         if(is.scale(object$scale)){
             # as.vector is needed to declass the mean.
-            scaleValue <- as.vector(forecast(object$scale,h=h,newdata=newdata,interval="none")$mean);
+            scaleValue <- c(tail(as.vector(fitted(object$scale)), trailing),
+                            as.vector(forecast(object$scale,h=h,newdata=newdata,interval="none")$mean));
         }
         else{
             scaleValue <- object$scale;
@@ -6711,7 +6723,8 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 }
             }
             else{
-                vcovMulti <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, s2);
+                vcovMulti <- covarAnal(lagsModelAll, hModel, matWt[1,,drop=FALSE], matF, vecG,
+                                       s2)[trailing+(1:h),trailing+(1:h),drop=FALSE];
                 if(is.scale(object$scale)){
                     # Fix the matrix with the time varying variance
                     vcovMulti[] <- vcovMulti / s2 * (sqrt(s2Forecast) %*% t(sqrt(s2Forecast)));

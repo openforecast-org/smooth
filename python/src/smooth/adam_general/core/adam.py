@@ -2806,7 +2806,8 @@ class ADAM:
             and distribution in ("dnorm", "dlaplace", "ds", "dgnorm")
         )
         # The drift of the states of the other pure multiplicative ETS, without the
-        # adaptive regressors
+        # adaptive regressors and without a scale model, whose likelihood takes the
+        # errors without it
         drifting = (
             multiplicative
             and (
@@ -2817,6 +2818,7 @@ class ADAM:
                 self._explanatory.get("xreg_model", False)
                 and self._explanatory.get("regressors") == "adapt"
             )
+            and getattr(self, "scale_model", None) is None
         )
         gaussian = additive or (
             multiplicative and distribution == "dlnorm" and adam_ets
@@ -5086,20 +5088,28 @@ class ADAM:
         for key, power in (("_filter_variances", 2), ("_filter_mean", 1)):
             self._general[key] = self._gap_variance(power=power, h=h) if h else None
         # The k last periods of the sample without an observed size, from which the
-        # forecasts of the models with the drift of the states (and the simulated ones)
-        # start, as R's forecast.adam
+        # forecasts of the models with the drift of the states or with a scale model
+        # (and the simulated and the cumulative ones) start, as R's forecast.adam
         ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
         observed = np.flatnonzero(ot_logical)
         trailing = len(ot_logical) - (observed[-1] + 1 if observed.size else 0)
         lags_model_max = int(self._lags_model["lags_model_max"])
-        if not 0 < trailing < len(ot_logical) - lags_model_max or (
-            getattr(self, "scale_model", None) is not None
-        ):
+        if not 0 < trailing < len(ot_logical) - lags_model_max:
             trailing = 0
         self._general["_gap_trailing"] = trailing
+        scale_model = getattr(self, "scale_model", None)
         self._general["_gap_drifting"] = bool(
-            trailing and self._gap_variance(drift=True) is not None
+            trailing
+            and (scale_model is not None or self._gap_variance(drift=True) is not None)
         )
+        # The scale over those periods: the fitted values of the scale model
+        if trailing and scale_model is not None:
+            self._general["scale_forecast"] = np.concatenate(
+                [
+                    np.ravel(scale_model.fitted)[-trailing:],
+                    self._general["scale_forecast"],
+                ]
+            )
 
         # Standard single-model prediction
         self._forecast_results = forecaster(

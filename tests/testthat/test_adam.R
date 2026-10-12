@@ -1285,3 +1285,34 @@ test_that("the forecasts after the last observed size", {
     expect_equal(as.vector(testSimulated$upper), as.vector(testApproximate$upper), tolerance=5e-3);
 })
 
+test_that("the cumulative forecasts and the scale models after the last observed size", {
+    z <- as.numeric(AirPassengers);
+    z[c(10,50,51,90,140,142:144)] <- NA;
+    testModel <- suppressWarnings(adam(z, "AAN", distribution="dnorm"));
+    # The variance of the sum over the h steps after the sample, from the last observed value
+    testForecast <- forecast(testModel, h=4, interval="approximate", level=0.9, cumulative=TRUE);
+    variances <- covarAnal(1, 7, matrix(1,1,2), testModel$transition, testModel$persistence,
+                           mean(adam_varianceDebiased(testModel)))[4:7,4:7];
+    expect_equal(as.vector(testForecast$upper), sum(forecast(testModel, h=4)$mean) +
+                     qnorm(0.95)*sqrt(sum(variances)));
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=4, interval="simulated", level=0.9, cumulative=TRUE, nsim=50000);
+    expect_equal(as.vector(testSimulated$upper), as.vector(testForecast$upper), tolerance=5e-3);
+
+    # The scale of the k last periods is the fitted one of the scale model
+    testModel <- implant(testModel, suppressWarnings(sm(testModel, model="MNN")));
+    testApproximate <- forecast(testModel, h=4, interval="approximate", level=0.9);
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=4, interval="simulated", level=0.9, nsim=50000);
+    expect_equal(as.vector(testSimulated$upper), as.vector(testApproximate$upper), tolerance=5e-3);
+    testModel <- suppressWarnings(adam(z, "MNM", distribution="dgamma"));
+    testModel <- implant(testModel, suppressWarnings(sm(testModel, model="MNN")));
+    expect_length(predict(testModel)$mean, length(z));
+
+    # The profile at the last observed value, with the corrections of the filter after the
+    # missing values inside the sample, gives the forecasts from the end of the sample
+    testModel <- suppressWarnings(adam(ts(z, frequency=12), "ANA", distribution="dnorm"));
+    expect_equal(as.vector(forecast(testModel, h=4, interval="simulated", nsim=10)$mean),
+                 as.vector(forecast(testModel, h=4)$mean));
+})
+

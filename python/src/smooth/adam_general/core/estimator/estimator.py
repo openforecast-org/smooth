@@ -507,6 +507,7 @@ def estimator(
         other_parameter_estimate=other_parameter_estimate,
         other_value=other if other is not None else 2.0,
         smoother=smoother,
+        adam_ets=adam_ets,
     )
     # Get initial parameter vector and bounds; user-provided values are used as-is
     # A dict of named values, as R's named B, replaces the parameters of those names

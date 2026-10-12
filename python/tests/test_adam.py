@@ -1516,3 +1516,22 @@ def test_provided_occurrence_of_the_horizon():
     np.testing.assert_allclose(np.ravel(forecast.mean), sizes * probabilities)
     assert model._occurrence["occurrence"] == "fixed"
     np.testing.assert_allclose(np.ravel(model.predict(h=4).mean), before)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize("model,distribution", [("MAdM", "dinvgauss"), ("MAM", "dgamma")])
+def test_adam_ets_multiplicative_starts_as_r(model, distribution):
+    """ADAM ETS starts its smoothing parameters at R's general values, not at the
+    small ones of the conventional multiplicative ETS, so the fit is R's."""
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        "{ y <- as.numeric(AirPassengers);"
+        f" m <- adam(ts(y, frequency=12), '{model}', distribution='{distribution}',"
+        " ets='adam'); list(y=y, ll=as.numeric(logLik(m)), B=as.numeric(m$B)) }"
+    )
+    fit = ADAM(model=model, lags=[12], distribution=distribution, ets="adam").fit(
+        np.array(r["y"], float)
+    )
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    np.testing.assert_allclose(np.asarray(fit.b_value), r["B"], rtol=1e-6, atol=1e-8)

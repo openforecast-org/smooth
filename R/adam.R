@@ -6389,6 +6389,36 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
     }
 
+    # With the k last periods of the sample without an observed size, the forecast of the pure
+    # multiplicative ETS with the drift of the states over them (adam_gapVarianceModel()), and the
+    # simulated one of any model, start from the last observed size, as h+k steps ahead: the
+    # uncertainty of the states over those periods is then that of the k first steps
+    yActuals <- as.vector(actuals(object));
+    otLogical <- !is.na(yActuals);
+    if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
+        otLogical[] <- otLogical & yActuals!=0;
+    }
+    trailing <- obsInSample - max(c(0, which(otLogical)));
+    if(trailing>0 && trailing<obsInSample-lagsModelMax && !is.scale(object$scale) && !cumulative &&
+       (interval=="simulated" || !is.null(attr(adam_gapVarianceModel(object), "drift")))){
+        originStates <- obsStates - trailing;
+        matVt <- t(object$states[originStates-(lagsModelMax:1)+1,,drop=FALSE]);
+        # The profile at the origin: the latest state of each component at its position in the lag
+        for(i in 1:length(lagsModelAll)){
+            positions <- 1:lagsModelAll[i];
+            profilesRecentTable[i,positions] <- object$states[originStates -
+                                                                  (obsInSample-trailing-positions) %% lagsModelAll[i], i];
+        }
+        indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
+                                               lags(object), c(yIndex,yForecastIndex),
+                                               yClasses)$lookup[,-c(1:(obsInSample-trailing+lagsModelMax)),drop=FALSE];
+        matWt <- rbind(object$measurement[obsInSample-trailing+(1:trailing),,drop=FALSE], matWt);
+    }
+    else{
+        trailing <- 0;
+    }
+    hModel <- h + trailing;
+
     # Create C++ adam class, which will then use fit, forecast etc methods
     adamCpp <- object$adamCpp;
     # adamCpp <- new(adamCore,
@@ -6404,9 +6434,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     # Do this for cases, when h<=m as well and prediction /confidence / simulated interval
     # if(Ttype!="M" && (Stype!="M" | (Stype=="M" & h<=lagsModelMin)) ||
     #    any(interval==c("nonparametric","semiparametric","empirical","approximate"))){
-        adamForecast <- adamCpp$forecast(matWt, matF,
-                                         indexLookupTable, profilesRecentTable,
-                                         h)$forecast;
+        adamForecast <- tail(adamCpp$forecast(matWt, matF,
+                                              indexLookupTable, profilesRecentTable,
+                                              hModel)$forecast, h);
     # }
     # else{
     #     # If we do simulations, leave it for later
@@ -6549,7 +6579,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     #### Simulated interval ####
     if(interval=="simulated"){
-        arrVt <- array(NA, c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired, h+lagsModelMax, nsim));
+        arrVt <- array(NA, c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired, hModel+lagsModelMax, nsim));
         arrVt[,1:lagsModelMax,] <- rep(matVt,nsim);
 
         # The scale, or the scale model's forecasts, de-biased for the simulations
@@ -6561,16 +6591,16 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             scaleValue <- object$scale;
         }
         scaleValue <- adam_scaleSimulation(object, scaleValue);
-        matErrors <- matrix(adam_errorsSimulate(h*nsim, object$distribution, scaleValue, object$other,
+        matErrors <- matrix(adam_errorsSimulate(hModel*nsim, object$distribution, scaleValue, object$other,
                                                 obsInSample-nparam(object)),
-                            h,nsim);
+                            hModel,nsim);
         # Normalise errors in order not to get ridiculous things on small nsim
         if(nsim<=500){
             if(Etype=="A"){
-                matErrors[] <- matErrors - array(apply(matErrors,1,mean),c(h,nsim));
+                matErrors[] <- matErrors - array(apply(matErrors,1,mean),c(hModel,nsim));
             }
             else{
-                matErrors[] <- (1+matErrors) / array(apply(1+matErrors,1,mean),c(h,nsim))-1;
+                matErrors[] <- (1+matErrors) / array(apply(1+matErrors,1,mean),c(hModel,nsim))-1;
             }
         }
         # This stuff is needed in order to produce adequate values for weird models
@@ -6580,7 +6610,8 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
 
         # States, Errors, Ot, Transition, Measurement, Persistence
-        ySimulated <- adamCpp$simulate(matErrors, matrix(rbinom(h*nsim, 1, pForecast), h, nsim),
+        ySimulated <- adamCpp$simulate(matErrors, rbind(matrix(1, trailing, nsim),
+                                                        matrix(rbinom(h*nsim, 1, pForecast), h, nsim)),
                                        arrVt, matWt,
                                        array(matF,c(dim(matF),nsim)),
                                        matrix(vecG, componentsNumberETS+componentsNumberARIMA+
@@ -6590,7 +6621,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                                              c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired,
                                                lagsModelMax,
                                                nsim)),
-                                       EtypeModified, FALSE)$data;
+                                       EtypeModified, FALSE)$data[trailing+(1:h),,drop=FALSE];
 
         #### Note that the cumulative doesn't work with oes at the moment!
         if(cumulative){
@@ -6663,7 +6694,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                         s2Forecast[] <- exp(s2Forecast)-1;
                     }
                 }
-                vcovMulti <- adamVarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, s2);
+                vcovMulti <- tail(adamVarAnal(lagsModelAll, hModel, matWt[1,,drop=FALSE], matF, vecG, s2), h);
                 if(is.scale(object$scale)){
                     # Fix the variances with the time varying ones
                     vcovMulti[] <- vcovMulti / s2 * s2Forecast;
@@ -6703,18 +6734,18 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         #### Semiparametric, nonparametric and empirical interval ####
         # Extract multistep errors and calculate the covariance matrix
         else if(any(interval==c("semiparametric","nonparametric","empirical"))){
-            if(h>1){
-                adamErrors <- as.matrix(rmultistep(object, h=h));
+            if(hModel>1){
+                adamErrors <- as.matrix(rmultistep(object, h=hModel));
 
                 if(any(object$distribution==c("dinvgauss","dgamma","dlnorm","dls","dllaplace","dlgnorm")) && (Etype=="A")){
                     yFittedMatrix <- adamErrors;
-                    for(i in 1:h){
+                    for(i in 1:hModel){
                         yFittedMatrix[,i] <- fitted(object)[1:nrow(adamErrors)+i-1];
                     }
                     adamErrors[] <- adamErrors/yFittedMatrix;
                 }
-                # The windows with all their targets observed
-                adamErrors <- adamErrors[complete.cases(adamErrors),,drop=FALSE];
+                # The windows with all their targets observed, at the steps after the origin
+                adamErrors <- adamErrors[complete.cases(adamErrors),trailing+(1:h),drop=FALSE];
                 nWindows <- nrow(adamErrors);
 
                 if(interval=="semiparametric"){

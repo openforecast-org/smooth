@@ -1241,3 +1241,33 @@ test_that("the filter of the pure additive models with the other distributions",
     gapVariance <- adam_gapVarianceModel(testModel)[otLogical];
     expect_equal(testModel$scale, mean(abs(residuals(testModel)[otLogical])/sqrt(gapVariance)));
 })
+
+# With the k last periods without an observed size, the forecasts of the pure multiplicative
+# ETS with the drift of the states start from the last observed size, as h+k steps ahead: for
+# ETS(M,N,N), the level at that size, with the h+k step variance, and the simulated forecasts of
+# any model, which then take the uncertainty of the states over those periods as the filter
+test_that("the forecasts after the last observed size", {
+    set.seed(41);
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e*rbinom(300, 1, 0.6);
+    y[295:300] <- 0;
+    testModel <- adam(y, "MNN", occurrence="fixed", distribution="dgamma");
+    last <- max(which(y!=0));
+    trailing <- 300 - last;
+    testForecast <- forecast(testModel, h=3, interval="approximate", level=0.9, occurrence=rep(1, 3));
+    expect_equal(as.vector(testForecast$mean),
+                 rep(unname(testModel$states[nrow(testModel$states)-trailing, 1]), 3));
+    variances <- tail(adamVarAnal(1, 3+trailing, matrix(1), matrix(1), testModel$persistence,
+                                  mean(adam_varianceDebiased(testModel))), 3);
+    expect_equal(as.vector(testForecast$upper/testForecast$mean),
+                 qgamma(0.95, shape=1/variances, scale=variances));
+
+    z <- as.numeric(AirPassengers);
+    z[141:144] <- NA;
+    testModel <- suppressWarnings(adam(z, "AAN", distribution="dnorm"));
+    testApproximate <- forecast(testModel, h=3, interval="approximate", level=0.9);
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=3, interval="simulated", level=0.9, nsim=50000);
+    expect_equal(as.vector(testSimulated$upper), as.vector(testApproximate$upper), tolerance=5e-3);
+})
+

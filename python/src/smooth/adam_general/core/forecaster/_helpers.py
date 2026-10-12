@@ -124,14 +124,17 @@ def _prepare_lookup_table(lags_dict, observations_dict, general_dict):
     numpy.ndarray
         Lookup table for forecasting
     """
+    # With the origin at the last observed size, k periods before the end of the
+    # sample, the horizon is h+k from there
+    shift = int(general_dict.get("_gap_shift", 0) or 0)
     lookup_result = adam_profile_creator(
         lags_model_all=lags_dict["lags_model_all"],
         lags_model_max=lags_dict["lags_model_max"],
-        obs_all=observations_dict["obs_in_sample"] + general_dict["h"],
+        obs_all=observations_dict["obs_in_sample"] + general_dict["h"] - shift,
         lags=lags_dict["lags"],
     )
     lookup = lookup_result["index_lookup_table"][
-        :, (observations_dict["obs_in_sample"] + lags_dict["lags_model_max"]) :
+        :, (observations_dict["obs_in_sample"] - shift + lags_dict["lags_model_max"]) :
     ]
     return lookup
 
@@ -161,7 +164,11 @@ def _prepare_matrices_for_forecast(
     # Get state matrix
     # The last lag cycle of states. Taken from the state matrix's own width, which
     # is what R does too (nrow(object$states)) — the head may have been trimmed.
-    mat_vt = model_prepared["states"][:, -lags_dict["lags_model_max"] :]
+    # (at the origin of the forecast, k periods before the end with "_gap_shift")
+    origin = model_prepared["states"].shape[1] - int(
+        general_dict.get("_gap_shift", 0) or 0
+    )
+    mat_vt = model_prepared["states"][:, origin - lags_dict["lags_model_max"] : origin]
 
     # Get measurement matrix: that of the horizon when the new regressors are known
     if model_prepared.get("measurement_forecast") is not None:

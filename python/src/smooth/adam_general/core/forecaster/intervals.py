@@ -475,7 +475,12 @@ def generate_simulation_interval(
     arr_vt = np.zeros((n_components, h + lags_model_max, nsim), order="F")
 
     # Initialize with current states (replicated across nsim)
-    mat_vt = prepared_model["states"][:, -lags_model_max:]
+    # The states at the origin of the forecast (k periods before the end with
+    # "_gap_shift")
+    origin = prepared_model["states"].shape[1] - int(
+        general_dict.get("_gap_shift", 0) or 0
+    )
+    mat_vt = prepared_model["states"][:, origin - lags_model_max : origin]
     for i in range(nsim):
         arr_vt[:, :lags_model_max, i] = mat_vt[:, :lags_model_max]
 

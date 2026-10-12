@@ -1414,3 +1414,19 @@ def test_ics_are_those_of_r(model):
             assert ics[name] == pytest.approx(value, rel=1e-8)
     else:
         assert ics == pytest.approx(r["values"][0], rel=1e-8)
+
+
+def test_simulated_forecasts_after_the_last_observed_value():
+    """With the last values missing, the simulated forecasts start from the last
+    observed value, as h+k steps ahead, so they take the uncertainty of the states
+    over the missing values as the filter of the analytical intervals, as R."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) + np.arange(72) * 2.0
+    y[-4:] = np.nan
+    model = ADAM(model="AAN", distribution="dnorm").fit(y)
+    approximate = model.predict(h=3, interval="approximate", level=0.9)
+    simulated = model.predict(h=3, interval="simulated", level=0.9, nsim=50000, seed=41)
+    np.testing.assert_allclose(
+        np.ravel(simulated.upper), np.ravel(approximate.upper), rtol=1e-2
+    )

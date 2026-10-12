@@ -601,7 +601,13 @@ multistep variance when the last periods were unobserved. Both terms come out of
 variance is $\sigma^2 f_{T+h}$. For the pure multiplicative ADAM ETS with the log-normal
 distribution, the same run of the filter of Proposition~\ref{prop:lognormal} gives the exact interval
 $z_{T+h}/\hat\mu_{T+h}\sim\log\mathcal N(-s b_{T+h}, s f_{T+h})$ around the point forecast with zero
-errors, which is $\log\mathcal N(-s a_h/2, s\kappa_h)$ when $\vect P_{T+1} = \vect 0$.
+errors, which is $\log\mathcal N(-s a_h/2, s\kappa_h)$ when $\vect P_{T+1} = \vect 0$. For the
+other models a simpler route is enough: when the last $k$ periods of the sample are unobserved, the
+forecast $h$ steps ahead is the forecast $h+k$ steps ahead from the last observed period, whose
+multistep distribution includes the uncertainty of the states over those $k$ periods. It ignores
+only the covariance left at that period by earlier unobserved ones, which decays at the observed
+periods; the \texttt{smooth} package uses it for the pure multiplicative ETS with the Gamma and the
+Inverse Gaussian distributions, and for the simulated intervals of all its models.
 
 For a model with an occurrence part, an interval of the demand with coverage $c$ that counts the
 zeros as covered is an interval of the sizes with coverage $(c - (1-p_t))/p_t$, so its bounds are

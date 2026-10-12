@@ -5082,6 +5082,21 @@ class ADAM:
         h = int(self._general.get("h", 0) or 0)
         for key, power in (("_filter_variances", 2), ("_filter_mean", 1)):
             self._general[key] = self._gap_variance(power=power, h=h) if h else None
+        # The k last periods of the sample without an observed size, from which the
+        # forecasts of the models with the drift of the states (and the simulated ones)
+        # start, as R's forecast.adam
+        ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
+        observed = np.flatnonzero(ot_logical)
+        trailing = len(ot_logical) - (observed[-1] + 1 if observed.size else 0)
+        lags_model_max = int(self._lags_model["lags_model_max"])
+        if not 0 < trailing < len(ot_logical) - lags_model_max or (
+            getattr(self, "scale_model", None) is not None
+        ):
+            trailing = 0
+        self._general["_gap_trailing"] = trailing
+        self._general["_gap_drifting"] = bool(
+            trailing and self._gap_variance(drift=True) is not None
+        )
 
         # Standard single-model prediction
         self._forecast_results = forecaster(

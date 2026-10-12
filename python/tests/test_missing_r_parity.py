@@ -440,6 +440,18 @@ FILTER_INTERVAL_CASES = {
         "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
         lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
     ),
+    "adam MNN dgamma trailing zeros": (
+        GAP_DRIFT_DATA + " y[295:300] <- 0;",
+        "adam(y, 'MNN', occurrence='fixed', distribution='dgamma')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dgamma"),
+    ),
+    "adam MNN dinvgauss ADAM ETS trailing zeros": (
+        GAP_DRIFT_DATA + " y[296:300] <- 0;",
+        "adam(y, 'MNN', occurrence='fixed', distribution='dinvgauss', ets='adam')",
+        lambda: ADAM(
+            model="MNN", occurrence="fixed", distribution="dinvgauss", ets="adam"
+        ),
+    ),
     "ces none": (
         AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
         "ces(y, 'none')",

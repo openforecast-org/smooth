@@ -722,15 +722,104 @@ def forecaster(
 
     # 5. Prepare lookup table for forecasting
     lookup = _prepare_lookup_table(lags_dict, observations_dict, general_dict)
-    model_prepared = _forecast_measurement(
-        model_prepared, explanatory_checked, components_dict, general_dict["h"]
-    )
+    if not general_dict.get("_gap_shift"):
+        model_prepared = _forecast_measurement(
+            model_prepared, explanatory_checked, components_dict, general_dict["h"]
+        )
 
     # 6. Set interval from caller and resolve "prediction" → "simulated"/"approximate"
     general_dict["interval"] = interval
     general_dict = _determine_forecast_interval(
         general_dict, model_type_dict, explanatory_checked, lags_dict
     )
+
+    # 6b. With the k last periods of the sample without an observed size, the
+    # forecast of the pure multiplicative ETS with the drift of the states over them,
+    # and the simulated one of any model, start from the last observed size, as h+k
+    # steps ahead, as R's forecast.adam: the uncertainty of the states over those
+    # periods is then that of the k first steps
+    trailing = int(general_dict.get("_gap_trailing", 0) or 0)
+    if (
+        trailing
+        and not general_dict.get("cumulative", False)
+        and (
+            general_dict.get("_gap_drifting", False)
+            or general_dict["interval"] == "simulated"
+        )
+    ):
+        h = general_dict["h"]
+        obs = observations_dict["obs_in_sample"]
+        states = np.asarray(model_prepared["states"])
+        origin = states.shape[1] - trailing
+        # The profile at the origin: the latest state of each component at its
+        # position in the lag
+        profile = np.array(model_prepared["profiles_recent_table"], dtype=float)
+        for i, lag in enumerate(np.ravel(lags_dict["lags_model_all"]).astype(int)):
+            positions = np.arange(1, lag + 1)
+            profile[i, :lag] = states[
+                i, origin - 1 - (obs - trailing - positions) % lag
+            ]
+        _, mat_wt, _, _ = _prepare_matrices_for_forecast(
+            model_prepared, observations_dict, lags_dict, general_dict
+        )
+        measurement = np.vstack(
+            [np.asarray(model_prepared["measurement"])[obs - trailing : obs], mat_wt]
+        )
+        p_forecast, _ = _process_occurrence_forecast(occurrence_dict, general_dict)
+        general_shifted = {
+            **general_dict,
+            "h": h + trailing,
+            "_gap_trailing": 0,
+            "_gap_shift": trailing,
+        }
+        result = forecaster(
+            {
+                **model_prepared,
+                "profiles_recent_table": profile,
+                "measurement_forecast": measurement,
+            },
+            observations_dict,
+            general_shifted,
+            {
+                **occurrence_dict,
+                "p_forecast": np.concatenate([np.ones(trailing), p_forecast]),
+            },
+            lags_dict,
+            model_type_dict,
+            explanatory_checked,
+            components_dict,
+            constants_checked,
+            params_info,
+            adam_cpp,
+            interval=general_dict["interval"],
+            level=level,
+            side=side,
+        )
+        # The forecast of the h steps after the sample
+        _prepare_forecast_index(observations_dict, general_dict)
+        index = observations_dict["y_forecast_index"]
+        if general_shifted.get("_scenarios_matrix") is not None:
+            general_dict["_scenarios_matrix"] = np.asarray(
+                general_shifted["_scenarios_matrix"]
+            )[trailing:]
+        return ForecastResult(
+            mean=pd.Series(
+                np.asarray(result.mean)[trailing:], index=index, name="mean"
+            ),
+            lower=(
+                None
+                if result.lower is None
+                else result.lower.iloc[trailing:].set_axis(index, axis=0)
+            ),
+            upper=(
+                None
+                if result.upper is None
+                else result.upper.iloc[trailing:].set_axis(index, axis=0)
+            ),
+            level=result.level,
+            side=result.side,
+            interval=result.interval,
+        )
 
     # 7. Generate point forecasts using adam_cpp.forecast()
     y_forecast_values = _generate_point_forecasts(

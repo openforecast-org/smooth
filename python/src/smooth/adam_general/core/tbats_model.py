@@ -1654,6 +1654,13 @@ class TBATS:
             else None
         )
 
+        observed = np.flatnonzero(ot & ~np.isnan(self._y_in_sample))
+        trailing = len(ot) - (observed[-1] + 1 if observed.size else 0)
+        if not 0 < trailing < len(ot) - int(struct["lags_model_max"]) or (
+            self.scale_model is not None
+        ):
+            trailing = 0
+
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
             """ADAM's forecaster in the space of the transformed data."""
             general_dict = {
@@ -1670,6 +1677,9 @@ class TBATS:
                 # The variances of the filter at the h steps ahead, after the periods
                 # without an observed size in the sample (None without them)
                 "_filter_variances": self._gap_variance(h=h) if h else None,
+                # The last periods without an observed size, from which the simulated
+                # forecasts start, as R's forecast.adam
+                "_gap_trailing": trailing,
                 **general,
             }
             result = forecaster(

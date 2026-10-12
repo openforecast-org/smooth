@@ -41,7 +41,8 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("fitted", &FitResult::fitted)
         .def_readonly("errors", &FitResult::errors)
         .def_readonly("profile", &FitResult::profile)
-        .def_readonly("profileInitial", &FitResult::profileInitial);
+        .def_readonly("profileInitial", &FitResult::profileInitial)
+        .def_readonly("profileObserved", &FitResult::profileObserved);
 
     // Bind FilterResult struct
     py::class_<FilterResult>(m, "FilterResult")
@@ -50,6 +51,7 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("errors", &FilterResult::errors)
         .def_readonly("profile", &FilterResult::profile)
         .def_readonly("profileInitial", &FilterResult::profileInitial)
+        .def_readonly("profileObserved", &FilterResult::profileObserved)
         .def_readonly("variances", &FilterResult::variances)
         .def_readonly("innovationsScale", &FilterResult::innovationsScale);
 

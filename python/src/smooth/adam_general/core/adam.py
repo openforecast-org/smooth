@@ -1895,6 +1895,24 @@ class ADAM:
         return self._prepared.get("profiles_recent_table")
 
     @property
+    def profile_observed(self) -> Optional[Any]:
+        """
+        The profile of the states at the last observed value (R: $profileObserved).
+
+        The origin of the forecasts after the periods without an observed value at
+        the end of the sample; with the corrections of the filter after the missing
+        values inside the sample, which the states do not record. It equals
+        :attr:`profile` when the sample ends with an observed value.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been fitted yet.
+        """
+        self._check_is_fitted()
+        return self._prepared.get("profile_observed")
+
+    @property
     def n_param(self) -> Any:
         """
         Parameter count information (R: $nParam).

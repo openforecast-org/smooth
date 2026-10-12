@@ -1259,6 +1259,7 @@ def preparator(
         "residuals": errors,
         "states": states,
         "profiles_recent_table": adam_fitted.profile,
+        "profile_observed": np.asarray(adam_fitted.profileObserved),
         "persistence": matrices_dict["vec_g"],
         "transition": matrices_dict["mat_f"],
         "measurement": matrices_dict["mat_wt"],

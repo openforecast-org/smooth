@@ -753,30 +753,20 @@ def forecaster(
     # that of the k first steps
     trailing = int(general_dict.get("_gap_trailing", 0) or 0)
     cumulative = general_dict.get("cumulative", False)
-    if trailing and (
-        cumulative
-        or general_dict.get("_gap_drifting", False)
-        or general_dict["interval"] == "simulated"
+    if (
+        trailing
+        and model_prepared.get("profile_observed") is not None
+        and (
+            cumulative
+            or general_dict.get("_gap_drifting", False)
+            or general_dict["interval"] == "simulated"
+        )
     ):
         h = general_dict["h"]
         obs = observations_dict["obs_in_sample"]
-        states = np.asarray(model_prepared["states"])
-        origin = states.shape[1] - trailing
-        # The profile at the origin: the latest state of each component at its
-        # position in the lag. The cells not updated after the origin keep it in the
-        # profile at the end (with the corrections of the filter at the observed
-        # sizes, which the states do not record), and the ETS seasonal states, which
-        # the periods without an observed size carry over, are those after it
-        profile = np.array(model_prepared["profiles_recent_table"], dtype=float)
-        ets_non_seasonal = (
-            components_dict["components_number_ets"]
-            - components_dict["components_number_ets_seasonal"]
-        )
-        for i, lag in enumerate(np.ravel(lags_dict["lags_model_all"]).astype(int)):
-            columns = origin - 1 - (obs - trailing - np.arange(1, lag + 1)) % lag
-            updated = (lag == 1) | (columns + lag < states.shape[1])
-            seasonal = ets_non_seasonal <= i < components_dict["components_number_ets"]
-            profile[i, :lag][updated] = states[i, columns[updated] + seasonal * lag]
+        # The profile at the origin, with the corrections of the filter that the
+        # states do not record
+        profile = np.array(model_prepared["profile_observed"], dtype=float)
         _, mat_wt, _, _ = _prepare_matrices_for_forecast(
             model_prepared, observations_dict, lags_dict, general_dict
         )

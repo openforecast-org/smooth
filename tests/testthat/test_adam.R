@@ -1311,9 +1311,15 @@ test_that("the cumulative forecasts and the scale models after the last observed
 
     # The profile at the last observed value, with the corrections of the filter after the
     # missing values inside the sample, gives the forecasts from the end of the sample
-    testModel <- suppressWarnings(adam(ts(z, frequency=12), "ANA", distribution="dnorm"));
-    expect_equal(as.vector(forecast(testModel, h=4, interval="simulated", nsim=10)$mean),
-                 as.vector(forecast(testModel, h=4)$mean));
+    for(testModel in list(suppressWarnings(adam(ts(z, frequency=12), "ANA", distribution="dnorm")),
+                          suppressWarnings(adam(ts(z, frequency=12), "NNN", lags=c(1,12),
+                                                orders=list(ar=c(0,1), i=c(1,1), ma=c(1,1)))),
+                          suppressWarnings(tbats(ts(z, frequency=12), distribution="dnorm", lambda=1,
+                                                 trend="none", harmonics=2,
+                                                 orders=list(ar=0, ma=0, select=FALSE))))){
+        expect_equal(as.vector(forecast(testModel, h=4, interval="simulated", nsim=10)$mean),
+                     as.vector(forecast(testModel, h=4)$mean));
+    }
 })
 
 # ADAM ETS moves the level by (1+e)^alpha, whose mean is below one: the mean drifts below the

@@ -1261,6 +1261,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                                     data=yInSample, holdout=yHoldout, fitted=yFitted, residuals=errors,
                                     forecast=yForecast, states=matVt, accuracy=errormeasures,
                                     profile=profilesRecentTable, profileInitial=profilesRecentInitial,
+                    profileObserved=adamFitted$profileObserved,
                                     persistence=vecG[,1], transition=matF,
                                     measurement=matWt, initial=initialValue, initialType=initialType,
                                     constant=constantValue, nParam=parametersNumber,

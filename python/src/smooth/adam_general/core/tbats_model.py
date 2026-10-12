@@ -962,6 +962,13 @@ class TBATS:
         return np.asarray(self._best["fitted"]["profile"])
 
     @property
+    def profile_observed(self) -> NDArray:
+        """The profile of the states at the last observed value, the origin of the
+        forecasts after the periods without one (R's ``$profileObserved``)."""
+        self._check_fitted()
+        return np.asarray(self._best["fitted"]["profile_observed"])
+
+    @property
     def initial_type(self) -> str:
         """The initialisation used (R's ``$initialType``): ``"provided"`` when some
         initial states are."""
@@ -1696,6 +1703,7 @@ class TBATS:
                     "transition": best["elements"]["mat_f"],
                     "persistence": best["elements"]["vec_g"],
                     "profiles_recent_table": best["fitted"]["profile"],
+                    "profile_observed": best["fitted"]["profile_observed"],
                     "residuals": pd.Series(errors),
                     # The prediction of the model at the missing values
                     "y_fitted": np.where(

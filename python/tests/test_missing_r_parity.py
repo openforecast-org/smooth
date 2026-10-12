@@ -613,3 +613,21 @@ def test_the_provided_occurrence_agrees(probabilities):
     np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
     np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
     np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The profile at the last observed value, with the corrections of the filter after the
+# missing values inside the sample, as R's $profileObserved
+@pytest.mark.parametrize("shift", [SHIFT_ADAM, SHIFT_TBATS], ids=["adam", "tbats"])
+def test_the_profile_observed_agrees(shift):
+    r_call, make, _, _ = shift
+    r = r_dict(
+        f"{{ {AIRPASSENGERS_GAPS} y[142:144] <- NA; m <- suppressWarnings({r_call});"
+        " list(y=as.numeric(y), p=as.vector(m$profileObserved),"
+        " n=nrow(m$profileObserved)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    profile = np.asarray(make().fit(y).profile_observed)
+    np.testing.assert_allclose(
+        profile, np.reshape(r["p"], (r["n"][0], -1), order="F"), rtol=1e-8
+    )
+

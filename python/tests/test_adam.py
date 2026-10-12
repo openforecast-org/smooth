@@ -1462,12 +1462,20 @@ def test_simulated_skeleton_after_missing_values_inside_and_at_the_end():
     ) + np.arange(72) * 2.0
     y[[10, 40, 64]] = np.nan
     y[-3:] = np.nan
-    model = ADAM(model="ANA", lags=[12], distribution="dnorm").fit(y)
-    np.testing.assert_allclose(
-        np.ravel(model.predict(h=4, interval="simulated", nsim=10).mean),
-        np.ravel(model.predict(h=4).mean),
-        rtol=1e-12,
-    )
+    for model in (
+        ADAM(model="ANA", lags=[12], distribution="dnorm").fit(y),
+        ADAM(
+            model="NNN",
+            lags=[1, 12],
+            orders={"ar": [0, 1], "i": [1, 1], "ma": [1, 1]},
+            distribution="dnorm",
+        ).fit(y),
+    ):
+        np.testing.assert_allclose(
+            np.ravel(model.predict(h=4, interval="simulated", nsim=10).mean),
+            np.ravel(model.predict(h=4).mean),
+            rtol=1e-12,
+        )
 
 
 def test_mean_of_adam_ets_with_a_multiplicative_error():

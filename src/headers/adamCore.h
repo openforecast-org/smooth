@@ -29,6 +29,9 @@ struct FitResult {
     arma::mat profile;
     // The profile the fit started from (the solved one of initial="gradient")
     arma::mat profileInitial;
+    // The profile at the last observed value, with the corrections of the filter that the
+    // states do not record: the origin of the forecasts after the periods without one
+    arma::mat profileObserved;
 };
 
 // Result structure for the filter (filter()): the fitter's fields, and for each period the
@@ -40,6 +43,7 @@ struct FilterResult {
     arma::vec errors;
     arma::mat profile;
     arma::mat profileInitial;
+    arma::mat profileObserved;
     arma::vec variances;
     arma::vec innovationsScale;
 };
@@ -880,6 +884,7 @@ public:
         result.errors = fitted.errors;
         result.profile = fitted.profile;
         result.profileInitial = fitted.profileInitial;
+        result.profileObserved = fitted.profileObserved;
         result.variances = state.variances;
         result.innovationsScale = state.innovationsScale;
         return result;
@@ -1122,31 +1127,42 @@ public:
         };
 
         // What to do in the forward pass
+        // The profile after the last observed value (the last forward pass writes it last)
+        int lastObserved = obs - 1;
+        while(lastObserved > 0 && (vectorOt(lastObserved) == 0 || std::isnan(vectorOt(lastObserved)))) {
+            lastObserved--;
+        }
+        arma::mat profileObserved = profilesRecent;
+
         auto forwardStep = [&](int i) {
             int idx = i - H;
             if(filterState != nullptr && pass == lastPass &&
                (filterState->linear || vectorOt(idx) == 0 || std::isnan(vectorOt(idx)))) {
                 filterStep(i);
-                return;
             }
-            /* # Measurement equation and the error term */
-            vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
-                    matrixWt.row(idx), E, T, S,
-                    nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-            // We need this multiplication for cases, when occurrence is fractional (NaN
-            // marks a missing occurrence, which has no error)
-            if(vectorOt(idx) != 0 && !std::isnan(vectorOt(idx))) {
-                vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
+            else {
+                /* # Measurement equation and the error term */
+                vecYfit(idx) = adamWvalue(profilesRecent(indexLookupTable.col(i)),
+                        matrixWt.row(idx), E, T, S,
+                        nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
+                // We need this multiplication for cases, when occurrence is fractional (NaN
+                // marks a missing occurrence, which has no error)
+                if(vectorOt(idx) != 0 && !std::isnan(vectorOt(idx))) {
+                    vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
+                }
+                // errorf() returns 0 when ot==0; dispatches to occurrenceError() when O!='n'
+                vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
+                /* # Transition equation */
+                profilesRecent(indexLookupTable.col(i)) =
+                    transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
+                    adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
+                               nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
+                               vectorG, vecErrors(idx), vecYfit(idx), adamETS);
+                matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
             }
-            // errorf() returns 0 when ot==0; dispatches to occurrenceError() when O!='n'
-            vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
-            /* # Transition equation */
-            profilesRecent(indexLookupTable.col(i)) =
-                transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
-                adamGvalue(profilesRecent(indexLookupTable.col(i)), matrixF, matrixWt.row(idx), E, T, S,
-                           nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
-                           vectorG, vecErrors(idx), vecYfit(idx), adamETS);
-            matrixVt.col(i) = profilesRecent(indexLookupTable.col(i));
+            if(idx == lastObserved) {
+                profileObserved = profilesRecent;
+            }
         };
 
         // What to do in the backward pass
@@ -1253,6 +1269,7 @@ public:
         result.errors = vecErrors;
         result.profile = profilesRecent;
         result.profileInitial = profileInitial;
+        result.profileObserved = profileObserved;
         return result;
     }
 

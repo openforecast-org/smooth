@@ -107,6 +107,7 @@ for the sklearn-style fitted values (`persistence_*_`, `arma_parameters_`,
 | `m$initial`, `m$initialType` | `m.initial_value`, `m.initial_type` |
 | `m$transition`, `m$measurement` | `m.transition`, `m.measurement` |
 | `m$profile` | `m.profile` |
+| `m$profileObserved` (the profile at the last observed value) | `m.profile_observed` |
 | `m$scale` (number **or** scale model) | `m.scale` (always a float) and `m.scale_model` (model or `None`) |
 | `m$lossValue` | `m.loss_value` |
 | `m$loss`, `m$distribution` | `m.loss_`, `m.distribution_` |

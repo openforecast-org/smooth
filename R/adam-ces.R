@@ -1258,6 +1258,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                     data=yInSample, holdout=yHoldout, fitted=yFitted, residuals=errors,
                                     forecast=yForecast, states=matVt, accuracy=errormeasures,
                                     profile=profilesRecentTable, profileInitial=profilesRecentInitial,
+                    profileObserved=adamFitted$profileObserved,
                                     persistence=vecG[,1], transition=matF,
                                     measurement=matWt, initial=initialValue, initialType=initialType,
                                     nParam=parametersNumber,

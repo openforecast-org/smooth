@@ -300,6 +300,8 @@
 #' \item \code{lagsAll} - the vector of the internal lags used in the model,
 #' \item \code{profile} - the matrix with the profile used in the construction of the model,
 #' \item \code{profileInitial} - the matrix with the initial profile (for the before the sample values),
+#' \item \code{profileObserved} - the matrix with the profile at the last observed value (the
+#' origin of the forecasts after the periods without an observed value at the end of the sample),
 #' \item \code{call} - the call used in the evaluation,
 #' \item \code{bounds} - the type of bounds used in the process,
 #' \item \code{res} - result of the model estimation, the output of the \code{nloptr()} function, explaining
@@ -2209,6 +2211,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                     data=cbind(NA,xregData), holdout=NULL, fitted=yFitted, residuals=errors,
                     forecast=yForecast, states=matVt,
                     profile=profilesRecentTable, profileInitial=profilesRecentInitial,
+                    profileObserved=adamFitted$profileObserved,
                     persistence=persistence, phi=phi, transition=matF,
                     measurement=matWt, initial=initialValue, initialType=initialType,
                     initialEstimated=initialEstimated, orders=orders, arma=armaParametersList,
@@ -6406,24 +6409,13 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         otLogical[] <- otLogical & yActuals!=0;
     }
     trailing <- obsInSample - max(c(0, which(otLogical)));
-    if(trailing>0 && trailing<obsInSample-lagsModelMax &&
+    if(trailing>0 && trailing<obsInSample-lagsModelMax && !is.null(object$profileObserved) &&
        (cumulative || interval=="simulated" || is.scale(object$scale) ||
         !is.null(attr(adam_gapVarianceModel(object), "drift")))){
         originStates <- obsStates - trailing;
         matVt <- t(object$states[originStates-(lagsModelMax:1)+1,,drop=FALSE]);
-        # The profile at the origin: the latest state of each component at its position in the
-        # lag. The cells not updated after the origin keep it in the profile at the end (with the
-        # corrections of the filter at the observed sizes, which the states do not record), and
-        # the ETS seasonal states, which the periods without an observed size carry over, are
-        # those after it
-        for(i in 1:length(lagsModelAll)){
-            positions <- 1:lagsModelAll[i];
-            rows <- originStates - (obsInSample-trailing-positions) %% lagsModelAll[i];
-            updated <- lagsModelAll[i]==1 | rows+lagsModelAll[i]<=obsStates;
-            seasonal <- i>componentsNumberETSNonSeasonal && i<=componentsNumberETS;
-            profilesRecentTable[i,positions[updated]] <-
-                object$states[rows[updated] + seasonal*lagsModelAll[i], i];
-        }
+        # The profile at the origin, with the corrections of the filter that the states do not record
+        profilesRecentTable[] <- object$profileObserved;
         indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
                                                lags(object), c(yIndex,yForecastIndex),
                                                yClasses)$lookup[,-c(1:(obsInSample-trailing+lagsModelMax)),drop=FALSE];

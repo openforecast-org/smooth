@@ -32,7 +32,8 @@ namespace Rcpp {
             Named("fitted") = result.fitted,
             Named("errors") = result.errors,
             Named("profile") = result.profile,
-            Named("profileInitial") = result.profileInitial
+            Named("profileInitial") = result.profileInitial,
+            Named("profileObserved") = result.profileObserved
         );
     }
 
@@ -44,6 +45,7 @@ namespace Rcpp {
             Named("errors") = result.errors,
             Named("profile") = result.profile,
             Named("profileInitial") = result.profileInitial,
+            Named("profileObserved") = result.profileObserved,
             Named("variances") = result.variances,
             Named("innovationsScale") = result.innovationsScale
         );

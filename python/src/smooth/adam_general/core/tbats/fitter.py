@@ -660,6 +660,7 @@ def fit(
             "profile": np.asarray(fitted.profile),
             "y_bc": y_bc,
             "profile_initial": np.asarray(fitted.profileInitial),
+            "profile_observed": np.asarray(fitted.profileObserved),
             "mat_wt": w_t,
         }
 

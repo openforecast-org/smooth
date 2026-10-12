@@ -1040,6 +1040,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                     data=yInSample, holdout=yHoldout, fitted=yFitted, residuals=errors,
                                     forecast=yForecast, states=matVt, accuracy=errormeasures,
                                     profile=profilesRecentTable, profileInitial=profilesRecentInitial,
+                    profileObserved=adamFitted$profileObserved,
                                     persistence=vecG[,1], transition=matF,
                                     measurement=matWt, initial=initialValue, initialType=initialType,
                                     nParam=parametersNumber,

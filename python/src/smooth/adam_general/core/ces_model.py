@@ -727,6 +727,7 @@ class CES:
         errors = np.array(adam_fitted.errors).ravel()
         y_fitted = np.array(adam_fitted.fitted).ravel()
         profiles_recent_table = np.array(adam_fitted.profile)
+        profile_observed = np.array(adam_fitted.profileObserved)
         mat_vt = np.array(adam_fitted.states).T  # C++ returns (components, time)
 
         # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces(), with the
@@ -869,6 +870,7 @@ class CES:
         self._mat_wt = mat_wt
         self._vec_g = vec_g
         self._profiles_recent_table = profiles_recent_table
+        self._profile_observed = profile_observed
         self._profiles_recent_initial = profiles_recent_initial
         self._index_lookup_table = index_lookup_table
         self._adam_cpp = adam_cpp
@@ -898,6 +900,7 @@ class CES:
             "transition": mat_f,
             "persistence": vec_g,
             "profiles_recent_table": profiles_recent_table,
+            "profile_observed": profile_observed,
             "residuals": pd.Series(np.asarray(errors, dtype=float)),
             "y_fitted": np.asarray(y_fitted, dtype=float).copy(),
             "scale": scale,
@@ -1193,6 +1196,13 @@ class CES:
         """The profile of the states at the end of the sample (R's ``$profile``)."""
         self._check_fitted()
         return self._profiles_recent_table
+
+    @property
+    def profile_observed(self) -> NDArray:
+        """The profile of the states at the last observed value, the origin of the
+        forecasts after the periods without one (R's ``$profileObserved``)."""
+        self._check_fitted()
+        return self._profile_observed
 
     @property
     def time_elapsed(self) -> float:

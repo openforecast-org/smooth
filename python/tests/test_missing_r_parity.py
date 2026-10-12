@@ -598,7 +598,8 @@ def test_the_shifted_forecasts_agree(case):
 def test_the_provided_occurrence_agrees(probabilities):
     r = r_dict(
         f"{{ {GAP_DRIFT_DATA} p <- {probabilities};"
-        " m <- suppressWarnings(adam(y, 'MNN', occurrence='fixed', distribution='dgamma'));"
+        " m <- suppressWarnings(adam(y, 'MNN', occurrence='fixed',"
+        " distribution='dgamma'));"
         " f <- forecast(m, h=6, interval='approximate', level=0.9, occurrence=p);"
         " list(y=y, p=p, mean=as.numeric(f$mean), lower=as.numeric(f$lower),"
         " upper=as.numeric(f$upper)) }"

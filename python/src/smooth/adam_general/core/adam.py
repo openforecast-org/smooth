@@ -2178,6 +2178,9 @@ class ADAM:
         self._check_is_fitted()
         if getattr(self, "_is_combined", False):
             return self._combined_fitted
+        # A scale model fitted in logs (sm()) has the scale as its fitted values, as R
+        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+            return np.exp(self._prepared["y_fitted"])
         return self._prepared["y_fitted"]
 
     @property
@@ -3834,6 +3837,13 @@ class ADAM:
             )
         finally:
             self._occurrence["occurrence"] = occurrence_type
+        # A scale model fitted in logs (sm()) forecasts the scale, as R's forecast.adam
+        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+            predictions.mean = np.exp(predictions.mean)
+            if predictions.lower is not None:
+                predictions.lower = np.exp(predictions.lower)
+            if predictions.upper is not None:
+                predictions.upper = np.exp(predictions.upper)
 
         # Post-interval NaN patch: when an occurrence forecast is present
         # and the upper bound came back as NaN (sparse occurrence at long
@@ -5104,6 +5114,9 @@ class ADAM:
         # over the same horizon and hand it to the interval code, which is what
         # R does with forecast(object$scale, h)$mean (R/adam.R:6485-6530).
         self._general["scale_forecast"] = self._forecast_scale_model()
+        # The scale of the sample (the fitted one of a scale model), whose de-biased
+        # variances the analytical intervals average, as R's adam_varianceDebiased
+        self._general["scale_fitted"] = self.extract_scale()
         # The df for de-biasing the scale, after implanting: `params_info` is a
         # snapshot taken at estimation time and holds the pre-implant count.
         self._general["df_scale"] = self._df_scale

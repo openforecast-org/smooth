@@ -120,9 +120,14 @@ def generate_prediction_interval(
     e_type = model_type_dict["error_type"]  # "A" or "M"
     # The variance implied by the scale, de-biased (R: adam_varianceDebiased), so the
     # analytical intervals use the same estimate as the likelihood and simulations
-    s2 = (
-        scale_variance(
-            prepared_model["scale"], general["distribution"], general.get("other")
+    scale = general.get("scale_fitted")
+    s2 = float(
+        np.mean(
+            scale_variance(
+                prepared_model["scale"] if scale is None else scale,
+                general["distribution"],
+                general.get("other"),
+            )
         )
         * _obs_observed(observations_dict)
         / _df_scale(general, observations_dict, params_info)

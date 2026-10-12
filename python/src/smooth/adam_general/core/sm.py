@@ -424,10 +424,8 @@ def _finalise(
 ) -> None:
     """Post-fit corrections R applies before returning the scale model."""
     if log_model:
-        # Undo the log trick on everything the user reads back.
-        scale_model._prepared["fitted"] = np.exp(
-            np.asarray(scale_model.fitted, dtype=np.float64)
-        )
+        # Undo the log trick on everything the user reads back: the fitted values
+        # and the forecasts of a model "in logs" are exponentiated
         scale_model.model_name_sm_ = f"{scale_model.model_name} in logs"
 
     # logLik is the loss (the location likelihood), not the scale model's own, with

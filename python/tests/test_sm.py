@@ -7,6 +7,8 @@ with::
 """
 
 import json
+import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -283,3 +285,42 @@ def test_the_scale_model_takes_the_missing_values_for_gaps():
     scale = sm(location)
     assert np.isfinite(scale.loglik)
     assert "iETS" not in str(scale.model_name)
+
+
+# The scale model in logs exponentiates its fitted values and forecasts, and the
+# analytical variance of a multiplicative model averages the de-biased fitted scale,
+# as R
+SM_PARITY_CASES = {
+    "logs": ("AAN", "dnorm", "ANN"),
+    "multiplicative": ("MNM", "dgamma", "MNN"),
+}
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize("case", sorted(SM_PARITY_CASES))
+def test_the_scale_model_forecasts_agree(case):
+    sys.path.insert(0, str(Path(__file__).parent))
+    from _r_bridge import r_dict
+
+    model, distribution, scale_model = SM_PARITY_CASES[case]
+    r = r_dict(
+        "{ y <- as.numeric(AirPassengers);"
+        f" m <- adam(ts(y, frequency=12), '{model}', distribution='{distribution}');"
+        f" s <- suppressWarnings(sm(m, model='{scale_model}')); m <- implant(m, s);"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9);"
+        " list(y=y, fitted=as.numeric(fitted(s)),"
+        " scale=as.numeric(forecast(s, h=6)$mean),"
+        " lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    location = ADAM(model=model, lags=[12], distribution=distribution)
+    location.fit(np.array(r["y"], float))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        location.scale_model = location.sm(model=scale_model)
+    forecast = location.predict(h=6, interval="approximate", level=0.9)
+    np.testing.assert_allclose(np.ravel(location.scale_model.fitted), r["fitted"])
+    np.testing.assert_allclose(
+        np.ravel(location.scale_model.predict(h=6).mean), r["scale"]
+    )
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)

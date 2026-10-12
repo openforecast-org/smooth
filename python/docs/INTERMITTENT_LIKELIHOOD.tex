@@ -606,8 +606,36 @@ other models a simpler route is enough: when the last $k$ periods of the sample 
 forecast $h$ steps ahead is the forecast $h+k$ steps ahead from the last observed period, whose
 multistep distribution includes the uncertainty of the states over those $k$ periods. It ignores
 only the covariance left at that period by earlier unobserved ones, which decays at the observed
-periods; the \texttt{smooth} package uses it for the pure multiplicative ETS with the Gamma and the
-Inverse Gaussian distributions, and for the simulated intervals of all its models.
+periods. The \texttt{smooth} package uses it for the pure multiplicative ETS with the Gamma and the
+Inverse Gaussian distributions, for the simulated intervals of all its models, for the cumulative
+forecasts of all its models (the variance of a sum needs the covariances of the horizons, which the
+filter does not carry) and for the models with a dynamic scale, whose scale over the $k$ periods is
+the fitted one of the scale model.
+
+The origin of these forecasts is the profile of the states after the update at the last observed
+period, which is not the state vector recorded at that period. In the lagged form of ADAM a period
+writes to the states only the cells it uses, one per component, while the update of the filter after
+an unobserved stretch moves every cell correlated with the observation, including the seasonal and
+the ARIMA cells of the other positions of their lags. Rebuilding the profile from the recorded states
+misses these corrections: the forecasts from the last observed period then differ from those from
+the end of the sample, by up to $10^{-3}$ for a TBATS model in our examples. The fitter therefore
+keeps a copy of the profile after the last observed period of its final pass, and the forecasts
+from there coincide with those from the end of the sample.
+
+The point forecast of ADAM is the forecast with zero errors. It is the conditional mean of the pure
+additive models and of the conventional multiplicative ETS, where $\E(1+g_k\epsilon_t) = 1$, but not
+of the ETS of ADAM, whose multiplicative components move by $(1+\epsilon_t)^{g_k}$ with
+$\E(1+\epsilon_t)^{g_k} < 1$ for $0 < g_k < 1$. In ETS(M,N,N), for instance,
+$\E(z_{T+h}\mid Y_T) = \hat\mu_{T+h}\left[\E(1+\epsilon)^{\alpha}\right]^{h-1}$, which for the Gamma
+distribution with mean one and variance $s$ is
+$\left[\Gamma(1/s+\alpha)s^{\alpha}/\Gamma(1/s)\right]^{h-1}$. The quantiles drift down in the same
+way, which the approximate intervals of the conventional ETS ignore: with $s = 0.32$ and
+$\alpha = 0.21$ the upper bound of the 90\% interval twelve steps ahead was 0.45 against 0.32 from
+the simulated paths, and 0.59 against 0.30 after six unobserved periods at the end of the sample.
+The package simulates the intervals of these models by default and takes their mean from the
+simulated paths after the first step (and from the first step after an unobserved stretch at the end
+of the sample). The pure multiplicative ETS of ADAM with the log-normal distribution keeps the exact
+interval above.
 
 For a model with an occurrence part, an interval of the demand with coverage $c$ that counts the
 zeros as covered is an interval of the sizes with coverage $(c - (1-p_t))/p_t$, so its bounds are
@@ -629,7 +657,29 @@ the update touch only the rows and the columns of the cells used in the period. 
 monthly models the extra cost is negligible. The number of cells is the sum of the lags of the
 states, so it grows quickly with high orders and long seasonal periods (an AR(60) has 1830 cells):
 there the update of the covariance dominates while it is non-zero, and it stays non-zero when the
-next unobserved period comes before it has decayed. The variances $f_t$
+next unobserved period comes before it has decayed.
+
+The covariance has a low rank, which reduces this cost when the unobserved periods are few. With a
+single source of error, an unobserved period adds the rank-one term $\vect g\vect g'$, and an observed
+one removes the direction it reveals while adding the new error, so that $\vect P_t$ has at most as
+many dimensions as there were unobserved periods since it last vanished. Writing $\vect P_t =
+\vect U_t\vect U_t'$ with $r$ columns, the propagation touches the rows of the cells used in the
+period, an unobserved period appends the column $\vect g$ on those cells, and an observed one, with
+$\vect a = \vect U_t'\vect w$ and $f_t = 1 + \vect a'\vect a$, replaces the factor
+$\vect M = [\vect U_t^{F}, \vect g]$ (with $\vect U_t^{F}$ the propagated $\vect U_t$) by the first $r$
+columns of $\vect M\vect H$, where $\vect H$ is the Householder reflection that takes $(\vect a, 1)$ to
+the last axis. Since $\vect M(\vect a, 1)' = f_t\vect k_t$, this is the rank-one update
+\[
+\vect U_{t+1} = \vect U_t^{F} - \frac{f_t\vect k_t + \sqrt{f_t}\,\vect g}{f_t + \sqrt{f_t}}\,\vect a' ,
+\]
+and the cost of a period is proportional to the number of cells times $r$ rather than to its square.
+For the conventional ETS of Remark~\ref{rem:approxfilter} an unobserved period adds the columns of a
+root of $\Var\boldsymbol\eta$, and the update at an observed one is $\vect U_t(\vect I -
+\beta\vect a\vect a')$ with $\beta = (1 - \sqrt{\sigma_u^2/f_t})/\vect a'\vect a$. The package uses the
+factor when four times the number of its columns at most is below the number of cells, and the whole
+covariance otherwise, as for intermittent demand, where the unobserved periods are many: with lags 24
+and 168 (193 cells) and 1 to 48 missing values among 1344 hourly observations, the filter is 8.6 to
+1.3 times faster with the factor, with the same results. The variances $f_t$
 and the derivatives $b_t$ do not depend on the data or on the initial states, so they can be
 recomputed for a fitted model by running the filter on its matrices and the pattern of the observed
 periods, without the data. The reset approximation needs only the coefficients $c_i$ up to the
@@ -674,7 +724,9 @@ Generalised Normal distributions take the variances of the filter, keeping the e
 the scale $s f_t^{1/p}$ ($p$ such that the variance is proportional to $s^p$): the convolution of these
 kinked densities with the normal uncertainty of the states is poorly integrated by the Gauss--Hermite
 rule, and the error of the approximation is small (a Kullback--Leibler divergence below 0.05 for the
-Laplace at $f_t = 4$).
+Laplace at $f_t = 4$). With a dynamic model of the scale \citep{ADAM}, the errors of the location
+model are standardised by the fitted scale, which takes the place of the variances $f_t$ in the joint
+likelihood, and the pure multiplicative models have no drift.
 
 % =============================================================================
 \section{Conclusions}

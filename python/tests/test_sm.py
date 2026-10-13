@@ -287,6 +287,32 @@ def test_the_scale_model_takes_the_missing_values_for_gaps():
     assert "iETS" not in str(scale.model_name)
 
 
+def test_the_scale_model_in_logs_sums_in_the_space_of_the_data():
+    """The cumulative forecasts of a scale model fitted in logs are the sums of the
+    scale, simulated for the intervals, and its refitted values and reforecasts are
+    the scale, as R."""
+    scale = sm(ADAM(model="ANN", lags=[1]).fit(_series("positive")), model="ANN")
+    assert scale.model_name_sm_.endswith(" in logs")
+    forecasts = np.asarray(scale.predict(h=4).mean)
+    np.testing.assert_allclose(scale.predict(h=4, cumulative=True).mean, forecasts.sum())
+    cumulative = scale.predict(h=4, interval="approximate", cumulative=True, seed=41)
+    assert cumulative.interval == "simulated"
+    assert 0 < float(cumulative.lower.iloc[0, 0]) < forecasts.sum()
+    np.testing.assert_allclose(
+        np.median(np.asarray(scale.reapply(nsim=100, seed=41).refitted), axis=1),
+        np.asarray(scale.fitted),
+        rtol=0.05,
+    )
+    # The mean of the scale is above its skeleton, the median of a model in logs
+    mean = np.asarray(scale.predict(h=4, point="mean", seed=41).mean)
+    assert np.all(mean > forecasts)
+    simulated = scale.predict(h=2, interval="simulated", nsim=20000, seed=41)
+    reforecast = scale.reforecast(h=2, nsim=200, seed=41)
+    np.testing.assert_allclose(
+        np.ravel(reforecast.lower), np.ravel(simulated.lower), rtol=0.2
+    )
+
+
 # The scale model in logs exponentiates its fitted values and forecasts, and the
 # analytical variance of a multiplicative model averages the de-biased fitted scale,
 # as R

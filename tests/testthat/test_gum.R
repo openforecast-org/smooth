@@ -73,3 +73,23 @@ test_that("vcov(type='hessian') of gum() is the inverse FI of the fit", {
     expect_true(all(is.finite(diag(v))))
     expect_equal(diag(v), abs(diag(suppressWarnings(solve(m$FI)))), ignore_attr=TRUE)
 })
+
+# The model is fitted in logs: its cumulative values are the sums in the space of the data
+test_that("the cumulative forecasts and the reforecasts of the multiplicative gum()", {
+    testModel <- gum(AirPassengers, orders=c(1,1), lags=c(1,12), type="multiplicative", h=4, holdout=FALSE);
+    expect_equal(as.vector(forecast(testModel, h=4, cumulative=TRUE)$mean),
+                 sum(forecast(testModel, h=4)$mean));
+    set.seed(41);
+    testForecast <- forecast(testModel, h=4, interval="approximate", cumulative=TRUE, nsim=20000);
+    expect_equal(testForecast$interval, "simulated");
+    expect_true(testForecast$lower < sum(forecast(testModel, h=4)$mean) && testForecast$upper > testForecast$mean);
+    expect_equal(as.vector(forecast(testModel, h=4, interval="simulated", cumulative=TRUE, side="upper",
+                                  nsim=100)$lower), 0);
+    set.seed(41);
+    expect_equal(apply(reapply(testModel, nsim=100)$refitted, 1, median), as.vector(fitted(testModel)),
+                 tolerance=0.05);
+    set.seed(41);
+    testReforecast <- reforecast(testModel, h=4, cumulative=TRUE, nsim=200);
+    expect_equal(as.vector(testReforecast$lower), as.vector(testForecast$lower), tolerance=0.02);
+    expect_equal(as.vector(testReforecast$upper), as.vector(testForecast$upper), tolerance=0.02);
+})

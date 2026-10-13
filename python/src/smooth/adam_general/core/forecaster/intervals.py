@@ -623,9 +623,11 @@ def generate_simulation_interval(
     # 9. Handle cumulative forecasts
     n_levels = len(level_low)
     if general_dict.get("cumulative", False):
-        # The h steps after the sample, with the origin k periods before its end
+        # The h steps after the sample, with the origin k periods before its end, in
+        # the space of the data for a model in logs
+        paths = y_simulated[int(general_dict.get("_gap_shift", 0) or 0) :]
         cum_sums = np.sum(
-            y_simulated[int(general_dict.get("_gap_shift", 0) or 0) :], axis=0
+            np.exp(paths) if general_dict.get("_log_model") else paths, axis=0
         )
         y_forecast_sim = np.mean(cum_sums)
         y_lower = np.nanquantile(cum_sums, level_low).reshape(1, n_levels)

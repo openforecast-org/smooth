@@ -3752,6 +3752,10 @@ class ADAM:
         self._general["interval"] = interval
         self._general["nsim"] = nsim
         self._general["cumulative"] = cumulative
+        # A scale model fitted in logs (sm()) has its forecasts exponentiated, and
+        # sums its paths in the space of the data for the cumulative ones, as R
+        log_model = getattr(self, "model_name_sm_", "").endswith(" in logs")
+        self._general["_log_model"] = log_model
         self._general["scenarios"] = scenarios
         self._general["point"] = point
         self._general["seed"] = seed
@@ -3837,8 +3841,9 @@ class ADAM:
             )
         finally:
             self._occurrence["occurrence"] = occurrence_type
-        # A scale model fitted in logs (sm()) forecasts the scale, as R's forecast.adam
-        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+        # A scale model fitted in logs (sm()) forecasts the scale, as R's forecast.adam;
+        # the cumulative values are already in the space of the data
+        if log_model and not cumulative:
             predictions.mean = np.exp(predictions.mean)
             if predictions.lower is not None:
                 predictions.lower = np.exp(predictions.lower)
@@ -6534,6 +6539,9 @@ class ADAM:
         new_states = np.array(result.states, copy=True, order="C")
         new_fitted = np.array(result.fitted, copy=True, order="C") * pt.reshape(-1, 1)
         new_fitted = np.ascontiguousarray(new_fitted).copy()
+        # A scale model fitted in logs (sm()) has the scale as its values, as R
+        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+            new_fitted = np.exp(new_fitted)
         new_profile = np.array(result.profile, copy=True, order="C")
 
         # 10. Build the result object
@@ -6931,16 +6939,19 @@ class ADAM:
         )
         paths = np.array(result.data, copy=True, order="C")  # (h, nsim, nsim)
 
-        # 7. Reduce to mean + intervals (R lines 1294-1316).
+        # 7. Reduce to mean + intervals (R lines 1294-1316), in the space of the data
+        # for a scale model fitted in logs (sm()), as R
+        log_model = getattr(self, "model_name_sm_", "").endswith(" in logs")
+        values = np.exp(paths) if log_model else paths
         mean_index = _forecast_index(self.fitted, h)
         if cumulative:
-            cumsums = np.nansum(paths, axis=0)  # (nsim, nsim)
+            cumsums = np.nansum(values, axis=0)  # (nsim, nsim)
             mean_scalar = float(_trim_mean(cumsums.ravel(), trim))
             mean_series = pd.Series([mean_scalar], index=mean_index[:1])
         else:
             # Trimmed mean per horizon step over all (k, j) pairs.
             mean_arr = np.array(
-                [_trim_mean(paths[i, :, :].ravel(), trim) for i in range(h)],
+                [_trim_mean(values[i, :, :].ravel(), trim) for i in range(h)],
                 dtype=float,
             )
             mean_series = pd.Series(mean_arr, index=mean_index)
@@ -6955,7 +6966,7 @@ class ADAM:
                 np.asarray(skeleton, dtype=float), index=mean_series.index
             )
         elif point == "median":
-            totals = np.nansum(paths, axis=0)[None] if cumulative else paths
+            totals = np.nansum(values, axis=0)[None] if cumulative else values
             mean_series = pd.Series(
                 np.nanmedian(totals.reshape(totals.shape[0], -1), axis=1),
                 index=mean_series.index,
@@ -6984,12 +6995,12 @@ class ADAM:
         upper_df = pd.DataFrame(np.zeros(level_up.shape), index=idx, columns=upper_cols)
 
         if cumulative:
-            cumsums = np.nansum(paths, axis=0).ravel()
+            cumsums = np.nansum(values, axis=0).ravel()
             lower_df.iloc[0, :] = np.nanquantile(cumsums, level_low[0, :])
             upper_df.iloc[0, :] = np.nanquantile(cumsums, level_up[0, :])
         elif interval == "prediction":
             for i in range(h):
-                flat = paths[i, :, :].ravel()
+                flat = values[i, :, :].ravel()
                 lower_df.iloc[i, :] = np.nanquantile(flat, level_low[i, :])
                 upper_df.iloc[i, :] = np.nanquantile(flat, level_up[i, :])
         else:  # confidence
@@ -6997,7 +7008,7 @@ class ADAM:
                 # Average across parameter sets (axis 0 of the (nsim, nsim)
                 # slice) first, then quantile across error samples.
                 col_means = np.array(
-                    [_trim_mean(paths[i, :, j], trim) for j in range(nsim)],
+                    [_trim_mean(values[i, :, j], trim) for j in range(nsim)],
                     dtype=float,
                 )
                 lower_df.iloc[i, :] = np.nanquantile(col_means, level_low[i, :])
@@ -7005,7 +7016,7 @@ class ADAM:
 
         # Inf / NaN substitution (R lines 1320-1364).
         if not cumulative:
-            inf_low_val = -np.inf if e_type == "A" else 0.0
+            inf_low_val = -np.inf if e_type == "A" and not log_model else 0.0
             lower_df = lower_df.where(level_low != 0.0, inf_low_val)
             upper_df = upper_df.where(level_up != 1.0, np.inf)
         else:

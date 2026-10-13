@@ -1355,3 +1355,19 @@ test_that("the cumulative intervals of the multiplicative models are simulated",
     expect_equal(forecast(testModel, h=4, interval="approximate", cumulative=TRUE)$interval,
                  "approximate");
 })
+
+# The scale model in logs sums its forecasts in the space of the data
+test_that("the cumulative forecasts and the reforecasts of sm() in logs", {
+    testModel <- suppressWarnings(sm(adam(AirPassengers, "ANA", lags=12, h=4, holdout=FALSE), model="ANN"));
+    expect_match(testModel$model, "in logs");
+    expect_equal(as.vector(forecast(testModel, h=4, cumulative=TRUE)$mean),
+                 sum(forecast(testModel, h=4)$mean));
+    set.seed(41);
+    expect_equal(apply(reapply(testModel, nsim=100)$refitted, 1, median), as.vector(fitted(testModel)),
+                 tolerance=0.05);
+    set.seed(41);
+    testForecast <- forecast(testModel, h=2, interval="simulated", nsim=20000);
+    set.seed(41);
+    testReforecast <- reforecast(testModel, h=2, nsim=200);
+    expect_equal(as.vector(testReforecast$lower), as.vector(testForecast$lower), tolerance=0.2);
+})

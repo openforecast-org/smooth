@@ -701,6 +701,10 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     }
 
     yt <- matrix(actuals(object));
+    # A model in logs is refitted to the logarithms of the data
+    if(adam_logModel(object)){
+        yt[] <- log(yt);
+    }
     # The missing values are skipped, as in the fit
     missingValues <- is.na(yt[,1]);
     ot[missingValues | is.na(ot[,1])] <- 0;
@@ -721,8 +725,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     fittedMatrix[] <- adamRefitted$fitted * as.vector(pt);
     profilesRecentArray[] <- adamRefitted$profile;
 
-    # If this was a model in logarithms (e.g. ARIMA for sm), then take exponent
-    if(any(unlist(gregexpr("in logs",object$model))!=-1)){
+    # If this was a model in logarithms (e.g. ARIMA for sm or the multiplicative GUM), then take
+    # exponent
+    if(adam_logModel(object)){
         fittedMatrix[] <- exp(fittedMatrix);
     }
 
@@ -1153,11 +1158,13 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     #### Note that the cumulative doesn't work with oes at the moment!
     if(cumulative){
-        # The totals of the paths
-        yForecast[] <- mean(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),trim=trim);
+        # The totals of the paths, in the space of the data for a model in logs
+        ySums <- apply(if(adam_logModel(object)){exp(arrayYSimulated)}else{arrayYSimulated},
+                       c(2,3), sum, na.rm=TRUE);
+        yForecast[] <- mean(ySums,trim=trim);
         if(interval!="none"){
-            yLower[] <- quantile(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),levelLow,type=7);
-            yUpper[] <- quantile(apply(arrayYSimulated,c(2,3),sum,na.rm=TRUE),levelUp,type=7);
+            yLower[] <- quantile(ySums,levelLow,type=7);
+            yUpper[] <- quantile(ySums,levelUp,type=7);
         }
     }
     else{
@@ -1204,11 +1211,8 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             }
         }
         else{
-            if(Etype=="A" && any(levelLow==0)){
-                yLower[] <- -Inf;
-            }
-            else if(Etype=="M" && any(levelLow==0)){
-                yLower[] <- 0;
+            if(any(levelLow==0)){
+                yLower[] <- if(Etype=="A" && !adam_logModel(object)){-Inf}else{0};
             }
             if(any(levelUp==1)){
                 yUpper[] <- Inf;
@@ -1250,8 +1254,9 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         yUpper[] <- yLower[] <- NA;
     }
 
-    # If this was a model in logarithms (e.g. ARIMA for sm), then take exponent
-    if(any(unlist(gregexpr("in logs",object$model))!=-1)){
+    # If this was a model in logarithms (e.g. ARIMA for sm or the multiplicative GUM), then take
+    # exponent. The cumulative values are already in the space of the data
+    if(adam_logModel(object) && !cumulative){
         yForecast[] <- exp(yForecast);
         yLower[] <- exp(yLower);
         yUpper[] <- exp(yUpper);

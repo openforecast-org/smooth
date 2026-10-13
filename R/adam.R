@@ -6309,7 +6309,6 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     etsModel <- etsChecker(object);
     # arimaModel <- arimaChecker(object);
     # cesModel <- cesChecker(object);
-    gumModel <- gumChecker(object);
     # ssarimaModel <- ssarimaChecker(object);
 
     # Technical parameters
@@ -6513,6 +6512,8 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
     # How many levels did user asked to produce
     nLevels <- length(level);
+    # A model in logs (sm(), multiplicative gum()) has its forecasts exponentiated
+    logModel <- adam_logModel(object);
     # Cumulative forecasts have only one observation
     if(cumulative){
         # hFinal is the number of elements we will have in the final forecast
@@ -6520,8 +6521,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         # In case of occurrence model use simulations - the cumulative probability is a bitch
         # (not for the one of the missing values only, whose probability is one). So do the
         # multiplicative models: the variance of the sum of their errors needs the covariances
-        # of the horizons, which their analytical variances do not have
-        if((occurrenceModel && any(pForecast<1)) ||
+        # of the horizons, which their analytical variances do not have. A model in logs sums
+        # its paths in the space of the data
+        if((occurrenceModel && any(pForecast<1)) || (logModel && interval!="none") ||
            (interval=="approximate" &&
             (any(c(Etype,Ttype,Stype)=="M") ||
              any(object$distribution==c("dlnorm","dinvgauss","dgamma","dls","dllaplace","dlgnorm"))))){
@@ -6549,7 +6551,8 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     }
     # Fill in the point forecasts
     if(cumulative){
-        yForecast[] <- sum(as.vector(adamForecast) * as.vector(pForecast));
+        yForecast[] <- sum(as.vector(if(logModel){exp(adamForecast)}else{adamForecast}) *
+                               as.vector(pForecast));
     }
     else{
         yForecast[] <- as.vector(adamForecast) * as.vector(pForecast);
@@ -6640,9 +6643,11 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
         #### Note that the cumulative doesn't work with oes at the moment!
         if(cumulative){
-            yForecast[] <- mean(colSums(ySimulated,na.rm=TRUE));
-            yLower[] <- quantile(colSums(ySimulated,na.rm=TRUE),levelLow,type=7);
-            yUpper[] <- quantile(colSums(ySimulated,na.rm=TRUE),levelUp,type=7);
+            # The totals of the paths, in the space of the data
+            ySums <- colSums(if(logModel){exp(ySimulated)}else{ySimulated}, na.rm=TRUE);
+            yForecast[] <- mean(ySums);
+            yLower[] <- quantile(ySums,levelLow,type=7);
+            yUpper[] <- quantile(ySums,levelUp,type=7);
         }
         else{
             for(i in 1:h){
@@ -7035,11 +7040,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             }
         }
         else{
-            if(Etype=="A" && any(levelLow==0)){
-                yLower[] <- -Inf;
-            }
-            else if(Etype=="M" && any(levelLow==0)){
-                yLower[] <- 0;
+            # The bounds are relative to the centre here: zero for the totals of a model in logs
+            if(any(levelLow==0)){
+                yLower[] <- switch(Etype, "A"=if(logModel){-yCentre}else{-Inf}, "M"=0);
             }
             if(any(levelUp==1)){
                 yUpper[] <- Inf;
@@ -7090,8 +7093,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
 
 
-    # If this was a model in logarithms (e.g. ARIMA for sm), then take exponent
-    if(any(unlist(gregexpr("in logs",object$model))!=-1)){
+    # If this was a model in logarithms (e.g. ARIMA for sm or the multiplicative GUM), then take
+    # exponent. The cumulative values are already in the space of the data
+    if(logModel && !cumulative){
         yForecast[] <- exp(yForecast);
         yLower[] <- exp(yLower);
         yUpper[] <- exp(yUpper);
@@ -7110,14 +7114,6 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                     call.=FALSE);
             ySimulated <- FALSE;
         }
-    }
-
-    # Fix values if we have a log-model in case of GUM
-    if(gumModel && object$type=="multiplicative"){
-        yForecast[] <- exp(yForecast);
-        yLower[] <- exp(yLower);
-        yUpper[] <- exp(yUpper);
-
     }
 
 

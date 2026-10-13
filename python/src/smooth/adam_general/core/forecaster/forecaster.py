@@ -880,7 +880,10 @@ def forecaster(
     y_sizes = y_forecast_values
     y_forecast_values = y_forecast_values * p_forecast
     if general_dict.get("cumulative"):
-        # The h steps after the sample, with the origin k periods before its end
+        # The h steps after the sample, with the origin k periods before its end; a
+        # model in logs sums its forecasts in the space of the data
+        if general_dict.get("_log_model"):
+            y_forecast_values = np.exp(y_sizes) * p_forecast
         y_forecast_values = np.sum(
             y_forecast_values[int(general_dict.get("_gap_shift", 0) or 0) :]
         )
@@ -888,7 +891,8 @@ def forecaster(
     # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated
     # (not for the occurrence of the missing values only, whose probability is one).
     # So do the multiplicative models: the variance of the sum of their errors needs
-    # the covariances of the horizons, which their analytical variances do not have
+    # the covariances of the horizons, which their analytical variances do not have.
+    # A model in logs sums its paths in the space of the data
     occurrence_model = occurrence_model and np.any(np.asarray(p_forecast) < 1)
     multiplicative = "M" in (
         model_type_dict["error_type"],
@@ -903,7 +907,9 @@ def forecaster(
         "dlgnorm",
     )
     if general_dict.get("cumulative", False) and (
-        occurrence_model or (multiplicative and resolved_interval == "approximate")
+        occurrence_model
+        or (multiplicative and resolved_interval == "approximate")
+        or (general_dict.get("_log_model") and resolved_interval != "none")
     ):
         general_dict["interval"] = "simulated"
         resolved_interval = "simulated"
@@ -1096,7 +1102,8 @@ def _forecast_point(arguments):
         general_dict.get("ets") == "adam",
         not np.ravel(arguments["observations_dict"]["ot_logical"])[-1],
     )
-    if point == "median" and intermittent:
+    # Nor of a model in logs (R's adam_skeletonSteps)
+    if (point == "median" and intermittent) or general_dict.get("_log_model"):
         steps = 0
     if steps >= h:
         return result
@@ -1107,9 +1114,16 @@ def _forecast_point(arguments):
             interval="simulated", general={"scenarios": True, "cumulative": False}
         )
         paths = np.asarray(general["_scenarios_matrix"], dtype=float)
+        # A model in logs averages its paths in the space of the data, whose mean
+        # predict() takes the exponent of when it is not cumulative
+        log_model = general_dict.get("_log_model", False)
+        if log_model:
+            paths = np.exp(paths)
         values = np.atleast_1d(
             np.mean(np.sum(paths, axis=0)) if cumulative else np.mean(paths, axis=1)
         )
+        if log_model and not cumulative:
+            values = np.log(values)
     else:
         interval = arguments["interval"]
         if intermittent:

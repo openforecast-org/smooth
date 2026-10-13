@@ -1021,6 +1021,7 @@ class CES:
     # The methods of ADAM, as R's methods of adam() take the ces() models: these need
     # only the residuals, the scale and the distribution
     _check_is_fitted = _check_fitted
+    _log_model = ADAM._log_model
     _gap_residuals = ADAM._gap_residuals
     rstandard = ADAM.rstandard
     rstudent = ADAM.rstudent

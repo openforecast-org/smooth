@@ -2152,6 +2152,12 @@ class ADAM:
     # =========================================================================
 
     @property
+    def _log_model(self) -> bool:
+        """Whether the model works in logarithms, with its values exponentiated: a
+        scale model fitted in logs by sm() (R's ``adam_logModel``)."""
+        return getattr(self, "model_name_sm_", "").endswith(" in logs")
+
+    @property
     def fitted(self) -> NDArray:
         """
         Return in-sample fitted values.
@@ -2179,7 +2185,7 @@ class ADAM:
         if getattr(self, "_is_combined", False):
             return self._combined_fitted
         # A scale model fitted in logs (sm()) has the scale as its fitted values, as R
-        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+        if self._log_model:
             return np.exp(self._prepared["y_fitted"])
         return self._prepared["y_fitted"]
 
@@ -2211,7 +2217,7 @@ class ADAM:
         if missing is not None and np.any(missing):
             y[missing] = np.nan
         # A scale model fitted in logs (sm()) has the scale as its data, as R
-        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+        if self._log_model:
             y = np.exp(y)
         return y
 
@@ -3757,7 +3763,7 @@ class ADAM:
         self._general["cumulative"] = cumulative
         # A scale model fitted in logs (sm()) has its forecasts exponentiated, and
         # sums its paths in the space of the data for the cumulative ones, as R
-        log_model = getattr(self, "model_name_sm_", "").endswith(" in logs")
+        log_model = self._log_model
         self._general["_log_model"] = log_model
         self._general["scenarios"] = scenarios
         self._general["point"] = point
@@ -5970,7 +5976,7 @@ class ADAM:
 
         actuals = np.asarray(self.actuals, dtype=float)
         # A scale model fitted in logs (sm()) is refitted to the logarithms
-        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+        if self._log_model:
             actuals = np.log(actuals)
 
         # ``functools.partial`` over the top-level worker is picklable —
@@ -6492,7 +6498,7 @@ class ADAM:
         # 7. yt and ot (R/reapply.R:745-754)
         y_in_sample = np.asarray(self.actuals, dtype=np.float64).reshape(-1, 1)
         # A scale model fitted in logs (sm()) is refitted to the logarithms, as R
-        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+        if self._log_model:
             y_in_sample = np.log(y_in_sample)
         occurrence_dict = getattr(self, "_occurrence", {}) or {}
         occurrence_model = occurrence_dict.get("occurrence_model", False)
@@ -6555,7 +6561,7 @@ class ADAM:
         new_fitted = np.array(result.fitted, copy=True, order="C") * pt.reshape(-1, 1)
         new_fitted = np.ascontiguousarray(new_fitted).copy()
         # A scale model fitted in logs (sm()) has the scale as its values, as R
-        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+        if self._log_model:
             new_fitted = np.exp(new_fitted)
         new_profile = np.array(result.profile, copy=True, order="C")
 
@@ -6956,7 +6962,7 @@ class ADAM:
 
         # 7. Reduce to mean + intervals (R lines 1294-1316), in the space of the data
         # for a scale model fitted in logs (sm()), as R
-        log_model = getattr(self, "model_name_sm_", "").endswith(" in logs")
+        log_model = self._log_model
         values = np.exp(paths) if log_model else paths
         mean_index = _forecast_index(self.fitted, h)
         if cumulative:

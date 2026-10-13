@@ -2210,6 +2210,9 @@ class ADAM:
         missing = self._observations.get("y_na_values")
         if missing is not None and np.any(missing):
             y[missing] = np.nan
+        # A scale model fitted in logs (sm()) has the scale as its data, as R
+        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+            y = np.exp(y)
         return y
 
     @property
@@ -3811,8 +3814,12 @@ class ADAM:
                 new_xreg = full
         self._set_new_xreg(new_xreg)
 
-        # Validate prediction inputs and prepare data for forecasting
+        # Validate prediction inputs and prepare data for forecasting. A scale model
+        # (sm()) keeps its standardised residuals, which the preparation replaces
         self._validate_prediction_inputs()
+        residuals = (
+            self._prepared["residuals"] if getattr(self, "is_scale_", False) else None
+        )
         self._prepare_prediction_data()
 
         # Pre-compute p_forecast so forecaster can use it for both point forecasts
@@ -3841,6 +3848,8 @@ class ADAM:
             )
         finally:
             self._occurrence["occurrence"] = occurrence_type
+            if residuals is not None:
+                self._prepared["residuals"] = residuals
         # A scale model fitted in logs (sm()) forecasts the scale, as R's forecast.adam;
         # the cumulative values are already in the space of the data
         if log_model and not cumulative:
@@ -5960,6 +5969,9 @@ class ADAM:
         }
 
         actuals = np.asarray(self.actuals, dtype=float)
+        # A scale model fitted in logs (sm()) is refitted to the logarithms
+        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+            actuals = np.log(actuals)
 
         # ``functools.partial`` over the top-level worker is picklable —
         # joblib needs that. Same callable works in serial mode too.
@@ -6479,6 +6491,9 @@ class ADAM:
 
         # 7. yt and ot (R/reapply.R:745-754)
         y_in_sample = np.asarray(self.actuals, dtype=np.float64).reshape(-1, 1)
+        # A scale model fitted in logs (sm()) is refitted to the logarithms, as R
+        if getattr(self, "model_name_sm_", "").endswith(" in logs"):
+            y_in_sample = np.log(y_in_sample)
         occurrence_dict = getattr(self, "_occurrence", {}) or {}
         occurrence_model = occurrence_dict.get("occurrence_model", False)
         if occurrence_model:

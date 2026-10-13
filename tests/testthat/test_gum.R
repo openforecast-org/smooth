@@ -90,6 +90,12 @@ test_that("the cumulative forecasts and the reforecasts of the multiplicative gu
                  tolerance=0.05);
     set.seed(41);
     testReforecast <- reforecast(testModel, h=4, cumulative=TRUE, nsim=200);
-    expect_equal(as.vector(testReforecast$lower), as.vector(testForecast$lower), tolerance=0.02);
-    expect_equal(as.vector(testReforecast$upper), as.vector(testForecast$upper), tolerance=0.02);
+    # With the uncertainty of the parameters, the bounds of the sums are wider
+    expect_true(testReforecast$lower < testForecast$lower && testReforecast$upper > testForecast$upper);
+    expect_equal(as.vector(testReforecast$lower), as.vector(testForecast$lower), tolerance=0.15);
+    # The point likelihoods of the logarithms with the Jacobian, and the OPG covariance
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    expect_no_warning(vcov(testModel));
+    # The parameters drawn by reapply() enter the model
+    expect_true(sd(reapply(testModel, nsim=10)$refitted[10,]) > 0);
 })

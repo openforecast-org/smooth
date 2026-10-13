@@ -293,6 +293,9 @@ def test_the_scale_model_in_logs_sums_in_the_space_of_the_data():
     the scale, as R."""
     scale = sm(ADAM(model="ANN", lags=[1]).fit(_series("positive")), model="ANN")
     assert scale.model_name_sm_.endswith(" in logs")
+    # Its data are the scale, and its standardised residuals stay after forecasting
+    assert np.all(np.asarray(scale.actuals) > 0)
+    residuals = np.asarray(scale.residuals).copy()
     forecasts = np.asarray(scale.predict(h=4).mean)
     np.testing.assert_allclose(scale.predict(h=4, cumulative=True).mean, forecasts.sum())
     cumulative = scale.predict(h=4, interval="approximate", cumulative=True, seed=41)
@@ -311,6 +314,7 @@ def test_the_scale_model_in_logs_sums_in_the_space_of_the_data():
     np.testing.assert_allclose(
         np.ravel(reforecast.lower), np.ravel(simulated.lower), rtol=0.2
     )
+    np.testing.assert_array_equal(np.asarray(scale.residuals), residuals)
 
 
 # The scale model in logs exponentiates its fitted values and forecasts, and the

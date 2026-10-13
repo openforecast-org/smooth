@@ -7654,6 +7654,13 @@ pointLik.adam <- function(object, log=TRUE, ...){
         otLogical <- observed;
         yFitted <- fitted(object);
     }
+    # A model in logs (the multiplicative GUM) has the density of the logarithms of the data,
+    # with the Jacobian, as in its likelihood
+    logModel <- adam_logModel(object);
+    if(logModel){
+        yInSample <- log(yInSample);
+        yFitted <- log(yFitted);
+    }
     scale <- extractScale(object);
     other <- switch(distribution,
                     "dalaplace"=object$other$alpha,
@@ -7718,6 +7725,9 @@ pointLik.adam <- function(object, log=TRUE, ...){
     );
     if(any(distribution==c("dllaplace","dls","dlgnorm"))){
         likValues[otLogical] <- likValues[otLogical] - log(yInSample[otLogical]);
+    }
+    if(logModel){
+        likValues[otLogical] <- likValues[otLogical] - yInSample[otLogical];
     }
     # The Gamma and the Inverse Gaussian mixed over the drift after those periods
     if(!is.null(attr(gapVariance, "drift")) && distribution!="dlnorm"){

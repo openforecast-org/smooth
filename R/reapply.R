@@ -527,8 +527,19 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
         }
     }
 
-    # Transition, persistence and measurement of GUM
-    # if(gumModel){}
+    # Persistence, transition (by columns) and measurement of GUM, in the order of its filler
+    if(gumModel){
+        gNames <- grep("^g[0-9]+$", parametersNames, value=TRUE);
+        FNames <- grep("^F[0-9]+$", parametersNames, value=TRUE);
+        wNames <- grep("^w[0-9]+$", parametersNames, value=TRUE);
+        matG[seq_along(gNames),] <- t(randomParameters[,gNames,drop=FALSE]);
+        nF <- sqrt(length(FNames));
+        arrF[seq_len(nF),seq_len(nF),] <- t(randomParameters[,FNames,drop=FALSE]);
+        for(i in seq_along(wNames)){
+            arrWt[,i,] <- matrix(randomParameters[,wNames[i]], dim(arrWt)[1], nsim, byrow=TRUE);
+        }
+        k <- k+length(gNames)+length(FNames)+length(wNames);
+    }
 
     if(xregModel && any(substr(parametersNames,1,5)=="delta")){
         deltas <- which(substr(colnames(randomParameters),1,5)=="delta");
@@ -661,8 +672,20 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
     j <- componentsNumberETS;
     # CES states
     # if(cesModel){}
-    # GUM states
-    # if(gumModel){}
+    # GUM states, each repeated over its lag
+    if(gumModel){
+        vtNames <- grep("^vt[0-9]+$", parametersNames, value=TRUE);
+        if(length(vtNames)>0){
+            vtStart <- c(0, cumsum(lagsModelAll))[seq_along(lagsModelAll)];
+            for(i in seq_along(lagsModelAll)){
+                profilesRecentArray[i,,] <- t(randomParameters[, vtNames[vtStart[i]+
+                                                                     rep_len(1:lagsModelAll[i], lagsModelMax)],
+                                                               drop=FALSE]);
+            }
+        }
+        j <- j+length(lagsModelAll);
+        k <- k+length(vtNames);
+    }
     # ARIMA states in the profileRecent
     if(arimaModel){
         j <- componentsNumberETS;

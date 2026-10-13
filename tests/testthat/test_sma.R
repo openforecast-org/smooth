@@ -26,3 +26,14 @@ test_that("sma() forecast() method works", {
     expect_equal(length(fc$mean), 8)
     expect_true(all(fc$lower <= fc$upper))
 })
+
+# The missing values are gaps in the selection of the order and in the fit: the states are
+# filtered over them, the likelihood is over the observed values, and the information
+# criterion of the selected order is that of the model
+test_that("sma() takes the missing values for gaps", {
+    yNA <- y;
+    yNA[c(30, 31, 60)] <- NA;
+    m <- suppressWarnings(sma(yNA, h=8, holdout=TRUE, silent=TRUE));
+    expect_equal(sum(pointLik(m)), as.numeric(logLik(m)));
+    expect_equal(as.numeric(m$ICs[m$orders[1]]), as.numeric(AICc(m)));
+})

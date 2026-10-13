@@ -41,6 +41,20 @@ test_that("ADAM ETS(CCC) on BJsales", {
     expect_match(modelType(testModel), "CCN")
 })
 
+# The occurrence and the regressors are counted once in a combination
+test_that("ADAM combination counts the occurrence and the regressors once", {
+    skip_on_cran()
+    set.seed(41);
+    y <- rgamma(120, shape=5, scale=2) * rbinom(120, 1, 0.6);
+    testCombined <- adam(y, "CNN", occurrence="fixed");
+    expect_equal(nparam(testCombined), sum(sapply(testCombined$models, nparam) * testCombined$ICw));
+    xregData <- data.frame(y=as.numeric(BJsales), x=rnorm(150), z=rnorm(150));
+    testCombined <- adam(xregData, "CNN", regressors="select");
+    expect_equal(nparam(testCombined), sum(sapply(testCombined$models, nparam) * testCombined$ICw));
+    expect_equal(testCombined$nParam[1,2],
+                 sum(sapply(testCombined$models, function(x){x$nParam[1,2]}) * testCombined$ICw));
+})
+
 # ADAM forecasts with approximated interval
 test_that("ADAM forecast with simulated interval", {
     skip_on_cran()
@@ -1055,3 +1069,305 @@ test_that("The multistep errors start from the states before their targets", {
                     B=fitMSE$B, maxeval=1);
     expect_equal(fitMSEh$lossValue, fitMSE$lossValue, tolerance=1e-10);
 });
+
+# Over the periods without an observed size, the states of a pure additive model with the
+# normal distribution are filtered: for ETS(A,N,N) the variance of the level relative to
+# sigma^2 grows by alpha^2 over them and becomes P (1-alpha)^2 / (P+1) at an observed size,
+# and the variance of the error is sigma^2 (P+1), in the likelihood, the scale, the
+# diagnostics and the forecasts
+test_that("the filter of a pure additive model over the zeros and the missing values", {
+    set.seed(41);
+    e <- rnorm(300, 0, 5);
+    level <- 100 + cumsum(0.3*e);
+    y <- (c(100, level[-300]) + e)*rbinom(300, 1, 0.5);
+    y[c(50, 51, 299, 300)] <- NA;
+    testModel <- suppressWarnings(adam(y, "ANN", occurrence="fixed", distribution="dnorm"));
+    otLogical <- !is.na(y) & y!=0;
+    alpha <- testModel$persistence[1];
+    gapVariance <- rep(1, 303);
+    P <- 0;
+    for(t in 1:303){
+        gapVariance[t] <- P + 1;
+        P <- if(t<=300 && otLogical[t]){P*(1-alpha)^2/(P+1)}else{P+alpha^2};
+    }
+    expect_equal(adam_gapVarianceModel(testModel), gapVariance[1:300]);
+    expect_equal(testModel$scale, mean(residuals(testModel)[otLogical]^2/gapVariance[1:300][otLogical]));
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    expect_equal(var(rstandard(testModel)[otLogical]), 1, tolerance=0.1);
+    # The h steps after the sample are unobserved too
+    s2 <- adam_varianceDebiased(testModel);
+    testForecast <- forecast(testModel, h=3, interval="approximate", level=0.9, occurrence=rep(1, 3));
+    expect_equal(as.vector(testForecast$upper - testForecast$mean),
+                 qnorm(0.95, 0, sqrt(s2*gapVariance[301:303])));
+})
+
+
+# The pure multiplicative ADAM ETS is additive in logs, where its states are filtered: for
+# ETS(M,N,N), log(1+e) is N(-s a/2, s k), with k = P+1 as for ETS(A,N,N) and a = 1 - 2x, x
+# being the derivative of the mean of the log of the level in the scale, which decreases
+# by alpha/2 over the periods without an observed size and is corrected by the gain
+# (P+alpha)/k at the observed ones, and the scale is the maximum likelihood of that
+test_that("the filter of the pure multiplicative ADAM ETS with dlnorm", {
+    set.seed(41);
+    u <- rnorm(300, -0.1, sqrt(0.2));
+    level <- 10*exp(cumsum(c(0, 0.3*u[-300])));
+    y <- level*exp(u)*rbinom(300, 1, 0.4);
+    testModel <- adam(y, "MNN", occurrence="fixed", distribution="dlnorm", ets="adam");
+    otLogical <- y!=0;
+    alpha <- testModel$persistence[1];
+    gapVariance <- gapMean <- rep(1, 300);
+    P <- x <- 0;
+    for(t in 1:300){
+        gapVariance[t] <- P + 1;
+        gapMean[t] <- 1 - 2*x;
+        x <- x - alpha/2 + otLogical[t]*(P+alpha)/(P+1)*(0.5-x);
+        P <- if(otLogical[t]){P*(1-alpha)^2/(P+1)}else{P+alpha^2};
+    }
+    expect_equal(adam_gapVarianceModel(testModel), gapVariance);
+    expect_equal(adam_gapVarianceModel(testModel, 1), gapMean);
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    # The scale maximises the likelihood given the other parameters
+    logResiduals <- log(residuals(testModel)[otLogical]);
+    likelihood <- function(scale){
+        sum(dnorm(logResiduals, -scale*gapMean[otLogical]/2, sqrt(scale*gapVariance[otLogical]),
+                  log=TRUE));
+    }
+    expect_equal(testModel$scale, optimize(likelihood, c(0.01, 2), maximum=TRUE)$maximum,
+                 tolerance=1e-4);
+})
+
+
+# The log-normal 1+e has the mean of one and the variance s of its log: the one-step
+# interval is qlnorm(-s/2, sqrt(s)) around the fitted values, and for the pure
+# multiplicative ADAM ETS the h-step one is qlnorm(-s a_h/2, sqrt(s k_h)) exactly
+test_that("the dlnorm intervals come from logN(-s/2, s)", {
+    set.seed(41);
+    u <- rnorm(300, -0.1, sqrt(0.2));
+    y <- 10*exp(cumsum(c(0, 0.3*u[-300])))*exp(u);
+    testModel <- adam(y, "MNN", distribution="dlnorm", ets="adam", h=5);
+    s2 <- adam_varianceDebiased(testModel);
+    testPredict <- predict(testModel, interval="prediction", level=0.9);
+    expect_equal(as.vector(testPredict$upper/fitted(testModel)), rep(qlnorm(0.95, -s2/2, sqrt(s2)), 300));
+    testForecast <- forecast(testModel, h=5, interval="approximate", level=0.9);
+    alpha <- testModel$persistence[1];
+    expect_equal(as.vector(testForecast$upper/testForecast$mean),
+                 qlnorm(0.95, -s2*(1+(0:4)*alpha)/2, sqrt(s2*(1+(0:4)*alpha^2))));
+})
+
+# The intervals of an occurrence model are of the sizes, so they are around the fitted
+# values of the sizes, not around their products with the probability
+test_that("the intervals of an occurrence model are around the sizes", {
+    set.seed(41);
+    y <- rnorm(300, 100, 10)*rbinom(300, 1, 0.4);
+    testModel <- adam(y, "ANN", occurrence="fixed", h=5);
+    p <- fitted(testModel$occurrence)[1];
+    s2 <- adam_varianceDebiased(testModel);
+    testPredict <- predict(testModel, interval="prediction", level=0.9);
+    expect_equal(as.vector(testPredict$upper - fitted(testModel)/p),
+                 rep(qnorm((1+(0.9-(1-p))/p)/2, 0, sqrt(s2)), 300));
+    testForecast <- forecast(testModel, h=1, interval="approximate", level=0.9);
+    expect_equal(as.vector(testForecast$upper - testForecast$mean/p),
+                 qnorm((1+(0.9-(1-p))/p)/2, 0, sqrt(s2)));
+})
+
+
+# The analytical covariance of the multistep errors of ETS(A,N,N) has 1 + (i-1) alpha^2 on
+# the diagonal and alpha + (i-1) alpha^2 above it, from the C++ shared with Python
+test_that("covarAnal() of ETS(A,N,N) is the closed form", {
+    covarMat <- covarAnal(1, 5, matrix(1), matrix(1), 0.3, 2);
+    expect_equal(diag(covarMat), 2*(1 + (0:4)*0.09));
+    expect_equal(covarMat[1,-1], rep(2*0.3, 4));
+    expect_equal(covarMat[3,5], 2*(0.3 + 2*0.09));
+})
+
+# The moments of the errors in logs of the conventional ETS(M,N,N), u = log(1+e) and
+# log(1 + alpha e), are those of the simulated ones. Over j-1 periods without an observed size
+# after an observed one, its filter moves the level by them, so the variance of its drift at the
+# next observed size is (j-1) times that of log(1 + alpha e); and the fixed point of the moment
+# equations with such a drift gives the scale
+test_that("the drift of the states of the pure multiplicative ETS after the gaps", {
+    set.seed(41);
+    noise <- adam_gapDrift(c(0.3), c(TRUE, TRUE), "dgamma", FALSE, 0.2)$noise;
+    errors <- rgamma(3e5, shape=5, scale=0.2);
+    innovations <- cbind(log(errors), log(1 + 0.3*(errors - 1)));
+    expect_equal(noise$mean, colMeans(innovations), tolerance=1e-2);
+    expect_equal(noise$covariance, cov(innovations), tolerance=1e-2);
+
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e;
+    y[c(50, 51, 52)] <- 0;
+    y[200:300] <- y[200:300]*rbinom(101, 1, 0.5);
+    testModel <- adam(y, "MNN", occurrence="fixed", distribution="dgamma");
+    otLogical <- y!=0;
+    noise <- adam_gapDrift(testModel$persistence, otLogical, "dgamma", FALSE, testModel$scale)$noise;
+    drift <- attr(adam_gapVarianceModel(testModel), "drift");
+    expect_equal(drift$variance[1:49], rep(0, 49));
+    expect_equal(drift$variance[50], 3*noise$covariance[2,2]);
+
+    # The scale of errors (1+e) D - 1 is s, with the drift D of the simulated innovations
+    gaps <- rgeom(1e5, 0.35) + 1;
+    otLogical <- rep(FALSE, sum(gaps));
+    otLogical[cumsum(gaps)] <- TRUE;
+    driftValues <- sapply(gaps, function(j){prod(1 + 0.3*(rgamma(j-1, shape=5, scale=0.2) - 1))});
+    errors <- rgamma(1e5, shape=5, scale=0.2)*driftValues - 1;
+    gapDrift <- function(scale){
+        noise <- adam_gapDrift(c(0.3), otLogical, "dgamma", FALSE, scale)$noise;
+        return(list(mean=(gaps-1)*noise$mean[2], variance=(gaps-1)*noise$covariance[2,2]));
+    }
+    expect_equal(adam_scaler("dgamma", "M", errors, NULL, 1e5, NULL, gapDrift=gapDrift), 0.2, tolerance=2e-2);
+})
+
+# The Gamma, the Inverse Gaussian and the conventional log-normal after the periods without
+# an observed size: the point likelihoods sum to the log-likelihood, and the fits without
+# such periods are those of the one-step density
+test_that("the likelihood of the pure multiplicative ETS with the drift after the gaps", {
+    set.seed(41);
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e*rbinom(300, 1, 0.35);
+    for(distribution in c("dgamma","dinvgauss","dlnorm")){
+        testModel <- adam(y, "MNN", occurrence="fixed", distribution=distribution);
+        expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    }
+    # ADAM ETS, whose filter runs in logs with the errors of mean zero and the variance one
+    for(distribution in c("dgamma","dinvgauss")){
+        testModel <- adam(y, "MNN", occurrence="fixed", distribution=distribution, ets="adam");
+        expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    }
+    testModel <- adam(AirPassengers, "MNN", distribution="dgamma");
+    # residuals() of the Gamma are the ratios 1+e
+    expect_equal(testModel$scale, mean((residuals(testModel)-1)^2));
+})
+
+# The pure additive models with the Laplace, the S and the Generalised Normal distributions
+# take the variances of the filter after the periods without an observed size, with the scale
+# s k^(1/p) of the variance k times the one-step one, p of adam_scalePower()
+test_that("the filter of the pure additive models with the other distributions", {
+    set.seed(41);
+    y <- (100 + cumsum(rnorm(300, 0, 3)) + rlaplace(300, 0, 3))*rbinom(300, 1, 0.4);
+    otLogical <- y!=0;
+    for(distribution in c("dlaplace","ds","dgnorm")){
+        testModel <- adam(y, "ANN", occurrence="fixed", distribution=distribution);
+        gapVariance <- adam_gapVarianceModel(testModel);
+        expect_true(all(gapVariance[otLogical] >= 1) && any(gapVariance[otLogical] > 1));
+        expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    }
+    testModel <- adam(y, "ANN", occurrence="fixed", distribution="dlaplace");
+    gapVariance <- adam_gapVarianceModel(testModel)[otLogical];
+    expect_equal(testModel$scale, mean(abs(residuals(testModel)[otLogical])/sqrt(gapVariance)));
+})
+
+# With the k last periods without an observed size, the forecasts of the pure multiplicative
+# ETS with the drift of the states start from the last observed size, as h+k steps ahead: for
+# ETS(M,N,N), the level at that size, with the h+k step variance, and the simulated forecasts of
+# any model, which then take the uncertainty of the states over those periods as the filter
+test_that("the forecasts after the last observed size", {
+    set.seed(41);
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e*rbinom(300, 1, 0.6);
+    y[295:300] <- 0;
+    testModel <- adam(y, "MNN", occurrence="fixed", distribution="dgamma");
+    last <- max(which(y!=0));
+    trailing <- 300 - last;
+    testForecast <- forecast(testModel, h=3, interval="approximate", level=0.9, occurrence=rep(1, 3));
+    expect_equal(as.vector(testForecast$mean),
+                 rep(unname(testModel$states[nrow(testModel$states)-trailing, 1]), 3));
+    variances <- tail(adamVarAnal(1, 3+trailing, matrix(1), matrix(1), testModel$persistence,
+                                  mean(adam_varianceDebiased(testModel))), 3);
+    expect_equal(as.vector(testForecast$upper/testForecast$mean),
+                 qgamma(0.95, shape=1/variances, scale=variances));
+
+    z <- as.numeric(AirPassengers);
+    z[141:144] <- NA;
+    testModel <- suppressWarnings(adam(z, "AAN", distribution="dnorm"));
+    testApproximate <- forecast(testModel, h=3, interval="approximate", level=0.9);
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=3, interval="simulated", level=0.9, nsim=50000);
+    expect_equal(as.vector(testSimulated$upper), as.vector(testApproximate$upper), tolerance=5e-3);
+})
+
+test_that("the cumulative forecasts and the scale models after the last observed size", {
+    z <- as.numeric(AirPassengers);
+    z[c(10,50,51,90,140,142:144)] <- NA;
+    testModel <- suppressWarnings(adam(z, "AAN", distribution="dnorm"));
+    # The variance of the sum over the h steps after the sample, from the last observed value
+    testForecast <- forecast(testModel, h=4, interval="approximate", level=0.9, cumulative=TRUE);
+    variances <- covarAnal(1, 7, matrix(1,1,2), testModel$transition, testModel$persistence,
+                           mean(adam_varianceDebiased(testModel)))[4:7,4:7];
+    expect_equal(as.vector(testForecast$upper), sum(forecast(testModel, h=4)$mean) +
+                     qnorm(0.95)*sqrt(sum(variances)));
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=4, interval="simulated", level=0.9, cumulative=TRUE, nsim=50000);
+    expect_equal(as.vector(testSimulated$upper), as.vector(testForecast$upper), tolerance=5e-3);
+
+    # The scale of the k last periods is the fitted one of the scale model
+    testModel <- implant(testModel, suppressWarnings(sm(testModel, model="MNN")));
+    testApproximate <- forecast(testModel, h=4, interval="approximate", level=0.9);
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=4, interval="simulated", level=0.9, nsim=50000);
+    expect_equal(as.vector(testSimulated$upper), as.vector(testApproximate$upper), tolerance=5e-3);
+    testModel <- suppressWarnings(adam(z, "MNM", distribution="dgamma"));
+    testModel <- implant(testModel, suppressWarnings(sm(testModel, model="MNN")));
+    expect_length(predict(testModel)$mean, length(z));
+
+    # The profile at the last observed value, with the corrections of the filter after the
+    # missing values inside the sample, gives the forecasts from the end of the sample
+    for(testModel in list(suppressWarnings(adam(ts(z, frequency=12), "ANA", distribution="dnorm")),
+                          suppressWarnings(adam(ts(z, frequency=12), "NNN", lags=c(1,12),
+                                                orders=list(ar=c(0,1), i=c(1,1), ma=c(1,1)))),
+                          suppressWarnings(tbats(ts(z, frequency=12), distribution="dnorm", lambda=1,
+                                                 trend="none", harmonics=2,
+                                                 orders=list(ar=0, ma=0, select=FALSE))))){
+        expect_equal(as.vector(forecast(testModel, h=4, interval="simulated", nsim=10)$mean),
+                     as.vector(forecast(testModel, h=4)$mean));
+    }
+})
+
+# ADAM ETS moves the level by (1+e)^alpha, whose mean is below one: the mean drifts below the
+# skeleton after the first step, and the prediction interval is simulated
+test_that("the mean of ADAM ETS with a multiplicative error", {
+    set.seed(41);
+    e <- rgamma(300, shape=5, scale=0.2);
+    y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e;
+    testModel <- adam(y, "MNN", distribution="dgamma", ets="adam");
+    scaleValue <- adam_scaleSimulation(testModel, testModel$scale);
+    alpha <- testModel$persistence[1];
+    drift <- exp(lgamma(1/scaleValue+alpha) + alpha*log(scaleValue) - lgamma(1/scaleValue));
+    skeleton <- as.vector(forecast(testModel, h=6)$mean);
+    set.seed(41);
+    testForecast <- forecast(testModel, h=6, point="mean", nsim=100000);
+    expect_equal(as.vector(testForecast$mean)[1], skeleton[1]);
+    expect_equal(as.vector(testForecast$mean), skeleton*drift^(0:5), tolerance=3e-3);
+    expect_equal(forecast(testModel, h=6, interval="prediction", nsim=10)$interval, "simulated");
+})
+
+
+# The variance of a sum of the multiplicative errors needs the covariances of the horizons
+test_that("the cumulative intervals of the multiplicative models are simulated", {
+    testModel <- adam(AirPassengers, "MNM", lags=12, h=4, holdout=FALSE);
+    set.seed(41);
+    testForecast <- forecast(testModel, h=4, interval="approximate", cumulative=TRUE, nsim=20000);
+    expect_equal(testForecast$interval, "simulated");
+    set.seed(41);
+    testSimulated <- forecast(testModel, h=4, interval="simulated", cumulative=TRUE, nsim=20000);
+    expect_equal(testForecast$lower, testSimulated$lower);
+    expect_equal(as.vector(testForecast$mean), sum(forecast(testModel, h=4)$mean), tolerance=1e-3);
+    testModel <- adam(AirPassengers, "ANN", h=4, holdout=FALSE);
+    expect_equal(forecast(testModel, h=4, interval="approximate", cumulative=TRUE)$interval,
+                 "approximate");
+})
+
+# The scale model in logs sums its forecasts in the space of the data
+test_that("the cumulative forecasts and the reforecasts of sm() in logs", {
+    testModel <- suppressWarnings(sm(adam(AirPassengers, "ANA", lags=12, h=4, holdout=FALSE), model="ANN"));
+    expect_match(testModel$model, "in logs");
+    expect_equal(as.vector(forecast(testModel, h=4, cumulative=TRUE)$mean),
+                 sum(forecast(testModel, h=4)$mean));
+    set.seed(41);
+    expect_equal(apply(reapply(testModel, nsim=100)$refitted, 1, median), as.vector(fitted(testModel)),
+                 tolerance=0.05);
+    set.seed(41);
+    testForecast <- forecast(testModel, h=2, interval="simulated", nsim=20000);
+    set.seed(41);
+    testReforecast <- reforecast(testModel, h=2, nsim=200);
+    expect_equal(as.vector(testReforecast$lower), as.vector(testForecast$lower), tolerance=0.2);
+})

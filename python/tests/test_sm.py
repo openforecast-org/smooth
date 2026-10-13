@@ -7,6 +7,8 @@ with::
 """
 
 import json
+import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -283,3 +285,72 @@ def test_the_scale_model_takes_the_missing_values_for_gaps():
     scale = sm(location)
     assert np.isfinite(scale.loglik)
     assert "iETS" not in str(scale.model_name)
+
+
+def test_the_scale_model_in_logs_sums_in_the_space_of_the_data():
+    """The cumulative forecasts of a scale model fitted in logs are the sums of the
+    scale, simulated for the intervals, and its refitted values and reforecasts are
+    the scale, as R."""
+    scale = sm(ADAM(model="ANN", lags=[1]).fit(_series("positive")), model="ANN")
+    assert scale.model_name_sm_.endswith(" in logs")
+    # Its data are the scale, and its standardised residuals stay after forecasting
+    assert np.all(np.asarray(scale.actuals) > 0)
+    residuals = np.asarray(scale.residuals).copy()
+    forecasts = np.asarray(scale.predict(h=4).mean)
+    np.testing.assert_allclose(scale.predict(h=4, cumulative=True).mean, forecasts.sum())
+    cumulative = scale.predict(h=4, interval="approximate", cumulative=True, seed=41)
+    assert cumulative.interval == "simulated"
+    assert 0 < float(cumulative.lower.iloc[0, 0]) < forecasts.sum()
+    np.testing.assert_allclose(
+        np.median(np.asarray(scale.reapply(nsim=100, seed=41).refitted), axis=1),
+        np.asarray(scale.fitted),
+        rtol=0.05,
+    )
+    # The mean of the scale is above its skeleton, the median of a model in logs
+    mean = np.asarray(scale.predict(h=4, point="mean", seed=41).mean)
+    assert np.all(mean > forecasts)
+    simulated = scale.predict(h=2, interval="simulated", nsim=20000, seed=41)
+    reforecast = scale.reforecast(h=2, nsim=200, seed=41)
+    np.testing.assert_allclose(
+        np.ravel(reforecast.lower), np.ravel(simulated.lower), rtol=0.2
+    )
+    np.testing.assert_array_equal(np.asarray(scale.residuals), residuals)
+
+
+# The scale model in logs exponentiates its fitted values and forecasts, and the
+# analytical variance of a multiplicative model averages the de-biased fitted scale,
+# as R
+SM_PARITY_CASES = {
+    "logs": ("AAN", "dnorm", "ANN"),
+    "multiplicative": ("MNM", "dgamma", "MNN"),
+}
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize("case", sorted(SM_PARITY_CASES))
+def test_the_scale_model_forecasts_agree(case):
+    sys.path.insert(0, str(Path(__file__).parent))
+    from _r_bridge import r_dict
+
+    model, distribution, scale_model = SM_PARITY_CASES[case]
+    r = r_dict(
+        "{ y <- as.numeric(AirPassengers);"
+        f" m <- adam(ts(y, frequency=12), '{model}', distribution='{distribution}');"
+        f" s <- suppressWarnings(sm(m, model='{scale_model}')); m <- implant(m, s);"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9);"
+        " list(y=y, fitted=as.numeric(fitted(s)),"
+        " scale=as.numeric(forecast(s, h=6)$mean),"
+        " lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    location = ADAM(model=model, lags=[12], distribution=distribution)
+    location.fit(np.array(r["y"], float))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        location.scale_model = location.sm(model=scale_model)
+    forecast = location.predict(h=6, interval="approximate", level=0.9)
+    np.testing.assert_allclose(np.ravel(location.scale_model.fitted), r["fitted"])
+    np.testing.assert_allclose(
+        np.ravel(location.scale_model.predict(h=6).mean), r["scale"]
+    )
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)

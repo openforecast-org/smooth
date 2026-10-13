@@ -373,6 +373,8 @@ the model,
 \item \code{lagsAll} - the vector of the internal lags used in the model,
 \item \code{profile} - the matrix with the profile used in the construction of the model,
 \item \code{profileInitial} - the matrix with the initial profile (for the before the sample values),
+\item \code{profileObserved} - the matrix with the profile at the last observed value (the
+origin of the forecasts after the periods without an observed value at the end of the sample),
 \item \code{call} - the call used in the evaluation,
 \item \code{bounds} - the type of bounds used in the process,
 \item \code{res} - result of the model estimation, the output of the \code{nloptr()} function, explaining

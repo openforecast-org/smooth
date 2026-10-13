@@ -1,0 +1,794 @@
+% A first draft for Computational Statistics. The journal uses the Springer Nature
+% template (sn-jnl); the article class is kept here so that the draft compiles anywhere.
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[round]{natbib}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\E}{\mathrm{E}}
+\DeclareMathOperator{\KL}{KL}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\Cov}{Cov}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\newtheorem{example}{Example}
+
+\sloppy
+
+\title{Estimating exponential smoothing with unobserved periods: the observed-data
+likelihood of ADAM and iETS}
+\author{Ivan Svetunkov\thanks{TODO: affiliation and co-authors.}}
+\date{Draft, October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Exponential smoothing in its single source of error (SSOE) form is estimated by running the
+model's recursion through the data and maximising the likelihood of the one-step-ahead errors.
+This is the exact likelihood when every observation is available, because the states are then
+known functions of the data and the parameters. We show that it stops being so as soon as some
+periods are unobserved: the zeros of an intermittent demand model (iETS) and the missing values
+in the Augmented Dynamic Adaptive Model (ADAM). The usual remedies do not restore it. The
+differential entropy of the unobserved sizes that iETS adds to the likelihood does not follow
+from the EM algorithm it is derived from: its stationary points differ from those of the
+observed-data likelihood, and it shrinks the estimate of the scale by the share of the observed
+periods. Propagating the states through the unobserved periods with zero errors and keeping the
+one-step density ignores that the error at the next observation is a multistep one. For the linear
+Gaussian models and for the pure multiplicative ETS of ADAM with the log-normal distribution, which
+is linear in logarithms, we derive the exact observed-data likelihood: a Kalman filter in which the
+state covariance builds up over the unobserved periods and the gain varies with it. It reduces to
+the usual SSOE recursion when all periods are observed. For the other pure multiplicative models
+we give an approximation that mixes the one-step density over the drift of the states, with its
+moments by quadrature, and moment equations for the scale solved by fixed-point iteration. We also
+correct the estimator of the scale of the log-normal distribution used in ADAM, which is not the
+maximum likelihood one, and the prediction intervals of the models with an occurrence part.
+\end{abstract}
+
+\noindent\textbf{Keywords:} exponential smoothing; state space models; intermittent demand;
+missing values; Kalman filter; EM algorithm; maximum likelihood.
+
+% =============================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Exponential smoothing (ETS) in the innovations, or single source of error (SSOE), state space form
+\citep{Snyder1985,OrdKoehlerSnyder1997,Hyndman2008} is estimated by a remarkably simple procedure:
+the model is run through the data with its own recursion, the one-step-ahead errors are recorded,
+and their likelihood is maximised. The simplicity rests on one property. With a single source of
+error, the state vector at time $t$ is a deterministic function of the initial states, the
+parameters and the observations up to $t$, so that the conditional distribution of each observation
+given the past is the distribution of the one-step error. No filter is needed, and the likelihood is
+the product of the one-step densities.
+
+The Augmented Dynamic Adaptive Model \citep[ADAM,][]{ADAM} extends this framework to ARIMA,
+regressors, multiple seasonalities, a variety of distributions and, through an occurrence part, to
+intermittent demand \citep[iETS,][]{iETS}. Two situations in ADAM involve periods in which the
+variable of interest is not observed. In intermittent demand the demand is $y_t = o_t z_t$, the
+product of a Bernoulli occurrence $o_t$ and a potential demand size $z_t$, and the size is not
+observed when $o_t = 0$. With missing values, nothing is observed at those periods. In both cases
+the implementation follows the recursion of the complete-data case: the error is set to zero at the
+unobserved periods, so that the states go on with the transition alone, and the likelihood is that of
+the one-step errors at the observed periods. For the occurrence model, \citet{iETS} add the
+differential entropy of the unobserved sizes to the likelihood, as the expected log-density of the
+missing values, by analogy with the EM algorithm \citep{EM}.
+
+This paper shows that neither of these gives the likelihood of the observed data, and derives what
+does. The argument is structural rather than empirical: we compare the objective functions, their
+stationary points and the distributions of the errors, and we do not present a forecasting
+evaluation here. The contributions are as follows.
+\begin{enumerate}
+\item The entropy-augmented likelihood of iETS is not the objective of the EM algorithm: replacing
+the cross-entropy of the E-step by the entropy at the current parameters changes the stationary
+points. The EM algorithm converges to the stationary points of the observed-data likelihood, in which
+the unobserved sizes do not appear at all; the entropy version shrinks the estimate of the scale by
+the share of the observed periods and is unbounded with a dynamic scale
+(Section~\ref{sec:entropy}).
+\item With unobserved periods the states are no longer known functions of the data, and the SSOE
+recursion with a fixed gain is not the conditional mean of the states. For linear Gaussian models the
+exact observed-data likelihood is given by a Kalman filter written for the SSOE form, whose state
+covariance is zero as long as every period is observed, builds up over the unobserved periods and
+decays afterwards, and whose gain varies with it (Section~\ref{sec:linear}). The familiar SSOE
+recursion is its special case for complete data.
+\item The pure multiplicative ETS of ADAM, whose states are updated by powers of $1+\epsilon_t$, is
+linear in logarithms, and with the log-normal distribution the same filter applied to the logarithms
+gives its exact likelihood, with the scale in closed form. The estimator of the scale of the
+log-normal distribution used in ADAM is not the maximum likelihood one, even without unobserved
+periods (Section~\ref{sec:multiplicative}).
+\item For the other pure multiplicative models (the Gamma and the inverse Gaussian distributions,
+and the conventional multiplicative ETS) the logarithms of the states are linear in non-Gaussian
+innovations. We approximate the predictive density by the one-step density mixed over a Gaussian
+drift of the states, with moments by Gauss--Legendre quadrature on the quantile function and the
+mixture by Gauss--Hermite quadrature, and estimate the scale by moment equations that account for
+the drift, solved by fixed-point iteration (Section~\ref{sec:approximate}).
+\item The multistep structure carries over to the prediction intervals: the interval $h$ steps ahead
+is the density after an unobserved stretch of $h$ periods, and the intervals of a model with an
+occurrence part are intervals of the sizes, centred on their forecast rather than on that of the
+demand (Section~\ref{sec:intervals}).
+\end{enumerate}
+The computational aspects, and the parts of this programme that are implemented in the
+\texttt{smooth} package for R and Python, are discussed in Section~\ref{sec:computation}, and
+Section~\ref{sec:conclusions} concludes.
+
+% =============================================================================
+\section{The model and its current estimation}
+\label{sec:model}
+
+\subsection{ADAM in the SSOE form}
+
+ADAM \citep{ADAM} writes a model with the state vector $\vect v_t$ and the vector of lags
+$\vect l$ as
+\begin{equation}
+z_t = w(\vect v_{t-\vect l}) + r(\vect v_{t-\vect l})\,\epsilon_t, \qquad
+\vect v_t = f(\vect v_{t-\vect l}) + g(\vect v_{t-\vect l})\,\epsilon_t ,
+\label{eq:adam}
+\end{equation}
+where $\vect v_{t-\vect l}$ holds each component at its own lag and $\epsilon_t$ are independent
+errors. Two classes of models matter here.
+
+\paragraph{Pure additive models.} With the measurement vector $\vect w$, the transition matrix
+$\vect F$ and the persistence vector $\vect g$,
+\begin{equation}
+z_t = \vect w'\vect v_{t-\vect l} + \epsilon_t, \qquad
+\vect v_t = \vect F\vect v_{t-\vect l} + \vect g\epsilon_t .
+\label{eq:additive}
+\end{equation}
+This covers ETS with additive components, ARIMA and regressors in ADAM. Stacking the lagged
+components gives the usual form with a single lag, $\vect x_t = \vect F_x \vect x_{t-1} +
+\vect g_x\epsilon_t$, $z_t = \vect w_x'\vect x_{t-1} + \epsilon_t$ \citep{Hyndman2008};
+we use it in the derivations and write $\vect w$, $\vect F$ and $\vect g$ for its matrices.
+
+\paragraph{Pure multiplicative models.} With all the components multiplicative (or absent), the
+location is the product of the components, $\mu_t = l_{t-1} b_{t-1}^{\phi} s_{t-m}$, and
+$z_t = \mu_t(1+\epsilon_t)$ with $\E(1+\epsilon_t) = 1$. The conventional form of ETS
+\citep{Hyndman2008} updates each component $k$ by the factor $1+g_k\epsilon_t$, for instance
+$l_t = l_{t-1}b_{t-1}^{\phi}(1+\alpha\epsilon_t)$ and $b_t = b_{t-1}^{\phi}(1+\beta\epsilon_t)$. The
+form of ADAM \citep{ADAM} updates it by the power $(1+\epsilon_t)^{g_k}$, for instance
+$l_t = l_{t-1}b_{t-1}^{\phi}(1+\epsilon_t)^{\alpha}$.
+
+\subsection{Unobserved periods}
+
+Let $O_t = 1$ when $z_t$ is observed and $O_t = 0$ otherwise. In iETS \citep{iETS},
+$y_t = o_t z_t$ with $o_t \sim \text{Bernoulli}(p_t)$ independent of $z_t$, and $O_t = o_t$; with
+missing values, $O_t = 0$ at the missing periods. $T$ is the number of periods, $T_1 = \sum_t O_t$
+the number of the observed ones, and $j_t$, defined at the observed periods, is the number of
+periods since the previous observed one (the demand interval in iETS), with $j_t = 1$ when $z_{t-1}$
+is observed and the first interval counted from the initial states.
+
+\subsection{The current estimator}
+
+The implementation of ADAM, and the estimator of \citet[Appendix~C]{iETS}, run the recursion of
+\eqref{eq:adam} with $\epsilon_t = 0$ at the unobserved periods:
+\begin{equation}
+\hat{\vect v}_t = f(\hat{\vect v}_{t-\vect l}) \quad (O_t = 0), \qquad
+\hat{\vect v}_t = f(\hat{\vect v}_{t-\vect l}) + g(\hat{\vect v}_{t-\vect l})\,\hat\epsilon_t
+\quad (O_t = 1),
+\label{eq:recursion}
+\end{equation}
+with $\hat\epsilon_t$ the error of $z_t$ against $\hat\mu_t = w(\hat{\vect v}_{t-\vect l})$, which is
+the $j_t$-steps-ahead point forecast from the states at the previous observed period. The
+log-likelihood of the sizes is then $\sum_{O_t=1}\log f_z(z_t\mid\hat\mu_t,\sigma)$ with the
+one-step density $f_z$. For the occurrence model, \citet{iETS} add, for each zero, the expected
+log-density of the unobserved size, $\int f_z\log f_z\,dz = -H_z$, the negative differential entropy:
+\begin{equation}
+\ell_H(\theta) = \sum_{O_t=1}\log f_z(z_t\mid\hat\mu_t,\sigma) - \sum_{O_t=0}H_z(\hat\mu_t,\sigma)
++ \sum_{O_t=1}\log p_t + \sum_{O_t=0}\log(1-p_t),
+\label{eq:entropy}
+\end{equation}
+with $\theta$ the parameters of the sizes \citep[eq.~B.6]{iETS}.
+
+% =============================================================================
+\section{The observed-data likelihood and the entropy}
+\label{sec:entropy}
+
+\begin{proposition}[Observed-data likelihood]
+\label{prop:observed}
+Let $Y$ be the observed data, $\theta$ the parameters of the sizes and $\lambda$ those of the
+occurrence. Then
+\begin{equation}
+\ell(\theta,\lambda\mid Y) = \sum_{O_t=1}\log f\!\left(z_t\mid Y_{t-1};\theta\right)
++ \sum_{O_t=1}\log p_t + \sum_{O_t=0}\log(1-p_t),
+\label{eq:observed}
+\end{equation}
+where $f(z_t\mid Y_{t-1};\theta)$ is the predictive density of the size given the observed past.
+The unobserved sizes do not appear, and the two parts separate.
+\end{proposition}
+
+\begin{proof}
+Since $z_t$ is continuous and independent of $o_t$, $P(y_t = 0\mid Y_{t-1}) =
+(1-p_t)\int f(z\mid Y_{t-1})\,dz = 1-p_t$, and $y_t > 0$ has the density $p_t f(y_t\mid Y_{t-1})$.
+The prediction-error decomposition of the joint density of the observed data gives
+\eqref{eq:observed}. Equivalently, the complete-data likelihood $L_c(\theta,\lambda\mid Y,Z_0)$ with
+the unobserved sizes $Z_0$ \citep[eq.~B.3]{iETS} integrates over $Z_0$ to \eqref{eq:observed}.
+\end{proof}
+
+The predictive density in \eqref{eq:observed} is the one-step density only when the states at
+$t-1$ are known given $Y_{t-1}$, which is the subject of Section~\ref{sec:linear}. Here we compare
+\eqref{eq:entropy} with the EM algorithm that motivates it.
+
+\begin{proposition}[The entropy is not the E-step]
+\label{prop:em}
+The E-step of the EM algorithm for the complete-data likelihood takes, at each zero, the
+cross-entropy $\int f_z(z\mid\theta^{(k)})\log f_z(z\mid\theta)\,dz$ at the current estimate
+$\theta^{(k)}$, and its gradient in $\theta$ at $\theta = \theta^{(k)}$ is zero. The fixed points of
+EM are therefore the stationary points of \eqref{eq:observed}. The entropy term
+$-H_z(\theta) = \int f_z(z\mid\theta)\log f_z(z\mid\theta)\,dz$ of \eqref{eq:entropy} has a non-zero
+gradient, and the stationary points of $\ell_H$ differ from those of \eqref{eq:observed}.
+\end{proposition}
+
+\begin{proof}
+The E-step is $Q(\theta\mid\theta^{(k)}) = \E_{Z_0\mid Y,\theta^{(k)}}\log L_c(\theta\mid Y,Z_0)$,
+in which the term of a zero is the cross-entropy above, and
+\[
+\int f_z^{(k)}\log f_z\,dz = -H_z\!\left(\theta^{(k)}\right) - \KL\!\left(f_z^{(k)}\,\middle\|\,
+f_z\right).
+\]
+At $\theta = \theta^{(k)}$ its gradient is
+$\int f_z\,\partial_\theta\log f_z\,dz = \partial_\theta\int f_z\,dz = 0$, so that
+$\nabla Q(\theta\mid\theta^{(k)})|_{\theta=\theta^{(k)}} = \nabla\ell(\theta^{(k)})$, and a fixed point
+of EM is a stationary point of $\ell$ \citep{EM}. Writing $-H_z(\theta)$ sets $\theta^{(k)} = \theta$
+before the maximisation, so that the distribution of the missing sizes moves with the parameters;
+its gradient $-\partial_\theta H_z(\theta)$ is not zero in general (for instance in the scale), and it
+adds to the score of \eqref{eq:observed}.
+\end{proof}
+
+\begin{corollary}[The scale is shrunk]
+\label{cor:shrink}
+For the normal distribution with fixed location, the maximiser of \eqref{eq:entropy} in the
+variance is $\hat\sigma^2_H = \frac{1}{T}\sum_{O_t=1}e_t^2 = \frac{T_1}{T}\hat\sigma^2$, where
+$\hat\sigma^2 = \frac{1}{T_1}\sum_{O_t=1}e_t^2$ is the fixed point of EM.
+\end{corollary}
+
+\begin{proof}
+With $H_z = \frac12\log(2\pi e\sigma^2)$, the derivative of \eqref{eq:entropy} in $\sigma^2$ is
+$-\frac{T_1}{2\sigma^2} + \frac{\sum e_t^2}{2\sigma^4} - \frac{T_0}{2\sigma^2}$. EM iterates
+$\sigma^2_{(k+1)} = (\sum_{O_t=1}e_t^2 + T_0\sigma^2_{(k)})/T$, whose fixed point is $\hat\sigma^2$.
+\end{proof}
+
+\begin{remark}
+Two further consequences follow from the dependence of $H_z$ on the parameters. For the log-normal
+iETS(M,N,N), $-H_z = -\log\hat l_{t-1} + \frac{\sigma^2}{2} - \frac12\log(2\pi e\sigma^2)$ grows
+without bound as the fitted level goes to zero, which pulls the location. With a dynamic model for
+the scale \citep{ADAM}, the zeros alone reward a scale going to zero (to infinity for
+the Gamma distribution, whose entropy decreases in the scale for large values), and the likelihood
+is unbounded. Note also that, with $H = -\E\log f$, the sign of the entropy term in
+\citet[eqs.~29 and B.6]{iETS} should be negative, as in \eqref{eq:entropy}.
+\end{remark}
+
+% =============================================================================
+\section{Linear Gaussian models: the exact likelihood}
+\label{sec:linear}
+
+Consider the pure additive model \eqref{eq:additive} with $\epsilon_t\sim\mathcal N(0,\sigma^2)$ in
+its single-lag form, and let $\vect x_0$ be a parameter. Define $\vect a_t = \E(\vect x_{t-1}\mid
+Y_{t-1})$ and $\sigma^2\vect P_t = \Var(\vect x_{t-1}\mid Y_{t-1})$, the conditional mean and
+covariance of the state entering period $t$.
+
+\begin{proposition}[The filter of the SSOE model]
+\label{prop:kalman}
+With $\vect a_1 = \vect x_0$ and $\vect P_1 = \vect 0$, the recursions
+\begin{equation}
+\begin{aligned}
+O_t = 1:&\quad v_t = z_t - \vect w'\vect a_t,\quad f_t = \vect w'\vect P_t\vect w + 1,\quad
+\vect k_t = (\vect F\vect P_t\vect w + \vect g)/f_t,\\
+&\quad \vect a_{t+1} = \vect F\vect a_t + \vect k_t v_t,\quad
+\vect P_{t+1} = \vect F\vect P_t\vect F' + \vect g\vect g' - \vect k_t\vect k_t' f_t,
+\\
+O_t = 0:&\quad \vect a_{t+1} = \vect F\vect a_t,\quad
+\vect P_{t+1} = \vect F\vect P_t\vect F' + \vect g\vect g',
+\end{aligned}
+\label{eq:kalman}
+\end{equation}
+give $z_t\mid Y_{t-1}\sim\mathcal N(\vect w'\vect a_t,\sigma^2 f_t)$ at the observed periods, and the
+observed-data log-likelihood of the sizes is
+\begin{equation}
+\ell(\theta,\sigma^2) = -\frac12\sum_{O_t=1}\left[\log(2\pi\sigma^2 f_t) +
+\frac{v_t^2}{\sigma^2 f_t}\right],\qquad
+\hat\sigma^2 = \frac{1}{T_1}\sum_{O_t=1}\frac{v_t^2}{f_t}.
+\label{eq:kalmanlik}
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+The model is linear and Gaussian, so $(\vect x_{t-1}, z_t, \vect x_t)$ is jointly Gaussian given
+$Y_{t-1}$. With $\vect x_{t-1}\mid Y_{t-1}\sim\mathcal N(\vect a_t,\sigma^2\vect P_t)$ and $\epsilon_t$
+independent of $\vect x_{t-1}$: $\E(z_t\mid Y_{t-1}) = \vect w'\vect a_t$,
+$\Var(z_t\mid Y_{t-1}) = \sigma^2(\vect w'\vect P_t\vect w + 1)$, and, since
+$\vect x_t = \vect F\vect x_{t-1} + \vect g\epsilon_t$ shares $\epsilon_t$ with $z_t$,
+$\Cov(\vect x_t, z_t\mid Y_{t-1}) = \sigma^2(\vect F\vect P_t\vect w + \vect g)$. The conditional
+distribution of $\vect x_t$ given $z_t$ gives the update at the observed periods; at the unobserved
+ones $\vect x_t$ is only propagated. The decomposition of Proposition~\ref{prop:observed} gives
+\eqref{eq:kalmanlik}, and $\sigma^2$ concentrates out because $f_t$ and $\vect k_t$ do not depend on
+it.
+\end{proof}
+
+The filter is the Kalman filter for a state space model with correlated disturbances
+\citep{Harvey1989,DurbinKoopman2012}, written for the single source of error.
+
+\begin{corollary}[Complete data]
+\label{cor:complete}
+If $\vect P_t = \vect 0$ and $O_t = 1$, then $\vect k_t = \vect g$, $f_t = 1$ and
+$\vect P_{t+1} = \vect 0$. Hence, when all periods are observed, \eqref{eq:kalman} is the SSOE
+recursion and \eqref{eq:kalmanlik} the likelihood of the one-step errors.
+\end{corollary}
+
+\begin{proof}
+$\vect k_t = \vect g/1$ and $\vect P_{t+1} = \vect g\vect g' - \vect g\vect g' = \vect 0$.
+\end{proof}
+
+Corollary~\ref{cor:complete} is the formal statement of the property that makes the usual
+estimation of ETS exact \citep{OrdKoehlerSnyder1997}. With unobserved periods it fails: after
+$j-1$ unobserved periods following a period with $\vect P = \vect 0$,
+\begin{equation}
+\vect P = \sum_{i=1}^{j-1}\vect F^{i-1}\vect g\vect g'\vect F'^{\,i-1}, \qquad
+f = 1 + \sum_{i=1}^{j-1}c_i^2 \equiv \kappa_j, \qquad c_i = \vect w'\vect F^{i-1}\vect g,
+\label{eq:kappa}
+\end{equation}
+and the update at the next observed period leaves $\vect P_{t+1}\neq\vect 0$ unless the observation
+reveals the whole drift. The state uncertainty then persists and decays over the following
+observations, and the gain differs from $\vect g$ as long as it does.
+
+\begin{proposition}[The current estimator is not the maximum likelihood estimator]
+\label{prop:notmle}
+With unobserved periods and $\vect g\neq\vect 0$, the recursion \eqref{eq:recursion} with the
+one-step density differs from \eqref{eq:kalmanlik} in three respects: the variance of the error
+at an observed period is $\sigma^2 f_t\geq\sigma^2$ rather than $\sigma^2$; the gain of the update is
+$\vect k_t$ rather than $\vect g$, so that the fitted states and the errors differ; and these
+differences persist after the unobserved periods through $\vect P_t$. Its maximiser is therefore not
+the maximum likelihood estimator.
+\end{proposition}
+
+\begin{proof}
+By Proposition~\ref{prop:kalman} the predictive distribution is $\mathcal N(\vect w'\vect a_t,
+\sigma^2 f_t)$, and $f_t > 1$ whenever $\vect P_t\neq\vect 0$, which holds at the first observed period
+after an unobserved one with $c_1\neq 0$, and at the following ones until $\vect P_t$ returns to zero.
+The conditional mean $\vect a_t$ follows the gain $\vect k_t\neq\vect g$ at those periods, while
+\eqref{eq:recursion} uses $\vect g$.
+\end{proof}
+
+\begin{example}
+For the local level model, ETS(A,N,N), with $\vect P = 0$ before an interval of $j$ periods, the
+gain at its end is
+\begin{equation}
+\alpha_j = \frac{(j-1)\alpha^2 + \alpha}{(j-1)\alpha^2 + 1},
+\label{eq:gain}
+\end{equation}
+which is $\alpha$ for $j = 1$ and tends to one as $j$ grows: after a long interval the level should
+jump almost to the new observation, while \eqref{eq:recursion} moves it by $\alpha$ times the error.
+The remaining variance $P_{t+1} = (j-1)\alpha^2 + \alpha^2 - \alpha_j^2\kappa_j$ is positive for
+$j > 1$ and $0<\alpha<1$, and each following observed period multiplies it by
+$(1-\alpha)^2/(1+P_t)$.
+\end{example}
+
+\begin{remark}
+Two approximations of \eqref{eq:kalman} are of interest because they keep the structure of the
+SSOE recursion. Resetting $\vect P$ to zero after each observed period gives the variance
+$\kappa_{j_t}$ of \eqref{eq:kappa} at the observed periods and, with the gain \eqref{eq:gain} (or
+its multivariate counterpart), the first-order correction of the states. Keeping only $\kappa_{j_t}$
+and the gain $\vect g$ corrects the likelihood but not the states, and underestimates the variance
+at the observed periods that follow a long interval.
+% TODO: illustration of the size of the three versions on simulated series.
+\end{remark}
+
+% =============================================================================
+\section{Pure multiplicative ETS of ADAM}
+\label{sec:multiplicative}
+
+\begin{lemma}[Linearity in logarithms]
+\label{lem:loglinear}
+In the pure multiplicative ETS of ADAM, with $u_t = \log(1+\epsilon_t)$, the logarithms of the
+components satisfy
+\begin{equation}
+\log z_t = \vect w'\log\vect v_{t-\vect l} + u_t, \qquad
+\log\vect v_t = \vect F\log\vect v_{t-\vect l} + \vect g\,u_t ,
+\label{eq:loglinear}
+\end{equation}
+with the $\vect w$, $\vect F$ and $\vect g$ of the corresponding additive model. In the conventional
+form, the innovation of component $k$ is $L_k(\epsilon_t) = \log(1+g_k\epsilon_t)$ instead of
+$g_k u_t$, and the model is linear in logarithms with a non-Gaussian innovation vector.
+\end{lemma}
+
+\begin{proof}
+Take logarithms of the measurement $z_t = l_{t-1}b_{t-1}^{\phi}s_{t-m}(1+\epsilon_t)$ and of the
+updates, for instance $\log l_t = \log l_{t-1} + \phi\log b_{t-1} + \alpha u_t$ and
+$\log b_t = \phi\log b_{t-1} + \beta u_t$ in the ADAM form, and
+$\log l_t = \log l_{t-1} + \phi\log b_{t-1} + \log(1+\alpha\epsilon_t)$ in the conventional one.
+\end{proof}
+
+With the log-normal distribution, $u_t\sim\mathcal N(-s/2, s)$ so that $\E(1+\epsilon_t) = 1$, and
+\eqref{eq:loglinear} is a linear Gaussian model for $\log z_t$ with a known mean of the errors.
+
+\begin{proposition}[Exact likelihood of the log-normal ADAM ETS]
+\label{prop:lognormal}
+For the pure multiplicative ETS of ADAM with the log-normal distribution, the filter
+\eqref{eq:kalman} applied to $\log z_t$, with $u_t = -s/2 + \eta_t$, $\eta_t\sim\mathcal N(0,s)$,
+the mean $-s\vect g/2$ added to the propagation of $\vect a_t$ and $-s/2$ to the prediction of
+$\log z_t$, gives the exact observed-data likelihood
+\[
+\ell(\theta, s) = -\frac12\sum_{O_t=1}\left[\log(2\pi s f_t) + \frac{v_t(s)^2}{s f_t}\right]
+- \sum_{O_t=1}\log z_t ,
+\]
+where $v_t(s) = v_t^0 + s\,b_t$ is linear in $s$ because $f_t$ and the gains do not depend on $s$.
+The maximum likelihood estimate of the scale is the positive root of
+\begin{equation}
+\left(\sum_{O_t=1}\frac{b_t^2}{f_t}\right)s^2 + T_1 s - \sum_{O_t=1}\frac{(v_t^0)^2}{f_t} = 0 .
+\label{eq:lognormalscale}
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+The filter is that of Proposition~\ref{prop:kalman} for the linear Gaussian model
+\eqref{eq:loglinear}, with the Jacobian of the transformation. The predictions $\vect w'\vect a_t$
+are linear in the known means $-s/2$ with coefficients that depend on the gains only, which gives
+$v_t(s) = v_t^0 + s b_t$. Setting the derivative in $s$ to zero and multiplying by $2s^2$ gives
+\eqref{eq:lognormalscale}.
+\end{proof}
+
+When $\vect P$ is zero at the previous observed period, $f_t = \kappa_{j_t}$ and
+$b_t = a_{j_t}/2$ with $a_j = 1 + \sum_{i<j}c_i$, so that
+$\log(z_t/\hat\mu_t)\sim\mathcal N(-s a_{j_t}/2, s\kappa_{j_t})$ and
+\begin{equation}
+\hat s = \frac{2\left(\sqrt{T_1^2 + \sum\frac{a_{j_t}^2}{\kappa_{j_t}}\sum\frac{u_t^2}{\kappa_{j_t}}}
+- T_1\right)}{\sum a_{j_t}^2/\kappa_{j_t}} .
+\label{eq:lognormalscalereset}
+\end{equation}
+
+\begin{corollary}[The scale of the log-normal distribution]
+\label{cor:lognormalscale}
+Without unobserved periods the maximum likelihood estimate of $s$ is
+$\hat s = 2(\sqrt{1+m}-1)$ with $m = \frac{1}{T_1}\sum u_t^2$. The estimator
+$2(1-\sqrt{1-m})$, the root of $s^2 - 4s + 4m = 0$, is not the maximum likelihood one; it
+overestimates $s$ (by about 35\% at $s = 0.5$) and is undefined for $m > 1$.
+\end{corollary}
+
+\begin{proof}
+Set $f_t = 1$ and $b_t = 1/2$ in \eqref{eq:lognormalscale}: $\frac{T_1}{4}s^2 + T_1 s - T_1 m = 0$,
+that is $s^2 + 4s - 4m = 0$. For $s = 0.5$, $m = s + s^2/4 = 0.5625$ and $2(1-\sqrt{1-m}) = 0.677$.
+\end{proof}
+
+% =============================================================================
+\section{Other pure multiplicative models: an approximate predictive density}
+\label{sec:approximate}
+
+For the Gamma and the inverse Gaussian distributions, and for the conventional ETS with any of the
+three, Lemma~\ref{lem:loglinear} still gives a linear model for the logarithms of the states, but
+with non-Gaussian innovations $L_k(\epsilon_t)$, and the measurement $z_t = \mu_t(1+\epsilon_t)$
+keeps the one-step distribution of $1+\epsilon_t$. We approximate the conditional distribution of
+the logarithm of the location by a normal one and keep the one-step density exact.
+
+\subsection{The drift of the states}
+
+Let the states at the previous observed period be known (the reset approximation of
+Section~\ref{sec:linear}). Over $j_t - 1$ unobserved periods the logarithm of the location drifts by
+\begin{equation}
+d_t = \log\frac{\mu_t}{\hat\mu_t} = \sum_{i=1}^{j_t-1}\sum_k c_{i,k}\,L_k(\epsilon_{t-i}),
+\qquad c_{i,k} = \vect w'\vect F^{i-1}\vect e_k ,
+\label{eq:drift}
+\end{equation}
+where $\vect e_k$ is the $k$-th unit vector, so that $c_{i,k}$ are the coefficients $c_i$ of
+\eqref{eq:kappa} for the persistence of the component $k$ alone. Its mean and variance are
+\begin{equation}
+m_t = \sum_{i<j_t}\vect c_i'\boldsymbol\mu_L, \qquad
+w_t = \sum_{i<j_t}\vect c_i'\boldsymbol\Sigma_L\vect c_i,
+\label{eq:driftmoments}
+\end{equation}
+with $\boldsymbol\mu_L$ and $\boldsymbol\Sigma_L$ the mean and the covariance of the innovation
+vector. These depend on the distribution and the scale. We compute them by Gauss--Legendre
+quadrature on the quantile function $Q$ of $1+\epsilon$:
+$\E h(\epsilon) = \int_0^1 h(Q(u)-1)\,du \approx \sum_q \omega_q h(Q(u_q)-1)$
+\citep{GolubWelsch1969}. The integrands $\log(1-g+gQ(u))$ and $g\log Q(u)$ have at most logarithmic
+singularities at the ends of the interval, and 32 nodes are ample for the accuracy needed here.
+
+\subsection{The mixture density}
+
+With $d_t\sim\mathcal N(m_t, w_t)$, the predictive density of the size is
+\begin{equation}
+\tilde f(z_t) = \int f_z\!\left(z_t\mid\hat\mu_t e^{d}\right)\phi(d; m_t, w_t)\,dd
+\approx \sum_{q=1}^{Q}\frac{\omega_q}{\sqrt\pi}\,
+f_z\!\left(z_t\mid\hat\mu_t e^{m_t + \sqrt{2w_t}x_q}\right),
+\label{eq:mixture}
+\end{equation}
+with the Gauss--Hermite nodes $x_q$ and weights $\omega_q$ \citep{LiuPierce1994}. It is exact for
+$j_t = 1$. For the log-normal distribution the mixture is log-normal again,
+$\log(z_t/\hat\mu_t)\sim\mathcal N(-s/2 + m_t, s + w_t)$, and no quadrature is needed.
+
+The normal approximation of the drift is the only approximation in \eqref{eq:mixture}. Against the
+exact density of the size after an interval, computed by numerical convolution, the largest
+Kullback--Leibler divergence per observation over a grid of $s\in[0.05,1]$, $\alpha\in[0.1,0.6]$
+and $j\in[2,20]$ for iETS(M,N,N) was 0.0007 for the Gamma, 0.0033 for the log-normal and 0.0038 for
+the inverse Gaussian distribution, against 2.36, 5.05 and 31.5 for the one-step density.
+% TODO: describe the computation of the exact density and report the grid in a table.
+
+\subsection{The scale}
+
+ADAM estimates the scale of the Gamma and the inverse Gaussian distributions by moments rather than
+by maximum likelihood \citep{ADAM}: $\hat s = \frac{1}{T_1}\sum e_t^2$ for the Gamma
+and $\hat s = \frac{1}{T_1}\sum e_t^2/(1+e_t)$ for the inverse Gaussian, with the relative errors
+$e_t = z_t/\hat\mu_t - 1$ and $\Var(1+\epsilon_t) = s$. After an interval,
+$1 + e_t = (1+\epsilon_t)D_t$ with $D_t = e^{d_t}$ independent of $\epsilon_t$.
+
+\begin{proposition}[Moment equations with the drift]
+\label{prop:moments}
+With $\E(1+\epsilon_t) = 1$ and $\Var(1+\epsilon_t) = s$,
+\begin{align*}
+\E(e_t^2) &= (1+s)\,\E(D_t^2) - 2\,\E(D_t) + 1,\\
+\E\!\left(\frac{e_t^2}{1+e_t}\right) &= \E(D_t) - 2 + (1+s)\,\E(D_t^{-1})
+\quad\text{(inverse Gaussian)},
+\end{align*}
+the latter because $\E[(1+\epsilon)^{-1}] = 1 + s$ for the inverse Gaussian distribution with mean
+one and dispersion $s$. With the normal drift, $\E D_t = e^{m_t + w_t/2}$, $\E D_t^2 = e^{2m_t+2w_t}$
+and $\E D_t^{-1} = e^{-m_t + w_t/2}$.
+\end{proposition}
+
+\begin{proof}
+Expand $e_t^2 = (1+e_t)^2 - 2(1+e_t) + 1$ and $e_t^2/(1+e_t) = (1+e_t) - 2 + (1+e_t)^{-1}$, use the
+independence of $\epsilon_t$ and $D_t$, and the moments of the inverse Gaussian and the log-normal
+distributions.
+\end{proof}
+
+Because $m_t$ and $w_t$ depend on $s$ through $\boldsymbol\mu_L$ and $\boldsymbol\Sigma_L$, the
+estimating equations obtained by replacing the expectations by sample means,
+\begin{equation}
+s = h(s) = \frac{\sum e_t^2 - \sum\left(\E D_t^2 - 2\E D_t + 1\right)}{\sum\E D_t^2}
+\quad\text{(Gamma)},
+\label{eq:fixedpoint}
+\end{equation}
+and the analogous one for the inverse Gaussian, are solved by the fixed-point iteration
+$s^{(n+1)} = h(s^{(n)})$ from the one-step estimate $s^{(0)}$. Without intervals $h$ does not depend
+on $s$ and the iteration returns the one-step estimate at once. The dependence of $h$ on $s$ is weak,
+of the order of $(j_t - 1)\alpha^2 s$ in iETS(M,N,N), so that $h$ is a contraction for the values of
+the parameters of interest and a few iterations suffice. For the log-normal distribution the
+estimate is \eqref{eq:lognormalscalereset} with $a_t = 1 - 2m_t/s$ and $\kappa_t = 1 + w_t/s$,
+iterated in the same way.
+
+\begin{remark}
+On simulated errors with the drift of iETS(M,N,N) these equations recover the scale without bias.
+Within a fitted model the estimate is still biased upwards, because the states after an interval
+are updated with the gain $\vect g$ rather than with the conditional mean, so that part of the drift
+leaks into the following errors (Proposition~\ref{prop:notmle}). The approximate filter of the next
+remark addresses both.
+\end{remark}
+
+\begin{remark}[An approximate filter]
+\label{rem:approxfilter}
+The reset approximation can be lifted as in Section~\ref{sec:linear}: carry a covariance
+$\vect P_t$ of the logarithms of the states, propagate it over the unobserved periods with
+$\boldsymbol\Sigma_L$, use $d_t\sim\mathcal N(m_t, \vect w'\vect P_t\vect w)$ in \eqref{eq:mixture},
+and update the states with the linear projection of the logarithm of the state on $\log z_t$, which
+reduces to the conventional update when $\vect P_t = \vect 0$. This is a moment-matching filter in the
+spirit of the extended and unscented filters \citep{DurbinKoopman2012}. Explicitly, with
+$\vect a_t$ and $\vect P_t$ the mean and the covariance of $\vect x_{t-1}$ (in logs), $\mu_u$ and
+$\sigma_u^2$ the mean and the variance of $u_t$, and $\eta_k(u) = \log(1 + g_k(e^u - 1))$ the
+innovations of the conventional ETS: at an observed value,
+\[
+f_t = \vect w'\vect P_t\vect w + \sigma_u^2,\quad
+\hat{\vect x} = \vect a_t + \vect P_t\vect w\,\frac{\log z_t - \vect w'\vect a_t - \mu_u}{f_t},\quad
+\hat u = \log z_t - \vect w'\hat{\vect x},
+\]
+\[
+\vect a_{t+1} = \vect F\hat{\vect x} + \boldsymbol\eta(\hat u),\quad
+\vect P_{t+1} = (\vect F - \vect g\vect w')\left(\vect P_t - \frac{\vect P_t\vect w\vect w'\vect P_t}{f_t}\right)
+(\vect F - \vect g\vect w')',
+\]
+the innovations being linearised at $\epsilon_t = 0$ for the covariance; at an unobserved one
+$\vect a_{t+1} = \vect F\vect a_t + \E\boldsymbol\eta$ and
+$\vect P_{t+1} = \vect F\vect P_t\vect F' + \Var\boldsymbol\eta$. With $\vect P_t = \vect 0$,
+$\hat{\vect x} = \vect a_t$, $\hat u = \log(1+\epsilon_t)$ is the error of the recursion and
+$\vect P_{t+1} = \vect 0$, so the filter is the SSOE recursion; for the ETS of ADAM, $\boldsymbol\eta(u) =
+\vect g u$ and the update is that of Proposition~\ref{prop:kalman}.
+\end{remark}
+
+% =============================================================================
+\section{Prediction intervals}
+\label{sec:intervals}
+
+A forecast $h$ steps ahead from the end of the sample is the prediction after an unobserved stretch
+of $h-1$ periods, so the results above give the predictive distributions. For the linear Gaussian
+models the variance is $\sigma^2(\vect w'\vect F^{h-1}\vect P_{T+1}\vect F'^{\,h-1}\vect w +
+\kappa_h)$: the state covariance at the end of the sample, zero for complete data, adds to the usual
+multistep variance when the last periods were unobserved. Both terms come out of the filter
+\eqref{eq:kalman} itself, run past the end of the sample with $O_{T+1} = \dots = O_{T+h} = 0$: the
+variance is $\sigma^2 f_{T+h}$. For the pure multiplicative ADAM ETS with the log-normal
+distribution, the same run of the filter of Proposition~\ref{prop:lognormal} gives the exact interval
+$z_{T+h}/\hat\mu_{T+h}\sim\log\mathcal N(-s b_{T+h}, s f_{T+h})$ around the point forecast with zero
+errors, which is $\log\mathcal N(-s a_h/2, s\kappa_h)$ when $\vect P_{T+1} = \vect 0$. For the
+other models a simpler route is enough: when the last $k$ periods of the sample are unobserved, the
+forecast $h$ steps ahead is the forecast $h+k$ steps ahead from the last observed period, whose
+multistep distribution includes the uncertainty of the states over those $k$ periods. It ignores
+only the covariance left at that period by earlier unobserved ones, which decays at the observed
+periods. The \texttt{smooth} package uses it for the pure multiplicative ETS with the Gamma and the
+Inverse Gaussian distributions, for the simulated intervals of all its models, for the cumulative
+forecasts of all its models (the variance of a sum needs the covariances of the horizons, which the
+filter does not carry) and for the models with a dynamic scale, whose scale over the $k$ periods is
+the fitted one of the scale model.
+
+The origin of these forecasts is the profile of the states after the update at the last observed
+period, which is not the state vector recorded at that period. In the lagged form of ADAM a period
+writes to the states only the cells it uses, one per component, while the update of the filter after
+an unobserved stretch moves every cell correlated with the observation, including the seasonal and
+the ARIMA cells of the other positions of their lags. Rebuilding the profile from the recorded states
+misses these corrections: the forecasts from the last observed period then differ from those from
+the end of the sample, by up to $10^{-3}$ for a TBATS model in our examples. The fitter therefore
+keeps a copy of the profile after the last observed period of its final pass, and the forecasts
+from there coincide with those from the end of the sample.
+
+The point forecast of ADAM is the forecast with zero errors. It is the conditional mean of the pure
+additive models and of the conventional multiplicative ETS, where $\E(1+g_k\epsilon_t) = 1$, but not
+of the ETS of ADAM, whose multiplicative components move by $(1+\epsilon_t)^{g_k}$ with
+$\E(1+\epsilon_t)^{g_k} < 1$ for $0 < g_k < 1$. In ETS(M,N,N), for instance,
+$\E(z_{T+h}\mid Y_T) = \hat\mu_{T+h}\left[\E(1+\epsilon)^{\alpha}\right]^{h-1}$, which for the Gamma
+distribution with mean one and variance $s$ is
+$\left[\Gamma(1/s+\alpha)s^{\alpha}/\Gamma(1/s)\right]^{h-1}$. The quantiles drift down in the same
+way, which the approximate intervals of the conventional ETS ignore: with $s = 0.32$ and
+$\alpha = 0.21$ the upper bound of the 90\% interval twelve steps ahead was 0.45 against 0.32 from
+the simulated paths, and 0.59 against 0.30 after six unobserved periods at the end of the sample.
+The package simulates the intervals of these models by default and takes their mean from the
+simulated paths after the first step (and from the first step after an unobserved stretch at the end
+of the sample). The pure multiplicative ETS of ADAM with the log-normal distribution keeps the exact
+interval above.
+
+For a model with an occurrence part, an interval of the demand with coverage $c$ that counts the
+zeros as covered is an interval of the sizes with coverage $(c - (1-p_t))/p_t$, so its bounds are
+quantiles of the sizes around their forecast $\hat\mu_t$. Centring them on the forecast of the
+demand, $p_t\hat\mu_t$, which is the conditional mean of $y_t$ but not a location of the sizes,
+places the upper bound well below the corresponding quantile of the demand.
+
+% =============================================================================
+\section{Computation and implementation}
+\label{sec:computation}
+
+\paragraph{Cost.} The filter \eqref{eq:kalman} costs $O(n^2)$ operations per period for $n$
+states, against $O(n)$ for the SSOE recursion, but only while $\vect P_t\neq\vect 0$: by
+Corollary~\ref{cor:complete} it is the SSOE recursion whenever the covariance is zero, so it can
+switch to it once the covariance has decayed below a tolerance, and complete data cost nothing more.
+In the lagged form of ADAM a state with lag $m$ is held in $m$ cells of its profile, of which one is
+used in each period, so the covariance is kept over the cells of the profile and the propagation and
+the update touch only the rows and the columns of the cells used in the period. For non-seasonal and
+monthly models the extra cost is negligible. The number of cells is the sum of the lags of the
+states, so it grows quickly with high orders and long seasonal periods (an AR(60) has 1830 cells):
+there the update of the covariance dominates while it is non-zero, and it stays non-zero when the
+next unobserved period comes before it has decayed.
+
+The covariance has a low rank, which reduces this cost when the unobserved periods are few. With a
+single source of error, an unobserved period adds the rank-one term $\vect g\vect g'$, and an observed
+one removes the direction it reveals while adding the new error, so that $\vect P_t$ has at most as
+many dimensions as there were unobserved periods since it last vanished. Writing $\vect P_t =
+\vect U_t\vect U_t'$ with $r$ columns, the propagation touches the rows of the cells used in the
+period, an unobserved period appends the column $\vect g$ on those cells, and an observed one, with
+$\vect a = \vect U_t'\vect w$ and $f_t = 1 + \vect a'\vect a$, replaces the factor
+$\vect M = [\vect U_t^{F}, \vect g]$ (with $\vect U_t^{F}$ the propagated $\vect U_t$) by the first $r$
+columns of $\vect M\vect H$, where $\vect H$ is the Householder reflection that takes $(\vect a, 1)$ to
+the last axis. Since $\vect M(\vect a, 1)' = f_t\vect k_t$, this is the rank-one update
+\[
+\vect U_{t+1} = \vect U_t^{F} - \frac{f_t\vect k_t + \sqrt{f_t}\,\vect g}{f_t + \sqrt{f_t}}\,\vect a' ,
+\]
+and the cost of a period is proportional to the number of cells times $r$ rather than to its square.
+For the conventional ETS of Remark~\ref{rem:approxfilter} an unobserved period adds the columns of a
+root of $\Var\boldsymbol\eta$, and the update at an observed one is $\vect U_t(\vect I -
+\beta\vect a\vect a')$ with $\beta = (1 - \sqrt{\sigma_u^2/f_t})/\vect a'\vect a$. The package uses the
+factor when four times the number of its columns at most is below the number of cells, and the whole
+covariance otherwise, as for intermittent demand, where the unobserved periods are many: with lags 24
+and 168 (193 cells) and 1 to 48 missing values among 1344 hourly observations, the filter is 8.6 to
+1.3 times faster with the factor, with the same results. The variances $f_t$
+and the derivatives $b_t$ do not depend on the data or on the initial states, so they can be
+recomputed for a fitted model by running the filter on its matrices and the pattern of the observed
+periods, without the data. The reset approximation needs only the coefficients $c_i$ up to the
+longest interval, which are those of the analytical multistep variance of ADAM \citep{ADAM}, computed
+once per evaluation of the likelihood. The quadrature of Section~\ref{sec:approximate} adds 32
+evaluations of the quantile function per iteration of the scale and per evaluation, and the mixture
+16 evaluations of the one-step density per observation that follows an interval.
+
+\paragraph{Reproducibility.} The quadrature rules are fixed sets of numbers, so that two
+implementations evaluate the same likelihood. The coefficients $c_i$ are computed by one routine in
+C++ shared by the R and the Python versions of the package, and the sums are accumulated in the
+same order in both.
+
+\paragraph{Implementation.} The \texttt{smooth} package (R and Python) implements, on its
+development branch: the observed-data likelihood without the entropy (Proposition~\ref{prop:observed});
+the filter \eqref{eq:kalman} for the pure additive models with the normal distribution (ETS, ARIMA
+and regression in ADAM), and in logs (Proposition~\ref{prop:lognormal}) for the pure multiplicative
+ADAM ETS with the log-normal distribution, with the scales \eqref{eq:kalmanlik} and
+\eqref{eq:lognormalscale}; the mixture \eqref{eq:mixture} with the moment equations of
+Proposition~\ref{prop:moments} for the other pure multiplicative models; the corrected scale of the
+log-normal distribution (Corollary~\ref{cor:lognormalscale}); and the prediction intervals of
+Section~\ref{sec:intervals}. The filter is one routine of the C++ core shared by the two languages.
+It takes the place of the fitter of the package in the last forward pass: the initial states are
+still obtained by backcasting with the SSOE recursion, the covariance starts at zero after them, and
+the filter departs from the recursion only at the unobserved periods and while the covariance is not
+zero, so the fits of complete data do not change to the last bit. It is used with every loss, so
+that the fitted values after the unobserved periods are the filtered predictions whatever the
+estimator. The other linear models of the package (CES, GUM, the state space ARIMA, the simple
+moving average and TBATS with the normal distribution, in the space of the transformed data) use the
+same filter. The approximate filter of Remark~\ref{rem:approxfilter} is implemented for the pure
+multiplicative ETS with the Gamma and the Inverse Gaussian distributions, in logs, with the moments of
+$u_t = \log(1+\epsilon_t)$ and of the innovations of the states from the quadrature of
+Section~\ref{sec:approximate}: for the ETS of ADAM the innovations are $\vect g u_t$, so the filter is
+that of Proposition~\ref{prop:lognormal} and the drift is $\mathcal N(\mu_u (m_t-1), \sigma_u^2
+(f_t-1))$ with $m_t = 2b_t$; for the conventional ETS, whose innovations $\log(1+g_k\epsilon_t)$ are
+not linear in $u_t$, the states take their posterior at an observed value and move by the innovations
+at the error it implies, with the covariance linearised at $\epsilon_t = 0$, so that it does not depend
+on the data and the filter is the recursion when the covariance is zero; the drift is then
+$\mathcal N(0, f_t - \sigma_u^2)$, and the filter depends on the scale through the moments, so it runs
+inside the fixed point of the scale. The pure additive models with the Laplace, the S and the
+Generalised Normal distributions take the variances of the filter, keeping the error in its family with
+the scale $s f_t^{1/p}$ ($p$ such that the variance is proportional to $s^p$): the convolution of these
+kinked densities with the normal uncertainty of the states is poorly integrated by the Gauss--Hermite
+rule, and the error of the approximation is small (a Kullback--Leibler divergence below 0.05 for the
+Laplace at $f_t = 4$). With a dynamic model of the scale \citep{ADAM}, the errors of the location
+model are standardised by the fitted scale, which takes the place of the variances $f_t$ in the joint
+likelihood, and the pure multiplicative models have no drift.
+
+% =============================================================================
+\section{Conclusions}
+\label{sec:conclusions}
+
+The estimation of exponential smoothing by its own recursion and the likelihood of the one-step
+errors is exact only because, with complete data, the states are known functions of the data. When
+some periods are unobserved, as with the zeros of intermittent demand or with missing values, the
+states become uncertain, and the estimator of ADAM and iETS is no longer the maximum likelihood one.
+Adding the differential entropy of the unobserved sizes does not repair this, and biases the scale.
+For the linear Gaussian models and for the pure multiplicative ETS of ADAM with the log-normal
+distribution, the exact likelihood is given by a filter whose gain and variance vary after the
+unobserved periods and reduce to those of the SSOE recursion with complete data. For the other pure
+multiplicative models a Gaussian approximation of the drift of the logarithms of the states gives an
+accurate predictive density. The mixed models, with additive and multiplicative components, are
+linear in neither space and are left for further work, as are the empirical evaluation of the
+estimators and the forecasting performance of the corrected models.
+% TODO: evaluation on simulated and real intermittent series.
+
+\begin{thebibliography}{99}
+
+\bibitem[Dempster et~al.(1977)]{EM}
+Dempster, A.~P., Laird, N.~M. and Rubin, D.~B. (1977). Maximum likelihood from incomplete data via
+the EM algorithm. \emph{Journal of the Royal Statistical Society, Series B}, 39(1), 1--38.
+
+\bibitem[Durbin and Koopman(2012)]{DurbinKoopman2012}
+Durbin, J. and Koopman, S.~J. (2012). \emph{Time Series Analysis by State Space Methods}, 2nd
+edition. Oxford University Press.
+
+\bibitem[Golub and Welsch(1969)]{GolubWelsch1969}
+Golub, G.~H. and Welsch, J.~H. (1969). Calculation of Gauss quadrature rules. \emph{Mathematics of
+Computation}, 23(106), 221--230.
+
+\bibitem[Harvey(1989)]{Harvey1989}
+Harvey, A.~C. (1989). \emph{Forecasting, Structural Time Series Models and the Kalman Filter}.
+Cambridge University Press.
+
+\bibitem[Hyndman et~al.(2008)]{Hyndman2008}
+Hyndman, R.~J., Koehler, A.~B., Ord, J.~K. and Snyder, R.~D. (2008). \emph{Forecasting with
+Exponential Smoothing: The State Space Approach}. Springer.
+
+\bibitem[Liu and Pierce(1994)]{LiuPierce1994}
+Liu, Q. and Pierce, D.~A. (1994). A note on Gauss--Hermite quadrature. \emph{Biometrika}, 81(3),
+624--629.
+
+\bibitem[Ord et~al.(1997)]{OrdKoehlerSnyder1997}
+Ord, J.~K., Koehler, A.~B. and Snyder, R.~D. (1997). Estimation and prediction for a class of
+dynamic nonlinear statistical models. \emph{Journal of the American Statistical Association},
+92(440), 1621--1629.
+
+\bibitem[Snyder(1985)]{Snyder1985}
+Snyder, R.~D. (1985). Recursive estimation of dynamic linear models. \emph{Journal of the Royal
+Statistical Society, Series B}, 47(2), 272--276.
+
+\bibitem[Svetunkov(2023)]{ADAM}
+Svetunkov, I. (2023). \emph{Forecasting and Analytics with the Augmented Dynamic Adaptive Model
+(ADAM)}. Chapman and Hall/CRC.
+
+\bibitem[Svetunkov and Boylan(2023)]{iETS}
+Svetunkov, I. and Boylan, J.~E. (2023). iETS: State space model for intermittent demand
+forecasting. \emph{International Journal of Production Economics}, 265, 109013.
+
+\end{thebibliography}
+
+\end{document}

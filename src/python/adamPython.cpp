@@ -10,11 +10,21 @@
 #include <carma>
 
 #include "../headers/adamCore.h"
+#include "../headers/covarAnalCore.h"
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(_adamCore, m) {
     m.doc() = "Python bindings for adamCore class";
+
+    // The analytical covariance matrix of the multistep errors (R's covarAnalCpp())
+    m.def("covar_anal_cpp",
+          [](const arma::vec& lagsModel, const unsigned int h, const arma::mat& measurement,
+             const arma::mat& transition, const arma::vec& persistence, const double s2) {
+              return covarAnalCore(lagsModel, h, measurement.row(0), transition, persistence, s2);
+          },
+          py::arg("lags_model"), py::arg("h"), py::arg("measurement"), py::arg("transition"),
+          py::arg("persistence"), py::arg("s2"));
 
     // Bind PolyResult struct
     py::class_<PolyResult>(m, "PolyResult")
@@ -31,7 +41,19 @@ PYBIND11_MODULE(_adamCore, m) {
         .def_readonly("fitted", &FitResult::fitted)
         .def_readonly("errors", &FitResult::errors)
         .def_readonly("profile", &FitResult::profile)
-        .def_readonly("profileInitial", &FitResult::profileInitial);
+        .def_readonly("profileInitial", &FitResult::profileInitial)
+        .def_readonly("profileObserved", &FitResult::profileObserved);
+
+    // Bind FilterResult struct
+    py::class_<FilterResult>(m, "FilterResult")
+        .def_readonly("states", &FilterResult::states)
+        .def_readonly("fitted", &FilterResult::fitted)
+        .def_readonly("errors", &FilterResult::errors)
+        .def_readonly("profile", &FilterResult::profile)
+        .def_readonly("profileInitial", &FilterResult::profileInitial)
+        .def_readonly("profileObserved", &FilterResult::profileObserved)
+        .def_readonly("variances", &FilterResult::variances)
+        .def_readonly("innovationsScale", &FilterResult::innovationsScale);
 
     // Bind OmFitGeneralResult struct
     py::class_<OmFitGeneralResult>(m, "OmFitGeneralResult")
@@ -112,6 +134,21 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("backcast"),
             py::arg("nIterations"),
             py::arg("O") = 'n')
+        .def("filter", &adamCore::filter,
+            py::arg("matrixVt"),
+            py::arg("matrixWt"),
+            py::arg("matrixF"),
+            py::arg("vectorG"),
+            py::arg("indexLookupTable"),
+            py::arg("profilesRecent"),
+            py::arg("vectorYt"),
+            py::arg("vectorOt"),
+            py::arg("backcast"),
+            py::arg("nIterations"),
+            py::arg("logs"),
+            py::arg("scale"),
+            py::arg("noiseMean") = arma::vec(),
+            py::arg("noiseCovariance") = arma::mat())
         .def("omfitGeneral", &adamCore::omfitGeneral,
             py::arg("matrixVtA"),
             py::arg("matrixWtA"),

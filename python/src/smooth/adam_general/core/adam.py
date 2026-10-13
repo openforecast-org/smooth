@@ -1,6 +1,7 @@
 import time
 import warnings
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import greybox as gb
@@ -21,7 +22,7 @@ from smooth.adam_general.core.forecaster import forecaster, preparator
 from smooth.adam_general.core.forecaster.intervals import ensure_level_format
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
-from smooth.adam_general.core.utils.n_param import NParam
+from smooth.adam_general.core.utils.n_param import NParam, count_xreg_params
 from smooth.adam_general.core.utils.printing import decorate_occurrence_name
 from smooth.adam_general.core.utils.utils import (
     OUTLIER_NAMES,
@@ -1894,6 +1895,24 @@ class ADAM:
         return self._prepared.get("profiles_recent_table")
 
     @property
+    def profile_observed(self) -> Optional[Any]:
+        """
+        The profile of the states at the last observed value (R: $profileObserved).
+
+        The origin of the forecasts after the periods without an observed value at
+        the end of the sample; with the corrections of the filter after the missing
+        values inside the sample, which the states do not record. It equals
+        :attr:`profile` when the sample ends with an observed value.
+
+        Raises
+        ------
+        ValueError
+            If the model has not been fitted yet.
+        """
+        self._check_is_fitted()
+        return self._prepared.get("profile_observed")
+
+    @property
     def n_param(self) -> Any:
         """
         Parameter count information (R: $nParam).
@@ -2133,6 +2152,12 @@ class ADAM:
     # =========================================================================
 
     @property
+    def _log_model(self) -> bool:
+        """Whether the model works in logarithms, with its values exponentiated: a
+        scale model fitted in logs by sm() (R's ``adam_logModel``)."""
+        return getattr(self, "model_name_sm_", "").endswith(" in logs")
+
+    @property
     def fitted(self) -> NDArray:
         """
         Return in-sample fitted values.
@@ -2159,6 +2184,9 @@ class ADAM:
         self._check_is_fitted()
         if getattr(self, "_is_combined", False):
             return self._combined_fitted
+        # A scale model fitted in logs (sm()) has the scale as its fitted values, as R
+        if self._log_model:
+            return np.exp(self._prepared["y_fitted"])
         return self._prepared["y_fitted"]
 
     @property
@@ -2188,6 +2216,9 @@ class ADAM:
         missing = self._observations.get("y_na_values")
         if missing is not None and np.any(missing):
             y[missing] = np.nan
+        # A scale model fitted in logs (sm()) has the scale as its data, as R
+        if self._log_model:
+            y = np.exp(y)
         return y
 
     @property
@@ -2366,8 +2397,17 @@ class ADAM:
         obs = self._nobs_observed()
         errors = self.residuals.copy().astype(float)
         dist = self.distribution_
+        # The observed sizes (R's residsToGo): the zeros of an occurrence model have
+        # no size, and their residuals are not in the mean
+        sizes = np.isfinite(errors)
+        if hasattr(self, "_observations"):
+            sizes &= np.asarray(self._observations["ot_logical"], dtype=bool)
+        elif hasattr(self, "_ot"):
+            sizes &= np.asarray(self._ot, dtype=bool)
         if dist in ("dinvgauss", "dgamma"):
-            return errors / np.nanmean(errors)
+            return errors / np.mean(errors[sizes])
+        # Each error as the one-step one, after the periods without an observed size
+        errors = self._gap_residuals()
 
         # R's rstandard.adam standardises by extractScale(), de-biased in the
         # variance space. extract_scale() is a vector when a scale model is
@@ -2382,7 +2422,7 @@ class ADAM:
             errors = errors + raw_scale / 2
         # The conventional residuals of Laplace, ALaplace and Logistic are not centred
         if dist not in ("dlaplace", "dalaplace", "dlogis"):
-            errors = errors - np.nanmean(errors)
+            errors = errors - np.mean(errors[sizes])
         # sigma for dnorm and dlnorm, s^2 for S, s for the rest
         if dist in ("dt", "dnorm", "dlnorm"):
             errors = errors / np.sqrt(scale)
@@ -2444,7 +2484,8 @@ class ADAM:
         # The missing values (NaN residuals) are not observations
         obs = self._nobs_observed()
         df = obs - self.nparam - 1
-        errors = self.residuals.copy().astype(float)
+        # Each error as the one-step one, after the periods without an observed size
+        errors = self._gap_residuals()
         dist = self.distribution_
 
         if dist == "dnorm":
@@ -2755,6 +2796,126 @@ class ADAM:
         zeros of an occurrence model, whose sizes are not observed."""
         return int(np.sum(self._observations["ot_logical"]))
 
+    def _gap_variance(self, power: int = 2, drift: bool = False, h: int = 0) -> Any:
+        """The variance (or with ``power=1`` the multiplier of the mean) of the
+        errors at the observed sizes relative to the one-step one, after the periods
+        without an observed size (R's ``adam_gapVarianceModel``): ones unless the
+        model is pure additive with the normal distribution, or a pure
+        multiplicative ETS with the log-normal one (exactly through the filter of
+        ``adam_cpp.filter`` for ADAM ETS, through the drift of the states for the
+        conventional one). With ``h>0``, the values of the h steps ahead after the
+        sample of the first two, and None for the other models or without such
+        periods in the sample. With ``drift=True``, the moments of the drift at the
+        observed sizes (``gap_drift()``) of a pure multiplicative ETS with the
+        Gamma, the Inverse Gaussian or the conventional log-normal (R's attribute
+        "drift"), and None for the other models."""
+        from smooth.adam_general.core.utils.var_covar import filter_variances, gap_drift
+
+        ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
+        ones = np.ones(len(ot_logical))
+        # A scale model (sm()) has its own residuals, standardised already
+        if getattr(self, "is_scale_", False):
+            return None if drift or h > 0 else ones
+        model_type = self._model_type
+        error_type = model_type["error_type"]
+        distribution = self.distribution_
+        multiplicative = (
+            error_type == "M"
+            and model_type["trend_type"] != "A"
+            and model_type["season_type"] != "A"
+            and model_type["ets_model"]
+            and not self._arima.get("arima_model", False)
+        )
+        trend_type = model_type["trend_type"]
+        season_type = model_type["season_type"]
+        adam_ets = getattr(self, "ets", None) == "adam"
+        additive = (
+            error_type == "A"
+            and trend_type != "M"
+            and season_type != "M"
+            and distribution in ("dnorm", "dlaplace", "ds", "dgnorm")
+        )
+        # The drift of the states of the other pure multiplicative ETS, without the
+        # adaptive regressors and without a scale model, whose likelihood takes the
+        # errors without it
+        drifting = (
+            multiplicative
+            and (
+                distribution in ("dgamma", "dinvgauss")
+                or (distribution == "dlnorm" and not adam_ets)
+            )
+            and not (
+                self._explanatory.get("xreg_model", False)
+                and self._explanatory.get("regressors") == "adapt"
+            )
+            and getattr(self, "scale_model", None) is None
+        )
+        gaussian = additive or (
+            multiplicative and distribution == "dlnorm" and adam_ets
+        )
+        if (
+            not (gaussian or drifting)
+            or (h > 0 and not gaussian)
+            or (drift and not drifting)
+            or ot_logical.all()
+        ):
+            return None if drift or h > 0 else ones
+        # The filter, in logs for the multiplicative models. Its variances and the
+        # derivatives of its innovations in the scale do not depend on the data or on
+        # the initial states, so no backcasting is needed for them; the conventional
+        # ETS needs the moments of its errors at the scale
+        vec_g = self._prepared.get("vec_g", self._adam_created["vec_g"])
+        scale = self.scale
+        noise = (
+            gap_drift(vec_g, ot_logical, distribution, False, scale)[2]
+            if drifting and not adam_ets
+            else None
+        )
+        arguments = (
+            self._adam_cpp,
+            self._lags_model["lags_model_all"],
+            self._observations.get("head_length", 0),
+            self._prepared["mat_wt"],
+            self._prepared["mat_f"],
+            vec_g,
+            self._prepared["mat_vt"],
+            ot_logical,
+            h,
+            multiplicative,
+        )
+        if gaussian:
+            return filter_variances(*arguments, power)
+        filtered = SimpleNamespace(
+            variances=filter_variances(*arguments, 2, noise),
+            innovationsScale=filter_variances(*arguments, 1, noise) / 2,
+        )
+        moments = gap_drift(
+            vec_g, ot_logical, distribution, adam_ets, scale, filtered, noise
+        )
+        if drift:
+            return moments[:2]
+        if distribution == "dlnorm":
+            ones[ot_logical] = (
+                1 - 2 * moments[0] / scale if power == 1 else 1 + moments[1] / scale
+            )
+        return ones
+
+    def _gap_residuals(self) -> NDArray:
+        """The residuals as the one-step ones after the periods without an
+        observed size (R's ``adam_gapResiduals``): ``e/sqrt(k)`` for the normal
+        distribution, and for the log-normal the ratio
+        ``exp((log(r) + s a/2)/sqrt(k) - s/2)``, logN(-s/2, s) as the one-step
+        error."""
+        errors = np.asarray(self.residuals, dtype=float)
+        gap = self._gap_variance()
+        if self.distribution_ == "dlnorm":
+            scale = self.extract_scale()
+            return np.exp(
+                (np.log(errors) + scale * self._gap_variance(1) / 2) / np.sqrt(gap)
+                - scale / 2
+            )
+        return errors / np.sqrt(gap)
+
     def _ic_occurrence_terms(self):
         """``(n_param_all, n_param_sizes, obs)`` for AICc/BICc.
 
@@ -2940,6 +3101,9 @@ class ADAM:
         self._check_is_fitted()
 
         residuals = np.asarray(self.residuals, dtype=float)
+        # Each error as the one-step one, after the periods without an observed size
+        if not getattr(self, "_is_combined", False):
+            residuals = self._gap_residuals()
         residuals = residuals[np.isfinite(residuals)]
         # R's ``sigma.adam`` (R/adam.R:4687) divides by the non-zero sample minus
         # the parameters, without the scale ones under likelihood loss.
@@ -3035,7 +3199,10 @@ class ADAM:
         sizes are not observed, have only the latter, as R. With ``log=False``
         the densities themselves are returned.
         """
-        from smooth.adam_general.core.utils.utils import calculate_likelihood
+        from smooth.adam_general.core.utils.utils import (
+            calculate_likelihood,
+            gap_log_density,
+        )
 
         self._check_is_fitted()
         # With a scale model, the likelihood is that of the scale model (R's sm())
@@ -3117,9 +3284,18 @@ class ADAM:
                 y_fitted[ot_logical].reshape(-1, 1),
                 scale,
                 other,
+                # The mean and the variance after the periods without an observed size
+                self._gap_variance(1)[ot_logical].reshape(-1, 1),
+                self._gap_variance()[ot_logical].reshape(-1, 1),
             ),
             dtype=float,
         ).ravel()
+        # The Gamma and the Inverse Gaussian mixed over the drift after those periods
+        drift = self._gap_variance(drift=True)
+        if drift is not None and distribution != "dlnorm":
+            lik_values[ot_logical] = gap_log_density(
+                y[ot_logical], y_fitted[ot_logical], scale, distribution, *drift
+            )
 
         if occurrence_model:
             # The zeros have only the occurrence-model Bernoulli contribution:
@@ -3585,12 +3761,13 @@ class ADAM:
         self._general["interval"] = interval
         self._general["nsim"] = nsim
         self._general["cumulative"] = cumulative
+        # A scale model fitted in logs (sm()) has its forecasts exponentiated, and
+        # sums its paths in the space of the data for the cumulative ones, as R
+        log_model = self._log_model
+        self._general["_log_model"] = log_model
         self._general["scenarios"] = scenarios
         self._general["point"] = point
         self._general["seed"] = seed
-
-        if occurrence is not None:
-            self._occurrence["occurrence"] = occurrence
 
         # A pure regression is a greybox ALM, forecasted by ALM.predict()
         # (R: forecast.alm())
@@ -3643,26 +3820,50 @@ class ADAM:
                 new_xreg = full
         self._set_new_xreg(new_xreg)
 
-        # Validate prediction inputs and prepare data for forecasting
+        # Validate prediction inputs and prepare data for forecasting. A scale model
+        # (sm()) keeps its standardised residuals, which the preparation replaces
         self._validate_prediction_inputs()
+        residuals = (
+            self._prepared["residuals"] if getattr(self, "is_scale_", False) else None
+        )
         self._prepare_prediction_data()
 
         # Pre-compute p_forecast so forecaster can use it for both point forecasts
         # and interval adjustment (R: forecast.adam lines 6134-6172, 6204-6210).
         p_forecast_arr = None
         om_model = getattr(self, "_om_model", None)
-        if om_model is not None:
+        if occurrence is not None:
+            p_forecast_arr = np.ravel(np.asarray(occurrence, dtype=float))
+        elif om_model is not None:
             occ_fc = om_model.predict(h=h)
             p_forecast_arr = np.asarray(occ_fc.mean.values, dtype=float)
             # Store in occurrence_dict so _process_occurrence_forecast can use it
             self._occurrence["p_forecast"] = p_forecast_arr
 
-        # Execute the prediction (forecaster handles p scaling + interval adjustment)
-        predictions = self._execute_prediction(
-            interval=interval,
-            level=level,
-            side=side,
-        )
+        # Execute the prediction (forecaster handles p scaling + interval adjustment).
+        # The probabilities provided for the horizon replace those of the occurrence
+        # model in this forecast only, as R's occurrence
+        occurrence_type = self._occurrence["occurrence"]
+        if occurrence is not None:
+            self._occurrence["occurrence"] = p_forecast_arr
+        try:
+            predictions = self._execute_prediction(
+                interval=interval,
+                level=level,
+                side=side,
+            )
+        finally:
+            self._occurrence["occurrence"] = occurrence_type
+            if residuals is not None:
+                self._prepared["residuals"] = residuals
+        # A scale model fitted in logs (sm()) forecasts the scale, as R's forecast.adam;
+        # the cumulative values are already in the space of the data
+        if log_model and not cumulative:
+            predictions.mean = np.exp(predictions.mean)
+            if predictions.lower is not None:
+                predictions.lower = np.exp(predictions.lower)
+            if predictions.upper is not None:
+                predictions.upper = np.exp(predictions.upper)
 
         # Post-interval NaN patch: when an occurrence forecast is present
         # and the upper bound came back as NaN (sparse occurrence at long
@@ -3830,6 +4031,8 @@ class ADAM:
             self._explanatory,
             self._params_info,
         ) = result
+        # The ETS form, as R's ets: the cost function and the preparator read it
+        self._general["ets"] = self.ets
 
     def _populate_from_alm(self, y, X):
         """Populate model attributes from the greybox.ALM early-exit object.
@@ -4148,14 +4351,13 @@ class ADAM:
     def _apply_selected_regressors(self, estimated):
         """Make the regressors selected by the estimator those of the model, and
         count them in the parameters."""
-        from smooth.adam_general.core.utils.n_param import count_xreg_params
-
         self._explanatory, self._persistence, self._initials = self._xreg_dicts(
             estimated
         )
         self._model_type["xreg_model"] = bool(self._explanatory["xreg_model"])
+        # A combination keeps the weighted count of its models
         n_param = self._general.get("n_param")
-        if n_param is not None:
+        if n_param is not None and not getattr(self, "_is_combined", False):
             n_estimated, n_provided = count_xreg_params(self._explanatory)
             if self._initials.get("initial_type") == "complete":
                 n_estimated, n_provided = 0, n_provided + n_estimated
@@ -4331,6 +4533,7 @@ class ADAM:
         obs_in_sample = self._observations["obs_in_sample"]
         y_fitted_combined = np.zeros(obs_in_sample)
         n_param_weighted = 0.0
+        xreg_weighted = 0.0
 
         # Store ALL models for later forecasting (filtering happens at predict-time)
         self._prepared_models = []
@@ -4437,6 +4640,8 @@ class ADAM:
             n_param_weighted += (
                 result["adam_estimated"]["n_param_estimated"] * original_weight
             )
+            if initials.get("initial_type") != "complete":
+                xreg_weighted += count_xreg_params(explanatory)[0] * original_weight
 
             # Store for later forecasting
             # (using ORIGINAL weight - filtering at predict-time)
@@ -4465,9 +4670,10 @@ class ADAM:
             np.array(self._observations["y_in_sample"]) - y_fitted_combined
         )
 
-        # Create NParam with weighted average internal params + scale
+        # Create NParam with weighted average internal and xreg params + scale
         n_param = NParam()
-        n_param.estimated["internal"] = n_param_weighted
+        n_param.estimated["internal"] = n_param_weighted - xreg_weighted
+        n_param.estimated["xreg"] = xreg_weighted
         # The distribution scale is always estimated (concentrated likelihood).
         n_param.estimated["scale"] = 1
         n_param.update_totals()
@@ -4928,9 +5134,40 @@ class ADAM:
         # over the same horizon and hand it to the interval code, which is what
         # R does with forecast(object$scale, h)$mean (R/adam.R:6485-6530).
         self._general["scale_forecast"] = self._forecast_scale_model()
+        # The scale of the sample (the fitted one of a scale model), whose de-biased
+        # variances the analytical intervals average, as R's adam_varianceDebiased
+        self._general["scale_fitted"] = self.extract_scale()
         # The df for de-biasing the scale, after implanting: `params_info` is a
         # snapshot taken at estimation time and holds the pre-implant count.
         self._general["df_scale"] = self._df_scale
+        # The variances and the means of the filter at the h steps ahead, after the
+        # periods without an observed value in the sample (None without them)
+        h = int(self._general.get("h", 0) or 0)
+        for key, power in (("_filter_variances", 2), ("_filter_mean", 1)):
+            self._general[key] = self._gap_variance(power=power, h=h) if h else None
+        # The k last periods of the sample without an observed size, from which the
+        # forecasts of the models with the drift of the states or with a scale model
+        # (and the simulated and the cumulative ones) start, as R's forecast.adam
+        ot_logical = np.asarray(self._observations["ot_logical"], dtype=bool)
+        observed = np.flatnonzero(ot_logical)
+        trailing = len(ot_logical) - (observed[-1] + 1 if observed.size else 0)
+        lags_model_max = int(self._lags_model["lags_model_max"])
+        if not 0 < trailing < len(ot_logical) - lags_model_max:
+            trailing = 0
+        self._general["_gap_trailing"] = trailing
+        scale_model = getattr(self, "scale_model", None)
+        self._general["_gap_drifting"] = bool(
+            trailing
+            and (scale_model is not None or self._gap_variance(drift=True) is not None)
+        )
+        # The scale over those periods: the fitted values of the scale model
+        if trailing and scale_model is not None:
+            self._general["scale_forecast"] = np.concatenate(
+                [
+                    np.ravel(scale_model.fitted)[-trailing:],
+                    self._general["scale_forecast"],
+                ]
+            )
 
         # Standard single-model prediction
         self._forecast_results = forecaster(
@@ -4960,26 +5197,69 @@ class ADAM:
         """
         Execute combined forecasting using IC-weighted model averaging.
 
-        Generates forecasts from all models with non-zero IC weights and
-        combines them using Akaike weights.
+        As R's ``forecast.adamCombined``: each model with an IC weight of at least
+        0.01 (the weights renormalised) is forecast as a single model, and the
+        means and the bounds are averaged with the weights.
 
         Returns
         -------
         ForecastResult
             IC-weighted combined forecast results.
         """
-        from smooth.adam_general.core.forecaster import forecaster_combined
+        import copy
 
-        self._forecast_results = forecaster_combined(
-            prepared_models=self._prepared_models,
-            ic_weights=self._ic_weights,
-            observations_dict=self._observations,
-            general_dict=self._general,
-            occurrence_dict=self._occurrence,
-            params_info=self._params_info,
-            interval=interval,
+        models = [m for m in self._prepared_models if m["weight"] >= 0.01]
+        total = sum(m["weight"] for m in models)
+        mean, lower, upper = 0.0, 0.0, 0.0
+        for model_info in models:
+            weight = model_info["weight"] / total
+            prepared = model_info["prepared"]
+            n_est = model_info["n_param_estimated"]
+
+            general = copy.deepcopy(self._general)
+            general["distribution"] = prepared["distribution"]
+            general["distribution_new"] = prepared["distribution"]
+            # The table of the model as fitted alone: its parameters, with the
+            # regressors, the occurrence and the scale of the combination
+            n_param = copy.deepcopy(self._n_param)
+            n_param.estimated["xreg"] = (
+                count_xreg_params(model_info["explanatory_dict"])[0]
+                if self._initials.get("initial_type") != "complete"
+                else 0
+            )
+            n_param.estimated["internal"] = n_est - n_param.estimated["xreg"]
+            n_param.update_totals()
+            general["n_param"] = n_param
+
+            member = copy.copy(self)
+            member.__dict__.update(
+                _is_combined=False,
+                _general=general,
+                _n_param=n_param,
+                _params_info=[[n_est, 1, n_est + 1], [0]],
+                _prepared=prepared,
+                _model_type=model_info["model_type_dict"],
+                _components=model_info["components_dict"],
+                _lags_model=model_info["lags_dict"],
+                _observations=model_info["observations_dict"],
+                _adam_created=model_info["adam_created"],
+                _explanatory=model_info["explanatory_dict"],
+                _adam_cpp=model_info["result"]["adam_estimated"]["adam_cpp"],
+            )
+            forecast = member._execute_prediction(interval, level, side)
+            mean = mean + forecast.mean.fillna(0) * weight
+            if forecast.lower is not None:
+                lower = lower + forecast.lower.fillna(0) * weight
+            if forecast.upper is not None:
+                upper = upper + forecast.upper.fillna(0) * weight
+
+        self._forecast_results = ForecastResult(
+            mean=mean.rename("mean"),
+            lower=lower if isinstance(lower, pd.DataFrame) else None,
+            upper=upper if isinstance(upper, pd.DataFrame) else None,
             level=level,
             side=side,
+            interval=interval,
         )
         return self._forecast_results
 
@@ -5095,7 +5375,11 @@ class ADAM:
         (intermittent) models, which R also routes to the Hessian.
         """
         from smooth.adam_general.core.utils.cost_functions import CF
-        from smooth.adam_general.core.utils.utils import calculate_likelihood, scaler
+        from smooth.adam_general.core.utils.utils import (
+            calculate_likelihood,
+            gap_log_density,
+            scaler,
+        )
         from smooth.adam_general.core.utils.var_covar import covar_opg
 
         if self._general.get("loss") != "likelihood":
@@ -5143,7 +5427,7 @@ class ADAM:
             )
             if not isinstance(result, tuple):
                 return None
-            fitted, errors = result
+            fitted, errors, gap, gap_mean, drift_at = result
             fitted = np.asarray(fitted, dtype=float).ravel()
             errors = np.asarray(errors, dtype=float).ravel()
             if not np.all(np.isfinite(fitted)):
@@ -5157,7 +5441,15 @@ class ADAM:
                 fitted[ot_logical],
                 int(np.sum(ot_logical)),
                 other_b,
+                gap_mean[ot_logical],
+                gap[ot_logical],
+                drift_at,
             )
+            # The drift after the periods without an observed size, as in CF
+            drift = None if drift_at is None else drift_at(scale)
+            if drift is not None and distribution == "dlnorm":
+                gap_mean[ot_logical] = 1 - 2 * drift[0] / scale
+                gap[ot_logical] = 1 + drift[1] / scale
             lik = np.asarray(
                 calculate_likelihood(
                     distribution,
@@ -5166,9 +5458,15 @@ class ADAM:
                     fitted[ot_logical].reshape(-1, 1),
                     scale,
                     other_b,
+                    gap_mean[ot_logical].reshape(-1, 1),
+                    gap[ot_logical].reshape(-1, 1),
                 ),
                 dtype=float,
             ).ravel()
+            if drift is not None and distribution != "dlnorm":
+                lik = gap_log_density(
+                    y[ot_logical], fitted[ot_logical], scale, distribution, *drift[:2]
+                )
             vec = np.zeros(obs, dtype=float)
             vec[ot_logical] = lik
             if not np.all(np.isfinite(vec)):
@@ -5677,6 +5975,9 @@ class ADAM:
         }
 
         actuals = np.asarray(self.actuals, dtype=float)
+        # A scale model fitted in logs (sm()) is refitted to the logarithms
+        if self._log_model:
+            actuals = np.log(actuals)
 
         # ``functools.partial`` over the top-level worker is picklable —
         # joblib needs that. Same callable works in serial mode too.
@@ -6196,6 +6497,9 @@ class ADAM:
 
         # 7. yt and ot (R/reapply.R:745-754)
         y_in_sample = np.asarray(self.actuals, dtype=np.float64).reshape(-1, 1)
+        # A scale model fitted in logs (sm()) is refitted to the logarithms, as R
+        if self._log_model:
+            y_in_sample = np.log(y_in_sample)
         occurrence_dict = getattr(self, "_occurrence", {}) or {}
         occurrence_model = occurrence_dict.get("occurrence_model", False)
         if occurrence_model:
@@ -6256,6 +6560,9 @@ class ADAM:
         new_states = np.array(result.states, copy=True, order="C")
         new_fitted = np.array(result.fitted, copy=True, order="C") * pt.reshape(-1, 1)
         new_fitted = np.ascontiguousarray(new_fitted).copy()
+        # A scale model fitted in logs (sm()) has the scale as its values, as R
+        if self._log_model:
+            new_fitted = np.exp(new_fitted)
         new_profile = np.array(result.profile, copy=True, order="C")
 
         # 10. Build the result object
@@ -6653,16 +6960,19 @@ class ADAM:
         )
         paths = np.array(result.data, copy=True, order="C")  # (h, nsim, nsim)
 
-        # 7. Reduce to mean + intervals (R lines 1294-1316).
+        # 7. Reduce to mean + intervals (R lines 1294-1316), in the space of the data
+        # for a scale model fitted in logs (sm()), as R
+        log_model = self._log_model
+        values = np.exp(paths) if log_model else paths
         mean_index = _forecast_index(self.fitted, h)
         if cumulative:
-            cumsums = np.nansum(paths, axis=0)  # (nsim, nsim)
+            cumsums = np.nansum(values, axis=0)  # (nsim, nsim)
             mean_scalar = float(_trim_mean(cumsums.ravel(), trim))
             mean_series = pd.Series([mean_scalar], index=mean_index[:1])
         else:
             # Trimmed mean per horizon step over all (k, j) pairs.
             mean_arr = np.array(
-                [_trim_mean(paths[i, :, :].ravel(), trim) for i in range(h)],
+                [_trim_mean(values[i, :, :].ravel(), trim) for i in range(h)],
                 dtype=float,
             )
             mean_series = pd.Series(mean_arr, index=mean_index)
@@ -6677,7 +6987,7 @@ class ADAM:
                 np.asarray(skeleton, dtype=float), index=mean_series.index
             )
         elif point == "median":
-            totals = np.nansum(paths, axis=0)[None] if cumulative else paths
+            totals = np.nansum(values, axis=0)[None] if cumulative else values
             mean_series = pd.Series(
                 np.nanmedian(totals.reshape(totals.shape[0], -1), axis=1),
                 index=mean_series.index,
@@ -6706,12 +7016,12 @@ class ADAM:
         upper_df = pd.DataFrame(np.zeros(level_up.shape), index=idx, columns=upper_cols)
 
         if cumulative:
-            cumsums = np.nansum(paths, axis=0).ravel()
+            cumsums = np.nansum(values, axis=0).ravel()
             lower_df.iloc[0, :] = np.nanquantile(cumsums, level_low[0, :])
             upper_df.iloc[0, :] = np.nanquantile(cumsums, level_up[0, :])
         elif interval == "prediction":
             for i in range(h):
-                flat = paths[i, :, :].ravel()
+                flat = values[i, :, :].ravel()
                 lower_df.iloc[i, :] = np.nanquantile(flat, level_low[i, :])
                 upper_df.iloc[i, :] = np.nanquantile(flat, level_up[i, :])
         else:  # confidence
@@ -6719,7 +7029,7 @@ class ADAM:
                 # Average across parameter sets (axis 0 of the (nsim, nsim)
                 # slice) first, then quantile across error samples.
                 col_means = np.array(
-                    [_trim_mean(paths[i, :, j], trim) for j in range(nsim)],
+                    [_trim_mean(values[i, :, j], trim) for j in range(nsim)],
                     dtype=float,
                 )
                 lower_df.iloc[i, :] = np.nanquantile(col_means, level_low[i, :])
@@ -6727,7 +7037,7 @@ class ADAM:
 
         # Inf / NaN substitution (R lines 1320-1364).
         if not cumulative:
-            inf_low_val = -np.inf if e_type == "A" else 0.0
+            inf_low_val = -np.inf if e_type == "A" and not log_model else 0.0
             lower_df = lower_df.where(level_low != 0.0, inf_low_val)
             upper_df = upper_df.where(level_up != 1.0, np.inf)
         else:

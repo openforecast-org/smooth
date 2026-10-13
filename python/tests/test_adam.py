@@ -1414,3 +1414,146 @@ def test_ics_are_those_of_r(model):
             assert ics[name] == pytest.approx(value, rel=1e-8)
     else:
         assert ics == pytest.approx(r["values"][0], rel=1e-8)
+
+
+def test_simulated_forecasts_after_the_last_observed_value():
+    """With the last values missing, the simulated forecasts start from the last
+    observed value, as h+k steps ahead, so they take the uncertainty of the states
+    over the missing values as the filter of the analytical intervals, as R."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) + np.arange(72) * 2.0
+    y[-4:] = np.nan
+    model = ADAM(model="AAN", distribution="dnorm").fit(y)
+    approximate = model.predict(h=3, interval="approximate", level=0.9)
+    simulated = model.predict(h=3, interval="simulated", level=0.9, nsim=50000, seed=41)
+    np.testing.assert_allclose(
+        np.ravel(simulated.upper), np.ravel(approximate.upper), rtol=1e-2
+    )
+
+
+def test_cumulative_and_scale_forecasts_after_the_last_observed_value():
+    """The cumulative forecasts and those with a scale model start from the last
+    observed value too, as R: the analytical bounds agree with the simulated ones."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) + np.arange(72) * 2.0
+    y[-4:] = np.nan
+    model = ADAM(model="AAN", distribution="dnorm").fit(y)
+    for scale_model in (False, True):
+        if scale_model:
+            model.scale_model = model.sm(model="MNN")
+        for cumulative in (True, False):
+            arguments = {"h": 3, "level": 0.9, "cumulative": cumulative}
+            approximate = model.predict(interval="approximate", **arguments)
+            simulated = model.predict(
+                interval="simulated", nsim=50000, seed=41, **arguments
+            )
+            np.testing.assert_allclose(
+                np.ravel(simulated.upper), np.ravel(approximate.upper), rtol=1e-2
+            )
+
+
+def test_cumulative_intervals_of_multiplicative_models_are_simulated():
+    """The variance of a sum of the multiplicative errors needs the covariances of
+    the horizons, so their cumulative intervals are simulated, as R, with the mean
+    of the simulated sums as the forecast."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) * (1 + np.arange(72) * 0.02)
+    model = ADAM(model="MNM", lags=[12]).fit(y)
+    arguments = {"h": 4, "cumulative": True, "nsim": 20000, "seed": 41}
+    approximate = model.predict(interval="approximate", **arguments)
+    simulated = model.predict(interval="simulated", **arguments)
+    assert approximate.interval == "simulated"
+    np.testing.assert_allclose(np.ravel(approximate.lower), np.ravel(simulated.lower))
+    np.testing.assert_allclose(
+        np.ravel(approximate.mean), np.sum(model.predict(h=4).mean), rtol=1e-3
+    )
+    additive = ADAM(model="ANN").fit(y)
+    assert additive.predict(h=4, interval="approximate", cumulative=True).interval == (
+        "approximate"
+    )
+
+
+def test_simulated_skeleton_after_missing_values_inside_and_at_the_end():
+    """The profile at the last observed value, with the corrections of the filter
+    after the missing values inside the sample, gives the forecasts from the end."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    ) + np.arange(72) * 2.0
+    y[[10, 40, 64]] = np.nan
+    y[-3:] = np.nan
+    for model in (
+        ADAM(model="ANA", lags=[12], distribution="dnorm").fit(y),
+        ADAM(
+            model="NNN",
+            lags=[1, 12],
+            orders={"ar": [0, 1], "i": [1, 1], "ma": [1, 1]},
+            distribution="dnorm",
+        ).fit(y),
+    ):
+        np.testing.assert_allclose(
+            np.ravel(model.predict(h=4, interval="simulated", nsim=10).mean),
+            np.ravel(model.predict(h=4).mean),
+            rtol=1e-12,
+        )
+
+
+def test_mean_of_adam_ets_with_a_multiplicative_error():
+    """ADAM ETS moves the level by (1+e)^alpha, whose mean is below one: the mean
+    drifts below the skeleton after the first step, and the prediction interval is
+    simulated, as R."""
+    from scipy.special import gammaln
+
+    rng = np.random.default_rng(41)
+    e = rng.gamma(5, 0.2, 300)
+    y = 10 * np.cumprod(np.concatenate([[1], 1 + 0.3 * (e[:-1] - 1)])) * e
+    model = ADAM(model="MNN", distribution="dgamma", ets="adam").fit(y)
+    scale = model.scale
+    alpha = model.persistence_level_
+    drift = np.exp(
+        gammaln(1 / scale + alpha) + alpha * np.log(scale) - gammaln(1 / scale)
+    )
+    skeleton = np.ravel(model.predict(h=6).mean)
+    mean = np.ravel(model.predict(h=6, point="mean", nsim=100000, seed=41).mean)
+    assert mean[0] == pytest.approx(skeleton[0], rel=1e-12)
+    np.testing.assert_allclose(mean, skeleton * drift ** np.arange(6), rtol=1e-2)
+    assert model.predict(h=6, interval="prediction", nsim=10).interval == "simulated"
+
+
+
+def test_provided_occurrence_of_the_horizon():
+    """The probabilities provided to predict() multiply the forecasts of the sizes
+    in that forecast only: the occurrence of the model is kept."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    )
+    y[::5] = 0
+    model = ADAM(model="MNN", occurrence="fixed").fit(y)
+    before = np.ravel(model.predict(h=4).mean)
+    sizes = np.ravel(model.predict(h=4, occurrence=np.ones(4)).mean)
+    probabilities = np.array([1, 0, 0.5, 1])
+    forecast = model.predict(h=4, occurrence=probabilities)
+    np.testing.assert_allclose(np.ravel(forecast.mean), sizes * probabilities)
+    assert model._occurrence["occurrence"] == "fixed"
+    np.testing.assert_allclose(np.ravel(model.predict(h=4).mean), before)
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize("model,distribution", [("MAdM", "dinvgauss"), ("MAM", "dgamma")])
+def test_adam_ets_multiplicative_starts_as_r(model, distribution):
+    """ADAM ETS starts its smoothing parameters at R's general values, not at the
+    small ones of the conventional multiplicative ETS, so the fit is R's."""
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        "{ y <- as.numeric(AirPassengers);"
+        f" m <- adam(ts(y, frequency=12), '{model}', distribution='{distribution}',"
+        " ets='adam'); list(y=y, ll=as.numeric(logLik(m)), B=as.numeric(m$B)) }"
+    )
+    fit = ADAM(model=model, lags=[12], distribution=distribution, ets="adam").fit(
+        np.array(r["y"], float)
+    )
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    np.testing.assert_allclose(np.asarray(fit.b_value), r["B"], rtol=1e-6, atol=1e-8)

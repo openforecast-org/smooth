@@ -5,7 +5,6 @@ import pandas as pd
 
 # Note: adam_cpp instance is passed to functions that need C++ integration
 # The adamCore object is created in architector() and passed through the pipeline
-from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import OUTLIER_NAMES, observed_mask
 
 from ._helpers import (
@@ -103,7 +102,9 @@ def _check_fitted_values(model_prepared, occurrence_dict, observations_dict):
 
     # Fix cases when we have zeroes in the provided occurrence. At the missing
     # values the fitted is the prediction of the model
-    if occurrence_dict["occurrence"] == "provided":
+    if isinstance(occurrence_dict["occurrence"], str) and (
+        occurrence_dict["occurrence"] == "provided"
+    ):
         zero = ~occurrence_dict["ot_logical"] & observed_mask(observations_dict)
         model_prepared["y_fitted"][zero] = (
             model_prepared["y_fitted"][zero] * occurrence_dict["p_fitted"][zero]
@@ -172,14 +173,30 @@ def _determine_forecast_interval(
     """
     # If this is "prediction", do simulations for multiplicative components
     if general_dict["interval"] == "prediction":
-        # Simulate stuff for the ETS only
+        # Simulate stuff for the ETS only, and for ADAM ETS with a multiplicative error,
+        # whose states move by (1+e)^g and drift below the skeleton (but the pure
+        # multiplicative one with the log-normal distribution, exact in logs)
+        trend_type = model_type_dict["trend_type"]
+        season_type = model_type_dict["season_type"]
+        distribution = (
+            general_dict.get("distribution_new") or general_dict["distribution"]
+        )
+        log_normal_exact = (
+            distribution == "dlnorm"
+            and not model_type_dict.get("arima_model", False)
+            and trend_type != "A"
+            and season_type != "A"
+        )
         if (
             model_type_dict["ets_model"] or explanatory_checked["xreg_number"] > 0
         ) and (
-            model_type_dict["trend_type"] == "M"
+            trend_type == "M"
+            or (season_type == "M" and general_dict["h"] > lags_dict["lags_model_min"])
             or (
-                model_type_dict["season_type"] == "M"
-                and general_dict["h"] > lags_dict["lags_model_min"]
+                model_type_dict["ets_model"]
+                and general_dict.get("ets") == "adam"
+                and model_type_dict["error_type"] == "M"
+                and not log_normal_exact
             )
         ):
             general_dict["interval"] = "simulated"
@@ -358,15 +375,10 @@ def _process_occurrence_forecast(occurrence_dict, general_dict):
     """
     # Initialize occurrence model flag
     occurrence_model = False
-    # If the occurrence values are provided for the holdout
-    if occurrence_dict.get("occurrence") is not None and isinstance(
-        occurrence_dict["occurrence"], bool
-    ):
-        p_forecast = occurrence_dict["occurrence"] * 1
-    elif occurrence_dict.get("occurrence") is not None and isinstance(
-        occurrence_dict["occurrence"], (int, float)
-    ):
-        p_forecast = occurrence_dict["occurrence"]
+    # If the occurrence values are provided for the holdout (in place of the type)
+    provided = occurrence_dict.get("occurrence")
+    if provided is not None and not isinstance(provided, str):
+        p_forecast = np.ravel(np.asarray(provided, dtype=float))
     else:
         # If this is a mixture model, produce forecasts for the occurrence
         if occurrence_dict.get("occurrence_model"):
@@ -722,15 +734,116 @@ def forecaster(
 
     # 5. Prepare lookup table for forecasting
     lookup = _prepare_lookup_table(lags_dict, observations_dict, general_dict)
-    model_prepared = _forecast_measurement(
-        model_prepared, explanatory_checked, components_dict, general_dict["h"]
-    )
+    if not general_dict.get("_gap_shift"):
+        model_prepared = _forecast_measurement(
+            model_prepared, explanatory_checked, components_dict, general_dict["h"]
+        )
 
     # 6. Set interval from caller and resolve "prediction" → "simulated"/"approximate"
     general_dict["interval"] = interval
     general_dict = _determine_forecast_interval(
         general_dict, model_type_dict, explanatory_checked, lags_dict
     )
+
+    # 6b. With the k last periods of the sample without an observed size, the
+    # forecast of the pure multiplicative ETS with the drift of the states over them
+    # (and of the models with a scale model), and the simulated and the cumulative
+    # ones of any model, start from the last observed size, as h+k steps ahead, as
+    # R's forecast.adam: the uncertainty of the states over those periods is then
+    # that of the k first steps
+    trailing = int(general_dict.get("_gap_trailing", 0) or 0)
+    cumulative = general_dict.get("cumulative", False)
+    if (
+        trailing
+        and model_prepared.get("profile_observed") is not None
+        and (
+            cumulative
+            or general_dict.get("_gap_drifting", False)
+            or general_dict["interval"] == "simulated"
+        )
+    ):
+        h = general_dict["h"]
+        obs = observations_dict["obs_in_sample"]
+        # The profile at the origin, with the corrections of the filter that the
+        # states do not record
+        profile = np.array(model_prepared["profile_observed"], dtype=float)
+        _, mat_wt, _, _ = _prepare_matrices_for_forecast(
+            model_prepared, observations_dict, lags_dict, general_dict
+        )
+        measurement = np.vstack(
+            [np.asarray(model_prepared["measurement"])[obs - trailing : obs], mat_wt]
+        )
+        p_forecast, _ = _process_occurrence_forecast(occurrence_dict, general_dict)
+        # The variances and the means of the filter (of the steps after the sample)
+        # at the last h steps
+        general_shifted = {
+            **general_dict,
+            "h": h + trailing,
+            "_gap_trailing": 0,
+            "_gap_shift": trailing,
+            **{
+                key: np.concatenate([np.ones(trailing), np.ravel(general_dict[key])])
+                for key in ("_filter_variances", "_filter_mean")
+                if general_dict.get(key) is not None
+            },
+        }
+        result = forecaster(
+            {
+                **model_prepared,
+                "profiles_recent_table": profile,
+                "measurement_forecast": measurement,
+            },
+            observations_dict,
+            general_shifted,
+            # The probabilities of the horizon (provided in place of the type, or of
+            # the occurrence model) after ones over those periods
+            {
+                **occurrence_dict,
+                **{
+                    key: np.concatenate([np.ones(trailing), p_forecast])
+                    for key in ("p_forecast", "occurrence")
+                    if key == "p_forecast"
+                    or not isinstance(occurrence_dict.get(key), (str, type(None)))
+                },
+            },
+            lags_dict,
+            model_type_dict,
+            explanatory_checked,
+            components_dict,
+            constants_checked,
+            params_info,
+            adam_cpp,
+            interval=general_dict["interval"],
+            level=level,
+            side=side,
+        )
+        # The forecast of the h steps after the sample (the cumulative one sums them)
+        _prepare_forecast_index(observations_dict, general_dict)
+        index = observations_dict["y_forecast_index"]
+        if cumulative:
+            index, trailing = index[:1], 0
+        if general_shifted.get("_scenarios_matrix") is not None:
+            general_dict["_scenarios_matrix"] = np.asarray(
+                general_shifted["_scenarios_matrix"]
+            )[trailing:]
+        return ForecastResult(
+            mean=pd.Series(
+                np.asarray(result.mean)[trailing:], index=index, name="mean"
+            ),
+            lower=(
+                None
+                if result.lower is None
+                else result.lower.iloc[trailing:].set_axis(index, axis=0)
+            ),
+            upper=(
+                None
+                if result.upper is None
+                else result.upper.iloc[trailing:].set_axis(index, axis=0)
+            ),
+            level=result.level,
+            side=result.side,
+            interval=result.interval,
+        )
 
     # 7. Generate point forecasts using adam_cpp.forecast()
     y_forecast_values = _generate_point_forecasts(
@@ -762,12 +875,42 @@ def forecaster(
         occurrence_dict, general_dict
     )
 
-    # 10. Apply occurrence probabilities and handle cumulative
+    # 10. Apply occurrence probabilities and handle cumulative. The intervals of an
+    # occurrence model are of the sizes, around their forecasts
+    y_sizes = y_forecast_values
     y_forecast_values = y_forecast_values * p_forecast
     if general_dict.get("cumulative"):
-        y_forecast_values = np.sum(y_forecast_values)
-    # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated.
-    if occurrence_model and general_dict.get("cumulative", False):
+        # The h steps after the sample, with the origin k periods before its end; a
+        # model in logs sums its forecasts in the space of the data
+        if general_dict.get("_log_model"):
+            y_forecast_values = np.exp(y_sizes) * p_forecast
+        y_forecast_values = np.sum(
+            y_forecast_values[int(general_dict.get("_gap_shift", 0) or 0) :]
+        )
+        y_sizes = y_forecast_values
+    # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated
+    # (not for the occurrence of the missing values only, whose probability is one).
+    # So do the multiplicative models: the variance of the sum of their errors needs
+    # the covariances of the horizons, which their analytical variances do not have.
+    # A model in logs sums its paths in the space of the data
+    occurrence_model = occurrence_model and np.any(np.asarray(p_forecast) < 1)
+    multiplicative = "M" in (
+        model_type_dict["error_type"],
+        model_type_dict["trend_type"],
+        model_type_dict["season_type"],
+    ) or (general_dict.get("distribution_new") or general_dict["distribution"]) in (
+        "dlnorm",
+        "dinvgauss",
+        "dgamma",
+        "dls",
+        "dllaplace",
+        "dlgnorm",
+    )
+    if general_dict.get("cumulative", False) and (
+        occurrence_model
+        or (multiplicative and resolved_interval == "approximate")
+        or (general_dict.get("_log_model") and resolved_interval != "none")
+    ):
         general_dict["interval"] = "simulated"
         resolved_interval = "simulated"
 
@@ -800,7 +943,7 @@ def forecaster(
                 y_lower, y_upper, y_simulated = _cached_sim
             else:
                 nsim = general_dict.get("nsim", 10000)
-                y_lower, y_upper, y_simulated, _ = generate_simulation_interval(
+                y_lower, y_upper, y_simulated, y_mean = generate_simulation_interval(
                     y_forecast_values,
                     model_prepared,
                     general_dict,
@@ -817,11 +960,14 @@ def forecaster(
                     nsim=nsim,
                     p_forecast=p_forecast if occurrence_model else None,
                 )
+                # The cumulative forecast is the mean of the simulated sums, as in R
+                if general_dict.get("cumulative", False):
+                    y_forecast_values = y_mean
             if general_dict.get("scenarios", False):
                 general_dict["_scenarios_matrix"] = y_simulated
         elif resolved_interval == "approximate":
             y_lower, y_upper = generate_prediction_interval(
-                y_forecast_values,
+                y_sizes,
                 model_prepared,
                 general_dict,
                 observations_dict,
@@ -836,7 +982,7 @@ def forecaster(
                 warnings.warn('scenarios=True requires interval="simulated". Ignored.')
         elif resolved_interval in ("semiparametric", "empirical", "nonparametric"):
             y_lower, y_upper = generate_multistep_interval(
-                y_forecast_values,
+                y_sizes,
                 model_prepared,
                 general_dict,
                 observations_dict,
@@ -884,13 +1030,25 @@ def forecaster(
 SYMMETRIC_DISTRIBUTIONS = ("dnorm", "dlaplace", "ds", "dgnorm", "dlogis", "dt")
 
 
-def _skeleton_steps(point, model_type_dict, components_dict, lags_dict, distribution):
+def _skeleton_steps(
+    point,
+    model_type_dict,
+    components_dict,
+    lags_dict,
+    distribution,
+    adam_ets=False,
+    gapped=False,
+):
     """The number of the first steps where the skeleton is the mean (median) of the
     forecast distribution (R's ``adam_skeletonSteps``). The mean: wherever the model
     is linear in the errors or they multiply additive components and the mean of the
     error is its neutral value; with a multiplicative trend only at the first step,
-    and with a multiplicative seasonality until its first lag. The median: an
-    additive model with a symmetric distribution."""
+    and with a multiplicative seasonality until its first lag. ADAM ETS moves its
+    multiplicative components by (1+e)^g, whose mean is below one: with a
+    multiplicative error the skeleton is the mean at the first step only, and with
+    any multiplicative component not after the periods without an observed size at
+    the end of the sample (``gapped``). The median: an additive model with a
+    symmetric distribution."""
     if distribution == "dalaplace":
         return 0
     e_type = model_type_dict["error_type"]
@@ -901,6 +1059,11 @@ def _skeleton_steps(point, model_type_dict, components_dict, lags_dict, distribu
         return np.inf if additive and distribution in SYMMETRIC_DISTRIBUTIONS else 0
     if e_type == "M" and components_dict.get("components_number_arima", 0) > 0:
         return 0
+    if adam_ets and "M" in (e_type, t_type, s_type):
+        if gapped:
+            return 0
+        if e_type == "M":
+            return 1
     if t_type == "M":
         return 1
     if s_type == "M":
@@ -936,8 +1099,11 @@ def _forecast_point(arguments):
         arguments["components_dict"],
         arguments["lags_dict"],
         distribution,
+        general_dict.get("ets") == "adam",
+        not np.ravel(arguments["observations_dict"]["ot_logical"])[-1],
     )
-    if point == "median" and intermittent:
+    # Nor of a model in logs (R's adam_skeletonSteps)
+    if (point == "median" and intermittent) or general_dict.get("_log_model"):
         steps = 0
     if steps >= h:
         return result
@@ -948,9 +1114,16 @@ def _forecast_point(arguments):
             interval="simulated", general={"scenarios": True, "cumulative": False}
         )
         paths = np.asarray(general["_scenarios_matrix"], dtype=float)
+        # A model in logs averages its paths in the space of the data, whose mean
+        # predict() takes the exponent of when it is not cumulative
+        log_model = general_dict.get("_log_model", False)
+        if log_model:
+            paths = np.exp(paths)
         values = np.atleast_1d(
             np.mean(np.sum(paths, axis=0)) if cumulative else np.mean(paths, axis=1)
         )
+        if log_model and not cumulative:
+            values = np.log(values)
     else:
         interval = arguments["interval"]
         if intermittent:
@@ -963,216 +1136,3 @@ def _forecast_point(arguments):
         values[: int(steps)] = skeleton[: int(steps)]
     result.mean = pd.Series(values, index=result.mean.index, name="mean")
     return result
-
-
-def forecaster_combined(
-    prepared_models,
-    ic_weights,
-    observations_dict,
-    general_dict,
-    occurrence_dict,
-    params_info,
-    interval="prediction",
-    level=0.95,
-    side="both",
-):
-    """
-    Generate combined forecasts from multiple prepared models using IC weights.
-
-    This function produces IC-weighted point forecasts and prediction intervals
-    by combining forecasts from multiple ADAM models. Each model's forecast
-    contribution is proportional to its Akaike weight.
-
-    Parameters
-    ----------
-    prepared_models : list of dict
-        List of prepared model dictionaries. Each dict must contain:
-
-        - 'name': Model name string (e.g., 'ANN')
-        - 'weight': IC weight for this model (>= 0.01 to be included)
-        - 'result': Original selection result with adam_estimated
-        - 'model_type_dict': Model type specification
-        - 'components_dict': Component counts
-        - 'lags_dict': Lag structure
-        - 'prepared': Prepared model from preparator()
-
-    ic_weights : dict
-        Dictionary mapping model names to IC weights. Weights should sum to 1.0.
-
-    observations_dict : dict
-        Observation information (shared across all models).
-
-    general_dict : dict
-        General configuration containing 'h' (horizon) and other settings.
-
-    occurrence_dict : dict
-        Occurrence model specification.
-
-    params_info : list or array
-        Parameter count information for interval calculation.
-
-    interval : str, default='prediction'
-        Interval type matching R's ``forecast.adam()``:
-        'none', 'prediction', 'simulated', 'approximate', etc.
-
-    level : float, default=0.95
-        Confidence level for prediction intervals (0 to 1).
-
-    side : str, default='both'
-        Interval side: 'both', 'lower', or 'upper'.
-
-    Returns
-    -------
-    ForecastResult
-        Structured result with ``mean`` (pd.Series), ``lower`` and
-        ``upper`` (pd.DataFrame or None) containing IC-weighted combined
-        forecasts.
-
-    Notes
-    -----
-    The combined forecast is computed as:
-
-    .. math::
-
-        \\hat{y}_{T+h}^{combined} = \\sum_{m=1}^{M} w_m \\hat{y}_{T+h}^{(m)}
-
-    where :math:`w_m` is the Akaike weight for model m.
-
-    For prediction intervals, the same weighting is applied to lower and upper
-    bounds. This is an approximation that works well when models agree.
-    """
-    import copy
-
-    h = general_dict["h"]
-
-    # Drop models with negligible IC weight (< 0.01) and renormalise the
-    # remaining weights so they sum to 1.
-    model_weights = {m["name"]: m["weight"] for m in prepared_models}
-    filtered_weights = {k: v for k, v in model_weights.items() if v >= 0.01}
-    total_weight = sum(filtered_weights.values())
-    if total_weight > 0:
-        filtered_weights = {k: v / total_weight for k, v in filtered_weights.items()}
-
-    # Initialize combined arrays
-    has_intervals = interval != "none"
-    n_out = 1 if general_dict.get("cumulative", False) else h
-    y_forecast_combined = np.zeros(n_out)
-    # For interval columns, accumulate by column name
-    interval_accum = {}  # col_name -> np.zeros(n_out)
-    forecast_index = None
-
-    for model_info in prepared_models:
-        model_name = model_info["name"]
-        weight = filtered_weights.get(model_name, 0)
-
-        if weight == 0:
-            continue
-
-        result = model_info["result"]
-        prepared = model_info["prepared"]
-        model_type_dict = model_info["model_type_dict"]
-        components_dict = model_info["components_dict"]
-        lags_dict = model_info["lags_dict"]
-        adam_cpp = result["adam_estimated"]["adam_cpp"]
-
-        general_dict_copy = copy.deepcopy(general_dict)
-
-        # Use the sub-model's own distribution (stored by preparator at fit time).
-        # Without this, A-error sub-models would inherit the best (M-error) model's
-        # "dgamma" distribution, causing wrong error generation and wider intervals.
-        sub_dist = prepared.get("distribution")
-        if sub_dist:
-            general_dict_copy["distribution"] = sub_dist
-
-        # Build per-sub-model NParam so simulation uses df = T - k_i, not weighted_k.
-        n_est_i = model_info.get("n_param_estimated", 0)
-        n_param_sub = NParam()
-        n_param_sub.estimated["internal"] = n_est_i
-        if general_dict_copy.get("loss") == "likelihood":
-            n_param_sub.estimated["scale"] = 1
-        n_param_sub.update_totals()
-        general_dict_copy["n_param"] = n_param_sub
-
-        # Build per-sub-model params_info for sigma() and the scale's df, which
-        # drop the scale only under likelihood. Combined model stores [[0],[0]]
-        # which would cause IndexError in sigma(). The combination's own df does
-        # not apply to the members.
-        sub_params_info = [[n_est_i, 1, n_est_i + 1], [0]]
-        general_dict_copy["df_scale"] = None
-
-        model_forecast = forecaster(
-            model_prepared=prepared,
-            observations_dict=observations_dict,
-            general_dict=general_dict_copy,
-            occurrence_dict=occurrence_dict,
-            lags_dict=lags_dict,
-            model_type_dict=model_type_dict,
-            explanatory_checked=model_info.get(
-                "explanatory_dict",
-                {"xreg_model": False, "xreg_number": 0},
-            ),
-            components_dict=components_dict,
-            constants_checked=model_info.get(
-                "constants_dict",
-                {"constant_required": False},
-            ),
-            params_info=sub_params_info,
-            adam_cpp=adam_cpp,
-            interval=interval,
-            level=level,
-            side=side,
-        )
-
-        if forecast_index is None:
-            forecast_index = model_forecast.mean.index
-
-        y_forecast_combined += (
-            np.nan_to_num(model_forecast.mean.values, nan=0.0) * weight
-        )
-
-        if has_intervals:
-            if model_forecast.lower is not None:
-                for col in model_forecast.lower.columns:
-                    key = ("lower", col)
-                    if key not in interval_accum:
-                        interval_accum[key] = np.zeros(n_out)
-                    interval_accum[key] += (
-                        np.nan_to_num(model_forecast.lower[col].values, nan=0.0)
-                        * weight
-                    )
-            if model_forecast.upper is not None:
-                for col in model_forecast.upper.columns:
-                    key = ("upper", col)
-                    if key not in interval_accum:
-                        interval_accum[key] = np.zeros(n_out)
-                    interval_accum[key] += (
-                        np.nan_to_num(model_forecast.upper[col].values, nan=0.0)
-                        * weight
-                    )
-
-    # Build ForecastResult
-    mean_series = pd.Series(y_forecast_combined, index=forecast_index, name="mean")
-    lower_df = None
-    upper_df = None
-    if has_intervals:
-        lower_keys = sorted(k for k in interval_accum if k[0] == "lower")
-        upper_keys = sorted(k for k in interval_accum if k[0] == "upper")
-        if lower_keys:
-            lower_df = pd.DataFrame(
-                {k[1]: interval_accum[k] for k in lower_keys},
-                index=forecast_index,
-            )
-        if upper_keys:
-            upper_df = pd.DataFrame(
-                {k[1]: interval_accum[k] for k in upper_keys},
-                index=forecast_index,
-            )
-
-    return ForecastResult(
-        mean=mean_series,
-        lower=lower_df,
-        upper=upper_df,
-        level=level,
-        side=side,
-        interval=interval,
-    )

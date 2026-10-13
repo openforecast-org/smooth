@@ -11,7 +11,6 @@ from typing import Literal, Optional
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import stats as scipy_stats
 
 from smooth.adam_general.core.adam import ADAM
 
@@ -217,7 +216,9 @@ class SMA(ADAM):
 
     @staticmethod
     def _ic_for_order(y_is: NDArray, order: int, ic: str) -> float:
-        """Fit SMA(order) on y_is and return the IC (df=1: scale is the sole param)."""
+        """Fit SMA(order) on y_is and return the IC, as R's sma(): the likelihood
+        over the observed values, with the filter over the missing ones, and
+        df = order + 1 (the backcast initials and the scale)."""
         m = ADAM(
             model="NNN",
             ar_order=order,
@@ -233,18 +234,14 @@ class SMA(ADAM):
             verbose=0,
         )
         m.fit(y_is)
-        n = len(y_is)
-        fitted = np.asarray(m.fitted, dtype=float)
-        errors = y_is - fitted
-        scale = float(np.sqrt(np.sum(errors**2) / n))
-        if scale <= 0:
-            scale = float(np.finfo(float).eps)
-        loglik = float(np.sum(scipy_stats.norm.logpdf(y_is, fitted, scale)))
-        return _ic_value(loglik, df=1, n=n, ic=ic)
+        n = int(np.sum(~np.isnan(y_is)))
+        return _ic_value(float(m.loglik), df=order + 1, n=n, ic=ic)
 
     def _select_order(self, y_is: NDArray, ic: str) -> tuple[int, NDArray]:
         """Return (best_order, ICs_array) via ternary or sequential search."""
-        max_order = min(200, len(y_is))
+        # df = order + 1, so the order is capped to keep the denominator of AICc
+        # positive, as R
+        max_order = min(200, max(1, int(np.sum(~np.isnan(y_is))) - 3))
         ICs = np.full(max_order, np.nan)
 
         def ev(k: int) -> float:

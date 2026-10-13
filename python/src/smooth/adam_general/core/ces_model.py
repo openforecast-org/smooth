@@ -721,15 +721,20 @@ class CES:
             o_type="n",
             loss=self.loss,
             distribution="dnorm",
+            filter_logs=False,
         )
 
         errors = np.array(adam_fitted.errors).ravel()
         y_fitted = np.array(adam_fitted.fitted).ravel()
         profiles_recent_table = np.array(adam_fitted.profile)
+        profile_observed = np.array(adam_fitted.profileObserved)
         mat_vt = np.array(adam_fitted.states).T  # C++ returns (components, time)
 
-        # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces()
-        scale = _sum_r(errors[ot_logical] ** 2) / obs_observed
+        # Scale, sigma^2 as in the ADAM monograph -- R's scaler() in ces(), with the
+        # variance of the errors after the missing values, of the filter
+        gap = np.ravel(adam_fitted.variances).astype(float)
+        errors_std = errors[ot_logical] / np.sqrt(gap[ot_logical])
+        scale = _sum_r(errors_std**2) / obs_observed
         # No errors at the missing values, where the fitted values are the predictions
         errors[~observed] = np.nan
 
@@ -865,6 +870,7 @@ class CES:
         self._mat_wt = mat_wt
         self._vec_g = vec_g
         self._profiles_recent_table = profiles_recent_table
+        self._profile_observed = profile_observed
         self._profiles_recent_initial = profiles_recent_initial
         self._index_lookup_table = index_lookup_table
         self._adam_cpp = adam_cpp
@@ -889,9 +895,12 @@ class CES:
             "states": self.states,
             "mat_vt": profiles_recent_initial,
             "measurement": mat_wt,
+            "mat_wt": mat_wt,
+            "mat_f": mat_f,
             "transition": mat_f,
             "persistence": vec_g,
             "profiles_recent_table": profiles_recent_table,
+            "profile_observed": profile_observed,
             "residuals": pd.Series(np.asarray(errors, dtype=float)),
             "y_fitted": np.asarray(y_fitted, dtype=float).copy(),
             "scale": scale,
@@ -975,9 +984,11 @@ class CES:
         if not hasattr(self, "model_name"):
             raise RuntimeError("Model has not been fitted yet.")
         y = self.fitted + self.residuals
+        # The variance after the missing values
+        scale = self.scale * cast(Any, self)._gap_variance().reshape(-1, 1)
         lik_values = np.ravel(
             calculate_likelihood(
-                "dnorm", "A", y, self.fitted.reshape(-1, 1), self.scale, None
+                "dnorm", "A", y, self.fitted.reshape(-1, 1), scale, None
             )
         )
         lik_values[np.isnan(self.residuals)] = 0
@@ -1010,6 +1021,8 @@ class CES:
     # The methods of ADAM, as R's methods of adam() take the ces() models: these need
     # only the residuals, the scale and the distribution
     _check_is_fitted = _check_fitted
+    _log_model = ADAM._log_model
+    _gap_residuals = ADAM._gap_residuals
     rstandard = ADAM.rstandard
     rstudent = ADAM.rstudent
     outlierdummy = ADAM.outlierdummy
@@ -1046,6 +1059,7 @@ class CES:
     _set_new_xreg = ADAM._set_new_xreg
     _validate_prediction_inputs = ADAM._validate_prediction_inputs
     _execute_prediction = ADAM._execute_prediction
+    _gap_variance = ADAM._gap_variance
     _forecast_scale_model = ADAM._forecast_scale_model
 
     def _prepare_prediction_data(self):
@@ -1085,11 +1099,18 @@ class CES:
             )
             if not isinstance(result, tuple):
                 return np.full(len(observed), np.nan)
-            fitted, errors = result
-            scale = _sum_r(errors[observed] ** 2) / np.sum(observed)
+            fitted, errors, gap = result
+            scale = _sum_r((errors[observed] / np.sqrt(gap[observed])) ** 2) / np.sum(
+                observed
+            )
             values = np.ravel(
                 calculate_likelihood(
-                    "dnorm", "A", fitted + errors, fitted.reshape(-1, 1), scale, None
+                    "dnorm",
+                    "A",
+                    fitted + errors,
+                    fitted.reshape(-1, 1),
+                    scale * gap.reshape(-1, 1),
+                    None,
                 )
             )
             values[~observed] = 0
@@ -1176,6 +1197,13 @@ class CES:
         """The profile of the states at the end of the sample (R's ``$profile``)."""
         self._check_fitted()
         return self._profiles_recent_table
+
+    @property
+    def profile_observed(self) -> NDArray:
+        """The profile of the states at the last observed value, the origin of the
+        forecasts after the periods without one (R's ``$profileObserved``)."""
+        self._check_fitted()
+        return self._profile_observed
 
     @property
     def time_elapsed(self) -> float:

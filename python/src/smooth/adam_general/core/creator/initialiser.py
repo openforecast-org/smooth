@@ -143,6 +143,7 @@ def initialiser(
     profile_dict=None,  # Added
     adam_cpp=None,
     smoother=None,
+    adam_ets=False,
 ):
     """
     Initialize parameter vector and bounds for ADAM optimization.
@@ -476,7 +477,9 @@ def initialiser(
         if persistence_checked["persistence_estimate"] and any(
             persistence_estimate_vector
         ):
-            if any(
+            # The small starting values of the multiplicative models are those of the
+            # conventional ETS, as R's
+            if not adam_ets and any(
                 ptype == "M"
                 for ptype in [
                     model_type_dict["error_type"],

@@ -531,14 +531,13 @@ covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
     parametersNames <- names(parameterValues);
     persistenceNames <- names(object$persistence);
     transitionDim <- ncol(object$transition);
-    transitionNames <- grep("^F", parametersNames, value=TRUE);   # row-major order
+    # The transition is filled by columns from its coefficients (the filler of gum())
+    transitionNames <- grep("^F", parametersNames, value=TRUE);
     initialsEstimated <- identical(object$initialType, "optimal");
 
     perturbTransitionCell <- function(transition, nameJ, delta){
         k <- match(nameJ, transitionNames);
-        row <- ((k-1) %/% transitionDim)+1;
-        col <- ((k-1) %% transitionDim)+1;
-        transition[row,col] <- transition[row,col]+delta;
+        transition[k] <- transition[k]+delta;
         return(transition);
     }
 
@@ -559,7 +558,7 @@ covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
                 }
             }
             modelLocal <- try(suppressWarnings(
-                gum(object$data, orders=object$orders, lags=object$lags,
+                gum(object$data, orders=object$orders, lags=object$lags, type=object$type,
                     model=clone, h=0)), silent=TRUE);
         }
         else{
@@ -579,7 +578,7 @@ covarOPGgum <- function(object, stepSize=.Machine$double.eps^(1/4)){
                 }
             }
             modelLocal <- try(suppressWarnings(
-                gum(object$data, orders=object$orders, lags=object$lags,
+                gum(object$data, orders=object$orders, lags=object$lags, type=object$type,
                     persistence=persistence, transition=transition,
                     initial=object$initialType, h=0)), silent=TRUE);
         }

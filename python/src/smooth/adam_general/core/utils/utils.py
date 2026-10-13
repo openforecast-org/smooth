@@ -686,32 +686,44 @@ def _real_log(x):
     return np.log(np.abs(np.asarray(x, dtype=np.float64)))
 
 
-def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
+def calculate_likelihood(
+    distribution, Etype, y, y_fitted, scale, other, gap_mean=1.0, gap_variance=1.0
+):
     """Log-density of one observation, mirroring R's cost function.
 
     The densities come from greybox, so both languages evaluate the same code;
     only the parameterisation is spelled out here, following the switch in
     ``R/adam.R:790-862``. A multiplicative error scales the density's scale by
-    the fitted value.
+    the fitted value. ``gap_mean`` and ``gap_variance`` are the multipliers of the
+    mean and of the variance of the error after the periods without an observed
+    size (the filter, ``filter_variances()``), for dnorm and dlnorm, and for the
+    Laplace, S and Generalised Normal distributions with an additive error, whose
+    scale is then ``s gap_variance^(1/p)``, p of ``scale_power()``.
     """
     y = np.asarray(y, dtype=np.float64).reshape(-1, 1)
     mult = y_fitted if Etype == "M" else 1.0
+    gap_root = np.sqrt(gap_variance) if Etype == "A" else 1.0
 
     if distribution == "dnorm":
-        return gb.dnorm(y, y_fitted, np.sqrt(scale) * mult, log=True)
+        return gb.dnorm(y, y_fitted, np.sqrt(scale * gap_variance) * mult, log=True)
     if distribution == "dlaplace":
-        return gb.dlaplace(y, y_fitted, scale * mult, log=True)
+        return gb.dlaplace(y, y_fitted, scale * mult * gap_root, log=True)
     if distribution == "ds":
         # R scales by sqrt(fitted) here, not by fitted.
         return gb.ds(
             y,
             y_fitted,
-            scale * (np.sqrt(np.abs(y_fitted)) if Etype == "M" else 1.0),
+            scale
+            * (
+                np.sqrt(np.abs(y_fitted))
+                if Etype == "M"
+                else _pow_r(np.asarray(gap_variance, dtype=float), 0.25)
+            ),
             log=True,
         )
     if distribution == "dgnorm":
         beta = other if other is not None else 2.0
-        return gb.dgnorm(y, y_fitted, scale * mult, beta, log=True)
+        return gb.dgnorm(y, y_fitted, scale * mult * gap_root, beta, log=True)
     if distribution == "dalaplace":
         return gb.dalaplace(y, y_fitted, scale * mult, other, log=True)
     if distribution == "dlogis":
@@ -722,7 +734,12 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
 
     # Log-domain: the density on the log scale plus the Jacobian -log(y).
     if distribution == "dlnorm":
-        return gb.dlnorm(y, _real_log(y_fitted) - scale / 2, np.sqrt(scale), log=True)
+        return gb.dlnorm(
+            y,
+            _real_log(y_fitted) - scale * gap_mean / 2,
+            np.sqrt(scale * gap_variance),
+            log=True,
+        )
     if distribution == "dllaplace":
         return gb.dlaplace(np.log(y), _real_log(y_fitted), scale, log=True) - np.log(y)
     if distribution == "dls":
@@ -738,6 +755,92 @@ def calculate_likelihood(distribution, Etype, y, y_fitted, scale, other):
         return gb.dgamma(y, shape=1 / scale, scale=scale * np.abs(y_fitted), log=True)
 
     raise ValueError(f"Unsupported distribution {distribution!r}.")
+
+
+# The Gauss-Hermite rule with 16 nodes, for the mean over a normal variable: x_q with
+# the weights w_q/sqrt(pi), the same numbers as R's adam_gaussHermite
+_GAUSS_HERMITE_NODES = np.array(
+    [
+        -4.688738939305819,
+        -3.869447904860123,
+        -3.176999161979956,
+        -2.5462021578474814,
+        -1.9517879909162539,
+        -1.3802585391988809,
+        -0.8229514491446559,
+        -0.27348104613815244,
+        0.27348104613815244,
+        0.8229514491446559,
+        1.3802585391988809,
+        1.9517879909162539,
+        2.5462021578474814,
+        3.176999161979956,
+        3.869447904860123,
+        4.688738939305819,
+    ]
+)
+_GAUSS_HERMITE_WEIGHTS = np.array(
+    [
+        1.4978147231618314e-10,
+        1.3094732162868187e-07,
+        1.5300032162487316e-05,
+        0.0005259849265739094,
+        0.007266937601184743,
+        0.04728475235401403,
+        0.15833837275094964,
+        0.28656852123801213,
+        0.28656852123801213,
+        0.15833837275094964,
+        0.04728475235401403,
+        0.007266937601184743,
+        0.0005259849265739094,
+        1.5300032162487316e-05,
+        1.3094732162868187e-07,
+        1.4978147231618314e-10,
+    ]
+)
+
+
+def gap_log_density(y, mu, scale, distribution, drift_mean, drift_variance):
+    """The log-density of the observed sizes after the periods without an observed
+    size, with the Gamma or the Inverse Gaussian distribution, as R's
+    ``adam_gapLogDensity()``: the one-step density at ``mu*exp(d)``, mixed over the
+    normal drift ``d`` with the Gauss-Hermite rule. The sizes without the uncertainty
+    of the drift take the one-step density at its mean."""
+    y = np.asarray(y, dtype=float).ravel()
+    mu = np.asarray(mu, dtype=float).ravel()
+    drift_mean = np.asarray(drift_mean, dtype=float).ravel()
+    drift_variance = np.asarray(drift_variance, dtype=float).ravel()
+
+    def log_density(y, mu):
+        if distribution == "dgamma":
+            values = gb.dgamma(y, shape=1 / scale, scale=scale * np.abs(mu), log=True)
+        else:
+            values = gb.dinvgauss(y, np.abs(mu), np.abs(scale / mu), log=True)
+        return np.asarray(values, dtype=float)
+
+    values = log_density(y, mu * _exp_r(drift_mean))
+    # A NaN drift (from parameters outside the region where 1+g e is positive) stays NaN
+    gapped = np.isnan(drift_variance) | (drift_variance > 0)
+    if np.any(gapped):
+        drift = (
+            drift_mean[gapped, None]
+            + np.sqrt(2 * drift_variance[gapped])[:, None]
+            * _GAUSS_HERMITE_NODES[None, :]
+        )
+        nodes_number = len(_GAUSS_HERMITE_NODES)
+        densities = (
+            log_density(
+                np.repeat(y[gapped, None], nodes_number, axis=1).ravel(order="F"),
+                (mu[gapped, None] * _exp_r(drift)).ravel(order="F"),
+            ).reshape(-1, nodes_number, order="F")
+            + _log_r(_GAUSS_HERMITE_WEIGHTS)[None, :]
+        )
+        densities_max = np.max(densities, axis=1)
+        values[gapped] = densities_max + _log_r(
+            _sum_r(_exp_r(densities - densities_max[:, None]), axis=1)
+        )
+    return values
 
 
 def observed_mask(observations_dict):
@@ -898,7 +1001,17 @@ def _sum_r(values, axis=None):
 # does not warn on double overflow. Suppress the warning, not the value: the
 # result is unchanged, so the fit stays bit-comparable with R.
 @np.errstate(over="ignore")
-def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
+def scaler(
+    distribution,
+    Etype,
+    errors,
+    y_fitted,
+    obs_in_sample,
+    other,
+    gap_mean=1.0,
+    gap_variance=1.0,
+    gap_drift=None,
+):
     """
     Calculate scale parameter for the provided parameters.
 
@@ -909,10 +1022,58 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
     - y_fitted (np.array): Array of fitted values
     - obs_in_sample (int): Number of observations in sample
     - other (float): Additional parameter for some distributions
+    - gap_mean, gap_variance (float or np.array): the multipliers of the mean and of
+      the variance of the errors after the periods without an observed size
+      (the filter, ``filter_variances()``), ones elsewhere; used by dnorm and dlnorm
+    - gap_drift (callable or None): the moments of the drift of the states of a
+      pure multiplicative ETS over those periods at a scale (``gap_drift()``),
+      which depend on the scale itself: the scale is then the fixed point of the
+      moment equations, from the one-step scale (R's ``adam_scaler()``)
 
     Returns:
     float: The calculated scale parameter
     """
+    if gap_drift is not None:
+        scale = scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other)
+        errors = np.asarray(errors, dtype=float)
+        for _ in range(100):
+            drift = gap_drift(scale)
+            drift_mean, drift_variance = drift[0], drift[1]
+            # The filter of the conventional ETS depends on the scale, and so do its
+            # errors
+            if len(drift) > 2:
+                errors = np.asarray(drift[2], dtype=float)
+            # E(D), E(D^2) and E(1/D) of the log-normal drift D
+            expected_drift = _exp_r(drift_mean + drift_variance / 2)
+            expected_square = _exp_r(2 * drift_mean + 2 * drift_variance)
+            expected_inverse = _exp_r(-drift_mean + drift_variance / 2)
+            if distribution == "dlnorm":
+                # log(1+e) + log(D) is N(-s/2 + m, s + v)
+                scale_new = scaler(
+                    distribution,
+                    Etype,
+                    errors,
+                    y_fitted,
+                    obs_in_sample,
+                    other,
+                    1 - 2 * drift_mean / scale,
+                    1 + drift_variance / scale,
+                )
+            elif distribution == "dgamma":
+                # E(e^2) = (1+s) E(D^2) - 2 E(D) + 1
+                scale_new = (
+                    _sum_r(errors**2) - _sum_r(expected_square - 2 * expected_drift + 1)
+                ) / _sum_r(expected_square)
+            else:
+                # E(e^2/(1+e)) = E(D) - 2 + (1+s) E(1/D)
+                scale_new = (
+                    _sum_r(errors**2 / (1 + errors))
+                    - _sum_r(expected_drift - 2 + expected_inverse)
+                ) / _sum_r(expected_inverse)
+            if not np.isfinite(scale_new) or abs(scale_new - scale) <= 1e-10 * scale:
+                return scale_new
+            scale = scale_new
+        return scale
 
     # Helper: take ``log`` of a possibly-negative input via complex extension.
     # ``log(as.complex(z))`` for z < 0 yields ``log|z| + iπ``; downstream the
@@ -928,19 +1089,23 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
         # between two parameterisations of the same fit -- ANN and MNN coincide
         # when alpha = 0 -- and flip the selected model. Mirrors R's
         # ``adam_scaler`` (R/utils-adam.R).
-        return _sum_r(errors**2) / obs_in_sample
+        return _sum_r(errors**2 / gap_variance) / obs_in_sample
 
+    # After the periods without an observed size, the variance of the error is
+    # gap_variance times the one-step one: the scale s gap_variance^(1/p)
     elif distribution == "dlaplace":
-        return _sum_r(np.abs(errors)) / obs_in_sample
+        return _sum_r(np.abs(errors) / np.sqrt(gap_variance)) / obs_in_sample
 
     elif distribution == "ds":
-        return _sum_r(np.sqrt(np.abs(errors))) / (obs_in_sample * 2)
+        gap_quarter = _pow_r(np.asarray(gap_variance, dtype=float), 0.25)
+        return _sum_r(np.sqrt(np.abs(errors)) / gap_quarter) / (obs_in_sample * 2)
 
     elif distribution == "dgnorm":
         beta = other if other is not None else 2.0
-        return (beta * _sum_r(_pow_r(np.abs(errors), beta)) / obs_in_sample) ** (
-            1 / beta
-        )
+        gap_power = _pow_r(np.asarray(gap_variance, dtype=float), beta / 2)
+        return (
+            beta * _sum_r(_pow_r(np.abs(errors), beta) / gap_power) / obs_in_sample
+        ) ** (1 / beta)
 
     elif distribution == "dalaplace":
         return _sum_r(errors * (other - (errors <= 0) * 1)) / obs_in_sample
@@ -953,8 +1118,12 @@ def scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other):
             log_term = np.abs(complex_log(1 + errors / y_fitted))
         else:  # "M"
             log_term = np.abs(complex_log(1 + errors))
-        temp = 1 - np.sqrt(np.abs(1 - _sum_r(log_term**2) / obs_in_sample))
-        return 2 * np.abs(temp)
+        # The maximum likelihood of s for log(1+e) ~ N(-s a/2, s k), the root of
+        # sum(a^2/k) s^2 + 4 n s - 4 sum(u^2/k) = 0, as R's adam_scaler
+        gap_ratio = np.asarray(gap_mean, dtype=float) ** 2 / gap_variance
+        gap_sum = _sum_r(np.resize(gap_ratio, len(log_term)))
+        root = np.sqrt(obs_in_sample**2 + gap_sum * _sum_r(log_term**2 / gap_variance))
+        return 2 * (root - obs_in_sample) / gap_sum
 
     elif distribution == "dllaplace":
         if Etype == "A":

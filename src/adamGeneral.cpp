@@ -32,7 +32,22 @@ namespace Rcpp {
             Named("fitted") = result.fitted,
             Named("errors") = result.errors,
             Named("profile") = result.profile,
-            Named("profileInitial") = result.profileInitial
+            Named("profileInitial") = result.profileInitial,
+            Named("profileObserved") = result.profileObserved
+        );
+    }
+
+    // Wrapper for FilterResult
+    template <> SEXP wrap(const FilterResult& result) {
+        return List::create(
+            Named("states") = result.states,
+            Named("fitted") = result.fitted,
+            Named("errors") = result.errors,
+            Named("profile") = result.profile,
+            Named("profileInitial") = result.profileInitial,
+            Named("profileObserved") = result.profileObserved,
+            Named("variances") = result.variances,
+            Named("innovationsScale") = result.innovationsScale
         );
     }
 
@@ -110,6 +125,7 @@ RCPP_MODULE(adamCore_module) {
     .field("sparseTransition", &adamCore::sparseTransition)
     .method("polynomialise", &adamCore::polynomialise)
     .method("fit", &adamCore::fit)
+    .method("filter", &adamCore::filter)
     .method("omfitGeneral", &adamCore::omfitGeneral)
     .method("forecast", &adamCore::forecast)
     .method("ferrors", &adamCore::ferrors)

@@ -11,6 +11,22 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// covarAnalCpp
+arma::mat covarAnalCpp(const arma::vec& lagsModel, const unsigned int h, const arma::mat& measurement, const arma::mat& transition, const arma::vec& persistence, const double s2);
+RcppExport SEXP _smooth_covarAnalCpp(SEXP lagsModelSEXP, SEXP hSEXP, SEXP measurementSEXP, SEXP transitionSEXP, SEXP persistenceSEXP, SEXP s2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type lagsModel(lagsModelSEXP);
+    Rcpp::traits::input_parameter< const unsigned int >::type h(hSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type measurement(measurementSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type transition(transitionSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type persistence(persistenceSEXP);
+    Rcpp::traits::input_parameter< const double >::type s2(s2SEXP);
+    rcpp_result_gen = Rcpp::wrap(covarAnalCpp(lagsModel, h, measurement, transition, persistence, s2));
+    return rcpp_result_gen;
+END_RCPP
+}
 // smoothEigensR
 arma::vec smoothEigensR(const arma::mat& persistence, const arma::mat& transition, const arma::mat& measurement, const arma::ivec& lagsModelAll, bool xregModel, int obsInSample, bool hasDelta, int xregNumber, bool constantRequired);
 RcppExport SEXP _smooth_smoothEigensR(SEXP persistenceSEXP, SEXP transitionSEXP, SEXP measurementSEXP, SEXP lagsModelAllSEXP, SEXP xregModelSEXP, SEXP obsInSampleSEXP, SEXP hasDeltaSEXP, SEXP xregNumberSEXP, SEXP constantRequiredSEXP) {

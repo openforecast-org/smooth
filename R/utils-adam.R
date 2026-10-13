@@ -1504,12 +1504,46 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     return(list(B=B,Bl=Bl,Bu=Bu))
 }
 
-adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other){
+adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other,
+                        gapMean=1, gapVariance=1, gapDrift=NULL){
+    # After the periods without an observed size of a pure multiplicative ETS, the moments of
+    # the drift of the states (gapDrift(scale), adam_gapDrift()) depend on the scale itself:
+    # the scale is the fixed point of the moment equations below, from the one-step scale
+    if(!is.null(gapDrift)){
+        scale <- adam_scaler(distribution, Etype, errors, yFitted, obsInSample, other);
+        for(i in 1:100){
+            drift <- gapDrift(scale);
+            # The filter of the conventional ETS depends on the scale, and so do its errors
+            if(!is.null(drift$errors)){
+                errors <- drift$errors;
+            }
+            # E(D), E(D^2) and E(1/D) of the log-normal drift D
+            driftMean <- exp(drift$mean + drift$variance/2);
+            driftSquare <- exp(2*drift$mean + 2*drift$variance);
+            driftInverse <- exp(-drift$mean + drift$variance/2);
+            scaleNew <- switch(distribution,
+                               # log(1+e) + log(D) is N(-s/2 + m, s + v)
+                               "dlnorm"=adam_scaler(distribution, Etype, errors, yFitted, obsInSample, other,
+                                                    1 - 2*drift$mean/scale, 1 + drift$variance/scale),
+                               # E(e^2) = (1+s) E(D^2) - 2 E(D) + 1
+                               "dgamma"=(sum(errors^2) - sum(driftSquare - 2*driftMean + 1))/sum(driftSquare),
+                               # E(e^2/(1+e)) = E(D) - 2 + (1+s) E(1/D)
+                               "dinvgauss"=(sum(errors^2/(1+errors)) - sum(driftMean - 2 + driftInverse))/
+                                   sum(driftInverse));
+            if(!is.finite(scaleNew) || abs(scaleNew - scale) <= 1e-10*scale){
+                return(scaleNew);
+            }
+            scale <- scaleNew;
+        }
+        return(scale);
+    }
     return(switch(distribution,
-                  "dnorm"=sum(errors^2)/obsInSample,
-                  "dlaplace"=sum(abs(errors))/obsInSample,
-                  "ds"=sum(sqrt(abs(errors))) / (obsInSample*2),
-                  "dgnorm"=(other*sum(abs(errors)^other)/obsInSample)^{1/other},
+                  # After the periods without an observed size, the variance of the error is gapVariance
+                  # times the one-step one: the scale s gapVariance^(1/p), p of adam_scalePower()
+                  "dnorm"=sum(errors^2/gapVariance)/obsInSample,
+                  "dlaplace"=sum(abs(errors)/sqrt(gapVariance))/obsInSample,
+                  "ds"=sum(sqrt(abs(errors))/gapVariance^(1/4)) / (obsInSample*2),
+                  "dgnorm"=(other*sum(abs(errors)^other/gapVariance^(other/2))/obsInSample)^{1/other},
                   "dalaplace"=sum(errors*(other-(errors<=0)*1))/obsInSample,
                   # Log-domain distributions: route 1+errors (or 1+errors/yFitted)
                   # through as.complex() and take abs() of the resulting log so
@@ -1517,10 +1551,14 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                   # Equivalent Python: abs(log((1+errors).astype(complex))). The
                   # outer abs() is the modulus of the complex log, replacing the
                   # earlier Re()/abs() of a real arg pattern.
-                  "dlnorm"=2*abs(switch(Etype,
-                                        "A"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors/yFitted)))^2)/
-                                                           obsInSample)),
-                                        "M"=1-sqrt(abs(1-sum(abs(log(as.complex(1+errors)))^2)/obsInSample)))),
+                  # The maximum likelihood of s for log(1+e) ~ N(-s a/2, s k), the root of
+                  # sum(a^2/k) s^2 + 4 n s - 4 sum(u^2/k) = 0, with a=k=1 unless the
+                  # observations follow periods without an observed size (adam_gapVariance())
+                  "dlnorm"={
+                      u <- abs(log(as.complex(1+switch(Etype, "A"=errors/yFitted, "M"=errors))));
+                      gapSum <- sum(rep_len(gapMean^2/gapVariance, length(u)));
+                      2*(sqrt(obsInSample^2 + gapSum*sum(u^2/gapVariance)) - obsInSample)/gapSum;
+                  },
                   "dllaplace"=switch(Etype,
                                      "A"=sum(abs(log(as.complex(1+errors/yFitted))))/obsInSample,
                                      "M"=sum(abs(log(as.complex(1+errors))))/obsInSample),
@@ -1654,6 +1692,219 @@ adam_accuracy <- function(holdout, forecast, inSample){
     inSample <- as.vector(inSample);
     return(measures(as.vector(holdout)[observed], as.vector(forecast)[observed],
                     inSample[!is.na(inSample)]));
+}
+
+# The variance of the error at each observed size relative to the one-step variance.
+# After j-1 periods without an observed size (the zeros of an occurrence model and the
+# missing values), the states have gone on with zero errors, and the error of a pure
+# additive model at the next observed size sums the one-step errors since then, with the
+# coefficients c_i of covarAnal(): its variance is 1 + sum(c_i^2, i<j). With power=1,
+# 1 + sum(c_i, i<j), the multiplier of the mean of the error in that sum. The first gap
+# counts from the initial states
+adam_gapVariance <- function(lagsModelAll, matWt, matF, vecG, otLogical, power=2){
+    indices <- which(otLogical);
+    gaps <- diff(c(0, indices));
+    gapVariance <- rep(1, length(otLogical));
+    if(any(gaps>1)){
+        covarMat <- covarAnal(lagsModelAll, max(gaps), matWt[1,,drop=FALSE], matF, vecG, 1);
+        gapVariance[indices] <- switch(power, cumsum(covarMat[1,]), diag(covarMat))[gaps];
+    }
+    return(gapVariance);
+}
+
+# The gap variance (or with power=1 the multiplier of the mean) of the observations of a
+# fitted model at its observed sizes (with h>0, at the h periods after the sample, or NULL
+# without the filter): ones unless the model is pure additive with the normal, the Laplace, the
+# S or the Generalised Normal distribution, or a pure multiplicative ADAM ETS with the log-normal
+# one. The other pure multiplicative ETS have the moments of their drift in the attribute "drift"
+# (and the multipliers for the conventional log-normal)
+adam_gapVarianceModel <- function(object, power=2, h=0){
+    y <- as.vector(actuals(object));
+    otLogical <- !is.na(y);
+    if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
+        otLogical[] <- otLogical & y!=0;
+    }
+    gapVariance <- rep(1, length(y));
+    # A scale model (sm()) has its own residuals, standardised already
+    if(is.scale(object)){
+        return(if(h>0){NULL}else{gapVariance});
+    }
+    distribution <- object$distribution;
+    adamETS <- adamETSChecker(object);
+    multiplicative <- errorType(object)=="M" && !grepl("A", modelType(object)) && modelType(object)!="NNN" &&
+        !arimaChecker(object);
+    additive <- errorType(object)=="A" && !grepl("M", modelType(object)) &&
+        any(distribution==c("dnorm","dlaplace","ds","dgnorm"));
+    # The drift of the states of the other pure multiplicative ETS, without the adaptive regressors
+    # and without a scale model (implant()), whose likelihood takes the errors without it
+    drifting <- multiplicative && (any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
+        !grepl("{D}", object$model, fixed=TRUE) && !is.scale(object$scale);
+    gaussian <- additive || multiplicative && distribution=="dlnorm" && adamETS;
+    if(!(gaussian || drifting) || h>0 && !gaussian){
+        return(if(h>0){NULL}else{gapVariance});
+    }
+    # The models fitted without the filter (cma()) have the unconditional ones of the recursion
+    if(is.null(object$adamCpp) || smoothType(object)=="CMA"){
+        if(h>0){
+            return(NULL);
+        }
+        if(distribution=="dnorm"){
+            gapVariance[] <- adam_gapVariance(modelLags(object), object$measurement, object$transition,
+                                              matrix(object$persistence, ncol=1), otLogical, power);
+        }
+        return(gapVariance);
+    }
+    if(!any(!otLogical)){
+        return(if(h>0){NULL}else{gapVariance});
+    }
+    # The filter (adamCore$filter()), in logs for the multiplicative models. Its variances and the
+    # derivatives of its innovations in the scale do not depend on the data or on the initial
+    # states, so no backcasting is needed for them; the conventional ETS needs the moments of its
+    # errors at the scale
+    scale <- object$scale;
+    noise <- if(drifting && !adamETS) adam_gapDrift(object$persistence, otLogical, distribution, FALSE, scale)$noise;
+    lagsModelAll <- modelLags(object);
+    lagsModelMax <- max(lagsModelAll);
+    headLength <- max(c(object$headLength, lagsModelMax));
+    obsInSample <- length(y);
+    # With h>0, the h periods after the sample are unobserved: the values there give the
+    # forecast, with the last measurement
+    matWt <- object$measurement[c(1:obsInSample, rep(obsInSample, h)),,drop=FALSE];
+    indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
+                                           headLength=headLength)$lookup;
+    filtered <- object$adamCpp$filter(matrix(0, nrow(object$profileInitial), obsInSample+h+headLength),
+                                      matWt, object$transition, matrix(object$persistence, ncol=1),
+                                      indexLookupTable, object$profileInitial,
+                                      rep(1, obsInSample+h), c(otLogical, rep(FALSE, h))*1, FALSE, 1,
+                                      multiplicative, 0,
+                                      if(is.null(noise)) numeric(0) else noise$mean,
+                                      if(is.null(noise)) matrix(0, 0, 0) else noise$covariance);
+    if(gaussian){
+        values <- switch(power, 2*filtered$innovationsScale, filtered$variances);
+        if(h>0){
+            return(tail(values, h));
+        }
+        gapVariance[] <- values;
+    }
+    else{
+        drift <- adam_gapDrift(object$persistence, otLogical, distribution, adamETS, scale, filtered, noise);
+        if(distribution=="dlnorm"){
+            gapVariance[otLogical] <- switch(power, 1 - 2*drift$mean/scale, 1 + drift$variance/scale);
+        }
+        attr(gapVariance, "drift") <- drift;
+    }
+    return(gapVariance);
+}
+
+# The residuals of a fitted model as the one-step ones after the periods without an
+# observed size: e/sqrt(k) for the normal distribution, and for the log-normal the ratio
+# exp((log(r) + s a/2)/sqrt(k) - s/2), logN(-s/2, s) as the one-step error
+adam_gapResiduals <- function(object){
+    errors <- residuals(object);
+    gapVariance <- adam_gapVarianceModel(object);
+    if(object$distribution=="dlnorm"){
+        scale <- extractScale(object);
+        errors[] <- exp((log(errors) + scale*adam_gapVarianceModel(object, 1)/2)/sqrt(gapVariance) -
+                            scale/2);
+    }
+    else{
+        errors[] <- errors / sqrt(gapVariance);
+    }
+    return(errors);
+}
+
+# The Gauss-Legendre rule with 32 nodes on (0,1), for the moments of a function of the
+# error through its quantiles, and the Gauss-Hermite rule with 16 nodes, for the mean over a
+# normal variable: x_q with the weights w_q/sqrt(pi). The same numbers are in Python.
+adam_gaussLegendre <- list(nodes=c(
+    0.001368069075259215, 0.007194244227365809, 0.017618872206246805, 0.03254696203113017,
+      0.051839422116973954, 0.07531619313371501, 0.10275810201602881, 0.13390894062985514,
+      0.16847786653489238, 0.20614212137961885, 0.24655004553388532, 0.28932436193468236,
+      0.33406569885893617, 0.38035631887393145, 0.42776401920860174, 0.4758461671561308,
+      0.5241538328438692, 0.5722359807913983, 0.6196436811260685, 0.6659343011410639,
+      0.7106756380653176, 0.7534499544661146, 0.7938578786203812, 0.8315221334651076,
+      0.8660910593701449, 0.8972418979839711, 0.924683806866285, 0.948160577883026,
+      0.9674530379688698, 0.9823811277937532, 0.9928057557726342, 0.9986319309247408),
+                           weights=c(
+    0.003509305004735253, 0.008137197365452872, 0.012696032654631012, 0.017136931456510882,
+      0.021417949011113418, 0.025499029631188046, 0.029342046739267783, 0.03291111138818084,
+      0.03617289705442417, 0.039096947893535114, 0.041655962113473353, 0.04382604650220189,
+      0.04558693934788189, 0.046922199540402255, 0.047819360039637354, 0.04827004425736383,
+      0.04827004425736383, 0.047819360039637354, 0.046922199540402255, 0.04558693934788189,
+      0.04382604650220189, 0.041655962113473353, 0.039096947893535114, 0.03617289705442417,
+      0.03291111138818084, 0.029342046739267783, 0.025499029631188046, 0.021417949011113418,
+      0.017136931456510882, 0.012696032654631012, 0.008137197365452872, 0.003509305004735253));
+adam_gaussHermite <- list(nodes=c(
+    -4.688738939305819, -3.869447904860123, -3.176999161979956, -2.5462021578474814,
+      -1.9517879909162539, -1.3802585391988809, -0.8229514491446559, -0.27348104613815244,
+      0.27348104613815244, 0.8229514491446559, 1.3802585391988809, 1.9517879909162539,
+      2.5462021578474814, 3.176999161979956, 3.869447904860123, 4.688738939305819),
+                          weights=c(
+    1.4978147231618314e-10, 1.3094732162868187e-07, 1.5300032162487316e-05,
+      0.0005259849265739094, 0.007266937601184743, 0.04728475235401403, 0.15833837275094964,
+      0.28656852123801213, 0.28656852123801213, 0.15833837275094964, 0.04728475235401403,
+      0.007266937601184743, 0.0005259849265739094, 1.5300032162487316e-05,
+      1.3094732162868187e-07, 1.4978147231618314e-10));
+
+# The moments of the errors of a pure multiplicative ETS in logs at the scale, the noise of
+# adamCore$filter(): of u = log(1+e) and of the innovations of the states, g u for ADAM ETS and
+# log(1 + g e) for the conventional one, from the quantiles of 1+e at the Gauss-Legendre nodes.
+# With the filter, the mean and the variance of the logarithm of the drift of the states at the
+# observed sizes: N(mu (m-1), v (f-1)) for ADAM ETS, whose filter runs with the error of mean zero
+# and the variance one (f and m being its variances and multipliers of the mean, and mu and v those
+# of u), and N(0, f - v) for the conventional one, whose filter runs with these moments
+adam_gapDrift <- function(vecG, otLogical, distribution, adamETS, scale, filtered=NULL, noise=NULL){
+    if(is.null(noise)){
+        vecG <- as.vector(vecG);
+        quantiles <- switch(distribution,
+                            "dgamma"=qgamma(adam_gaussLegendre$nodes, shape=1/scale, scale=scale),
+                            "dinvgauss"=qinvgauss(adam_gaussLegendre$nodes, mean=1, dispersion=scale),
+                            "dlnorm"=qlnorm(adam_gaussLegendre$nodes, -scale/2, sqrt(scale)));
+        innovations <- cbind(log(quantiles),
+                             if(adamETS) outer(log(quantiles), vecG) else log(1 + outer(quantiles-1, vecG)));
+        # Their means and covariances by sums (as Python's, rather than the BLAS products)
+        weights <- adam_gaussLegendre$weights;
+        noiseMean <- colSums(weights * innovations);
+        noiseCovariance <- outer(seq_along(noiseMean), seq_along(noiseMean), Vectorize(function(i, j){
+            return(sum(weights * innovations[,i] * innovations[,j]) - noiseMean[i] * noiseMean[j]);
+        }));
+        noise <- list(mean=noiseMean, covariance=noiseCovariance);
+    }
+    drift <- list(mean=rep(0, sum(otLogical)), variance=rep(0, sum(otLogical)), noise=noise);
+    if(!is.null(filtered)){
+        if(adamETS){
+            drift$mean[] <- noise$mean[1] * (2*filtered$innovationsScale[otLogical] - 1);
+            drift$variance[] <- noise$covariance[1,1] * (filtered$variances[otLogical] - 1);
+        }
+        else{
+            drift$variance[] <- filtered$variances[otLogical] - noise$covariance[1,1];
+        }
+    }
+    return(drift);
+}
+
+# The log-density of the observed sizes after the periods without an observed size, with the
+# Gamma or the Inverse Gaussian distribution: the one-step density at mu*exp(d), mixed over
+# the normal drift d with the Gauss-Hermite rule. The sizes without the uncertainty of the drift
+# take the one-step density at its mean.
+adam_gapLogDensity <- function(y, mu, scale, distribution, driftMean, driftVariance){
+    logDensity <- function(y, mu){
+        return(switch(distribution,
+                      "dgamma"=dgamma(y, shape=1/scale, scale=scale*abs(mu), log=TRUE),
+                      "dinvgauss"=dinvgauss(y, mean=abs(mu), dispersion=abs(scale/mu), log=TRUE)));
+    }
+    values <- logDensity(y, mu*exp(driftMean));
+    # A NaN drift (from parameters outside the region where 1+g e is positive) stays NaN
+    gapped <- is.na(driftVariance) | driftVariance>0;
+    if(any(gapped)){
+        nodesNumber <- length(adam_gaussHermite$nodes);
+        drift <- driftMean[gapped] + outer(sqrt(2*driftVariance[gapped]), adam_gaussHermite$nodes);
+        densities <- matrix(logDensity(rep(y[gapped], nodesNumber), mu[gapped]*exp(drift)), ncol=nodesNumber) +
+            rep(log(adam_gaussHermite$weights), each=sum(gapped));
+        densitiesMax <- apply(densities, 1, max);
+        values[gapped] <- densitiesMax + log(rowSums(exp(densities - densitiesMax)));
+    }
+    return(values);
 }
 
 # The observed sizes, which the scale is divided by: the missing values are not, and

@@ -4,6 +4,7 @@ import pandas as pd
 from smooth.adam_general.core.creator import filler
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.utils import scaler
+from smooth.adam_general.core.utils.var_covar import gap_drift
 
 from ._helpers import _safe_create_index
 
@@ -537,7 +538,15 @@ def _process_arma_parameters(arima_checked, adam_estimated):
 
 
 def _calculate_scale_parameter(
-    general_dict, model_type_dict, errors, y_fitted, observations_dict, other
+    general_dict,
+    model_type_dict,
+    errors,
+    y_fitted,
+    observations_dict,
+    other,
+    gap,
+    gap_mean,
+    drift_at=None,
 ):
     """
     Calculate scale parameter using scaler function.
@@ -556,21 +565,32 @@ def _calculate_scale_parameter(
         Dictionary with observation data and related information
     other : dict
         Additional parameters
+    gap, gap_mean : numpy.ndarray
+        The multipliers of the variance and of the mean of the errors after the
+        periods without an observed size (the filter, :func:`filter_variances`),
+        ones elsewhere
+    drift_at : callable or None
+        The moments of the drift of the states over those periods at a scale
+        (:func:`gap_drift`), for the pure multiplicative ETS it applies to
 
     Returns
     -------
     float
         Calculated scale parameter
     """
+    ot_logical = observations_dict["ot_logical"]
     scale = scaler(
         general_dict["distribution_new"],
         model_type_dict["error_type"],
-        errors[observations_dict["ot_logical"]],
-        y_fitted[observations_dict["ot_logical"]],
+        np.ravel(errors)[ot_logical],
+        np.ravel(y_fitted)[ot_logical],
         # divided by the observed sizes: the missing values are not, and neither
         # are the zeros of an occurrence model
         int(np.sum(observations_dict["ot_logical"])),
         other,
+        gap_mean[ot_logical],
+        gap[ot_logical],
+        drift_at,
     )
 
     return scale
@@ -1040,12 +1060,47 @@ def preparator(
     ):
         other = abs(float(adam_estimated["B"][-1]))
 
+    # The filter over the periods without an observed value, as in the estimation
+    error_type = model_type_dict["error_type"]
+    trend_type = model_type_dict["trend_type"]
+    season_type = model_type_dict["season_type"]
+    distribution = general_dict["distribution_new"]
+    adam_ets = general_dict.get("ets") == "adam"
+    multiplicative = (
+        model_type_dict["ets_model"]
+        and not arima_checked.get("arima_model", False)
+        and error_type == "M"
+        and trend_type != "A"
+        and season_type != "A"
+    )
+    gap_drifting = (
+        multiplicative
+        and (
+            distribution in ("dgamma", "dinvgauss")
+            or (distribution == "dlnorm" and not adam_ets)
+        )
+        and not (
+            explanatory_checked.get("xreg_model", False)
+            and explanatory_checked.get("regressors") == "adapt"
+        )
+    )
+    filter_logs = None
+    if (
+        distribution in ("dnorm", "dlaplace", "ds", "dgnorm")
+        and error_type == "A"
+        and trend_type != "M"
+        and season_type != "M"
+    ):
+        filter_logs = False
+    elif gap_drifting or (multiplicative and distribution == "dlnorm" and adam_ets):
+        filter_logs = True
+
     # Call the fit (or gradient initial-state solve) with the prepared inputs.
     # For initial="gradient" the dispatcher re-solves the initials from the seed
     # profile and fits with backcast=False; otherwise it is the ordinary fit.
     # Note: E, T, S, nNonSeasonal, nSeasonal, nArima, nXreg, constant are set
     # during adamCore construction.
-    adam_fitted = adam_fit_or_gradient(
+    fit_arguments = dict(
         adam_cpp=adam_cpp,
         mat_vt=mat_vt,
         mat_wt=mat_wt,
@@ -1070,7 +1125,47 @@ def preparator(
         horizon=general_dict.get("h", 0),
         multisteps=general_dict.get("multisteps", False),
         xreg_number=int(explanatory_checked.get("xreg_number", 0) or 0),
+        filter_logs=filter_logs,
     )
+    adam_fitted = adam_fit_or_gradient(**fit_arguments)
+    # The drift of the states of the other pure multiplicative ETS, as in the
+    # estimation: the scale is found here, so that the filter of the conventional
+    # ETS, which runs with the moments of the errors at the scale, gives the states,
+    # the fitted values and the errors
+    ot_logical = np.asarray(observations_dict["ot_logical"], dtype=bool)
+    drift_at = None
+    if gap_drifting:
+
+        def drift_at(scale):
+            nonlocal adam_fitted
+            moments = gap_drift(
+                vec_g,
+                ot_logical,
+                distribution,
+                adam_ets,
+                scale,
+                adam_fitted if adam_ets else None,
+            )
+            if adam_ets or np.all(ot_logical):
+                return moments[:2]
+            adam_fitted = adam_fit_or_gradient(**fit_arguments, filter_noise=moments[2])
+            moments = gap_drift(
+                vec_g, ot_logical, distribution, False, scale, adam_fitted, moments[2]
+            )
+            return moments[0], moments[1], np.ravel(adam_fitted.errors)[ot_logical]
+
+        scale = scaler(
+            distribution,
+            error_type,
+            np.ravel(adam_fitted.errors)[ot_logical],
+            np.ravel(adam_fitted.fitted)[ot_logical],
+            int(np.sum(ot_logical)),
+            other,
+            1.0,
+            1.0,
+            drift_at,
+        )
+        drift_at(scale)
     # The gradient solve overwrites the head of mat_vt in place; mirror the
     # solved initials back into matrices_dict so downstream initial-value
     # extraction reports them (not the discarded seed).
@@ -1113,9 +1208,24 @@ def preparator(
     arma_parameters_list = _process_arma_parameters(arima_checked, adam_estimated)
 
     # 12. Calculate scale parameter
-    scale = _calculate_scale_parameter(
-        general_dict, model_type_dict, errors, y_fitted, observations_dict, other
-    )
+    # The variance and the mean after the periods without an observed size, as in
+    # the estimation
+    gap = gap_mean = np.ones(len(observations_dict["ot_logical"]))
+    if filter_logs is False or (filter_logs and distribution == "dlnorm" and adam_ets):
+        gap = np.ravel(adam_fitted.variances).astype(float)
+        gap_mean = 2 * np.ravel(adam_fitted.innovationsScale).astype(float)
+    if not gap_drifting:
+        scale = _calculate_scale_parameter(
+            general_dict,
+            model_type_dict,
+            errors,
+            y_fitted,
+            observations_dict,
+            other,
+            gap,
+            gap_mean,
+            None,
+        )
 
     # 13. Process constant and other parameters
     constant_value, other_returned = _process_other_parameters(
@@ -1149,6 +1259,7 @@ def preparator(
         "residuals": errors,
         "states": states,
         "profiles_recent_table": adam_fitted.profile,
+        "profile_observed": np.asarray(adam_fitted.profileObserved),
         "persistence": matrices_dict["vec_g"],
         "transition": matrices_dict["mat_f"],
         "measurement": matrices_dict["mat_wt"],

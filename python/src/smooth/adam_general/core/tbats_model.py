@@ -30,6 +30,7 @@ from smooth.adam_general.core.utils.utils import (
     scale_debias,
     xreg_selector,
 )
+from smooth.adam_general.core.utils.var_covar import filter_variances
 
 TREND_OPTIONS = ("auto", "none", "additive", "damped")
 DISTRIBUTION_OPTIONS = ("auto", "dnorm", "dlaplace", "ds", "dgnorm")
@@ -961,6 +962,13 @@ class TBATS:
         return np.asarray(self._best["fitted"]["profile"])
 
     @property
+    def profile_observed(self) -> NDArray:
+        """The profile of the states at the last observed value, the origin of the
+        forecasts after the periods without one (R's ``$profileObserved``)."""
+        self._check_fitted()
+        return np.asarray(self._best["fitted"]["profile_observed"])
+
+    @property
     def initial_type(self) -> str:
         """The initialisation used (R's ``$initialType``): ``"provided"`` when some
         initial states are."""
@@ -1173,6 +1181,36 @@ class TBATS:
     # The diagnostics of ADAM, which need only the residuals, the scale and the
     # distribution: the residuals are those of the transformed data
     _check_is_fitted = _check_fitted
+
+    def _gap_variance(self, power: int = 2, h: int = 0) -> Any:
+        """The variance of the errors at the observed sizes relative to the one-step
+        one, after the periods without an observed size (R's
+        ``adam_gapVarianceModel``): those of the filter with the normal
+        distribution, ones otherwise. With ``h>0``, those of the h steps ahead, and
+        None for the other distributions or without such periods in the sample."""
+        ot = self._ot & ~np.isnan(self._y_in_sample)
+        if getattr(self, "is_scale_", False) or self.distribution_ != "dnorm":
+            return None if h > 0 else np.ones(len(ot))
+        best = self._best
+        if h == 0:
+            return np.asarray(best["fitted"]["variances"], dtype=float)
+        if ot.all():
+            return None
+        return filter_variances(
+            best["adam_cpp"],
+            best["struct"]["lags_model_all"],
+            0,
+            best["fitted"]["mat_wt"],
+            best["elements"]["mat_f"],
+            best["elements"]["vec_g"],
+            best["fitted"]["profile_initial"],
+            ot,
+            h,
+            False,
+            power,
+        )
+
+    _gap_residuals = ADAM._gap_residuals
     rstandard = ADAM.rstandard
     rstudent = ADAM.rstudent
     outlierdummy = ADAM.outlierdummy
@@ -1623,6 +1661,17 @@ class TBATS:
             else None
         )
 
+        observed = np.flatnonzero(ot & ~np.isnan(self._y_in_sample))
+        trailing = len(ot) - (observed[-1] + 1 if observed.size else 0)
+        if not 0 < trailing < len(ot) - int(struct["lags_model_max"]):
+            trailing = 0
+        # With a scale model the forecasts start there too, with its fitted scale
+        # over those periods
+        if trailing and scale_forecast is not None:
+            scale_forecast = np.concatenate(
+                [np.ravel(self.scale_model.fitted)[-trailing:], scale_forecast]
+            )
+
         def run(interval: Any, level: Any, side: Any, **general: Any) -> Any:
             """ADAM's forecaster in the space of the transformed data."""
             general_dict = {
@@ -1636,6 +1685,14 @@ class TBATS:
                 "n_param": None,
                 "scale_forecast": scale_forecast,
                 "seed": seed,
+                # The variances of the filter at the h steps ahead, after the periods
+                # without an observed size in the sample (None without them)
+                "_filter_variances": self._gap_variance(h=h) if h else None,
+                # The last periods without an observed size, from which the simulated
+                # and the cumulative forecasts (and all with a scale model) start, as
+                # R's forecast.adam
+                "_gap_trailing": trailing,
+                "_gap_drifting": bool(trailing) and scale_forecast is not None,
                 **general,
             }
             result = forecaster(
@@ -1646,6 +1703,7 @@ class TBATS:
                     "transition": best["elements"]["mat_f"],
                     "persistence": best["elements"]["vec_g"],
                     "profiles_recent_table": best["fitted"]["profile"],
+                    "profile_observed": best["fitted"]["profile_observed"],
                     "residuals": pd.Series(errors),
                     # The prediction of the model at the missing values
                     "y_fitted": np.where(

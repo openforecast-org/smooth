@@ -243,6 +243,33 @@ class TestADAMCombinationReporting:
 
         assert model.nparam == pytest.approx(expected, rel=1e-12)
 
+    def test_nparam_counts_the_occurrence_and_the_regressors_once(self):
+        """The occurrence and the scale are common to the models, and the
+        regressors are averaged in their own column, as R."""
+        rng = np.random.default_rng(41)
+        y = rng.gamma(5, 2, 120) * rng.binomial(1, 0.6, 120)
+        model = ADAM(model="CNN", occurrence="fixed").fit(y)
+        expected = sum(
+            ADAM(model=name, occurrence="fixed").fit(y).nparam * weight
+            for name, weight in model.ic_weights.items()
+        )
+        assert model.nparam == pytest.approx(expected, rel=1e-12)
+
+        X = rng.normal(size=(150, 2))
+        y = 200 + np.cumsum(rng.normal(size=150)) + 3 * X[:, 0]
+        model = ADAM(model="CNN", regressors="select").fit(y, X)
+        estimated = model._n_param.estimated
+        xreg = sum(
+            m["weight"]
+            * m["explanatory_dict"]["xreg_number"]
+            * m["explanatory_dict"]["xreg_model"]
+            for m in model.models
+        )
+        assert estimated["xreg"] == pytest.approx(xreg, rel=1e-12)
+        assert estimated["all"] == pytest.approx(
+            estimated["internal"] + estimated["xreg"] + estimated["scale"], rel=1e-12
+        )
+
 
 class TestADAMCombinationEdgeCases:
     """Tests for edge cases in model combination."""

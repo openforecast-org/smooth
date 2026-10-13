@@ -9,7 +9,7 @@ default (``r_parity`` marker).
 import numpy as np
 import pytest
 
-from smooth import ADAM, CES, MSARIMA, OM, OMG, TBATS
+from smooth import ADAM, CES, MSARIMA, OM, OMG, SMA, TBATS
 
 from ._r_bridge import r_dict
 
@@ -293,3 +293,342 @@ def test_the_scale_model_over_gaps_agrees():
     fit = sm(ADAM(model="MAM", lags=[12]).fit(_values(r["y"])))
     assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
     np.testing.assert_allclose(fit.coef, r["B"], atol=1e-8)
+
+
+# The variance of the error after the periods without an observed size (the zeros of
+# an occurrence model and the missing values) of the pure additive models with the
+# normal distribution, and the variance and the mean of the pure multiplicative ADAM
+# ETS with the log-normal one: the likelihood, its terms, the scale and the
+# standardised residuals agree with R
+GAP_VARIANCE_DATA = (
+    "set.seed(41); e <- rnorm(200, 0, 5); level <- 100 + cumsum(0.3*e);"
+    " y <- (c(100, level[-200]) + e)*rbinom(200, 1, 0.5); y[c(50, 51)] <- NA;"
+)
+# ETS(M,N,N) with Gamma errors and a probability of occurrence of 0.35
+GAP_DRIFT_DATA = (
+    "set.seed(41); e <- rgamma(300, shape=5, scale=0.2);"
+    " y <- 10*cumprod(c(1, 1+0.3*(e[-300]-1)))*e*rbinom(300, 1, 0.35);"
+)
+
+GAP_VARIANCE_CASES = {
+    "adam ANN occurrence": (
+        GAP_VARIANCE_DATA,
+        "adam(y, 'ANN', occurrence='fixed', distribution='dnorm')",
+        lambda: ADAM(model="ANN", occurrence="fixed", distribution="dnorm"),
+    ),
+    "adam AAA missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'AAA', distribution='dnorm')",
+        lambda: ADAM(model="AAA", lags=[12], distribution="dnorm"),
+    ),
+    "adam ADAM ETS dlnorm occurrence": (
+        "set.seed(41); u <- rnorm(200, -0.1, sqrt(0.2));"
+        " l <- 10*exp(cumsum(c(0, 0.3*u[-200]))); y <- l*exp(u)*rbinom(200, 1, 0.4);"
+        " y[c(50, 51)] <- NA;",
+        "adam(y, 'MNN', occurrence='fixed', distribution='dlnorm', ets='adam')",
+        lambda: ADAM(
+            model="MNN", occurrence="fixed", distribution="dlnorm", ets="adam"
+        ),
+    ),
+    "adam ADAM ETS dlnorm missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
+        lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
+    ),
+    "adam MNN dgamma occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dgamma')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dgamma"),
+    ),
+    "adam MNN dinvgauss occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dinvgauss')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dinvgauss"),
+    ),
+    "adam MNN conventional dlnorm occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dlnorm')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dlnorm"),
+    ),
+    "adam ADAM ETS MMdN dinvgauss occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MMdN', occurrence='fixed', distribution='dinvgauss', ets='adam')",
+        lambda: ADAM(
+            model="MMdN", occurrence="fixed", distribution="dinvgauss", ets="adam"
+        ),
+    ),
+    "adam ANN dlaplace occurrence": (
+        GAP_VARIANCE_DATA,
+        "adam(y, 'ANN', occurrence='fixed', distribution='dlaplace')",
+        lambda: ADAM(model="ANN", occurrence="fixed", distribution="dlaplace"),
+    ),
+    "adam ANN ds occurrence": (
+        GAP_VARIANCE_DATA,
+        "adam(y, 'ANN', occurrence='fixed', distribution='ds')",
+        lambda: ADAM(model="ANN", occurrence="fixed", distribution="ds"),
+    ),
+    "adam AAN dgnorm missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'AAN', distribution='dgnorm')",
+        lambda: ADAM(model="AAN", lags=[12], distribution="dgnorm"),
+    ),
+    "adam MNN dgamma ADAM ETS occurrence": (
+        GAP_DRIFT_DATA,
+        "adam(y, 'MNN', occurrence='fixed', distribution='dgamma', ets='adam')",
+        lambda: ADAM(
+            model="MNN", occurrence="fixed", distribution="dgamma", ets="adam"
+        ),
+    ),
+    "adam MNM dgamma missing": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'MNM', distribution='dgamma')",
+        lambda: ADAM(model="MNM", lags=[12], distribution="dgamma"),
+    ),
+    "ces missing": (
+        AIRPASSENGERS_GAPS,
+        "ces(ts(y, frequency=12), seasonality='full')",
+        lambda: CES(seasonality="full", lags=[12]),
+    ),
+    "tbats missing": (
+        AIRPASSENGERS_GAPS,
+        "tbats(ts(y, frequency=12), distribution='dnorm', lambda=1, trend='none',"
+        " harmonics=2, orders=list(ar=0, ma=0, select=FALSE))",
+        lambda: TBATS(
+            lags=[1, 12],
+            distribution="dnorm",
+            lambda_bc=1,
+            trend="none",
+            harmonics=[2],
+            orders={"ar": 0, "ma": 0, "select": False},
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(GAP_VARIANCE_CASES))
+def test_the_gap_variance_agrees(case):
+    data, r_call, make = GAP_VARIANCE_CASES[case]
+    r = r_dict(
+        f"{{ {data} m <- suppressWarnings({r_call}); list(y=as.numeric(y),"
+        " ll=as.numeric(logLik(m)), scale=m$scale, pl=as.numeric(pointLik(m)),"
+        " rs=as.numeric(rstandard(m))) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    fit = make().fit(y)
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    assert fit.scale == pytest.approx(r["scale"][0], rel=1e-8)
+    np.testing.assert_allclose(fit.point_lik(), r["pl"], atol=1e-8)
+    rs = np.array([np.nan if v is None or v == "NA" else v for v in r["rs"]], float)
+    np.testing.assert_allclose(np.asarray(fit.rstandard(), float), rs, atol=1e-7)
+
+
+# The intervals after the periods without an observed value in the sample, from the
+# filter with the h steps ahead unobserved: of a pure additive model with the normal
+# distribution and of a pure multiplicative ADAM ETS with the log-normal one, with
+# missing values inside and at the end of the sample
+FILTER_INTERVAL_CASES = {
+    "adam AAdN dnorm": (
+        AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
+        "adam(ts(y, frequency=12), 'AAdN', distribution='dnorm')",
+        lambda: ADAM(model="AAdN", lags=[12], distribution="dnorm"),
+    ),
+    "adam AAA dnorm MSE": (
+        AIRPASSENGERS_GAPS,
+        "adam(ts(y, frequency=12), 'AAA', distribution='dnorm', loss='MSE')",
+        lambda: ADAM(model="AAA", lags=[12], distribution="dnorm", loss="MSE"),
+    ),
+    "adam ADAM ETS MMdM dlnorm": (
+        AIRPASSENGERS_GAPS + " y[144] <- NA;",
+        "adam(ts(y, frequency=12), 'MMdM', distribution='dlnorm', ets='adam')",
+        lambda: ADAM(model="MMdM", lags=[12], distribution="dlnorm", ets="adam"),
+    ),
+    "adam MNM dgamma missing values inside and at the end": (
+        AIRPASSENGERS_GAPS + " y[142:144] <- NA;",
+        "adam(ts(y, frequency=12), 'MNM', distribution='dgamma')",
+        lambda: ADAM(model="MNM", lags=[12], distribution="dgamma"),
+    ),
+    "adam MNN dgamma trailing zeros": (
+        GAP_DRIFT_DATA + " y[295:300] <- 0;",
+        "adam(y, 'MNN', occurrence='fixed', distribution='dgamma')",
+        lambda: ADAM(model="MNN", occurrence="fixed", distribution="dgamma"),
+    ),
+    "adam MNN dinvgauss ADAM ETS trailing zeros": (
+        GAP_DRIFT_DATA + " y[296:300] <- 0;",
+        "adam(y, 'MNN', occurrence='fixed', distribution='dinvgauss', ets='adam')",
+        lambda: ADAM(
+            model="MNN", occurrence="fixed", distribution="dinvgauss", ets="adam"
+        ),
+    ),
+    "ces none": (
+        AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
+        "ces(y, 'none')",
+        lambda: CES(seasonality="none"),
+    ),
+    "tbats dnorm": (
+        AIRPASSENGERS_GAPS + " y[144] <- NA;",
+        "tbats(ts(y, frequency=12), distribution='dnorm', lambda=1, trend='none',"
+        " harmonics=2, orders=list(ar=0, ma=0, select=FALSE))",
+        lambda: TBATS(
+            lags=[1, 12],
+            distribution="dnorm",
+            lambda_bc=1,
+            trend="none",
+            harmonics=[2],
+            orders={"ar": 0, "ma": 0, "select": False},
+        ),
+    ),
+    "sma": (
+        AIRPASSENGERS_GAPS + " y[144] <- NA;",
+        "sma(y, h=6, holdout=FALSE, silent=TRUE)",
+        lambda: SMA(h=6),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(FILTER_INTERVAL_CASES))
+def test_the_intervals_after_gaps_agree(case):
+    data, r_call, make = FILTER_INTERVAL_CASES[case]
+    r = r_dict(
+        f"{{ {data} m <- suppressWarnings({r_call});"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9);"
+        " list(y=as.numeric(y), ll=as.numeric(logLik(m)),"
+        " pl=as.numeric(pointLik(m)), lower=as.numeric(f$lower),"
+        " upper=as.numeric(f$upper)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    fit = make().fit(y)
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    np.testing.assert_allclose(fit.point_lik(), r["pl"], atol=1e-8)
+    forecast = fit.predict(h=6, interval="approximate", level=0.9)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The combinations after the periods without an observed value: each model forecast
+# as a single one (with the filter and from the last observed size), as R's
+# forecast.adamCombined
+COMBINATION_CASES = {
+    "adam ACN": (
+        AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
+        "adam(ts(y, frequency=12), 'ACN', distribution='dnorm')",
+        lambda: ADAM(model="ACN", lags=[12], distribution="dnorm"),
+    ),
+    "adam CNN trailing zeros": (
+        GAP_DRIFT_DATA + " y[295:300] <- 0;",
+        "adam(y, 'CNN', occurrence='fixed')",
+        lambda: ADAM(model="CNN", occurrence="fixed"),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(COMBINATION_CASES))
+def test_the_combination_after_gaps_agrees(case):
+    data, r_call, make = COMBINATION_CASES[case]
+    r = r_dict(
+        f"{{ {data} m <- suppressWarnings({r_call});"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9);"
+        " list(y=as.numeric(y), mean=as.numeric(f$mean),"
+        " lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    forecast = make().fit(y).predict(h=6, interval="approximate", level=0.9)
+    np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The cumulative forecasts and those of a model with a scale model after the periods
+# without an observed value at the end of the sample, from the last observed one, as
+# R's forecast.adam
+SHIFT_ADAM = (
+    "adam(ts(y, frequency=12), 'AAN', distribution='dnorm')",
+    lambda: ADAM(model="AAN", lags=[12], distribution="dnorm"),
+    "model='MNN'",
+    {"model": "MNN"},
+)
+SHIFT_TBATS = (
+    "tbats(ts(y, frequency=12), distribution='dnorm', lambda=1, trend='none',"
+    " harmonics=2, orders=list(ar=0, ma=0, select=FALSE))",
+    lambda: TBATS(
+        lags=[1, 12],
+        distribution="dnorm",
+        lambda_bc=1,
+        trend="none",
+        harmonics=[2],
+        orders={"ar": 0, "ma": 0, "select": False},
+    ),
+    "",
+    {},
+)
+SHIFT_CASES = {
+    "cumulative approximate": (SHIFT_ADAM, "approximate", True, False),
+    "cumulative semiparametric": (SHIFT_ADAM, "semiparametric", True, False),
+    "scale model": (SHIFT_ADAM, "approximate", False, True),
+    "scale model cumulative": (SHIFT_ADAM, "approximate", True, True),
+    "tbats cumulative": (SHIFT_TBATS, "approximate", True, False),
+    "tbats scale model": (SHIFT_TBATS, "approximate", False, True),
+}
+
+
+@pytest.mark.parametrize("case", list(SHIFT_CASES))
+def test_the_shifted_forecasts_agree(case):
+    (r_call, make, r_scale, py_scale), interval, cumulative, scale = SHIFT_CASES[case]
+    implant = f"m <- implant(m, suppressWarnings(sm(m, {r_scale})));" if scale else ""
+    r = r_dict(
+        f"{{ {AIRPASSENGERS_GAPS} y[142:144] <- NA;"
+        f" m <- suppressWarnings({r_call}); {implant}"
+        f" f <- forecast(m, h=4, interval='{interval}', level=0.9,"
+        f" cumulative={'TRUE' if cumulative else 'FALSE'});"
+        " list(y=as.numeric(y), mean=as.numeric(f$mean),"
+        " lower=as.numeric(f$lower), upper=as.numeric(f$upper)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    fit = make().fit(y)
+    if scale:
+        fit.scale_model = fit.sm(**py_scale)
+    forecast = fit.predict(h=4, interval=interval, level=0.9, cumulative=cumulative)
+    np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The probabilities of occurrence provided for the horizon, in place of those of the
+# occurrence model in this forecast only, as R's forecast(occurrence=)
+@pytest.mark.parametrize("probabilities", ["rep(0.5, 6)", "c(1, 0, 1, 0.3, 1, 1)"])
+def test_the_provided_occurrence_agrees(probabilities):
+    r = r_dict(
+        f"{{ {GAP_DRIFT_DATA} p <- {probabilities};"
+        " m <- suppressWarnings(adam(y, 'MNN', occurrence='fixed',"
+        " distribution='dgamma'));"
+        " f <- forecast(m, h=6, interval='approximate', level=0.9, occurrence=p);"
+        " list(y=y, p=p, mean=as.numeric(f$mean), lower=as.numeric(f$lower),"
+        " upper=as.numeric(f$upper)) }"
+    )
+    fit = ADAM(model="MNN", occurrence="fixed", distribution="dgamma").fit(
+        np.array(r["y"], float)
+    )
+    forecast = fit.predict(
+        h=6, interval="approximate", level=0.9, occurrence=np.array(r["p"], float)
+    )
+    assert fit._occurrence["occurrence"] == "fixed"
+    np.testing.assert_allclose(np.ravel(forecast.mean), r["mean"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.lower), r["lower"], rtol=1e-8)
+    np.testing.assert_allclose(np.ravel(forecast.upper), r["upper"], rtol=1e-8)
+
+
+# The profile at the last observed value, with the corrections of the filter after the
+# missing values inside the sample, as R's $profileObserved
+@pytest.mark.parametrize("shift", [SHIFT_ADAM, SHIFT_TBATS], ids=["adam", "tbats"])
+def test_the_profile_observed_agrees(shift):
+    r_call, make, _, _ = shift
+    r = r_dict(
+        f"{{ {AIRPASSENGERS_GAPS} y[142:144] <- NA; m <- suppressWarnings({r_call});"
+        " list(y=as.numeric(y), p=as.vector(m$profileObserved),"
+        " n=nrow(m$profileObserved)) }"
+    )
+    y = np.array([np.nan if v is None or v == "NA" else v for v in r["y"]], float)
+    profile = np.asarray(make().fit(y).profile_observed)
+    np.testing.assert_allclose(
+        profile, np.reshape(r["p"], (r["n"][0], -1), order="F"), rtol=1e-8
+    )
+

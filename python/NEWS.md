@@ -79,6 +79,7 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* A multiplicative ETS candidate with a zero scale raised `ZeroDivisionError` in the likelihood and in the drift of its states after the unobserved periods, which stopped the selection of `ADAM(occurrence="auto")`; it takes R's infinity, as R (the sums of the scale are NumPy floats).
 * `predict()` of `ADAM` with a fitted occurrence model as its `occurrence` failed: the forecaster took the model for the probabilities. It is forecast as the model's own occurrence, as R.
 * `ADAM` with an occurrence on data without zeros fits no occurrence model, as R: it fitted one, and failed on the shortest series.
 * The samples of one to three observations are fitted as in R: alpha is set to zero (it was left neither estimated nor set, so the fit failed), the level of one or two observations is provided, and the model is used as it is (the `"use"` path raised).

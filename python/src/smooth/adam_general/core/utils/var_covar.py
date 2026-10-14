@@ -384,7 +384,10 @@ def gap_drift(
         vec_g = np.asarray(vec_g, dtype=float).ravel()
         nodes = _GAUSS_LEGENDRE_NODES
         if distribution == "dgamma":
-            quantiles = gb.qgamma(nodes, shape=1 / scale, scale=scale)
+            # A zero scale gives the infinite shape of R, not an error
+            with np.errstate(divide="ignore"):
+                shape = np.float64(1) / scale
+            quantiles = gb.qgamma(nodes, shape=shape, scale=scale)
         elif distribution == "dinvgauss":
             quantiles = gb.qinvgauss(nodes, 1.0, scale)
         else:

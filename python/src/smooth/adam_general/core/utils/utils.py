@@ -989,7 +989,8 @@ def _sum_r(values, axis=None):
     else:
         running = np.cumsum(values, axis=axis, dtype=np.longdouble)
         total = np.take(running, -1, axis=axis)
-    return float(total) if np.ndim(total) == 0 else np.asarray(total, dtype=float)
+    # A NumPy float, so that a division by a zero sum gives R's infinity
+    return np.float64(total) if np.ndim(total) == 0 else np.asarray(total, dtype=float)
 
 
 # Overflow here is the infeasibility signal, not a defect. During optimisation

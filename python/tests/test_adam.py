@@ -1576,3 +1576,20 @@ def test_adam_tiny_samples_as_r(y, forecast, loglik):
     assert np.allclose(np.asarray(model.predict(h=2).mean), forecast)
     if loglik is not None:
         assert model.loglik == pytest.approx(loglik, abs=1e-6)
+
+
+def test_adam_forecasts_a_provided_occurrence_model():
+    """A fitted occurrence model as the occurrence is forecast as the model's own, as R."""
+    import warnings
+
+    from smooth import OM
+
+    rng = np.random.default_rng(3)
+    y = (rng.random(60) < 0.6) * (50 + rng.normal(size=60))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        om = OM(model="MNN", occurrence="fixed").fit(y)
+        model = ADAM(model="ANN", occurrence=om).fit(y)
+        forecast = np.asarray(model.predict(h=3).mean, dtype=float)
+    assert np.all(np.isfinite(forecast))
+    assert np.all(forecast < np.max(y))

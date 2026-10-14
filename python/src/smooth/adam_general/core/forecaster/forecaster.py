@@ -375,9 +375,14 @@ def _process_occurrence_forecast(occurrence_dict, general_dict):
     """
     # Initialize occurrence model flag
     occurrence_model = False
-    # If the occurrence values are provided for the holdout (in place of the type)
+    # If the occurrence values are provided for the holdout (in place of the type);
+    # a fitted occurrence model is forecast as the model's own, as R
     provided = occurrence_dict.get("occurrence")
-    if provided is not None and not isinstance(provided, str):
+    if (
+        provided is not None
+        and not isinstance(provided, str)
+        and not hasattr(provided, "predict")
+    ):
         p_forecast = np.ravel(np.asarray(provided, dtype=float))
     else:
         # If this is a mixture model, produce forecasts for the occurrence

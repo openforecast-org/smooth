@@ -321,13 +321,11 @@ C++ dependencies:
 - Armadillo library (via RcppArmadillo)
 - C++11 or later
 
-**Pending version bumps (greybox).** R's greybox 2.0.10 and Python's 1.0.9 compute the
+**Pending version bump (greybox).** R's greybox 2.0.10 and Python's 1.0.9 compute the
 log-densities of `dlaplace`, `ds` and `dgnorm` analytically and identically in both
 languages, which smooth's R/Python parity relies on (`tbats()` with `distribution="auto"`
-selects with `dgnorm`). Once they are released, raise the minimum versions: `greybox>=1.0.9`
-in `python/pyproject.toml` as soon as 1.0.9 is on PyPI, and `greybox (>= 2.0.10)` in
-`DESCRIPTION` with the next smooth release after 2.0.10 is on CRAN. Remove this note when
-both are done.
+selects with `dgnorm`). Python requires `greybox>=1.0.9`; raise `greybox (>= 2.0.10)` in
+`DESCRIPTION` with the next smooth release after 2.0.10 is on CRAN, and remove this note.
 
 ## Mac OS Specific Notes
 

@@ -1143,6 +1143,11 @@ class ADAM:
             # so all models in the pool use consistent initialization
             self._execute_estimation(estimation=True)
 
+        elif self._model_type["model_do"] == "use":
+            # Everything is provided (the samples too small to estimate), as R: the
+            # estimator only evaluates the model, with nothing left to optimise
+            self._execute_estimation(estimation=True)
+
         elif self._model_type["model_do"] == "combine":
             # Store original model specification for display (e.g., "CCC")
             self._original_model_spec = self._model_type.get("model", self.model)
@@ -1156,7 +1161,7 @@ class ADAM:
             model_do = self._model_type["model_do"]
             warnings.warn(
                 f"Unknown model_do value: {model_do}. "
-                "Expected one of: 'estimate', 'select', 'combine'"
+                "Expected one of: 'estimate', 'select', 'combine', 'use'"
             )
 
         # Prepare final results and format output data

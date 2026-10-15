@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.8",
+  "schema_version": "0.9",
   "paper": {
     "title": "The observed-data likelihood of ADAM and iETS with unobserved periods: entropy term, SSOE Kalman filter and multiplicative approximations",
     "licence": "CC-BY-4.0",
@@ -91,7 +91,7 @@
     {
       "type": "agent",
       "positions": [
-        "contributor"
+        "author"
       ],
       "models": [
         {
@@ -160,6 +160,38 @@
           "extent": "full"
         }
       ]
+    },
+    {
+      "id": "P5",
+      "type": "agent",
+      "name": "Claude Code (independent proof checker)",
+      "positions": [
+        "contributor"
+      ],
+      "models": [
+        {
+          "model": "M1",
+          "role": "subagent"
+        }
+      ],
+      "credit_roles": [
+        "validation"
+      ],
+      "ai_tasks": [
+        {
+          "task": "review",
+          "extent": "full"
+        }
+      ],
+      "tools": [
+        "code_execution",
+        "file_access"
+      ],
+      "record_source": "self_reported",
+      "run_period": {
+        "start": "2026-10-15",
+        "end": "2026-10-15"
+      }
     }
   ],
   "models": [
@@ -303,10 +335,10 @@
       "role": "principal",
       "novelty": "new",
       "scope": {
-        "population": "iETS and ADAM models with an occurrence part",
+        "population": "models of intermittent demand $y_t=o_tz_t$ (iETS, ADAM with an occurrence part)",
         "data_type": "intermittent demand time series",
         "conditions": [
-          "Bernoulli occurrence independent of the demand sizes"
+          "Bernoulli occurrence independent of a continuous demand size"
         ]
       },
       "support": [
@@ -321,13 +353,6 @@
         "C42"
       ],
       "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "moderate",
-          "rationale": "Short derivation by the prediction-error decomposition; unreviewed draft."
-        }
-      ],
       "provenance": "author_stated"
     },
     {
@@ -337,10 +362,10 @@
       "role": "principal",
       "novelty": "refutation",
       "scope": {
-        "population": "iETS and ADAM models with an occurrence part",
+        "population": "iETS estimated by the entropy-augmented likelihood",
         "data_type": "intermittent demand time series",
         "conditions": [
-          "Bernoulli occurrence independent of the demand sizes"
+          "sizes unobserved at the periods with zero demand"
         ]
       },
       "support": [
@@ -359,14 +384,16 @@
         "C2"
       ],
       "verification": "unchecked",
-      "assessments": [
+      "provenance": "author_stated",
+      "relations": [
         {
-          "by": "author",
-          "strength": "moderate",
-          "rationale": "Analytical derivation in a single unreviewed draft; not peer- or machine-checked."
+          "type": "contradicts",
+          "target": "doi:10.1016/j.ijpe.2023.109013",
+          "id_type": "doi",
+          "locator": "Appendix B, eq. B.6 (likelihood with the differential entropy of the unobserved sizes, derived by analogy with the EM algorithm)",
+          "self": true
         }
-      ],
-      "provenance": "author_stated"
+      ]
     },
     {
       "id": "C12",
@@ -375,10 +402,10 @@
       "role": "principal",
       "novelty": "new",
       "scope": {
-        "population": "iETS and ADAM models with an occurrence part",
-        "data_type": "intermittent demand time series",
+        "population": "iETS with normally distributed demand sizes",
         "conditions": [
-          "Bernoulli occurrence independent of the demand sizes"
+          "location of the sizes held fixed",
+          "variance as the only free parameter"
         ]
       },
       "support": [
@@ -390,15 +417,9 @@
       "depends_on": [
         "C11"
       ],
-      "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Elementary calculus on a closed-form objective, checkable by hand."
-        }
-      ],
-      "provenance": "author_stated"
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "verified_by": "P5"
     },
     {
       "id": "C13",
@@ -407,10 +428,9 @@
       "role": "supporting",
       "novelty": "new",
       "scope": {
-        "population": "iETS and ADAM models with an occurrence part",
-        "data_type": "intermittent demand time series",
+        "population": "iETS with a dynamic model for the scale of the demand sizes",
         "conditions": [
-          "Bernoulli occurrence independent of the demand sizes"
+          "normal or Gamma distribution of the sizes"
         ]
       },
       "support": [
@@ -423,14 +443,8 @@
         "C11"
       ],
       "warrant": "W1",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "low",
-          "rationale": "Stated in a remark with a one-sentence argument and no formal proof."
-        }
-      ],
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "verification": "unchecked"
     },
     {
       "id": "C14",
@@ -448,14 +462,20 @@
         "C2"
       ],
       "warrant": "W2",
-      "assessments": [
+      "provenance": "author_stated",
+      "verification": "unchecked",
+      "relations": [
         {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Follows directly from the definition of differential entropy."
+          "type": "contradicts",
+          "target": "doi:10.1016/j.ijpe.2023.109013",
+          "id_type": "doi",
+          "locator": "eq. 29 and eq. B.6 (sign of the entropy term)",
+          "self": true
         }
       ],
-      "provenance": "author_stated"
+      "scope": {
+        "population": "iETS objective of Svetunkov and Boylan (2023)"
+      }
     },
     {
       "id": "C15",
@@ -464,10 +484,10 @@
       "role": "principal",
       "novelty": "extension",
       "scope": {
-        "population": "pure additive ADAM models (ETS with additive components, ARIMA, regression) with normally distributed errors",
+        "population": "pure additive single source of error models (ETS with additive components, ARIMA, regression)",
         "data_type": "univariate time series with unobserved periods",
         "conditions": [
-          "single source of error state space form",
+          "normally distributed errors",
           "initial states treated as fixed parameters"
         ],
         "excludes": [
@@ -489,15 +509,25 @@
       "depends_on": [
         "C10"
       ],
-      "verification": "unchecked",
-      "assessments": [
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "relations": [
         {
-          "by": "author",
-          "strength": "moderate",
-          "rationale": "Standard Kalman filter algebra for correlated disturbances written for one error source; unreviewed draft."
+          "type": "extends",
+          "target": "doi:10.1017/cbo9781107049994",
+          "id_type": "doi",
+          "locator": "Kalman filter for state space models with correlated disturbances",
+          "self": false
+        },
+        {
+          "type": "extends",
+          "target": "doi:10.1093/acprof:oso/9780199641178.001.0001",
+          "id_type": "doi",
+          "locator": "Kalman filter for state space models with correlated disturbances",
+          "self": false
         }
       ],
-      "provenance": "author_stated"
+      "verified_by": "P5"
     },
     {
       "id": "C16",
@@ -506,14 +536,10 @@
       "role": "supporting",
       "novelty": "new",
       "scope": {
-        "population": "pure additive ADAM models (ETS with additive components, ARIMA, regression) with normally distributed errors",
-        "data_type": "univariate time series with unobserved periods",
+        "population": "pure additive single source of error models",
+        "data_type": "univariate time series",
         "conditions": [
-          "single source of error state space form",
-          "initial states treated as fixed parameters"
-        ],
-        "excludes": [
-          "models mixing additive and multiplicative components"
+          "every period observed"
         ]
       },
       "support": [
@@ -526,15 +552,9 @@
         "C15",
         "C1"
       ],
-      "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Two-line algebraic identity."
-        }
-      ],
-      "provenance": "author_stated"
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "verified_by": "P5"
     },
     {
       "id": "C17",
@@ -543,14 +563,11 @@
       "role": "principal",
       "novelty": "refutation",
       "scope": {
-        "population": "pure additive ADAM models (ETS with additive components, ARIMA, regression) with normally distributed errors",
+        "population": "pure additive single source of error models",
         "data_type": "univariate time series with unobserved periods",
         "conditions": [
-          "single source of error state space form",
-          "initial states treated as fixed parameters"
-        ],
-        "excludes": [
-          "models mixing additive and multiplicative components"
+          "normally distributed errors",
+          "persistence vector $\\mathbf g\\neq\\mathbf 0$"
         ]
       },
       "support": [
@@ -570,14 +587,16 @@
         "C4"
       ],
       "verification": "unchecked",
-      "assessments": [
+      "provenance": "author_stated",
+      "relations": [
         {
-          "by": "author",
-          "strength": "moderate",
-          "rationale": "Analytical derivation in a single unreviewed draft; not peer- or machine-checked."
+          "type": "contradicts",
+          "target": "doi:10.1016/j.ijpe.2023.109013",
+          "id_type": "doi",
+          "locator": "Appendix C (estimation with zero errors at the unobserved periods)",
+          "self": true
         }
-      ],
-      "provenance": "author_stated"
+      ]
     },
     {
       "id": "C18",
@@ -586,14 +605,10 @@
       "role": "supporting",
       "novelty": "new",
       "scope": {
-        "population": "pure additive ADAM models (ETS with additive components, ARIMA, regression) with normally distributed errors",
-        "data_type": "univariate time series with unobserved periods",
+        "population": "ETS(A,N,N)",
         "conditions": [
-          "single source of error state space form",
-          "initial states treated as fixed parameters"
-        ],
-        "excludes": [
-          "models mixing additive and multiplicative components"
+          "normally distributed errors",
+          "zero state covariance before an interval of $j$ periods"
         ]
       },
       "support": [
@@ -606,13 +621,6 @@
         "C15"
       ],
       "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Direct substitution into the filter."
-        }
-      ],
       "provenance": "author_stated"
     },
     {
@@ -628,14 +636,10 @@
         }
       ],
       "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Taking logarithms of the model equations."
-        }
-      ],
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "scope": {
+        "population": "pure multiplicative ETS in the ADAM and conventional forms"
+      }
     },
     {
       "id": "C20",
@@ -647,11 +651,7 @@
         "population": "pure multiplicative ETS in the ADAM form",
         "data_type": "positive univariate time series with unobserved periods",
         "conditions": [
-          "log-normal distribution of $1+\\epsilon_t$ with $\\E(1+\\epsilon_t)=1$"
-        ],
-        "excludes": [
-          "models mixing additive and multiplicative components",
-          "conventional multiplicative ETS"
+          "log-normal distribution with $\\E(1+\\epsilon_t)=1$"
         ]
       },
       "support": [
@@ -671,13 +671,6 @@
         "C19"
       ],
       "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "moderate",
-          "rationale": "Analytical derivation in a single unreviewed draft; not peer- or machine-checked."
-        }
-      ],
       "provenance": "author_stated"
     },
     {
@@ -688,13 +681,10 @@
       "novelty": "new",
       "scope": {
         "population": "pure multiplicative ETS in the ADAM form",
-        "data_type": "positive univariate time series with unobserved periods",
+        "data_type": "positive univariate time series",
         "conditions": [
-          "log-normal distribution of $1+\\epsilon_t$ with $\\E(1+\\epsilon_t)=1$"
-        ],
-        "excludes": [
-          "models mixing additive and multiplicative components",
-          "conventional multiplicative ETS"
+          "log-normal distribution with $\\E(1+\\epsilon_t)=1$",
+          "every period observed"
         ]
       },
       "support": [
@@ -710,15 +700,9 @@
       "depends_on": [
         "C20"
       ],
-      "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Root of a quadratic obtained from the score; checkable by hand."
-        }
-      ],
-      "provenance": "author_stated"
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "verified_by": "P5"
     },
     {
       "id": "C22",
@@ -728,13 +712,10 @@
       "novelty": "refutation",
       "scope": {
         "population": "pure multiplicative ETS in the ADAM form",
-        "data_type": "positive univariate time series with unobserved periods",
+        "data_type": "positive univariate time series",
         "conditions": [
-          "log-normal distribution of $1+\\epsilon_t$ with $\\E(1+\\epsilon_t)=1$"
-        ],
-        "excludes": [
-          "models mixing additive and multiplicative components",
-          "conventional multiplicative ETS"
+          "log-normal distribution with $\\E(1+\\epsilon_t)=1$",
+          "every period observed"
         ]
       },
       "support": [
@@ -750,14 +731,16 @@
         "C21"
       ],
       "verification": "unchecked",
-      "assessments": [
+      "provenance": "author_stated",
+      "relations": [
         {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Arithmetic consequence of the closed-form maximum likelihood scale."
+          "type": "contradicts",
+          "target": "doi:10.1201/9781003452652",
+          "id_type": "doi",
+          "locator": "estimator of the scale of the log-normal distribution",
+          "self": true
         }
-      ],
-      "provenance": "author_stated"
+      ]
     },
     {
       "id": "C23",
@@ -774,20 +757,20 @@
       "depends_on": [
         "C19"
       ],
-      "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Expansion of squares and independence."
-        }
-      ],
-      "provenance": "author_stated"
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "scope": {
+        "population": "pure multiplicative models with Gamma, log-normal or inverse Gaussian errors",
+        "conditions": [
+          "drift factor $D_t$ independent of $\\epsilon_t$"
+        ]
+      },
+      "verified_by": "P5"
     },
     {
       "id": "C24",
       "statement": "For iETS(M,N,N) in the [[D7:conventional multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest Kullback-Leibler divergence per observation from the exact density of 0.00115 for the Gamma, 0.00448 for the log-normal and 0.00400 for the inverse Gaussian distribution, against 2.359, 5.947 and 47.545 for the one-step density.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "principal",
       "novelty": "new",
       "scope": {
@@ -811,6 +794,14 @@
             "A3",
             "A4",
             "A5"
+          ],
+          "results": [
+            "E20.R1",
+            "E20.R2",
+            "E20.R3",
+            "E20.R4",
+            "E20.R5",
+            "E20.R6"
           ]
         }
       ],
@@ -829,7 +820,7 @@
     {
       "id": "C25",
       "statement": "On errors simulated with the [[D9:drift of the states]] of iETS(M,N,N) and 1000 observed sizes, the fixed-point moment estimator of the Gamma and inverse Gaussian scale had a median relative bias of +0.02% with no failed fits when the drift order $\\E(j-1)\\alpha^2s$ was at most 0.02, and failed in 18%, 52% and 71% of fits for drift orders of 0.02 to 0.1, 0.1 to 0.3 and above 0.3.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -847,6 +838,16 @@
           "artefacts": [
             "A3",
             "A6"
+          ],
+          "results": [
+            "E21.R1",
+            "E21.R2",
+            "E21.R3",
+            "E21.R4",
+            "E21.R5",
+            "E21.R6",
+            "E21.R7",
+            "E21.R8"
           ]
         }
       ],
@@ -875,10 +876,10 @@
       "role": "principal",
       "novelty": "new",
       "scope": {
-        "population": "iETS and ADAM models with an occurrence part",
-        "data_type": "intermittent demand time series",
+        "population": "models with an occurrence part (iETS, ADAM)",
         "conditions": [
-          "Bernoulli occurrence independent of the demand sizes"
+          "prediction interval of the demand that counts zeros as covered",
+          "Bernoulli occurrence independent of a continuous demand size"
         ]
       },
       "support": [
@@ -892,13 +893,6 @@
         "C42"
       ],
       "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Direct consequence of the mixture of a point mass at zero and the size distribution."
-        }
-      ],
       "provenance": "author_stated"
     },
     {
@@ -920,19 +914,12 @@
         "C40"
       ],
       "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "high",
-          "rationale": "Jensen's inequality and the Gamma moments."
-        }
-      ],
       "provenance": "author_stated"
     },
     {
       "id": "C28",
       "statement": "For ETS(M,N,N) in the [[D6:ADAM multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\\alpha=0.21$, the approximate upper bound of the 90% prediction interval divided by the point forecast was 2.431 against 1.807 from simulated paths twelve steps ahead, and 2.616 against 1.638 after six unobserved periods at the end of the sample.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -951,6 +938,12 @@
           "artefacts": [
             "A3",
             "A7"
+          ],
+          "results": [
+            "E22.R1",
+            "E22.R2",
+            "E22.R3",
+            "E22.R4"
           ]
         }
       ],
@@ -973,15 +966,8 @@
       "role": "supporting",
       "novelty": "new",
       "scope": {
-        "population": "pure additive ADAM models (ETS with additive components, ARIMA, regression) with normally distributed errors",
-        "data_type": "univariate time series with unobserved periods",
-        "conditions": [
-          "single source of error state space form",
-          "initial states treated as fixed parameters"
-        ],
-        "excludes": [
-          "models mixing additive and multiplicative components"
-        ]
+        "population": "linear single source of error models",
+        "data_type": "univariate time series with unobserved periods"
       },
       "support": [
         {
@@ -992,20 +978,14 @@
       "depends_on": [
         "C15"
       ],
-      "verification": "unchecked",
-      "assessments": [
-        {
-          "by": "author",
-          "strength": "moderate",
-          "rationale": "Analytical derivation in a single unreviewed draft; not peer- or machine-checked."
-        }
-      ],
-      "provenance": "author_stated"
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "verified_by": "P5"
     },
     {
       "id": "C30",
       "statement": "For ADAM ETS(A,N,A) with lags 24 and 168 (193 state cells) on 1344 hourly observations generated by ETS(A,N,A), the low-rank factor form of the [[D8:SSOE Kalman filter]] was 10.55 times faster than the full covariance form for one missing value and 3.50 times faster for 48, with log-likelihoods equal to within 4.5e-13.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -1026,6 +1006,11 @@
           "artefacts": [
             "A3",
             "A8"
+          ],
+          "results": [
+            "E23.R1",
+            "E23.R2",
+            "E23.R3"
           ]
         }
       ],
@@ -1113,7 +1098,7 @@
     {
       "id": "C33",
       "statement": "For the pure additive models with the Laplace, S and Generalised Normal distributions, the smooth package keeps the error in its family with scale $sf_t^{1/p}$, and the Kullback-Leibler divergence of this approximation from the exact density is 0.0491 for the Laplace distribution and 0.260 for the S distribution at $f_t=4$.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -1126,6 +1111,10 @@
           "artefacts": [
             "A3",
             "A9"
+          ],
+          "results": [
+            "E24.R1",
+            "E24.R2"
           ]
         }
       ],
@@ -1265,7 +1254,7 @@
     {
       "id": "C34",
       "statement": "For iETS(M,N,N) in the [[D6:ADAM multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest Kullback-Leibler divergence per observation from the exact density of 0.01452 for the Gamma and 0.00045 for the inverse Gaussian distribution, and is exact for the log-normal distribution, against 4.584, 18.635 and 630.772 for the one-step density.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -1289,6 +1278,14 @@
             "A3",
             "A4",
             "A5"
+          ],
+          "results": [
+            "E20.R7",
+            "E20.R8",
+            "E20.R9",
+            "E20.R10",
+            "E20.R11",
+            "E20.R12"
           ]
         }
       ],
@@ -1303,8 +1300,8 @@
     },
     {
       "id": "C35",
-      "statement": "Within iETS(M,N,N) models fitted by the [[D5:zero-error recursion]], updating the states with the persistence vector $\\mathbf g$ after an interval raised the relative bias of the fixed-point moment estimate of the Gamma and inverse Gaussian scale in 97 of 120 cells, by a median of 12.8 percentage points.",
-      "type": "associational",
+      "statement": "Within iETS(M,N,N) models fitted by the [[D5:zero-error recursion]], updating the states with the persistence vector $\\mathbf g$ after an interval raised the estimate of the Gamma and inverse Gaussian scale from the moment equation solved by bisection by more than three Monte Carlo standard errors in 97 of 120 cells, with a median increase in relative bias of 12.8 percentage points.",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -1321,6 +1318,11 @@
           "artefacts": [
             "A3",
             "A6"
+          ],
+          "results": [
+            "E21.R9",
+            "E21.R10",
+            "E21.R11"
           ]
         }
       ],
@@ -1338,8 +1340,8 @@
     },
     {
       "id": "C36",
-      "statement": "For ETS(M,N,N) in the [[D7:conventional multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\\alpha=0.21$, the approximate upper bound of the 90% prediction interval divided by the point forecast was 2.431 against 2.393 from simulated paths twelve steps ahead, and 2.616 against 2.537 after six unobserved periods at the end of the sample.",
-      "type": "associational",
+      "statement": "For ETS(M,N,N) in the [[D7:conventional multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\\alpha=0.21$, the approximate upper bound of the 90% prediction interval divided by the point forecast was 2.431 against 2.393 from simulated paths twelve steps ahead, and 2.616 against 2.536 after six unobserved periods at the end of the sample.",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -1358,6 +1360,12 @@
           "artefacts": [
             "A3",
             "A7"
+          ],
+          "results": [
+            "E22.R5",
+            "E22.R6",
+            "E22.R7",
+            "E22.R8"
           ]
         }
       ],
@@ -1373,7 +1381,7 @@
     {
       "id": "C37",
       "statement": "For ADAM ETS(A,N,A) with lags 24 and 168 on 1344 hourly observations following a fixed sine pattern, the low-rank factor form of the [[D8:SSOE Kalman filter]] was 2.96 times faster than the full covariance form for one missing value and 0.72 times as fast for 48, and slower than the full form above about 30 missing values.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -1394,6 +1402,10 @@
           "artefacts": [
             "A3",
             "A8"
+          ],
+          "results": [
+            "E23.R4",
+            "E23.R5"
           ]
         }
       ],
@@ -1415,7 +1427,7 @@
     {
       "id": "C38",
       "statement": "At variance ratio $f_t=4$, the 16-node Gauss-Hermite mixture of the error density over normal state uncertainty had a Kullback-Leibler divergence from the exact density of 0.0081 for the Laplace and 0.113 for the S distribution, against 0.0491 and 0.260 for the error kept in its family with scale $sf_t^{1/p}$.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "supporting",
       "novelty": "new",
       "scope": {
@@ -1432,6 +1444,12 @@
           "artefacts": [
             "A3",
             "A9"
+          ],
+          "results": [
+            "E24.R1",
+            "E24.R2",
+            "E24.R3",
+            "E24.R4"
           ]
         }
       ],
@@ -1452,8 +1470,7 @@
     {
       "id": "E1",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): $\\ell(\\theta,\\lambda\\mid Y)=\\sum_{O_t=1}\\log f(z_t\\mid Y_{t-1};\\theta)+\\sum_{O_t=1}\\log p_t+\\sum_{O_t=0}\\log(1-p_t)$",
-      "theorem": "$\\ell(\\theta,\\lambda\\mid Y)=\\sum_{O_t=1}\\log f(z_t\\mid Y_{t-1};\\theta)+\\sum_{O_t=1}\\log p_t+\\sum_{O_t=0}\\log(1-p_t)$",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1497,8 +1514,7 @@
     {
       "id": "E2",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Stationary points of $\\ell_H$ differ from those of $\\ell$",
-      "theorem": "Stationary points of $\\ell_H$ differ from those of $\\ell$",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1550,8 +1566,7 @@
     {
       "id": "E3",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): $\\arg\\max_{\\sigma^2}\\ell_H=\\frac{1}{T}\\sum_{O_t=1}e_t^2$",
-      "theorem": "$\\arg\\max_{\\sigma^2}\\ell_H=\\frac{1}{T}\\sum_{O_t=1}e_t^2$",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1589,8 +1604,7 @@
     {
       "id": "E4",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Filter likelihood of the linear Gaussian SSOE model with unobserved periods",
-      "theorem": "Filter likelihood of the linear Gaussian SSOE model with unobserved periods",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1645,8 +1659,7 @@
     {
       "id": "E5",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Complete data reduce the filter to the SSOE recursion",
-      "theorem": "Complete data reduce the filter to the SSOE recursion",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1684,8 +1697,7 @@
     {
       "id": "E6",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): The zero-error recursion is not the maximum likelihood estimator",
-      "theorem": "The zero-error recursion is not the maximum likelihood estimator",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1725,8 +1737,7 @@
     {
       "id": "E7",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): $\\alpha_j=((j-1)\\alpha^2+\\alpha)/((j-1)\\alpha^2+1)$ for ETS(A,N,N)",
-      "theorem": "$\\alpha_j=((j-1)\\alpha^2+\\alpha)/((j-1)\\alpha^2+1)$ for ETS(A,N,N)",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1757,8 +1768,7 @@
     {
       "id": "E8",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Linearity in logarithms of the ADAM multiplicative ETS",
-      "theorem": "Linearity in logarithms of the ADAM multiplicative ETS",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1796,8 +1806,7 @@
     {
       "id": "E9",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Exact likelihood and scale equation of the log-normal ADAM ETS",
-      "theorem": "Exact likelihood and scale equation of the log-normal ADAM ETS",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1851,8 +1860,7 @@
     {
       "id": "E10",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): $\\hat s=2(\\sqrt{1+m}-1)$ without unobserved periods",
-      "theorem": "$\\hat s=2(\\sqrt{1+m}-1)$ without unobserved periods",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1895,8 +1903,7 @@
     {
       "id": "E11",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Moment equations of the relative errors with drift",
-      "theorem": "Moment equations of the relative errors with drift",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1924,8 +1931,7 @@
     {
       "id": "E12",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Coverage of the size interval inside a demand interval",
-      "theorem": "Coverage of the size interval inside a demand interval",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -1960,8 +1966,7 @@
     {
       "id": "E13",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Zero-error forecast of ADAM ETS is not the conditional mean",
-      "theorem": "Zero-error forecast of ADAM ETS is not the conditional mean",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -2003,8 +2008,7 @@
     {
       "id": "E14",
       "profile": "formal",
-      "description": "Analytical derivation in the source draft (artefact A1): Rank of the state covariance of the SSOE filter",
-      "theorem": "Rank of the state covariance of the SSOE filter",
+      "description": "Analytical derivation in the source draft (artefact A1).",
       "foundation": "Kolmogorov probability axioms",
       "steps": [
         {
@@ -2017,7 +2021,7 @@
         },
         {
           "id": "E14.2",
-          "statement": "An observed period removes the direction it reveals while adding the new error, leaving the rank unchanged",
+          "statement": "An observed period removes the direction it reveals while adding the new error, so the rank does not increase",
           "by": [
             "D8"
           ],
@@ -2058,7 +2062,145 @@
       "runs": 1,
       "seeds": [
         20261015
-      ]
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "value": 0.001147669555304068,
+          "conditions": {
+            "distribution": "dgamma",
+            "ets_form": "conventional",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R2",
+          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "value": 2.359344901764189,
+          "conditions": {
+            "distribution": "dgamma",
+            "ets_form": "conventional",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R3",
+          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "value": 0.004478045527634884,
+          "conditions": {
+            "distribution": "dlnorm",
+            "ets_form": "conventional",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R4",
+          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "value": 5.947322649817578,
+          "conditions": {
+            "distribution": "dlnorm",
+            "ets_form": "conventional",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R5",
+          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "value": 0.00399623186332274,
+          "conditions": {
+            "distribution": "dinvgauss",
+            "ets_form": "conventional",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R6",
+          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "value": 47.545190336883074,
+          "conditions": {
+            "distribution": "dinvgauss",
+            "ets_form": "conventional",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R7",
+          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "value": 0.014519691145235577,
+          "conditions": {
+            "distribution": "dgamma",
+            "ets_form": "adam",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R8",
+          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "value": 4.583576097536914,
+          "conditions": {
+            "distribution": "dgamma",
+            "ets_form": "adam",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R9",
+          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "value": 9.638705681090434e-07,
+          "conditions": {
+            "distribution": "dlnorm",
+            "ets_form": "adam",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R10",
+          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "value": 18.635381272371507,
+          "conditions": {
+            "distribution": "dlnorm",
+            "ets_form": "adam",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R11",
+          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "value": 0.00044603365455395534,
+          "conditions": {
+            "distribution": "dinvgauss",
+            "ets_form": "adam",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        },
+        {
+          "id": "R12",
+          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "value": 630.7721304928126,
+          "conditions": {
+            "distribution": "dinvgauss",
+            "ets_form": "adam",
+            "model": "iETS(M,N,N)"
+          },
+          "artefact": "A4"
+        }
+      ],
+      "execution": {
+        "code_version": "f9d062ee850675acc2160d851a34093d035a474e",
+        "notes": "Run with the claimset scripts not yet committed; the scripts are archived at f1de3ea1 and the package code is identical at both commits (user-reported)."
+      }
     },
     {
       "id": "E21",
@@ -2078,7 +2220,134 @@
       "seeds": [
         "numpy SeedSequence(20261015), one child stream per cell"
       ],
-      "outputs": "fixed-point estimator, 1000 observed sizes, by drift order: <=0.02 median relative bias +0.02%, 0% failed; 0.02-0.1 -0.06%, 18%; 0.1-0.3 -0.42%, 52%; >0.3 -0.43%, 71%. Within fitted models the gain update raised the relative bias in 97 of 120 cells by a median of 12.8 percentage points"
+      "outputs": "fixed-point estimator, 1000 observed sizes, by drift order: <=0.02 median relative bias +0.02%, 0% failed; 0.02-0.1 -0.06%, 18%; 0.1-0.3 -0.42%, 52%; >0.3 -0.43%, 71%. Within fitted models the gain update raised the relative bias in 97 of 120 cells by a median of 12.8 percentage points",
+      "results": [
+        {
+          "id": "R1",
+          "quantity": "median relative bias of the scale estimate",
+          "value": 0.0001590643108680817,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": "<=0.02"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R2",
+          "quantity": "share of failed fits",
+          "value": 0.0,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": "<=0.02"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R3",
+          "quantity": "median relative bias of the scale estimate",
+          "value": -0.0005993510206586256,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": "0.02-0.1"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R4",
+          "quantity": "share of failed fits",
+          "value": 0.17673529411764705,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": "0.02-0.1"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R5",
+          "quantity": "median relative bias of the scale estimate",
+          "value": -0.0041824876680562895,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": "0.1-0.3"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R6",
+          "quantity": "share of failed fits",
+          "value": 0.523375,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": "0.1-0.3"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R7",
+          "quantity": "median relative bias of the scale estimate",
+          "value": -0.004309863992060126,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": ">0.3"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R8",
+          "quantity": "share of failed fits",
+          "value": 0.7100576923076923,
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000,
+            "drift_order": ">0.3"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R9",
+          "quantity": "cells where the gain update raised the scale estimate by more than three Monte Carlo standard errors",
+          "value": 97,
+          "conditions": {
+            "estimator": "moment equation solved by bisection",
+            "observed_sizes": 100,
+            "comparison": "fitted model with gain update vs simulated drift errors"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R10",
+          "quantity": "number of cells",
+          "value": 120,
+          "conditions": {
+            "estimator": "moment equation solved by bisection",
+            "observed_sizes": 100,
+            "comparison": "fitted model with gain update vs simulated drift errors"
+          },
+          "artefact": "A6"
+        },
+        {
+          "id": "R11",
+          "quantity": "median increase in relative bias from the gain update",
+          "value": 0.12792793852670048,
+          "conditions": {
+            "estimator": "moment equation solved by bisection",
+            "observed_sizes": 100,
+            "comparison": "fitted model with gain update vs simulated drift errors"
+          },
+          "artefact": "A6"
+        }
+      ],
+      "execution": {
+        "code_version": "f9d062ee850675acc2160d851a34093d035a474e",
+        "notes": "Run with the claimset scripts not yet committed; the scripts are archived at f1de3ea1 and the package code is identical at both commits (user-reported)."
+      }
     },
     {
       "id": "E22",
@@ -2098,7 +2367,125 @@
       "runs": 1000000,
       "seeds": [
         20261015
-      ]
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "value": 2.430867663875322,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "adam",
+            "h": 12,
+            "unobserved_at_end": 0,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        },
+        {
+          "id": "R2",
+          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "value": 1.8071312998210094,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "adam",
+            "h": 12,
+            "unobserved_at_end": 0,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        },
+        {
+          "id": "R3",
+          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "value": 2.615866692147225,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "adam",
+            "h": 12,
+            "unobserved_at_end": 6,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        },
+        {
+          "id": "R4",
+          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "value": 1.6379222812406813,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "adam",
+            "h": 12,
+            "unobserved_at_end": 6,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        },
+        {
+          "id": "R5",
+          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "value": 2.430867663875322,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "conventional",
+            "h": 12,
+            "unobserved_at_end": 0,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        },
+        {
+          "id": "R6",
+          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "value": 2.3927301164131274,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "conventional",
+            "h": 12,
+            "unobserved_at_end": 0,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        },
+        {
+          "id": "R7",
+          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "value": 2.615866692147225,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "conventional",
+            "h": 12,
+            "unobserved_at_end": 6,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        },
+        {
+          "id": "R8",
+          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "value": 2.536487773418306,
+          "conditions": {
+            "distribution": "Gamma",
+            "ets_form": "conventional",
+            "h": 12,
+            "unobserved_at_end": 6,
+            "s": 0.32,
+            "alpha": 0.21
+          },
+          "artefact": "A7"
+        }
+      ],
+      "execution": {
+        "code_version": "3eb93bb12aa875b23a0d6cc1ba57523c89a83e76",
+        "notes": "Run with the claimset scripts not yet committed; the scripts are archived at f1de3ea1 and the package code is identical at both commits (user-reported)."
+      }
     },
     {
       "id": "E23",
@@ -2106,7 +2493,6 @@
       "description": "Timing of the SSOE Kalman filter in the smooth package with the low-rank factor against the full covariance, both built from smooth commit 53104ee9, for ADAM ETS(A,N,A) with lags 24 and 168 (193 profile cells), normal distribution and backcast initial states, on 1344 hourly observations with 1 to 48 nested missing values, for data generated by ETS(A,N,A) and by a fixed sine pattern; 25 interleaved repetitions per case on one cloud VM (Intel Xeon 2.80 GHz, 4 vCPUs, Linux 6.18.44, Python 3.11.15) with one thread.",
       "design": "benchmark",
       "estimand": "ratio of median run time, full covariance over low-rank factor",
-      "estimate": null,
       "n": 25,
       "data_origin": "primary",
       "preregistered": false,
@@ -2116,6 +2502,80 @@
       ],
       "availability": {
         "level": "public"
+      },
+      "results": [
+        {
+          "id": "R1",
+          "quantity": "speed-up of low-rank over full covariance filter",
+          "value": 10.55114215060036,
+          "unit": "ratio",
+          "conditions": {
+            "data": "ets",
+            "missing_values": 1,
+            "timed_call": "filter pass"
+          },
+          "artefact": "A8"
+        },
+        {
+          "id": "R2",
+          "quantity": "speed-up of low-rank over full covariance filter",
+          "value": 3.5046113453883225,
+          "unit": "ratio",
+          "conditions": {
+            "data": "ets",
+            "missing_values": 48,
+            "timed_call": "filter pass"
+          },
+          "artefact": "A8"
+        },
+        {
+          "id": "R3",
+          "quantity": "largest absolute difference in log-likelihood, low-rank vs full",
+          "value": 4.547473508864641e-13,
+          "conditions": {
+            "data": "ets"
+          },
+          "artefact": "A8"
+        },
+        {
+          "id": "R4",
+          "quantity": "speed-up of low-rank over full covariance filter",
+          "value": 2.960894167501268,
+          "unit": "ratio",
+          "conditions": {
+            "data": "sine",
+            "missing_values": 1,
+            "timed_call": "filter pass"
+          },
+          "artefact": "A8"
+        },
+        {
+          "id": "R5",
+          "quantity": "speed-up of low-rank over full covariance filter",
+          "value": 0.7235443143279483,
+          "unit": "ratio",
+          "conditions": {
+            "data": "sine",
+            "missing_values": 48,
+            "timed_call": "filter pass"
+          },
+          "artefact": "A8"
+        },
+        {
+          "id": "R6",
+          "quantity": "largest absolute difference in log-likelihood, low-rank vs full",
+          "value": 0.0,
+          "conditions": {
+            "data": "sine"
+          },
+          "artefact": "A8"
+        }
+      ],
+      "execution": {
+        "code_version": "53104ee9757348b8aa32779dc7fc06c754be9681",
+        "hardware": "cloud VM, Intel Xeon 2.80 GHz, 4 vCPUs, one thread",
+        "software": "Linux 6.18.44, glibc 2.39, Python 3.11.15",
+        "notes": "Both variants built from the clean commit 53104ee9; the timing script is archived at f1de3ea1."
       }
     },
     {
@@ -2136,7 +2596,61 @@
       "runs": 1,
       "seeds": [
         20261015
-      ]
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "quantity": "KL divergence, exact density vs approximation",
+          "value": 0.04911403773707054,
+          "conditions": {
+            "distribution": "dlaplace",
+            "approximation": "family_scaled",
+            "f_t": 4,
+            "s": 1
+          },
+          "artefact": "A9"
+        },
+        {
+          "id": "R2",
+          "quantity": "KL divergence, exact density vs approximation",
+          "value": 0.2598001588579059,
+          "conditions": {
+            "distribution": "ds",
+            "approximation": "family_scaled",
+            "f_t": 4,
+            "s": 1
+          },
+          "artefact": "A9"
+        },
+        {
+          "id": "R3",
+          "quantity": "KL divergence, exact density vs approximation",
+          "value": 0.008097015561062926,
+          "conditions": {
+            "distribution": "dlaplace",
+            "approximation": "gauss_hermite 16 nodes",
+            "f_t": 4,
+            "s": 1
+          },
+          "artefact": "A9"
+        },
+        {
+          "id": "R4",
+          "quantity": "KL divergence, exact density vs approximation",
+          "value": 0.112708849233957,
+          "conditions": {
+            "distribution": "ds",
+            "approximation": "gauss_hermite 16 nodes",
+            "f_t": 4,
+            "s": 1
+          },
+          "artefact": "A9"
+        }
+      ],
+      "execution": {
+        "code_version": "3eb93bb12aa875b23a0d6cc1ba57523c89a83e76",
+        "notes": "Run with the claimset scripts not yet committed; the scripts are archived at f1de3ea1 and the package code is identical at both commits (user-reported)."
+      }
     }
   ],
   "warrants": [
@@ -2191,13 +2705,14 @@
   "artefacts": [
     {
       "id": "A1",
-      "kind": "other",
+      "kind": "manuscript",
       "uri": "https://github.com/openforecast-org/smooth/blob/8a5fbbb334b0d6192a3c3e8a5773f512e548e891/python/docs/INTERMITTENT_LIKELIHOOD.tex",
       "version": "sha256:44eb855578262cd1668929bc6659cfcaaa4cd3b3e153541deffd91720908d1e3",
       "availability": {
         "level": "public"
       },
-      "description": "LaTeX source of the draft 'Estimating exponential smoothing with unobserved periods: the observed-data likelihood of ADAM and iETS' (October 2026)."
+      "description": "LaTeX source of the draft 'Estimating exponential smoothing with unobserved periods: the observed-data likelihood of ADAM and iETS' (October 2026).",
+      "licence": "LGPL-2.1-only"
     },
     {
       "id": "A2",

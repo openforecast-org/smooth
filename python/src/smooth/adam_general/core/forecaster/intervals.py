@@ -9,12 +9,14 @@ from smooth.adam_general.core.utils.distributions import (
 )
 from smooth.adam_general.core.utils.utils import (
     _sum_r,
+    gap_quantile,
     observed_mask,
     scale_debias,
     scale_variance,
 )
 from smooth.adam_general.core.utils.var_covar import (
     covar_anal,
+    gap_drift,
     var_anal,
 )
 
@@ -142,8 +144,9 @@ def generate_prediction_interval(
     # Skipping for now.
     # Will ask Ivan what this is
 
-    # The mean of log(1+e) times -2 for the log-normal, when it is not the variance
-    v_mean = None
+    # The mean of log(1+e) times -2 for the log-normal, when it is not the variance,
+    # and the moments of the log of the drift of the states for the mixtures
+    v_mean = drift = None
     if scale_2d_override is not None:
         v_voc_multi = np.asarray(scale_2d_override, dtype=float).ravel()
     elif (
@@ -171,6 +174,35 @@ def generate_prediction_interval(
             v_mean = s2_horizon * general["_filter_mean"]
         if general.get("cumulative", False):
             v_voc_multi = np.sum(v_voc_multi[shift:])
+    elif (
+        general["distribution"] in ("dgamma", "dinvgauss")
+        and general.get("ets") == "adam"
+        and model_type_dict["ets_model"]
+        and not model_type_dict.get("arima_model", False)
+        and e_type == "M"
+        and model_type_dict["trend_type"] != "A"
+        and model_type_dict["season_type"] != "A"
+        and s2_forecast is None
+        and not general.get("cumulative", False)
+    ):
+        # A pure multiplicative ADAM ETS with the Gamma or the Inverse Gaussian: z/mu
+        # at the horizon j is D(1+e), log(D) ~ N(mu (a_j - 1), v (k_j - 1)) with the
+        # moments mu and v of log(1+e) and the multipliers a_j and k_j of the
+        # log-normal above, the quantiles of their mixture
+        multiplier_mean = general.get("_filter_mean")
+        multiplier_variance = general.get("_filter_variances")
+        if multiplier_variance is None:
+            covar = covar_anal(
+                lags_dict["lags_model_all"], general["h"], mat_wt, mat_f, vec_g, 1.0
+            )
+            multiplier_mean = np.cumsum(covar[0])
+            multiplier_variance = np.diag(covar)
+        noise = gap_drift(vec_g, [], general["distribution"], True, s2)[2]
+        v_voc_multi = s2
+        drift = (
+            noise[0][0] * (np.ravel(multiplier_mean) - 1),
+            noise[1][0, 0] * (np.ravel(multiplier_variance) - 1),
+        )
     elif (
         model_type_dict["ets_model"]
         and general["distribution"]
@@ -276,7 +308,15 @@ def generate_prediction_interval(
     y_lower_mult = None
     y_upper_mult = None
 
-    if distribution == "dnorm":
+    if drift is not None:
+        y_lower_mult = gap_quantile(
+            np.broadcast_to(ll, (h, n_levels)), distribution, s2, *drift
+        )
+        y_upper_mult = gap_quantile(
+            np.broadcast_to(lu, (h, n_levels)), distribution, s2, *drift
+        )
+
+    elif distribution == "dnorm":
         sd = np.sqrt(scale_2d)
         y_lower[:] = gb.qnorm(ll, loc, sd)
         y_upper[:] = gb.qnorm(lu, loc, sd)

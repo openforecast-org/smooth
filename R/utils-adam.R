@@ -1765,7 +1765,8 @@ adam_gapVarianceModel <- function(object, power=2, h=0){
     drifting <- multiplicative && (any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
         !grepl("{D}", object$model, fixed=TRUE) && !is.scale(object$scale);
     gaussian <- additive || multiplicative && distribution=="dlnorm" && adamETS;
-    if(!(gaussian || drifting) || h>0 && !gaussian){
+    # With h>0, the multipliers of the moments of log(1+e) over the horizon, for the models in logs
+    if(!(gaussian || drifting) || h>0 && !(gaussian || drifting && adamETS)){
         return(if(h>0){NULL}else{gapVariance});
     }
     # The models fitted without the filter (cma()) have the unconditional ones of the recursion
@@ -1804,7 +1805,7 @@ adam_gapVarianceModel <- function(object, power=2, h=0){
                                       multiplicative, 0,
                                       if(is.null(noise)) numeric(0) else noise$mean,
                                       if(is.null(noise)) matrix(0, 0, 0) else noise$covariance);
-    if(gaussian){
+    if(gaussian || h>0){
         values <- switch(power, 2*filtered$innovationsScale, filtered$variances);
         if(h>0){
             return(tail(values, h));
@@ -1930,6 +1931,37 @@ adam_gapLogDensity <- function(y, mu, scale, distribution, driftMean, driftVaria
         values[gapped] <- densitiesMax + log(rowSums(exp(densities - densitiesMax)));
     }
     return(values);
+}
+
+# The quantiles of D(1+e), with log(D) ~ N(driftMean, driftVariance) and 1+e of the one-step Gamma or
+# Inverse Gaussian distribution, from the mixture of adam_gapLogDensity(): the quantiles of the
+# extreme nodes of the Gauss-Hermite rule bracket those of the mixture, which are bisected in logs.
+# The drift moments are recycled over the levels, as the variances over a matrix of levels
+adam_gapQuantile <- function(levels, distribution, scale, driftMean, driftVariance){
+    probability <- function(q){
+        return(switch(distribution,
+                      "dgamma"=pgamma(q, shape=1/scale, scale=scale),
+                      "dinvgauss"=pinvgauss(q, mean=1, dispersion=scale)));
+    }
+    quantiles <- switch(distribution,
+                        "dgamma"=qgamma(levels, shape=1/scale, scale=scale),
+                        "dinvgauss"=qinvgauss(levels, mean=1, dispersion=scale));
+    driftMean <- rep_len(driftMean, length(levels));
+    shifts <- driftMean + outer(sqrt(2*rep_len(driftVariance, length(levels))), adam_gaussHermite$nodes);
+    inside <- which(quantiles>0 & is.finite(quantiles));
+    lower <- log(quantiles[inside]) + shifts[inside,1];
+    upper <- log(quantiles[inside]) + shifts[inside,ncol(shifts)];
+    weights <- rep(adam_gaussHermite$weights, each=length(inside));
+    for(i in 1:60){
+        middle <- (lower+upper)/2;
+        below <- rowSums(weights*matrix(probability(exp(middle - shifts[inside,,drop=FALSE])),
+                                        ncol=ncol(shifts))) < levels[inside];
+        lower[below] <- middle[below];
+        upper[!below] <- middle[!below];
+    }
+    quantiles[] <- quantiles*exp(driftMean);
+    quantiles[inside] <- exp((lower+upper)/2);
+    return(quantiles);
 }
 
 # The observed sizes, which the scale is divided by: the missing values are not, and

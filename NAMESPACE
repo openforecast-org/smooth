@@ -278,6 +278,7 @@ importFrom(nloptr,nloptr)
 importFrom(statmod,
   dinvgauss,
   gauss.quad,
+  pinvgauss,
   qinvgauss,
   rinvgauss
 )
@@ -318,6 +319,7 @@ importFrom(stats,
   optim,
   optimize,
   pacf,
+  pgamma,
   plnorm,
   pnorm,
   poly,

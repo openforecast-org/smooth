@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claimset v0.8 reference validator (draft).
+"""Claimset v0.9 reference validator (draft).
 
 Usage:
     python3 validate.py claimset.json              # check a submission (default)
@@ -18,7 +18,7 @@ import json
 import re
 import sys
 
-SCHEMA_VERSION = "0.8"
+SCHEMA_VERSION = "0.9"
 
 ENUM = {
     "status": {"active", "corrected", "retracted", "withdrawn", "expression_of_concern"},
@@ -29,7 +29,7 @@ ENUM = {
     "role": {"principal", "supporting", "background"},
     "novelty": {"new", "replication", "extension", "refutation", "restatement"},
     "provenance": {"author_stated", "extracted", "inferred"},
-    "verification": {"machine_checked", "peer_checked", "unchecked"},
+    "verification": {"machine_checked", "agent_checked", "peer_checked", "unchecked"},
     "verifiability": {"open", "audit_only", "unverifiable", "not_applicable"},
     "flag": {"api_model_dependency", "figure_without_data", "unpublished_prompts",
              "unrecorded_model_settings", "unstated_support"},
@@ -44,7 +44,7 @@ ENUM = {
     "design_model_role": {"subject", "instrument", "annotator", "generator", "baseline"},
     "reasoning": {"deductive", "inductive", "abductive", "analogical", "interpretive"},
     "artefact_kind": {"code", "data", "protocol", "proof", "model", "software", "figure", "table",
-                      "prompt", "trace", "other"},
+                      "prompt", "trace", "manuscript", "other"},
     "relation": {"supports", "contradicts", "extends", "refines", "replicates", "fails_to_replicate", "supersedes"},
     "limitation_category": {"sampling", "sample_size", "measurement", "confounding", "data_quality",
                             "model_specification", "analytic_flexibility", "researcher_position",
@@ -67,6 +67,7 @@ ENUM = {
     "support_kind": {"empirical_quant", "empirical_qual", "simulation", "demonstration", "formal_proof",
                      "argument", "cited", "consensus", "expert_judgement", "assumption", "unstated"},
     "id_type": {"doi", "arxiv", "handle", "pmid", "isbn", "url", "physical"},
+    "rel_id_type": {"claimset", "doi", "arxiv", "handle", "pmid", "isbn", "url", "physical"},
     "by": {"author", "converter", "reviewer"},
     "reviewer_type": {"ai", "human"},
     "strength": {"high", "moderate", "low", "very_low"},
@@ -242,6 +243,8 @@ def validate(doc, published=False):
         if a.get("underlying_data"):
             ref("1", f"{w}.underlying_data", a["underlying_data"], "artefacts")
         check_availability(r, w, a.get("availability"))
+        if not a.get("licence"):
+            r.warn("W9", f"{w}.licence", "recommended: state the artefact's licence (SPDX identifier)")
 
     # ---------- Models ----------
     for m in coll["models"]:
@@ -289,7 +292,32 @@ def validate(doc, published=False):
                 p = ref("1", f"{dw}.prompts", dm["prompts"], "artefacts")
                 if p is not None and p.get("kind") != "prompt":
                     r.err("1", f"{dw}.prompts", "must point to an artefact of kind prompt")
+        if e.get("profile") in ("quant", "simulation"):
+            res = as_list(e.get("results"))
+            if e.get("estimate") is None and not res:
+                r.warn("W8", w, "no estimate and no results: add a structured results list for the numbers this evidence produced")
+            seen_r = set()
+            for i, rs in enumerate(res):
+                rs = as_dict(rs)
+                rw = f"{w}.results[{i}]"
+                rid = rs.get("id")
+                if not isinstance(rid, str) or not re.match(r"^R\d+$", rid):
+                    r.err("38", rw, "result id must look like R1, R2, …")
+                elif rid in seen_r:
+                    r.err("38", rw, f"duplicate result id {rid}")
+                else:
+                    seen_r.add(rid)
+                if not rs.get("quantity"):
+                    r.err("38", rw, "missing quantity")
+                if not isinstance(rs.get("value"), (int, float)) or isinstance(rs.get("value"), bool):
+                    r.err("38", rw, "value must be a number")
+                if rs.get("artefact"):
+                    ref("38", f"{rw}.artefact", rs["artefact"], "artefacts")
+        elif e.get("results"):
+            r.err("38", w, "results are used only in quant and simulation evidence")
         if e.get("profile") == "formal":
+            if "theorem" in e:
+                r.err("37", f"{w}.theorem", "removed in v0.9: the formal claim's statement is the theorem")
             steps = as_list(e.get("steps"))
             seen = set()
             for i, s in enumerate(steps):
@@ -345,6 +373,15 @@ def validate(doc, published=False):
     # ---------- Claims ----------
     for cid, c in claims.items():
         validate_claim(r, c, cid, ids, by_id, ref, converted)
+
+    # identical scopes (warning W6)
+    groups = {}
+    for cid, c in claims.items():
+        if c.get("scope"):
+            groups.setdefault(json.dumps(c["scope"], sort_keys=True), []).append(cid)
+    for g in groups.values():
+        if len(g) >= 3:
+            r.warn("W6", "claims:" + ",".join(g), "these claims share an identical scope; check that each scope fits its own claim")
 
     # depends_on cycles (rule 8)
     graph = {cid: [d for d in as_list(c.get("depends_on")) if d in claims] for cid, c in claims.items()}
@@ -459,6 +496,14 @@ def validate_claim(r, c, cid, ids, by_id, ref, converted):
                 r.err("10", f"{sw}.evidence", f"{k} must point to evidence with profile {profile_for[k]}")
             if k == "simulation" and e is not None and not (as_list(s.get("artefacts")) or as_list(e.get("artefacts"))):
                 r.err("10", sw, "simulation support requires an artefact")
+            if s.get("results"):
+                if k not in ("empirical_quant", "simulation"):
+                    r.err("38", f"{sw}.results", "results references only on empirical_quant and simulation support")
+                rids = {as_dict(x).get("id") for x in as_list(e.get("results"))} if e is not None else set()
+                for ref_id in as_list(s.get("results")):
+                    m = re.match(r"^(E\d+)\.(R\d+)$", str(ref_id))
+                    if not m or m.group(1) != s.get("evidence") or m.group(2) not in rids:
+                        r.err("38", f"{sw}.results", f"'{ref_id}' does not resolve to a result of {s.get('evidence')}")
         elif k == "demonstration":
             if not as_list(s.get("artefacts")):
                 r.err("10", sw, "demonstration support requires artefacts")
@@ -525,11 +570,45 @@ def validate_claim(r, c, cid, ids, by_id, ref, converted):
         ref("11", f"{w}.limitations", lid, "limitations")
     for d in as_list(c.get("depends_on")):
         ref("1", f"{w}.depends_on", d, "claims")
+    rel_types = []
     for i, rel in enumerate(as_list(c.get("relations"))):
         rel = as_dict(rel)
-        check_enum(r, "1", f"{w}.relations[{i}].type", rel.get("type"), "relation", required=True)
+        rw = f"{w}.relations[{i}]"
+        check_enum(r, "34", f"{rw}.type", rel.get("type"), "relation", required=True)
+        rel_types.append(rel.get("type"))
         if not rel.get("target"):
-            r.err("1", f"{w}.relations[{i}]", "missing target")
+            r.err("34", rw, "missing target")
+        check_enum(r, "34", f"{rw}.id_type", rel.get("id_type"), "rel_id_type", required=True)
+        if rel.get("id_type") == "url" and not rel.get("archive_uri"):
+            r.err("34", rw, "url targets require archive_uri")
+        if "self" in rel and not isinstance(rel.get("self"), bool):
+            r.err("34", f"{rw}.self", "must be true or false")
+    nov = c.get("novelty")
+    if nov == "refutation" and not ({"contradicts", "fails_to_replicate"} & set(rel_types)):
+        r.err("33", w, "a refutation needs a relation of type contradicts or fails_to_replicate naming what it refutes")
+    if nov == "replication" and not ({"replicates", "fails_to_replicate"} & set(rel_types)):
+        r.err("33", w, "a replication needs a relation of type replicates or fails_to_replicate naming what it replicates")
+    if nov == "extension" and "extends" not in rel_types:
+        r.warn("W7", w, "extension without an extends relation; name the work it extends")
+
+    if c.get("type") == "formal":
+        if not c.get("verification") and ({"formal_proof", "argument"} & set(kinds)):
+            r.err("35", w, "formal claims proved or argued in the paper require verification")
+        if c.get("assessments"):
+            r.err("35", w, "formal claims carry verification, not strength assessments; remove assessments")
+    ver = c.get("verification")
+    if ver in ("agent_checked", "peer_checked"):
+        p = by_id(c.get("verified_by"), "contributors")
+        if p is None:
+            r.err("36", w, f"verification {ver} requires verified_by naming a contributor")
+        elif ver == "agent_checked" and (p.get("type") != "agent" or "author" in as_list(p.get("positions"))):
+            r.err("36", w, "agent_checked requires verified_by to be an agent contributor that is not an author")
+        elif ver == "peer_checked" and p.get("type") != "human":
+            r.err("36", w, "peer_checked requires verified_by to be a human contributor")
+    if ver == "machine_checked":
+        fe = [by_id(s.get("evidence"), "evidence") for s in support if s.get("kind") == "formal_proof"]
+        if not any(e is not None and e.get("proof_artefact") and e.get("checker") for e in fe):
+            r.err("36", w, "machine_checked requires formal evidence with proof_artefact and checker")
 
     provs = [c.get("provenance")] + list(as_dict(c.get("field_provenance")).values())
     for p in provs[1:]:
@@ -676,6 +755,8 @@ def validate_contributors(r, contributors, paper, ref, converted):
                 tk = as_dict(tk)
                 check_enum(r, "1", f"{w}.ai_tasks[{i}].task", tk.get("task"), "task", required=True)
                 check_enum(r, "1", f"{w}.ai_tasks[{i}].extent", tk.get("extent"), "extent", required=True)
+            if "author" not in pos and any(as_dict(tk).get("task") == "writing" for tk in as_list(p.get("ai_tasks"))):
+                r.warn("W10", w, "this agent has the task writing but is not an author; agents that produced the content are authors")
             for tool in as_list(p.get("tools")):
                 check_enum(r, "1", f"{w}.tools", tool, "tool")
             for f in ("ai_tasks", "tools"):

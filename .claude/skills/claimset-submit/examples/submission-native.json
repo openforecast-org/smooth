@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.8",
+  "schema_version": "0.9",
   "paper": {
     "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
     "licence": "CC-BY-4.0",
@@ -119,7 +119,7 @@
     {
       "id": "C2",
       "statement": "Method M improves [[D1:forecast skill]] over the seasonal naive benchmark on monthly retail sales series.",
-      "type": "associational",
+      "type": "descriptive",
       "role": "principal",
       "novelty": "new",
       "scope": {

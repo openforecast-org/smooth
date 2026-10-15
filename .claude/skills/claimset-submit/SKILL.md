@@ -1,17 +1,17 @@
 ---
 name: claimset-submit
-description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.8 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
+description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.9 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
 ---
 
 # Preparing a Claimset submission
 
 A claimset is a research paper written for LLM readers: a flat JSON file of atomic, self-contained claims plus the definitions, evidence, assumptions, limitations, warrants and artefacts that support, condition and limit them. You write every field. A human decides two things (guarantor and licence), and you ask them before you finish.
 
-The normative rules are in `references/spec-v0.8.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
+The normative rules are in `references/spec-v0.9.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
 
 You produce a **submission**. The platform turns it into the published file: it mints the DOI and assigns version, publication date, status, the OpenAlex classification IDs and each claim's verifiability. You never supply these, and you never ask the human for them.
 
-This skill covers **native** papers (research you or other agents produced). Converting an existing published paper is a separate process; do not use this skill for it.
+This skill covers **native** papers: research you or other agents produced, including research first written up as a manuscript (LaTeX, PDF, notes) by the same team. Converting a third party's published paper is a separate process; do not use this skill for it.
 
 ## Non-negotiable rules
 
@@ -56,19 +56,28 @@ Work in this order: principal claims → supporting claims → background claims
 - Mark defined terms: `[[D1:forecast skill]]`. Mathematics in LaTeX between `$…$`.
 
 **Choose `type`:**
-| If the claim says… | type |
+| If the claim states… | type |
 |---|---|
-| what something is, how often, how much | `descriptive` |
-| X is related to / differs with / outperforms Y, without a causal design | `associational` |
-| X causes Y (randomised or credible causal design) | `causal` |
+| what something is, how often, how much, or what was measured in a computation, simulation or benchmark under stated conditions (including method comparisons measured there) | `descriptive` |
+| a relationship observed in data the work did not control | `associational` |
+| that X causes Y in a real-world system (randomised or credible causal design) | `causal` |
 | what will happen | `predictive` |
 | what something means (qualitative interpretation) | `interpretive` (needs a warrant) |
 | a theorem or mathematical result | `formal` |
-| how to do something / a method works as specified | `methodological` |
+| that a method, procedure or implementation does what is specified | `methodological` |
 
-A benchmark comparison of methods is usually `associational`, not `causal`.
+"Method M was 10.5 times faster" or "the KL divergence was 0.001" are `descriptive`: they report a measurement.
 
 **Choose `novelty`:** `new` · `replication` · `extension` · `refutation` · `restatement` (background only).
+
+**Link to prior work.** A `refutation` must have a `contradicts` (or `fails_to_replicate`) relation naming what it refutes; a `replication` must have `replicates` or `fails_to_replicate`; an `extension` should have `extends`. The target can be a paper, book or software release, with a `locator` for the exact place:
+
+```json
+"relations": [{"type": "contradicts", "target": "doi:10.1016/j.ijpe.2023.109013", "id_type": "doi",
+               "locator": "eq. 29 and B.6", "self": true}]
+```
+
+Set `self: true` when the target shares a human supervisor, guarantor or contributor with this paper. Refuting your own earlier work is a self-correction; record it plainly.
 
 ### 4. Attach support to every claim
 
@@ -77,7 +86,7 @@ Each claim needs at least one support entry. Use these exact pointer fields:
 ```json
 {"kind": "empirical_quant", "evidence": "E1", "artefacts": ["A2"]}
 {"kind": "empirical_qual", "evidence": "E2"}
-{"kind": "simulation", "evidence": "E3", "artefacts": ["A4"]}
+{"kind": "simulation", "evidence": "E3", "artefacts": ["A4"], "results": ["E3.R1", "E3.R2"]}
 {"kind": "demonstration", "artefacts": ["A5"]}
 {"kind": "formal_proof", "evidence": "E4"}
 {"kind": "argument", "warrant": "W1"}
@@ -90,14 +99,24 @@ Each claim needs at least one support entry. Use these exact pointer fields:
 - `self: true` when the cited work shares a human supervisor, guarantor or contributor with this paper.
 - Background claims (prior knowledge restated for context) may use only `cited` and/or `consensus`, and must have `novelty: restatement`.
 - Never use `unstated`; it exists only for converted papers. If you cannot support a claim, remove it or turn it into an assumption.
+- When a statement quotes numbers, point `results` at the structured results that hold them.
 
 ### 5. Build evidence objects
 
 One evidence object per analysis, reused by every claim it supports. Write `description` so it stands alone (what was done, on what data, how). Fill the profile fields:
-- `quant`: design, estimand, estimate, interval `{level, lower, upper}`, n, model (the statistical model).
+- `quant`: design, estimand, n, model (the statistical model); `estimate` and `interval` for a single result, otherwise `results`.
 - `qual`: data_sources, n_participants_or_cases, sampling, analytic_approach, exemplars, reflexivity.
-- `simulation`: model, parameters (artefact), runs, seeds, outputs.
-- `formal`: theorem, foundation (e.g. `ZFC`), assumptions, steps (each `{id, statement, by, rule}`), proof_artefact, checker. Add `verification` on the claim.
+- `simulation`: model, parameters (artefact), runs, seeds, `results`.
+- `formal`: foundation (e.g. `ZFC`), assumptions, steps (each `{id, statement, by, rule}`), proof_artefact, checker. No `theorem` field: the formal claim's statement is the theorem.
+
+**Results.** Every number that a claim quotes goes into the evidence's `results` list, one entry per number:
+
+```json
+"results": [{"id": "R1", "quantity": "speed-up of low-rank over full covariance filter", "value": 10.55,
+             "conditions": {"missing_values": 1, "data": "ETS(A,N,A)"}, "artefact": "A8"}]
+```
+
+Copy values from the result tables, never retype them from prose. If the code that produced the results differs from the archived artefact version, record it in `execution`: `{"code_version": "<commit>", "notes": "…"}`.
 
 Set `availability` on every evidence object and artefact. If the level is not `public`, give a `reason`; for `platform`, `audit` or `author_only` also a `content_hash` (compute it, e.g. `sha256:<hex>` of the file; never invent one).
 
@@ -115,16 +134,27 @@ Use `check: "tested"` or `"sensitivity_analysed"` only if the work actually did 
 ### 7. Separate scope from limitations
 
 - **Scope** = what the work covered: population, setting, geography, language, period, data_type, conditions, and `excludes` (where it explicitly does not apply). "English-language data only" is scope.
+- **Write scope claim by claim, never per section.** Claims from the same section often differ: a result about series where every period is observed must not carry the scope "series with unobserved periods". Leave out fields that do not apply. The validator warns when three or more claims share an identical scope; treat that as a prompt to check each one.
 - **Limitation** = a threat to a claim *within* that scope, e.g. "All 1,200 series come from one retailer's store network". Each limitation names the claims it `affects`, its `impact` and its `mitigation`. No paper-wide or generic limitations ("more research is needed" is not a limitation).
 
-### 8. Assess strength
+### 8. Assess strength, or verification for formal claims
 
-For each non-assumption claim, add one assessment `{"by": "author", "strength": …, "rationale": …}` using `high` · `moderate` · `low` · `very_low`. Be conservative: a single unreplicated study is rarely `high`. The rationale names the reason in one sentence.
+For each claim that is neither an assumption nor `formal`, add one assessment `{"by": "author", "strength": …, "rationale": …}` using `high` · `moderate` · `low` · `very_low`. Be conservative: a single unreplicated study is rarely `high`. The rationale names the reason in one sentence.
+
+Formal claims get **no strength assessment**. A formal claim proved or argued in the paper gets `verification` instead:
+- `unchecked`: nobody independent has checked it. This is the honest default for a proof you wrote.
+- `agent_checked`: a separate agent that did not author the claim re-derived it step by step. If your environment lets you start another agent, give it only the claimset and the manuscript and ask it to re-derive each formal claim and report any step that fails; list it as a `contributor` with task `review`, and set `verified_by` to its contributor ID. Never mark your own checking as `agent_checked`.
+- `peer_checked`: a named human checked it (`verified_by` = that human).
+- `machine_checked`: only with a proof-assistant artefact and `checker`.
+
+Formal results cited as background (`role: background`) carry neither.
 
 ### 9. Fill contributors, models and paper metadata
 
-- **You** are an `agent` contributor with position `author`, your model(s) in `models`, your `ai_tasks` and `tools`, and an honest `record_source`. If earlier agents worked on this and you do not know which, set `paper.contribution_record` to `partial` or `unknown`.
+- **Agents.** Every agent that produced the paper's content (analysis, claims, text, or turning the team's own manuscript into this claimset) is an `author`; you are one. An agent that only ran a computation the authors report, or checked a proof, is a `contributor`. Give each agent its model(s), `ai_tasks`, `tools` and an honest `record_source`. If earlier agents worked on this and you do not know which, set `paper.contribution_record` to `partial` or `unknown`.
+- **Manuscript.** If the work was first written up as a manuscript, list it as an artefact of kind `manuscript`.
 - **Models**: provider, name, version required; identifier, weights, accessed recommended.
+- **Artefacts**: give every artefact a `licence` (SPDX identifier) where one applies.
 - **Humans** from step 2, with their positions (`supervisor`, `guarantor`, `contributor`) and CRediT roles.
 - **Paper**: title (descriptive, no rhetoric), licence, contributions, `autonomy`, contribution_record, `origin: "native"`. Nothing else at paper level.
 - **Classification**: give 3–8 precise `keywords` (e.g. `"healthcare demand forecasting"`); the platform assigns the OpenAlex subfield and topics from them and from the content. You may add `subfield` and `topics` as proposals only if you looked them up in OpenAlex; never guess IDs.
@@ -150,8 +180,10 @@ Re-read the file as a sceptical reviewer who sees only one claim at a time:
 - Does each principal claim's evidence actually show what the statement says, within its scope?
 - Is anything stated more strongly than the evidence allows?
 - Is every important assumption surfaced, with an honest `check`?
+- Does each claim's scope describe that claim, not its section?
+- Does every refutation, replication and extension name the work it relates to?
 - Are limitations specific and attached to the right claims?
-- Are all numbers identical to the source results?
+- Are all numbers identical to the structured results and the source tables?
 
 ### 12. Hand over
 

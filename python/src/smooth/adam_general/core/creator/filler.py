@@ -316,20 +316,10 @@ def filler(
             matrices_dict["mat_vt"][i, : lags_dict["lags_model_max"]] = B[j - 1]
             i += 1
 
-        if model_type_dict["model_is_seasonal"] and (
-            isinstance(initials_checked["initial_seasonal_estimate"], bool)
-            and initials_checked["initial_seasonal_estimate"]
-            or isinstance(initials_checked["initial_seasonal_estimate"], list)
-            and any(initials_checked["initial_seasonal_estimate"])
+        if model_type_dict["model_is_seasonal"] and any(
+            initials_checked["initial_seasonal_estimate"]
         ):
             for k in range(components_dict["components_number_ets_seasonal"]):
-                # Convert initial_seasonal_estimate to a list if it's not already
-                # This is for handling single seasonalities
-                if isinstance(initials_checked["initial_seasonal_estimate"], bool):
-                    initials_checked["initial_seasonal_estimate"] = [
-                        initials_checked["initial_seasonal_estimate"]
-                    ] * components_dict["components_number_ets_seasonal"]
-
                 if initials_checked["initial_seasonal_estimate"][k]:
                     # added a -1 because the seasonal index is 0-based in R
                     seasonal_index = (

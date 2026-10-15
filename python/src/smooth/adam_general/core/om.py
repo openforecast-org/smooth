@@ -144,12 +144,7 @@ def om_initial_transform(
 
         # ---- Seasonal
         if model_is_seasonal:
-            estimates = initial_seasonal_estimate
-            if isinstance(estimates, bool):
-                estimates_iter = [estimates] * components_number_ets_seasonal
-            else:
-                estimates_iter = list(estimates)
-            if any(estimates_iter):
+            if any(initial_seasonal_estimate):
                 for i in range(components_number_ets_seasonal):
                     n = lags_model_seasonal[i]
                     seasonal_occ = np.asarray(mat_vt[j + i, :n], dtype=np.float64)
@@ -860,9 +855,7 @@ class OM(ADAM):
         df_initials = 0
         if mt.get("ets_model", True):
             level_est = bool(ini.get("initial_level_estimate", True))
-            seas_est = ini.get("initial_seasonal_estimate", [])
-            if not isinstance(seas_est, (list, tuple, np.ndarray)):
-                seas_est = [seas_est]
+            seas_est = ini["initial_seasonal_estimate"]
             lags_seasonal = self._lags_model.get("lags_model_seasonal", []) or []
             seas_lags_est = [
                 int(lag) for est, lag in zip(seas_est, lags_seasonal) if bool(est)
@@ -984,9 +977,7 @@ class OM(ADAM):
             model_is_seasonal=model_type_dict.get("model_is_seasonal", False),
             initial_level_estimate=self._initials.get("initial_level_estimate", True),
             initial_trend_estimate=self._initials.get("initial_trend_estimate", True),
-            initial_seasonal_estimate=self._initials.get(
-                "initial_seasonal_estimate", True
-            ),
+            initial_seasonal_estimate=self._initials["initial_seasonal_estimate"],
             components_number_ets=components_dict.get("components_number_ets", 0),
             components_number_ets_non_seasonal=components_dict.get(
                 "components_number_ets_non_seasonal", 0
@@ -1064,9 +1055,7 @@ class OM(ADAM):
             model_is_seasonal=model_type_dict.get("model_is_seasonal", False),
             initial_level_estimate=self._initials.get("initial_level_estimate", True),
             initial_trend_estimate=self._initials.get("initial_trend_estimate", True),
-            initial_seasonal_estimate=self._initials.get(
-                "initial_seasonal_estimate", True
-            ),
+            initial_seasonal_estimate=self._initials["initial_seasonal_estimate"],
             components_number_ets=self._components.get("components_number_ets", 0),
             components_number_ets_non_seasonal=self._components.get(
                 "components_number_ets_non_seasonal", 0

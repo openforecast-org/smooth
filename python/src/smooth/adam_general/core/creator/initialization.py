@@ -321,7 +321,7 @@ def _initialize_ets_seasonal_states_with_decomp(
         or (e_type == "A" and s_type == "M")
     ):
         for i in range(components_number_ets_seasonal):
-            if initials_checked["initial_seasonal_estimate"]:
+            if initials_checked["initial_seasonal_estimate"][i]:
                 #  Use initial["seasonal"][i] which already contains the correct number
                 # of values (R line 968)
                 mat_vt[i + j, 0 : lags_model[i + j]] = y_decomposition["initial"][
@@ -343,7 +343,7 @@ def _initialize_ets_seasonal_states_with_decomp(
     # For mixed models use a different set of initials (R lines 987-1006)
     elif e_type == "M" and s_type == "A":
         for i in range(components_number_ets_seasonal):
-            if initials_checked["initial_seasonal_estimate"]:
+            if initials_checked["initial_seasonal_estimate"][i]:
                 # Use initial["seasonal"][i] and apply log transformation (R line 991)
                 mat_vt[i + j, 0 : lags_model[i + j]] = np.log(
                     y_decomposition["initial"]["seasonal"][i]
@@ -445,7 +445,7 @@ def _initialize_ets_seasonal_states_small_sample(
     # Initialize seasonal components
     if s_type == "A":
         for i in range(components_number_ets_seasonal):
-            if initials_checked["initial_seasonal_estimate"]:
+            if initials_checked["initial_seasonal_estimate"][i]:
                 mat_vt[i + j, 0 : lags_model[i + j]] = (
                     y_in_sample[0 : lags_model[i + j]] - mat_vt[0, 0]
                 )
@@ -460,7 +460,7 @@ def _initialize_ets_seasonal_states_small_sample(
     # For mixed models use a different set of initials
     else:
         for i in range(components_number_ets_seasonal):
-            if initials_checked["initial_seasonal_estimate"]:
+            if initials_checked["initial_seasonal_estimate"][i]:
                 # abs() is needed for mixed ETS+ARIMA
                 mat_vt[i + j, 0 : lags_model[i + j]] = y_in_sample[
                     0 : lags_model[i + j]

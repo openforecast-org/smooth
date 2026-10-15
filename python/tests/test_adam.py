@@ -433,6 +433,25 @@ class TestADAMLags:
         )
         np.testing.assert_allclose(model.coef, expected, rtol=1e-6)
 
+    @pytest.mark.r_parity
+    @pytest.mark.parametrize("ets", ["ANA", "MNM"])
+    @pytest.mark.parametrize("initial", ["optimal", "backcasting"])
+    def test_initials_of_two_seasonalities_match_r(self, log_air, ets, initial):
+        """Each seasonal component's initials are estimated and counted, as in R."""
+        from ._r_bridge import r_dict
+
+        model = ADAM(model=ets, lags=[4, 12], initial=initial).fit(log_air)
+        expected = r_dict(
+            f"{{m <- adam(y, '{ets}', lags=c(4,12), initial='{initial}');"
+            " list(coef=unname(coef(m)), loglik=as.numeric(logLik(m)),"
+            " nparam=nparam(m), aicc=AICc(m))}",
+            R_data={"y": log_air},
+        )
+        np.testing.assert_allclose(model.coef, expected["coef"], rtol=1e-6)
+        np.testing.assert_allclose(model.loglik, expected["loglik"], rtol=1e-10)
+        assert model.nparam == expected["nparam"][0]
+        np.testing.assert_allclose(model.aicc, expected["aicc"], rtol=1e-10)
+
 
 class TestADAMRegularisation:
     """LASSO / RIDGE: ``lambda_param`` is R's ``lambda``, zero when not provided."""

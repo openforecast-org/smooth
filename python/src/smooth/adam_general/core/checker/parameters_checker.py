@@ -758,6 +758,11 @@ def parameters_checker(
         lags_model = [lag for lag in lags_model if lag == 1]
         lags_model_seasonal = []
 
+    # One flag per seasonal component, as R's initialSeasonalEstimate
+    init_info["initial_seasonal_estimate"] = [
+        init_info["initial_seasonal_estimate"]
+    ] * len(lags_model_seasonal)
+
     n_param_max = _calculate_n_param_max(
         ets_model=ets_model,
         persistence_level_estimate=persist_info.get("persistence_level_estimate", True),
@@ -771,9 +776,7 @@ def parameters_checker(
         initial_type=init_info.get("initial_type", "optimal"),
         initial_level_estimate=init_info.get("initial_level_estimate", True),
         initial_trend_estimate=init_info.get("initial_trend_estimate", True),
-        initial_seasonal_estimate=init_info.get(
-            "initial_seasonal_estimate", [True] * len(lags_model_seasonal)
-        ),
+        initial_seasonal_estimate=init_info["initial_seasonal_estimate"],
         lags_model_seasonal=lags_model_seasonal,
         arima_model=arima_model,
         initial_arima_number=arima_info.get("initial_arima_number", 0),

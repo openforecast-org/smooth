@@ -297,7 +297,7 @@ def count_internal_params(
         # Seasonal initials
         n_seasonal_init = initials_checked.get("initial_seasonal_number", 0)
         if n_seasonal_init > 0:
-            if initials_checked.get("initial_seasonal_estimate", True):
+            if any(initials_checked["initial_seasonal_estimate"]):
                 n_estimated += n_seasonal_init
             else:
                 n_provided += n_seasonal_init

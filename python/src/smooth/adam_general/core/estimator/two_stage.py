@@ -217,11 +217,7 @@ def _run_two_stage_estimator(
     # Seasonal
     if model_type_dict.get("model_is_seasonal", False):
         n_seasonal = components_dict_s1.get("components_number_ets_seasonal", 0)
-        seasonal_estimate = initials_dict.get(
-            "initial_seasonal_estimate", [False] * n_seasonal
-        )
-        if not isinstance(seasonal_estimate, list):
-            seasonal_estimate = [seasonal_estimate] * n_seasonal
+        seasonal_estimate = initials_dict["initial_seasonal_estimate"]
 
         for i in range(n_seasonal):
             lag = lags_model_s1[current_row] if current_row < len(lags_model_s1) else 1

@@ -762,15 +762,11 @@ def initialiser(
             names.append("trend")
             j += 1
 
-        if model_type_dict["model_is_seasonal"] and (
-            isinstance(initials_checked["initial_seasonal_estimate"], bool)
-            and initials_checked["initial_seasonal_estimate"]
-            or isinstance(initials_checked["initial_seasonal_estimate"], list)
-            and any(initials_checked["initial_seasonal_estimate"])
-        ):
+        seasonal_estimate = initials_checked["initial_seasonal_estimate"]
+        if model_type_dict["model_is_seasonal"] and any(seasonal_estimate):
             if components_dict["components_number_ets_seasonal"] > 1:
                 for k in range(components_dict["components_number_ets_seasonal"]):
-                    if initials_checked["initial_seasonal_estimate"][k]:
+                    if seasonal_estimate[k]:
                         # Get the correct seasonal component index and lag
                         seasonal_index = (
                             components_dict["components_number_ets"]

@@ -1,0 +1,240 @@
+{
+  "schema_version": "0.8",
+  "paper": {
+    "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
+    "licence": "CC-BY-4.0",
+    "classification": {
+      "subfield": "openalex:subfields/XXXX",
+      "topics": [
+        "openalex:TXXXXX"
+      ],
+      "keywords": [
+        "retail demand forecasting"
+      ]
+    },
+    "contributions": [
+      "C2"
+    ],
+    "autonomy": "human_supervised",
+    "contribution_record": "complete",
+    "origin": "native",
+    "id": "doi:10.0000/claimset.2026.000123",
+    "version": 1,
+    "status": "active",
+    "date": "2026-10-20"
+  },
+  "contributors": [
+    {
+      "id": "P1",
+      "type": "agent",
+      "name": "Example research agent",
+      "positions": [
+        "author"
+      ],
+      "models": [
+        {
+          "model": "M1",
+          "role": "sole"
+        }
+      ],
+      "credit_roles": [
+        "formal_analysis",
+        "software",
+        "writing_original_draft"
+      ],
+      "ai_tasks": [
+        {
+          "task": "analysis",
+          "extent": "full"
+        },
+        {
+          "task": "writing",
+          "extent": "full"
+        },
+        {
+          "task": "json_preparation",
+          "extent": "full"
+        }
+      ],
+      "tools": [
+        "code_execution",
+        "file_access"
+      ],
+      "record_source": "harness"
+    },
+    {
+      "id": "P2",
+      "type": "human",
+      "name": "A. Researcher",
+      "orcid": "0000-0000-0000-0000",
+      "positions": [
+        "supervisor",
+        "guarantor"
+      ],
+      "credit_roles": [
+        "conceptualization",
+        "supervision"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "M1",
+      "provider": "Example provider",
+      "name": "Example model",
+      "version": "1.0",
+      "identifier": "example-model-1-0",
+      "weights": "api_only",
+      "accessed": "2026-10-01"
+    }
+  ],
+  "definitions": [
+    {
+      "id": "D1",
+      "term": "forecast skill",
+      "definition": "Relative reduction in mean absolute scaled error against a seasonal naive benchmark."
+    }
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "statement": "Monthly retail sales series exhibit annual seasonality.",
+      "type": "descriptive",
+      "role": "background",
+      "novelty": "restatement",
+      "support": [
+        {
+          "kind": "consensus"
+        }
+      ],
+      "provenance": "author_stated",
+      "verifiability": "not_applicable",
+      "verifiability_flags": []
+    },
+    {
+      "id": "C3",
+      "statement": "Forecast errors of method M are independent across series.",
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "new",
+      "support": [
+        {
+          "kind": "assumption"
+        }
+      ],
+      "assumption_category": "statistical",
+      "check": "unchecked",
+      "provenance": "author_stated",
+      "verifiability": "not_applicable",
+      "verifiability_flags": []
+    },
+    {
+      "id": "C2",
+      "statement": "Method M improves [[D1:forecast skill]] over the seasonal naive benchmark on monthly retail sales series.",
+      "type": "associational",
+      "role": "principal",
+      "novelty": "new",
+      "scope": {
+        "population": "monthly retail sales series",
+        "geography": "United Kingdom",
+        "language": "not applicable",
+        "period": "2010-2024",
+        "data_type": "aggregate sales counts",
+        "conditions": [
+          "horizon of 1 to 12 months"
+        ],
+        "excludes": [
+          "series shorter than 36 observations"
+        ]
+      },
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E1",
+          "artefacts": [
+            "A2"
+          ]
+        }
+      ],
+      "assumptions": [
+        "C3"
+      ],
+      "limitations": [
+        "L1"
+      ],
+      "assessments": [
+        {
+          "by": "author",
+          "strength": "moderate",
+          "rationale": "Single benchmark collection, no external replication."
+        }
+      ],
+      "depends_on": [
+        "C1"
+      ],
+      "provenance": "author_stated",
+      "verifiability": "open",
+      "verifiability_flags": []
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "profile": "quant",
+      "description": "Benchmark of method M against the seasonal naive method on 1,200 monthly retail sales series, rolling origin, horizons 1 to 12.",
+      "design": "benchmark",
+      "estimand": "mean relative MASE reduction",
+      "estimate": 0.08,
+      "interval": {
+        "level": 0.95,
+        "lower": 0.05,
+        "upper": 0.11
+      },
+      "n": 1200,
+      "data_origin": "secondary",
+      "preregistered": false,
+      "artefacts": [
+        "A1"
+      ],
+      "availability": {
+        "level": "public"
+      }
+    }
+  ],
+  "warrants": [],
+  "limitations": [
+    {
+      "id": "L1",
+      "category": "sampling",
+      "statement": "All 1,200 series come from one retailer's store network.",
+      "affects": [
+        "C2"
+      ],
+      "impact": "reduces_transferability",
+      "mitigation": "none"
+    }
+  ],
+  "artefacts": [
+    {
+      "id": "A1",
+      "kind": "code",
+      "uri": "https://example.org/repo",
+      "version": "v1.0",
+      "licence": "MIT",
+      "availability": {
+        "level": "public"
+      }
+    },
+    {
+      "id": "A2",
+      "kind": "table",
+      "uri": "https://example.org/repo/results.csv",
+      "version": "sha256:0000",
+      "licence": "CC-BY-4.0",
+      "availability": {
+        "level": "public"
+      },
+      "description": "Mean relative MASE reduction of method M by forecast horizon, 1 to 12 months."
+    }
+  ]
+}

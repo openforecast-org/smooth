@@ -73,9 +73,8 @@ tree), greybox 1.0.9, numpy 2.4.6, scipy 1.17.1, pandas, Python 3.11.15. The run
 prints the versions, the commit of the repository (git rev-parse HEAD) and its
 dirty state, and writes them into the CSVs.
 
-Run (from any directory), with the number of worker processes (default 2):
-  /home/user/smooth/python/.venv/bin/python \
-      /home/user/smooth/python/docs/claimset/scripts/kl_mixture.py [workers]
+Run from the repository root, with the number of worker processes (default 2):
+  python/.venv/bin/python python/docs/claimset/scripts/kl_mixture.py [workers]
 Outputs: results/kl_mixture.csv (one row per grid cell) and
 results/kl_mixture_refine.csv, next to this script.
 """

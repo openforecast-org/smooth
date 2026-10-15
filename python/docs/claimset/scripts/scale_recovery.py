@@ -98,7 +98,8 @@ one grandchild per cell, so the results do not depend on the number of worker pr
 1.0.9, numpy 2.4.6, scipy 1.17.1, Python 3.11.15. The commit (git rev-parse HEAD) and
 the dirty state are printed at run time and written into the CSV.
 
-Run: /home/user/smooth/python/.venv/bin/python scale_recovery.py   (from any directory)
+Run from the repository root:
+  python/.venv/bin/python python/docs/claimset/scripts/scale_recovery.py
 Output: results/scale_recovery.csv next to this script (one row per cell and method).
 
 """

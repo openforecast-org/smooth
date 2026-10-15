@@ -24,11 +24,11 @@ and the timings can be interleaved. Rebuild (about 3 minutes):
 
     bash python/docs/claimset/scripts/build_lowrank_variants.sh [OUTPUT_DIR]
 
-OUTPUT_DIR (default $LOWRANK_DIR, else the scratchpad path in VARIANT_DIR_DEFAULT
-below) must be outside the repository; this script reads the same LOWRANK_DIR and
-refuses to run if OUTPUT_DIR/variants/{lowrank,full}/_adamCore*.so are missing, or if
-they were built from another commit than the one checked out (warning only when the
-working tree's src/ is dirty).
+OUTPUT_DIR (default $LOWRANK_DIR, else smooth-lowrank in the temporary directory:
+VARIANT_DIR_DEFAULT below) must be outside the repository; this script reads the same
+LOWRANK_DIR and refuses to run if OUTPUT_DIR/variants/{lowrank,full}/_adamCore*.so
+are missing, or if they were built from another commit than the one checked out
+(warning only when the working tree's src/ is dirty).
 
 Model and data (settings fixed below):
 - The paper does not say which hourly data it used, and the speed-up depends on them
@@ -112,6 +112,7 @@ import importlib.util  # noqa: E402
 import platform  # noqa: E402
 import subprocess  # noqa: E402
 import sys  # noqa: E402
+import tempfile  # noqa: E402
 import time  # noqa: E402
 import warnings  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -140,10 +141,7 @@ MODES = ("filter_pass", "package_call", "likelihood")
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[3]
-VARIANT_DIR_DEFAULT = (
-    "/tmp/claude-0/-home-user-smooth/c34150ae-909d-5316-a13a-6b545c1fe8a0"
-    "/scratchpad/lowrank"
-)
+VARIANT_DIR_DEFAULT = str(Path(tempfile.gettempdir()) / "smooth-lowrank")
 VARIANT_DIR = Path(os.environ.get("LOWRANK_DIR", VARIANT_DIR_DEFAULT))
 CSV = HERE / "results" / "lowrank_timing.csv"
 

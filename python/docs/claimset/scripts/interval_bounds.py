@@ -75,8 +75,9 @@ Versions: smooth 1.2.0 (python, editable from the working tree), greybox 1.0.9, 
 2.4.6, scipy 1.17.1, Python 3.11.15. The commit (git rev-parse HEAD of the repository)
 and its dirty state are printed at run time and written into the CSV.
 
-Run: /home/user/smooth/python/.venv/bin/python interval_bounds.py  (from any
-directory); writes results/interval_bounds.csv next to this script."""
+Run from the repository root:
+  python/.venv/bin/python python/docs/claimset/scripts/interval_bounds.py
+It writes results/interval_bounds.csv next to this script."""
 
 import importlib
 import subprocess

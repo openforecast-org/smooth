@@ -14,14 +14,14 @@
 # The repository itself is not modified.
 #
 # Usage: bash build_lowrank_variants.sh [OUTPUT_DIR]
-#   OUTPUT_DIR defaults to $LOWRANK_DIR, else to the scratchpad directory below. The variants land
+#   OUTPUT_DIR defaults to $LOWRANK_DIR, else to smooth-lowrank in the temporary directory. The variants land
 #   in OUTPUT_DIR/variants/{lowrank,full}/_adamCore*.so, where lowrank_timing.py looks for them
 #   (it reads the same LOWRANK_DIR).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-DEFAULT_DIR=/tmp/claude-0/-home-user-smooth/c34150ae-909d-5316-a13a-6b545c1fe8a0/scratchpad/lowrank
+DEFAULT_DIR="${TMPDIR:-/tmp}/smooth-lowrank"
 OUT="${1:-${LOWRANK_DIR:-$DEFAULT_DIR}}"
 PYTHON="$REPO/python/.venv/bin/python"
 case "$OUT/" in "$REPO"/*) echo "OUTPUT_DIR must be outside the repository" >&2; exit 1;; esac

@@ -306,7 +306,7 @@ def _calculate_n_param_max(
         Whether initial level is estimated
     initial_trend_estimate : bool
         Whether initial trend is estimated
-    initial_seasonal_estimate : list or bool
+    initial_seasonal_estimate : list
         Whether initial seasonal(s) are estimated
     lags_model_seasonal : list
         List of seasonal lags
@@ -348,28 +348,10 @@ def _calculate_n_param_max(
             int(persistence_seasonal_estimate) if persistence_seasonal_estimate else 0
         )
 
-    # Handle list/bool for initial_seasonal_estimate - multiply by lags as in R
     # R: sum(initialSeasonalEstimate*lagsModelSeasonal)
-    if lags_model_seasonal and initial_seasonal_estimate:
-        if isinstance(initial_seasonal_estimate, (list, np.ndarray)):
-            # Element-wise multiplication of estimates and lags, then sum
-            init_seasonal_arr = np.array(initial_seasonal_estimate, dtype=int)
-            lags_arr = np.array(lags_model_seasonal)
-            # Broadcast if lengths differ (repeat estimates if shorter)
-            if len(init_seasonal_arr) < len(lags_arr):
-                init_seasonal_arr = np.tile(init_seasonal_arr, len(lags_arr))[
-                    : len(lags_arr)
-                ]
-            elif len(init_seasonal_arr) > len(lags_arr):
-                init_seasonal_arr = init_seasonal_arr[: len(lags_arr)]
-            sum_initial_seasonal_lags = int(np.sum(init_seasonal_arr * lags_arr))
-        else:
-            # Single boolean - multiply by sum of lags
-            sum_initial_seasonal_lags = int(initial_seasonal_estimate) * sum(
-                lags_model_seasonal
-            )
-    else:
-        sum_initial_seasonal_lags = 0
+    sum_initial_seasonal_lags = int(
+        np.dot(initial_seasonal_estimate, lags_model_seasonal)
+    )
 
     # Check if initial type requires estimation
     initial_needs_estimation = initial_type in ["optimal", "two-stage"]

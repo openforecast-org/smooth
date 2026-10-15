@@ -127,16 +127,7 @@ def _process_initial_values(
 
             # Write down the initial seasonals
             if model_type_dict["model_is_seasonal"]:
-                #  Convert initial_seasonal_estimate to list if it's a boolean (for
-                # single seasonality)
-                if isinstance(initials_checked["initial_seasonal_estimate"], bool):
-                    seasonal_estimate_list = [
-                        initials_checked["initial_seasonal_estimate"]
-                    ] * components_dict["components_number_ets_seasonal"]
-                else:
-                    seasonal_estimate_list = initials_checked[
-                        "initial_seasonal_estimate"
-                    ]
+                seasonal_estimate_list = initials_checked["initial_seasonal_estimate"]
 
                 initial_estimated[
                     j + 1 : j + 1 + components_dict["components_number_ets_seasonal"]

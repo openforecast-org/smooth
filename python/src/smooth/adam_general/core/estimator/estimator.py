@@ -651,9 +651,7 @@ def estimator(
     df_initials = 0
     if model_type_dict["ets_model"]:
         level_est = bool(initials_dict.get("initial_level_estimate", True))
-        seasonal_estimate = initials_dict.get("initial_seasonal_estimate", [])
-        if not isinstance(seasonal_estimate, (list, tuple, np.ndarray)):
-            seasonal_estimate = [seasonal_estimate]
+        seasonal_estimate = initials_dict["initial_seasonal_estimate"]
         lags_model_seasonal = lags_dict.get("lags_model_seasonal", []) or []
         seasonal_lags_estimated = [
             int(lag)

@@ -762,11 +762,7 @@ def initialiser(
             names.append("trend")
             j += 1
 
-        # One flag per seasonal component, as R's initialSeasonalEstimate
-        seasonal_estimate = np.broadcast_to(
-            initials_checked["initial_seasonal_estimate"],
-            components_dict["components_number_ets_seasonal"],
-        )
+        seasonal_estimate = initials_checked["initial_seasonal_estimate"]
         if model_type_dict["model_is_seasonal"] and any(seasonal_estimate):
             if components_dict["components_number_ets_seasonal"] > 1:
                 for k in range(components_dict["components_number_ets_seasonal"]):

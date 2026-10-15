@@ -1034,9 +1034,19 @@ def scaler(
     float: The calculated scale parameter
     """
     if gap_drift is not None:
-        scale = scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other)
+        # The fixed point s = h(s) from the one-step scale; where |h'(s)| > 1 the
+        # iteration diverges, oscillates or leaves the positive scales, and the scale
+        # is then the root of s - h(s), bracketed and bisected in log(s) from the
+        # one-step scale (R's adam_scaler())
+        scale_one_step = scale = scaler(
+            distribution, Etype, errors, y_fitted, obs_in_sample, other
+        )
+        if not (np.isfinite(scale) and scale > 0):
+            return float("nan")
         errors = np.asarray(errors, dtype=float)
-        for _ in range(100):
+        rooting = False
+        lower = upper = None
+        for i in range(1, 301):
             drift = gap_drift(scale)
             drift_mean, drift_variance = drift[0], drift[1]
             # The filter of the conventional ETS depends on the scale, and so do its
@@ -1070,10 +1080,27 @@ def scaler(
                     _sum_r(errors**2 / (1 + errors))
                     - _sum_r(expected_drift - 2 + expected_inverse)
                 ) / _sum_r(expected_inverse)
-            if not np.isfinite(scale_new) or abs(scale_new - scale) <= 1e-10 * scale:
-                return scale_new
-            scale = scale_new
-        return scale
+            if not rooting:
+                positive = bool(np.isfinite(scale_new)) and scale_new > 0
+                if positive and abs(scale_new - scale) <= 1e-10 * scale:
+                    return scale_new
+                rooting = not positive or i >= 100
+                scale = scale_one_step if rooting else scale_new
+                continue
+            # s < h(s) below the root and s > h(s) above it; an overflow of the moments
+            # says neither, and a root found against it is not one
+            if np.isfinite(scale_new) and scale_new > scale:
+                lower = scale
+            else:
+                upper = scale
+                upper_finite = bool(np.isfinite(scale_new))
+            if lower is not None and upper is not None:
+                if upper <= (1 + 1e-10) * lower:
+                    return math.sqrt(lower * upper) if upper_finite else float("nan")
+                scale = math.sqrt(lower * upper)
+            else:
+                scale = scale / 2 if lower is None else scale * 2
+        return float("nan")
 
     # Helper: take ``log`` of a possibly-negative input via complex extension.
     # ``log(as.complex(z))`` for z < 0 yields ``log|z| + iπ``; downstream the

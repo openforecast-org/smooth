@@ -1508,10 +1508,17 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                         gapMean=1, gapVariance=1, gapDrift=NULL){
     # After the periods without an observed size of a pure multiplicative ETS, the moments of
     # the drift of the states (gapDrift(scale), adam_gapDrift()) depend on the scale itself:
-    # the scale is the fixed point of the moment equations below, from the one-step scale
+    # the scale is the fixed point of the moment equations below, s = h(s), from the one-step scale.
+    # Where |h'(s)| > 1 the iteration diverges, oscillates or leaves the positive scales, and the
+    # scale is then the root of s - h(s), bracketed and bisected in log(s) from the one-step scale
     if(!is.null(gapDrift)){
-        scale <- adam_scaler(distribution, Etype, errors, yFitted, obsInSample, other);
-        for(i in 1:100){
+        scaleOneStep <- scale <- adam_scaler(distribution, Etype, errors, yFitted, obsInSample, other);
+        if(!is.finite(scale) || scale<=0){
+            return(NaN);
+        }
+        rooting <- FALSE;
+        lower <- upper <- NA;
+        for(i in 1:300){
             drift <- gapDrift(scale);
             # The filter of the conventional ETS depends on the scale, and so do its errors
             if(!is.null(drift$errors)){
@@ -1530,12 +1537,30 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                                # E(e^2/(1+e)) = E(D) - 2 + (1+s) E(1/D)
                                "dinvgauss"=(sum(errors^2/(1+errors)) - sum(driftMean - 2 + driftInverse))/
                                    sum(driftInverse));
-            if(!is.finite(scaleNew) || abs(scaleNew - scale) <= 1e-10*scale){
-                return(scaleNew);
+            if(!rooting){
+                positive <- is.finite(scaleNew) && scaleNew>0;
+                if(positive && abs(scaleNew - scale) <= 1e-10*scale){
+                    return(scaleNew);
+                }
+                rooting <- !positive || i>=100;
+                scale <- if(rooting) scaleOneStep else scaleNew;
+                next;
             }
-            scale <- scaleNew;
+            # s < h(s) below the root and s > h(s) above it; an overflow of the moments says
+            # neither, and a root found against it is not one
+            if(is.finite(scaleNew) && scaleNew>scale){
+                lower <- scale;
+            }
+            else{
+                upper <- scale;
+                upperFinite <- is.finite(scaleNew);
+            }
+            if(!is.na(lower) && !is.na(upper) && upper <= (1+1e-10)*lower){
+                return(if(upperFinite) sqrt(lower*upper) else NaN);
+            }
+            scale <- switch(is.na(lower) + 2*is.na(upper) + 1, sqrt(lower*upper), scale/2, scale*2);
         }
-        return(scale);
+        return(NaN);
     }
     return(switch(distribution,
                   # After the periods without an observed size, the variance of the error is gapVariance

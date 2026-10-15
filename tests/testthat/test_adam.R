@@ -1371,3 +1371,16 @@ test_that("the cumulative forecasts and the reforecasts of sm() in logs", {
     testReforecast <- reforecast(testModel, h=2, nsim=200);
     expect_equal(as.vector(testReforecast$lower), as.vector(testForecast$lower), tolerance=0.2);
 })
+
+# The fixed point of the scale diverges on this series (|h'(s)| > 1): the scale is the root of
+# its moment equations, and the fit leaves its starting values
+test_that("the scale of ADAM ETS after the gaps where its fixed point diverges", {
+    set.seed(1);
+    q <- rgamma(200, 2, scale=0.5);
+    y <- 100*exp(cumsum(c(0, 0.6*log(q))))[1:200]*q*rep(c(0,0,0,0,1), 40);
+    for(distribution in c("dgamma","dinvgauss")){
+        testModel <- suppressWarnings(adam(y, "MNN", occurrence="fixed", distribution=distribution, ets="adam"));
+        expect_true(is.finite(testModel$scale));
+        expect_true(is.finite(logLik(testModel)) && logLik(testModel) > -1e300);
+    }
+})

@@ -1371,3 +1371,33 @@ test_that("the cumulative forecasts and the reforecasts of sm() in logs", {
     testReforecast <- reforecast(testModel, h=2, nsim=200);
     expect_equal(as.vector(testReforecast$lower), as.vector(testForecast$lower), tolerance=0.2);
 })
+
+# The fixed point of the scale diverges on this series (|h'(s)| > 1): the scale is the root of
+# its moment equations, and the fit leaves its starting values
+test_that("the scale of ADAM ETS after the gaps where its fixed point diverges", {
+    set.seed(1);
+    q <- rgamma(200, 2, scale=0.5);
+    y <- 100*exp(cumsum(c(0, 0.6*log(q))))[1:200]*q*rep(c(0,0,0,0,1), 40);
+    for(distribution in c("dgamma","dinvgauss")){
+        testModel <- suppressWarnings(adam(y, "MNN", occurrence="fixed", distribution=distribution, ets="adam"));
+        expect_true(is.finite(testModel$scale));
+        expect_true(is.finite(logLik(testModel)) && logLik(testModel) > -1e300);
+    }
+})
+
+# The approximate intervals of ADAM ETS with the Gamma and the Inverse Gaussian take the drift of
+# the states over the horizon (and over the last unobserved periods), close to the simulated ones
+test_that("the approximate intervals of ADAM ETS with the drift", {
+    set.seed(5);
+    q <- rgamma(120, 1/0.1, scale=0.1);
+    y <- 100*exp(cumsum(c(0, 0.3*log(q))))[1:120]*q*(1+0.2*sin(2*pi*(1:120)/12));
+    y[115:120] <- NA;
+    for(distribution in c("dgamma","dinvgauss")){
+        testModel <- suppressWarnings(adam(y, "MNM", lags=12, distribution=distribution, ets="adam"));
+        testApproximate <- forecast(testModel, h=12, interval="approximate", level=0.9);
+        set.seed(1);
+        testSimulated <- forecast(testModel, h=12, interval="simulated", level=0.9, nsim=20000);
+        expect_equal(as.vector(testApproximate$upper), as.vector(testSimulated$upper), tolerance=0.05);
+        expect_equal(as.vector(testApproximate$lower), as.vector(testSimulated$lower), tolerance=0.05);
+    }
+})

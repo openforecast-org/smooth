@@ -2853,9 +2853,11 @@ class ADAM:
         gaussian = additive or (
             multiplicative and distribution == "dlnorm" and adam_ets
         )
+        # With h>0, the multipliers of the moments of log(1+e) over the horizon, for
+        # the models in logs
         if (
             not (gaussian or drifting)
-            or (h > 0 and not gaussian)
+            or (h > 0 and not (gaussian or (drifting and adam_ets)))
             or (drift and not drifting)
             or ot_logical.all()
         ):
@@ -2883,7 +2885,7 @@ class ADAM:
             h,
             multiplicative,
         )
-        if gaussian:
+        if gaussian or h > 0:
             return filter_variances(*arguments, power)
         filtered = SimpleNamespace(
             variances=filter_variances(*arguments, 2, noise),

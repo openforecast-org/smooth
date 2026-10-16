@@ -1576,3 +1576,27 @@ def test_adam_ets_multiplicative_starts_as_r(model, distribution):
     )
     assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
     np.testing.assert_allclose(np.asarray(fit.b_value), r["B"], rtol=1e-6, atol=1e-8)
+
+
+@pytest.mark.parametrize("distribution", ["dgamma", "dinvgauss"])
+def test_approximate_intervals_of_adam_ets_take_the_drift(distribution):
+    """The approximate intervals of ADAM ETS with the Gamma and the Inverse Gaussian
+    take the drift of the states over the horizon and over the missing values at
+    the end, close to the simulated ones, as in R."""
+    rng = np.random.default_rng(5)
+    t = np.arange(120)
+    q = rng.gamma(10, 0.1, 120)
+    level = 100 * np.exp(np.concatenate([[0], np.cumsum(0.3 * np.log(q))]))[:120]
+    y = level * q * (1 + 0.2 * np.sin(2 * np.pi * (t + 1) / 12))
+    y[-6:] = np.nan
+    model = ADAM(model="MNM", lags=[12], distribution=distribution, ets="adam").fit(y)
+    approximate = model.predict(h=12, interval="approximate", level=0.9)
+    simulated = model.predict(
+        h=12, interval="simulated", level=0.9, nsim=20000, seed=1
+    )
+    for bound in ("lower", "upper"):
+        np.testing.assert_allclose(
+            np.ravel(getattr(approximate, bound)),
+            np.ravel(getattr(simulated, bound)),
+            rtol=0.05,
+        )

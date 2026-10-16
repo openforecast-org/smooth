@@ -165,6 +165,30 @@ def test_the_fit_over_gaps_agrees(case):
     np.testing.assert_allclose(np.asarray(fit.predict(h=5).mean), r["fc"], atol=1e-8)
 
 
+# The fixed point of the scale of the ETS of ADAM diverges on this series (|h'(s)| > 1):
+# the scale is the root of its moment equations, bracketed and bisected, in both
+SCALE_ROOT = (
+    "set.seed(1); q <- rgamma(200, 2, scale=0.5);"
+    " y <- 100*exp(cumsum(c(0, 0.6*log(q))))[1:200]*q*rep(c(0,0,0,0,1), 40);"
+)
+
+
+@pytest.mark.parametrize("distribution", ["dgamma", "dinvgauss"])
+def test_the_scale_root_agrees(distribution):
+    r = r_dict(
+        f"{{ {SCALE_ROOT} m <- suppressWarnings(adam(y, 'MNN', distribution="
+        f"'{distribution}', occurrence='fixed', ets='adam')); list(y=y,"
+        " ll=as.numeric(logLik(m)), B=unname(m$B), scale=m$scale) }"
+    )
+    fit = ADAM(
+        model="MNN", distribution=distribution, occurrence="fixed", ets="adam"
+    ).fit(np.asarray(r["y"], dtype=float))
+    assert np.isfinite(fit.scale) and fit.loglik > -1e300
+    assert fit.loglik == pytest.approx(r["ll"][0], abs=1e-8)
+    assert fit.scale == pytest.approx(r["scale"][0], rel=1e-8)
+    np.testing.assert_allclose(fit.coef, r["B"], atol=1e-8)
+
+
 # The missing values as gaps in ADAM and TBATS: the filled values seed the states
 # only, and everything else takes the observed values
 AIRPASSENGERS_GAPS = "y <- as.numeric(AirPassengers); y[c(10,50,51,90,140)] <- NA;"
@@ -459,6 +483,18 @@ FILTER_INTERVAL_CASES = {
             model="MNN", occurrence="fixed", distribution="dinvgauss", ets="adam"
         ),
     ),
+    # The drift of the states of ADAM ETS over the horizon, and over the missing
+    # values at the end, with the quantiles of the mixture
+    "adam ADAM ETS MNM dgamma": (
+        "y <- as.numeric(AirPassengers);",
+        "adam(ts(y, frequency=12), 'MNM', distribution='dgamma', ets='adam')",
+        lambda: ADAM(model="MNM", lags=[12], distribution="dgamma", ets="adam"),
+    ),
+    "adam ADAM ETS MNM dinvgauss missing values at the end": (
+        AIRPASSENGERS_GAPS + " y[142:144] <- NA;",
+        "adam(ts(y, frequency=12), 'MNM', distribution='dinvgauss', ets='adam')",
+        lambda: ADAM(model="MNM", lags=[12], distribution="dinvgauss", ets="adam"),
+    ),
     "ces none": (
         AIRPASSENGERS_GAPS + " y[c(143, 144)] <- NA;",
         "ces(y, 'none')",
@@ -631,4 +667,3 @@ def test_the_profile_observed_agrees(shift):
     np.testing.assert_allclose(
         profile, np.reshape(r["p"], (r["n"][0], -1), order="F"), rtol=1e-8
     )
-

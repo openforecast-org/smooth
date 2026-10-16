@@ -843,6 +843,48 @@ def gap_log_density(y, mu, scale, distribution, drift_mean, drift_variance):
     return values
 
 
+def gap_quantile(levels, distribution, scale, drift_mean, drift_variance):
+    """The quantiles of ``D(1+e)``, with ``log(D) ~ N(drift_mean, drift_variance)``
+    and ``1+e`` of the one-step Gamma or Inverse Gaussian distribution, from the
+    mixture of :func:`gap_log_density`, as R's ``adam_gapQuantile()``: the quantiles
+    of the extreme nodes of the Gauss-Hermite rule bracket those of the mixture,
+    which are bisected in logs. The drift moments are recycled over the levels in
+    column-major order, as R recycles the variances over a matrix of levels."""
+    levels = np.asarray(levels, dtype=float)
+
+    def probability(q):
+        if distribution == "dgamma":
+            return gb.pgamma(q, shape=1 / scale, scale=scale)
+        return gb.pinvgauss(q, 1.0, scale)
+
+    if distribution == "dgamma":
+        quantiles = gb.qgamma(levels.ravel(order="F"), shape=1 / scale, scale=scale)
+    else:
+        quantiles = gb.qinvgauss(levels.ravel(order="F"), 1.0, scale)
+    quantiles = np.asarray(quantiles, dtype=float)
+    flat = levels.ravel(order="F")
+    mean = np.resize(np.ravel(drift_mean), flat.size)
+    shifts = (
+        mean[:, None]
+        + np.sqrt(2 * np.resize(np.ravel(drift_variance), flat.size))[:, None]
+        * _GAUSS_HERMITE_NODES[None, :]
+    )
+    inside = np.flatnonzero((quantiles > 0) & np.isfinite(quantiles))
+    lower = _log_r(quantiles[inside]) + shifts[inside, 0]
+    upper = _log_r(quantiles[inside]) + shifts[inside, -1]
+    for _ in range(60):
+        middle = (lower + upper) / 2
+        values = np.asarray(
+            probability(_exp_r(middle[:, None] - shifts[inside])), dtype=float
+        )
+        below = _sum_r(_GAUSS_HERMITE_WEIGHTS[None, :] * values, axis=1) < flat[inside]
+        lower = np.where(below, middle, lower)
+        upper = np.where(below, upper, middle)
+    quantiles = quantiles * _exp_r(mean)
+    quantiles[inside] = _exp_r((lower + upper) / 2)
+    return quantiles.reshape(levels.shape, order="F")
+
+
 def observed_mask(observations_dict):
     """The observed in-sample values: the missing ones (``y_na_values``) are not."""
     n = observations_dict["obs_in_sample"]
@@ -1034,9 +1076,19 @@ def scaler(
     float: The calculated scale parameter
     """
     if gap_drift is not None:
-        scale = scaler(distribution, Etype, errors, y_fitted, obs_in_sample, other)
+        # The fixed point s = h(s) from the one-step scale; where |h'(s)| > 1 the
+        # iteration diverges, oscillates or leaves the positive scales, and the scale
+        # is then the root of s - h(s), bracketed and bisected in log(s) from the
+        # one-step scale (R's adam_scaler())
+        scale_one_step = scale = scaler(
+            distribution, Etype, errors, y_fitted, obs_in_sample, other
+        )
+        if not (np.isfinite(scale) and scale > 0):
+            return float("nan")
         errors = np.asarray(errors, dtype=float)
-        for _ in range(100):
+        rooting = False
+        lower = upper = None
+        for i in range(1, 301):
             drift = gap_drift(scale)
             drift_mean, drift_variance = drift[0], drift[1]
             # The filter of the conventional ETS depends on the scale, and so do its
@@ -1070,10 +1122,27 @@ def scaler(
                     _sum_r(errors**2 / (1 + errors))
                     - _sum_r(expected_drift - 2 + expected_inverse)
                 ) / _sum_r(expected_inverse)
-            if not np.isfinite(scale_new) or abs(scale_new - scale) <= 1e-10 * scale:
-                return scale_new
-            scale = scale_new
-        return scale
+            if not rooting:
+                positive = bool(np.isfinite(scale_new)) and scale_new > 0
+                if positive and abs(scale_new - scale) <= 1e-10 * scale:
+                    return scale_new
+                rooting = not positive or i >= 100
+                scale = scale_one_step if rooting else scale_new
+                continue
+            # s < h(s) below the root and s > h(s) above it; an overflow of the moments
+            # says neither, and a root found against it is not one
+            if np.isfinite(scale_new) and scale_new > scale:
+                lower = scale
+            else:
+                upper = scale
+                upper_finite = bool(np.isfinite(scale_new))
+            if lower is not None and upper is not None:
+                if upper <= (1 + 1e-10) * lower:
+                    return math.sqrt(lower * upper) if upper_finite else float("nan")
+                scale = math.sqrt(lower * upper)
+            else:
+                scale = scale / 2 if lower is None else scale * 2
+        return float("nan")
 
     # Helper: take ``log`` of a possibly-negative input via complex extension.
     # ``log(as.complex(z))`` for z < 0 yields ``log|z| + iπ``; downstream the

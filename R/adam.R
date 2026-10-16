@@ -6234,8 +6234,8 @@ adam_xregForecast <- function(object, xreg, hNeeded, outlierNames=NULL){
 #' @rdname forecast.smooth
 #' @importFrom generics forecast
 #' @importFrom stats rnorm rlogis rt rlnorm rgamma
-#' @importFrom stats qnorm qlogis qt qlnorm qgamma
-#' @importFrom statmod rinvgauss qinvgauss
+#' @importFrom stats qnorm qlogis qt qlnorm qgamma pgamma
+#' @importFrom statmod rinvgauss qinvgauss pinvgauss
 #' @importFrom greybox rlaplace rs ralaplace rgnorm
 #' @importFrom greybox qlaplace qs qalaplace qgnorm
 #' @export
@@ -6677,7 +6677,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         #### Approximate and confidence interval ####
         # Produce covariance matrix and use it. vcovMean is the mean of log(1+e) times -2 for
         # the log-normal, when it differs from the variance
-        vcovMean <- NULL;
+        vcovMean <- vcovDrift <- NULL;
         if(any(interval=="approximate")){
             # The variance of the model implied by the scale, de-biased; with a scale
             # model it is replaced by its forecasts below
@@ -6704,6 +6704,24 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 if(cumulative){
                     vcovMulti <- sum(vcovMulti);
                 }
+            }
+            # A pure multiplicative ADAM ETS with the Gamma or the Inverse Gaussian: z/mu at the horizon
+            # j is D(1+e), log(D) ~ N(mu (a_j - 1), v (k_j - 1)) with the moments mu and v of log(1+e)
+            # and the multipliers a_j and k_j of the log-normal above, the quantiles of their mixture
+            else if(any(object$distribution==c("dgamma","dinvgauss")) && etsModel && adamETSChecker(object) &&
+                    !arimaChecker(object) && Etype=="M" && Ttype!="A" && Stype!="A" &&
+                    !is.scale(object$scale) && !cumulative){
+                multiplierMean <- adam_gapVarianceModel(object, 1, h);
+                multiplierVariance <- adam_gapVarianceModel(object, 2, h);
+                if(is.null(multiplierVariance)){
+                    covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, 1);
+                    multiplierMean <- cumsum(covarMat[1,]);
+                    multiplierVariance <- diag(covarMat);
+                }
+                noise <- adam_gapDrift(vecG, TRUE, object$distribution, TRUE, s2)$noise;
+                vcovMulti <- s2;
+                vcovDrift <- list(mean=noise$mean[1]*(multiplierMean-1),
+                                  variance=noise$covariance[1,1]*(multiplierVariance-1));
             }
             # IG and Lnorm can use approximations from the multiplications
             else if(etsModel && any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) && Etype=="M"){
@@ -6810,7 +6828,13 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
 
         # Calculate interval for approximate and semiparametric
         if(any(interval==c("approximate","semiparametric"))){
-            if(object$distribution=="dnorm"){
+            if(!is.null(vcovDrift)){
+                yLower[] <- adam_gapQuantile(levelLow, object$distribution, vcovMulti,
+                                             vcovDrift$mean, vcovDrift$variance);
+                yUpper[] <- adam_gapQuantile(levelUp, object$distribution, vcovMulti,
+                                             vcovDrift$mean, vcovDrift$variance);
+            }
+            else if(object$distribution=="dnorm"){
                 if(Etype=="A"){
                     yLower[] <- qnorm(levelLow, 0, sqrt(vcovMulti));
                     yUpper[] <- qnorm(levelUp, 0, sqrt(vcovMulti));

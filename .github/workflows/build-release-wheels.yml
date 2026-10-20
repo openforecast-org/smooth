@@ -106,7 +106,7 @@ jobs:
           key: cibuildwheel-${{ matrix.tag }}-v1
 
       - name: Build & test wheels
-        uses: pypa/cibuildwheel@v4.2.0
+        uses: pypa/cibuildwheel@v4.3.1
         with:
           package-dir: python
           output-dir: wheelhouse

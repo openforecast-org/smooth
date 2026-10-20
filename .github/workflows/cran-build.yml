@@ -127,6 +127,9 @@ jobs:
           MANUAL: ${{ matrix.config.manual }}
           _R_CHECK_RD_VALIDATE_RD2HTML_: ${{ matrix.config.html }}
           _R_CHECK_RD_MATH_RENDERING_: ${{ matrix.config.html }}
+          # The hard-dependency leg cannot install every Suggests: check
+          # without them there (tests using them must skip when absent).
+          _R_CHECK_FORCE_SUGGESTS_: ${{ matrix.config.deps == '"all"' }}
         run: |
           args <- c("--as-cran", if (Sys.getenv("MANUAL") != "true") "--no-manual")
           res <- rcmdcheck::rcmdcheck(Sys.glob("dist/*.tar.gz"), args = args,

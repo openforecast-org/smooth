@@ -72,14 +72,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The PDF manual is checked on one leg only (it needs LaTeX).
+        # The PDF manual is checked on one leg only (it needs LaTeX), the
+        # HTML manual on the Ubuntu legs (it needs HTML Tidy and V8).
         # Windows installs hard dependencies only, as in the PR checks:
         # some Suggests (doMC) do not work there.
         config:
-          - {os: ubuntu-latest,  r: 'release', deps: '"all"',  manual: true}
-          - {os: ubuntu-latest,  r: 'devel',   deps: '"all"',  manual: false, http-user-agent: 'release'}
-          - {os: macos-latest,   r: 'release', deps: '"all"',  manual: false}
-          - {os: windows-latest, r: 'release', deps: '"hard"', manual: false}
+          - {os: ubuntu-latest,  r: 'release', deps: '"all"',  manual: true,  html: true}
+          - {os: ubuntu-latest,  r: 'devel',   deps: '"all"',  manual: false, html: true, http-user-agent: 'release'}
+          - {os: macos-latest,   r: 'release', deps: '"all"',  manual: false, html: false}
+          - {os: windows-latest, r: 'release', deps: '"hard"', manual: false, html: false}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -102,7 +103,12 @@ jobs:
             any::testthat
             any::knitr
             any::rmarkdown
+            ${{ matrix.config.html && 'any::V8' || '' }}
           needs: check
+
+      - name: Install HTML Tidy
+        if: matrix.config.html
+        run: sudo apt-get update && sudo apt-get install -y tidy
 
       - uses: r-lib/actions/setup-tinytex@v2
         if: matrix.config.manual
@@ -119,6 +125,8 @@ jobs:
         shell: Rscript {0}
         env:
           MANUAL: ${{ matrix.config.manual }}
+          _R_CHECK_RD_VALIDATE_RD2HTML_: ${{ matrix.config.html }}
+          _R_CHECK_RD_MATH_RENDERING_: ${{ matrix.config.html }}
         run: |
           args <- c("--as-cran", if (Sys.getenv("MANUAL") != "true") "--no-manual")
           res <- rcmdcheck::rcmdcheck(Sys.glob("dist/*.tar.gz"), args = args,

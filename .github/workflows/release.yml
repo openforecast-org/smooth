@@ -27,6 +27,8 @@ env:
 jobs:
   publish:
     name: Publish to PyPI
+    # Skip R-only releases (cran-submit.yml handles those).
+    if: contains(join(github.event.release.assets.*.name, ' '), '.whl')
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -43,11 +45,12 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           mkdir -p dist
-          # ``gh release download`` pulls every asset attached to
+          # ``gh release download`` pulls the wheels + sdist attached to
           # the release into ``dist/``. The wheels + sdist that
           # build-release-wheels.yml staged on the draft are the
           # exact files we publish to PyPI.
-          gh release download "$TAG" --repo "${{ github.repository }}" --dir dist
+          gh release download "$TAG" --repo "${{ github.repository }}" --dir dist \
+            --pattern '*.whl' --pattern '*-*.tar.gz'
           ls -R dist/
 
       - name: Publish to PyPI (with PEP 740 attestations)

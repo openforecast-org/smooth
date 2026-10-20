@@ -1,0 +1,66 @@
+name: Submit release to CRAN
+
+# Fires when a release staged by cran-build.yml is published. Uploads
+# the staged ``<package>_<version>.tar.gz`` to CRAN's submission form,
+# with the release body as the submission comment, through
+# ``devtools:::upload_cran()`` (the upload step of ``submit_cran()``).
+# CRAN then emails the maintainer (DESCRIPTION) a link that has to be
+# clicked by hand.
+#
+# Runs only for releases holding an R tarball (named after the
+# repository, which is the package name); Python releases go through
+# release.yml. Re-running this workflow submits again.
+on:
+  release:
+    types: [published]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: cran-submit-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: Submit to CRAN
+    if: contains(join(github.event.release.assets.*.name, ' '), format('{0}_', github.event.repository.name))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download tarball
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+          PKG: ${{ github.event.repository.name }}
+        run: |
+          gh release download "$TAG" --repo "${{ github.repository }}" --dir dist --pattern "${PKG}_*.tar.gz"
+          ls -l dist
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: any::devtools
+
+      # upload_cran() reads the maintainer and cran-comments.md from a
+      # package directory: unpack the tarball and put the release body
+      # there as cran-comments.md. It aborts if CRAN does not confirm.
+      - name: Upload and confirm
+        shell: Rscript {0}
+        env:
+          PKG: ${{ github.event.repository.name }}
+          COMMENT: ${{ github.event.release.body }}
+        run: |
+          comment <- Sys.getenv("COMMENT")
+          if (!nzchar(trimws(comment))) {
+            stop("The release body (submission comment) is empty")
+          }
+          tarball <- Sys.glob(file.path("dist", paste0(Sys.getenv("PKG"), "_*.tar.gz")))
+          utils::untar(tarball, exdir = "src")
+          pkgDir <- file.path("src", Sys.getenv("PKG"))
+          writeLines(comment, file.path(pkgDir, "cran-comments.md"))
+          devtools:::upload_cran(pkgDir, tarball)

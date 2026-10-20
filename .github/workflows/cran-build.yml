@@ -1,0 +1,178 @@
+name: Build CRAN release
+
+# Builds the R source tarball, checks it with ``R CMD check --as-cran``
+# and stages it on a **draft** GitHub release. Run manually; nothing is
+# sent to CRAN and no git tag is created. Re-running with the same
+# ``tag`` input replaces the draft's assets in place.
+#
+# The draft's body is ``cran-comments.md``. Edit it in the GitHub UI
+# (it is sent to CRAN as the submission comment), then click "Publish
+# release": that creates the git tag and fires cran-submit.yml, which
+# uploads the staged tarball to CRAN. CRAN then emails the maintainer
+# a confirmation link, which has to be clicked by hand.
+#
+# Use a tag that no Python release uses (Python and R versions differ;
+# where they could clash, prefix the R tag, e.g. ``r-v0.1.2``).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for the draft release (e.g. v4.4.2). Re-runs with the same tag replace the existing draft.'
+        required: true
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build source tarball
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          cache: true
+          extra-packages: |
+            any::knitr
+            any::rmarkdown
+          needs: build
+
+      # ghostscript + qpdf for --compact-vignettes, which CRAN expects.
+      - name: Install vignette compaction tools
+        run: sudo apt-get update && sudo apt-get install -y ghostscript qpdf
+
+      - name: Build tarball
+        run: |
+          mkdir dist
+          cd dist
+          R CMD build --compact-vignettes=gs+qpdf ..
+          ls -l
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cran-tarball
+          path: dist/*.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+
+  check:
+    name: Check on ${{ matrix.config.os }} (${{ matrix.config.r }})
+    needs: build
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The PDF manual is checked on one leg only (it needs LaTeX).
+        # Windows installs hard dependencies only, as in the PR checks:
+        # some Suggests (doMC) do not work there.
+        config:
+          - {os: ubuntu-latest,  r: 'release', deps: '"all"',  manual: true}
+          - {os: ubuntu-latest,  r: 'devel',   deps: '"all"',  manual: false, http-user-agent: 'release'}
+          - {os: macos-latest,   r: 'release', deps: '"all"',  manual: false}
+          - {os: windows-latest, r: 'release', deps: '"hard"', manual: false}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          http-user-agent: ${{ matrix.config.http-user-agent }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: ${{ matrix.config.deps }}
+          cache: true
+          extra-packages: |
+            any::rcmdcheck
+            any::testthat
+            any::knitr
+            any::rmarkdown
+          needs: check
+
+      - uses: r-lib/actions/setup-tinytex@v2
+        if: matrix.config.manual
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: cran-tarball
+          path: dist
+
+      # Checks the exact tarball that will be submitted. Fails on any
+      # ERROR or WARNING; NOTEs are listed in the job summary for review
+      # (justify them in cran-comments.md).
+      - name: R CMD check --as-cran
+        shell: Rscript {0}
+        env:
+          MANUAL: ${{ matrix.config.manual }}
+        run: |
+          args <- c("--as-cran", if (Sys.getenv("MANUAL") != "true") "--no-manual")
+          res <- rcmdcheck::rcmdcheck(Sys.glob("dist/*.tar.gz"), args = args,
+                                      check_dir = "check", error_on = "never")
+          cat("### NOTEs\n\n", if (length(res$notes)) paste0("```\n", res$notes, "\n```\n") else "None\n",
+              file = Sys.getenv("GITHUB_STEP_SUMMARY"), sep = "")
+          if (length(res$errors) + length(res$warnings) > 0) {
+            stop("R CMD check produced ERRORs or WARNINGs")
+          }
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: check-${{ matrix.config.os }}-${{ matrix.config.r }}
+          path: check
+
+  prepare_draft_release:
+    name: Stage tarball on draft GitHub release
+    needs: [build, check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # Never stage onto a published release or onto a Python one.
+      - name: Check the tag is free
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if info=$(gh release view "$TAG" --json isDraft,assets 2>/dev/null); then
+            if [ "$(jq .isDraft <<< "$info")" != "true" ]; then
+              echo "::error::Release $TAG is already published"; exit 1
+            fi
+            if jq -e '.assets[].name | select(endswith(".whl"))' <<< "$info" > /dev/null; then
+              echo "::error::Release $TAG holds Python wheels; use another tag"; exit 1
+            fi
+          fi
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: cran-tarball
+          path: dist
+
+      - name: Create or update draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ github.sha }}
+          draft: true
+          prerelease: false
+          files: dist/*.tar.gz
+          fail_on_unmatched_files: true
+          body_path: cran-comments.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

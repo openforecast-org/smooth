@@ -21,7 +21,7 @@ Do not create summaries of what you do. Do not create additional files/documents
 
 Never create files or folders in the repository root. The root holds R package files only (DESCRIPTION, NAMESPACE, R/, src/, man/, tests/, vignettes/, ...) and must stay clean for CRAN. Put Python work under `python/`, and never let Python build artifacts (`.so`, `.venv`, `build/`, or symlinks into a venv) leak above the `python/` boundary — `R CMD build` follows symlinks during the source copy and dangling links abort the build.
 
-For Python, the local environment must always be `python/.venv`. Do not create venvs at the repo root, in `python/venv`, or anywhere else.
+For Python, the local environment must always be `python/.venv`. Do not create venvs at the repo root, in `python/venv`, or anywhere else. Run ruff, mypy and pytest from `python/` with `python/.venv`, never from the root: ruff and mypy write `.ruff_cache`/`.mypy_cache` in the current directory whatever their config says. `.claude/settings.local.json` points `RUFF_CACHE_DIR` and `MYPY_CACHE_DIR` into `python/` as a safety net.
 
 **Always run linting (ruff check, ruff format) and mypy after every Python code change.** Whenever anything under `python/src/` is edited, run all three checks from the `python/` directory before considering the task complete:
 

@@ -74,13 +74,11 @@ jobs:
       matrix:
         # The PDF manual is checked on one leg only (it needs LaTeX), the
         # HTML manual on the Ubuntu legs (it needs HTML Tidy and V8).
-        # Windows installs hard dependencies only, as in the PR checks:
-        # some Suggests (doMC) do not work there.
         config:
-          - {os: ubuntu-latest,  r: 'release', deps: '"all"',  manual: true,  html: true}
-          - {os: ubuntu-latest,  r: 'devel',   deps: '"all"',  manual: false, html: true, http-user-agent: 'release'}
-          - {os: macos-latest,   r: 'release', deps: '"all"',  manual: false, html: false}
-          - {os: windows-latest, r: 'release', deps: '"hard"', manual: false, html: false}
+          - {os: ubuntu-latest,  r: 'release', manual: true,  html: true}
+          - {os: ubuntu-latest,  r: 'devel',   manual: false, html: true, http-user-agent: 'release'}
+          - {os: macos-latest,   r: 'release', manual: false, html: false}
+          - {os: windows-latest, r: 'release', manual: false, html: false}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -94,11 +92,24 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
+      # Every Suggests that CRAN offers for this platform. Unix-only ones
+      # (doMC) are not built for Windows and are left out there.
+      - name: List installable Suggests
+        id: suggests
+        shell: Rscript {0}
+        run: |
+          s <- read.dcf("DESCRIPTION", "Suggests")[1, ]
+          s <- if (is.na(s)) character() else trimws(sub("\\(.*", "", strsplit(s, ",")[[1]]))
+          s <- intersect(s, rownames(available.packages(repos = "https://cloud.r-project.org")))
+          cat(sprintf("packages=%s\n", paste0("any::", s, collapse = " ")),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          dependencies: ${{ matrix.config.deps }}
+          dependencies: '"hard"'
           cache: true
           extra-packages: |
+            ${{ steps.suggests.outputs.packages }}
             any::rcmdcheck
             any::testthat
             any::knitr
@@ -127,9 +138,9 @@ jobs:
           MANUAL: ${{ matrix.config.manual }}
           _R_CHECK_RD_VALIDATE_RD2HTML_: ${{ matrix.config.html }}
           _R_CHECK_RD_MATH_RENDERING_: ${{ matrix.config.html }}
-          # The hard-dependency leg cannot install every Suggests: check
-          # without them there (tests using them must skip when absent).
-          _R_CHECK_FORCE_SUGGESTS_: ${{ matrix.config.deps == '"all"' }}
+          # Windows lacks the unix-only Suggests (doMC): check without them
+          # there (tests using them must skip when absent).
+          _R_CHECK_FORCE_SUGGESTS_: ${{ runner.os != 'Windows' }}
         run: |
           args <- c("--as-cran", if (Sys.getenv("MANUAL") != "true") "--no-manual")
           res <- rcmdcheck::rcmdcheck(Sys.glob("dist/*.tar.gz"), args = args,

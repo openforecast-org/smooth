@@ -47,22 +47,31 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
+      # Every Suggests that CRAN offers for this platform. Unix-only ones
+      # (doMC) are not built for Windows and are left out there.
+      - name: List installable Suggests
+        id: suggests
+        shell: Rscript {0}
+        run: |
+          s <- read.dcf("DESCRIPTION", "Suggests")[1, ]
+          s <- if (is.na(s)) character() else trimws(sub("\\(.*", "", strsplit(s, ",")[[1]]))
+          s <- intersect(s, rownames(available.packages(repos = "https://cloud.r-project.org")))
+          cat(sprintf("packages=%s\n", paste0("any::", s, collapse = " ")),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          # Don't check suggests to avoid Windows issues with doMC
           dependencies: '"hard"'
           # Cache the installed R-package tree keyed on DESCRIPTION +
           # the OS / R-version pair; rebuilds only when DESCRIPTION
           # changes. Saves ~3-5 min per leg.
           cache: true
           extra-packages: |
+            ${{ steps.suggests.outputs.packages }}
             any::rcmdcheck
             any::testthat
             any::knitr
             any::rmarkdown
-            any::numDeriv
-            any::doParallel
-            any::foreach
           needs: check
 
       - uses: r-lib/actions/check-r-package@v2

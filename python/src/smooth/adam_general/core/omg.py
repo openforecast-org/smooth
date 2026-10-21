@@ -1040,13 +1040,20 @@ class OMG:
             smoother=self.smoother,
         )
         # A side with regressors="select" selects them there as OM does, and then
-        # uses the selected columns of X, as R's omg()
+        # uses the selected columns of X, as R's omg(). Both see the in-sample data
         columns = None
         if (isinstance(spec, str) and any(c in spec for c in "ZXYFPS")) or (
             regressors == "select" and X is not None
         ):
             loss = self.loss_function if self.loss == "custom" else self.loss
-            pre = OM(model=spec, loss=loss, lambda_param=self.lambda_param, **common)
+            pre = OM(
+                model=spec,
+                loss=loss,
+                lambda_param=self.lambda_param,
+                holdout=self.holdout,
+                h=self.h,
+                **common,
+            )
             pre = pre.fit(y, X)
             spec = pre.model_type
             if regressors == "select" and X is not None:

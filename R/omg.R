@@ -182,14 +182,14 @@ omg <- function(data,
     lossArg <- if(loss == "likelihood") "likelihood" else loss
 
     # Pre-select ETS model when wildcard characters (Z/X/Y) are present. A side with
-    # regressors="select" selects them there as om() does (on the errors of that side's
-    # model without them, never the response), and then uses the selected ones
+    # regressors="select" selects them there as om() does, and then uses the selected
+    # ones. Both see the in-sample data only
     force(formulaB)
     xregSelect <- (NCOL(data)>1) & c(regressorsA, regressorsB)=="select"
     if(grepl("[ZXYFPS]", modelA) || xregSelect[1]) {
         preA  <- om(data=data, model=modelA, lags=lags, orders=ordersA,
                     constant=constantA, formula=formulaA, regressors=regressorsA,
-                    occurrence="odds-ratio", loss=loss, h=0, holdout=FALSE,
+                    occurrence="odds-ratio", loss=loss, h=h, holdout=holdout,
                     persistence=persistenceA, phi=phiA, initial=initial,
                     arma=armaA, ic=ic, bounds=bounds, ets=etsA, silent=TRUE, ...)
         modelA <- modelType(preA)
@@ -201,7 +201,7 @@ omg <- function(data,
     if(grepl("[ZXYFPS]", modelB) || xregSelect[2]) {
         preB  <- om(data=data, model=modelB, lags=lags, orders=ordersB,
                     constant=constantB, formula=formulaB, regressors=regressorsB,
-                    occurrence="inverse-odds-ratio", loss=loss, h=0, holdout=FALSE,
+                    occurrence="inverse-odds-ratio", loss=loss, h=h, holdout=holdout,
                     persistence=persistenceB, phi=phiB, initial=initial,
                     arma=armaB, ic=ic, bounds=bounds, ets=etsB, silent=TRUE, ...)
         modelB <- modelType(preB)

@@ -412,3 +412,15 @@ test_that("omg selects the regressors of each side as om()", {
     testModel <- om(xreg, "ANN", regressors="select", occurrence="general")
     expect_false(any(c("n","y") %in% c(names(coef(testModel$modelA)), names(coef(testModel$modelB)))))
 })
+
+# The pre-selection of omg() sees the in-sample data only, as om() with holdout
+test_that("omg selects the regressors without the holdout", {
+    set.seed(4)
+    xreg <- data.frame(y=0, a=rnorm(300), n=rnorm(300))
+    xreg$y <- rbinom(300, 1, plogis(2*xreg$a))
+    testModel <- omg(xreg, "ANN", regressorsA="select", h=50, holdout=TRUE)
+    testOM <- om(xreg[1:250,], "ANN", regressors="select", occurrence="odds-ratio")
+    expect_equal(setdiff(names(coef(testModel$modelA)), "alpha"),
+                 setdiff(names(coef(testOM)), "alpha"))
+    expect_equal(nobs(testModel), 250)
+})

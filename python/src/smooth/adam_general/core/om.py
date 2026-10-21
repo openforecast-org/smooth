@@ -714,7 +714,7 @@ class OM(ADAM):
         # A constant probability has no regressors, as it has no ARIMA
         if self._om_occurrence == "fixed":
             X = None
-        # The regressors are selected on the errors of the model without them, as R
+        # The regressors are selected on the occurrence indicator, as R
         if X is not None and getattr(self, "regressors", "use") == "select":
             fitted = _xreg_select_refit(self, y, X, getattr(self, "ic", "AICc"))
             vars(self).clear()

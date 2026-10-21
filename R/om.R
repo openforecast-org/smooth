@@ -21,7 +21,9 @@
 #' @param constant Logical; whether to include a constant term.
 #' @param formula Optional formula for external regressors.
 #' @param regressors How to handle regressors: \code{"use"},
-#'   \code{"select"}, or \code{"adapt"}.
+#'   \code{"select"}, or \code{"adapt"}. \code{"select"} chooses them with
+#'   \link[greybox]{stepwise} (\code{distribution="plogis"}) on the occurrence
+#'   indicator of the in-sample observations.
 #' @param occurrence Type of link function mapping state to probability:
 #'   \code{"fixed"} (constant), \code{"odds-ratio"}, \code{"inverse-odds-ratio"},
 #'   or \code{"direct"}.
@@ -393,10 +395,22 @@ om <- function(data,
 
     list2env(checkerReturn, envir=environment());
 
-    # The regressors (never the response) are selected as in adam(): on the errors of
-    # the model without them
+    # The regressors (never the response) are selected by stepwise() on the occurrence
+    # indicator of all the in-sample observations, and the model is refitted with them
     if(isTRUE(checkerReturn$xregModel) && regressors=="select"){
-        return(adam_xreg_selectRefit(cl, parent.frame(), data, responseName, "data", ic));
+        colnames(data) <- make.names(colnames(data), unique=TRUE);
+        responseName <- make.names(responseName);
+        dataSelect <- as.data.frame(data)[1:obsInSample,
+                                          c(responseName, setdiff(colnames(data), responseName)), drop=FALSE];
+        xregSelected <- names(coef(suppressWarnings(stepwise(dataSelect, ic=ic, distribution="plogis",
+                                                             silent=TRUE))))[-1];
+        callNew <- cl;
+        callNew$data <- data[, c(responseName, xregSelected), drop=FALSE];
+        callNew$formula <- NULL;
+        callNew$regressors <- "use";
+        modelReturned <- eval(callNew, envir=parent.frame());
+        modelReturned$call <- cl;
+        return(modelReturned);
     }
     # ``commonParametersChecker`` resets ``lossFunction`` to ``NULL`` for a
     # string-valued loss; restore the user-provided callable captured above

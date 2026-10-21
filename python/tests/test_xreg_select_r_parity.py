@@ -1,6 +1,7 @@
-"""R-Python parity of regressors="select" in CES, OM and OMG: the model without the
-regressors, stepwise() on its errors and the model with the selected ones, as R's
-adam_xreg_selectRefit(), on a series with one true regressor and two noise ones."""
+"""R-Python parity of regressors="select" in CES, OM and OMG, on a series with one
+true regressor and two noise ones: CES selects them by stepwise() on the errors of the
+model without them, as R's adam_xreg_selectRefit(), OM and OMG by stepwise(plogis) on
+the occurrence indicator, as R's om(), and each refits with the selected ones."""
 
 import warnings
 
@@ -70,9 +71,5 @@ def test_the_selection_agrees(case):
     # The forecasts take all the regressors given to fit()
     forecast = np.asarray(fit.predict(h=20, X=X.iloc[280:]).mean, dtype=float)
     assert np.all(np.isfinite(forecast))
-    if case == "OM":
-        # The fit with the selected ones starts from other initials of the regressors
-        # in R (ALM on the non-zero observations, degenerate there): a follow-up
-        return
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-6)
     np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-5)

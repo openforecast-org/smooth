@@ -536,7 +536,7 @@ test_that("om() names the constant level model as adam()", {
 })
 
 # regressors="select" keeps the true regressor, drops the noise and never takes the response
-test_that("om() selects the regressors as adam()", {
+test_that("om() selects the regressors by stepwise() on the occurrence indicator", {
     set.seed(4)
     xreg <- data.frame(y=0, a=rnorm(300), n=rnorm(300))
     xreg$y <- rbinom(300, 1, plogis(2*xreg$a))
@@ -544,6 +544,11 @@ test_that("om() selects the regressors as adam()", {
     expect_true("a" %in% names(coef(testModel)))
     expect_false(any(c("n","y") %in% names(coef(testModel))))
     expect_equal(modelName(testModel), "oETSX(ANN)[O]")
+    # The holdout is not used in the selection
+    xreg$y[1:300 > 250] <- 0;
+    testModel <- om(xreg, "ANN", regressors="select", occurrence="odds-ratio", h=50, holdout=TRUE)
+    expect_equal(names(coef(testModel))[-1],
+                 names(coef(stepwise(xreg[1:250,], distribution="plogis")))[-1])
 })
 
 test_that("om() and omg() forecast with the regressors of newdata", {

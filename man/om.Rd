@@ -33,7 +33,9 @@ automatically binarised: any non-zero value becomes 1.}
 \item{formula}{Optional formula for external regressors.}
 
 \item{regressors}{How to handle regressors: \code{"use"},
-\code{"select"}, or \code{"adapt"}.}
+\code{"select"}, or \code{"adapt"}. \code{"select"} chooses them with
+\link[greybox]{stepwise} (\code{distribution="plogis"}) on the occurrence
+indicator of the in-sample observations.}
 
 \item{occurrence}{Type of link function mapping state to probability:
 \code{"fixed"} (constant), \code{"odds-ratio"}, \code{"inverse-odds-ratio"},

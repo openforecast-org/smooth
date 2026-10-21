@@ -152,9 +152,10 @@ def estimate_and_select(estimator, arguments):
 
 def _xreg_select_refit(model, y, X, ic):
     """R's ``adam_xreg_selectRefit``, for the models that do not select in their
-    estimator (CES, OM): the model without the regressors, ``stepwise()`` (dnorm) on
-    its errors, and the model with the selected columns of ``X`` and
-    ``regressors="use"``, which carries them in ``xreg_columns`` for the forecasts."""
+    estimator (CES): the model without the regressors, ``stepwise()`` (dnorm) on its
+    errors, and the model with the selected columns of ``X`` and ``regressors="use"``,
+    which carries them in ``xreg_columns`` for the forecasts. OM selects them by
+    ``stepwise()`` (plogis) on the occurrence indicator, as R's ``om()``."""
 
     def fit(columns):
         clone = copy.deepcopy(model)
@@ -165,22 +166,39 @@ def _xreg_select_refit(model, y, X, ic):
             return clone.fit(y, None)
         return clone.fit(y, X.iloc[:, columns] if hasattr(X, "iloc") else X[:, columns])
 
-    fitted = fit(None)
-    errors = np.ravel(fitted.residuals).astype(float)
-    observed = ~np.isnan(errors)
     if not hasattr(X, "iloc"):
         X = np.asarray(X, dtype=float).reshape(np.shape(X)[0], -1)
     names = [f"x{i + 1}" for i in range(X.shape[1])]
-    selected = xreg_selector(
-        errors[observed],
-        np.asarray(X, dtype=float)[: len(errors)][observed],
-        names,
-        ic,
-        fitted.n_param.n_param_estimated,
-        "dnorm",
-    )
+    is_om = getattr(model, "_is_om", False)
+    if is_om:
+        # As R's om(): stepwise() on the occurrence indicator of all the in-sample
+        # observations, zeros and ones
+        response = np.asarray(y, dtype=float)[
+            : len(y) - (model.h if model.holdout else 0)
+        ]
+        observed = ~np.isnan(response)
+        selected = xreg_selector(
+            (response[observed] != 0) * 1.0,
+            np.asarray(X, dtype=float)[: len(response)][observed],
+            names,
+            ic,
+            0,
+            "plogis",
+        )
+    else:
+        fitted = fit(None)
+        errors = np.ravel(fitted.residuals).astype(float)
+        observed = ~np.isnan(errors)
+        selected = xreg_selector(
+            errors[observed],
+            np.asarray(X, dtype=float)[: len(errors)][observed],
+            names,
+            ic,
+            fitted.n_param.n_param_estimated,
+            "dnorm",
+        )
     columns = [names.index(name) for name in selected]
-    if columns:
+    if columns or is_om:
         fitted = fit(columns)
     fitted._explanatory["xreg_columns"] = columns
     return fitted

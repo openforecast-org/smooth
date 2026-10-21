@@ -46,7 +46,8 @@
     "cyclotomic polynomials",
     "time series forecasting"
    ]
-  }
+  },
+  "licence": "CC-BY-4.0"
  },
  "contributors": [
   {
@@ -54,7 +55,8 @@
    "type": "human",
    "name": "Ivan Svetunkov",
    "positions": [
-    "supervisor"
+    "supervisor",
+    "guarantor"
    ],
    "orcid": "0000-0001-7826-0281",
    "credit_roles": [
@@ -140,7 +142,7 @@
   {
    "id": "D1",
    "term": "lagged SSOE model",
-   "definition": "A pure additive single-source-of-error state space model $y_t = w' v_{t-l} + \\epsilon_t$, $v_t = F v_{t-l} + g \\epsilon_t$ with $k$ components, in which component $j$ of $v_{t-l}$ enters with its own lag $l_j$; its discount matrix is $D = F - g w'$ and its lag matrix is $L(B) = \\mathrm{diag}(B^{l_1}, \\dots, B^{l_k})$ for the backshift operator $B$."
+   "definition": "A pure additive single-source-of-error state space model $y_t = w' v_{t-l} + \\epsilon_t$, $v_t = F v_{t-l} + g \\epsilon_t$ with $k$ components, in which component $j$ of $v_{t-l}$ enters with its own lag $l_j$; its discount matrix is $D = F - g w'$ and its lag matrix is $L(B) = \\mathrm{diag}(B^{l_1}, \\dots, B^{l_k})$ for the backshift operator $B$; $\\Lambda(\\lambda) = \\mathrm{diag}(\\lambda^{l_1}, \\dots, \\lambda^{l_k})$ for a complex number $\\lambda$."
   },
   {
    "id": "D2",
@@ -1664,7 +1666,8 @@
    "availability": {
     "level": "public"
    },
-   "description": "Lab record of the study: questions, hypotheses, plans, runs, results and decisions, as an append-only, hash-chained event log (Claimset lab record specification v0.5), anchored on the git branch claimset-lab-eigenChecker of openforecast-org/smooth."
+   "description": "Lab record of the study: questions, hypotheses, plans, runs, results and decisions, as an append-only, hash-chained event log (Claimset lab record specification v0.5), anchored on the git branch claimset-lab-eigenChecker of openforecast-org/smooth.",
+   "licence": "CC-BY-4.0"
   }
  ],
  "references": [

@@ -678,15 +678,37 @@ inline double largestRootModulus(arma::vec c, double tolerance = 1e-6, bool belo
             return reflection;
         }
     }
+    // Above one, the bisection runs in the octave [2^m, 2^(m+1)] holding the modulus. Its
+    // interval of width 2^(m - warmLevel) around the previous modulus is a node of that
+    // bisection, so when it brackets the modulus the bisection continues from it to the same
+    // result; otherwise the octave is found by doubling.
+    static double previous = 0.0;
+    const int warmLevel = 6;
+    bool warm = false;
     if(!below(upper)) {
-        do {
-            lower = upper;
-            upper *= 2.0;
-        } while(!below(upper));
+        if(previous >= 1.0) {
+            const double octave = std::pow(2.0, std::floor(std::log2(previous)));
+            const double width = octave / std::pow(2.0, warmLevel);
+            const double start = octave + std::floor((previous - octave) / width) * width;
+            warm = below(start + width) && (start == 1.0 || !below(start));
+            if(warm) {
+                lower = start;
+                upper = start + width;
+            }
+        }
+        if(!warm) {
+            do {
+                lower = upper;
+                upper *= 2.0;
+            } while(!below(upper));
+        }
     }
     while(upper - lower > tolerance) {
         const double middle = (lower + upper) / 2.0;
         (below(middle) ? upper : lower) = middle;
+    }
+    if(upper > 1.0) {
+        previous = upper;
     }
     return upper;
 }

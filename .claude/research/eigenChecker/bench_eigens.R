@@ -13,7 +13,7 @@ add <- function(quantity, value, ...) {
 
 # Matrices of additive ETS with a level, an optional trend and seasonal lags
 etsMatrices <- function(alpha, gamma=NULL, lags=NULL, beta=NULL, phi=1) {
-    k <- 1 + !is.null(beta) + length(lags)
+    k <- 1 + (!is.null(beta)) + length(lags)
     F <- diag(k)
     g <- c(alpha, beta, gamma)
     w <- rep(1, k)

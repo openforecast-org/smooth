@@ -79,9 +79,9 @@ for name in families:
                       for e, a in pairs)
     conditions = {"family": name, "models": len(pairs)}
     results += [{"quantity": "admissibility decisions of the C++ core that differ from the prototype",
-                 "value": mismatches, "conditions": conditions},
+                 "value": int(mismatches), "conditions": conditions},
                 {"quantity": "max abs difference of the largest root modulus, C++ core against prototype",
-                 "value": modulusDiff, "conditions": conditions},
+                 "value": float(modulusDiff), "conditions": conditions},
                 {"quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
-                 "value": degreeDiffs, "conditions": conditions}]
+                 "value": int(degreeDiffs), "conditions": conditions}]
 write_results(results)

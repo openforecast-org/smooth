@@ -464,6 +464,17 @@ om <- function(data,
             yHoldout <- zoo(yHoldout, order.by=yForecastIndex);
         }
     }
+    # The regressors stay with the indicators, forecast() takes them from there, as
+    # from adam()
+    omHoldout <- yHoldout;
+    if(xregModel){
+        dataColumns <- c(responseName, setdiff(colnames(data), responseName));
+        omData <- data[1:obsInSample,dataColumns,drop=FALSE];
+        if(holdout){
+            omHoldout <- data[obsInSample+c(1:h),dataColumns,drop=FALSE];
+            omHoldout[,responseName] <- as.numeric(yHoldout);
+        }
+    }
 
     # Override occurrence-related flags set by checker
     occurrenceModel <- FALSE;
@@ -1046,6 +1057,10 @@ om <- function(data,
             adamArchitect$componentsNumberETS, componentsNumberARIMA,
             adamFilled$arimaPolynomials, nla$Etype,
             xregModel, nla$initialXregEstimate, xregNumber, lagsModelARIMA);
+        # forecast() takes the regressors from the data by these names
+        if(xregModel){
+            names(initialCollected$initialValue$xreg) <- xregNames;
+        }
 
         # ARMA parameters
         if(nla$arimaModel && (nla$arRequired || nla$maRequired)){
@@ -1084,11 +1099,16 @@ om <- function(data,
             yInSample <- zoo(yInSample, order.by=yInSampleIndex);
         }
 
+        # The missing observations stay missing
+        omDataFinal <- replace(yInSample, !otObserved, NA);
+        if(xregModel){
+            omData[,responseName] <- omDataFinal;
+            omDataFinal <- omData;
+        }
         subModel <- list(
             model = modelName,
             timeElapsed = Sys.time() - startTime,
-            # The missing observations stay missing
-            data = replace(yInSample, !otObserved, NA),
+            data = omDataFinal,
             fitted = yFitted,
             residuals = errors,
             forecast = yForecast,
@@ -1136,7 +1156,7 @@ om <- function(data,
         );
 
         if(holdout){
-            subModel$holdout <- yHoldout;
+            subModel$holdout <- omHoldout;
             subModel$accuracy <- measures(as.vector(yHoldout), yForecast,
                                           as.vector(yInSample));
         }

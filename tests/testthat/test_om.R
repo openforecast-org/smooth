@@ -545,3 +545,18 @@ test_that("om() selects the regressors as adam()", {
     expect_false(any(c("n","y") %in% names(coef(testModel))))
     expect_equal(modelName(testModel), "oETSX(ANN)[O]")
 })
+
+test_that("om() and omg() forecast with the regressors of newdata", {
+    set.seed(41);
+    x <- data.frame(y=0, a=rnorm(220));
+    x$y <- rbinom(220, 1, plogis(2*x$a));
+    testModel <- om(x[1:200,], "ANN", occurrence="odds-ratio");
+    level <- as.numeric(tail(testModel$states[,"level"], 1));
+    expect_equal(as.numeric(forecast(testModel, h=10, newdata=x[201:210,])$mean),
+                 plogis(level + x$a[201:210]*coef(testModel)["a"]), tolerance=1e-8);
+    testModel <- omg(x[1:200,], "ANN", "ANN");
+    forecastA <- forecast.adam(testModel$modelA, h=10, newdata=x[201:210,], interval="none")$mean;
+    expect_equal(as.numeric(forecastA),
+                 as.numeric(tail(testModel$modelA$states[,"level"], 1)) +
+                     x$a[201:210]*coef(testModel$modelA)["a"], tolerance=1e-8);
+})

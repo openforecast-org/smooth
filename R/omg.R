@@ -1020,6 +1020,21 @@ omg <- function(data,
             checker$xregModel, checker$initialXregEstimate, checker$xregNumber,
             checker$lagsModelARIMA)
 
+        # The regressors stay with the indicators, forecast() takes them from there by
+        # their names, as from adam()
+        sideData <- replace(yInSample, !otObserved, NA)
+        sideHoldout <- if(holdout) yHoldout else NULL
+        if(checker$xregModel) {
+            names(initialCollected$initialValue$xreg) <- checker$xregNames
+            dataColumns <- c(checker$responseName, setdiff(colnames(data), checker$responseName))
+            sideData <- data[1:obsInSample, dataColumns, drop=FALSE]
+            sideData[,checker$responseName] <- replace(as.numeric(yInSample), !otObserved, NA)
+            if(holdout) {
+                sideHoldout <- data[obsInSample+c(1:h), dataColumns, drop=FALSE]
+                sideHoldout[,checker$responseName] <- as.numeric(yHoldout)
+            }
+        }
+
         if(checker$arimaModel && (checker$arRequired || checker$maRequired)) {
             armaParametersList <- vector("list", checker$arRequired + checker$maRequired)
             j <- 1L
@@ -1053,7 +1068,7 @@ omg <- function(data,
             model       = modelName,
             timeElapsed = Sys.time() - startTime,
             # The missing observations stay missing, as in om()
-            data        = replace(yInSample, !otObserved, NA),
+            data        = sideData,
             fitted      = yFitted,
             residuals   = errors,
             forecast    = yForecast,
@@ -1094,7 +1109,7 @@ omg <- function(data,
             call        = cl)
 
         if(holdout) {
-            subModel$holdout  <- yHoldout
+            subModel$holdout  <- sideHoldout
         }
 
         # Tag the sub-model with an ``omg_submodel`` class ahead of ``om``

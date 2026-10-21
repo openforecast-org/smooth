@@ -400,3 +400,15 @@ test_that("omg skips the missing observations and refits on them for the covaria
     # The OPG reproduces the likelihood from the stored data, so it does not fall back
     expect_silent(vcov(testModel))
 })
+
+# regressorsA/B="select" select per side as om(), never take the response, and reach omg via om()
+test_that("omg selects the regressors of each side as om()", {
+    set.seed(4)
+    xreg <- data.frame(y=0, a=rnorm(300), n=rnorm(300))
+    xreg$y <- rbinom(300, 1, plogis(2*xreg$a))
+    testModel <- omg(xreg, "ANN", regressorsA="select", regressorsB="use")
+    expect_equal(names(coef(testModel$modelA)), c("alpha","a"))
+    expect_equal(names(coef(testModel$modelB)), c("alpha","a","n"))
+    testModel <- om(xreg, "ANN", regressors="select", occurrence="general")
+    expect_false(any(c("n","y") %in% c(names(coef(testModel$modelA)), names(coef(testModel$modelB)))))
+})

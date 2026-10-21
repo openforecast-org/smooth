@@ -181,22 +181,34 @@ omg <- function(data,
 
     lossArg <- if(loss == "likelihood") "likelihood" else loss
 
-    # Pre-select ETS model when wildcard characters (Z/X/Y) are present
-    if(grepl("[ZXYFPS]", modelA)) {
+    # Pre-select ETS model when wildcard characters (Z/X/Y) are present. A side with
+    # regressors="select" selects them there as om() does (on the errors of that side's
+    # model without them, never the response), and then uses the selected ones
+    force(formulaB)
+    xregSelect <- (NCOL(data)>1) & c(regressorsA, regressorsB)=="select"
+    if(grepl("[ZXYFPS]", modelA) || xregSelect[1]) {
         preA  <- om(data=data, model=modelA, lags=lags, orders=ordersA,
                     constant=constantA, formula=formulaA, regressors=regressorsA,
                     occurrence="odds-ratio", loss=loss, h=0, holdout=FALSE,
                     persistence=persistenceA, phi=phiA, initial=initial,
                     arma=armaA, ic=ic, bounds=bounds, ets=etsA, silent=TRUE, ...)
         modelA <- modelType(preA)
+        if(xregSelect[1]) {
+            formulaA <- reformulate(c(setdiff(all.vars(formula(preA)), c(yName, ".")), "1"), yName)
+            regressorsA <- "use"
+        }
     }
-    if(grepl("[ZXYFPS]", modelB)) {
+    if(grepl("[ZXYFPS]", modelB) || xregSelect[2]) {
         preB  <- om(data=data, model=modelB, lags=lags, orders=ordersB,
                     constant=constantB, formula=formulaB, regressors=regressorsB,
                     occurrence="inverse-odds-ratio", loss=loss, h=0, holdout=FALSE,
                     persistence=persistenceB, phi=phiB, initial=initial,
                     arma=armaB, ic=ic, bounds=bounds, ets=etsB, silent=TRUE, ...)
         modelB <- modelType(preB)
+        if(xregSelect[2]) {
+            formulaB <- reformulate(c(setdiff(all.vars(formula(preB)), c(yName, ".")), "1"), yName)
+            regressorsB <- "use"
+        }
     }
 
     #### parametersChecker for A and B ####

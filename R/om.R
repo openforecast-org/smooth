@@ -392,6 +392,12 @@ om <- function(data,
     }
 
     list2env(checkerReturn, envir=environment());
+
+    # The regressors (never the response) are selected as in adam(): on the errors of
+    # the model without them
+    if(isTRUE(checkerReturn$xregModel) && regressors=="select"){
+        return(adam_xreg_selectRefit(cl, parent.frame(), data, responseName, "data", ic));
+    }
     # ``commonParametersChecker`` resets ``lossFunction`` to ``NULL`` for a
     # string-valued loss; restore the user-provided callable captured above
     # so the optimiser-side cost dispatch can call it.

@@ -141,6 +141,7 @@ Bugfixes:
 * `ces()` failed with `regressors="select"` ("number of items to replace is not a multiple of replacement length"): it selects the regressors as `adam()` does, with `stepwise()` on the errors of the model without them, and refits the model with the selected ones (`adam_xreg_selectRefit()`, shared with `gum()`, `ssarima()` and `om()`).
 * `gum()` failed with `regressors="select"`: it selects the regressors as `adam()` does.
 * `ssarima()` failed with `regressors="select"`: it selects the regressors as `adam()` does.
+* `om(regressors="select")` took all the columns as regressors, the response included: it selects them as `adam()` does, on the errors of the model without them, and the response is never a candidate.
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

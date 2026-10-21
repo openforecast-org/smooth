@@ -534,3 +534,14 @@ test_that("om() names the constant level model as adam()", {
     y <- rbinom(120, 1, 0.4)
     expect_equal(modelName(om(y, "NNN", occurrence="odds-ratio")), "oConstant level[O]")
 })
+
+# regressors="select" keeps the true regressor, drops the noise and never takes the response
+test_that("om() selects the regressors as adam()", {
+    set.seed(4)
+    xreg <- data.frame(y=0, a=rnorm(300), n=rnorm(300))
+    xreg$y <- rbinom(300, 1, plogis(2*xreg$a))
+    testModel <- om(xreg, "ANN", regressors="select", occurrence="odds-ratio")
+    expect_true("a" %in% names(coef(testModel)))
+    expect_false(any(c("n","y") %in% names(coef(testModel))))
+    expect_equal(modelName(testModel), "oETSX(ANN)[O]")
+})

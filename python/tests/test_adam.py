@@ -271,6 +271,30 @@ class TestADAMAttributes:
         assert model.initial_value["trend"] == states[1, 0]
         np.testing.assert_array_equal(model.initial_value["seasonal"], states[2, :12])
 
+    @pytest.mark.parametrize(
+        "initial",
+        [{"level": 100.0}, {"seasonal": np.ones(12)}, [100.0, None, np.ones(12)]],
+    )
+    def test_partial_initials_are_kept_and_the_rest_estimated(
+        self, seasonal_series, initial
+    ):
+        """The provided initials are used and the others estimated, as R."""
+        model = ADAM(model="AAA", lags=[12], initial=initial).fit(seasonal_series)
+        given = initial if isinstance(initial, dict) else {"level": 100.0}
+        assert model.initial_type == "provided"
+        for key, value in given.items():
+            np.testing.assert_array_equal(model.initial_value[key], value)
+        assert np.isfinite(model.loglik)
+
+    def test_vector_of_initials_is_split_into_components(self, seasonal_series):
+        """A vector holds the level, trend and seasonal initials in turn, as R."""
+        vector = np.r_[100.0, 1.0, np.arange(12.0) - 5.5]
+        model = ADAM(model="AAA", lags=[12], initial=vector).fit(seasonal_series)
+        assert model.initial_type == "provided"
+        assert model.initial_value["level"] == 100.0
+        assert model.initial_value["trend"] == 1.0
+        np.testing.assert_array_equal(model.initial_value["seasonal"], vector[2:])
+
     def test_persistence_level_attribute(self, simple_series):
         """Test that persistence level (alpha) is accessible."""
         model = ADAM(model="ANN")

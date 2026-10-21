@@ -746,8 +746,12 @@ class ADAM:
             estimated if applicable.
         initial : INITIAL_OPTIONS, default=None
             Method for initializing states or fixed initial states. Can be a string
-            (e.g., 'optimal', 'backcasting'), a dictionary of initial state values,
-            or a tuple of state names to initialize.
+            (e.g., 'optimal', 'backcasting'), a dictionary of initial state values
+            (``level``, ``trend``, ``seasonal``, ``arima``, ``xreg``; a list of
+            arrays in ``seasonal`` for several seasonal lags), a list of them in
+            that order (``None`` for the ones to estimate), or a vector of the
+            values one after another. The components not provided are estimated,
+            as R's ``initial``.
         arma : Optional[Dict[str, Any]], default=None
             Fixed ARMA parameters specification. If None, estimated if applicable.
         verbose : int, default=0

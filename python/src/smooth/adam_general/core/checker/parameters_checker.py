@@ -648,6 +648,9 @@ def parameters_checker(
         arima_model=arima_model,
         xreg_model=has_xreg,
         silent=silent,
+        model_do=model_do,
+        lags_model_seasonal=list(lags_model_seasonal),
+        initial_arima_number=arima_info.get("initial_arima_number", 0),
     )
 
     # The gradient initial-state solve profiles the loss in C++, which a custom
@@ -759,9 +762,9 @@ def parameters_checker(
         lags_model_seasonal = []
 
     # One flag per seasonal component, as R's initialSeasonalEstimate
-    init_info["initial_seasonal_estimate"] = [
-        init_info["initial_seasonal_estimate"]
-    ] * len(lags_model_seasonal)
+    init_info["initial_seasonal_estimate"] = init_info["initial_seasonal_estimate"][
+        : len(lags_model_seasonal)
+    ]
 
     n_param_max = _calculate_n_param_max(
         ets_model=ets_model,
@@ -1134,12 +1137,14 @@ def parameters_checker(
             model_type_dict["xreg_model"] = False
         else:
             # Update persistence and initials based on regressors mode
+            # The provided initials of the regressors are not estimated, as R
+            initials_dict["initial_xreg_estimate"] = not initials_dict.get(
+                "initial_xreg_provided", False
+            )
             if regressors == "adapt":
                 persistence_dict["persistence_xreg_estimate"] = True
-                initials_dict["initial_xreg_estimate"] = True
             else:
                 persistence_dict["persistence_xreg_estimate"] = False
-                initials_dict["initial_xreg_estimate"] = True
     else:
         xreg_dict = _xreg_dict_none(None)
 

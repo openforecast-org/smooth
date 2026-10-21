@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 from ._utils import _warn
@@ -358,6 +360,9 @@ def _check_initial(
     arima_model=False,
     xreg_model=False,
     silent=False,
+    model_do="estimate",
+    lags_model_seasonal=(),
+    initial_arima_number=0,
 ):
     """
     Check initial values for state components.
@@ -378,6 +383,13 @@ def _check_initial(
         Whether external regressors are used
     silent : bool, optional
         Whether to suppress warnings
+    model_do : str, optional
+        "estimate", "use", "select" or "combine": the provided values are used
+        with the first two only
+    lags_model_seasonal : sequence of int, optional
+        The lags of the seasonal components, to split the seasonal initials
+    initial_arima_number : int, optional
+        The number of the ARIMA initials
 
     Returns
     -------
@@ -394,7 +406,7 @@ def _check_initial(
         "initial_trend": None,
         "initial_trend_estimate": True,
         "initial_seasonal": None,
-        "initial_seasonal_estimate": True,
+        "initial_seasonal_estimate": [True] * len(lags_model_seasonal),
         "initial_arima": None,
         "initial_arima_estimate": True,
         "initial_arima_number": 0,
@@ -422,126 +434,117 @@ def _check_initial(
             _warn(f"Unknown initial value method: {initial}. Using 'optimal'.", silent)
             return result
 
-    # Handle numeric values
-    if isinstance(initial, (int, float)):
-        # Set all initial values to this value
-        result["initial"] = initial
-        result["initial_level"] = initial
-        result["initial_trend"] = initial if trend_type != "N" else None
-        result["initial_seasonal"] = initial if season_type != "N" else None
-        result["initial_arima"] = initial if arima_model else None
-
-        # Mark all as not estimated
-        result["initial_estimate"] = False
-        result["initial_level_estimate"] = False
-        result["initial_trend_estimate"] = False
-        result["initial_seasonal_estimate"] = False
-        result["initial_arima_estimate"] = False
-
-        # Set type to backcasting
-        result["initial_type"] = "provided"
-
-        return result
-
-    # Handle list/tuple of values
-    if isinstance(initial, (list, tuple)):
-        result["initial_type"] = "provided"
-
-        # Figure out the expected number of values
-        expected_components = (
-            1 + (trend_type != "N") + (season_type != "N") + arima_model
+    # The values provided, as R's parametersChecker(): a model in selection
+    # estimates them
+    if model_do not in ("estimate", "use"):
+        warnings.warn(
+            "Predefined initials vector can only be used with preselected ETS "
+            "model.\nChanging to estimation of initials.",
+            stacklevel=4,
         )
-
-        if len(initial) > expected_components:
-            _warn(
-                f"Too many initial values provided ({len(initial)}). "
-                f"Expected at most {expected_components}.",
-                silent,
-            )
-
-        # Assign values based on position
-        pos = 0
-
-        # Level
-        if ets_model and pos < len(initial):
-            result["initial_level"] = initial[pos]
-            result["initial_level_estimate"] = False
-            pos += 1
-
-        # Trend
-        if ets_model and trend_type != "N" and pos < len(initial):
-            result["initial_trend"] = initial[pos]
-            result["initial_trend_estimate"] = False
-            pos += 1
-
-        # Seasonal
-        if ets_model and season_type != "N" and pos < len(initial):
-            result["initial_seasonal"] = initial[pos]
-            result["initial_seasonal_estimate"] = False
-            pos += 1
-
-        # ARIMA
-        if arima_model and pos < len(initial):
-            result["initial_arima"] = initial[pos]
-            result["initial_arima_estimate"] = False
-
-            # Set ARIMA initial number
-            if isinstance(initial[pos], (list, np.ndarray)):
-                result["initial_arima_number"] = len(initial[pos])
-            else:
-                result["initial_arima_number"] = 1
-
-            pos += 1
-
-        # Mark overall initial as not estimated
-        result["initial_estimate"] = False
-
         return result
-
-    # Handle dictionary of named parameters
     if isinstance(initial, dict):
-        result["initial_type"] = "provided"
+        parts = [initial.get(k) for k in ("level", "trend", "seasonal", "arima")]
+        xreg = initial.get("xreg")
+    elif isinstance(initial, (list, tuple)) and any(
+        v is None or np.ndim(v) > 0 for v in initial
+    ):
+        # An unnamed list: level, trend, seasonal, ARIMA and xreg
+        parts = (list(initial) + [None] * 5)[:4]
+        xreg = (list(initial) + [None] * 5)[4]
+    else:
+        # A vector: level, trend, seasonal1, seasonal2, ..., ARIMA, xreg
+        vector = np.atleast_1d(np.asarray(initial, dtype=float))
+        parts, xreg, seasonals, j = [None] * 4, None, [], 0
+        if ets_model:
+            parts[0], j = vector[0], 1
+            if trend_type != "N" and j < len(vector) and not np.isnan(vector[j]):
+                parts[1], j = vector[j], j + 1
+            for lag in lags_model_seasonal if season_type != "N" else ():
+                if (
+                    len(vector[j : j + lag]) < lag
+                    or np.isnan(vector[j : j + lag]).any()
+                ):
+                    break
+                seasonals.append(vector[j : j + lag])
+                j += lag
+            parts[2] = seasonals or None
+        values = vector[j : j + initial_arima_number]
+        if arima_model and len(values) == initial_arima_number:
+            if not np.isnan(values).any():
+                parts[3], j = values, j + initial_arima_number
+        if xreg_model and j < len(vector):
+            xreg = vector[j:]
+    level, trend, seasonal, arima = parts
 
-        # Process level initial
-        if "level" in initial:
-            result["initial_level"] = initial["level"]
-            result["initial_level_estimate"] = False
-
-        # Process trend initial
-        if "trend" in initial and trend_type != "N":
-            result["initial_trend"] = initial["trend"]
-            result["initial_trend_estimate"] = False
-
-        # Process seasonal initial
-        if "seasonal" in initial and season_type != "N":
-            result["initial_seasonal"] = initial["seasonal"]
-            result["initial_seasonal_estimate"] = False
-
-        # Process ARIMA initial
-        if "arima" in initial and arima_model:
-            result["initial_arima"] = initial["arima"]
-            result["initial_arima_estimate"] = False
-
-            # Set ARIMA initial number
-            if isinstance(initial["arima"], (list, np.ndarray)):
-                result["initial_arima_number"] = len(initial["arima"])
-            else:
-                result["initial_arima_number"] = 1
-
-        # Process xreg initial
-        if "xreg" in initial:
-            result["initial_xreg"] = np.asarray(initial["xreg"], dtype=float).reshape(
-                -1, 1
+    # The checks of the values, as R's
+    if ets_model and level is not None:
+        if np.size(level) > 1:
+            _warn("Initial level contains more than one value! Using the first one.")
+        result["initial_level"] = float(np.ravel(level)[0])
+        result["initial_level_estimate"] = False
+    if ets_model and trend_type != "N" and trend is not None:
+        if np.size(trend) > 1:
+            _warn("Initial trend contains more than one value! Using the first one.")
+        result["initial_trend"] = float(np.ravel(trend)[0])
+        result["initial_trend_estimate"] = False
+    seasonal_estimate = [True] * len(lags_model_seasonal)
+    if ets_model and season_type != "N" and seasonal is not None:
+        seasonal = [seasonal] if np.ndim(seasonal[0]) == 0 else list(seasonal)
+        if len(seasonal) > len(lags_model_seasonal):
+            _warn(
+                "Initial seasonals contained more elements than needed! "
+                "Removing redundant ones."
             )
-            result["initial_xreg_provided"] = True
+            seasonal = seasonal[: len(lags_model_seasonal)]
+        lengths = [np.size(v) for v in seasonal]
+        if any(n not in lags_model_seasonal for n in lengths):
+            _warn(
+                "Some of initial seasonals have a wrong length, not corresponding "
+                "to the provided lags. I will estimate them."
+            )
+        # Each provided seasonal goes to the component of its lag
+        values = [None] * len(lags_model_seasonal)
+        for v in seasonal:
+            if np.size(v) in lags_model_seasonal:
+                i = lags_model_seasonal.index(np.size(v))
+                values[i] = np.asarray(v, dtype=float).ravel()
+                seasonal_estimate[i] = False
+        result["initial_seasonal"] = values
+    result["initial_seasonal_estimate"] = seasonal_estimate
+    if arima_model and arima is not None:
+        if np.size(arima) != initial_arima_number:
+            _warn(
+                f"The length of ARIMA initials is {np.size(arima)} instead of "
+                f"{initial_arima_number}. Estimating initials instead!"
+            )
+        else:
+            result["initial_arima"] = np.asarray(arima, dtype=float).ravel()
+            result["initial_arima_estimate"] = False
+            result["initial_arima_number"] = initial_arima_number
+    if xreg is not None:
+        values = xreg.values() if isinstance(xreg, dict) else xreg
+        result["initial_xreg"] = np.asarray(list(values), dtype=float).reshape(-1, 1)
+        result["initial_xreg_provided"] = True
 
-        # Mark overall initial as not estimated
-        result["initial_estimate"] = False
-
-        return result
-
-    # Invalid initial type
-    _warn(f"Invalid initial type: {type(initial)}. Using default values.", silent)
+    # Estimated if anything is, and provided if anything is, as R
+    seasonal_estimated = season_type != "N" and all(seasonal_estimate)
+    estimated = [
+        ets_model and result["initial_level_estimate"],
+        ets_model and trend_type != "N" and result["initial_trend_estimate"],
+        ets_model and seasonal_estimated,
+        arima_model and result["initial_arima_estimate"],
+        xreg_model and not result["initial_xreg_provided"],
+    ]
+    provided = [
+        ets_model and not result["initial_level_estimate"],
+        ets_model and trend_type != "N" and not result["initial_trend_estimate"],
+        ets_model and season_type != "N" and not all(seasonal_estimate),
+        arima_model and not result["initial_arima_estimate"],
+        xreg_model and result["initial_xreg_provided"],
+    ]
+    result["initial_estimate"] = any(estimated)
+    result["initial_type"] = "provided" if any(provided) else "backcasting"
     return result
 
 

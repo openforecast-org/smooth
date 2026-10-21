@@ -350,14 +350,15 @@ def test_initial_xreg_accepted(etsx_data):
     assert model._explanatory["xreg_model"] is True
 
 
-def test_initial_xreg_converges_to_same_result(etsx_data):
-    """Different xreg seeds converge to the same loss value."""
+def test_initial_xreg_is_kept_and_the_rest_estimated(etsx_data):
+    """The provided xreg initials are used, and the ETS initials estimated, as R."""
     y, X = etsx_data
-    m1 = ADAM(model="AAN", regressors="use", initial={"xreg": [0.0, 0.0]})
-    m1.fit(y, X)
-    m2 = ADAM(model="AAN", regressors="use", initial={"xreg": [2.0, -1.5]})
-    m2.fit(y, X)
-    assert abs(m1.loss_value - m2.loss_value) < 1.0
+    model = ADAM(model="AAN", regressors="use", initial={"xreg": [2.0, -1.5]})
+    model.fit(y, X)
+    assert model.initial_type == "provided"
+    assert model.initial_value["xreg"] == {"x1": 2.0, "x2": -1.5}
+    assert np.isfinite(model.initial_value["level"])
+    assert model.loss_value < 1e100
 
 
 def test_initial_xreg_wrong_length_raises(etsx_data):

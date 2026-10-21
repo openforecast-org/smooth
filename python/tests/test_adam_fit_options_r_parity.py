@@ -97,3 +97,31 @@ def test_the_initial_values_are_those_of_r(case):
             )
         else:
             np.testing.assert_allclose(np.ravel(initial[key]), value, rtol=1e-5)
+
+
+# (R initial, Python initial, model) of the initials provided by the user
+PROVIDED = {
+    "level": ("list(level=100)", {"level": 100.0}, "MAM"),
+    "level-trend": ("list(level=100, trend=2)", {"level": 100.0, "trend": 2.0}, "MAM"),
+    "seasonal": ("list(seasonal=rep(1,12))", {"seasonal": np.ones(12)}, "MAM"),
+    "vector": ("c(100, 2, rep(1,12))", np.r_[100.0, 2.0, np.ones(12)], "MAM"),
+    "unnamed": ("list(100, NULL, rep(1,12), NULL, NULL)", [100.0, None, np.ones(12)], "MAM"),
+    "selection": ("list(level=110)", {"level": 110.0}, "ZZN"),
+}
+
+
+@pytest.mark.parametrize("case", list(PROVIDED))
+def test_the_provided_initials_are_used_as_r(case):
+    r_initial, python_initial, model_type = PROVIDED[case]
+    r = r_dict(
+        f"{{ m <- suppressWarnings(adam(AirPassengers, '{model_type}', lags=12,"
+        f" initial={r_initial})); list(type=m$initialType,"
+        " logLik=as.numeric(logLik(m)), initial=m$initial) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model=model_type, lags=[12], initial=python_initial).fit(Y)
+    assert model.initial_type == r["type"][0]
+    np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
+    for key, value in r["initial"].items():
+        np.testing.assert_allclose(np.ravel(model.initial_value[key]), value, rtol=1e-4)

@@ -44,8 +44,8 @@ dfInitialsETSLevelSeasonal <- function(seasonalLags, levelEstimated){
     }
     total <- 0;
     for(k in 1:length(blocks)){
-        combsK <- combn(blocks, k, simplify=FALSE);
-        gcdsK <- vapply(combsK, function(s){ Reduce(dfGCD, s); }, numeric(1));
+        # combn() over the indices: combn(12, 1) would take 1:12 for a single block
+        gcdsK <- combn(seq_along(blocks), k, function(index){ return(Reduce(dfGCD, blocks[index])); });
         total <- total + (-1)^(k+1) * sum(gcdsK);
     }
     return(total);

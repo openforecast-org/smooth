@@ -868,7 +868,11 @@ class OM(ADAM):
                     for est, lag in zip(seas_est, lags_seasonal)
                 )
             )
-            ets_redundancy = naive_level_seasonal - df_level_seasonal
+            # B has m-1 initials per seasonal lag: without the level, their span
+            # lacks the constant that the level would take
+            ets_redundancy = naive_level_seasonal - (
+                df_initials_ets_level_seasonal(seas_lags_est, True) - (not level_est)
+            )
             df_initials = df_level_seasonal + mt.get("model_is_trendy", False) * bool(
                 ini.get("initial_trend_estimate", True)
             )

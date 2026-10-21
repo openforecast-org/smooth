@@ -180,6 +180,11 @@ PROVIDED_ALL = {
         dict(model="AAN", initial=[100.0, 1.0]),
         False,
     ),
+    "level-only-seasonal": (
+        "adam(y, 'AAA', initial=list(level=100))",
+        dict(model="AAA", lags=[12], initial={"level": 100.0}),
+        False,
+    ),
     "arima": (
         "adam(y, 'NNN', orders=list(ar=1), initial=list(arima=100))",
         dict(model="NNN", orders={"ar": 1}, initial={"arima": [100.0]}),
@@ -226,3 +231,21 @@ def test_the_provided_initials_are_counted_as_r(case):
     assert model.nparam == r["nparam"][0]
     provided = model.n_param.provided
     assert [provided["internal"], provided["xreg"]] == r["provided"]
+
+
+def test_the_provided_level_leaves_the_seasonal_initials_estimated():
+    """A provided level with the seasonal initials estimated: R counted 82
+    internal parameters (combn() of a single lag) and Python 16 (one too many
+    for the m-1 seasonal initials without the level), for the 15 in B."""
+    r = r_dict(
+        "{ m <- adam(AirPassengers, 'AAA', lags=12, initial=list(level=100));"
+        " list(n=m$nParam[, 'nParamInternal'], B=length(m$B)) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model="AAA", lags=[12], initial={"level": 100.0}).fit(Y)
+    assert r["n"] == [15, 1] and r["B"] == [15]
+    assert [model.n_param.estimated["internal"], model.n_param.provided["internal"]] == [
+        15,
+        1,
+    ]

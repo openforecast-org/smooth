@@ -1471,3 +1471,10 @@ test_that("ADAM with formula and regressors='select' refits without regressors w
     expect_equal(formula(testModel), y~1, ignore_attr=TRUE);
     expect_equal(colnames(coefbootstrap(testModel, nsim=2)$coefficients), "alpha");
 })
+
+test_that("ADAM counts the provided initial level as provided and the rest as estimated", {
+    testModel <- adam(AirPassengers, "AAA", lags=12, initial=list(level=100));
+    # alpha, beta, gamma, the trend and 11 seasonal initials
+    expect_equal(testModel$nParam[,"nParamInternal"], c(Estimated=15, Provided=1));
+    expect_equal(dfInitialsETSLevelSeasonal(12, FALSE), 12);
+})

@@ -1539,7 +1539,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                           as.logical(initialLevelEstimate));
             naiveLevelSeasonal <- initialLevelEstimate +
                 modelIsSeasonal*sum(initialSeasonalEstimate*(lagsModelSeasonal-1));
-            etsRedundancy <- naiveLevelSeasonal - dfLevelSeasonal;
+            # B has m-1 initials per seasonal lag: without the level, their span lacks
+            # the constant that the level would take
+            etsRedundancy <- naiveLevelSeasonal -
+                (dfInitialsETSLevelSeasonal(seasonalLagsEstimated, TRUE) - !initialLevelEstimate);
             dfInitials <- dfLevelSeasonal + modelIsTrendy*initialTrendEstimate;
         }
         if(arimaModel){

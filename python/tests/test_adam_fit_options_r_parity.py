@@ -125,3 +125,33 @@ def test_the_provided_initials_are_used_as_r(case):
     np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
     for key, value in r["initial"].items():
         np.testing.assert_allclose(np.ravel(model.initial_value[key]), value, rtol=1e-4)
+
+
+# (R persistence, Python persistence) with the regressors="adapt"
+DELTAS = {
+    "xreg": ("list(xreg=0.01)", {"xreg": 0.01}),
+    "delta": ("list(delta=0.01)", {"delta": [0.01]}),
+    "level-xreg": ("list(level=0.3, xreg=0.01)", {"level": 0.3, "xreg": 0.01}),
+}
+
+
+@pytest.mark.parametrize("case", list(DELTAS))
+def test_the_provided_deltas_are_used_as_r(case):
+    r_persistence, python_persistence = DELTAS[case]
+    r = r_dict(
+        "{ d <- data.frame(y=as.numeric(AirPassengers), x1=(0:143) %% 5);"
+        " m <- adam(d, 'ANN', lags=1, regressors='adapt',"
+        f" persistence={r_persistence}); list(persistence=as.list(m$persistence),"
+        " logLik=as.numeric(logLik(m)), df=nparam(m)) }"
+    )
+    X = pd.DataFrame({"x1": np.arange(144) % 5.0})
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(
+            model="ANN", lags=[1], regressors="adapt", persistence=python_persistence
+        ).fit(Y, X)
+    assert list(model.persistence_vector) == list(r["persistence"])
+    for key, value in r["persistence"].items():
+        assert model.persistence_vector[key] == pytest.approx(value[0], rel=1e-5)
+    np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
+    assert model.nparam == r["df"][0]

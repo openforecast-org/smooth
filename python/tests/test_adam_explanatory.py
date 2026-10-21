@@ -183,6 +183,17 @@ def test_etsx_adapt_deltas_within_bounds(etsx_data):
     assert deltas and all(0 <= d <= 1 for d in deltas)
 
 
+@pytest.mark.parametrize("delta", [0.02, [0.02, 0.03]])
+def test_etsx_adapt_provided_deltas_are_fixed(etsx_data, delta):
+    """persistence={"xreg": ...} fixes the deltas, one for all or one each, as R."""
+    y, X = etsx_data
+    model = ADAM(model="AAN", regressors="adapt", persistence={"xreg": delta})
+    model.fit(y, X=X)
+    expected = np.resize(delta, 2)
+    assert [model.persistence_vector[f"delta{i}"] for i in (1, 2)] == list(expected)
+    assert not any(n.startswith("delta") for n in model.coef_names)
+
+
 @pytest.mark.r_parity
 def test_etsx_adapt_dummies_match_r():
     """Monthly dummies with adapt: the initials (with R's auxiliary trend) and the

@@ -1141,10 +1141,26 @@ def parameters_checker(
             initials_dict["initial_xreg_estimate"] = not initials_dict.get(
                 "initial_xreg_provided", False
             )
-            if regressors == "adapt":
-                persistence_dict["persistence_xreg_estimate"] = True
-            else:
-                persistence_dict["persistence_xreg_estimate"] = False
+            # The provided smoothing parameters of the regressors are used, one
+            # for all of them or one each, as R
+            delta = persistence_dict.get("persistence_xreg")
+            delta = None if delta is None else np.ravel(np.asarray(delta, float))
+            n_xreg = xreg_dict["xreg_number"]
+            if delta is not None and len(delta) not in (1, n_xreg):
+                warnings.warn(
+                    "The length of the provided persistence for the xreg variables "
+                    "is wrong. Reverting to the estimation.",
+                    stacklevel=3,
+                )
+                delta = None
+            provided = delta is not None
+            persistence_dict["persistence_xreg"] = (
+                np.resize(delta, n_xreg) if provided else None
+            )
+            persistence_dict["persistence_xreg_provided"] = provided
+            persistence_dict["persistence_xreg_estimate"] = (
+                regressors == "adapt" and not provided
+            )
     else:
         xreg_dict = _xreg_dict_none(None)
 

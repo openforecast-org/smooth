@@ -262,22 +262,20 @@ class OMG:
             observations_a.get("ot_fit", observations_a["ot"]), dtype=np.float64
         )
         observed = ~np.isnan(ot)
-        self._fitted_combined = np.asarray(
-            omg_cf(
-                B_used,
-                side_a=side_a,
-                side_b=side_b,
-                n_params_a=n_params_a,
-                observations_dict=side_a["observations_dict"],
-                bounds=self.bounds,
-                adam_ets=(self.ets == "adam"),
-                loss=self.loss,  # type: ignore[arg-type]
-                loss_function=self.loss_function,
-                lambda_param=self.lambda_param,
-                return_fitted=True,
-            ),
-            dtype=np.float64,
-        ).ravel()
+        coupled = omg_cf(
+            B_used,
+            side_a=side_a,
+            side_b=side_b,
+            n_params_a=n_params_a,
+            observations_dict=side_a["observations_dict"],
+            bounds=self.bounds,
+            adam_ets=(self.ets == "adam"),
+            loss=self.loss,  # type: ignore[arg-type]
+            loss_function=self.loss_function,
+            lambda_param=self.lambda_param,
+            return_fitted=True,
+        )
+        self._fitted_combined = np.asarray(coupled["fitted"], dtype=np.float64).ravel()
         self._residuals_combined = ot - self._fitted_combined
         self._ot = ot
         p_fit = self._fitted_combined[observed]
@@ -299,9 +297,13 @@ class OMG:
 
         # Build the two OM sub-objects from the joint solution; they expose
         # the standard OM property surface for diagnostics.
-        self.model_a = self._om_from_side(side_a, B_used[:n_params_a], "odds-ratio")
+        # Their states, fitted values and the profiles they are forecast from come
+        # from the coupled recursion (mirrors R's omgFinalFit)
+        self.model_a = self._om_from_side(
+            side_a, B_used[:n_params_a], "odds-ratio", coupled["A"]
+        )
         self.model_b = self._om_from_side(
-            side_b, B_used[n_params_a:], "inverse-odds-ratio"
+            side_b, B_used[n_params_a:], "inverse-odds-ratio", coupled["B"]
         )
         # Preserve the raw input y for ``actuals`` — equivalent to R's
         # storing the original series on the omg object so that ``actuals(omg)``
@@ -616,7 +618,7 @@ class OMG:
         ot = np.asarray(self.actuals, dtype=float).ravel()
 
         def point_lik_at(b):
-            p = omg_cf(
+            coupled = omg_cf(
                 B=np.asarray(b, dtype=float),
                 side_a=side_a,
                 side_b=side_b,
@@ -629,7 +631,11 @@ class OMG:
                 lambda_param=self.lambda_param,
                 return_fitted=True,
             )
-            p = np.asarray(p, dtype=float).ravel()
+            # A scalar is the penalty of the parameters out of the bounds
+            p = np.asarray(
+                coupled["fitted"] if isinstance(coupled, dict) else coupled,
+                dtype=float,
+            ).ravel()
             if (
                 p.shape[0] != ot.shape[0]
                 or not np.all(np.isfinite(p))
@@ -1274,7 +1280,7 @@ class OMG:
     # Build per-sub-model OM objects from the joint estimate
     # ---------------------------------------------------------------------
 
-    def _om_from_side(self, side, B, occurrence_str) -> OM:
+    def _om_from_side(self, side, B, occurrence_str, coupled) -> OM:
         scaffold: OM = side["scaffold"]
         # Mark this sub-model so ``OM.actuals`` returns the latent
         # (unobservable) reconstruction rather than the binary indicator.
@@ -1296,6 +1302,7 @@ class OMG:
             "log_lik_adam_value": dict(self._log_lik_dict),
             "arima_polynomials": side["matrices_dict"].get("arima_polynomials"),
             "adam_cpp": side["adam_cpp"],
+            "coupled": coupled,
         }
         scaffold._adam_cpp = side["adam_cpp"]
         # Copies: the preparator writes the fitted states into them, and the joint

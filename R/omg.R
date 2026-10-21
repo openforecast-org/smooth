@@ -906,7 +906,6 @@ omg <- function(data,
         adamCreated   <- res$adamCreated
         occurrence    <- res$occurrence
         regressors    <- res$regressors
-        occurrenceChar <- if(occurrence == "odds-ratio") "o" else "i"
 
         adamFilled <- adam_filler(res$B,
                                   checker$etsModel, checker$Etype, checker$Ttype, checker$Stype,
@@ -935,26 +934,9 @@ omg <- function(data,
                                   checker$constantRequired, checker$initialArimaNumber)
 
         prof <- adamFilled$matVt[, seq_len(adamArchitect$lagsModelMax), drop=FALSE]
-        # Each side is reported as a standalone occurrence fit (as for
-        # backcasting/optimal); for initial="gradient" the dispatcher solves the
-        # side's initials by profiling its own occurrence loss. Non-gradient
-        # initials fall straight through to the ordinary fit with the same
-        # backcast flag, so backcasting/optimal are unchanged.
-        adamFitted <- adam_fitOrGradient(
-            adamFilled$matVt, adamFilled$matWt, adamFilled$matF, adamFilled$vecG,
-            adamArchitect$indexLookupTable, prof,
-            otFit, otFit,
-            checker$initialType, nIterations, adamArchitect$adamCpp,
-            checker$etsModel, checker$arimaModel, checker$xregModel,
-            checker$Etype, checker$Ttype, checker$Stype,
-            adamArchitect$componentsNumberETS,
-            adamArchitect$componentsNumberETSSeasonal,
-            adamArchitect$componentsNumberETSNonSeasonal,
-            adamArchitect$lagsModel, adamArchitect$lagsModelMax,
-            obsInSample, loss, oType=occurrenceChar,
-            componentsNumberARIMA=checker$componentsNumberARIMA,
-            lagsModelAll=adamArchitect$lagsModelAll,
-            xregNumber=checker$xregNumber)
+        # The states, fitted values and end-of-sample profile of the side come from
+        # the coupled recursion of the two sides, which the optimiser minimised
+        adamFitted <- res$coupled
 
         yFitted <- adamFitted$fitted
 
@@ -1161,18 +1143,20 @@ omg <- function(data,
         occurrence      = "inverse-odds-ratio",
         regressors      = regressorsB)
 
+    # The fitted probability and the two sub-models come from the coupled
+    # recursion the optimiser minimised (re-run omgCF_local at the final B)
+    coupled <- do.call(omgCF_local,
+                       c(list(B=c(jointResult$B_A, jointResult$B_B)),
+                         modifyList(jointResult$nloptrArgs, list(returnFitted=TRUE))))
+    pCoupled <- coupled$fitted
+    resA$coupled <- coupled$A
+    resB$coupled <- coupled$B
+
     modelA <- omgFinalFit(resA, hLocal=h)
     modelB <- omgFinalFit(resB, hLocal=h)
 
     EtypeA <- errorType(modelA)
     EtypeB <- errorType(modelB)
-
-    # The top-level fitted probability comes from the coupled recursion the
-    # optimiser minimised (re-run omgCF_local at the final B), not the standalone
-    # per-side refits. modelA/modelB are kept only for the sub-model diagnostics.
-    pCoupled  <- do.call(omgCF_local,
-                         c(list(B=c(jointResult$B_A, jointResult$B_B)),
-                           modifyList(jointResult$nloptrArgs, list(returnFitted=TRUE))))
     yFitted   <- modelA$fitted
     yFitted[] <- pCoupled
     # logLik is the Bernoulli of that same coupled probability, so $fitted and
@@ -1475,12 +1459,14 @@ omgCF_local <- function(B,
 
     pCombined <- omgLinkFunction(res$fittedA, res$fittedB, EtypeA, EtypeB)
 
-    # The coupled fitted probability. Returned directly for the final object so
-    # its $fitted (and the Bernoulli logLik computed from it) come from the same
-    # coupled recursion the optimiser minimised — not the standalone per-side
-    # refit, which only approximates it.
+    # The coupled fitted probability and the states and fitted values of both
+    # sides. Returned for the final object, so that its $fitted (and the Bernoulli
+    # logLik computed from it), its sub-models and its forecasts come from the
+    # same coupled recursion the optimiser minimised.
     if(returnFitted){
-        return(pCombined)
+        return(list(fitted=pCombined,
+                    A=list(states=res$statesA, fitted=res$fittedA, profile=res$profileA),
+                    B=list(states=res$statesB, fitted=res$fittedB, profile=res$profileB)))
     }
 
     if(any(is.nan(pCombined)) || any(pCombined <= 0) || any(pCombined >= 1)) {
@@ -1801,6 +1787,15 @@ coefbootstrap.omg <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
                           parallel=parallel, model=as.symbol("omg"),
                           timeElapsed=Sys.time()-startTime),
                      class="bootstrap"));
+}
+
+#' @export
+coef.omg <- function(object, ...){
+    # The parameters of model A followed by those of model B, named as in confint()
+    coefficients <- c(object$modelA$B, object$modelB$B)
+    names(coefficients) <- c(paste0("A:", names(object$modelA$B)),
+                             paste0("B:", names(object$modelB$B)))
+    return(coefficients)
 }
 
 #' @export

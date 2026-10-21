@@ -1298,14 +1298,20 @@ public:
         arma::vec vecBfit(obs, arma::fill::zeros);
         arma::vec vecErrorsA(obs, arma::fill::zeros);
         arma::vec vecErrorsB(obs, arma::fill::zeros);
+        // Model B runs in its own time frame, with the head of its own lags, so that
+        // its states, initials and forecasts line up with its lookup table: column i
+        // of model A is column i+offsetB of model B
+        int lagsModelMaxB = profilesRecentB.n_cols;
+        int offsetB = lagsModelMaxB - lagsModelMaxA;
 
         auto forwardStep = [&](int i) {
             int idx = i - lagsModelMaxA;
+            int iB = i + offsetB;
             /* # Measurement equations for models A and B */
             vecAfit(idx) = adamWvalue(profilesRecentA(indexLookupTableA.col(i)),
                     matrixWtA.row(idx), E, T, S,
                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-            vecBfit(idx) = adamWvalue(profilesRecentB(indexLookupTableB.col(i)),
+            vecBfit(idx) = adamWvalue(profilesRecentB(indexLookupTableB.col(iB)),
                     matrixWtB.row(idx), EB, TB, SB,
                     nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB);
             // Compute errors for both models jointly via occurrenceError(O='g')
@@ -1319,23 +1325,24 @@ public:
                 adamGvalue(profilesRecentA(indexLookupTableA.col(i)), matrixFA, matrixWtA.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorGA, vecErrorsA(idx), vecAfit(idx), adamETS);
-            profilesRecentB(indexLookupTableB.col(i)) =
-                adamFvalue(profilesRecentB(indexLookupTableB.col(i)),
+            profilesRecentB(indexLookupTableB.col(iB)) =
+                adamFvalue(profilesRecentB(indexLookupTableB.col(iB)),
                            matrixFB, EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nComponentsB, constantB) +
-                adamGvalue(profilesRecentB(indexLookupTableB.col(i)), matrixFB, matrixWtB.row(idx), EB, TB, SB,
+                adamGvalue(profilesRecentB(indexLookupTableB.col(iB)), matrixFB, matrixWtB.row(idx), EB, TB, SB,
                            nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB,
                            vectorGB, vecErrorsB(idx), vecBfit(idx), adamETSB);
             matrixVtA.col(i) = profilesRecentA(indexLookupTableA.col(i));
-            matrixVtB.col(i) = profilesRecentB(indexLookupTableB.col(i));
+            matrixVtB.col(iB) = profilesRecentB(indexLookupTableB.col(iB));
         };
 
         auto backwardStep = [&](int i) {
             int idx = i - lagsModelMaxA;
+            int iB = i + offsetB;
             /* # Measurement equations for models A and B */
             vecAfit(idx) = adamWvalue(profilesRecentA(indexLookupTableA.col(i)),
                     matrixWtA.row(idx), E, T, S,
                     nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant);
-            vecBfit(idx) = adamWvalue(profilesRecentB(indexLookupTableB.col(i)),
+            vecBfit(idx) = adamWvalue(profilesRecentB(indexLookupTableB.col(iB)),
                     matrixWtB.row(idx), EB, TB, SB,
                     nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB);
             auto errs = occurrenceError(vectorOt(idx), vecAfit(idx), vecBfit(idx), E, EB, 'g');
@@ -1348,32 +1355,32 @@ public:
                 adamGvalue(profilesRecentA(indexLookupTableA.col(i)), matrixFA, matrixWtA.row(idx), E, T, S,
                            nETS, nNonSeasonal, nSeasonal, nArima, nXreg, nComponents, constant,
                            vectorGA, vecErrorsA(idx), vecAfit(idx), adamETS);
-            profilesRecentB(indexLookupTableB.col(i)) =
-                adamFvalue(profilesRecentB(indexLookupTableB.col(i)),
+            profilesRecentB(indexLookupTableB.col(iB)) =
+                adamFvalue(profilesRecentB(indexLookupTableB.col(iB)),
                            matrixFB, EB, TB, SB, nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nComponentsB, constantB) +
-                adamGvalue(profilesRecentB(indexLookupTableB.col(i)), matrixFB, matrixWtB.row(idx), EB, TB, SB,
+                adamGvalue(profilesRecentB(indexLookupTableB.col(iB)), matrixFB, matrixWtB.row(idx), EB, TB, SB,
                            nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB,
                            vectorGB, vecErrorsB(idx), vecBfit(idx), adamETSB);
         };
 
         // The lags of model B come from its own lookup table
-        const arma::uvec lagsB = lookupLags(indexLookupTableB, lagsModelMaxA, obs);
+        const arma::uvec lagsB = lookupLags(indexLookupTableB, lagsModelMaxB, obs);
         // The head states as the backward pass leaves them, from time -H+1 to 0
         arma::mat headStatesA(nComponents, lagsModelMaxA, arma::fill::zeros);
-        arma::mat headStatesB(nComponentsB, lagsModelMaxA, arma::fill::zeros);
+        arma::mat headStatesB(nComponentsB, lagsModelMaxB, arma::fill::zeros);
         bool afterBackcast = false;
 
         auto headFillFwd = [&]() {
             if(afterBackcast) {
                 matrixVtA.cols(0, lagsModelMaxA-1) = headStatesA;
-                matrixVtB.cols(0, lagsModelMaxA-1) = headStatesB;
+                matrixVtB.cols(0, lagsModelMaxB-1) = headStatesB;
                 return;
             }
             // Model A: full trend-aware refinement via the shared helper
             refineHeadFwd(matrixVtA, profilesRecentA, matrixFA,
                           indexLookupTableA, lagsModelMaxA);
             // Model B: plain copy (B typically has no trend; keep original behaviour)
-            for (int i=0; i<lagsModelMaxA; i=i+1) {
+            for (int i=0; i<lagsModelMaxB; i=i+1) {
                 matrixVtB.col(i) = profilesRecentB(indexLookupTableB.col(i));
             }
         };
@@ -1533,7 +1540,9 @@ public:
 
             for(int i=lagsModelMaxA; i<obs+lagsModelMaxA; i=i+1){
                 int idx = i - lagsModelMaxA;
-                arma::uvec cA = indexLookupTableA.col(i), cB = indexLookupTableB.col(i);
+                // Model B in its own time frame, as in omfitGeneral()
+                arma::uvec cA = indexLookupTableA.col(i),
+                           cB = indexLookupTableB.col(i + profileB.n_cols - lagsModelMaxA);
                 arma::vec vA = profA(cA), vB = profB(cB);
                 arma::mat sA = sensA.rows(cA), sB = sensB.rows(cB);
                 arma::rowvec wA = matrixWtA.row(idx), wB = matrixWtB.row(idx);

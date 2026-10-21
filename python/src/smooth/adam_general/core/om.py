@@ -271,7 +271,8 @@ def om_preparator(
             "backcasting",
         )
 
-    adam_fitted = adam_fit_or_gradient(
+    # A side of OMG takes its fit from the coupled recursion of the two sides
+    adam_fitted = adam_estimated.get("coupled") or adam_fit_or_gradient(
         adam_cpp=adam_cpp,
         mat_vt=mat_vt,
         mat_wt=mat_wt,

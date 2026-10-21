@@ -424,3 +424,25 @@ test_that("omg selects the regressors without the holdout", {
                  setdiff(names(coef(testOM)), "alpha"))
     expect_equal(nobs(testModel), 250)
 })
+
+# coef() returns the parameters of model A followed by those of model B
+test_that("coef.omg joins the parameters of the two models", {
+    set.seed(41)
+    y <- rpois(200, 0.3)
+    testModel <- omg(y, "ANN", "MNN")
+    expect_equal(unname(coef(testModel)), unname(c(testModel$modelA$B, testModel$modelB$B)))
+    expect_equal(names(coef(testModel)), c(paste0("A:", names(testModel$modelA$B)),
+                                           paste0("B:", names(testModel$modelB$B))))
+})
+
+# The sides are forecast from the states the coupled recursion ends on: the additive
+# sides enter through the difference of their levels, which moves with the sum of
+# their smoothing parameters, so swapping these does not change the forecast
+test_that("omg forecasts from the coupled states", {
+    set.seed(41)
+    y <- rbinom(200, 1, 0.4)
+    testModel <- omg(y, "ANN", "ANN", h=10, persistenceA=0.05, persistenceB=0.02)
+    swapped <- omg(y, "ANN", "ANN", h=10, persistenceA=0.02, persistenceB=0.05)
+    expect_equal(as.numeric(fitted(swapped)), as.numeric(fitted(testModel)), tolerance=1e-10)
+    expect_equal(as.numeric(swapped$forecast), as.numeric(testModel$forecast), tolerance=1e-10)
+})

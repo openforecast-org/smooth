@@ -405,8 +405,7 @@ def test_the_regressors_of_the_probability_agree(model, occurrence):
         f"{{ {_XREG_DATA} m <- om(d[1:280,], '{model}', occurrence='{occurrence}');"
         " list(d=as.list(d), logLik=as.numeric(logLik(m)),"
         " fitted=as.numeric(fitted(m)),"
-        " coef=as.numeric(if(is.omg(m)) c(coef(m$modelA), coef(m$modelB))"
-        " else coef(m)),"
+        " coef=as.numeric(coef(m)),"
         " forecast=as.numeric(forecast(m, h=20, newdata=d[281:300,])$mean)) }"
     )
     d = r["d"]
@@ -415,16 +414,17 @@ def test_the_regressors_of_the_probability_agree(model, occurrence):
     fit = OM(model=model, occurrence=occurrence).fit(y[:280], X[:280])
     assert fit.loglik == pytest.approx(r["logLik"][0], rel=1e-6)
     np.testing.assert_allclose(fit.fitted, r["fitted"], rtol=1e-6, atol=1e-10)
+    coef = np.asarray(fit.coef, dtype=float)
+    ref = np.asarray(r["coef"], dtype=float)
     if occurrence == "general" and model == "ANN":
-        # The additive sides enter the probability through their difference only,
-        # so their smoothing parameters are not identified apart: R and Python end
-        # on different points of that ridge with the same fit (a follow-up)
-        return
-    coef = (
-        np.r_[fit.model_a.coef, fit.model_b.coef]
-        if occurrence == "general"
-        else fit.coef
-    )
-    np.testing.assert_allclose(coef, r["coef"], rtol=1e-4, atol=1e-6)
+        # The additive sides enter the probability through the difference of their
+        # levels, which moves with the sum of their smoothing parameters: only the
+        # sum is identified. The initial simplex holds two points of equal loss,
+        # one alpha up or the other, and the starting regressors of greybox's alm()
+        # and ALM, 4e-15 apart, break that tie differently in R and Python
+        alphas = [0, 4]
+        assert coef[alphas].sum() == pytest.approx(ref[alphas].sum(), rel=1e-4)
+        coef, ref = np.delete(coef, alphas), np.delete(ref, alphas)
+    np.testing.assert_allclose(coef, ref, rtol=1e-4, atol=1e-6)
     forecast = np.asarray(fit.predict(h=20, X=X[280:]).mean, dtype=float)
     np.testing.assert_allclose(forecast, r["forecast"], rtol=1e-5)

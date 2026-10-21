@@ -48,6 +48,7 @@ from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.om_cost import om_cf, om_link_function
+from smooth.adam_general.core.utils.printing import _build_model_name
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
@@ -61,14 +62,6 @@ _OCC_TO_CHAR = {
     "odds-ratio": "o",
     "inverse-odds-ratio": "i",
     "direct": "d",
-}
-
-# Uppercase letter shown in the printed model name, e.g. "oETS(MNN)[O]".
-_OCC_TO_BRACKET = {
-    "fixed": "F",
-    "odds-ratio": "O",
-    "inverse-odds-ratio": "I",
-    "direct": "D",
 }
 
 OM_OCCURRENCE_OPTIONS = Literal["fixed", "odds-ratio", "inverse-odds-ratio", "direct"]
@@ -1419,22 +1412,16 @@ class OM(ADAM):
         )
 
     def _set_om_fitted_attributes(self):
-        # Build the model name in oETS(...)[X] form
-        e = self._model_type.get("error_type", "")
-        t = self._model_type.get("trend_type", "")
-        s = self._model_type.get("season_type", "")
-        if self._model_type.get("damped", False) and t not in ("", "N"):
-            t = t + "d"
-        ets_str = f"{e}{t}{s}"
-        bracket = _OCC_TO_BRACKET[self._om_occurrence]
-        parts = [f"oETS({ets_str})"]
-        if self._arima.get("arima_model"):
-            ar = (self._arima.get("ar_orders") or [0])[0]
-            i = (self._arima.get("i_orders") or [0])[0]
-            ma = (self._arima.get("ma_orders") or [0])[0]
-            parts.append(f"ARIMA({ar},{i},{ma})")
-        # The type of the occurrence closes the name, as R's adam_model_name
-        self.model = "+".join(parts) + f"[{bracket}]"
+        # The name of the selected ETS, then R's adam_model_name with the "o"
+        # prefix: oETSX(...)[O], oARIMA(...)[O], ...
+        if self._model_type.get("ets_model"):
+            t = self._model_type["trend_type"]
+            if self._model_type.get("damped", False) and t != "N":
+                t += "d"
+            self.model = (
+                f"{self._model_type['error_type']}{t}{self._model_type['season_type']}"
+            )
+        self.model = _build_model_name(self, prefix="o")
 
     def _auto_predict_om(self):
         h = getattr(self, "h", None)

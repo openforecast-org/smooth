@@ -100,3 +100,32 @@ def test_om_redirect_passes_arguments_as_r(occurrence, r_args, py_args):
     r = _r_fit(f"om(y, model='MNN', occurrence='{occurrence}', {r_args})")
     py = OM(model="MNN", occurrence=occurrence, **py_args)
     _compare(py.fit(np.asarray(r["y"], dtype=float)), r)
+
+
+NAME_CASES = [
+    ("om(d, 'MNN', occurrence='odds-ratio')", "OM", {"occurrence": "odds-ratio"}),
+    ("om(d, 'MNN', occurrence='fixed')", "OM", {"occurrence": "fixed"}),
+    (
+        "om(d, 'NNN', orders=c(1,0,0), occurrence='direct')",
+        "OM",
+        {"model": "NNN", "ar_order": 1, "occurrence": "direct"},
+    ),
+    ("omg(d, 'MNN', 'MNN')", "OMG", {"model_a": "MNN"}),
+    ("adam(d, 'MNN', occurrence='odds-ratio')", "ADAM", {"occurrence": "odds-ratio"}),
+]
+
+
+@pytest.mark.parametrize("r_call,py_class,py_args", NAME_CASES)
+def test_names_with_regressors_match_r(r_call, py_class, py_args):
+    """The X of the regressors in the names, as R's adam_model_name."""
+    import smooth
+
+    r = r_dict(
+        "{ set.seed(3); x <- rnorm(200); y <- rbinom(200,1,plogis(x))*exp(x+2);"
+        f" d <- data.frame(y=y, x=x); list(y=y, x=x, name=modelName({r_call})) }}"
+    )
+    if py_class != "OMG":
+        py_args = {"model": "MNN", **py_args}
+    X = np.asarray(r["x"], dtype=float).reshape(-1, 1)
+    fit = getattr(smooth, py_class)(**py_args).fit(np.asarray(r["y"], dtype=float), X)
+    assert fit.model_name == r["name"][0]

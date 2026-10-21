@@ -600,3 +600,14 @@ def test_redirect_passes_the_arguments_of_om():
     assert (auto.loss, auto.lambda_param, auto.orders["select"]) == ("RIDGE", 0.3, False)
     with pytest.raises(TypeError, match="n_iterations"):
         OM(occurrence="general", n_iterations=3)
+
+
+def test_name_has_the_x_of_the_regressors():
+    """oETSX / oARIMAX with regressors, as R's adam_model_name."""
+    rng = np.random.default_rng(3)
+    x = rng.normal(size=(200, 1))
+    y = rng.binomial(1, 1 / (1 + np.exp(-x[:, 0]))).astype(float)
+    assert OM("MNN", occurrence="odds-ratio").fit(y, x).model == "oETSX(MNN)[O]"
+    arima = OM("NNN", ar_order=1, occurrence="direct").fit(y, x)
+    assert arima.model == "oARIMAX(1,0,0)[D]"
+    assert OM("MNN", occurrence="odds-ratio").fit(y).model == "oETS(MNN)[O]"

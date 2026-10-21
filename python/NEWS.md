@@ -131,6 +131,7 @@ Bugfixes:
 * `ADAM` and the classes built on it (`ES`, `MSARIMA`, `SMA`, `OM`, `AutoADAM`, `AutoMSARIMA`) and `AutoCES` accepted any unknown keyword (`reg_lambda=1`, `parallel=True`, ...) and ignored it. They now raise `TypeError` naming it; `**{"lambda": ...}` and `print_level` stay accepted.
 * `ADAM(occurrence=<fitted OM>).fit(y).predict(h)` failed with a `TypeError`: the forecaster took the occurrence model for probabilities provided for the horizon. It now forecasts with the model, as R's `adam()` with a provided `om`/`oes`.
 * `OM(occurrence="general")` and `OM(occurrence="auto")`, which return `OMG` and `AutoOM` as R's `om()` calls `omg()` and `auto.om()`, dropped `ets`, `smoother`, `loss`, `lambda_param`, `formula`, the `ar_order`/`i_order`/`ma_order` orders and the positional arguments, and `"general"` fitted `MNN` instead of the default `ZXZ`. All the arguments now go to the target, as in R, and those it does not take (`n_iterations`, and `formula` and `smoother` of `AutoOM`) raise a `TypeError` instead of being ignored. `"auto"` passes the orders of `om()` without selection, as R.
+* The names of `OM` (and of the `OM` that `AutoOM` selects) dropped the X of the regressors and named a pure ARIMA after the ETS it does not have (`oETS(MNN)[O]` for R's `oETSX(MNN)[O]`, `oETS(ANN)+ARIMA(1,0,0)[O]` for `oARIMAX(1,0,0)[O]`). They are now built as the names of `ADAM`, with R's `o` prefix.
 
 ## v1.1.1 (unreleased)
 

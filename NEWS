@@ -138,6 +138,7 @@ Bugfixes:
 * `om(occurrence="fixed")` with regressors kept their starting coefficients without estimating them, with a log-likelihood of NaN, so `auto.om()` with regressors failed ("missing value where TRUE/FALSE needed"). A constant probability has no regressors, as it has no ARIMA: they are dropped.
 * `om()` did not pass `smoother` on to `omg()` and `auto.om()` with `occurrence="general"` and `"auto"`, which used the default smoother instead.
 * `om(model="NNN")` without ARIMA and regressors was named "oRegression[O]" (and so on): it is "oConstant level[O]", as `adam()` names the model "Constant level".
+* `ces()` failed with `regressors="select"` ("number of items to replace is not a multiple of replacement length"): it selects the regressors as `adam()` does, with `stepwise()` on the errors of the model without them, and refits the model with the selected ones (`adam_xreg_selectRefit()`, shared with `gum()`, `ssarima()` and `om()`).
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

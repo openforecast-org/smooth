@@ -2154,6 +2154,36 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
     return(0);
 }
 
+#### Selection of the regressors of the functions other than adam() ####
+# As adam() does for regressors="select": the model is fitted without the regressors,
+# stepwise() picks them on its errors, and the model is refitted with the selected ones
+# and regressors="use". call is the call of the function (ces(), gum(), ssarima(), om()),
+# env its environment, data its data with the response and the candidate regressors, and
+# dataArg the name of its data argument.
+adam_xreg_selectRefit <- function(call, env, data, responseName, dataArg, ic){
+    colnames(data) <- make.names(colnames(data), unique=TRUE);
+    responseName <- make.names(responseName);
+    callNew <- call;
+    callNew[[dataArg]] <- data[, responseName, drop=FALSE];
+    callNew$xreg <- callNew$formula <- callNew$initialX <- NULL;
+    callNew$regressors <- "use";
+    modelReturned <- eval(callNew, envir=env);
+
+    # The observed values of the in-sample errors
+    errors <- as.vector(residuals(modelReturned));
+    rowsSelected <- !is.na(errors);
+    xregData <- as.data.frame(data)[seq_along(errors), colnames(data)!=responseName, drop=FALSE];
+    xregSelected <- names(adam_xreg_selector(errors[rowsSelected], xregData[rowsSelected,,drop=FALSE],
+                                             sum(rowsSelected), ic, nparam(modelReturned), "dnorm",
+                                             NULL, NULL)$initialXreg);
+    if(length(xregSelected)>0){
+        callNew[[dataArg]] <- data[, c(responseName, xregSelected), drop=FALSE];
+        modelReturned <- eval(callNew, envir=env);
+    }
+    modelReturned$call <- call;
+    return(modelReturned);
+}
+
 #### xreg variable selector using stepwise regression on residuals ####
 adam_xreg_selector <- function(errors, xregData, obsInSample, ic, df, distribution,
                                occurrence, other){

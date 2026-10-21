@@ -1641,3 +1641,21 @@ def test_approximate_intervals_of_adam_ets_take_the_drift(distribution):
             np.ravel(getattr(simulated, bound)),
             rtol=0.05,
         )
+
+
+@pytest.mark.parametrize(
+    "cls", ["ADAM", "ES", "MSARIMA", "SMA", "AutoADAM", "AutoMSARIMA", "AutoCES"]
+)
+def test_unknown_keyword_raises(cls):
+    """An unknown keyword is an error, not silently ignored."""
+    import smooth
+
+    with pytest.raises(TypeError, match="reg_lambda"):
+        getattr(smooth, cls)(reg_lambda=1)
+
+
+def test_lambda_alias_kept():
+    """``**{"lambda": ...}`` and ``print_level`` stay accepted aliases."""
+    model = ADAM(model="ANN", loss="LASSO", print_level=0, **{"lambda": 0.5})
+    assert model.lambda_param == 0.5
+    assert model.nlopt_kwargs == {"print_level": 0}

@@ -6,6 +6,7 @@ Self-contained module with its own fit pipeline, reusing adamCore C++ for
 state-space filtering and forecasting.
 """
 
+import inspect
 import re
 import time
 import warnings
@@ -1288,6 +1289,12 @@ class AutoCES:
         self.holdout = holdout
         self.bounds = bounds
         self.verbose = verbose
+        unknown = sorted(set(kwargs) - set(inspect.signature(CES.__init__).parameters))
+        if unknown:
+            raise TypeError(
+                f"AutoCES() got unexpected keyword argument(s): "
+                f"{', '.join(map(repr, unknown))}"
+            )
         self._kwargs = kwargs
 
     def fit(self, y: NDArray, X: Optional[NDArray] = None) -> CES:

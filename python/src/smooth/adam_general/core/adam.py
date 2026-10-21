@@ -868,7 +868,14 @@ class ADAM:
         self.holdout = holdout
         self.fast = fast
         # Handle 'lambda' from kwargs (since 'lambda' is a reserved word in Python)
-        # Users can pass either lambda_param=0.5 or **{'lambda': 0.5}
+        # Users can pass either lambda_param=0.5 or **{'lambda': 0.5}. Any other
+        # keyword is an error, as for a function without **kwargs
+        unknown = sorted(set(kwargs) - {"lambda", "print_level"})
+        if unknown:
+            raise TypeError(
+                f"{type(self).__name__}() got unexpected keyword argument(s): "
+                f"{', '.join(map(repr, unknown))}"
+            )
         if "lambda" in kwargs:
             self.lambda_param = kwargs["lambda"]
         else:

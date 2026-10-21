@@ -331,6 +331,12 @@
      "outcome": "confirmed",
      "extent": "full",
      "notes": "Re-ran confirm.py --test perlag --seed 2026 --n 200: ETS 1482 of 3042 and GUM 10 of 200 reproduced; per_lag_max implements D4 and pbh_max implements D5; counts unchanged with PBH tolerances 1e-9 to 1e-3 and with the cancelled-theta roots as reference. Noted that the earlier wording 'accepted 1482 of 3042' was ambiguous because all 3042 were accepted; the statement was reworded."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Reworded statement checked against a re-run at seed 2026: 3042 ETS accepted, 1482 of them not forgetting; 193 GUM accepted, 10 of them not forgetting."
     }
    ]
   },
@@ -517,7 +523,7 @@
   },
   {
    "id": "C4",
-   "statement": "On 575 random additive ETS and [[D8:GUM]] models, including ETS models with up to two seasonal lags from {24, 168, 365} whose MA polynomials have degree at most 536, the [[D7:step-down test]] on the MA polynomial after [[D6:cyclotomic cancellation]] gave an admissibility decision different from the roots of that polynomial on 0 models.",
+   "statement": "On 575 random additive ETS and [[D8:GUM]] models, including ETS models with up to two seasonal lags from {24, 168, 365} whose generator allows MA polynomial degrees up to 536, the [[D7:step-down test]] on the MA polynomial after [[D6:cyclotomic cancellation]] gave an admissibility decision different from the roots of that polynomial on 0 models.",
    "type": "methodological",
    "role": "principal",
    "novelty": "new",
@@ -605,7 +611,14 @@
      "by": "P3",
      "outcome": "disputed",
      "extent": "partial",
-     "notes": "0 step-down mismatches on 575 models reproduced, but the statement's description 'degree up to 366' was false: instrumented runs reached degree 535 before cancellation and 533 after."
+     "notes": "On the earlier statement 'MA polynomials of degree up to 366': 0 step-down mismatches on 575 models reproduced, but the statement's description 'degree up to 366' was false: instrumented runs reached degree 535 before cancellation and 533 after.",
+     "resolution": "The statement was reworded to the generator's bound of 536, the departure from the plan's text was recorded as a deviation (limitation L5), and the recheck confirmed the reworded statement."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "0 mismatches on 575 models reproduced; the bound of 536 holds by construction (1 + 1 + 168 + 365 + 1), with 535 measured before cancellation and 533 after, but no recorded result holds the realised degree."
     }
    ]
   },
@@ -667,6 +680,8 @@
      "additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0",
      "GUM with F = I and lags from {1, 4, 12}",
      "GUM with random F and lags from {1, 4, 12, 24}",
+     "additive ETS with up to two seasonal lags from {24, 168, 365}",
+     "GUM with random F and lags (1, 24, 168)",
      "bisection to a width of 1e-10",
      "numpy prototype"
     ],
@@ -691,6 +706,12 @@
      "outcome": "confirmed",
      "extent": "full",
      "notes": "198 inadmissible models and 5.8137e-11 reproduced; the difference is bounded by the 1e-10 bisection width by construction, so the result checks the bisection logic, and the values are not compared with the PBH reference."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "198 models and 5.8137e-11 reproduced and the rewording as 1/min|B| matches the bisection; the scope then omitted two of the four model families, since added."
     }
    ]
   },
@@ -739,6 +760,12 @@
      "outcome": "confirmed",
      "extent": "full",
      "notes": "Steps S1-S7 of E6 re-derived; simulated residual of the identity on 40 random GUMs at late t at most 1.7e-15 relative; the identity holds after start-up (initial states ignored), which was then in the scope only and is now in the statement."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The statement now carries the condition on initial states."
     }
    ]
   },
@@ -767,6 +794,12 @@
      "outcome": "confirmed",
      "extent": "full",
      "notes": "Re-derived by a Schur complement; 50 random block-diagonal D with lags from {1, 3, 4} gave moduli |mu|^(1/l) and agreeing decisions. Noted that the RN2 example labelled block-diagonal is lower-triangular, and that the claim does not cover ETS or GUM, whose D is not block-diagonal."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "E7.S1 now rests on C15 for a general M; S2 needs the components grouped by lag, which a simultaneous permutation allows; the claim does not cover ETS or GUM, whose D is not block-diagonal."
     }
    ]
   },
@@ -795,6 +828,12 @@
      "outcome": "confirmed",
      "extent": "full",
      "notes": "Steps re-derived and checked on 5 random GUMs with a constructed unobservable mode (residuals about 1e-14). Noted that step S3 rested on the general identity of the expansion rather than on C7; the dependency now points to C15."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "E8.S3 now cites C15 in its lambda != 0 form; S4 follows with M = F and M = D."
     }
    ]
   },
@@ -823,6 +862,12 @@
      "outcome": "confirmed",
      "extent": "full",
      "notes": "theta matches the closed form; det(I - D~) about 1e-17 for m = 1, 2, 4, 7, 12, 24; noted that step S5 needs the identity of the expansion, now cited as C15."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "E9.S5 now cites C15 at lambda = 1, giving det(I - D~) = theta(1) = 0."
     }
    ]
   },
@@ -932,7 +977,7 @@
   },
   {
    "id": "C12",
-   "statement": "For two random GUM models with lags (1, 24, 168) (MA polynomials of degree 193) and the cancelled MA polynomial of degree 168 of an ETS(A,N,A,A) model with seasonal lags 24 and 168, the [[D7:step-down test]] took 0.74, 0.81 and 0.42 ms against 23.8, 20.9 and 17.5 ms for all roots by numpy's companion-matrix eigenvalues.",
+   "statement": "For an admissible and an inadmissible random GUM model with lags (1, 24, 168) (MA polynomials of degree 193) and the cancelled MA polynomial of degree 168 of an ETS(A,N,A,A) model with seasonal lags 24 and 168, the [[D7:step-down test]] took 0.74, 0.81 and 0.42 ms against 23.8, 20.9 and 17.5 ms for all roots by numpy's companion-matrix eigenvalues.",
    "type": "descriptive",
    "role": "secondary",
    "novelty": "new",
@@ -974,7 +1019,14 @@
      "by": "P3",
      "outcome": "disputed",
      "extent": "partial",
-     "notes": "Checked an earlier statement based on run RN2 (step-down 0.007 ms, roots 22 ms, coefficients 4.7 ms): the order of magnitude and ranking reproduced, but the timed polynomial was inadmissible and the step-down stopped after 1 of 193 steps; a full recursion took about 0.5 ms."
+     "notes": "Checked an earlier statement based on run RN2 (step-down 0.007 ms, roots 22 ms, coefficients 4.7 ms): the order of magnitude and ranking reproduced, but the timed polynomial was inadmissible and the step-down stopped after 1 of 193 steps; a full recursion took about 0.5 ms.",
+     "resolution": "The claim was replaced by timings from run RN13 with full recursions (193, 170 and 168 steps), which the recheck reproduced."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "timing.py --seed 3 --repeats 50: 193, 170 and 168 steps; step-down 0.90, 0.57 and 0.43 ms against roots 24.5, 19.7 and 17.9 ms; same order and ranking, with load noise of 30 to 40 percent in the step-down times, so the times should not be read finer than a factor of two."
     }
    ]
   },
@@ -1024,7 +1076,15 @@
      "any square matrix $M$ of size $k$"
     ]
    },
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps S1-S6 of E11 re-derived; on 200 random models with lags from {1, 2, 3, 5} at complex lambda the identities of S2, S3, S5 and S6 held to relative errors of at most 7.3e-15; the rule of S6 was corrected to factor Lambda on the right."
+    }
+   ]
   }
  ],
  "evidence": [
@@ -1255,7 +1315,7 @@
   {
    "id": "E4",
    "profile": "simulation",
-   "description": "Planned test of the step-down test (lab plan PL4, run RN10): confirm.py --test stepdown --seed 2026 --n 200 generated the 500 models of plan PL3 afresh plus 50 additive ETS models with seasonal lags from {24, 168, 365} and 25 GUM models with lags (1, 24, 168) and normal F (standard deviation 0.3), and compared the step-down decision on the cancelled MA polynomial with the decision from its roots computed by numpy.",
+   "description": "Planned test of the step-down test (lab plan PL4, run RN10): confirm.py --test stepdown --seed 2026 --n 200 generated the 500 models of plan PL3 afresh plus 50 additive ETS models with seasonal lags from {24, 168, 365} and 25 GUM models with lags (1, 24, 168) and normal F (standard deviation 0.3), and compared the step-down decision on the cancelled MA polynomial with the decision from its roots computed by numpy. The generator allows MA polynomial degrees up to 536 (level, trend, seasonal lags 168 and 365, constant); the realised maximum was not recorded as a result.",
    "availability": {
     "level": "public"
    },
@@ -1303,7 +1363,7 @@
   {
    "id": "E5",
    "profile": "simulation",
-   "description": "Planned test of the bisection (lab plan PL5, run RN11): on the 575 models of plan PL4, for each model whose cancelled MA polynomial has a root-based largest mode modulus above 1 + 1e-8, bisection on r to width 1e-10 with the step-down test on theta*(B/r) was compared with the root-based value.",
+   "description": "Planned test of the bisection (lab plan PL5, run RN11): on the 575 models of plan PL4, for each model whose cancelled MA polynomial has a root-based largest mode modulus above 1 + 1e-8, bisection on r to width 1e-10 with the step-down test on theta*(B/r) was compared with the root-based value. The generator allows MA polynomial degrees up to 536 (level, trend, seasonal lags 168 and 365, constant); the realised maximum was not recorded as a result.",
    "availability": {
     "level": "public"
    },
@@ -1787,7 +1847,7 @@
       "S5",
       "D1"
      ],
-     "rule": "factoring $\\Lambda(\\lambda)$ out of $\\Lambda(\\lambda) - M$ on the left"
+     "rule": "factoring $\\Lambda(\\lambda)$ out on the right: $\\Lambda(\\lambda) - M = (I - M \\Lambda(\\lambda)^{-1}) \\Lambda(\\lambda)$"
     }
    ]
   },
@@ -1959,7 +2019,7 @@
   {
    "id": "L4",
    "category": "measurement",
-   "statement": "The reference decisions use numpy's polynomial roots (companion-matrix eigenvalues) for polynomials of degree up to 366 with many roots near the unit circle, whose accuracy there was not checked by a second method.",
+   "statement": "The reference decisions use numpy's polynomial roots (companion-matrix eigenvalues) for polynomials of degree up to 535 before cancellation with many roots near the unit circle, whose accuracy there was not checked by a second method.",
    "affects": [
     "C4",
     "C5"

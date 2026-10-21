@@ -1444,32 +1444,3 @@ class OMG:
             occurrence_type="general",
             other={"binary_data": occurrence_data},
         )
-
-
-def _build_omg_from_om_kwargs(**om_kwargs) -> OMG:
-    """Construct an OMG from the kwargs supplied to OM(occurrence='general', ...).
-
-    Forwards ``model`` / ``lags`` / ``orders`` as both ``model_a`` and
-    ``model_b`` and delegates to :class:`OMG`.
-    """
-    model = om_kwargs.pop("model", "MNN")
-    return OMG(
-        model_a=model,
-        model_b=model,
-        lags=om_kwargs.pop("lags", None),
-        orders_a=om_kwargs.pop("orders", None),
-        orders_b=None,
-        constant_a=om_kwargs.pop("constant", False),
-        formula_a=om_kwargs.pop("formula", None),
-        regressors_a=om_kwargs.pop("regressors", "use"),
-        persistence_a=om_kwargs.pop("persistence", None),
-        phi_a=om_kwargs.pop("phi", None),
-        arma_a=om_kwargs.pop("arma", None),
-        h=om_kwargs.pop("h", 0),
-        holdout=om_kwargs.pop("holdout", False),
-        initial=om_kwargs.pop("initial", "backcasting"),
-        ic=om_kwargs.pop("ic", "AICc"),
-        bounds=om_kwargs.pop("bounds", "usual"),
-        verbose=om_kwargs.pop("verbose", 0),
-        nlopt_kwargs=om_kwargs.pop("nlopt_kwargs", None),
-    )

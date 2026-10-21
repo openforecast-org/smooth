@@ -23,6 +23,7 @@ fitted values into [0, 1] probabilities, and the model name format.
 
 from __future__ import annotations
 
+import inspect
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Literal, Optional, Union, cast
@@ -33,6 +34,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from smooth.adam_general.core.adam import ADAM
+from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
 from smooth.adam_general.core.creator import (
     architector,
     creator,
@@ -461,45 +463,38 @@ class OM(ADAM):
     _OM_DEFAULT_LOSS = "likelihood"
 
     def __new__(cls, *args, **kwargs):
+        # R's om() hands all its arguments to omg() or auto.om(): those the
+        # target does not take raise its TypeError
+        bound = inspect.signature(cls.__init__).bind(None, *args, **kwargs)
+        arguments = dict(bound.arguments)
+        arguments.update(arguments.pop("kwargs", {}))
+        arguments.pop("self")
         # "auto" is the default, as R's om()
-        occ = kwargs.get("occurrence", "auto")
-        if occ == "general":
-            from smooth.adam_general.core.omg import _build_omg_from_om_kwargs
-
-            kwargs.pop("loss", None)
-            kwargs.pop("n_iterations", None)
-            return _build_omg_from_om_kwargs(**kwargs)
+        occ = arguments.pop("occurrence", "auto")
+        if occ not in ("auto", "general"):
+            return super().__new__(cls)
+        if "lambda" in arguments:
+            arguments["lambda_param"] = arguments.pop("lambda")
+        # The orders of om(), never selected unless asked, as R's om() passes
+        # its default orders(select=FALSE) to auto.om()
+        orders, _ = resolve_arima_orders(
+            arguments.pop("orders", None),
+            *(arguments.pop(f"{part}_order", 0) for part in ("ar", "i", "ma")),
+        )
         if occ == "auto":
             from smooth.adam_general.core.auto_om import AutoOM
 
-            kwargs.pop("occurrence", None)
-            return AutoOM(
-                **{
-                    k: v
-                    for k, v in kwargs.items()
-                    if k
-                    in (
-                        "model",
-                        "lags",
-                        "orders",
-                        "h",
-                        "holdout",
-                        "persistence",
-                        "phi",
-                        "initial",
-                        "constant",
-                        "arma",
-                        "regressors",
-                        "ic",
-                        "bounds",
-                        "verbose",
-                        "nlopt_kwargs",
-                        "loss",
-                        "lambda_param",
-                    )
-                }
-            )
-        return super().__new__(cls)
+            no_arima = {"ar": 0, "i": 0, "ma": 0, "select": False}
+            return AutoOM(orders=orders or no_arima, **arguments)
+
+        from smooth.adam_general.core.omg import OMG
+
+        arguments.setdefault("model", "ZXZ")
+        sides = ("model", "constant", "formula", "regressors", "persistence")
+        for key in (*sides, "phi", "arma"):
+            if key in arguments:
+                arguments[f"{key}_a"] = arguments.pop(key)
+        return OMG(orders_a=orders, **arguments)
 
     def __getnewargs_ex__(self):
         # copy and pickle call __new__ with these: the fitted type, not the default

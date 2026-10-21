@@ -78,3 +78,25 @@ def test_omg_mixed_sides_match_r(model_a, model_b):
     py = OMG(model_a=model_a, model_b=model_b, lags=[1, 7])
     py.fit(np.asarray(r["y"], dtype=float))
     _compare(py, r)
+
+
+REDIRECT_CASES = [
+    ("general", "ets='adam'", {"ets": "adam"}),
+    ("general", "orders=list(ar=1,i=0,ma=0)", {"ar_order": 1}),
+    ("general", "loss='MSE'", {"loss": "MSE"}),
+    ("general", "loss='RIDGE', lambda=0.3", {"loss": "RIDGE", "lambda_param": 0.3}),
+    ("auto", "ets='adam'", {"ets": "adam"}),
+    ("auto", "loss='MSE'", {"loss": "MSE"}),
+]
+
+
+@pytest.mark.parametrize(
+    "occurrence,r_args,py_args",
+    REDIRECT_CASES,
+    ids=[f"{c[0]}-{c[1]}" for c in REDIRECT_CASES],
+)
+def test_om_redirect_passes_arguments_as_r(occurrence, r_args, py_args):
+    """om() hands its arguments to omg() / auto.om(), as R."""
+    r = _r_fit(f"om(y, model='MNN', occurrence='{occurrence}', {r_args})")
+    py = OM(model="MNN", occurrence=occurrence, **py_args)
+    _compare(py.fit(np.asarray(r["y"], dtype=float)), r)

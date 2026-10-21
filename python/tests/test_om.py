@@ -581,3 +581,22 @@ def test_om_with_a_fixed_probability_has_no_arima():
     model = OM(model="MNN", orders={"ar": [1], "ma": [1]}, occurrence="fixed").fit(y)
     assert model.model == "oETS(ANN)[F]"
     assert np.isfinite(model.loglik)
+
+
+def test_redirect_passes_the_arguments_of_om():
+    """OM(occurrence="general"/"auto") hands its arguments over, as R's om()."""
+    from smooth import OMG, AutoOM
+
+    general = OM("ANN", occurrence="general", ets="adam", smoother="lowess", ma_order=1)
+    assert isinstance(general, OMG)
+    assert (general.model_a_spec, general.ets, general.smoother) == (
+        "ANN",
+        "adam",
+        "lowess",
+    )
+    assert general.orders_a == {"ar": 0, "i": 0, "ma": 1, "select": False}
+    auto = OM(occurrence="auto", loss="RIDGE", **{"lambda": 0.3})
+    assert isinstance(auto, AutoOM)
+    assert (auto.loss, auto.lambda_param, auto.orders["select"]) == ("RIDGE", 0.3, False)
+    with pytest.raises(TypeError, match="n_iterations"):
+        OM(occurrence="general", n_iterations=3)

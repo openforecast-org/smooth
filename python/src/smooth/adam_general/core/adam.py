@@ -1,3 +1,4 @@
+import inspect
 import time
 import warnings
 from dataclasses import dataclass
@@ -1105,6 +1106,38 @@ class ADAM:
         # The model as specified: the refit with the dummies of the outliers selects
         # it again, as R's auto.adam() re-evaluates its call
         model_spec = self.model
+
+        # Orders with select=True are selected by AutoADAM, as R's adam() hands
+        # the call to auto.adam() with its distribution
+        from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
+
+        orders, select = resolve_arima_orders(
+            self._init_orders,
+            self.ar_order,
+            self.i_order,
+            self.ma_order,
+            arima_select=self.arima_select,
+            silent=True,
+        )
+        if select:
+            from smooth.adam_general.core.auto_adam import AutoADAM
+
+            remapped = {"ar_order", "i_order", "ma_order", "orders", "arima_select"}
+            remapped |= {"self", "kwargs", "distribution", "outliers_level"}
+            kw = {
+                p: getattr(self, p)
+                for p in inspect.signature(ADAM.__init__).parameters
+                if p not in remapped
+            }
+            auto = AutoADAM(
+                orders=orders,
+                distribution=self.distribution or "default",
+                level=self.outliers_level,
+                **kw,
+            ).fit(y, X)
+            self.__dict__.update(auto.__dict__)
+            return self
+
         # The regressors with the names of the dummies of the outliers are renamed
         if self.outliers != "ignore" and isinstance(X, pd.DataFrame):
             clashes = [str(c) for c in X.columns if OUTLIER_NAMES.match(str(c))]

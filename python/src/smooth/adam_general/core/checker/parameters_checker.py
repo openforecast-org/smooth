@@ -1096,18 +1096,29 @@ def parameters_checker(
         return alm
 
     # Build explanatory variables dictionary
+    # The regressors of the probability of occurrence (OM, OMG) are estimated on all
+    # the observed values, with the occurrence indicator as the response, as R
+    occurrence_indicator = occurrence_model and distribution == "plogis"
     xreg_builder = partial(
         _process_xreg,
         regressors="use" if regressors == "select" else regressors,
-        y_in_sample=observations_dict["y_in_sample"],
+        y_in_sample=np.asarray(observations_dict["ot_logical"], dtype=float)
+        if occurrence_indicator
+        else observations_dict["y_in_sample"],
         obs_in_sample=observations_dict["obs_in_sample"],
         distribution=distribution,
         e_type=ets_info["error_type"],
         ic=ic,
         # The observed (non-zero) values: the missing ones are not in the regression
-        ot_logical=observations_dict["ot_logical"]
+        ot_logical=observed_mask(observations_dict)
+        if occurrence_indicator
+        else observations_dict["ot_logical"]
         if occurrence_model or not np.all(observed_mask(observations_dict))
         else None,
+        # The inverse odds ratio falls with the probability
+        sign=-1.0
+        if occurrence_indicator and occurrence == "inverse-odds-ratio"
+        else 1.0,
     )
     if has_xreg and regressors == "select":
         # As R, the model is estimated without the regressors, and the estimator
@@ -1356,6 +1367,7 @@ def _process_xreg(
     xreg_names_from_input=None,
     initial_xreg=None,
     ot_logical=None,
+    sign=1.0,
 ):
     """Process explanatory variables and return a populated xreg_dict.
 
@@ -1372,8 +1384,11 @@ def _process_xreg(
         User-supplied initial coefficient values, shape (p, 1). If provided,
         skips ALM computation and uses these values as optimizer seed.
     ot_logical : array-like of bool or None
-        The non-zero in-sample observations of an occurrence model, the only ones
-        the initials are estimated on (R's ``subset``); None uses all of them.
+        The in-sample observations the initials are estimated on (R's ``subset``):
+        the non-zero ones of a demand-sizes model; None uses all of them.
+    sign : float
+        Multiplies the estimated initials: -1 for the inverse odds ratio, which
+        falls with the probability of occurrence.
 
     Returns
     -------
@@ -1424,7 +1439,7 @@ def _process_xreg(
         # As R's xregInitialiser, a trend is added to get rid of the bias and dropped
         # afterwards, unless asked for, or a regressor is a trend itself: alm() drops
         # the first of two variables correlated above 0.999
-        # An occurrence model estimates them on the non-zero demand only, as R's
+        # A demand-sizes model estimates them on the non-zero demand only, as R's
         # subset, so that log(y) of the multiplicative models is defined
         subset = (
             np.ones(obs_in_sample, dtype=bool)
@@ -1468,7 +1483,7 @@ def _process_xreg(
                     y_response,
                     feature_names=[*names_selected, "trend"][: X_aug.shape[1] - 1],
                 )
-                return np.asarray(alm.coef, dtype=float)[:p]
+                return sign * np.asarray(alm.coef, dtype=float)[:p]
             except Exception:
                 return np.zeros(p)
 

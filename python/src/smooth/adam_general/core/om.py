@@ -571,7 +571,8 @@ class OM(ADAM):
             orders=orders,
             constant=constant,
             regressors=regressors,
-            distribution="dnorm",
+            # As R's om(), the checker estimates the regressors of the probability
+            distribution="plogis",
             # ADAM.__init__ types `loss` as a string Literal; the callable
             # path is handled by ADAM's parameter_checks (which natively
             # accepts callables and flips the internal flag to "custom").

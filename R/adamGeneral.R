@@ -1372,6 +1372,13 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 initialXregProvided <- FALSE;
                 # The function returns an ALM model
                 xregInitialiser <- function(Etype,distribution,formulaToUse,subset,responseName){
+                    # The regressors of the probability of occurrence (om(), omg()) are estimated
+                    # on all the observations, with the occurrence indicator as the response
+                    occurrenceIndicator <- occurrenceModel && distribution=="plogis";
+                    if(occurrenceIndicator){
+                        xregData[1:obsInSample,1] <- otLogical*1;
+                        subset <- subsetOccurrence;
+                    }
                     # Fix the default distribution for ALM
                     if(distribution=="default"){
                         distribution <- switch(Etype,
@@ -1475,6 +1482,10 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         }
                         # Reset terms, they are not needed for what comes, but confuse the formula() method
                         almModel$terms <- NULL;
+                    }
+                    # The inverse odds ratio falls with the probability
+                    if(occurrenceIndicator && occurrence=="inverse-odds-ratio"){
+                        almModel$coefficients[] <- -almModel$coefficients;
                     }
                     return(almModel);
                 }

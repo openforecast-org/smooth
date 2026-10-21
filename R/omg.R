@@ -216,7 +216,7 @@ omg <- function(data,
                                   formulaToUse=formulaA, orders=ordersA,
                                   constant=constantA, arma=armaA,
                                   persistence=persistenceA, phi=phiA,
-                                  initial=initial, distribution="dnorm",
+                                  initial=initial, distribution="plogis",
                                   loss=lossArg,
                                   h=h, holdout=holdout, occurrence="odds-ratio",
                                   ic=ic, bounds=bounds, regressors=regressorsA,
@@ -227,7 +227,7 @@ omg <- function(data,
                                   formulaToUse=formulaB, orders=ordersB,
                                   constant=constantB, arma=armaB,
                                   persistence=persistenceB, phi=phiB,
-                                  initial=initial, distribution="dnorm",
+                                  initial=initial, distribution="plogis",
                                   loss=lossArg,
                                   h=h, holdout=holdout, occurrence="inverse-odds-ratio",
                                   ic=ic, bounds=bounds, regressors=regressorsB,
@@ -239,6 +239,17 @@ omg <- function(data,
     }
     if(isTRUE(checkerB$select)) {
         stop("ARIMA order selection is not supported in omg(). Specify fixed orders.", call.=FALSE)
+    }
+
+    # The probability depends on the difference of the coefficients of the two sides,
+    # which the regression of the indicator estimates: each side starts from its half
+    for(k in seq_along(checkerA$xregModelInitials)){
+        if(!checkerA$initialXregProvided && !is.null(checkerA$xregModelInitials[[k]])){
+            checkerA$xregModelInitials[[k]]$initialXreg <- checkerA$xregModelInitials[[k]]$initialXreg / 2
+        }
+        if(!checkerB$initialXregProvided && !is.null(checkerB$xregModelInitials[[k]])){
+            checkerB$xregModelInitials[[k]]$initialXreg <- checkerB$xregModelInitials[[k]]$initialXreg / 2
+        }
     }
 
     #### Shared binary indicators (same data for A and B) ####

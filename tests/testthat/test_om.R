@@ -568,3 +568,20 @@ test_that("om() with regressors takes at least 1000 iterations, as adam()", {
     testModel <- om(x, "MNN", occurrence="direct");
     expect_gt(testModel$res$iterations, 3*40);
 })
+
+test_that("om() starts the regressors from the indicator on all the observations", {
+    set.seed(41);
+    x <- data.frame(y=0, a=rnorm(200), n1=rnorm(200));
+    x$y <- (runif(200) < plogis(2*x$a)) * rpois(200, 3);
+    xIndicator <- transform(x, y=(y!=0)*1, trend=1:200);
+    almCoefs <- as.numeric(coef(alm(y~a+n1+trend, xIndicator, distribution="plogis"))[c("a","n1")]);
+    for(occurrence in c("odds-ratio","inverse-odds-ratio")){
+        testModel <- om(x, "ANN", occurrence=occurrence, maxeval=1);
+        sign <- if(occurrence=="odds-ratio") 1 else -1;
+        expect_equal(as.numeric(testModel$B[c("a","n1")]), sign*almCoefs, tolerance=1e-6);
+    }
+    # The general model splits them between its sides
+    testModel <- omg(x, "ANN", "ANN", maxeval=1);
+    expect_equal(as.numeric(testModel$modelA$B[c("a","n1")]), almCoefs/2, tolerance=1e-6);
+    expect_equal(as.numeric(testModel$modelB$B[c("a","n1")]), -almCoefs/2, tolerance=1e-6);
+})

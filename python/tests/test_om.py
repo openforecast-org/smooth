@@ -625,3 +625,31 @@ def test_holdout_accuracy():
     assert om.accuracy["ME"] == pytest.approx(np.mean((y[-10:] != 0) - forecast))
     omg = OMG("MNN", "MNN", h=10, holdout=True).fit(y)
     assert np.isfinite(omg.accuracy["MASE"])
+
+
+@pytest.mark.parametrize(
+    "occurrence, sign", [("odds-ratio", 1), ("inverse-odds-ratio", -1)]
+)
+def test_the_regressors_start_from_the_indicator_on_all_observations(occurrence, sign):
+    from greybox import ALM
+
+    from smooth import OMG
+
+    rng = np.random.default_rng(41)
+    X = rng.normal(size=(200, 2))  # noqa: N806
+    y = (rng.random(200) < 1 / (1 + np.exp(-2 * X[:, 0]))) * rng.poisson(3, 200) + 0.0
+    om = OM("ANN", occurrence=occurrence).fit(y, X)
+    # The logistic regression of the indicator on zeros and ones, with a trend
+    alm = ALM(distribution="plogis")
+    alm.fit(np.column_stack([np.ones(200), X, np.arange(1.0, 201)]), (y != 0) * 1.0)
+    expected = sign * np.asarray(alm.coef)[:2]
+    np.testing.assert_allclose(
+        om._explanatory["xreg_model_initials"][0]["initial_xreg"].ravel(), expected
+    )
+    # The general model splits them between its sides
+    omg = OMG("ANN", "ANN").fit(y, X)
+    side = omg._side_a if occurrence == "odds-ratio" else omg._side_b
+    np.testing.assert_allclose(
+        side["explanatory"]["xreg_model_initials"][0]["initial_xreg"].ravel(),
+        expected / 2,
+    )

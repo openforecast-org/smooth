@@ -1079,6 +1079,19 @@ class OMG:
 
         scaffold._restore_user_model_spec(requested)
         scaffold._set_occurrence_series()
+        # The probability depends on the difference of the coefficients of the two
+        # sides, which the regression of the indicator estimates: each side starts
+        # from its half, as R
+        explanatory = scaffold._explanatory
+        if explanatory.get("xreg_model") and not scaffold._initials.get(
+            "initial_xreg_provided"
+        ):
+            explanatory["xreg_model_initials"] = [
+                None
+                if side is None
+                else {**side, "initial_xreg": side["initial_xreg"] / 2}
+                for side in explanatory["xreg_model_initials"]
+            ]
 
         adam_cpp, adam_created, profile_dict = scaffold._build_om_artifacts(
             lags_max_pad

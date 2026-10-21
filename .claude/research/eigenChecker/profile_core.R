@@ -12,7 +12,7 @@ Rcpp::sourceCpp(code='
 Rcpp::NumericVector profileCore(arma::mat persistence, arma::mat transition, arma::mat measurement,
                                 arma::ivec lags, int repeats) {
     auto now = [] { return std::chrono::steady_clock::now(); };
-    auto micro = [&](auto start) {
+    auto micro = [&](std::chrono::steady_clock::time_point start) {
         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
     };
     arma::mat D = transition - persistence * measurement;

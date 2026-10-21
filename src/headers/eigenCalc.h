@@ -1,4 +1,5 @@
 #include <map>
+#include <vector>
 #include "arimaBounds.h"
 
 // Helper: Invert measurement matrix (1/x, with inf->0)
@@ -446,13 +447,43 @@ inline arma::cx_vec fftCore(arma::cx_vec x) {
     return x;
 }
 
+// Coefficients (increasing powers of B) of det(I - M L(B)) by the expansion in principal
+// minors: the sum over the subsets S of the components of (-1)^|S| det(M_SS) B^(sum of the
+// lags in S). 2^k minors, so for a few components only.
+inline arma::vec minorPolynomial(const arma::mat& M, const arma::ivec& lags) {
+    const arma::uword k = lags.n_elem;
+    arma::vec coefficients(arma::accu(lags) + 1, arma::fill::zeros);
+    arma::uvec idx(k);
+    arma::cx_mat A;
+    for(arma::uword subset = 0; subset < (arma::uword(1) << k); subset++) {
+        arma::uword size = 0, power = 0;
+        for(arma::uword c = 0; c < k; c++) {
+            if(subset & (arma::uword(1) << c)) {
+                idx(size++) = c;
+                power += arma::uword(lags(c));
+            }
+        }
+        if(size == 0) {
+            coefficients(0) += 1.0;
+            continue;
+        }
+        A = arma::conv_to<arma::cx_mat>::from(M.submat(idx.head(size), idx.head(size)));
+        coefficients(power) += (size % 2 == 0 ? 1.0 : -1.0) * std::real(complexDeterminant(A));
+    }
+    return coefficients;
+}
+
 // Coefficients (increasing powers of B) of det(I - M L(B)), from its values at the N-th
-// roots of unity, N the smallest power of 2 above the degree sum(lags)
+// roots of unity, N the smallest power of 2 above the degree sum(lags); by the principal
+// minors when there are no more of them than determinants to evaluate
 inline arma::vec lagPolynomial(const arma::mat& M, const arma::ivec& lags) {
     const arma::uword k = lags.n_elem, degree = arma::accu(lags);
     arma::uword N = 1;
     while(N < degree + 1) {
         N <<= 1;
+    }
+    if(k < 20 && (arma::uword(1) << k) <= N / 2 + 1) {
+        return minorPolynomial(M, lags);
     }
     // The N-th roots of unity, kept once computed
     static std::map<arma::uword, arma::cx_vec> unityRoots;
@@ -522,39 +553,97 @@ inline const arma::vec& cyclotomicPolynomial(arma::uword n) {
 // Remove from theta and phi the cyclotomic factors Phi_n (n dividing a lag) they share, with
 // their multiplicity. A root of Phi_n is tried first: a remainder within the tolerance of
 // polynomialDivide() leaves |p(zeta)| below (n - 1) times it, so the division is attempted
-// only when both polynomials are that small there.
+// only when both polynomials are that small there. phi depends on F alone, which often stays
+// the same from one call to the next (ETS); when the same phi comes a second time, its own
+// cyclotomic factors are tabulated, and from then on only those are tried on theta, and the
+// cancelled phi of the last call is reused when the same factors are removed.
 inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& lags,
                             double tolerance = 1e-9) {
-    const arma::sword lagMax = arma::max(lags);
-    auto small = [&](const arma::vec& p, const std::complex<double>& zeta, double bound) {
+    struct PhiFactors {
+        arma::vec phi, phiCancelled;
+        arma::ivec lags;
+        bool tabulated = false;
+        std::vector<std::pair<arma::uword, arma::uword>> factors;
+        std::vector<arma::uword> removed;
+    };
+    static PhiFactors last;
+    auto small = [&](const arma::vec& p, arma::uword n) {
+        const std::complex<double> zeta = std::polar(1.0, 2.0 * arma::datum::pi / double(n));
         std::complex<double> value(0.0, 0.0);
         double size = 0.0;
         for(arma::uword i = p.n_elem; i-- > 0;) {
             value = value * zeta + p(i);
             size += std::abs(p(i));
         }
-        return std::abs(value) <= bound * size;
+        return std::abs(value) <= std::max(1.0, double(n) - 1.0) * tolerance * size;
     };
-    arma::vec thetaNew, phiNew;
-    for(arma::sword n = 1; n <= lagMax; n++) {
+    // Divide p by Phi_n while it is small at a root of Phi_n and divides, at most limit times
+    arma::vec quotient;
+    auto removeFactor = [&](arma::vec& p, arma::uword n, arma::uword limit) {
+        arma::uword times = 0;
+        while(times < limit && small(p, n) && polynomialDivide(p, cyclotomicPolynomial(n), quotient, tolerance)) {
+            p = quotient;
+            times++;
+        }
+        return times;
+    };
+    std::vector<arma::uword> candidates;
+    for(arma::uword n = 1; n <= arma::uword(arma::max(lags)); n++) {
         bool divides = false;
         for(arma::uword i = 0; i < lags.n_elem && !divides; i++) {
-            divides = lags(i) % n == 0;
+            divides = arma::uword(lags(i)) % n == 0;
         }
-        if(!divides) {
-            continue;
-        }
-        const std::complex<double> zeta = std::polar(1.0, 2.0 * arma::datum::pi / double(n));
-        const double bound = std::max(1.0, double(n) - 1.0) * tolerance;
-        while(small(theta, zeta, bound) && small(phi, zeta, bound)) {
-            const arma::vec& c = cyclotomicPolynomial(arma::uword(n));
-            if(!polynomialDivide(theta, c, thetaNew, tolerance) || !polynomialDivide(phi, c, phiNew, tolerance)) {
-                break;
-            }
-            theta = thetaNew;
-            phi = phiNew;
+        if(divides) {
+            candidates.push_back(n);
         }
     }
+
+    const bool same = last.phi.n_elem == phi.n_elem && arma::all(last.phi == phi) &&
+                      last.lags.n_elem == lags.n_elem && arma::all(last.lags == lags);
+    if(!same) {
+        last.phi = phi;
+        last.lags = lags;
+        last.tabulated = false;
+        last.removed.clear();
+        arma::vec thetaNew, phiNew;
+        for(arma::uword n : candidates) {
+            while(small(theta, n) && small(phi, n)) {
+                const arma::vec& c = cyclotomicPolynomial(n);
+                if(!polynomialDivide(theta, c, thetaNew, tolerance) || !polynomialDivide(phi, c, phiNew, tolerance)) {
+                    break;
+                }
+                theta = thetaNew;
+                phi = phiNew;
+            }
+        }
+        return;
+    }
+    if(!last.tabulated) {
+        arma::vec rest = phi;
+        last.factors.clear();
+        for(arma::uword n : candidates) {
+            const arma::uword times = removeFactor(rest, n, arma::uword(-1));
+            if(times > 0) {
+                last.factors.emplace_back(n, times);
+            }
+        }
+        last.tabulated = true;
+    }
+    std::vector<arma::uword> removed;
+    for(const auto& factor : last.factors) {
+        removed.push_back(removeFactor(theta, factor.first, factor.second));
+    }
+    if(removed != last.removed) {
+        last.phiCancelled = phi;
+        for(arma::uword i = 0; i < removed.size(); i++) {
+            for(arma::uword times = 0; times < removed[i]; times++) {
+                polynomialDivide(last.phiCancelled, cyclotomicPolynomial(last.factors[i].first), quotient, tolerance);
+                last.phiCancelled = quotient;
+            }
+        }
+        last.removed = removed;
+    }
+    phi = last.phiCancelled;
 }
 
 // The largest |lambda| = 1 / min|B| over the roots B of the polynomial c, by bisection on r

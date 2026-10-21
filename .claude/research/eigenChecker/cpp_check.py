@@ -56,9 +56,15 @@ with tempfile.TemporaryDirectory() as tmp:
     out <- lapply(models, function(m) {{
         k <- length(m$lags)
         F <- matrix(unlist(m$F), k, k, byrow=TRUE)
-        r <- smoothEigensPolyR(matrix(unlist(m$g)), F, matrix(unlist(m$w), 1), as.integer(unlist(m$lags)),
-                               FALSE, 1L, FALSE)
-        list(modulus=as.numeric(r), theta=attr(r, "maPolynomial"), phi=attr(r, "ariPolynomial"))
+        # Three calls: phi computed, then tabulated, then taken from the table
+        r <- lapply(1:3, function(i) smoothEigensPolyR(matrix(unlist(m$g)), F, matrix(unlist(m$w), 1),
+                                                       as.integer(unlist(m$lags)), FALSE, 1L, FALSE))
+        list(modulus=as.numeric(r[[3]]), theta=attr(r[[3]], "maPolynomial"), phi=attr(r[[3]], "ariPolynomial"),
+             repeatDiff=max(sapply(r, function(x) max(abs(as.numeric(x) - as.numeric(r[[1]])),
+                                                       if(length(attr(x, "maPolynomial")) ==
+                                                          length(attr(r[[1]], "maPolynomial")))
+                                                           max(abs(attr(x, "maPolynomial") - attr(r[[1]], "maPolynomial")))
+                                                       else Inf))))
     }})
     jsonlite::write_json(out, "{outputPath}", digits=NA, auto_unbox=TRUE)
     """
@@ -85,7 +91,9 @@ for name in families:
                              "against prototype",
                  "value": float(modulusDiff), "conditions": {**conditions, "inadmissible": len(inadmissible)}},
                 {"quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
-                 "value": int(degreeDiffs), "conditions": conditions}]
+                 "value": int(degreeDiffs), "conditions": conditions},
+                {"quantity": "max abs difference between three calls of the C++ core on the same model",
+                 "value": float(max(a["repeatDiff"] for _, a in pairs)), "conditions": conditions}]
 
 # The models on which the two differ, with the PBH reference
 for (name, (F, g, w, lags)), e, a in zip(models, expected, actual):

@@ -57,6 +57,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// smoothEigensPolyR
+Rcpp::NumericVector smoothEigensPolyR(const arma::mat& persistence, const arma::mat& transition, const arma::mat& measurement, const arma::ivec& lagsModelAll, bool xregModel, int obsInSample, bool hasDelta, int xregNumber, bool constantRequired);
+RcppExport SEXP _smooth_smoothEigensPolyR(SEXP persistenceSEXP, SEXP transitionSEXP, SEXP measurementSEXP, SEXP lagsModelAllSEXP, SEXP xregModelSEXP, SEXP obsInSampleSEXP, SEXP hasDeltaSEXP, SEXP xregNumberSEXP, SEXP constantRequiredSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type persistence(persistenceSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type transition(transitionSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type measurement(measurementSEXP);
+    Rcpp::traits::input_parameter< const arma::ivec& >::type lagsModelAll(lagsModelAllSEXP);
+    Rcpp::traits::input_parameter< bool >::type xregModel(xregModelSEXP);
+    Rcpp::traits::input_parameter< int >::type obsInSample(obsInSampleSEXP);
+    Rcpp::traits::input_parameter< bool >::type hasDelta(hasDeltaSEXP);
+    Rcpp::traits::input_parameter< int >::type xregNumber(xregNumberSEXP);
+    Rcpp::traits::input_parameter< bool >::type constantRequired(constantRequiredSEXP);
+    rcpp_result_gen = Rcpp::wrap(smoothEigensPolyR(persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber, constantRequired));
+    return rcpp_result_gen;
+END_RCPP
+}
 // hessianCpp
 NumericMatrix hessianCpp(Function f, NumericVector x0, double h);
 RcppExport SEXP _smooth_hessianCpp(SEXP fSEXP, SEXP x0SEXP, SEXP hSEXP) {

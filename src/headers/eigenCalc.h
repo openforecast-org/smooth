@@ -1,3 +1,6 @@
+#include <map>
+#include "arimaBounds.h"
+
 // Helper: Invert measurement matrix (1/x, with inf->0)
 arma::mat measurementInverterCpp(const arma::mat& measurement) {
     arma::mat result = 1.0 / measurement;
@@ -370,4 +373,246 @@ inline arma::vec eigenModuliCore(const arma::mat& A) {
         moduli(i - 1) = std::hypot(wr(i), wi(i));
     }
     return moduli;
+}
+
+// ---------------------------------------------------------------------------------------
+// The admissibility of a lagged SSOE model through its ARIMA form. With the lag matrix
+// L(B) = diag(B^l_1, ..., B^l_k), the model y_t = w' v_{t-l} + e_t, v_t = F v_{t-l} + g e_t
+// satisfies phi(B) y_t = theta(B) e_t with phi(B) = det(I - F L(B)) and
+// theta(B) = det(I - D L(B)), D = F - g w'. The model forgets its initial states when the
+// roots of theta, after removing the factors it shares with phi, lie outside the unit
+// circle. The shared factors that matter are unit roots: the redundancies between
+// components (level and seasonals, seasonals of nested periods) and the components that the
+// error does not drive (a constant, static regressors, persistence fixed at zero), all
+// products of cyclotomic polynomials Phi_n(B) with n dividing a lag. The determinant and
+// the FFT are written out, as in eigenModuliCore(), so that the R and Python builds round
+// identically whatever LAPACK each links.
+
+// The determinant of a complex square matrix by LU with partial pivoting
+inline std::complex<double> complexDeterminant(arma::cx_mat A) {
+    const arma::uword n = A.n_rows;
+    std::complex<double> determinant(1.0, 0.0);
+    for(arma::uword j = 0; j < n; j++) {
+        arma::uword pivot = j;
+        for(arma::uword i = j + 1; i < n; i++) {
+            if(std::abs(A(i, j)) > std::abs(A(pivot, j))) {
+                pivot = i;
+            }
+        }
+        if(std::abs(A(pivot, j)) == 0.0) {
+            return std::complex<double>(0.0, 0.0);
+        }
+        if(pivot != j) {
+            A.swap_rows(pivot, j);
+            determinant = -determinant;
+        }
+        determinant *= A(j, j);
+        for(arma::uword i = j + 1; i < n; i++) {
+            std::complex<double> factor = A(i, j) / A(j, j);
+            for(arma::uword c = j + 1; c < n; c++) {
+                A(i, c) -= factor * A(j, c);
+            }
+        }
+    }
+    return determinant;
+}
+
+// The discrete Fourier transform sum_j x_j exp(-2 pi i j m / n) of a vector whose length
+// is a power of 2: iterative radix-2 Cooley-Tukey
+inline arma::cx_vec fftCore(arma::cx_vec x) {
+    const arma::uword n = x.n_elem;
+    for(arma::uword i = 1, j = 0; i < n; i++) {
+        arma::uword bit = n >> 1;
+        for(; j & bit; bit >>= 1) {
+            j ^= bit;
+        }
+        j ^= bit;
+        if(i < j) {
+            std::swap(x(i), x(j));
+        }
+    }
+    for(arma::uword length = 2; length <= n; length <<= 1) {
+        const std::complex<double> step = std::polar(1.0, -2.0 * arma::datum::pi / double(length));
+        for(arma::uword start = 0; start < n; start += length) {
+            std::complex<double> twiddle(1.0, 0.0);
+            for(arma::uword k = 0; k < length / 2; k++) {
+                std::complex<double> even = x(start + k), odd = twiddle * x(start + k + length / 2);
+                x(start + k) = even + odd;
+                x(start + k + length / 2) = even - odd;
+                twiddle *= step;
+            }
+        }
+    }
+    return x;
+}
+
+// Coefficients (increasing powers of B) of det(I - M L(B)), from its values at the N-th
+// roots of unity, N the smallest power of 2 above the degree sum(lags)
+inline arma::vec lagPolynomial(const arma::mat& M, const arma::ivec& lags) {
+    const arma::uword k = lags.n_elem, degree = arma::accu(lags);
+    arma::uword N = 1;
+    while(N < degree + 1) {
+        N <<= 1;
+    }
+    arma::cx_vec roots(N), values(N);
+    for(arma::uword t = 0; t < N; t++) {
+        roots(t) = std::polar(1.0, 2.0 * arma::datum::pi * double(t) / double(N));
+    }
+    const arma::cx_mat Mc = arma::conv_to<arma::cx_mat>::from(M);
+    for(arma::uword j = 0; j < N; j++) {
+        arma::cx_mat A = -Mc;
+        for(arma::uword c = 0; c < k; c++) {
+            A.col(c) *= roots((j * arma::uword(lags(c))) % N);
+        }
+        A.diag() += 1.0;
+        values(j) = complexDeterminant(A);
+    }
+    const arma::vec coefficients = arma::real(fftCore(values));
+    return coefficients.head(degree + 1) / double(N);
+}
+
+// Divide p by q (both in increasing powers); true, with the quotient, if the remainder
+// is at most tolerance times the sum of the absolute coefficients of p
+inline bool polynomialDivide(const arma::vec& p, const arma::vec& q, arma::vec& quotient,
+                             double tolerance = 1e-9) {
+    const arma::uword m = q.n_elem - 1;
+    if(p.n_elem <= m) {
+        return false;
+    }
+    arma::vec r = p;
+    quotient.zeros(p.n_elem - m);
+    for(arma::uword i = p.n_elem - m; i-- > 0;) {
+        quotient(i) = r(i + m) / q(m);
+        r.subvec(i, i + m) -= quotient(i) * q;
+    }
+    return arma::max(arma::abs(r.head(m))) <= tolerance * arma::accu(arma::abs(p));
+}
+
+// Integer coefficients of the n-th cyclotomic polynomial, (B^n - 1) divided by those of the
+// proper divisors of n; kept once computed
+inline const arma::vec& cyclotomicPolynomial(arma::uword n) {
+    static std::map<arma::uword, arma::vec> computed;
+    auto found = computed.find(n);
+    if(found != computed.end()) {
+        return found->second;
+    }
+    arma::vec p(n + 1, arma::fill::zeros), quotient;
+    p(0) = -1;
+    p(n) = 1;
+    for(arma::uword d = 1; d < n; d++) {
+        if(n % d == 0) {
+            polynomialDivide(p, cyclotomicPolynomial(d), quotient);
+            p = arma::round(quotient);
+        }
+    }
+    return computed.emplace(n, p).first->second;
+}
+
+// Remove from theta and phi the cyclotomic factors Phi_n (n dividing a lag) they share, with
+// their multiplicity. A root of Phi_n is tried first: a remainder within the tolerance of
+// polynomialDivide() leaves |p(zeta)| below (n - 1) times it, so the division is attempted
+// only when both polynomials are that small there.
+inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& lags,
+                            double tolerance = 1e-9) {
+    const arma::uword lagMax = arma::max(lags);
+    auto small = [&](const arma::vec& p, const std::complex<double>& zeta, double bound) {
+        std::complex<double> value(0.0, 0.0);
+        for(arma::uword i = p.n_elem; i-- > 0;) {
+            value = value * zeta + p(i);
+        }
+        return std::abs(value) <= bound * arma::accu(arma::abs(p));
+    };
+    arma::vec thetaNew, phiNew;
+    for(arma::uword n = 1; n <= lagMax; n++) {
+        if(!arma::any(lags - (lags / arma::sword(n)) * arma::sword(n) == 0)) {
+            continue;
+        }
+        const std::complex<double> zeta = std::polar(1.0, 2.0 * arma::datum::pi / double(n));
+        const double bound = std::max(1.0, double(n) - 1.0) * tolerance;
+        while(small(theta, zeta, bound) && small(phi, zeta, bound)) {
+            const arma::vec& c = cyclotomicPolynomial(n);
+            if(!polynomialDivide(theta, c, thetaNew, tolerance) || !polynomialDivide(phi, c, phiNew, tolerance)) {
+                break;
+            }
+            theta = thetaNew;
+            phi = phiNew;
+        }
+    }
+}
+
+// The largest |lambda| = 1 / min|B| over the roots B of the polynomial c, by bisection on r
+// with the step-down test of arimaReflection() applied to c(B / r), which passes exactly when
+// all roots of c have |lambda| < r
+inline double largestRootModulus(arma::vec c, double tolerance = 1e-10) {
+    const double scale = arma::max(arma::abs(c));
+    arma::uword degree = c.n_elem - 1;
+    while(degree > 0 && std::abs(c(degree)) <= 1e-12 * scale) {
+        degree--;
+    }
+    if(degree == 0) {
+        return 0.0;
+    }
+    c = c.head(degree + 1) / c(0);
+    arma::vec powers(degree);
+    auto below = [&](double r) {
+        double power = 1.0;
+        for(arma::uword i = 0; i < degree; i++) {
+            power /= r;
+            powers(i) = c(i + 1) * power;
+        }
+        return arimaReflection(powers) < 1;
+    };
+    double lower = 0.0, upper = 1.0;
+    if(!below(upper)) {
+        do {
+            lower = upper;
+            upper *= 2.0;
+        } while(!below(upper));
+    }
+    while(upper - lower > tolerance) {
+        const double middle = (lower + upper) / 2.0;
+        (below(middle) ? upper : lower) = middle;
+    }
+    return upper;
+}
+
+struct SmoothEigensResult {
+    double modulus;
+    arma::vec ariPolynomial;
+    arma::vec maPolynomial;
+};
+
+// The polynomial counterpart of smoothEigensCpp(), with the same arguments: the largest
+// modulus of the roots of the cancelled MA polynomial of the components without adaptive
+// regressors, and, with adaptive regressors, of the average condition of smoothEigensCpp()
+inline SmoothEigensResult smoothEigensPolyCpp(const arma::mat& persistence,
+                                              const arma::mat& transition,
+                                              const arma::mat& measurement,
+                                              const arma::ivec& lagsModelAll,
+                                              bool& xregModel,
+                                              int& obsInSample,
+                                              bool& hasDelta,
+                                              int xregNumber = 0,
+                                              bool constantRequired = false) {
+    const bool adaptive = xregModel && hasDelta;
+    const int nComponents = int(lagsModelAll.n_elem) - (adaptive ? int(constantRequired) + xregNumber : 0);
+    SmoothEigensResult result;
+    result.modulus = 0.0;
+    if(nComponents > 0) {
+        const arma::uvec idx = arma::regspace<arma::uvec>(0, nComponents - 1);
+        const arma::ivec lags = lagsModelAll.elem(idx);
+        const arma::mat F = transition.submat(idx, idx);
+        const arma::rowvec measurementRow = measurement.row(obsInSample - 1);
+        result.maPolynomial = lagPolynomial(F - persistence.rows(idx) * measurementRow.cols(idx), lags);
+        result.ariPolynomial = lagPolynomial(F, lags);
+        cancelUnitRoots(result.maPolynomial, result.ariPolynomial, lags);
+        result.modulus = largestRootModulus(result.maPolynomial);
+    }
+    if(adaptive && xregNumber > 0) {
+        arma::vec eigenValues = smoothEigensCpp(persistence, transition, measurement, lagsModelAll,
+                                                xregModel, obsInSample, hasDelta, xregNumber,
+                                                constantRequired);
+        result.modulus = std::max(result.modulus, arma::max(eigenValues.tail(xregNumber)));
+    }
+    return result;
 }

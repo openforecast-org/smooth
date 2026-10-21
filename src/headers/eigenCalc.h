@@ -562,7 +562,7 @@ inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& 
     struct PhiFactors {
         arma::vec phi, phiCancelled;
         arma::ivec lags;
-        bool tabulated = false;
+        bool tabulated = false, cancelled = false;
         std::vector<std::pair<arma::uword, arma::uword>> factors;
         std::vector<arma::uword> removed;
     };
@@ -604,7 +604,7 @@ inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& 
         last.phi = phi;
         last.lags = lags;
         last.tabulated = false;
-        last.removed.clear();
+        last.cancelled = false;
         arma::vec thetaNew, phiNew;
         for(arma::uword n : candidates) {
             while(small(theta, n) && small(phi, n)) {
@@ -633,7 +633,7 @@ inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& 
     for(const auto& factor : last.factors) {
         removed.push_back(removeFactor(theta, factor.first, factor.second));
     }
-    if(removed != last.removed) {
+    if(!last.cancelled || removed != last.removed) {
         last.phiCancelled = phi;
         for(arma::uword i = 0; i < removed.size(); i++) {
             for(arma::uword times = 0; times < removed[i]; times++) {
@@ -642,6 +642,7 @@ inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& 
             }
         }
         last.removed = removed;
+        last.cancelled = true;
     }
     phi = last.phiCancelled;
 }

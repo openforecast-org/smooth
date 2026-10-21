@@ -717,8 +717,26 @@ class ADAM:
             Information criterion for model selection.
         bounds : Literal["usual", "admissible", "none"], default="usual"
             Parameter bounds specification during optimization.
-        occurrence : OCCURRENCE_OPTIONS, default="none"
-            Occurrence model type for intermittent data.
+        occurrence : OCCURRENCE_OPTIONS or fitted OM / OMG, default="none"
+            The model of the probability of occurrence, for intermittent data:
+
+            - ``"none"``: no occurrence model; zeros are ordinary values.
+            - ``"fixed"``: constant probability.
+            - ``"general"``: the general Beta model with two parameters
+              (an :class:`OMG`).
+            - ``"odds-ratio"``: the odds-ratio model, b=1 in the Beta.
+            - ``"inverse-odds-ratio"``: the model with a=1 in the Beta.
+            - ``"direct"``: the TSB-like (Teunter et al., 2011) probability
+              update, a+b=1.
+            - ``"auto"``: the type selected by :class:`AutoOM`.
+
+            The occurrence model takes the ETS form given in ``model``, the
+            ARIMA orders, the lags and the regressors of the demand sizes, and
+            is fitted first; its fitted probabilities then scale the sizes. An
+            already fitted :class:`OM` or :class:`OMG` can be passed instead
+            and is used as it stands (R's ``oes`` / ``om`` object); its
+            parameters are then not counted in ``nparam``. An unknown string
+            switches to ``"none"`` with a warning.
         persistence : Optional[Dict[str, float]], default=None
             Fixed persistence parameters (e.g., {"alpha": 0.5, "beta": 0.5}).
             If None, parameters are estimated.

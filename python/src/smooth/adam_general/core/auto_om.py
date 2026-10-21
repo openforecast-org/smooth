@@ -13,7 +13,10 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
+from smooth.adam_general.core.checker.arima_checks import (
+    _R_ORDERS,
+    resolve_arima_orders,
+)
 from smooth.adam_general.core.estimator.arima_selector import arima_selector
 from smooth.adam_general.core.om import OM, _check_om_loss
 from smooth.adam_general.core.omg import OMG
@@ -26,9 +29,6 @@ _VALID_OCCURRENCE = (
     "direct",
     "general",
 )
-
-# The default orders of R's auto.om()
-_R_ORDERS = {"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True}
 
 _IC_ATTR = {"AIC": "aic", "AICc": "aicc", "BIC": "bic", "BICc": "bicc"}
 

@@ -388,8 +388,8 @@ inline arma::vec eigenModuliCore(const arma::mat& A) {
 // the FFT are written out, as in eigenModuliCore(), so that the R and Python builds round
 // identically whatever LAPACK each links.
 
-// The determinant of a complex square matrix by LU with partial pivoting
-inline std::complex<double> complexDeterminant(arma::cx_mat A) {
+// The determinant of a complex square matrix by LU with partial pivoting; A is overwritten
+inline std::complex<double> complexDeterminant(arma::cx_mat& A) {
     const arma::uword n = A.n_rows;
     std::complex<double> determinant(1.0, 0.0);
     for(arma::uword j = 0; j < n; j++) {
@@ -459,8 +459,9 @@ inline arma::vec lagPolynomial(const arma::mat& M, const arma::ivec& lags) {
         roots(t) = std::polar(1.0, 2.0 * arma::datum::pi * double(t) / double(N));
     }
     const arma::cx_mat Mc = arma::conv_to<arma::cx_mat>::from(M);
+    arma::cx_mat A(k, k);
     for(arma::uword j = 0; j < N; j++) {
-        arma::cx_mat A = -Mc;
+        A = -Mc;
         for(arma::uword c = 0; c < k; c++) {
             A.col(c) *= roots((j * arma::uword(lags(c))) % N);
         }
@@ -514,23 +515,29 @@ inline const arma::vec& cyclotomicPolynomial(arma::uword n) {
 // only when both polynomials are that small there.
 inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& lags,
                             double tolerance = 1e-9) {
-    const arma::uword lagMax = arma::max(lags);
+    const arma::sword lagMax = arma::max(lags);
     auto small = [&](const arma::vec& p, const std::complex<double>& zeta, double bound) {
         std::complex<double> value(0.0, 0.0);
+        double size = 0.0;
         for(arma::uword i = p.n_elem; i-- > 0;) {
             value = value * zeta + p(i);
+            size += std::abs(p(i));
         }
-        return std::abs(value) <= bound * arma::accu(arma::abs(p));
+        return std::abs(value) <= bound * size;
     };
     arma::vec thetaNew, phiNew;
-    for(arma::uword n = 1; n <= lagMax; n++) {
-        if(!arma::any(lags - (lags / arma::sword(n)) * arma::sword(n) == 0)) {
+    for(arma::sword n = 1; n <= lagMax; n++) {
+        bool divides = false;
+        for(arma::uword i = 0; i < lags.n_elem && !divides; i++) {
+            divides = lags(i) % n == 0;
+        }
+        if(!divides) {
             continue;
         }
         const std::complex<double> zeta = std::polar(1.0, 2.0 * arma::datum::pi / double(n));
         const double bound = std::max(1.0, double(n) - 1.0) * tolerance;
         while(small(theta, zeta, bound) && small(phi, zeta, bound)) {
-            const arma::vec& c = cyclotomicPolynomial(n);
+            const arma::vec& c = cyclotomicPolynomial(arma::uword(n));
             if(!polynomialDivide(theta, c, thetaNew, tolerance) || !polynomialDivide(phi, c, phiNew, tolerance)) {
                 break;
             }

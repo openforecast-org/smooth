@@ -22,9 +22,14 @@ inline double arimaReflection(arma::vec c) {
         if(std::abs(k) >= 1) {
             break;
         }
-        if(q > 1) {
-            arma::vec head = c.head(q - 1);
-            c.head(q - 1) = (head - k * arma::reverse(head)) / (1 - k * k);
+        // c_i and c_{q-2-i} in pairs, in place: (c_i - k c_{q-2-i}) / (1 - k^2) and back
+        for(arma::uword i = 0, j = q - 1; i + 1 <= j; ++i) {
+            --j;
+            double a = c(i), b = c(j);
+            c(i) = (a - k * b) / (1 - k * k);
+            if(j != i) {
+                c(j) = (b - k * a) / (1 - k * k);
+            }
         }
     }
     return largest;

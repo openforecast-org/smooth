@@ -129,6 +129,7 @@ Bugfixes:
 * `forecast()` of a pure regression from `adam()` failed with "attempt to apply non-function": the model has no state space part. The fitted `alm()` is now kept in the object, `forecast()` is done by `forecast.alm()` (all the prediction intervals are the parametric ones there) and the in-sample intervals of `predict()` by `predict.alm()`, which failed the same way.
 * The help page of `sma()` listed the elements of the old `smooth` class (`order`, `lower`, `upper`, `errors`, `s2`, `y` and others), which it no longer returns: it returns an `adam` object, as `ssarima()`, `ces()` and `gum()`, and now refers to `adam()` for them.
 * `multicov(type="analytical")` of an `om()` model returned a matrix of NAs since it moved to the variance implied by the de-biased scale: the occurrence model is Bernoulli and has no scale. It uses `sigma()^2` on the link scale again, as before.
+* `adam(..., FI=TRUE)` (and the functions built on it, such as `es()` and `msarima()`) returned `TRUE` in `$FI` instead of the Fisher Information matrix when the model was estimated or selected: the matrix is now calculated, as with the reused model.
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

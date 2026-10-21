@@ -3158,6 +3158,13 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                 replace(yInSample, yNAValues[1:obsInSample], NA));
     }
 
+    # The Fisher Information is calculated by the model reused at its estimated parameters
+    if(any(modelDo==c("estimate","select")) && FI){
+        modelReturned$FI <- suppressWarnings(adam(modelReturned$data, h=0, model=modelReturned,
+                                                  formula=formula(modelReturned),
+                                                  FI=TRUE, stepSize=stepSize))$FI;
+    }
+
     if(!silent){
         plot(modelReturned, 7);
     }

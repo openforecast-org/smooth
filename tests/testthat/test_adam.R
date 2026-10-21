@@ -1401,3 +1401,11 @@ test_that("the approximate intervals of ADAM ETS with the drift", {
         expect_equal(as.vector(testApproximate$lower), as.vector(testSimulated$lower), tolerance=0.05);
     }
 })
+
+# FI=TRUE returns the Fisher Information matrix of the estimated model, not TRUE
+test_that("ADAM with FI=TRUE returns the Fisher Information matrix", {
+    testModel <- adam(BJsales, "AAdN", FI=TRUE);
+    expect_true(is.matrix(testModel$FI));
+    expect_equal(colnames(testModel$FI), names(coef(testModel)));
+    expect_equal(testModel$FI, adam(BJsales, model=testModel, FI=TRUE)$FI);
+})

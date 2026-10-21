@@ -25,7 +25,7 @@ Rcpp::NumericVector profileCore(arma::mat persistence, arma::mat transition, arm
     double cancellation = micro(t);
     cancelUnitRoots(theta, phi, lags);
     t = now();
-    for(int i = 0; i < repeats; i++) { largestRootModulus(theta); }
+    for(int i = 0; i < repeats; i++) { largestRootModulus(theta, 1e-6, false); }
     double bisection = micro(t);
     arma::vec c = theta.tail(theta.n_elem - 1) / theta(0);
     t = now();
@@ -50,6 +50,8 @@ set.seed(41)
 models <- list("ETS(A,N,A), m=12"=list(g=matrix(c(0.3, 0.1)), F=diag(2), w=matrix(1, 1, 2), lags=c(1L, 12L)),
                "ETS(A,N,A,A), m=24 and 168"=list(g=matrix(c(0.3, 0.1, 0.05)), F=diag(3), w=matrix(1, 1, 3),
                                                  lags=c(1L, 24L, 168L)),
+               "ETS(A,N,A,A), m=24 and 168, inadmissible"=list(g=matrix(c(1.2, 0.9, 0.05)), F=diag(3),
+                                                               w=matrix(1, 1, 3), lags=c(1L, 24L, 168L)),
                "GUM, orders (1,1,1), lags (1,24,168)"=list(g=matrix(rnorm(3, 0, 0.15)), F=matrix(rnorm(9, 0, 0.3), 3),
                                                            w=matrix(rnorm(3, 1, 0.15), 1), lags=c(1L, 24L, 168L)))
 results <- list()

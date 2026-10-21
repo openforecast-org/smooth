@@ -3,9 +3,14 @@
 args <- commandArgs(trailingOnly=TRUE)
 root <- args[1]
 repeats <- as.integer(args[2])
-# Compiled with the optimisation of an installed package (load_all() alone compiles with -O0)
-pkgbuild::compile_dll(root, force=TRUE, debug=FALSE, quiet=TRUE)
-suppressMessages(pkgload::load_all(root, compile=FALSE, quiet=TRUE))
+# Installed in a temporary library, compiled as for users (load_all() compiles with -O0)
+library <- file.path(tempdir(), "library")
+dir.create(library)
+install.packages(root, repos=NULL, type="source", lib=library, quiet=TRUE)
+suppressMessages(library(smooth, lib.loc=library))
+smoothEigensR <- smooth:::smoothEigensR
+smoothEigensPolyR <- smooth:::smoothEigensPolyR
+smoothEigens <- smooth:::smoothEigens
 set.seed(41)
 
 results <- list()
@@ -75,8 +80,8 @@ for(check in c("per-lag", "polynomial")) {
     counted <- if(check == "per-lag") smoothEigensOld else smoothEigensPoly
     assignInNamespace("smoothEigens", function(...) {calls <<- calls + 1; counted(...)}, "smooth")
     for(name in names(fits)) {
-        calls <- 0
-        time <- system.time(fit <- fits[[name]]())[["elapsed"]]
+        # The median of three fits; the calls are those of one fit
+        time <- median(replicate(3, {calls <- 0; system.time(fits[[name]]())[["elapsed"]]}))
         add("time of the fit, seconds", time, check=check, fit=name)
         add("calls of smoothEigens() in the fit", calls, check=check, fit=name)
         add("time of the fit per call of smoothEigens(), microseconds", time / max(calls, 1) * 1e6,

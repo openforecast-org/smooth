@@ -74,21 +74,23 @@ results = []
 for name in families:
     pairs = [(e, a) for e, a in zip(expected, actual) if e["family"] == name]
     mismatches = sum((e["modulus"] < 1) != (a["modulus"] < 1) for e, a in pairs)
-    modulusDiff = max(abs(e["modulus"] - a["modulus"]) for e, a in pairs)
+    inadmissible = [(e, a) for e, a in pairs if e["modulus"] >= 1 and a["modulus"] >= 1]
+    modulusDiff = max([abs(e["modulus"] - a["modulus"]) for e, a in inadmissible], default=0.0)
     degreeDiffs = sum(degree(e["theta"]) != degree(a["theta"]) or degree(e["phi"]) != degree(a["phi"])
                       for e, a in pairs)
     conditions = {"family": name, "models": len(pairs)}
     results += [{"quantity": "admissibility decisions of the C++ core that differ from the prototype",
                  "value": int(mismatches), "conditions": conditions},
-                {"quantity": "max abs difference of the largest root modulus, C++ core against prototype",
-                 "value": float(modulusDiff), "conditions": conditions},
+                {"quantity": "max abs difference of the largest root modulus on inadmissible models, C++ core "
+                             "against prototype",
+                 "value": float(modulusDiff), "conditions": {**conditions, "inadmissible": len(inadmissible)}},
                 {"quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
                  "value": int(degreeDiffs), "conditions": conditions}]
 
 # The models on which the two differ, with the PBH reference
 for (name, (F, g, w, lags)), e, a in zip(models, expected, actual):
     if degree(e["theta"]) != degree(a["theta"]) or degree(e["phi"]) != degree(a["phi"]) or \
-            abs(e["modulus"] - a["modulus"]) > 1e-9:
+            (e["modulus"] >= 1 and abs(e["modulus"] - a["modulus"]) > 1e-5):
         print(name, "lags", lags, "g", np.round(g, 4).tolist(), "F", np.round(F, 4).tolist())
         print("  prototype: degrees", degree(e["theta"]), degree(e["phi"]), "modulus", e["modulus"])
         print("  C++:       degrees", degree(a["theta"]), degree(a["phi"]), "modulus", a["modulus"])

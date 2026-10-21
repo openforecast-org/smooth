@@ -458,15 +458,19 @@ inline arma::vec lagPolynomial(const arma::mat& M, const arma::ivec& lags) {
     for(arma::uword t = 0; t < N; t++) {
         roots(t) = std::polar(1.0, 2.0 * arma::datum::pi * double(t) / double(N));
     }
+    // The coefficients are real, so the values at conjugate roots of unity are conjugate
     const arma::cx_mat Mc = arma::conv_to<arma::cx_mat>::from(M);
     arma::cx_mat A(k, k);
-    for(arma::uword j = 0; j < N; j++) {
+    for(arma::uword j = 0; j <= N / 2; j++) {
         A = -Mc;
         for(arma::uword c = 0; c < k; c++) {
             A.col(c) *= roots((j * arma::uword(lags(c))) % N);
         }
         A.diag() += 1.0;
         values(j) = complexDeterminant(A);
+        if(j > 0 && j < N - j) {
+            values(N - j) = std::conj(values(j));
+        }
     }
     const arma::vec coefficients = arma::real(fftCore(values));
     return coefficients.head(degree + 1) / double(N);
@@ -549,8 +553,10 @@ inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& 
 
 // The largest |lambda| = 1 / min|B| over the roots B of the polynomial c, by bisection on r
 // with the step-down test of arimaReflection() applied to c(B / r), which passes exactly when
-// all roots of c have |lambda| < r
-inline double largestRootModulus(arma::vec c, double tolerance = 1e-10) {
+// all roots of c have |lambda| < r. With belowOne false, a polynomial with all |lambda| < 1
+// returns the largest reflection coefficient of its step-down instead, also below one, which
+// spares the bisection when only the admissibility is needed.
+inline double largestRootModulus(arma::vec c, double tolerance = 1e-6, bool belowOne = true) {
     const double scale = arma::max(arma::abs(c));
     arma::uword degree = c.n_elem - 1;
     while(degree > 0 && std::abs(c(degree)) <= 1e-12 * scale) {
@@ -570,6 +576,12 @@ inline double largestRootModulus(arma::vec c, double tolerance = 1e-10) {
         return arimaReflection(powers) < 1;
     };
     double lower = 0.0, upper = 1.0;
+    if(!belowOne) {
+        const double reflection = arimaReflection(c.tail(degree));
+        if(reflection < 1) {
+            return reflection;
+        }
+    }
     if(!below(upper)) {
         do {
             lower = upper;
@@ -589,9 +601,12 @@ struct SmoothEigensResult {
     arma::vec maPolynomial;
 };
 
-// The polynomial counterpart of smoothEigensCpp(), with the same arguments: the largest
-// modulus of the roots of the cancelled MA polynomial of the components without adaptive
-// regressors, and, with adaptive regressors, of the average condition of smoothEigensCpp()
+// The polynomial counterpart of smoothEigensCpp(), with the same arguments. Its modulus is
+// below one exactly when the components without adaptive regressors forget their initial
+// states (and, with adaptive regressors, the average condition of smoothEigensCpp() holds):
+// below one it is the largest reflection coefficient of the cancelled MA polynomial, from one
+// pass of the step-down; at or above one, the largest modulus of its roots, which grows as
+// the parameters move away from the admissible region.
 inline SmoothEigensResult smoothEigensPolyCpp(const arma::mat& persistence,
                                               const arma::mat& transition,
                                               const arma::mat& measurement,
@@ -613,7 +628,7 @@ inline SmoothEigensResult smoothEigensPolyCpp(const arma::mat& persistence,
         result.maPolynomial = lagPolynomial(F - persistence.rows(idx) * measurementRow.cols(idx), lags);
         result.ariPolynomial = lagPolynomial(F, lags);
         cancelUnitRoots(result.maPolynomial, result.ariPolynomial, lags);
-        result.modulus = largestRootModulus(result.maPolynomial);
+        result.modulus = largestRootModulus(result.maPolynomial, 1e-6, false);
     }
     if(adaptive && xregNumber > 0) {
         arma::vec eigenValues = smoothEigensCpp(persistence, transition, measurement, lagsModelAll,

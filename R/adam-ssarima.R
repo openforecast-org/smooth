@@ -239,6 +239,11 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     }
     list2env(checkerReturn, envir=environment());
 
+    # The regressors are selected as in adam(): on the errors of the model without them
+    if(xregModel && regressors=="select"){
+        return(adam_xreg_selectRefit(cl, env, data, responseName, "y", ic));
+    }
+
     # A fix to make sure that usual bounds are possible
     bounds <- boundsOriginal;
 

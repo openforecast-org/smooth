@@ -155,3 +155,74 @@ def test_the_provided_deltas_are_used_as_r(case):
         assert model.persistence_vector[key] == pytest.approx(value[0], rel=1e-5)
     np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
     assert model.nparam == r["df"][0]
+
+
+SEASONALS = np.r_[[-10.0] * 3, [10.0] * 3, [0.0] * 6]
+# (R call, Python arguments, whether with the regressors a and b)
+PROVIDED_ALL = {
+    "vector-no-trend": (
+        "adam(y, 'ANA', initial=c(100,seasonals), persistence=c(0.1,0.1))",
+        dict(
+            model="ANA",
+            lags=[12],
+            initial=np.r_[100.0, SEASONALS],
+            persistence=[0.1, 0.1],
+        ),
+        False,
+    ),
+    "short-list-seasonal": (
+        "adam(y, 'ANA', initial=list(100,NULL,seasonals))",
+        dict(model="ANA", lags=[12], initial=[100.0, None, SEASONALS]),
+        False,
+    ),
+    "short-list-trend": (
+        "adam(y, 'AAN', initial=list(100,1))",
+        dict(model="AAN", initial=[100.0, 1.0]),
+        False,
+    ),
+    "arima": (
+        "adam(y, 'NNN', orders=list(ar=1), initial=list(arima=100))",
+        dict(model="NNN", orders={"ar": 1}, initial={"arima": [100.0]}),
+        False,
+    ),
+    "xreg-named": (
+        "adam(xreg, 'ANN', initial=list(level=100, xreg=c(b=-3,a=2)))",
+        dict(model="ANN", initial={"level": 100.0, "xreg": {"b": -3.0, "a": 2.0}}),
+        True,
+    ),
+    "xreg-unnamed": (
+        "adam(xreg, 'ANN', initial=list(level=100, xreg=c(2,-3)))",
+        dict(model="ANN", initial={"level": 100.0, "xreg": [2.0, -3.0]}),
+        True,
+    ),
+    "xreg-vector": (
+        "adam(xreg, 'ANN', initial=c(100,2,-3))",
+        dict(model="ANN", initial=np.r_[100.0, 2.0, -3.0]),
+        True,
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(PROVIDED_ALL))
+def test_the_provided_initials_are_counted_as_r(case):
+    """R's b41e16fd: the order of a vector without a trend, the count of the
+    provided parameters, the initials of the regressors by name or in their order,
+    and an unnamed list shorter than five elements."""
+    r_call, python_args, with_xreg = PROVIDED_ALL[case]
+    r = r_dict(
+        "{ seasonals <- c(rep(-10,3), rep(10,3), rep(0,6));"
+        " y <- ts(100 + rep(seasonals,10) + sin(1:120), frequency=12);"
+        " xreg <- data.frame(y=as.vector(y), a=cos(1:120), b=sin(1:120/3));"
+        f" m <- suppressWarnings({r_call}); list(y=as.vector(y),"
+        " logLik=as.numeric(logLik(m)), nparam=nparam(m),"
+        " provided=m$nParam['Provided', c('nParamInternal','nParamXreg')]) }"
+    )
+    t = np.arange(1, 121)
+    X = pd.DataFrame({"a": np.cos(t), "b": np.sin(t / 3)}) if with_xreg else None
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(**python_args).fit(np.asarray(r["y"], dtype=float), X)
+    np.testing.assert_allclose(model.loglik, r["logLik"][0], rtol=1e-10)
+    assert model.nparam == r["nparam"][0]
+    provided = model.n_param.provided
+    assert [provided["internal"], provided["xreg"]] == r["provided"]

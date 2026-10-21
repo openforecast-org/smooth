@@ -526,8 +526,12 @@ def _check_initial(
             result["initial_arima_estimate"] = False
             result["initial_arima_number"] = initial_arima_number
     if xreg is not None:
-        values = xreg.values() if isinstance(xreg, dict) else xreg
-        result["initial_xreg"] = np.asarray(list(values), dtype=float).reshape(-1, 1)
+        # A dict keeps the names, to be matched with the regressors, as R
+        result["initial_xreg"] = (
+            {name: float(v) for name, v in xreg.items()}
+            if isinstance(xreg, dict)
+            else np.asarray(xreg, dtype=float).reshape(-1, 1)
+        )
         result["initial_xreg_provided"] = True
 
     # Estimated if anything is, and provided if anything is, as R

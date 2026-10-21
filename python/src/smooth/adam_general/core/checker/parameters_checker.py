@@ -1402,6 +1402,14 @@ def _process_xreg(
 
     # ---------- initialise coefficients ----------
     if initial_xreg is not None:
+        # The named values are taken by name, the others in the order of the variables
+        if isinstance(initial_xreg, dict):
+            named = set(initial_xreg) == set(names_selected)
+            initial_xreg = (
+                [initial_xreg[name] for name in names_selected]
+                if named
+                else list(initial_xreg.values())
+            )
         initial_xreg_flat = np.asarray(initial_xreg, dtype=float).ravel()
         if len(initial_xreg_flat) != p:
             raise ValueError(

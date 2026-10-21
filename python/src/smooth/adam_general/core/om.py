@@ -709,6 +709,10 @@ class OM(ADAM):
                 nlopt_kwargs=getattr(self, "nlopt_kwargs", None),
             ).fit(y, X)
 
+        # A constant probability has no regressors, as it has no ARIMA
+        if self._om_occurrence == "fixed":
+            X = None
+
         self._start_time = time.time()
         # Stash the user's requested model spec so we can restore "M*"
         # components after parameters_checker (which auto-downgrades them when

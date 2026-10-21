@@ -187,3 +187,23 @@ def test_auto_om_selects_the_orders_as_r(r_args, py_args):
         "f=as.numeric(forecast(m, h=7)$mean)) }"
     )
     _compare(AutoOM(**py_args).fit(np.asarray(r["y"], dtype=float)), r)
+
+
+@pytest.mark.parametrize(
+    "r_call,py_class", [("om(d, occurrence='fixed')", "OM"), ("auto.om(d)", "AutoOM")]
+)
+def test_fixed_drops_the_regressors_as_r(r_call, py_class):
+    """A constant probability has no regressors, so auto.om() takes them."""
+    import smooth
+
+    r = r_dict(
+        "{ set.seed(4); d <- data.frame(y=rbinom(120,1,0.5), a=rnorm(120));"
+        f" m <- {r_call}; list(y=d$y, a=d$a, model=m$model,"
+        " logLik=as.numeric(logLik(m)), nparam=nparam(m),"
+        " f=as.numeric(forecast(m, h=7)$mean)) }"
+    )
+    X = np.asarray(r["a"], dtype=float).reshape(-1, 1)
+    kwargs = {"occurrence": "fixed"} if py_class == "OM" else {}
+    fit = getattr(smooth, py_class)(**kwargs).fit(np.asarray(r["y"], dtype=float), X)
+    _compare(fit, r)
+    assert fit.nparam == r["nparam"][0]

@@ -85,6 +85,10 @@ class OMG:
         ``loss_value``, ``loglik``, ``aic``/``aicc``/``bic``/``bicc``
         ``coef`` : joint parameter vector ``concat(B_A, B_B)``
         ``model_name`` : ``"oETS[G](MNN)(MNN)"``-style string
+
+    ``initial``, ``n_iterations`` (the backcasting iterations) and ``smoother``
+    (of ``msdecompose`` for the initial states) are those of :class:`OM`, shared
+    by both sub-models, as R's ``omg()``.
     """
 
     def __init__(
@@ -109,6 +113,7 @@ class OMG:
         h: int = 0,
         holdout: bool = False,
         initial: Union[str, Dict[str, Any]] = "backcasting",
+        n_iterations: Optional[int] = None,
         loss: Union[
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE"],
             Callable,
@@ -157,6 +162,9 @@ class OMG:
         self.h = h
         self.holdout = holdout
         self.initial = initial
+        # The backcasting iterations of both sub-models, as R's omg() passes its
+        # ellipsis to the checkers of both
+        self.n_iterations = n_iterations
         self.loss = loss
         self.loss_function = loss_function
         self.lambda_param = lambda_param
@@ -832,6 +840,7 @@ class OMG:
             h=0,
             holdout=False,
             initial=self.initial,
+            n_iterations=self.n_iterations,
             # Carry the callable through so bootstrap refits replay the
             # same custom loss; otherwise the resolved string flag.
             loss=self.loss_function if self.loss_function is not None else self.loss,
@@ -841,6 +850,7 @@ class OMG:
             verbose=0,
             nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
+            smoother=self.smoother,
         )
 
     def coefbootstrap(
@@ -1021,6 +1031,7 @@ class OMG:
             persistence=persistence,
             phi=phi,
             initial=self.initial,
+            n_iterations=self.n_iterations,
             arma=arma,
             ic=self.ic,
             bounds=self.bounds,

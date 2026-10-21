@@ -17,6 +17,7 @@ from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
 from smooth.adam_general.core.estimator.arima_selector import arima_selector
 from smooth.adam_general.core.om import OM, _check_om_loss
 from smooth.adam_general.core.omg import OMG
+from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT, SmootherType
 
 _VALID_OCCURRENCE = (
     "fixed",
@@ -70,6 +71,10 @@ class AutoOM:
     loss, lambda_param :
         The loss (and the LASSO / RIDGE weight) of every candidate, as R's
         ``auto.om()`` passes them to ``om()``.
+    n_iterations, smoother :
+        The backcasting iterations and the ``msdecompose`` smoother of the
+        initial states, as in :class:`OM`, passed to every candidate (both
+        sub-models of the general one).
     """
 
     def __init__(
@@ -83,6 +88,7 @@ class AutoOM:
         persistence: Optional[Dict[str, float]] = None,
         phi: Optional[float] = None,
         initial: Union[str, Dict[str, Any]] = "backcasting",
+        n_iterations: Optional[int] = None,
         constant: bool = False,
         arma: Optional[Dict[str, Any]] = None,
         regressors: Literal["use", "select", "adapt"] = "use",
@@ -97,6 +103,7 @@ class AutoOM:
         ma_order: Union[int, List[int], None] = None,
         loss: Any = "likelihood",
         lambda_param: Optional[float] = None,
+        smoother: SmootherType = SMOOTHER_DEFAULT,
     ) -> None:
         _check_om_loss(loss)
         if isinstance(occurrence, str):
@@ -115,6 +122,7 @@ class AutoOM:
         self.persistence = persistence
         self.phi = phi
         self.initial = initial
+        self.n_iterations = n_iterations
         self.constant = constant
         self.arma = arma
         self.regressors = regressors
@@ -125,6 +133,12 @@ class AutoOM:
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
+        if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
+            raise ValueError(
+                f"Invalid smoother: {smoother!r}. Must be one of "
+                "'default', 'ma', 'lowess', 'supsmu', 'global'."
+            )
+        self.smoother = smoother
         self.arima_select = arima_select
         self.ar_order = ar_order
         self.i_order = i_order
@@ -143,6 +157,8 @@ class AutoOM:
             h=self.h,
             holdout=self.holdout,
             initial=self.initial,
+            n_iterations=self.n_iterations,
+            smoother=self.smoother,
             ic=self.ic,
             bounds=self.bounds,
             verbose=self.verbose,

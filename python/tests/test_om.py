@@ -598,8 +598,9 @@ def test_redirect_passes_the_arguments_of_om():
     auto = OM(occurrence="auto", loss="RIDGE", **{"lambda": 0.3})
     assert isinstance(auto, AutoOM)
     assert (auto.loss, auto.lambda_param, auto.orders["select"]) == ("RIDGE", 0.3, False)
-    with pytest.raises(TypeError, match="n_iterations"):
-        OM(occurrence="general", n_iterations=3)
+    assert OM(occurrence="general", n_iterations=3).n_iterations == 3
+    auto = OM(occurrence="auto", n_iterations=3, smoother="lowess")
+    assert (auto.n_iterations, auto.smoother) == (3, "lowess")
 
 
 def test_name_has_the_x_of_the_regressors():

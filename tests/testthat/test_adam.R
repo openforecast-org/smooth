@@ -1433,3 +1433,12 @@ test_that("ADAM uses the provided initials of all the components", {
     expect_equal(testModel$initial$xreg, c(a=2,b=-3));
     expect_equal(adam(xreg, "ANN", initial=c(100,2,-3))$initial$xreg, c(a=2,b=-3));
 })
+
+# A model that selected no regressors is reused on the response only
+test_that("ADAM reuses a model with no regressors selected", {
+    xreg <- data.frame(y=100+sin(1:120), a=cos(1:120/7), b=sin(1:120/11));
+    testModel <- adam(xreg, "ANN", regressors="select");
+    expect_null(testModel$initial$xreg);
+    testReused <- adam(xreg, model=testModel, regressors="select");
+    expect_equal(as.numeric(logLik(testReused)), as.numeric(logLik(testModel)));
+})

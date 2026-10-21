@@ -134,6 +134,7 @@ Bugfixes:
 * The help of `adam()` said that `initial="gradient"` supported only ETS models without ARIMA and regressors: it supports ETS, ARIMA and explanatory variables, and the help pages of `es()`, `msarima()`, `ssarima()`, `ces()` and `gum()`, which accept it, now describe it.
 * `adam()` accepted `distribution="dalaplace"` (the Asymmetric Laplace), which is not one of its distributions, and fitted it: the argument checks of `adam()` and of the functions built on it listed it. It is removed from them and from the methods of `adam()`, so it is now an error, as any other unsupported distribution. `alm()` and the functions of the Asymmetric Laplace in `greybox` are unaffected.
 * The initials provided to `adam()` (and the functions built on it) follow its documentation: a vector of initials of a model without a trend took the level as the first seasonal initial (and the following values one place late), and counted the provided initials twice in the number of parameters; the provided initials of the explanatory variables failed ("length of 'dimnames' [1] not equal to array extent"), and are now taken by name or, unnamed, in the order of the variables; an unnamed list of initials with fewer than five elements failed ("subscript out of bounds").
+* `adam(data, model=<fitted adam>)` failed with "Mat::operator(): index out of bounds" when the fitted model had no regressors while `data` had other columns, e.g. after `regressors="select"` selected none of them: the model is now reused on the response only.
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

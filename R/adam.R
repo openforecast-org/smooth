@@ -436,6 +436,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         if(is.null(formula)){
             formula <- formula(model);
         }
+        # A model without regressors (e.g. none selected) is reused on the response only
+        if(is.null(regressors) && !is.null(ncol(data)) && ncol(data)>1){
+            data <- data[, all.vars(formula)[1], drop=FALSE];
+        }
 
         # Parameters of the original ARIMA model
         lags <- lags(model);

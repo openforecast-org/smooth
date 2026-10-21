@@ -1,0 +1,50 @@
+[
+ {
+  "quantity": "models accepted by the per-lag check that do not forget their initial states",
+  "value": 1482.0,
+  "conditions": {
+   "family": "ETS(A,N,A)",
+   "models": 3042
+  }
+ },
+ {
+  "quantity": "models rejected by the per-lag check that forget their initial states",
+  "value": 0.0,
+  "conditions": {
+   "family": "ETS(A,N,A)",
+   "models": 3042
+  }
+ },
+ {
+  "quantity": "models accepted by the per-lag check",
+  "value": 3042.0,
+  "conditions": {
+   "family": "ETS(A,N,A)",
+   "models": 3042
+  }
+ },
+ {
+  "quantity": "models accepted by the per-lag check that do not forget their initial states",
+  "value": 10.0,
+  "conditions": {
+   "family": "GUM",
+   "models": 200
+  }
+ },
+ {
+  "quantity": "models rejected by the per-lag check that forget their initial states",
+  "value": 1.0,
+  "conditions": {
+   "family": "GUM",
+   "models": 200
+  }
+ },
+ {
+  "quantity": "models accepted by the per-lag check",
+  "value": 193.0,
+  "conditions": {
+   "family": "GUM",
+   "models": 200
+  }
+ }
+]

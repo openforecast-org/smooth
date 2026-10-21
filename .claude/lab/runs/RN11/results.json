@@ -1,0 +1,19 @@
+[
+ {
+  "quantity": "max abs difference of max |lambda|, bisection against roots",
+  "value": 5.813682868449632e-11,
+  "conditions": {
+   "inadmissible_models": 198
+  }
+ },
+ {
+  "quantity": "models within 1e-8 of the unit circle, excluded",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "models compared",
+  "value": 575.0,
+  "conditions": {}
+ }
+]

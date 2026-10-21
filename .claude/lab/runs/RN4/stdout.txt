@@ -1,0 +1,4 @@
+admissibility decisions that differ from the PBH reference {} 0.0
+max abs difference of max |lambda| from the PBH reference, inadmissible models {'inadmissible_models': 40} 5.138112157965224e-13
+models within 1e-8 of the unit circle, excluded {} 0.0
+models compared {} 100.0

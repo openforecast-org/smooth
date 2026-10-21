@@ -261,6 +261,16 @@ class TestADAMEdgeCases:
 class TestADAMAttributes:
     """Tests for ADAM attributes after fitting."""
 
+    @pytest.mark.parametrize("initial", ["backcasting", "optimal"])
+    def test_initial_value_is_the_head_of_the_states(self, seasonal_series, initial):
+        """initial_value holds the initial states, as R's $initial."""
+        model = ADAM(model="AAA", lags=[12], initial=initial).fit(seasonal_series)
+        states = np.asarray(model.states)
+        assert list(model.initial_value) == ["level", "trend", "seasonal"]
+        assert model.initial_value["level"] == states[0, 0]
+        assert model.initial_value["trend"] == states[1, 0]
+        np.testing.assert_array_equal(model.initial_value["seasonal"], states[2, :12])
+
     def test_persistence_level_attribute(self, simple_series):
         """Test that persistence level (alpha) is accessible."""
         model = ADAM(model="ANN")

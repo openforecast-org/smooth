@@ -1714,7 +1714,7 @@ class ADAM:
         >>> init_level = model.initial_value['level']
         """
         self._check_is_fitted()
-        return self._prepared.get("initial_value", {})
+        return self._prepared.get("initial", self._prepared.get("initial_value", {}))
 
     def _resolve_smoother(self) -> str:
         """The msdecompose smoother to use, resolving "default".

@@ -55,3 +55,45 @@ def test_the_model_type_is_the_selected_one(pool):
         warnings.simplefilter("ignore")
         model = ADAM(model=python_model, lags=[12]).fit(Y)
     assert model.model_type == r["type"][0]
+
+
+# (R call, Python arguments, with the regressor x1)
+INITIALS = {
+    "MAM": ("AirPassengers, 'MAM', lags=12", dict(model="MAM", lags=[12]), False),
+    "ARIMA": (
+        "AirPassengers, 'ANN', lags=c(1,12), initial='optimal',"
+        " orders=list(ar=c(1,1), i=c(1,0), ma=c(0,0))",
+        dict(
+            model="ANN",
+            lags=[1, 12],
+            initial="optimal",
+            orders={"ar": [1, 1], "i": [1, 0], "ma": [0, 0]},
+        ),
+        False,
+    ),
+    "ETSX": ("d, 'MNN', lags=1", dict(model="MNN", lags=[1]), True),
+}
+
+
+@pytest.mark.parametrize("case", list(INITIALS))
+def test_the_initial_values_are_those_of_r(case):
+    r_call, python_arguments, xreg = INITIALS[case]
+    r = r_dict(
+        "{ d <- data.frame(y=as.numeric(AirPassengers), x1=(0:143) %% 5);"
+        f" m <- adam({r_call}); i <- m$initial;"
+        " if(!is.null(i$xreg)) i$xreg <- as.list(i$xreg); list(initial=i) }"
+    )
+    X = pd.DataFrame({"x1": np.arange(144) % 5.0}) if xreg else None
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(**python_arguments).fit(Y, X)
+    initial = model.initial_value
+    assert list(initial) == list(r["initial"])
+    for key, value in r["initial"].items():
+        if key == "xreg":
+            assert list(initial[key]) == list(value)
+            np.testing.assert_allclose(
+                list(initial[key].values()), np.ravel(list(value.values())), rtol=1e-5
+            )
+        else:
+            np.testing.assert_allclose(np.ravel(initial[key]), value, rtol=1e-5)

@@ -647,9 +647,9 @@ inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& 
     phi = last.phiCancelled;
 }
 
-// The largest |lambda| = 1 / min|B| over the roots B of the polynomial c, to tolerance, by a
-// bracketing search on r with the step-down test of arimaReflection() applied to c(B / r),
-// which passes exactly when all roots of c have |lambda| < r. With belowOne false, a polynomial with all |lambda| < 1
+// The largest |lambda| = 1 / min|B| over the roots B of the polynomial c, by bisection on r
+// with the step-down test of arimaReflection() applied to c(B / r), which passes exactly when
+// all roots of c have |lambda| < r. With belowOne false, a polynomial with all |lambda| < 1
 // returns the largest reflection coefficient of its step-down instead, also below one, which
 // spares the bisection when only the admissibility is needed.
 inline double largestRootModulus(arma::vec c, double tolerance = 1e-6, bool belowOne = true) {
@@ -663,54 +663,30 @@ inline double largestRootModulus(arma::vec c, double tolerance = 1e-6, bool belo
     }
     c = c.head(degree + 1) / c(0);
     arma::vec powers(degree);
-    // The largest reflection coefficient of c(B / r): below one exactly when the test passes
-    auto reflection = [&](double r) {
+    auto below = [&](double r) {
         double power = 1.0;
         for(arma::uword i = 0; i < degree; i++) {
             power /= r;
             powers(i) = c(i + 1) * power;
         }
-        return arimaReflection(powers);
+        return arimaReflection(powers) < 1;
     };
-    double lower = 0.0, upper = 1.0, hLower = arma::datum::inf, hUpper = reflection(upper) - 1;
-    if(!belowOne && hUpper < 0) {
-        return hUpper + 1;
+    double lower = 0.0, upper = 1.0;
+    if(!belowOne) {
+        const double reflection = arimaReflection(c.tail(degree));
+        if(reflection < 1) {
+            return reflection;
+        }
     }
-    while(hUpper >= 0) {
-        lower = upper;
-        hLower = hUpper;
-        upper *= 2.0;
-        hUpper = reflection(upper) - 1;
+    if(!below(upper)) {
+        do {
+            lower = upper;
+            upper *= 2.0;
+        } while(!below(upper));
     }
-    // Illinois false position on the reflection minus one, which is >= 0 below the modulus and
-    // < 0 above it, with a bisection whenever a step falls outside the bracket or the last one
-    // did not halve it
-    int side = 0;
-    bool bisect = false;
     while(upper - lower > tolerance) {
-        const double width = upper - lower;
-        double r = upper - hUpper * width / (hUpper - hLower);
-        if(bisect || !std::isfinite(r) || r <= lower || r >= upper) {
-            r = (lower + upper) / 2.0;
-        }
-        const double h = reflection(r) - 1;
-        if(h < 0) {
-            upper = r;
-            hUpper = h;
-            if(side == -1) {
-                hLower /= 2.0;
-            }
-            side = -1;
-        }
-        else {
-            lower = r;
-            hLower = h;
-            if(side == 1) {
-                hUpper /= 2.0;
-            }
-            side = 1;
-        }
-        bisect = upper - lower > width / 2.0;
+        const double middle = (lower + upper) / 2.0;
+        (below(middle) ? upper : lower) = middle;
     }
     return upper;
 }

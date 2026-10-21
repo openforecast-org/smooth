@@ -62,8 +62,10 @@ smoothEigensPoly <- function(persistence, transition, measurement, lagsModelAll,
     hasDelta <- any(substr(persistenceNames,1,5)=="delta");
     xregNumber <- sum(substr(persistenceNames,1,5)=="delta");
     constantRequired <- any(persistenceNames %in% c("constant","drift"));
-    return(as.numeric(smoothEigensPolyR(persistence, transition, measurement, lagsModelAll, xregModel,
-                                        obsInSample, hasDelta, xregNumber, constantRequired)));
+    modulus <- as.numeric(smoothEigensPolyR(persistence, transition, measurement, lagsModelAll, xregModel,
+                                            obsInSample, hasDelta, xregNumber, constantRequired));
+    inadmissible <<- inadmissible + (modulus >= 1);
+    return(modulus);
 }
 hourly <- ts(100 + 10 * sin(2 * pi * (1:1008) / 24) + 5 * sin(2 * pi * (1:1008) / 168) + rnorm(1008),
              frequency=24)
@@ -77,15 +79,18 @@ fits <- list("gum(AirPassengers, orders=c(1,1), lags=c(1,12))"=
                  function() adam(hourly, "ANA", lags=c(24,168), bounds="admissible"),
              "ces(AirPassengers, \"full\")"=
                  function() ces(AirPassengers, seasonality="full", bounds="admissible"))
-calls <- 0
+calls <- inadmissible <- 0
 for(check in c("per-lag", "polynomial")) {
     counted <- if(check == "per-lag") smoothEigensOld else smoothEigensPoly
     assignInNamespace("smoothEigens", function(...) {calls <<- calls + 1; counted(...)}, "smooth")
     for(name in names(fits)) {
-        # The median of three fits; the calls are those of one fit
-        time <- median(replicate(3, {calls <<- 0; system.time(fits[[name]]())[["elapsed"]]}))
+        # The median of seven fits; the calls are those of one fit
+        time <- median(replicate(7, {calls <<- inadmissible <<- 0; system.time(fits[[name]]())[["elapsed"]]}))
         add("time of the fit, seconds", time, check=check, fit=name)
         add("calls of smoothEigens() in the fit", calls, check=check, fit=name)
+        if(check == "polynomial") {
+            add("calls of smoothEigens() on inadmissible parameters in the fit", inadmissible, check=check, fit=name)
+        }
         add("time of the fit per call of smoothEigens(), microseconds", time / max(calls, 1) * 1e6,
             check=check, fit=name)
     }

@@ -6,7 +6,9 @@ repeats <- as.integer(args[2])
 # Installed in a temporary library, compiled as for users (load_all() compiles with -O0)
 library <- file.path(tempdir(), "library")
 dir.create(library)
+pkgbuild::clean_dll(root)
 install.packages(root, repos=NULL, type="source", lib=library, quiet=TRUE)
+pkgbuild::clean_dll(root)
 suppressMessages(library(smooth, lib.loc=library))
 smoothEigensR <- smooth:::smoothEigensR
 smoothEigensPolyR <- smooth:::smoothEigensPolyR
@@ -81,7 +83,7 @@ for(check in c("per-lag", "polynomial")) {
     assignInNamespace("smoothEigens", function(...) {calls <<- calls + 1; counted(...)}, "smooth")
     for(name in names(fits)) {
         # The median of three fits; the calls are those of one fit
-        time <- median(replicate(3, {calls <- 0; system.time(fits[[name]]())[["elapsed"]]}))
+        time <- median(replicate(3, {calls <<- 0; system.time(fits[[name]]())[["elapsed"]]}))
         add("time of the fit, seconds", time, check=check, fit=name)
         add("calls of smoothEigens() in the fit", calls, check=check, fit=name)
         add("time of the fit per call of smoothEigens(), microseconds", time / max(calls, 1) * 1e6,

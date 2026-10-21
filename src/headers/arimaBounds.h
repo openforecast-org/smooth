@@ -23,12 +23,13 @@ inline double arimaReflection(arma::vec c) {
             break;
         }
         // c_i and c_{q-2-i} in pairs, in place: (c_i - k c_{q-2-i}) / (1 - k^2) and back
+        const double scale = 1 / (1 - k * k);
         for(arma::uword i = 0, j = q - 1; i + 1 <= j; ++i) {
             --j;
             double a = c(i), b = c(j);
-            c(i) = (a - k * b) / (1 - k * k);
+            c(i) = (a - k * b) * scale;
             if(j != i) {
-                c(j) = (b - k * a) / (1 - k * k);
+                c(j) = (b - k * a) * scale;
             }
         }
     }

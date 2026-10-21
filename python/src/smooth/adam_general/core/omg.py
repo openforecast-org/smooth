@@ -100,8 +100,6 @@ class OMG:
         orders_b: Optional[Dict[str, Any]] = None,
         constant_a: bool = False,
         constant_b: Optional[bool] = None,
-        formula_a: Optional[str] = None,
-        formula_b: Optional[str] = None,
         regressors_a: Literal["use", "select", "adapt"] = "use",
         regressors_b: Optional[str] = None,
         persistence_a: Optional[Dict[str, float]] = None,
@@ -147,8 +145,6 @@ class OMG:
         self.orders_b = orders_b if orders_b is not None else orders_a
         self.constant_a = constant_a
         self.constant_b = constant_b if constant_b is not None else constant_a
-        self.formula_a = formula_a
-        self.formula_b = formula_b if formula_b is not None else formula_a
         self.regressors_a = regressors_a
         self.regressors_b = regressors_b if regressors_b is not None else regressors_a
         self.persistence_a = persistence_a
@@ -827,8 +823,6 @@ class OMG:
             orders_b=self.orders_b,
             constant_a=self.constant_a,
             constant_b=self.constant_b,
-            formula_a=self.formula_a,
-            formula_b=self.formula_b,
             regressors_a=self.regressors_a,
             regressors_b=self.regressors_b,
             persistence_a=self.persistence_a,
@@ -897,13 +891,6 @@ class OMG:
                 "method='dsr' requires greybox.dsrboot which is not yet "
                 "available in Python; use method='cr'."
             )
-        any_regressors = self.regressors_a or self.regressors_b
-        if any_regressors and (self.formula_a or self.formula_b):
-            raise NotImplementedError(
-                "coefbootstrap does not yet support OMG models with external "
-                "regressors. File an issue if you need this."
-            )
-
         y_raw = np.asarray(self._y_raw, dtype=float)
         nobs = int(y_raw.size)
         if size is None:

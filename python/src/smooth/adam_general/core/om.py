@@ -487,7 +487,7 @@ class OM(ADAM):
         from smooth.adam_general.core.omg import OMG
 
         arguments.setdefault("model", "ZXZ")
-        sides = ("model", "constant", "formula", "regressors", "persistence")
+        sides = ("model", "constant", "regressors", "persistence")
         for key in (*sides, "phi", "arma"):
             if key in arguments:
                 arguments[f"{key}_a"] = arguments.pop(key)
@@ -507,7 +507,6 @@ class OM(ADAM):
         ma_order: Union[int, List[int]] = 0,
         orders: Optional[Dict[str, Any]] = None,
         constant: bool = False,
-        formula: Optional[str] = None,
         regressors: Literal["use", "select", "adapt"] = "use",
         # ``str`` (not just the OM_OCCURRENCE_OPTIONS literals) because ``__new__``
         # also routes "general"/"auto", and wrappers pass runtime-validated strings.
@@ -603,7 +602,6 @@ class OM(ADAM):
         self._is_omg_submodel: bool = False
         self._om_occurrence = occurrence
         self._occurrence_char = _OCC_TO_CHAR[occurrence]
-        self._formula = formula
 
     # ------------------------------------------------------------------
     # Hook overrides
@@ -809,7 +807,6 @@ class OM(ADAM):
             "arma": self.arma,
             "h": self.h,
             "holdout": self.holdout,
-            "formula": self._formula,
         }
         for key in (
             "lags",

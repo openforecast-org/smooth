@@ -4720,7 +4720,7 @@ sigma.adam <- function(object, ...){
                        "ds"=,
                        "dgnorm"=,
                        "dt"=,
-                       "dlogis"=,
+                       "dlogis"=sum(errors^2,na.rm=TRUE),
                        "dlnorm"=,
                        "dllaplace"=,
                        "dls"=sum(log(residuals(object))^2,na.rm=TRUE),

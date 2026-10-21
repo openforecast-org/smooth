@@ -814,6 +814,14 @@ test_that("Pure regression stores sigma^2 as the scale, as the other ADAM models
     expect_equal(testModel$scale, mean(residuals(testModel)^2));
 })
 
+test_that("sigma() of the additive distributions is the root of the de-biased mean squared error", {
+    for(distribution in c("dnorm", "dlaplace", "ds", "dgnorm")){
+        testModel <- adam(BJsales, "AAN", distribution=distribution, silent=TRUE);
+        df <- nobs(testModel) - nparam(testModel) + testModel$nParam[1,4];
+        expect_equal(sigma(testModel), sqrt(sum(residuals(testModel)^2)/df));
+    }
+})
+
 test_that("Pure regression is forecasted and predicted by forecast.alm() / predict.alm()", {
     xreg <- data.frame(y=as.vector(BJsales), x=as.vector(BJsales.lead));
     testModel <- adam(xreg, "NNN", h=10, holdout=TRUE, silent=TRUE);

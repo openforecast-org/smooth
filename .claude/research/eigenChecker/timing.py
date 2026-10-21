@@ -18,12 +18,12 @@ rng = np.random.default_rng(args.seed)
 # Number of recursion steps the step-down test runs before it stops
 def steps(c):
     c = trim(c)
-    c = c / c[0]
-    for n, j in enumerate(range(len(c) - 1, 0, -1), start=1):
+    c, degree = c / c[0], len(c) - 1
+    for n, j in enumerate(range(degree, 0, -1), start=1):
         if abs(c[j]) >= 1:
             return n
         c = (c[:j] - c[j] * c[j:0:-1]) / (1 - c[j] ** 2)
-    return len(c) - 1
+    return degree
 
 
 def mean_ms(f):

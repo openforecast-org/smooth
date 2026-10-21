@@ -1,0 +1,12 @@
+admissibility decisions of the C++ core that differ from the prototype {'family': 'ETS', 'models': 100} 0
+max abs difference of the largest root modulus, C++ core against prototype {'family': 'ETS', 'models': 100} 5.820477433360338e-11
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'ETS', 'models': 100} 0
+admissibility decisions of the C++ core that differ from the prototype {'family': 'ETS high degree', 'models': 100} 0
+max abs difference of the largest root modulus, C++ core against prototype {'family': 'ETS high degree', 'models': 100} 1.8247644251179196e-07
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'ETS high degree', 'models': 100} 1
+admissibility decisions of the C++ core that differ from the prototype {'family': 'GUM identity', 'models': 100} 0
+max abs difference of the largest root modulus, C++ core against prototype {'family': 'GUM identity', 'models': 100} 5.8198779129270406e-11
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'GUM identity', 'models': 100} 0
+admissibility decisions of the C++ core that differ from the prototype {'family': 'GUM random', 'models': 100} 0
+max abs difference of the largest root modulus, C++ core against prototype {'family': 'GUM random', 'models': 100} 5.7583937618232994e-11
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'GUM random', 'models': 100} 0

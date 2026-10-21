@@ -1,0 +1,98 @@
+[
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "ETS",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus, C++ core against prototype",
+  "value": 5.820477433360338e-11,
+  "conditions": {
+   "family": "ETS",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 0,
+  "conditions": {
+   "family": "ETS",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "ETS high degree",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus, C++ core against prototype",
+  "value": 1.8247644251179196e-07,
+  "conditions": {
+   "family": "ETS high degree",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 1,
+  "conditions": {
+   "family": "ETS high degree",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM identity",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus, C++ core against prototype",
+  "value": 5.8198779129270406e-11,
+  "conditions": {
+   "family": "GUM identity",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM identity",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM random",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus, C++ core against prototype",
+  "value": 5.7583937618232994e-11,
+  "conditions": {
+   "family": "GUM random",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM random",
+   "models": 100
+  }
+ }
+]

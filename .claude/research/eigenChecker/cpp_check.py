@@ -8,7 +8,7 @@ import tempfile
 
 import numpy as np
 
-from admissibility import (arima_form, cancel, ets, gum_random, gum_start, max_lambda_roots, trim,
+from admissibility import (arima_form, cancel, ets, gum_random, gum_start, max_lambda_roots, pbh_max, trim,
                            write_results)
 
 parser = argparse.ArgumentParser()
@@ -84,4 +84,13 @@ for name in families:
                  "value": float(modulusDiff), "conditions": conditions},
                 {"quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
                  "value": int(degreeDiffs), "conditions": conditions}]
+
+# The models on which the two differ, with the PBH reference
+for (name, (F, g, w, lags)), e, a in zip(models, expected, actual):
+    if degree(e["theta"]) != degree(a["theta"]) or degree(e["phi"]) != degree(a["phi"]) or \
+            abs(e["modulus"] - a["modulus"]) > 1e-9:
+        print(name, "lags", lags, "g", np.round(g, 4).tolist(), "F", np.round(F, 4).tolist())
+        print("  prototype: degrees", degree(e["theta"]), degree(e["phi"]), "modulus", e["modulus"])
+        print("  C++:       degrees", degree(a["theta"]), degree(a["phi"]), "modulus", a["modulus"])
+        print("  PBH reference", pbh_max(F, g, w, lags))
 write_results(results)

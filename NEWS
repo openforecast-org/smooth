@@ -143,6 +143,7 @@ Bugfixes:
 * `ssarima()` failed with `regressors="select"`: it selects the regressors as `adam()` does.
 * `om(regressors="select")` took all the columns as regressors, the response included: it selects them as `adam()` does, on the errors of the model without them, and the response is never a candidate.
 * `forecast()` of `om()` and `omg()` with regressors ignored `newdata` and took the last in-sample values of the regressors: the models kept the indicators without the regressors in `$data` and their initial values without names. They keep them now, as `adam()`, also in `$holdout`.
+* `om()` with regressors stopped after 40 iterations per parameter, as without them: it takes at least 1000, as `adam()` and the Python `OM` (`occurrence="direct"` on a series with three regressors: log-likelihood -131.52 as Python, was -134.96).
 * `omg(regressorsA="select")` (and `regressorsB`) took all the columns as regressors, the response included: each side selects them as `om()` does, so `om(occurrence="general")` and `auto.om()` select them too.
 
 

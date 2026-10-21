@@ -560,3 +560,11 @@ test_that("om() and omg() forecast with the regressors of newdata", {
                  as.numeric(tail(testModel$modelA$states[,"level"], 1)) +
                      x$a[201:210]*coef(testModel$modelA)["a"], tolerance=1e-8);
 })
+
+test_that("om() with regressors takes at least 1000 iterations, as adam()", {
+    set.seed(41);
+    x <- data.frame(y=0, a=rnorm(200), n1=rnorm(200));
+    x$y <- rbinom(200, 1, plogis(2*x$a));
+    testModel <- om(x, "MNN", occurrence="direct");
+    expect_gt(testModel$res$iterations, 3*40);
+})

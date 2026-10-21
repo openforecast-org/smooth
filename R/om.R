@@ -710,7 +710,11 @@ om <- function(data,
                         objective=do.call(omCF_local, c(list(B=B_used), nloptrArgs)));
         }
         else{
-            maxevalUsed <- if(is.null(maxeval)) length(B_used) * 40L else maxeval;
+            maxevalUsed <- maxeval;
+            if(is.null(maxeval)){
+                # As adam(), at least 1000 iterations with the regressors
+                maxevalUsed <- if(xregModel) max(1000, length(B_used) * 100) else length(B_used) * 40;
+            }
             res <- suppressWarnings(do.call(nloptr,
                                             c(list(x0=B_used, eval_f=omCF_local,
                                                    lb=lb, ub=ub,

@@ -1409,3 +1409,9 @@ test_that("ADAM with FI=TRUE returns the Fisher Information matrix", {
     expect_equal(colnames(testModel$FI), names(coef(testModel)));
     expect_equal(testModel$FI, adam(BJsales, model=testModel, FI=TRUE)$FI);
 })
+
+# The Asymmetric Laplace is not a distribution of adam() and is rejected by it
+test_that("ADAM rejects distribution=\"dalaplace\"", {
+    expect_error(adam(AirPassengers, "MNN", distribution="dalaplace"), "should be one of");
+    expect_error(auto.adam(AirPassengers, "MNN", distribution="dalaplace"));
+})

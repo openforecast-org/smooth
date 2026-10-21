@@ -43,7 +43,6 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         other <- switch(distribution,
                         "dgnorm"=,
                         "dlgnorm"=object$other$shape,
-                        "dalaplace"=object$other$alpha,
                         NULL);
     }
     else{
@@ -113,7 +112,6 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     et[otLogical] <- switch(distribution,
                    "dnorm"=et[otLogical]^2,
                    "dlaplace"=abs(et[otLogical]),
-                   "dalaplace"=et[otLogical]*(other-(et[otLogical]<=0)*1),
                    "ds"=0.5*abs(et[otLogical])^0.5,
                    # "dgnorm"=(other*sum(abs(errors)^other)/obsInSample)^{1/other}
                    "dgnorm"=(other*abs(et[otLogical])^other)^{1/other},
@@ -142,7 +140,6 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                              "M"=(object$holdout[,responseName]-object$forecast)/object$forecast);
         newCall$data[obsInSample+1:h,responseName] <- switch(distribution,
                                                              "dnorm"=etForecast^2,
-                                                             "dalaplace"=etForecast*(other-(etForecast<=0)*1),
                                                              "dlaplace"=abs(etForecast),
                                                              "ds"=0.5*abs(etForecast)^0.5,
                                                              "dgnorm"=(other*abs(etForecast)^other)^{1/other},
@@ -215,9 +212,6 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     newCall$silent <- TRUE;
     if(any(distribution==c("dgnorm","dlgnorm"))){
         newCall$shape <- other;
-    }
-    else if(distribution=="dalaplace"){
-        newCall$alpha <- other;
     }
 
     # The zeros of an occurrence model are the missing values of the response
@@ -484,14 +478,6 @@ sm_logDensities <- function(y, mu, scale, distribution, Etype, other, otLogical)
                            #                 "M"=dlogis(x=y[otLogical],
                            #                            location=mu[otLogical],
                            #                            scale=scale[otLogical]*mu[otLogical], log=TRUE)),
-                           "dalaplace"=switch(EtypeSM,
-                                              "A"=dalaplace(q=y[otLogical],
-                                                            mu=mu[otLogical],
-                                                            scale=scale[otLogical], alpha=other, log=TRUE),
-                                              "M"=dalaplace(q=y[otLogical],
-                                                            mu=mu[otLogical],
-                                                            scale=scale[otLogical]*mu[otLogical],
-                                                            alpha=other, log=TRUE)),
                            # "dlnorm"=dlnorm(x=y[otLogical],
                            #                 meanlog=Re(log(as.complex(mu[otLogical])))-scaleSM^2/2-log(scale[otLogical]),
                            #                 sdlog=scaleSM, log=TRUE),

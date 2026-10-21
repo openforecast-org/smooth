@@ -316,9 +316,8 @@ If equal to 41, then the detailed results of the optimisation are returned.
 }
 You can read more about these parameters by running the function
 \link[nloptr]{nloptr.print.options}.
-The parameter \code{lambda} for LASSO / RIDGE, \code{alpha} for the Asymmetric
-Laplace, \code{shape} for the Generalised Normal and \code{nu} for Student's distributions
-can be provided here as well.}
+The parameter \code{lambda} for LASSO / RIDGE, \code{shape} for the Generalised Normal
+and \code{nu} for Student's distributions can be provided here as well.}
 
 \item{object}{The model previously estimated using \code{adam()} function.}
 
@@ -369,7 +368,7 @@ the model,
 \item \code{logLik} - the value of the log-likelihood,
 \item \code{distribution} - the distribution function used in the calculation of the likelihood,
 \item \code{scale} - the value of the scale parameter of the distribution, as in the ADAM monograph: sigma^2 for \code{dnorm}, \code{dlnorm}, \code{dinvgauss} and \code{dgamma}, and s for the others (the MLE, not de-biased), or the scale model from \link[greybox]{sm} after \code{implant()},
-\item \code{lambda} - the value of the parameter used in LASSO / dalaplace / dt,
+\item \code{lambda} - the value of the parameter used in LASSO / dt,
 \item \code{B} - the vector of all estimated parameters,
 \item \code{lags} - the vector of lags used in the model construction,
 \item \code{lagsAll} - the vector of the internal lags used in the model,

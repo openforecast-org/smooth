@@ -314,9 +314,9 @@ covarOPG <- function(object, stepSize=.Machine$double.eps^(1/4)){
     baseArma <- if(length(c(names(armaAr), names(armaMa)))>0){ object$arma; } else { list(); }
     baseInitialArg <- if(initialsEstimated){ initialList; } else { initialType; }
 
-    # The parameter of the distribution (shape of dgnorm, alpha of dalaplace) and the
+    # The parameter of the distribution (shape of dgnorm) and the
     # constant (or drift) of ARIMA, provided at their values in the refits
-    baseOther <- object$other[intersect(names(object$other), c("shape","alpha","nu"))];
+    baseOther <- object$other[intersect(names(object$other), c("shape","nu"))];
     baseConstant <- if(is.numeric(object$constant)){ object$constant; } else { NULL; }
 
     refit <- function(persistence, phi, arma, initialArg, other, constant){

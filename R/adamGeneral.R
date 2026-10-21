@@ -1,6 +1,6 @@
 commonParametersChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
                                     persistence, phi, initial,
-                                    distribution=c("default","dnorm","dlaplace","dalaplace","ds","dgnorm",
+                                    distribution=c("default","dnorm","dlaplace","ds","dgnorm",
                                                    "dlnorm","dinvgauss","dgamma","plogis"),
                                     loss, h, holdout, occurrence,
                                     ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
@@ -562,7 +562,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
     if(!fast){
         #### Distribution selected ####
-        distribution <- match.arg(distribution[1], c("default","dnorm","dlaplace","dalaplace","ds","dgnorm",
+        distribution <- match.arg(distribution[1], c("default","dnorm","dlaplace","ds","dgnorm",
                                                       "dlnorm","dinvgauss","dgamma","plogis"));
     }
 
@@ -1428,7 +1428,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     formulaOriginal <- formulaToUse;
                     # If the formula is not provided, construct one
                     if(formulaIsAbsent){
-                        if(Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt","dalaplace"))){
+                        if(Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt"))){
                             if(trendIncluded){
                                 formulaOriginal <- formulaToUse <- as.formula(paste0("log(`",responseName,"`)~."));
                             }
@@ -1451,7 +1451,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         # If formula only contains ".", then just change it
                         if(length(all.vars(formulaToUse))==2 && all.vars(formulaToUse)[2]=="."){
                             # Take logs if the model requires that
-                            if((Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt","dalaplace")))){
+                            if((Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt")))){
                                 if(trendIncluded){
                                     formulaToUse <- as.formula(paste0("log(`",responseName,"`)~."));
                                 }
@@ -1473,7 +1473,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                             # If formula contains only one element, or several, but no logs, then change response formula
                             if((length(formulaToUse[[2]])==1 ||
                                 (length(formulaToUse[[2]])>1 & !any(as.character(formulaToUse[[2]])=="log"))) &&
-                               (Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt","dalaplace")))){
+                               (Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt")))){
                                 if(trendIncluded){
                                     formulaToUse <- update(formulaToUse,log(.)~.);
                                 }
@@ -2841,7 +2841,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             modelDo <- "estimate";
         }
         Etype <- switch(distribution,
-                        "default"=,"dnorm"=,"dlaplace"=,"ds"=,"dgnorm"=,"dlogis"=,"plogis"=,"dt"=,"dalaplace"="A",
+                        "default"=,"dnorm"=,"dlaplace"=,"ds"=,"dgnorm"=,"dlogis"=,"plogis"=,"dt"="A",
                         "dlnorm"=,"dllaplace"=,"dls"=,"dlgnorm"=,"dinvgauss"=,"dgamma"="M",
                         "A");
         Ttype <- "N";
@@ -3074,7 +3074,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 adamSpecificChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
                                 outliers=c("ignore","use","select"), level=0.99,
                                 persistence, phi, initial,
-                                distribution=c("default","dnorm","dlaplace","dalaplace",
+                                distribution=c("default","dnorm","dlaplace",
                                                "ds","dgnorm","dlnorm","dinvgauss","dgamma","plogis"),
                                 loss, h, holdout, occurrence,
                                 ic=c("AICc","AIC","BIC","BICc"),
@@ -3085,7 +3085,7 @@ adamSpecificChecker <- function(data, model, lags, formulaToUse, orders, constan
     outliers <- match.arg(outliers)
     if(!fast){
         distribution <- match.arg(distribution[1],
-                                   c("default","dnorm","dlaplace","dalaplace",
+                                   c("default","dnorm","dlaplace",
                                      "ds","dgnorm","dlnorm","dinvgauss","dgamma","plogis"))
     }
 

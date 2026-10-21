@@ -1954,7 +1954,6 @@ print.omg <- function(x, digits=4, ...) {
                       "dlogis"    = "Logistic",
                       "plogis"    = "Cumulative Logistic",
                       "dt"        = paste0("Student t with df=", round(x$other$nu, digits)),
-                      "dalaplace" = paste0("Asymmetric Laplace with alpha=", round(x$other$alpha, digits)),
                       "dlnorm"    = "Log-Normal",
                       "dllaplace" = "Log-Laplace",
                       "dls"       = "Log-S",

@@ -132,6 +132,7 @@ Bugfixes:
 * `adam(..., FI=TRUE)` (and the functions built on it, such as `es()` and `msarima()`) returned `TRUE` in `$FI` instead of the Fisher Information matrix when the model was estimated or selected: the matrix is now calculated, as with the reused model.
 * `oes()` failed with `xreg` as a data frame ("undefined columns selected"): `xreg` can be a vector, a matrix or a data frame, merged with `y` into the data passed to `om()`.
 * The help of `adam()` said that `initial="gradient"` supported only ETS models without ARIMA and regressors: it supports ETS, ARIMA and explanatory variables, and the help pages of `es()`, `msarima()`, `ssarima()`, `ces()` and `gum()`, which accept it, now describe it.
+* `adam()` accepted `distribution="dalaplace"` (the Asymmetric Laplace), which is not one of its distributions, and fitted it: the argument checks of `adam()` and of the functions built on it listed it. It is removed from them and from the methods of `adam()`, so it is now an error, as any other unsupported distribution. `alm()` and the functions of the Asymmetric Laplace in `greybox` are unaffected.
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

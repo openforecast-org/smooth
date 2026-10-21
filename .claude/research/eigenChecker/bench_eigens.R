@@ -3,7 +3,9 @@
 args <- commandArgs(trailingOnly=TRUE)
 root <- args[1]
 repeats <- as.integer(args[2])
-suppressMessages(pkgload::load_all(root, quiet=TRUE))
+# Compiled with the optimisation of an installed package (load_all() alone compiles with -O0)
+pkgbuild::compile_dll(root, force=TRUE, debug=FALSE, quiet=TRUE)
+suppressMessages(pkgload::load_all(root, compile=FALSE, quiet=TRUE))
 set.seed(41)
 
 results <- list()

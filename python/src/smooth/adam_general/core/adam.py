@@ -3905,7 +3905,7 @@ class ADAM:
         if occurrence is not None:
             p_forecast_arr = np.ravel(np.asarray(occurrence, dtype=float))
         elif om_model is not None:
-            occ_fc = om_model.predict(h=h)
+            occ_fc = om_model.predict(h=h, X=X)
             p_forecast_arr = np.asarray(occ_fc.mean.values, dtype=float)
             # Store in occurrence_dict so _process_occurrence_forecast can use it
             self._occurrence["p_forecast"] = p_forecast_arr
@@ -4270,7 +4270,13 @@ class ADAM:
             )
         else:
             common.update(model=adam_model, orders=orders, regressors=self.regressors)
-            m = AutoOM(**common) if occ == "auto" else OM(occurrence=occ, **common)
+            if occ == "auto":
+                # As R's adam(), which gives auto.om() its own orders: without ARIMA
+                # there is no orders selection in the occurrence part
+                no_arima = {"ar": 0, "i": 0, "ma": 0, "select": False}
+                m = AutoOM(**{**common, "orders": orders or no_arima})
+            else:
+                m = OM(occurrence=occ, **common)
         # AutoOM returns the selected model
         return m.fit(y, X)
 

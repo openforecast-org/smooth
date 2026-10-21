@@ -7,7 +7,7 @@ import copy
 import numpy as np
 
 from smooth.adam_general.core.utils.cost_functions import fit_at_parameters
-from smooth.adam_general.core.utils.utils import observed_mask, xreg_selector
+from smooth.adam_general.core.utils.utils import xreg_selector
 
 from .optimization import _set_distribution
 
@@ -97,8 +97,11 @@ def estimate_and_select(estimator, arguments):
         other,
     )
     obs = arguments["observations_dict"]["obs_in_sample"]
-    # On the observed values only: the filled ones are not data
-    observed = observed_mask(arguments["observations_dict"])
+    # On the observed non-zero values only (R's otLogical): the filled ones are not
+    # data, and the zeros belong to the occurrence part
+    observed = np.asarray(arguments["observations_dict"]["ot_logical"], dtype=bool)[
+        :obs
+    ]
     names = list(select["names"])
     selected = xreg_selector(
         selection_errors(fitted, distribution, model_type)[observed],

@@ -1669,8 +1669,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                any(c(Etype,Ttype,Stype)=="A") && any(errors<=0)){
                 errors[errors<=0] <- 1e-100;
             }
-            # The missing values are zeros, which the occurrence model takes as a constant
-            errors[yNAValues[1:obsInSample]] <- 0;
 
             df <- length(B)+1;
             if(any(distributionNew==c("dgnorm","dlgnorm","dt")) && otherParameterEstimate){
@@ -1680,15 +1678,16 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
             # Call the xregSelector providing the original matrix with the data
             xregIndex[] <- switch(Etype,"A"=1,"M"=2);
-            # Without an occurrence model, on the observed values only
-            rowsSelected <- occurrenceModel | !yNAValues[1:obsInSample];
+            # On the observed non-zero values only, as tbats() does: the occurrence part
+            # does not change the selection, and stepwise() cannot refit an occurrence
+            # model whose response is not the errors
             xregModelInitials[[xregIndex]] <- adam_xreg_selector(
-                errors=errors[rowsSelected],
+                errors=errors[otLogical],
                 xregData=xregDataOriginal[1:obsInSample,
                                           colnames(xregDataOriginal)!=responseName,
-                                          drop=FALSE][rowsSelected,,drop=FALSE],
-                obsInSample=sum(rowsSelected), ic=ic,
-                df=df, distribution=distributionNew, occurrence=if(occurrenceModel) omModel,
+                                          drop=FALSE][otLogical,,drop=FALSE],
+                obsInSample=sum(otLogical), ic=ic,
+                df=df, distribution=distributionNew, occurrence="none",
                 other=other);
             xregNumber <- length(xregModelInitials[[xregIndex]]$initialXreg);
             xregNames <- names(xregModelInitials[[xregIndex]]$initialXreg);
@@ -1741,12 +1740,11 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 }
 
                 # Estimate alm again in order to get proper initials
-                # On the observed (non-zero) values only when some are missing
-                almModel <- do.call(alm,c(list(formula=formulaToUse,
-                                               data=data[1:obsInSample,,drop=FALSE],
-                                               distribution=distributionNew, loss=lossNew),
-                                          if(any(yNAValues)) list(subset=which(otLogical)) else
-                                              list(occurrence=omModel)));
+                # On the observed non-zero values only, what alm() with the occurrence would fit
+                almModel <- do.call(alm,list(formula=formulaToUse,
+                                             data=data[1:obsInSample,,drop=FALSE],
+                                             distribution=distributionNew, loss=lossNew,
+                                             subset=which(otLogical)));
 
                 # Remove trend
                 if(!trendIncluded){
@@ -1792,6 +1790,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                     interceptIsPresent[] <- TRUE;
                     xregData <- xregData[,-1,drop=FALSE];
                 }
+                # Cut to obsAll, or extend with the last values (Naive) as parametersChecker() does
+                xregData <- xregData[pmin(1:obsAll, nrow(xregData)),,drop=FALSE];
                 xregNumber <- ncol(xregData);
 
                 # If there are factors not in the alm data, create additional initials
@@ -6337,6 +6337,9 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     }
     vecG <- matrix(object$persistence, ncol=1);
 
+    # The occurrence and the scale models take the newdata as given: their regressors
+    # can differ from the selected ones of the demand
+    newdataProvided <- newdata;
     # Deal with explanatory variables
     if(ncol(object$data)>1){
         newdata <- adam_xregNewdata(object, h, newdata);
@@ -6459,7 +6462,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 pForecast <- rep(1,h);
             }
             else{
-                pForecast <- forecast(object$occurrence, h=h, newdata=newdata)$mean;
+                pForecast <- forecast(object$occurrence, h=h, newdata=newdataProvided)$mean;
             }
         }
         else{
@@ -6576,7 +6579,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         if(is.scale(object$scale)){
             # as.vector is needed to declass the mean.
             scaleValue <- c(tail(as.vector(fitted(object$scale)), trailing),
-                            as.vector(forecast(object$scale,h=h,newdata=newdata,interval="none")$mean));
+                            as.vector(forecast(object$scale,h=h,newdata=newdataProvided,interval="none")$mean));
         }
         else{
             scaleValue <- object$scale;
@@ -6657,7 +6660,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             s2 <- mean(adam_varianceDebiased(object));
             # If scale model is included, produce forecasts
             if(is.scale(object$scale)){
-                s2Forecast <- adam_scaleModelVariance(object, h, newdata);
+                s2Forecast <- adam_scaleModelVariance(object, h, newdataProvided);
             }
             # A pure multiplicative ADAM ETS with the log-normal is additive in logs: log(1+e) at
             # the horizon j has the mean -s2*a_j/2 and the variance s2*k_j, as over the gaps
@@ -6783,7 +6786,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             else{
                 # If scale model is included, produce forecasts
                 if(is.scale(object$scale)){
-                    vcovMulti <- adam_scaleModelVariance(object, h, newdata);
+                    vcovMulti <- adam_scaleModelVariance(object, h, newdataProvided);
                 }
                 else{
                     vcovMulti <- adam_varianceDebiased(object);

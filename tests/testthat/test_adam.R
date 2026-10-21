@@ -1472,6 +1472,32 @@ test_that("ADAM with formula and regressors='select' refits without regressors w
     expect_equal(colnames(coefbootstrap(testModel, nsim=2)$coefficients), "alpha");
 })
 
+# The regressors are selected on the non-zero values, whatever the occurrence model
+test_that("ADAM with an occurrence model and regressors='select'", {
+    set.seed(41);
+    xregData <- data.frame(y=0, a=rnorm(150), n1=rnorm(150), n2=rnorm(150));
+    xregData$y <- rbinom(150, 1, plogis(2*xregData$a)) * (10+3*xregData$a+rnorm(150));
+    omModel <- om(xregData$y[1:140], "MNN", occurrence="odds-ratio");
+    occurrences <- list("auto","fixed","odds-ratio","inverse-odds-ratio","direct","general",omModel);
+    for(occurrence in occurrences){
+        testModel <- adam(xregData[1:140,], "ANN", occurrence=occurrence, regressors="select");
+        expect_true("a" %in% names(coef(testModel)));
+        expect_true(all(is.finite(forecast(testModel, h=10, newdata=xregData[141:150,])$mean)));
+    }
+    testModel <- adam(xregData[1:140,], "MNN", occurrence="auto", regressors="select",
+                      formula=y~a+n1);
+    expect_true("a" %in% names(coef(testModel)));
+    # Without newdata, h beyond the sample takes the last values of the regressors
+    testModel <- adam(xregData, "ANN", occurrence="auto", regressors="select", h=5);
+    expect_length(testModel$forecast, 5);
+    # The occurrence model takes the newdata as given, with its own regressors
+    testModel <- adam(xregData[1:140,], "ANN", occurrence="direct", regressors="select");
+    expect_equal(forecast(testModel, h=10, newdata=xregData[141:150,])$mean,
+                 forecast(testModel, h=10, newdata=xregData[141:150,],
+                          occurrence=forecast(testModel$occurrence, h=10,
+                                              newdata=xregData[141:150,])$mean)$mean);
+})
+
 test_that("ADAM counts the provided initial level as provided and the rest as estimated", {
     testModel <- adam(AirPassengers, "AAA", lags=12, initial=list(level=100));
     # alpha, beta, gamma, the trend and 11 seasonal initials

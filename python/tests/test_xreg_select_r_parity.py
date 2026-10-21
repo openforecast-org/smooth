@@ -1,7 +1,9 @@
-"""R-Python parity of regressors="select" in CES, OM and OMG, on a series with one
-true regressor and two noise ones: CES selects them by stepwise() on the errors of the
-model without them, as R's adam_xreg_selectRefit(), OM and OMG by stepwise(plogis) on
-the occurrence indicator, as R's om(), and each refits with the selected ones."""
+"""R-Python parity of regressors="select" in CES, OM, OMG and ADAM with an occurrence
+model, on a series with one true regressor and two noise ones: CES selects them by
+stepwise() on the errors of the model without them, as R's adam_xreg_selectRefit(),
+OM and OMG by stepwise(plogis) on the occurrence indicator, as R's om(), ADAM by
+stepwise() on the errors of its non-zero values, and each refits with the selected
+ones."""
 
 import warnings
 
@@ -9,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from smooth import CES, OM, OMG
+from smooth import ADAM, CES, OM, OMG
 from tests._r_bridge import r_dict
 
 pytestmark = pytest.mark.r_parity
@@ -18,8 +20,9 @@ NAMES = ["a", "n1", "n2"]
 DATA = (
     "set.seed(41); d <- data.frame(y=0, a=rnorm(300), n1=rnorm(300), n2=rnorm(300));"
     " d$y <- 100 + cumsum(rnorm(300)) + 3*d$a + rnorm(300);"
-    " d$o <- rbinom(300, 1, plogis(2*d$a));"
+    " d$o <- rbinom(300, 1, plogis(2*d$a)); d$i <- d$o * (10 + 3*d$a + rnorm(300));"
     " dc <- d[, c('y', 'a', 'n1', 'n2')]; do <- d[, c('o', 'a', 'n1', 'n2')];"
+    " di <- d[, c('i', 'a', 'n1', 'n2')];"
 )
 CASES = {
     "CES": (
@@ -36,6 +39,11 @@ CASES = {
         "omg(do[1:280,], 'ANN', regressorsA='select', regressorsB='use')",
         lambda: OMG(model_a="ANN", regressors_a="select", regressors_b="use"),
         "o",
+    ),
+    "ADAM": (
+        "adam(di[1:280,], 'ANN', occurrence='auto', regressors='select')",
+        lambda: ADAM(model="ANN", occurrence="auto", regressors="select"),
+        "i",
     ),
 }
 

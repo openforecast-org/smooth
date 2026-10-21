@@ -43,10 +43,10 @@ jobs:
         # leak into artifact names and break the upload step.
         include:
           # Linux: cp311–cp314 manylinux
-          - { os: ubuntu-latest,  cibw-build: 'cp311-manylinux*', tag: 'cp311-linux' }
-          - { os: ubuntu-latest,  cibw-build: 'cp312-manylinux*', tag: 'cp312-linux' }
-          - { os: ubuntu-latest,  cibw-build: 'cp313-manylinux*', tag: 'cp313-linux' }
-          - { os: ubuntu-latest,  cibw-build: 'cp314-manylinux*', tag: 'cp314-linux' }
+          - { os: ubuntu-26.04,  cibw-build: 'cp311-manylinux*', tag: 'cp311-linux' }
+          - { os: ubuntu-26.04,  cibw-build: 'cp312-manylinux*', tag: 'cp312-linux' }
+          - { os: ubuntu-26.04,  cibw-build: 'cp313-manylinux*', tag: 'cp313-linux' }
+          - { os: ubuntu-26.04,  cibw-build: 'cp314-manylinux*', tag: 'cp314-linux' }
           # macOS: cp311–cp313 (cp314 not yet on macOS x86_64 — same
           # skip rule release.yml uses today). Glob matches both
           # x86_64 and arm64 — the row produces both wheels.
@@ -178,7 +178,7 @@ jobs:
 
   build_sdist:
     name: Build sdist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -207,7 +207,7 @@ jobs:
   prepare_draft_release:
     name: Stage wheels on draft GitHub release
     needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write   # creating / updating the draft release
     steps:

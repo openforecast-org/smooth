@@ -27,7 +27,7 @@ env:
 jobs:
   build:
     name: Build source tarball
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -75,8 +75,8 @@ jobs:
         # The PDF manual is checked on one leg only (it needs LaTeX), the
         # HTML manual on the Ubuntu legs (it needs HTML Tidy and V8).
         config:
-          - {os: ubuntu-latest,  r: 'release', manual: true,  html: true}
-          - {os: ubuntu-latest,  r: 'devel',   manual: false, html: true, http-user-agent: 'release'}
+          - {os: ubuntu-26.04,  r: 'release', manual: true,  html: true}
+          - {os: ubuntu-26.04,  r: 'devel',   manual: false, html: true, http-user-agent: 'release'}
           - {os: macos-latest,   r: 'release', manual: false, html: false}
           - {os: windows-latest, r: 'release', manual: false, html: false}
     env:
@@ -160,7 +160,7 @@ jobs:
   prepare_draft_release:
     name: Stage tarball on draft GitHub release
     needs: [build, check]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:

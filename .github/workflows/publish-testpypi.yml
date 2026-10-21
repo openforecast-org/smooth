@@ -29,7 +29,7 @@ env:
 jobs:
   publish:
     name: Publish to TestPyPI
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment:
       name: testpypi
       url: https://test.pypi.org/p/smooth

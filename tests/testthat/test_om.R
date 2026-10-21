@@ -506,3 +506,13 @@ test_that("om with a fixed probability has no ARIMA, whatever the orders", {
     expect_equal(modelName(testModel), "oETS(ANN)[F]")
     expect_true(is.finite(logLik(testModel)))
 })
+
+# A constant probability has no regressors, so auto.om() can compare it with the others
+test_that("om(occurrence=\"fixed\") drops the regressors and auto.om() takes them", {
+    set.seed(4)
+    xreg <- data.frame(y=rbinom(120, 1, 0.5), a=rnorm(120))
+    testModel <- om(xreg, occurrence="fixed")
+    expect_equal(modelName(testModel), "oETS(ANN)[F]")
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(om(xreg$y, occurrence="fixed"))))
+    expect_true(is.finite(AICc(auto.om(xreg))))
+})

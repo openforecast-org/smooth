@@ -227,11 +227,8 @@ om <- function(data,
         modelDo <- modelDo_user;
     }
 
-    dataChecked <- adam_checkData(data, lags, h, holdout, yName, modelDo, formula);
-    list2env(dataChecked, envir=environment());
-
     #### Force ETS(A,N,N) with persistence=0 for "fixed" occurrence ####
-    # A constant probability has no ARIMA either
+    # A constant probability has no ARIMA or regressors either
     if(occurrence == "fixed"){
         model <- "ANN";
         persistence <- 0;
@@ -239,7 +236,15 @@ om <- function(data,
         modelDo <- "use";
         orders <- list(ar=0, i=0, ma=0);
         constant <- FALSE;
+        if(!is.null(ncol(data)) && ncol(data)>1){
+            data <- data[, if(is.null(formula)) 1 else all.vars(formula)[1], drop=FALSE];
+        }
+        formula <- NULL;
     }
+
+    dataChecked <- adam_checkData(data, lags, h, holdout, yName, modelDo, formula);
+    list2env(dataChecked, envir=environment());
+
 
     #### Call parametersChecker ####
     checkerReturn <- parametersChecker(data=data, model=model, lags=lags,

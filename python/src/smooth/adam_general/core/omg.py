@@ -1039,13 +1039,21 @@ class OMG:
             ets=self.ets,
             smoother=self.smoother,
         )
-        if isinstance(spec, str) and any(c in spec for c in "ZXYFPS"):
+        # A side with regressors="select" selects them there as OM does, and then
+        # uses the selected columns of X, as R's omg()
+        columns = None
+        if (isinstance(spec, str) and any(c in spec for c in "ZXYFPS")) or (
+            regressors == "select" and X is not None
+        ):
             loss = self.loss_function if self.loss == "custom" else self.loss
-            spec = (
-                OM(model=spec, loss=loss, lambda_param=self.lambda_param, **common)
-                .fit(y, X)
-                .model_type
-            )
+            pre = OM(model=spec, loss=loss, lambda_param=self.lambda_param, **common)
+            pre = pre.fit(y, X)
+            spec = pre.model_type
+            if regressors == "select" and X is not None:
+                columns = pre._explanatory["xreg_columns"]
+                common["regressors"] = "use"
+                X = (X.iloc if hasattr(X, "iloc") else np.asarray(X))[:, columns]
+                X = X if columns else None
         scaffold = OM(
             model=spec, verbose=self.verbose, holdout=self.holdout, h=self.h, **common
         )
@@ -1056,6 +1064,8 @@ class OMG:
             else None
         )
         scaffold._check_parameters(y, X)
+        if columns is not None:
+            scaffold._explanatory["xreg_columns"] = columns
 
         # Pure-regression early exit: return a minimal marker dict so OMG.fit()
         # can detect and handle both sides without running the ETS machinery.
@@ -1063,6 +1073,7 @@ class OMG:
             return {
                 "scaffold": scaffold,
                 "is_alm": True,
+                "X": X,
                 "occurrence_str": occurrence,
             }
 
@@ -1342,8 +1353,9 @@ class OMG:
         scaffold_b = side_b["scaffold"]
         scaffold_b._alm_model = alm_b
 
-        scaffold_a._populate_from_alm(y, X)
-        scaffold_b._populate_from_alm(y, X)
+        # Both on the regressors of A, which B is fitted on
+        scaffold_a._populate_from_alm(y, side_a["X"])
+        scaffold_b._populate_from_alm(y, side_a["X"])
 
         self.model_a = scaffold_a
         self.model_b = scaffold_b

@@ -44,6 +44,7 @@ from smooth.adam_general.core.creator import (
 from smooth.adam_general.core.estimator.optimization import (
     _configure_optimizer,
 )
+from smooth.adam_general.core.estimator.xreg_select import _xreg_select_refit
 from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
@@ -712,6 +713,12 @@ class OM(ADAM):
         # A constant probability has no regressors, as it has no ARIMA
         if self._om_occurrence == "fixed":
             X = None
+        # The regressors are selected on the errors of the model without them, as R
+        if X is not None and getattr(self, "regressors", "use") == "select":
+            fitted = _xreg_select_refit(self, y, X, getattr(self, "ic", "AICc"))
+            vars(self).clear()
+            vars(self).update(vars(fitted))
+            return self
 
         self._start_time = time.time()
         # Stash the user's requested model spec so we can restore "M*"
@@ -1493,8 +1500,8 @@ class OM(ADAM):
             "FI": None,
         }
 
-        if X_future is not None and self._explanatory.get("xreg_model"):
-            self._explanatory["new_xreg"] = np.asarray(X_future, dtype=float)
+        if X_future is not None:
+            self._set_new_xreg(np.asarray(X_future, dtype=float))
 
         fc = forecaster(
             model_prepared=model_prepared,

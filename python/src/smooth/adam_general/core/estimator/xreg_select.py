@@ -2,6 +2,8 @@
 without the regressors, ``stepwise()`` selects them on its errors, and the model with
 the selected ones is estimated from its parameters (R/adam.R, ``estimator()``)."""
 
+import copy
+
 import numpy as np
 
 from smooth.adam_general.core.utils.cost_functions import fit_at_parameters
@@ -146,3 +148,39 @@ def estimate_and_select(estimator, arguments):
         }
     )
     return {**result, "explanatory_dict": xreg}
+
+
+def _xreg_select_refit(model, y, X, ic):
+    """R's ``adam_xreg_selectRefit``, for the models that do not select in their
+    estimator (CES, OM): the model without the regressors, ``stepwise()`` (dnorm) on
+    its errors, and the model with the selected columns of ``X`` and
+    ``regressors="use"``, which carries them in ``xreg_columns`` for the forecasts."""
+
+    def fit(columns):
+        clone = copy.deepcopy(model)
+        clone.regressors = "use"
+        if hasattr(clone, "_config"):
+            clone._config["regressors"] = "use"
+        if not columns:
+            return clone.fit(y, None)
+        return clone.fit(y, X.iloc[:, columns] if hasattr(X, "iloc") else X[:, columns])
+
+    fitted = fit(None)
+    errors = np.ravel(fitted.residuals).astype(float)
+    observed = ~np.isnan(errors)
+    if not hasattr(X, "iloc"):
+        X = np.asarray(X, dtype=float).reshape(np.shape(X)[0], -1)
+    names = [f"x{i + 1}" for i in range(X.shape[1])]
+    selected = xreg_selector(
+        errors[observed],
+        np.asarray(X, dtype=float)[: len(errors)][observed],
+        names,
+        ic,
+        fitted.n_param.n_param_estimated,
+        "dnorm",
+    )
+    columns = [names.index(name) for name in selected]
+    if columns:
+        fitted = fit(columns)
+    fitted._explanatory["xreg_columns"] = columns
+    return fitted

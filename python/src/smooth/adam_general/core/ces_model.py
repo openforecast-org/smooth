@@ -25,9 +25,11 @@ from smooth.adam_general.core.ces.creator import ces_creator
 from smooth.adam_general.core.ces.filler import ces_filler
 from smooth.adam_general.core.ces.initialiser import ces_initialiser
 from smooth.adam_general.core.checker.data_checks import _fill_missing
+from smooth.adam_general.core.checker.parameters_checker import _process_xreg
 from smooth.adam_general.core.creator.architector import (
     adam_head_length,
 )
+from smooth.adam_general.core.estimator.xreg_select import _xreg_select_refit
 from smooth.adam_general.core.utils.ic import AIC, BIC, AICc, BICc
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.utils import _sum_r, multistep_log_lik
@@ -291,6 +293,12 @@ class CES:
         self
         """
         _check_loss(self.loss)
+        # The regressors are selected on the errors of the model without them, as R
+        if X is not None and self.regressors == "select":
+            fitted = _xreg_select_refit(self, y, X, self.ic)
+            vars(self).clear()
+            vars(self).update(vars(fitted))
+            return self
         start_time = time.time()
         y = np.asarray(y, dtype=np.float64).ravel()
         nlopt_settings = self._nlopt
@@ -379,6 +387,19 @@ class CES:
         xreg_number = X.shape[1] if X is not None and xreg_model else 0
         xreg_data = X[:obs_in_sample] if X is not None and xreg_model else None
         xreg_names = [f"x{i + 1}" for i in range(xreg_number)]
+        # Their initials, as R's parametersChecker: ALM with a trend on the observed
+        xreg_initials = None
+        if xreg_model:
+            xreg_initials = _process_xreg(
+                np.asarray(X, dtype=float),
+                "use",
+                y_in_sample,
+                obs_in_sample,
+                "default",
+                "A",
+                self.ic,
+                ot_logical=observed,
+            )["xreg_model_initials"][0]["initial_xreg"].ravel()
 
         # Build lags_model_all — R lines 584-590
         if self.seasonality == "none":
@@ -460,6 +481,7 @@ class CES:
             lags=lags,
             xreg_data=xreg_data,
             xreg_names=xreg_names,
+            xreg_model_initials=xreg_initials,
             head_length=head_length,
         )
 

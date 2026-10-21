@@ -516,3 +516,14 @@ test_that("om(occurrence=\"fixed\") drops the regressors and auto.om() takes the
     expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(om(xreg$y, occurrence="fixed"))))
     expect_true(is.finite(AICc(auto.om(xreg))))
 })
+
+# The smoother reaches omg() and auto.om() when om() redirects to them
+test_that("om() passes smoother on to omg() and auto.om()", {
+    set.seed(5)
+    y <- ts(rbinom(120, 1, 0.3+0.3*sin(1:120*2*pi/12)), frequency=12)
+    testModel <- om(y, "ANA", occurrence="general", initial="optimal", smoother="global")
+    expect_equal(logLik(testModel), logLik(omg(y, "ANA", "ANA", initial="optimal", smoother="global")))
+    expect_false(isTRUE(all.equal(logLik(testModel), logLik(omg(y, "ANA", "ANA", initial="optimal")))))
+    expect_equal(logLik(om(y, "ANA", occurrence="auto", initial="optimal", smoother="global")),
+                 logLik(auto.om(y, "ANA", initial="optimal", smoother="global")))
+})

@@ -158,7 +158,7 @@ om <- function(data,
                           initial=initial, arma=arma,
                           ic=ic, bounds=bounds, silent=silent, ets=ets,
                           occurrence=c("fixed","general","odds-ratio","inverse-odds-ratio","direct"),
-                          constant=constant, loss=loss, ...)
+                          constant=constant, loss=loss, smoother=smoother, ...)
         result$call <- match.call()
         return(result)
     }
@@ -174,7 +174,7 @@ om <- function(data,
                       etsA=ets, etsB=ets,
                       lags=lags, h=h, holdout=holdout,
                       initial=initial, loss=loss, ic=ic,
-                      bounds=bounds, silent=silent, ...)
+                      bounds=bounds, silent=silent, smoother=smoother, ...)
         result$call <- match.call()
         return(result)
     }

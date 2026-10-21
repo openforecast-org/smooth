@@ -129,3 +129,31 @@ def test_names_with_regressors_match_r(r_call, py_class, py_args):
     X = np.asarray(r["x"], dtype=float).reshape(-1, 1)
     fit = getattr(smooth, py_class)(**py_args).fit(np.asarray(r["y"], dtype=float), X)
     assert fit.model_name == r["name"][0]
+
+
+@pytest.mark.parametrize(
+    "r_call,py_class,py_args",
+    [
+        ("om(y, 'MNN', occurrence='odds-ratio', h=10, holdout=TRUE)", "OM", {}),
+        ("om(y, 'MNN', occurrence='fixed', h=10, holdout=TRUE)", "OM", {}),
+        ("omg(y, 'MNN', 'MNN', h=10, holdout=TRUE)", "OMG", {"model_a": "MNN"}),
+    ],
+)
+def test_holdout_accuracy_matches_r(r_call, py_class, py_args):
+    """accuracy of om() / omg() with a holdout, as R's measures()."""
+    import smooth
+
+    r = r_dict(
+        "{ set.seed(3); y <- rbinom(120,1,0.4)*exp(rnorm(120,2,0.3));"
+        f" a <- ({r_call})$accuracy; a <- a[is.finite(a)];"
+        " list(y=y, names=names(a), a=unname(a)) }"
+    )
+    if py_class == "OM":
+        occurrence = r_call.split("occurrence='")[1].split("'")[0]
+        py_args = {"model": "MNN", "occurrence": occurrence}
+    fit = getattr(smooth, py_class)(h=10, holdout=True, **py_args)
+    accuracy = fit.fit(np.asarray(r["y"], dtype=float)).accuracy
+    # MPE and MAPE divide by the zeros of the holdout: R's measures() returns
+    # -Inf / Inf, which JSON does not carry, and greybox's in Python finite values
+    for name, value in zip(r["names"], r["a"]):
+        assert accuracy[name] == pytest.approx(value, rel=1e-6), name

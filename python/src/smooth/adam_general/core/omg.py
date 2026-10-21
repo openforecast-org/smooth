@@ -33,6 +33,7 @@ from smooth.adam_general.core.om import (
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.omg_cost import omg_cf, omg_link_function
+from smooth.adam_general.core.utils.printing import _compute_forecast_errors
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
@@ -307,6 +308,13 @@ class OMG:
         # Auto-forecast if h > 0
         if self.h and self.h > 0:
             self._auto_forecast = self._forecast_combined(self.h, X_future=None)
+            # Against the binary holdout, scaled by the series, as R's omg()
+            if self.holdout:
+                self.accuracy = _compute_forecast_errors(
+                    np.asarray(self.holdout_data),
+                    self._auto_forecast.mean,
+                    self._y_raw[: self._observations_dict["obs_in_sample"]],
+                )
         else:
             self._auto_forecast = None
 

@@ -611,3 +611,16 @@ def test_name_has_the_x_of_the_regressors():
     arima = OM("NNN", ar_order=1, occurrence="direct").fit(y, x)
     assert arima.model == "oARIMAX(1,0,0)[D]"
     assert OM("MNN", occurrence="odds-ratio").fit(y).model == "oETS(MNN)[O]"
+
+
+def test_holdout_accuracy():
+    """With a holdout, OM and OMG compute accuracy as ADAM, as R."""
+    from smooth import OMG
+
+    rng = np.random.default_rng(3)
+    y = rng.binomial(1, 0.4, 120) * np.exp(rng.normal(2, 0.3, 120))
+    om = OM("MNN", occurrence="odds-ratio", h=10, holdout=True).fit(y)
+    forecast = om.predict(h=10).mean.values
+    assert om.accuracy["ME"] == pytest.approx(np.mean((y[-10:] != 0) - forecast))
+    omg = OMG("MNN", "MNN", h=10, holdout=True).fit(y)
+    assert np.isfinite(omg.accuracy["MASE"])

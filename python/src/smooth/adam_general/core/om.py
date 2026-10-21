@@ -48,7 +48,10 @@ from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.om_cost import om_cf, om_link_function
-from smooth.adam_general.core.utils.printing import _build_model_name
+from smooth.adam_general.core.utils.printing import (
+    _build_model_name,
+    _compute_forecast_errors,
+)
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
@@ -1433,6 +1436,12 @@ class OM(ADAM):
         # to probabilities; for the raw forecast call we need to re-run the
         # C++ forecaster on the optimal states then apply the link.
         self._auto_forecast = self._om_forecast(h, X_future=None)
+        if self.holdout:
+            self.accuracy = _compute_forecast_errors(
+                self._observations["y_holdout"],
+                self._auto_forecast.mean,
+                self._observations["y_in_sample"],
+            )
 
     def _run_forecaster(self, h: int, X_future=None):
         """Call the C++ forecaster; return ``(fc, raw_array)`` (before link function).

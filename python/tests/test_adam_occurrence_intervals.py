@@ -281,3 +281,33 @@ def test_the_name_has_the_type_of_the_fitted_occurrence(occurrence):
     )
     fit = ADAM(model="MNN", occurrence=occurrence).fit(np.asarray(r["y"], dtype=float))
     assert fit.model_name == r["name"][0]
+
+
+@pytest.mark.r_parity
+def test_predict_with_a_provided_occurrence_model():
+    """As R's adam(occurrence=<om>): forecast with the fitted occurrence model."""
+    from smooth import OM
+
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        "{ set.seed(3); y <- rbinom(200,1,0.4)*exp(rnorm(200,2,0.3));"
+        " o <- om(y, 'MNN', occurrence='odds-ratio');"
+        " m <- adam(y, 'MNN', occurrence=o);"
+        " list(y=y, mean=as.vector(forecast(m, h=5)$mean)) }"
+    )
+    y = np.asarray(r["y"], dtype=float)
+    occurrence = OM(model="MNN", occurrence="odds-ratio").fit(y)
+    fc = ADAM(model="MNN", occurrence=occurrence).fit(y).predict(h=5)
+    np.testing.assert_allclose(fc.mean.values, r["mean"], rtol=1e-4)
+
+
+def test_predict_with_a_fitted_om_scales_by_its_probabilities(y):
+    """A provided fitted OM gives the forecast of the sizes times its p."""
+    from smooth import OM
+
+    occurrence = OM(model="MNN", occurrence="odds-ratio").fit(y)
+    fc = ADAM(model="MNN", occurrence=occurrence).fit(y).predict(h=5)
+    p = occurrence.predict(h=5).mean.values
+    assert np.all(np.isfinite(fc.mean.values))
+    assert np.all(fc.mean.values <= fc.mean.values / p + 1e-10)

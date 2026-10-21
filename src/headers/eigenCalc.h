@@ -454,10 +454,16 @@ inline arma::vec lagPolynomial(const arma::mat& M, const arma::ivec& lags) {
     while(N < degree + 1) {
         N <<= 1;
     }
-    arma::cx_vec roots(N), values(N);
-    for(arma::uword t = 0; t < N; t++) {
-        roots(t) = std::polar(1.0, 2.0 * arma::datum::pi * double(t) / double(N));
+    // The N-th roots of unity, kept once computed
+    static std::map<arma::uword, arma::cx_vec> unityRoots;
+    arma::cx_vec& roots = unityRoots[N];
+    if(roots.n_elem != N) {
+        roots.set_size(N);
+        for(arma::uword t = 0; t < N; t++) {
+            roots(t) = std::polar(1.0, 2.0 * arma::datum::pi * double(t) / double(N));
+        }
     }
+    arma::cx_vec values(N);
     // The coefficients are real, so the values at conjugate roots of unity are conjugate
     const arma::cx_mat Mc = arma::conv_to<arma::cx_mat>::from(M);
     arma::cx_mat A(k, k);

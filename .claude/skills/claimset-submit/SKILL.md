@@ -1,13 +1,15 @@
 ---
 name: claimset-submit
-description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.9 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
+description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.18 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
 ---
 
 # Preparing a Claimset submission
 
 A claimset is a research paper written for LLM readers: a flat JSON file of atomic, self-contained claims plus the definitions, evidence, assumptions, limitations, warrants and artefacts that support, condition and limit them. You write every field. A human decides two things (guarantor and licence), and you ask them before you finish.
 
-The normative rules are in `references/spec-v0.9.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
+The normative rules are in `references/spec-v0.18.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
+
+**Versions.** This skill, its spec and its validator are one version. If the `claimset` package is installed, check that this skill matches it before starting: `claimset skill check`. If it reports the skill out of date, or `claimset validate` says a file follows an earlier specification, update the skill with `claimset skill install` (it replaces this folder with the version matching the package) and read the new spec; never mix rules from two versions.
 
 You produce a **submission**. The platform turns it into the published file: it mints the DOI and assigns version, publication date, status, the OpenAlex classification IDs and each claim's verifiability. You never supply these, and you never ask the human for them.
 
@@ -41,11 +43,31 @@ Ask only these. Do not ask for a DOI, a publication date or a classification: th
 
 If the human cannot be asked (unattended run), stop after building and validating the file and list these questions as open items. Never fill guarantor or licence on your own.
 
+### 2a. If the research has a lab record
+
+If the work was done with a lab record (`lab/lab.jsonl`, specified in `references/lab-record-v0.5.md`), start from it rather than from a manuscript:
+- Run `claimset lab export -o claimset.json` if the tool is available. It writes a draft that holds everything the record states and prints a **completion list**: the decisions and wording still needed (licence, guarantor, principal claims, claim types, scopes, evidence profiles and descriptions, statements of negative results). Work through that list; do not change what the record states, such as `hypothesis`, `planning`, `planned_at`, `lab_runs` or the exploration counts. If export refuses (an open hypothesis, an unmerged agent log, a record that does not verify), fix the record with `claimset lab` commands, never by editing it.
+- Without the tool, build the claims from the record by hand, following the mapping in lab record §9.
+- Every hypothesis that reached `supported`, `not_supported` or `inconclusive` becomes a claim with `hypothesis: {lab_event, outcome}`, `planning`, and for planned tests `planned_at`, `planned_at_anchor` and `test` (the decision rule) copied from the record. Never upgrade `exploratory` to `confirmatory`, and never change a `test`: it is what the plan fixed before the data were seen.
+- **Negative results are claims too**, in this claimset: state plainly what was not found, with scope and evidence (see `examples/submission-from-lab.json`, claim C4).
+- Fill `paper.exploration` with the counts from the record, and list the record as an artefact of kind `lab_record`, with any `withheld_events` and their reasons.
+- Give evidence objects the `lab_runs` they came from, and take `results` from the record's result events.
+
+Then continue with the steps below to choose principal claims, review wording and scope, and ask the human.
+
+**Planned tests without a lab record.** If a claim was tested under a plan registered before the data were seen (for example a pre-registration), set `planning: confirmatory` (or `confirmatory_with_deviations`), `planned_at`, `planned_at_anchor`, and `test`: the framework, its parameters (for a significance test: `alpha`, `test`, `sides`, `correction`, `sample`), the `quantities` the rules use and the rules for `supported` and `not_supported`, exactly as registered, with the registration's URI in `registration`. `not_supported` means the registered refutation rule was met; otherwise a test that was not significant is `inconclusive`.
+
 ### 3. Write the claims first
 
-Work in this order: principal claims → supporting claims → background claims → assumptions.
+Work in this order: principal claims → supporting claims → assumptions.
 
 **Find the principal claims.** These are the contributions: what the work establishes that a reader should take away. Usually 1–5. List them in `paper.contributions` in order of priority.
+
+**Decide what belongs (spec §3.3.4).** Claims are the work's own: the contributions, the claims they rest on, the assumptions and conditions, the results (including those against the method). Never restate what others found. Prior work enters only by reference, listed once in `references` (`B1`, …):
+- a result your claim builds on → `cited` support of that claim, `{"kind": "cited", "reference": "B3", "locator": "Theorem 2"}`;
+- what your claim answers, extends or contradicts → a relation of that claim, `{"type": "addresses", "reference": "B4", "note": "Selection among ETS models often misidentifies the type of trend."}`;
+- a borrowed term (MASE, ETS) → a one-line definition with what this work specifies (e.g. the interval level) and `"source": "B5"`.
+Leave out general knowledge that no claim rests on and justifications of routine choices (which accuracy measure, which software); put such choices in the evidence's `description` if they matter. Define in full only the terms the work introduces or uses in its own sense.
 
 **Apply the granularity rule.** Split a statement when its parts differ in support, scope or status; keep it whole when splitting would lose meaning. A qualitative theme is one `interpretive` claim with a warrant.
 
@@ -68,7 +90,7 @@ Work in this order: principal claims → supporting claims → background claims
 
 "Method M was 10.5 times faster" or "the KL divergence was 0.001" are `descriptive`: they report a measurement.
 
-**Choose `novelty`:** `new` · `replication` · `extension` · `refutation` · `restatement` (background only).
+**Choose `novelty`:** `new` · `replication` · `extension` · `refutation`.
 
 **Link to prior work.** A `refutation` must have a `contradicts` (or `fails_to_replicate`) relation naming what it refutes; a `replication` must have `replicates` or `fails_to_replicate`; an `extension` should have `extends`. The target can be a paper, book or software release, with a `locator` for the exact place:
 
@@ -90,14 +112,14 @@ Each claim needs at least one support entry. Use these exact pointer fields:
 {"kind": "demonstration", "artefacts": ["A5"]}
 {"kind": "formal_proof", "evidence": "E4"}
 {"kind": "argument", "warrant": "W1"}
-{"kind": "cited", "target": "doi:10.xxxx/yyyy", "id_type": "doi", "self": false}
+{"kind": "cited", "reference": "B1", "locator": "Section 3", "self": false}
 {"kind": "consensus"}
 {"kind": "expert_judgement", "holder": "P2"}
 {"kind": "assumption"}
 ```
 
 - `self: true` when the cited work shares a human supervisor, guarantor or contributor with this paper.
-- Background claims (prior knowledge restated for context) may use only `cited` and/or `consensus`, and must have `novelty: restatement`.
+- Each cited work is listed once in `references`: `{"id": "B1", "target": "10.xxxx/yyyy", "id_type": "doi"}`, and cited by its ID.
 - Never use `unstated`; it exists only for converted papers. If you cannot support a claim, remove it or turn it into an assumption.
 - When a statement quotes numbers, point `results` at the structured results that hold them.
 
@@ -115,6 +137,17 @@ One evidence object per analysis, reused by every claim it supports. Write `desc
 "results": [{"id": "R1", "quantity": "speed-up of low-rank over full covariance filter", "value": 10.55,
              "conditions": {"missing_values": 1, "data": "ETS(A,N,A)"}, "artefact": "A8"}]
 ```
+
+Numbers that form a table (several quantities for several methods, datasets or settings) go into a result table instead, one per table, not one entry per number:
+
+```json
+"tables": [{"id": "T1", "description": "Mean MASE and MSIS of three methods on the M3 monthly series, horizons 1 to 18",
+            "conditions": {"dataset": "M3 monthly"}, "row_labels": ["method"], "columns": ["mean MASE", "mean MSIS"],
+            "rows": [{"id": "r1", "label": ["CES"], "values": [0.861, 6.95]},
+                     {"id": "r2", "label": ["ETS"], "values": [0.874, 6.71]}]}]
+```
+
+Claims cite a table (`E2.T1`) or a row (`E2.T1.r1`) in their support's `results`. A claimset distils the argument; it does not re-encode every table of the research, so record the tables the claims rest on.
 
 Copy values from the result tables, never retype them from prose. If the code that produced the results differs from the archived artefact version, record it in `execution`: `{"code_version": "<commit>", "notes": "…"}`.
 
@@ -141,13 +174,18 @@ Use `check: "tested"` or `"sensitivity_analysed"` only if the work actually did 
 
 For each claim that is neither an assumption nor `formal`, add one assessment `{"by": "author", "strength": …, "rationale": …}` using `high` · `moderate` · `low` · `very_low`. Be conservative: a single unreplicated study is rarely `high`. The rationale names the reason in one sentence.
 
-Formal claims get **no strength assessment**. A formal claim proved or argued in the paper gets `verification` instead:
-- `unchecked`: nobody independent has checked it. This is the honest default for a proof you wrote.
-- `agent_checked`: a separate agent that did not author the claim re-derived it step by step. If your environment lets you start another agent, give it only the claimset and the manuscript and ask it to re-derive each formal claim and report any step that fails; list it as a `contributor` with task `review`, and set `verified_by` to its contributor ID. Never mark your own checking as `agent_checked`.
-- `peer_checked`: a named human checked it (`verified_by` = that human).
-- `machine_checked`: only with a proof-assistant artefact and `checker`.
+Formal claims get **no strength assessment**. A formal claim proved or argued in the paper gets `verification` instead, and every independent check goes into `checks`.
 
-Formal results cited as background (`role: background`) carry neither.
+**Checking.** If your environment lets you start another agent, use it to check the claims, principal claims and refutations first:
+- Give the checker only the claimset and the manuscript, not your reasoning. Ask it to re-derive each formal claim step by step, and to reproduce numerical claims from the artefacts where feasible, reporting for each claim: confirmed, disputed (which step or number, and why) or inconclusive.
+- Prefer a checker on a **different model** from yours, ideally from a different provider; a same-model check shares your blind spots and the validator warns about it.
+- List the checker as a `contributor` with AI task `review`, and record each attempt on the claim:
+  `"checks": [{"by": "P5", "outcome": "confirmed", "extent": "full", "notes": "re-derived steps E2.1–E2.4"}]`
+- **Record every outcome, including failures.** A disputed check stays in the file. If you then correct the claim and a recheck confirms it, add `resolution` to the disputed check and record the new check. Never drop a failed check.
+
+Then set `verification` to match the checks: `agent_checked` (a full confirmed check by an agent, no unresolved dispute), `peer_checked` (the same by a named human), `disputed` (an unresolved dispute), `unchecked` (no full confirmed check), or `machine_checked` (only with a proof-assistant artefact and `checker`). Never record your own checking as a check.
+
+A formal result you cite and apply is `cited` support of your claim, not a claim of its own, and carries neither.
 
 ### 9. Fill contributors, models and paper metadata
 
@@ -164,7 +202,8 @@ Formal results cited as background (`role: background`) carry neither.
 Run:
 
 ```
-python3 scripts/validate.py claimset.json
+claimset validate claimset.json          # if the claimset package is installed
+python3 scripts/validate.py claimset.json  # otherwise, the bundled copy
 ```
 
 (Use `--json` for machine-readable output.) Fix every error and rerun until the file is valid. Then read each warning and fix it if you can; leave it only if the information genuinely does not exist.
@@ -175,7 +214,7 @@ The validator checks structure, references and some wording heuristics. It canno
 
 ### 11. Self-review before handing over
 
-Re-read the file as a sceptical reviewer who sees only one claim at a time:
+Re-read the file as a sceptical reviewer who sees only one claim at a time. If the `claimset` package is installed, read its reading view (`claimset render claimset.json`), which is what reading models will see:
 - Does each statement make sense alone, with no missing referent?
 - Does each principal claim's evidence actually show what the statement says, within its scope?
 - Is anything stated more strongly than the evidence allows?
@@ -183,7 +222,9 @@ Re-read the file as a sceptical reviewer who sees only one claim at a time:
 - Does each claim's scope describe that claim, not its section?
 - Does every refutation, replication and extension name the work it relates to?
 - Are limitations specific and attached to the right claims?
-- Are all numbers identical to the structured results and the source tables?
+- Are all numbers identical to the structured results and the source tables? Does each claim cite only the results its statement reports? (The validator warns, W12, when a cited result does not appear in the statement.)
+- Do the most important claims, especially refutations, have independent checks, with every outcome recorded?
+- If there is a lab record: are negative results included, are the exploration counts right, and is every exploratory claim labelled as such?
 
 ### 12. Hand over
 

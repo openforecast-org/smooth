@@ -1,0 +1,433 @@
+{
+  "schema_version": "0.18",
+  "paper": {
+    "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
+    "licence": "CC-BY-4.0",
+    "classification": {
+      "keywords": [
+        "retail demand forecasting"
+      ]
+    },
+    "contributions": [
+      "C2"
+    ],
+    "autonomy": "human_supervised",
+    "contribution_record": "complete",
+    "origin": "native",
+    "exploration": {
+      "lab_record": "A3",
+      "questions": 1,
+      "hypotheses": {
+        "total": 5,
+        "supported": 1,
+        "not_supported": 1,
+        "inconclusive": 0,
+        "revised": 1,
+        "abandoned": 1,
+        "open": 1
+      },
+      "tests": {
+        "total": 2,
+        "supported": 1,
+        "not_supported": 1,
+        "inconclusive": 0
+      },
+      "runs": {
+        "total": 37,
+        "confirmatory": 4,
+        "exploratory": 33,
+        "failed": 3
+      }
+    }
+  },
+  "contributors": [
+    {
+      "id": "P1",
+      "type": "agent",
+      "name": "Example research agent",
+      "positions": [
+        "author"
+      ],
+      "models": [
+        {
+          "model": "M1",
+          "role": "sole"
+        }
+      ],
+      "credit_roles": [
+        "formal_analysis",
+        "software",
+        "writing_original_draft"
+      ],
+      "ai_tasks": [
+        {
+          "task": "analysis",
+          "extent": "full"
+        },
+        {
+          "task": "writing",
+          "extent": "full"
+        },
+        {
+          "task": "json_preparation",
+          "extent": "full"
+        }
+      ],
+      "tools": [
+        "code_execution",
+        "file_access"
+      ],
+      "record_source": "harness"
+    },
+    {
+      "id": "P2",
+      "type": "human",
+      "name": "A. Researcher",
+      "orcid": "0000-0000-0000-0000",
+      "positions": [
+        "supervisor",
+        "guarantor"
+      ],
+      "credit_roles": [
+        "conceptualization",
+        "supervision"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "M1",
+      "provider": "Example provider",
+      "name": "Example model",
+      "version": "1.0",
+      "identifier": "example-model-1-0",
+      "weights": "api_only",
+      "accessed": "2026-10-01"
+    }
+  ],
+  "definitions": [
+    {
+      "id": "D1",
+      "term": "forecast skill",
+      "definition": "Relative reduction in mean absolute scaled error against a seasonal naive benchmark."
+    }
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "statement": "Monthly retail sales series exhibit annual seasonality.",
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "new",
+      "support": [
+        {
+          "kind": "assumption"
+        }
+      ],
+      "provenance": "author_stated",
+      "assumption_category": "data",
+      "check": "unchecked"
+    },
+    {
+      "id": "C3",
+      "statement": "Forecast errors of method M are independent across series.",
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "new",
+      "support": [
+        {
+          "kind": "assumption"
+        }
+      ],
+      "assumption_category": "statistical",
+      "check": "unchecked",
+      "provenance": "author_stated"
+    },
+    {
+      "id": "C2",
+      "statement": "Method M reduces the mean absolute scaled error of the seasonal naive benchmark by 0.08 on monthly retail sales series.",
+      "type": "descriptive",
+      "role": "principal",
+      "novelty": "new",
+      "scope": {
+        "population": "monthly retail sales series",
+        "geography": "United Kingdom",
+        "language": "not applicable",
+        "period": "2010-2024",
+        "data_type": "aggregate sales counts",
+        "conditions": [
+          "horizon of 1 to 12 months"
+        ],
+        "excludes": [
+          "series shorter than 36 observations"
+        ]
+      },
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E1",
+          "artefacts": [
+            "A2"
+          ],
+          "results": [
+            "E1.R1"
+          ]
+        }
+      ],
+      "assumptions": [
+        "C1",
+        "C3"
+      ],
+      "limitations": [
+        "L1"
+      ],
+      "assessments": [
+        {
+          "by": "author",
+          "strength": "moderate",
+          "rationale": "Single benchmark collection, no external replication."
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H2",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-10-02T09:14:05Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.05,
+          "test": "one-sided test of mean relative MASE reduction, 95% interval from a paired bootstrap over series",
+          "sides": "greater",
+          "correction": "none",
+          "sample": "1,200 monthly series, the full collection, fixed in advance"
+        },
+        "quantities": {
+          "lower": {
+            "quantity": "mean relative MASE reduction, method M vs seasonal naive",
+            "conditions": {
+              "frequency": "monthly"
+            },
+            "field": "interval.lower"
+          },
+          "upper": {
+            "quantity": "mean relative MASE reduction, method M vs seasonal naive",
+            "conditions": {
+              "frequency": "monthly"
+            },
+            "field": "interval.upper"
+          }
+        },
+        "supported": "lower > 0",
+        "not_supported": "upper < 0.02",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL3"
+      }
+    },
+    {
+      "id": "C4",
+      "statement": "Method M does not reduce the mean absolute scaled error of the seasonal naive benchmark on weekly retail sales series by 0.02 or more: the mean relative reduction is -0.004.",
+      "type": "descriptive",
+      "role": "secondary",
+      "novelty": "new",
+      "scope": {
+        "population": "weekly retail sales series",
+        "geography": "United Kingdom",
+        "period": "2010-2024",
+        "conditions": [
+          "horizon of 1 to 52 weeks"
+        ]
+      },
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E2",
+          "results": [
+            "E2.R1"
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "by": "author",
+          "strength": "moderate",
+          "rationale": "Planned test with an interval including zero; single retailer."
+        }
+      ],
+      "hypothesis": {
+        "lab_event": "H3",
+        "outcome": "not_supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-10-02T09:20:41Z",
+      "planned_at_anchor": "none",
+      "provenance": "author_stated",
+      "test": {
+        "framework": "equivalence",
+        "parameters": {
+          "alpha": 0.05,
+          "test": "two one-sided tests on mean relative MASE reduction, 90% interval from a paired bootstrap",
+          "lower_bound": -0.02,
+          "upper_bound": 0.02,
+          "sample": "900 weekly series, the full collection, fixed in advance"
+        },
+        "quantities": {
+          "lower": {
+            "quantity": "mean relative MASE reduction, method M vs seasonal naive",
+            "conditions": {
+              "frequency": "weekly"
+            },
+            "field": "interval.lower"
+          },
+          "upper": {
+            "quantity": "mean relative MASE reduction, method M vs seasonal naive",
+            "conditions": {
+              "frequency": "weekly"
+            },
+            "field": "interval.upper"
+          }
+        },
+        "supported": "lower >= upper_bound",
+        "not_supported": "lower_bound < lower and upper < upper_bound",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL4"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "profile": "quant",
+      "description": "Benchmark of method M against the seasonal naive method on 1,200 monthly retail sales series, rolling origin, horizons 1 to 12.",
+      "design": "benchmark",
+      "estimand": "mean relative MASE reduction",
+      "estimate": 0.08,
+      "interval": {
+        "level": 0.95,
+        "lower": 0.05,
+        "upper": 0.11
+      },
+      "n": 1200,
+      "data_origin": "secondary",
+      "preregistered": false,
+      "artefacts": [
+        "A1"
+      ],
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN31",
+        "RN32"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "quantity": "mean relative MASE reduction, method M vs seasonal naive",
+          "value": 0.08,
+          "interval": {
+            "level": 0.95,
+            "lower": 0.05,
+            "upper": 0.11
+          },
+          "conditions": {
+            "frequency": "monthly"
+          },
+          "artefact": "A2"
+        }
+      ]
+    },
+    {
+      "id": "E2",
+      "profile": "quant",
+      "description": "Benchmark of method M against the seasonal naive method on 900 weekly retail sales series, rolling origin, horizons 1 to 52.",
+      "design": "benchmark",
+      "n": 900,
+      "data_origin": "secondary",
+      "preregistered": false,
+      "artefacts": [
+        "A1"
+      ],
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN35"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "quantity": "mean relative MASE reduction, method M vs seasonal naive",
+          "value": -0.004,
+          "interval": {
+            "level": 0.9,
+            "lower": -0.016,
+            "upper": 0.008
+          },
+          "conditions": {
+            "frequency": "weekly"
+          }
+        }
+      ]
+    }
+  ],
+  "warrants": [],
+  "limitations": [
+    {
+      "id": "L1",
+      "category": "sampling",
+      "statement": "All 1,200 series come from one retailer's store network.",
+      "affects": [
+        "C2"
+      ],
+      "impact": "reduces_transferability",
+      "mitigation": "none"
+    }
+  ],
+  "artefacts": [
+    {
+      "id": "A1",
+      "kind": "code",
+      "uri": "https://example.org/repo",
+      "version": "v1.0",
+      "licence": "MIT",
+      "availability": {
+        "level": "public"
+      }
+    },
+    {
+      "id": "A2",
+      "kind": "table",
+      "uri": "https://example.org/repo/results.csv",
+      "version": "sha256:0000",
+      "licence": "CC-BY-4.0",
+      "availability": {
+        "level": "public"
+      },
+      "description": "Mean relative MASE reduction of method M by forecast horizon, 1 to 12 months."
+    },
+    {
+      "id": "A3",
+      "kind": "lab_record",
+      "uri": "https://example.org/repo/lab/lab.jsonl",
+      "version": "sha256:1111",
+      "licence": "CC-BY-4.0",
+      "availability": {
+        "level": "public"
+      },
+      "description": "Lab record of the study: questions, hypotheses, plans, runs, results and decisions.",
+      "withheld_events": [
+        {
+          "event": "NT3",
+          "reason": "commercial",
+          "comment": "Note naming the retailer that supplied the data."
+        }
+      ]
+    }
+  ]
+}

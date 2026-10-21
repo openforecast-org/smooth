@@ -137,6 +137,7 @@ Bugfixes:
 * `adam(data, model=<fitted adam>)` failed with "Mat::operator(): index out of bounds" when the fitted model had no regressors while `data` had other columns, e.g. after `regressors="select"` selected none of them: the model is now reused on the response only.
 * `om(occurrence="fixed")` with regressors kept their starting coefficients without estimating them, with a log-likelihood of NaN, so `auto.om()` with regressors failed ("missing value where TRUE/FALSE needed"). A constant probability has no regressors, as it has no ARIMA: they are dropped.
 * `om()` did not pass `smoother` on to `omg()` and `auto.om()` with `occurrence="general"` and `"auto"`, which used the default smoother instead.
+* `om(model="NNN")` without ARIMA and regressors was named "oRegression[O]" (and so on): it is "oConstant level[O]", as `adam()` names the model "Constant level".
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

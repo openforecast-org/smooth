@@ -1011,7 +1011,8 @@ om <- function(data,
         }
 
         # Model name
-        modelStr <- paste0(nla$Etype, nla$Ttype, "d"[nla$phiEstimate], nla$Stype);
+        # Without ETS the model is "NNN", as in adam()
+        modelStr <- if(nla$etsModel) paste0(nla$Etype, nla$Ttype, "d"[nla$phiEstimate], nla$Stype) else "NNN";
         modelName <- adam_model_name(nla$etsModel, modelStr, xregModel, nla$arimaModel,
                                      nla$arOrders, nla$iOrders, nla$maOrders, lags,
                                      regressors, constantRequired, constantName,

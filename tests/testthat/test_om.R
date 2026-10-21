@@ -527,3 +527,10 @@ test_that("om() passes smoother on to omg() and auto.om()", {
     expect_equal(logLik(om(y, "ANA", occurrence="auto", initial="optimal", smoother="global")),
                  logLik(auto.om(y, "ANA", initial="optimal", smoother="global")))
 })
+
+# The model without ETS, ARIMA and regressors is a constant level, as in adam()
+test_that("om() names the constant level model as adam()", {
+    set.seed(5)
+    y <- rbinom(120, 1, 0.4)
+    expect_equal(modelName(om(y, "NNN", occurrence="odds-ratio")), "oConstant level[O]")
+})

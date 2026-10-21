@@ -396,17 +396,24 @@ om <- function(data,
     list2env(checkerReturn, envir=environment());
 
     # The regressors (never the response) are selected by stepwise() on the occurrence
-    # indicator of all the in-sample observations, and the model is refitted with them
+    # indicator of all the in-sample observations, and the model is refitted with them.
+    # A formula is applied to the data first, and the selection runs over its columns
     if(isTRUE(checkerReturn$xregModel) && regressors=="select"){
         colnames(data) <- make.names(colnames(data), unique=TRUE);
         responseName <- make.names(responseName);
-        dataSelect <- as.data.frame(data)[1:obsInSample,
-                                          c(responseName, setdiff(colnames(data), responseName)), drop=FALSE];
+        xregSelect <- if(is.null(xregTerms)) as.data.frame(data)[, colnames(data)!=responseName, drop=FALSE] else xregData;
+        dataSelect <- data.frame(as.data.frame(data)[1:obsInSample, responseName, drop=FALSE],
+                                 xregSelect[1:obsInSample,,drop=FALSE]);
         xregSelected <- names(coef(suppressWarnings(stepwise(dataSelect, ic=ic, distribution="plogis",
                                                              silent=TRUE))))[-1];
+        if(is.null(xregTerms)){
+            xregTerms <- setNames(nm=colnames(xregSelect));
+        }
+        # Without the selected regressors, the model is on the response only (y~1)
         callNew <- cl;
-        callNew$data <- data[, c(responseName, xregSelected), drop=FALSE];
-        callNew$formula <- NULL;
+        callNew$data <- data;
+        callNew$formula <- reformulate(if(length(xregSelected)==0) "1" else unique(xregTerms[xregSelected]),
+                                       response=responseName);
         callNew$regressors <- "use";
         modelReturned <- eval(callNew, envir=parent.frame());
         modelReturned$call <- cl;

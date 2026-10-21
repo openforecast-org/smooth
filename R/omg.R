@@ -194,7 +194,7 @@ omg <- function(data,
                     arma=armaA, ic=ic, bounds=bounds, ets=etsA, silent=TRUE, ...)
         modelA <- modelType(preA)
         if(xregSelect[1]) {
-            formulaA <- reformulate(c(setdiff(all.vars(formula(preA)), c(yName, ".")), "1"), yName)
+            formulaA <- formula(preA)
             regressorsA <- "use"
         }
     }
@@ -206,7 +206,7 @@ omg <- function(data,
                     arma=armaB, ic=ic, bounds=bounds, ets=etsB, silent=TRUE, ...)
         modelB <- modelType(preB)
         if(xregSelect[2]) {
-            formulaB <- reformulate(c(setdiff(all.vars(formula(preB)), c(yName, ".")), "1"), yName)
+            formulaB <- formula(preB)
             regressorsB <- "use"
         }
     }

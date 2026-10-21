@@ -590,3 +590,21 @@ test_that("om() starts the regressors from the indicator on all the observations
     expect_equal(as.numeric(testModel$modelA$B[c("a","n1")]), almCoefs/2, tolerance=1e-6);
     expect_equal(as.numeric(testModel$modelB$B[c("a","n1")]), -almCoefs/2, tolerance=1e-6);
 })
+
+test_that("om() and omg() apply the formula before selecting the regressors", {
+    set.seed(41);
+    x1 <- runif(150, 1, 10);
+    omData <- data.frame(y=rbinom(150, 1, plogis(2*log(x1)-2.5))*rpois(150, 3),
+                         x1=x1, x2=rnorm(150), x3=rnorm(150));
+    testModel <- om(omData, "MNN", occurrence="odds-ratio", formula=y~log(x1)+x2, regressors="select");
+    expect_equal(attr(terms(formula(testModel)), "term.labels"), "log(x1)");
+    testModel <- omg(omData, formulaA=y~log(x1)+x2, regressorsA="select");
+    expect_true(any(grepl("log", names(coef(testModel)))));
+    # No regressor selected: the model is on the response only
+    testModel <- om(omData, "MNN", occurrence="odds-ratio", formula=y~x2+x3, regressors="select");
+    expect_equal(names(coef(testModel)), "alpha");
+    expect_equal(formula(testModel), y~1, ignore_attr=TRUE);
+    testModel <- omg(omData, formulaA=y~x2+x3, regressorsA="select", holdout=TRUE, h=10);
+    expect_equal(names(coef(testModel)), c("A:alpha", "B:alpha"));
+    expect_length(forecast(testModel, h=10)$mean, 10);
+})

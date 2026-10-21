@@ -610,6 +610,8 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     #### Explanatory variables: xregModel and regressors ####
     regressors <- match.arg(regressors,c("use","select","adapt"));
     xregModel <- !is.null(xregData);
+    # The formula term of each expanded regressor, for regressors="select" with a formula
+    xregTerms <- NULL;
 
     #### Persistence provided ####
     # Vectors for persistence of different components
@@ -2220,9 +2222,13 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 # Evaluate data frame to do transformations of variables
                 xregData <- eval(mf, parent.frame());
 
-                # Remove variables that have "-x" in the formula
+                # Expand the interactions and the factors: the selection runs over the columns
                 dataTerms <- terms(xregData);
-                xregData <- xregData[,colnames(attr(dataTerms,"factors"))];
+                xregData <- model.matrix(dataTerms, xregData);
+                xregAssign <- attr(xregData, "assign");
+                xregData <- xregData[, xregAssign>0, drop=FALSE];
+                xregTerms <- setNames(labels(dataTerms)[xregAssign[xregAssign>0]],
+                                      make.names(colnames(xregData), unique=TRUE));
             }
             xregNumber <- ncol(xregData);
             xregNames <- colnames(xregData);
@@ -2290,9 +2296,12 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         xregData <- as.matrix(xregData);
 
         # If there are no variables after all of that, then xreg doesn't exist
+        # (A formula without regressors, e.g. y~1, asks for none)
         if(xregNumber==0){
-            warning("It looks like there are no suitable explanatory variables. Check the xreg! I dropped them out.",
-                    call.=FALSE);
+            if(is.null(formulaToUse) || length(all.vars(formulaToUse))>1){
+                warning("It looks like there are no suitable explanatory variables. Check the xreg! I dropped them out.",
+                        call.=FALSE);
+            }
             xregModel[] <- FALSE;
             xregData <- NULL;
         }
@@ -3027,6 +3036,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         xregNames = xregNames,
         responseName = responseName,
         formula = formulaToUse,
+        xregTerms = xregTerms,
         xregParametersMissing = xregParametersMissing,
         xregParametersIncluded = xregParametersIncluded,
         xregParametersEstimated = xregParametersEstimated,

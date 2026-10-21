@@ -1713,6 +1713,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 # Fix the name of the response variable
                 xregModelInitials[[xregIndex]]$formula[[2]] <- as.name(responseName);
                 formula <- xregModelInitials[[xregIndex]]$formula;
+                # With a formula, the selected columns go back to the terms they come from
+                if(!is.null(xregTerms)){
+                    formula <- reformulate(unique(xregTerms[all.vars(formula)[-1]]), response=responseName);
+                }
                 xregModelInitials[[which(c(1,2)!=xregIndex)]]$formula <- formulaToUse <- formula;
 
                 # Fix formula if dnorm / dlaplace / ds etc are used for Etype=="M"
@@ -1863,6 +1867,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                  ot, otLogical, occurrenceModel, pFitted,
                                  bounds, loss, lossFunction, distribution,
                                  horizon, multisteps, other, otherParameterEstimate, lambda, B));
+            }
+            else{
+                # No regressors selected: the model is on the response only
+                formula <- reformulate("1", response=responseName);
             }
         }
 

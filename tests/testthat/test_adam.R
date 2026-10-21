@@ -1450,3 +1450,24 @@ test_that("ADAM reuses a model with no regressors selected", {
     testReused <- adam(xreg, model=testModel, regressors="select");
     expect_equal(as.numeric(logLik(testReused)), as.numeric(logLik(testModel)));
 })
+
+# The formula is applied to the data first, and the regressors are selected over its columns
+test_that("ADAM with formula and regressors='select' selects the transformed regressors", {
+    set.seed(41);
+    x1 <- runif(150, 1, 10);
+    xregData <- data.frame(y=100+8*log(x1)+rnorm(150), x1=x1, x2=rnorm(150), x3=rnorm(150));
+    testModel <- adam(xregData, "ANN", formula=y~log(x1)+x2+x3, regressors="select",
+                      holdout=TRUE, h=10);
+    expect_true("log(x1)" %in% attr(terms(formula(testModel)), "term.labels"));
+    expect_true("log(x1)" %in% names(coef(testModel)));
+    expect_length(forecast(testModel, h=10, newdata=xregData[141:150,])$mean, 10);
+})
+
+test_that("ADAM with formula and regressors='select' refits without regressors when none is selected", {
+    set.seed(41);
+    xregData <- data.frame(y=100+cumsum(rnorm(120)), x1=runif(120, 1, 10), x2=rnorm(120));
+    testModel <- adam(xregData, "ANN", formula=y~log(x1)+x2, regressors="select");
+    expect_equal(names(coef(testModel)), "alpha");
+    expect_equal(formula(testModel), y~1, ignore_attr=TRUE);
+    expect_equal(colnames(coefbootstrap(testModel, nsim=2)$coefficients), "alpha");
+})

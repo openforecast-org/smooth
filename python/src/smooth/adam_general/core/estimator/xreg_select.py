@@ -11,9 +11,9 @@ from .optimization import _set_distribution
 
 # The distributions of the ratios 1+e/mu, and those with a shape parameter
 LOG_DISTRIBUTIONS = ("dlnorm", "dllaplace", "dls", "dlgnorm", "dinvgauss", "dgamma")
-SHAPE_DISTRIBUTIONS = ("dalaplace", "dgnorm", "dlgnorm", "dt")
+SHAPE_DISTRIBUTIONS = ("dgnorm", "dlgnorm", "dt")
 # Multiplicative errors with these distributions are regressed in logarithms
-LEVEL_DISTRIBUTIONS = ("dnorm", "dlaplace", "ds", "dgnorm", "dlogis", "dt", "dalaplace")
+LEVEL_DISTRIBUTIONS = ("dnorm", "dlaplace", "ds", "dgnorm", "dlogis", "dt")
 # The losses of ALM for the multistep ones
 ALM_LOSSES = {
     **dict.fromkeys(("MSEh", "TMSE", "GTMSE", "MSCE"), "MSE"),

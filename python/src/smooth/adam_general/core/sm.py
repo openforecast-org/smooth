@@ -21,7 +21,7 @@ from numpy.typing import NDArray
 from smooth.adam_general.core.utils.cost_functions import _sum_r
 
 # Distributions whose likelihood ``sm()`` knows how to score. R's switch has
-# entries for dalaplace/dlogis and the log-variants commented out, so they are
+# entries for dlogis and the log-variants commented out, so they are
 # genuinely unsupported rather than merely absent here.
 SUPPORTED_DISTRIBUTIONS = (
     "dnorm",
@@ -50,7 +50,7 @@ def _residual_transform(
     e = np.asarray(residuals, dtype=np.float64)
     if distribution == "dnorm":
         return e**2
-    if distribution in ("dlaplace", "dalaplace"):
+    if distribution == "dlaplace":
         return np.abs(e)
     if distribution == "ds":
         return 0.5 * np.abs(e) ** 0.5
@@ -84,7 +84,7 @@ def _holdout_transform(
     fc = np.asarray(forecast, dtype=np.float64)
     if distribution == "dnorm":
         return ef**2
-    if distribution in ("dlaplace", "dalaplace"):
+    if distribution == "dlaplace":
         return np.abs(ef)
     if distribution == "ds":
         return 0.5 * np.abs(ef) ** 0.5

@@ -69,7 +69,6 @@ def sigma(observations_dict, params_info, general, prepared_model, error_type=No
           * 'dgnorm': Generalized normal
           * 'dt': Student's t
           * 'dlogis': Logistic
-          * 'dalaplace': Asymmetric Laplace
           * 'dlnorm': Log-normal
           * 'dllaplace': Log-Laplace
           * 'dls': Log-S
@@ -215,7 +214,7 @@ def sigma(observations_dict, params_info, general, prepared_model, error_type=No
     elif distribution in ("dinvgauss", "dgamma"):
         ss = _sum_r((r - 1.0) ** 2)
     else:
-        # dnorm, dlaplace, ds, dgnorm, dt, dlogis, dalaplace
+        # dnorm, dlaplace, ds, dgnorm, dt, dlogis
         ss = _sum_r(r**2)
     return float(np.sqrt(ss / vals))
 

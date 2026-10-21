@@ -304,6 +304,13 @@ class AutoADAM(ADAM):
                 else list(_ALL_DISTRIBUTIONS)
             )
         )
+        unknown = set(self._auto_distribution_spec) - {"default", *_ALL_DISTRIBUTIONS}
+        if unknown:
+            # R stops via match.arg()
+            raise ValueError(
+                f"Unknown distribution(s): {', '.join(map(repr, sorted(unknown)))}. "
+                f"They should be among {', '.join(map(repr, _ALL_DISTRIBUTIONS))}."
+            )
         self._auto_outliers: str = outliers
         self._auto_level: float = level
         self._auto_verbose: int = verbose

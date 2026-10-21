@@ -1436,7 +1436,6 @@ def _process_xreg(
             "dgnorm",
             "dlogis",
             "dt",
-            "dalaplace",
         }
 
         def _resolve_dist_for_alm(etype, dist):

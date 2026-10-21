@@ -56,13 +56,6 @@ def _format_distribution(distribution: str, other: Optional[Dict] = None) -> str
             if isinstance(nu, float)
             else f"Student t with df={nu}"
         )
-    elif distribution == "dalaplace":
-        alpha = other.get("alpha", "?")
-        return (
-            f"Asymmetric Laplace with alpha={alpha:.4f}"
-            if isinstance(alpha, float)
-            else f"Asymmetric Laplace with alpha={alpha}"
-        )
     elif distribution == "dlgnorm":
         shape = other.get("shape", "?")
         return (

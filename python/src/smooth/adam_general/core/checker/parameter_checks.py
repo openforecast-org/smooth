@@ -74,8 +74,11 @@ def _check_distribution_loss(distribution, loss, silent=False):
     if distribution is None:
         distribution = "default"
     elif distribution not in valid_distributions:
-        _warn(f"Unknown distribution: {distribution}. Switching to 'default'.", silent)
-        distribution = "default"
+        # R stops here via match.arg(), as for the loss below
+        raise ValueError(
+            f"Unknown distribution: {distribution!r}. It should be one of "
+            f"{', '.join(repr(v) for v in valid_distributions)}."
+        )
 
     # Check loss function - handle callable custom loss
     loss_function = None

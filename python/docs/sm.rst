@@ -68,9 +68,8 @@ Requirements
 - its distribution is one of ``dnorm``, ``dlaplace``, ``ds``, ``dgnorm``,
   ``dlnorm``, ``dgamma``, ``dinvgauss``.
 
-``dalaplace`` and the log-variants are not supported — R's own loss function
-has no branch for them either, so they are rejected rather than silently
-mis-scored.
+The log-variants are not supported — R's own loss function has no branch for
+them either, so they are rejected rather than silently mis-scored.
 
 What the scale model is fitted to
 ---------------------------------

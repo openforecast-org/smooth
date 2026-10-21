@@ -1659,3 +1659,16 @@ def test_lambda_alias_kept():
     model = ADAM(model="ANN", loss="LASSO", print_level=0, **{"lambda": 0.5})
     assert model.lambda_param == 0.5
     assert model.nlopt_kwargs == {"print_level": 0}
+
+
+@pytest.mark.parametrize("distribution", ["dalaplace", "dfoo"])
+def test_unknown_distribution_raises(distribution):
+    """dalaplace is not implemented: rejected as any unknown distribution, as R's
+    match.arg() rejects one."""
+    from smooth import AutoADAM
+
+    y = np.random.default_rng(1).normal(10, 1, 50)
+    with pytest.raises(ValueError, match="Unknown distribution"):
+        ADAM(model="ANN", distribution=distribution).fit(y)
+    with pytest.raises(ValueError, match="Unknown distribution"):
+        AutoADAM(distribution=["dnorm", distribution])

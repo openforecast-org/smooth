@@ -1052,8 +1052,6 @@ def _skeleton_steps(
     any multiplicative component not after the periods without an observed size at
     the end of the sample (``gapped``). The median: an additive model with a
     symmetric distribution."""
-    if distribution == "dalaplace":
-        return 0
     e_type = model_type_dict["error_type"]
     t_type = model_type_dict.get("trend_type", "N")
     s_type = model_type_dict.get("season_type", "N")

@@ -2482,8 +2482,8 @@ class ADAM:
             errors = np.log(errors)
         if dist == "dlnorm":
             errors = errors + raw_scale / 2
-        # The conventional residuals of Laplace, ALaplace and Logistic are not centred
-        if dist not in ("dlaplace", "dalaplace", "dlogis"):
+        # The conventional residuals of Laplace and Logistic are not centred
+        if dist not in ("dlaplace", "dlogis"):
             errors = errors - np.mean(errors[sizes])
         # sigma for dnorm and dlnorm, s^2 for S, s for the rest
         if dist in ("dt", "dnorm", "dlnorm"):
@@ -2681,12 +2681,9 @@ class ADAM:
         p = np.array([(1 - level) / 2, (1 + level) / 2])
 
         # The quantiles of the standardised distribution, as R's outlierdummy.adam
-        other = getattr(self, "other", None) or {}
         scale = float(np.mean(self.extract_scale()))
         if dist in ("dlaplace", "dllaplace"):
             stat = gb.qlaplace(p, 0, 1)
-        elif dist == "dalaplace":
-            stat = gb.qalaplace(p, 0, 1, other.get("alpha", 0.5))
         elif dist == "dlogis":
             stat = gb.qlogis(p, 0, 1)
         elif dist == "dt":
@@ -3151,7 +3148,7 @@ class ADAM:
         R's convention.
 
         For the common case (``dnorm`` / ``dlaplace`` / ``ds`` / ``dgnorm``
-        / ``dt`` / ``dlogis`` / ``dalaplace``) this is
+        / ``dt`` / ``dlogis``) this is
         ``sqrt(sum(residuals²) / (nobs − nparam + 1))`` when loss is
         likelihood, or ``sqrt(sum(residuals²) / (nobs − nparam))``
         otherwise.
@@ -3198,7 +3195,7 @@ class ADAM:
         elif distribution in ("dinvgauss", "dgamma"):
             ss = float(np.sum((residuals - 1.0) ** 2))
         else:
-            # dnorm, dlaplace, ds, dgnorm, dt, dlogis, dalaplace — plain
+            # dnorm, dlaplace, ds, dgnorm, dt, dlogis — plain
             # sum of squared residuals.
             ss = float(np.sum(residuals**2))
 
@@ -6955,7 +6952,6 @@ class ADAM:
             n_obs=n_obs,
             n_param=int(self.nparam),
             shape=other_dict.get("shape", self._gnorm_shape()),
-            alpha=other_dict.get("alpha"),
             rng=rng,
         )
 
@@ -7301,7 +7297,6 @@ class ADAM:
                 scale_base, distribution, obs_in_sample, self._df_scale
             )
             shape = (self.other or {}).get("shape") if hasattr(self, "other") else None
-            alpha = (self.other or {}).get("alpha") if hasattr(self, "other") else None
             errors_flat = generate_errors(
                 distribution=distribution,
                 n=n_errors,
@@ -7309,7 +7304,6 @@ class ADAM:
                 obs_in_sample=obs_in_sample,
                 n_param=n_param,
                 shape=shape,
-                alpha=alpha,
                 random_state=rng,
             )
         else:

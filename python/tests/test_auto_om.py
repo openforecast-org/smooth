@@ -204,3 +204,16 @@ class TestHoldout:
 
     def test_no_holdout_data_when_holdout_false(self, fitted_auto):
         assert fitted_auto.holdout_data is None
+
+
+def test_default_selects_arima_orders():
+    """As R's auto.om(), the ARIMA orders are selected unless orders say no."""
+    rng = np.random.default_rng(5)
+    z = np.zeros(300)
+    for t in range(1, 300):
+        z[t] = 0.9 * z[t - 1] + rng.normal()
+    y = rng.binomial(1, 1 / (1 + np.exp(-z))).astype(float)
+    selected = AutoOM(model="NNN", occurrence=["odds-ratio"]).fit(y)
+    assert "ARIMA" in selected.model
+    fixed = AutoOM(model="MNN", orders={"ar": 0, "i": 0, "ma": 0}).fit(y)
+    assert "ARIMA" not in fixed.model

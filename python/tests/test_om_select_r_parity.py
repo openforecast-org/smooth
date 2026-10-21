@@ -157,3 +157,33 @@ def test_holdout_accuracy_matches_r(r_call, py_class, py_args):
     # -Inf / Inf, which JSON does not carry, and greybox's in Python finite values
     for name, value in zip(r["names"], r["a"]):
         assert accuracy[name] == pytest.approx(value, rel=1e-6), name
+
+
+AUTO_DATA = (
+    "set.seed(5); z <- as.numeric(arima.sim(list(ar=0.8), 300));"
+    " y <- rbinom(300, 1, plogis(z))*rpois(300, 3);"
+)
+
+
+@pytest.mark.parametrize(
+    "r_args,py_args",
+    [
+        ("model='NNN'", {"model": "NNN"}),
+        ("model='MNN'", {"model": "MNN"}),
+        ("model='ANN', lags=7", {"model": "ANN", "lags": [7]}),
+        (
+            "model='MNN', occurrence=c('odds-ratio','direct')",
+            {"model": "MNN", "occurrence": ["odds-ratio", "direct"]},
+        ),
+    ],
+)
+def test_auto_om_selects_the_orders_as_r(r_args, py_args):
+    """auto.om() selects the ARIMA orders by default."""
+    from smooth import AutoOM
+
+    r = r_dict(
+        f"{{ {AUTO_DATA} m <- auto.om(y, {r_args}); "
+        "list(y=y, model=m$model, logLik=as.numeric(logLik(m)), "
+        "f=as.numeric(forecast(m, h=7)$mean)) }"
+    )
+    _compare(AutoOM(**py_args).fit(np.asarray(r["y"], dtype=float)), r)

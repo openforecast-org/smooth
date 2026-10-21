@@ -11,7 +11,7 @@
   "contribution_record": "complete",
   "origin": "native",
   "exploration": {
-   "lab_record": "A4",
+   "lab_record": "A5",
    "questions": 1,
    "hypotheses": {
     "total": 5,
@@ -29,9 +29,9 @@
     "inconclusive": 0
    },
    "runs": {
-    "total": 11,
+    "total": 13,
     "confirmatory": 5,
-    "exploratory": 6,
+    "exploratory": 8,
     "failed": 1
    }
   },
@@ -125,6 +125,38 @@
     "name": "Claude Code",
     "version": "2.1.306"
    }
+  },
+  {
+   "id": "P3",
+   "type": "agent",
+   "name": "Independent checker agent",
+   "positions": [
+    "contributor"
+   ],
+   "models": [
+    {
+     "model": "M2",
+     "role": "sole"
+    }
+   ],
+   "credit_roles": [
+    "validation"
+   ],
+   "ai_tasks": [
+    {
+     "task": "review",
+     "extent": "full"
+    }
+   ],
+   "tools": [
+    "code_execution",
+    "file_access"
+   ],
+   "record_source": "self_reported",
+   "run_period": {
+    "start": "2026-10-21",
+    "end": "2026-10-21"
+   }
   }
  ],
  "models": [
@@ -136,6 +168,15 @@
    "identifier": "claude-opus-5-5",
    "accessed": "2026-10-21",
    "weights": "api_only"
+  },
+  {
+   "id": "M2",
+   "provider": "Anthropic",
+   "name": "Claude Sonnet",
+   "version": "5.5",
+   "identifier": "claude-sonnet-5-5",
+   "weights": "api_only",
+   "accessed": "2026-10-21"
   }
  ],
  "definitions": [
@@ -191,7 +232,7 @@
  "claims": [
   {
    "id": "C1",
-   "statement": "The [[D4:per-lag check]] accepted 1482 of 3042 [[D9:ETS(A,N,A)]] models and 10 of 200 random [[D8:GUM]] models with lags (1, 12) that do not [[D3:forget their initial states]].",
+   "statement": "The [[D4:per-lag check]] accepted all 3042 [[D9:ETS(A,N,A)]] grid models, 1482 of which do not [[D3:forget their initial states]], and 193 of 200 random [[D8:GUM]] models with lags (1, 12), 10 of which do not forget their initial states.",
    "type": "descriptive",
    "role": "principal",
    "novelty": "refutation",
@@ -205,7 +246,9 @@
      ],
      "results": [
       "E1.R1",
-      "E1.R4"
+      "E1.R3",
+      "E1.R4",
+      "E1.R6"
      ]
     }
    ],
@@ -280,6 +323,14 @@
      "by": "author",
      "strength": "moderate",
      "rationale": "Deterministic counts on a fixed grid and one seeded GUM sample, resting on a numpy reimplementation of the per-lag check and a reference written by the same agent."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-ran confirm.py --test perlag --seed 2026 --n 200: ETS 1482 of 3042 and GUM 10 of 200 reproduced; per_lag_max implements D4 and pbh_max implements D5; counts unchanged with PBH tolerances 1e-9 to 1e-3 and with the cancelled-theta roots as reference. Noted that the earlier wording 'accepted 1482 of 3042' was ambiguous because all 3042 were accepted; the statement was reworded."
     }
    ]
   },
@@ -357,6 +408,14 @@
      "strength": "low",
      "rationale": "One model out of 200 in one seeded sample; how far that model's reference lies from 1 was not recorded."
     }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "1 of 200 reproduced; the cancellation-based reference gives the same model."
+    }
    ]
   },
   {
@@ -425,7 +484,8 @@
      "adaptive regressors",
      "multiplicative models",
      "seasonal harmonics with non-integer periods (TBATS)",
-     "the largest mode modulus of admissible models, where a common factor that is not cyclotomic can remain in the cancelled MA polynomial"
+     "the largest mode modulus of admissible models, where a common factor that is not cyclotomic can remain in the cancelled MA polynomial",
+     "an eigenvalue of modulus above 1 shared by a reachable and observable mode and an unreachable or unobservable one"
     ]
    },
    "depends_on": [
@@ -445,11 +505,19 @@
      "strength": "moderate",
      "rationale": "A planned test on 500 seeded models with exact agreement, against a reference written by the same agent with the same numerical libraries."
     }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "0 mismatches, 172 inadmissible models, max difference 4.39648e-13 reproduced; D6 implemented as defined; seeds 1-5 with n = 400 (1000 models each) also gave 0 mismatches and maximum differences from 2.4e-13 to 5.3e-12."
+    }
    ]
   },
   {
    "id": "C4",
-   "statement": "On 575 random additive ETS and [[D8:GUM]] models with MA polynomials of degree up to 366, the [[D7:step-down test]] on the MA polynomial after [[D6:cyclotomic cancellation]] gave an admissibility decision different from the roots of that polynomial on 0 models.",
+   "statement": "On 575 random additive ETS and [[D8:GUM]] models, including ETS models with up to two seasonal lags from {24, 168, 365} whose MA polynomials have degree at most 536, the [[D7:step-down test]] on the MA polynomial after [[D6:cyclotomic cancellation]] gave an admissibility decision different from the roots of that polynomial on 0 models.",
    "type": "methodological",
    "role": "principal",
    "novelty": "new",
@@ -476,7 +544,7 @@
     "lab_event": "H4",
     "outcome": "supported"
    },
-   "planning": "confirmatory",
+   "planning": "confirmatory_with_deviations",
    "planned_at": "2026-10-21T15:21:39Z",
    "planned_at_anchor": "git_remote",
    "test": {
@@ -499,13 +567,18 @@
     "runs": 1,
     "lab_plan": "PL4"
    },
+   "limitations": [
+    "L3",
+    "L4",
+    "L5"
+   ],
    "scope": {
     "population": "pure additive lagged SSOE models",
     "conditions": [
      "additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0",
      "GUM with F = I and lags from {1, 4, 12}",
      "GUM with random F and lags from {1, 4, 12, 24}",
-     "additive ETS with seasonal lags from {24, 168, 365}",
+     "additive ETS with up to two seasonal lags from {24, 168, 365}",
      "GUM with random F and lags (1, 24, 168)",
      "numpy prototype"
     ],
@@ -520,21 +593,25 @@
    "depends_on": [
     "C3"
    ],
-   "limitations": [
-    "L3",
-    "L4"
-   ],
    "assessments": [
     {
      "by": "author",
      "strength": "moderate",
      "rationale": "A planned test on 575 seeded models with exact agreement; the reference roots at high degree were not checked by a second method."
     }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "disputed",
+     "extent": "partial",
+     "notes": "0 step-down mismatches on 575 models reproduced, but the statement's description 'degree up to 366' was false: instrumented runs reached degree 535 before cancellation and 533 after."
+    }
    ]
   },
   {
    "id": "C5",
-   "statement": "On the 198 inadmissible models among 575 random additive ETS and [[D8:GUM]] models, bisection on $r$ with the [[D7:step-down test]] applied to $\\theta^*(B/r)$ gave the largest mode modulus within 5.8e-11 of the value from the roots of $\\theta^*$.",
+   "statement": "On the 198 models among 575 random additive ETS and [[D8:GUM]] models whose cancelled MA polynomial $\\theta^*$ has a root inside the unit circle, bisection on $r$ with the [[D7:step-down test]] applied to $\\theta^*(B/r)$ gave $1/\\min|B|$ over the roots $B$ of $\\theta^*$ within 5.8e-11 of the value from numpy's roots.",
    "type": "methodological",
    "role": "secondary",
    "novelty": "new",
@@ -556,7 +633,7 @@
     "lab_event": "H5",
     "outcome": "supported"
    },
-   "planning": "confirmatory",
+   "planning": "confirmatory_with_deviations",
    "planned_at": "2026-10-21T15:21:42Z",
    "planned_at_anchor": "git_remote",
    "test": {
@@ -579,6 +656,11 @@
     "runs": 1,
     "lab_plan": "PL5"
    },
+   "limitations": [
+    "L3",
+    "L4",
+    "L5"
+   ],
    "scope": {
     "population": "inadmissible pure additive lagged SSOE models",
     "conditions": [
@@ -596,21 +678,25 @@
      "seasonal harmonics with non-integer periods (TBATS)"
     ]
    },
-   "limitations": [
-    "L3",
-    "L4"
-   ],
    "assessments": [
     {
      "by": "author",
-     "strength": "moderate",
-     "rationale": "A planned test on the seeded model set; the bisection width bounds the error by construction, and the comparison rests on numpy's roots."
+     "strength": "low",
+     "rationale": "The difference is bounded by the bisection width of 1e-10 once the step-down decisions on the scaled polynomials are right, so the test checks those decisions and the bisection logic rather than an independent accuracy."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "198 inadmissible models and 5.8137e-11 reproduced; the difference is bounded by the 1e-10 bisection width by construction, so the result checks the bisection logic, and the values are not compared with the PBH reference."
     }
    ]
   },
   {
    "id": "C6",
-   "statement": "For a [[D1:lagged SSOE model]], $\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t$, so the model has the ARIMA form with AR polynomial $\\phi(B) = \\det(I - F L(B))$ and MA polynomial $\\theta(B) = \\det(I - D L(B))$.",
+   "statement": "For a [[D1:lagged SSOE model]], ignoring the initial states, $\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t$, so the model has the ARIMA form with AR polynomial $\\phi(B) = \\det(I - F L(B))$ and MA polynomial $\\theta(B) = \\det(I - D L(B))$.",
    "type": "formal",
    "role": "supporting",
    "novelty": "extension",
@@ -646,32 +732,43 @@
      "note": "Hyndman, Koehler, Ord and Snyder relate the reduced forms of linear innovations state space models to ARIMA models."
     }
    ],
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps S1-S7 of E6 re-derived; simulated residual of the identity on 40 random GUMs at late t at most 1.7e-15 relative; the identity holds after start-up (initial states ignored), which was then in the scope only and is now in the statement."
+    }
+   ]
   },
   {
    "id": "C7",
    "statement": "If the discount matrix $D$ of a [[D1:lagged SSOE model]] is block-diagonal with one block $D_{ll}$ per unique lag $l$, every eigenvalue of the [[D2:expanded discount matrix]] has modulus $|\\mu|^{1/l}$ for an eigenvalue $\\mu$ of some $D_{ll}$, so all of them lie inside the unit circle exactly when the [[D4:per-lag check]] passes.",
    "type": "formal",
-   "role": "supporting",
+   "role": "secondary",
    "novelty": "new",
    "support": [
     {
      "kind": "formal_proof",
      "evidence": "E7"
-    },
-    {
-     "kind": "simulation",
-     "evidence": "E10",
-     "artefacts": [
-      "A1",
-      "A2"
-     ]
     }
    ],
    "scope": {
     "population": "lagged SSOE models whose discount matrix is block-diagonal across lags"
    },
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "depends_on": [
+    "C15"
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived by a Schur complement; 50 random block-diagonal D with lags from {1, 3, 4} gave moduli |mu|^(1/l) and agreeing decisions. Noted that the RN2 example labelled block-diagonal is lower-triangular, and that the claim does not cover ETS or GUM, whose D is not block-diagonal."
+    }
+   ]
   },
   {
    "id": "C8",
@@ -689,9 +786,17 @@
     "population": "pure additive lagged SSOE models"
    },
    "depends_on": [
-    "C7"
+    "C15"
    ],
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps re-derived and checked on 5 random GUMs with a constructed unobservable mode (residuals about 1e-14). Noted that step S3 rested on the general identity of the expansion rather than on C7; the dependency now points to C15."
+    }
+   ]
   },
   {
    "id": "C9",
@@ -709,9 +814,17 @@
     "population": "ETS(A,N,A) models"
    },
    "depends_on": [
-    "C8"
+    "C15"
    ],
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "theta matches the closed form; det(I - D~) about 1e-17 for m = 1, 2, 4, 7, 12, 24; noted that step S5 needs the identity of the expansion, now cited as C15."
+    }
+   ]
   },
   {
    "id": "C10",
@@ -754,6 +867,14 @@
      "by": "author",
      "strength": "low",
      "rationale": "Exploratory single case, chosen by the agent while designing the method."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Degree 193, shared factor 25, 0.9999965469723225 against PBH 0.9999965469723241."
     }
    ]
   },
@@ -799,11 +920,19 @@
      "strength": "low",
      "rationale": "Exploratory single case, chosen by the agent while designing the method."
     }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Degree 26, shared factor 14, 0.9829371631611427 against PBH 0.9829371631611421."
+    }
    ]
   },
   {
    "id": "C12",
-   "statement": "For a GUM with lags (1, 24, 168), whose MA polynomial has degree 193, the [[D7:step-down test]] took 0.007 ms against 22 ms for all roots by numpy's companion-matrix eigenvalues, and the coefficients by inverse discrete Fourier transform took 4.7 ms.",
+   "statement": "For two random GUM models with lags (1, 24, 168) (MA polynomials of degree 193) and the cancelled MA polynomial of degree 168 of an ETS(A,N,A,A) model with seasonal lags 24 and 168, the [[D7:step-down test]] took 0.74, 0.81 and 0.42 ms against 23.8, 20.9 and 17.5 ms for all roots by numpy's companion-matrix eigenvalues.",
    "type": "descriptive",
    "role": "secondary",
    "novelty": "new",
@@ -811,36 +940,47 @@
    "support": [
     {
      "kind": "simulation",
-     "evidence": "E10",
+     "evidence": "E12",
      "artefacts": [
       "A1",
-      "A2"
+      "A4"
      ],
      "results": [
-      "E10.R14",
-      "E10.R15",
-      "E10.R16"
+      "E12.R1",
+      "E12.R2",
+      "E12.R4",
+      "E12.R5",
+      "E12.R7",
+      "E12.R8"
      ]
     }
    ],
    "scope": {
-    "population": "GUM with lags (1, 24, 168)",
+    "population": "GUM with lags (1, 24, 168) and ETS(A,N,A,A) with seasonal lags 24 and 168",
     "conditions": [
      "numpy, Python 3.13, one x86_64 machine with 4 CPUs, mean of 50 repeats",
-     "coefficients computed with a Python loop over 256 points"
+     "step-down recursions of 193, 170 and 168 steps"
     ]
    },
    "assessments": [
     {
      "by": "author",
      "strength": "low",
-     "rationale": "Exploratory timings on one machine for one model, dominated by Python overhead rather than by the algorithms."
+     "rationale": "Exploratory timings on one machine for three polynomials, in Python, where the interpreter's overhead dominates the step-down recursion."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "disputed",
+     "extent": "partial",
+     "notes": "Checked an earlier statement based on run RN2 (step-down 0.007 ms, roots 22 ms, coefficients 4.7 ms): the order of magnitude and ranking reproduced, but the timed polynomial was inadmissible and the step-down stopped after 1 of 193 steps; a full recursion took about 0.5 ms."
     }
    ]
   },
   {
    "id": "C13",
-   "statement": "The numpy function per_lag_max() returns the same largest eigenvalue modulus as smoothEigensCpp() of the smooth package for models without adaptive regressors.",
+   "statement": "The numpy function per_lag_max() returns the same largest eigenvalue modulus as smoothEigensCpp() of the smooth package for models with a constant measurement vector and without adaptive regressors.",
    "type": "methodological",
    "role": "supporting",
    "novelty": "new",
@@ -865,6 +1005,26 @@
    ],
    "assumption_category": "methodological",
    "check": "unchecked"
+  },
+  {
+   "id": "C15",
+   "statement": "For the lag-1 expansion $\\tilde M$ of $v_t = M v_{t-l}$ in a [[D1:lagged SSOE model]], $\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M)$, which equals $\\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda))$ for $\\lambda \\neq 0$.",
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "new",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E11"
+    }
+   ],
+   "scope": {
+    "population": "pure additive lagged SSOE models",
+    "conditions": [
+     "any square matrix $M$ of size $k$"
+    ]
+   },
+   "verification": "unchecked"
   }
  ],
  "evidence": [
@@ -1193,7 +1353,7 @@
   {
    "id": "E10",
    "profile": "simulation",
-   "description": "Exploratory run RN2 of explore.py --seed 0: the ARIMA-form polynomials, their cyclotomic cancellation and the PBH reference for ETS(A,N,A,A) with seasonal lags 24 and 168 (alpha = 0.3, gamma = (0.1, 0.05)) and for GUM with orders (2, 2), lags (1, 12), F = I, g = 0.1 and w = 1 (the default starting point of gum()); the determinant identity at random complex B on 100 random GUM models; the expanded discount matrix of a block-diagonal D; and mean times over 50 repeats of three computations for a random GUM with lags (1, 24, 168).",
+   "description": "Exploratory run RN2 of explore.py --seed 0: the ARIMA-form polynomials, their cyclotomic cancellation and the PBH reference for ETS(A,N,A,A) with seasonal lags 24 and 168 (alpha = 0.3, gamma = (0.1, 0.05)) and for GUM with orders (2, 2), lags (1, 12), F = I, g = 0.1 and w = 1 (the default starting point of gum()); the determinant identity at random complex B on 100 random GUM models; the expanded discount matrix of a block-diagonal D; and mean times over 50 repeats of three computations for a random GUM with lags (1, 24, 168). The result labelled 'block-diagonal D, lags (1,12)' comes from D = [[0.7, 0], [-0.1, 0.3]], which is lower-triangular rather than block-diagonal.",
    "artefacts": [
     "A1",
     "A2"
@@ -1440,9 +1600,9 @@
      "id": "S1",
      "statement": "\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M) \\text{ for the lag-1 expansion } \\tilde M \\text{ of } v_t = M v_{t-l}",
      "by": [
-      "D2"
+      "C15"
      ],
-     "rule": "block elimination of the shift equations of each component's chain of lagged copies"
+     "rule": "identity of the lag-1 expansion"
     },
     {
      "id": "S2",
@@ -1500,10 +1660,9 @@
      "id": "S3",
      "statement": "\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda)),\\ \\lambda \\neq 0",
      "by": [
-      "C7",
-      "D1"
+      "C15"
      ],
-     "rule": "factoring $\\Lambda(\\lambda)$ out of $\\Lambda(\\lambda) - M$"
+     "rule": "identity of the lag-1 expansion"
     },
     {
      "id": "S4",
@@ -1565,11 +1724,196 @@
      "statement": "\\det(I - \\tilde D) = 1^{m+1} \\theta(1) = 0",
      "by": [
       "S3",
-      "C8"
+      "C15"
      ],
-     "rule": "identity of step S3 of the derivation of the common roots at $\\lambda = 1$"
+     "rule": "identity of the lag-1 expansion at $\\lambda = 1$"
     }
    ]
+  },
+  {
+   "id": "E11",
+   "profile": "formal",
+   "foundation": "linear algebra over the complex numbers",
+   "description": "Schur-complement derivation of the characteristic polynomial of the lag-1 expansion.",
+   "availability": {
+    "level": "public"
+   },
+   "steps": [
+    {
+     "id": "S1",
+     "statement": "\\lambda I - \\tilde M = \\begin{pmatrix} \\lambda I_k - A & -B \\\\ -C & \\lambda I - S \\end{pmatrix}",
+     "by": [
+      "D2"
+     ],
+     "rule": "partition of the states into the $k$ current values (heads) and the $\\sum_j (l_j - 1)$ lagged copies (tails); $S$ shifts each tail chain, $C$ feeds each head into its first copy, $A$ and $B$ hold the entries of $M$ that act on heads with lag 1 and on last copies"
+    },
+    {
+     "id": "S2",
+     "statement": "\\det(\\lambda I - S) = \\lambda^{\\sum_j (l_j - 1)}",
+     "by": [
+      "S1"
+     ],
+     "rule": "determinant of a lower-triangular matrix with diagonal $\\lambda$"
+    },
+    {
+     "id": "S3",
+     "statement": "A + B (\\lambda I - S)^{-1} C = M\\, \\mathrm{diag}(\\lambda^{1 - l_1}, \\dots, \\lambda^{1 - l_k}),\\ \\lambda \\neq 0",
+     "by": [
+      "S1"
+     ],
+     "rule": "$(\\lambda I - S)^{-1} C$ maps head $j$ to its copies $\\lambda^{-s}$, $s = 1, \\dots, l_j - 1$, and $B$ reads copy $l_i - 1$ of component $i$"
+    },
+    {
+     "id": "S4",
+     "statement": "\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j (l_j - 1)} \\det(\\lambda I_k - M\\, \\mathrm{diag}(\\lambda^{1 - l_j})) = \\det(\\Lambda(\\lambda) - M),\\ \\lambda \\neq 0",
+     "by": [
+      "S2",
+      "S3"
+     ],
+     "rule": "Schur complement, then factoring $\\lambda\\, \\Lambda(\\lambda)^{-1}$ out on the right"
+    },
+    {
+     "id": "S5",
+     "statement": "\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M) \\text{ for all } \\lambda",
+     "by": [
+      "S4"
+     ],
+     "rule": "two polynomials equal on $\\lambda \\neq 0$ are equal"
+    },
+    {
+     "id": "S6",
+     "statement": "\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda)),\\ \\lambda \\neq 0",
+     "by": [
+      "S5",
+      "D1"
+     ],
+     "rule": "factoring $\\Lambda(\\lambda)$ out of $\\Lambda(\\lambda) - M$ on the left"
+    }
+   ]
+  },
+  {
+   "id": "E12",
+   "profile": "simulation",
+   "description": "Exploratory run RN13 of timing.py --seed 3 --repeats 50: for the first admissible and the first inadmissible random GUM with lags (1, 24, 168) (normal F with standard deviation 0.3) and for the cancelled MA polynomial of ETS(A,N,A,A) with seasonal lags 24 and 168 (alpha = 0.3, gamma = (0.1, 0.05)), the number of recursion steps of the step-down test and the mean times over 50 repeats of the step-down test, of all roots by numpy's companion-matrix eigenvalues and of the coefficients by inverse discrete Fourier transform.",
+   "artefacts": [
+    "A1",
+    "A4"
+   ],
+   "model": "random GUM and a fixed ETS model generated by timing.py",
+   "parameters": "A4",
+   "runs": 1,
+   "seeds": [
+    3
+   ],
+   "availability": {
+    "level": "public"
+   },
+   "lab_runs": [
+    "RN13"
+   ],
+   "results": [
+    {
+     "id": "R1",
+     "quantity": "mean time of the step-down test, ms",
+     "value": 0.7429920399954426,
+     "conditions": {
+      "model": "random GUM, lags (1, 24, 168), admissible",
+      "degree": 193,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R2",
+     "quantity": "mean time of all roots by numpy companion eigenvalues, ms",
+     "value": 23.75985405999927,
+     "conditions": {
+      "model": "random GUM, lags (1, 24, 168), admissible",
+      "degree": 193,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R3",
+     "quantity": "recursion steps run by the step-down test",
+     "value": 193,
+     "conditions": {
+      "model": "random GUM, lags (1, 24, 168), admissible",
+      "degree": 193,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R4",
+     "quantity": "mean time of the step-down test, ms",
+     "value": 0.8138564999990194,
+     "conditions": {
+      "model": "random GUM, lags (1, 24, 168), inadmissible",
+      "degree": 193,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R5",
+     "quantity": "mean time of all roots by numpy companion eigenvalues, ms",
+     "value": 20.8541055600017,
+     "conditions": {
+      "model": "random GUM, lags (1, 24, 168), inadmissible",
+      "degree": 193,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R6",
+     "quantity": "recursion steps run by the step-down test",
+     "value": 170,
+     "conditions": {
+      "model": "random GUM, lags (1, 24, 168), inadmissible",
+      "degree": 193,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R7",
+     "quantity": "mean time of the step-down test, ms",
+     "value": 0.4172366199964017,
+     "conditions": {
+      "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+      "degree": 168,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R8",
+     "quantity": "mean time of all roots by numpy companion eigenvalues, ms",
+     "value": 17.457083500003137,
+     "conditions": {
+      "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+      "degree": 168,
+      "repeats": 50
+     }
+    },
+    {
+     "id": "R9",
+     "quantity": "mean time of the coefficients of theta and phi by inverse DFT, ms",
+     "value": 6.57281667999996,
+     "conditions": {
+      "model": "random GUM, lags (1, 24, 168), admissible",
+      "degree": 193,
+      "repeats": 50
+     }
+    }
+   ],
+   "execution": {
+    "code_version": "de2f5a7b2ffa38e84f9081ed272efc887eb07555",
+    "software": {
+     "python": "3.13.16",
+     "platform": "Linux-6.18.44-fc-v139-x86_64-with-glibc2.39"
+    },
+    "hardware": {
+     "machine": "x86_64",
+     "cpus": 4
+    }
+   }
   }
  ],
  "warrants": [],
@@ -1622,6 +1966,17 @@
    ],
    "impact": "could_reverse",
    "mitigation": "none"
+  },
+  {
+   "id": "L5",
+   "category": "other",
+   "statement": "The plans of the tests behind the step-down and bisection claims stated MA polynomial degrees up to 366; the generator code named in the plans, run unchanged, produced degrees up to 535 before cancellation.",
+   "affects": [
+    "C4",
+    "C5"
+   ],
+   "impact": "reduces_transferability",
+   "mitigation": "none"
   }
  ],
  "artefacts": [
@@ -1660,9 +2015,20 @@
   },
   {
    "id": "A4",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/de2f5a7b2ffa38e84f9081ed272efc887eb07555/.claude/research/eigenChecker/timing.py",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:0b1019becaecb87919356973d575bd470b6cd47cb1352a5e63b3941b657d7e4a",
+   "licence": "LGPL-2.1-only",
+   "description": "timing script: recursion steps and mean times of the step-down test, of all roots by numpy companion eigenvalues and of the DFT coefficients, for random GUMs with lags (1, 24, 168) and ETS(A,N,A,A) with seasonal lags 24 and 168"
+  },
+  {
+   "id": "A5",
    "kind": "lab_record",
    "uri": "https://github.com/openforecast-org/smooth/blob/claimset-lab-eigenChecker/.claude/lab/lab.jsonl",
-   "version": "sha256:fab2a89cc6cc7a3bb760ee7c6cc966765a68044c335bbaa0190df37aa01d4ce6",
+   "version": "sha256:618574ad7e3475b688ed348599bdb4a74a13b3dfe7d610b2925a37887dfbe671",
    "availability": {
     "level": "public"
    },

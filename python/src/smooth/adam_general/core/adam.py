@@ -3547,7 +3547,10 @@ class ADAM:
         >>> selected_type = model.model_type  # e.g., 'AAN'
         """
         self._check_is_fitted()
-        return self._model_type.get("model", "")
+        # As R's modelType(): the ETS part of the name of the fitted model
+        if not self._model_type.get("ets_model", False):
+            return "NNN"
+        return self.model_name.split("(", 1)[1].split(")", 1)[0]
 
     @property
     def orders(self) -> Dict[str, List[int]]:

@@ -32,3 +32,26 @@ def test_the_arima_orders_are_selected(cls):
     for key in ("ar", "i", "ma"):
         assert list(model.orders[key]) == list(r["orders"][key])
     np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
+
+
+# (R model, Python model): the pools whose model was reported as asked
+POOLS = {
+    "PPP": ("'PPP'", "PPP"),
+    "FFF": ("'FFF'", "FFF"),
+    "list": ("c('ANN','MAM')", ["ANN", "MAM"]),
+    "CCN": ("'CCN'", "CCN"),
+    "ZXZ": ("'ZXZ'", "ZXZ"),
+}
+
+
+@pytest.mark.parametrize("pool", list(POOLS))
+def test_the_model_type_is_the_selected_one(pool):
+    r_model, python_model = POOLS[pool]
+    r = r_dict(
+        f"{{ m <- adam(AirPassengers, {r_model}, lags=12);"
+        " list(type=modelType(m)) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model=python_model, lags=[12]).fit(Y)
+    assert model.model_type == r["type"][0]

@@ -216,6 +216,13 @@ class TestADAMModelSelection:
         forecast = model.predict(h=5)
         assert forecast.shape[0] == 5
 
+    @pytest.mark.parametrize("pool", ["PPP", "FFF", ["ANN", "MAN", "MAM"], "CCN"])
+    def test_model_type_is_the_selected_model(self, seasonal_series, pool):
+        """model_type is the ETS part of the model name, as R's modelType()."""
+        model = ADAM(model=pool, lags=[12]).fit(seasonal_series)
+        assert model.model_type == model.model_name.split("(")[1].split(")")[0]
+        assert "P" not in model.model_type and "F" not in model.model_type
+
 
 class TestADAMEdgeCases:
     """Edge case tests for ADAM."""

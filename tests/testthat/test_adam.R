@@ -1415,3 +1415,21 @@ test_that("ADAM rejects distribution=\"dalaplace\"", {
     expect_error(adam(AirPassengers, "MNN", distribution="dalaplace"), "should be one of");
     expect_error(auto.adam(AirPassengers, "MNN", distribution="dalaplace"));
 })
+
+# The provided initials follow the order of the documentation: level, trend, seasonal, ARIMA, xreg
+test_that("ADAM uses the provided initials of all the components", {
+    seasonals <- c(rep(-10,3), rep(10,3), rep(0,6));
+    y <- ts(100 + rep(seasonals,10) + sin(1:120), frequency=12);
+    testModel <- adam(y, "ANA", initial=c(100,seasonals), persistence=c(0.1,0.1));
+    expect_equal(unname(testModel$initial$level), 100);
+    expect_equal(unname(testModel$initial$seasonal), seasonals);
+    expect_equal(testModel$nParam["Provided","nParamInternal"], 15);
+    expect_equal(unname(adam(y, "ANA", initial=list(100,NULL,seasonals))$initial$seasonal),
+                 seasonals);
+    expect_equal(unname(adam(y, "AAN", initial=list(100,1))$initial$trend), 1);
+
+    xreg <- data.frame(y=as.vector(y), a=cos(1:120), b=sin(1:120/3));
+    testModel <- adam(xreg, "ANN", initial=list(level=100, xreg=c(b=-3,a=2)));
+    expect_equal(testModel$initial$xreg, c(a=2,b=-3));
+    expect_equal(adam(xreg, "ANN", initial=c(100,2,-3))$initial$xreg, c(a=2,b=-3));
+})

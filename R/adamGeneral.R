@@ -1052,41 +1052,15 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             # If the list is provided, then check what this is.
             # This should be: level, trend, seasonal[[1]], seasonal[[2]], ..., ARIMA, xreg
             if(is.list(initial)){
-                # If this is a named list, then extract stuff using names
-                if(!is.null(names(initial))){
-                    if(!is.null(initial$level)){
-                        initialLevel <- initial$level;
-                    }
-                    if(!is.null(initial$trend)){
-                        initialTrend <- initial$trend;
-                    }
-                    if(!is.null(initial$seasonal)){
-                        initialSeasonal <- initial$seasonal;
-                    }
-                    if(!is.null(initial$arima)){
-                        initialArima <- initial$arima;
-                    }
-                    if(!is.null(initial$xreg)){
-                        initialXreg <- initial$xreg;
-                    }
+                # An unnamed list has the components in this order, possibly fewer of them
+                if(is.null(names(initial))){
+                    names(initial) <- c("level","trend","seasonal","arima","xreg")[seq_along(initial)];
                 }
-                else{
-                    if(!is.null(initial[[1]])){
-                        initialLevel <- initial[[1]];
-                    }
-                    if(!is.null(initial[[2]])){
-                        initialTrend <- initial[[2]];
-                    }
-                    if(!is.null(initial[[3]])){
-                        initialSeasonal <- initial[[3]];
-                    }
-                    if(!is.null(initial[[4]])){
-                        initialArima <- initial[[4]];
-                    }
-                    if(!is.null(initial[[5]])){
-                        initialXreg <- initial[[5]];
-                    }
-                }
+                initialLevel <- initial$level;
+                initialTrend <- initial$trend;
+                initialSeasonal <- initial$seasonal;
+                initialArima <- initial$arima;
+                initialXreg <- initial$xreg;
             }
             else{
                 if(!is.numeric(initial)){
@@ -1106,6 +1080,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         if(etsModel){
                             initialLevel <- initial[1];
                             initialLevelEstimate[] <- FALSE;
+                            j <- 1;
                             if(modelIsTrendy){
                                 j <- 2;
                                 # If there is something in the vector, use it
@@ -1148,7 +1123,6 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                                 initialXregEstimate[] <- FALSE
                             }
                         }
-                        parametersNumber[2,1] <- parametersNumber[2,1] + j;
                     }
                 # }
             }
@@ -2063,7 +2037,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     }
                     else{
                         xregModelMatrix <- model.matrix(xregData,data=xregData);
-                        xregNamesModified <- xregNames;
+                        xregNamesModified <- xregNames <- setdiff(colnames(xregModelMatrix), "(Intercept)");
                     }
                     xregData <- as.matrix(xregModelMatrix);
 
@@ -2161,6 +2135,11 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         }
                     }
                     else{
+                        # The unnamed values are in the order of the variables
+                        if(is.null(names(initialXreg))){
+                            names(initialXreg) <- xregNames[seq_along(initialXreg)];
+                        }
+                        initialXreg <- initialXreg[xregNames];
                         xregModelInitials[[1]]$initialXreg <- initialXreg;
                         if(any(Etype==c("M","Z"))){
                             xregModelInitials[[2]]$initialXreg <- initialXreg;

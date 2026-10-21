@@ -3743,11 +3743,17 @@ class ADAM:
               ``"approximate"`` depending on the model type.
             - ``"simulated"``: Simulation-based intervals (Monte Carlo).
             - ``"approximate"``: Analytical (parametric) intervals.
-            - ``"semiparametric"``: Not yet implemented.
-            - ``"nonparametric"``: Not yet implemented.
-            - ``"empirical"``: Not yet implemented.
-            - ``"confidence"``: Not yet implemented.
-            - ``"complete"``: Not yet implemented.
+            - ``"semiparametric"``: From the multiple steps ahead forecast
+              errors (see :meth:`rmultistep`) and the assumed distribution of
+              the error term.
+            - ``"nonparametric"``: Taylor & Bunn (1999), quantile regressions
+              of the multiple steps ahead forecast errors.
+            - ``"empirical"``: Empirical quantiles of the multiple steps ahead
+              forecast errors.
+            - ``"confidence"``: Confidence interval of the point forecast, from
+              the uncertainty of the parameters (via :meth:`reforecast`).
+            - ``"complete"``: Prediction interval with the uncertainty of the
+              parameters (via :meth:`reforecast`).
         level : float or list of float, default=0.95
             Confidence level(s) for prediction intervals. Accepts a single
             value (e.g. ``0.95``) or a list for multiple simultaneous levels

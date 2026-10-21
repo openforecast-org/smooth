@@ -131,6 +131,7 @@ Bugfixes:
 * `multicov(type="analytical")` of an `om()` model returned a matrix of NAs since it moved to the variance implied by the de-biased scale: the occurrence model is Bernoulli and has no scale. It uses `sigma()^2` on the link scale again, as before.
 * `adam(..., FI=TRUE)` (and the functions built on it, such as `es()` and `msarima()`) returned `TRUE` in `$FI` instead of the Fisher Information matrix when the model was estimated or selected: the matrix is now calculated, as with the reused model.
 * `oes()` failed with `xreg` as a data frame ("undefined columns selected"): `xreg` can be a vector, a matrix or a data frame, merged with `y` into the data passed to `om()`.
+* The help of `adam()` said that `initial="gradient"` supported only ETS models without ARIMA and regressors: it supports ETS, ARIMA and explanatory variables, and the help pages of `es()`, `msarima()`, `ssarima()`, `ces()` and `gum()`, which accept it, now describe it.
 
 
 smooth v4.5.2 (Release date: 2026-09-04)

@@ -156,14 +156,16 @@
 #' which means that all states (including explanatory variables) are initialised
 #' via backcasting. Finally, \code{initial="gradient"} solves for the initial
 #' states by profiling the estimation loss at the current parameters: a single
-#' linear solve for additive ETS (exact, because the residuals are then affine
+#' linear solve for additive models (exact, because the residuals are then affine
 #' in the initial state; robust and multistep losses are handled by weighted
 #' least squares sweeps on the same design) or a loss-aware Gauss-Newton
 #' iteration for multiplicative / mixed ETS. It avoids the divergence that
 #' backcasting can exhibit for additive seasonal models with a trend and a large
-#' seasonal smoothing parameter. This option currently supports ETS models (no
-#' ARIMA/xreg, single seasonality) and the built-in losses; other specifications
-#' fall back to backcasting. A custom loss function cannot be profiled in C++, so
+#' seasonal smoothing parameter. This option supports ETS, ARIMA and explanatory
+#' variables with the built-in losses (as in \link[smooth]{es}, \link[smooth]{msarima},
+#' \link[smooth]{ssarima}, \link[smooth]{ces} and \link[smooth]{gum}); in a model
+#' with multiplicative components, the ARIMA and the explanatory variables fall
+#' back to backcasting. A custom loss function cannot be profiled in C++, so
 #' with it the initialisation is switched to \code{"backcasting"} with a warning.
 #'
 #' If a use provides a list of values, it is recommended to use the named one and

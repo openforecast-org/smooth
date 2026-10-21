@@ -51,9 +51,10 @@ multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
 \code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
 \code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.}
 
-\item{xreg}{Optional numeric vector or matrix of exogenous regressors, aligned
-with \code{y}. Merged with \code{y} into a multi-column data matrix before
-being passed to \link[smooth]{om}.}
+\item{xreg}{Optional numeric vector, matrix or data frame of exogenous regressors,
+aligned with \code{y} (the rows after the length of \code{y} are dropped).
+Merged with \code{y} into a multi-column data matrix, which is passed to
+\link[smooth]{om} as its \code{data}.}
 
 \item{regressors}{How to handle regressors: \code{"use"} or \code{"select"}.}
 

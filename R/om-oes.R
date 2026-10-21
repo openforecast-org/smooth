@@ -34,9 +34,10 @@
 #' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
 #' \code{initial="optimal"} and \code{"global"} otherwise; \code{"ma"},
 #' \code{"lowess"}, \code{"supsmu"} and \code{"global"} force the respective smoother.
-#' @param xreg Optional numeric vector or matrix of exogenous regressors, aligned
-#'   with \code{y}. Merged with \code{y} into a multi-column data matrix before
-#'   being passed to \link[smooth]{om}.
+#' @param xreg Optional numeric vector, matrix or data frame of exogenous regressors,
+#'   aligned with \code{y} (the rows after the length of \code{y} are dropped).
+#'   Merged with \code{y} into a multi-column data matrix, which is passed to
+#'   \link[smooth]{om} as its \code{data}.
 #' @param regressors How to handle regressors: \code{"use"} or \code{"select"}.
 #' @param silent If \code{TRUE}, suppresses output and plot.
 #' @param ... Additional arguments forwarded to \link[smooth]{om} (e.g.
@@ -72,14 +73,9 @@ oes <- function(y, model="MNN", lags=c(frequency(y)),
     initial    <- match.arg(initial);
     regressors <- match.arg(regressors);
     if(!is.null(xreg)){
-        if(is.matrix(xreg)){
-            data <- as.matrix(cbind(y=as.data.frame(y), as.data.frame(xreg[1:length(y),])));
-        }
-        else{
-            data <- as.matrix(cbind(y=as.data.frame(y), as.data.frame(xreg[1:length(y)])));
-        }
+        # A vector, a matrix or a data frame, cut to the length of y
+        data <- as.matrix(cbind(y=as.vector(y), as.data.frame(xreg)[1:length(y),,drop=FALSE]));
         data <- ts(data, start=start(y), frequency=frequency(y));
-        colnames(data)[1] <- "y";
         if(is.null(colnames(xreg))){
             if(!is.null(ncol(xreg))){
                 colnames(data)[-1] <- paste0("x", c(1:ncol(xreg)));

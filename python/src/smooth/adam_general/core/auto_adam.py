@@ -17,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from smooth.adam_general.core.adam import ADAM, LOSS_OPTIONS
+from smooth.adam_general.core.checker.data_checks import _check_occurrence
 from smooth.adam_general.core.estimator.arima_selector import (
     _normalize_lags_and_orders,
     arima_selector,
@@ -441,6 +442,9 @@ class AutoADAM(ADAM):
             val = getattr(self, attr, None)
             if val is not None:
                 adam_kw[attr] = val
+
+        # An unknown occurrence is an error, as in R, not a failure of every candidate
+        _check_occurrence(y_arr, adam_kw.get("occurrence", "none"), silent=True)
 
         lags = self.lags  # may be None (handled by ADAM internally)
 

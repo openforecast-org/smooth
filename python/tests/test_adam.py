@@ -11,7 +11,7 @@ Tests cover:
 import numpy as np
 import pytest
 
-from smooth import ADAM
+from smooth import ADAM, ES, MSARIMA, SMA, AutoADAM
 
 
 class TestADAMInitialization:
@@ -1672,3 +1672,12 @@ def test_unknown_distribution_raises(distribution):
         ADAM(model="ANN", distribution=distribution).fit(y)
     with pytest.raises(ValueError, match="Unknown distribution"):
         AutoADAM(distribution=["dnorm", distribution])
+
+
+@pytest.mark.parametrize("cls", [ADAM, AutoADAM, ES, MSARIMA, SMA])
+def test_an_unknown_occurrence_raises(cls):
+    """As R's match.arg(): an unknown occurrence stops, it did not fall back
+    to "none"."""
+    y = np.abs(np.random.default_rng(1).normal(10, 2, 60))
+    with pytest.raises(ValueError, match="occurrence should be one of"):
+        cls(occurrence="foo").fit(y)

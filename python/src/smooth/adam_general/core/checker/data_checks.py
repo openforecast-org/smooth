@@ -41,6 +41,22 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
     ]
     obs_nonzero = len(nonzero_indices)
 
+    # Validate the occurrence choice, as R's match.arg()
+    valid_occ = [
+        "none",
+        "auto",
+        "fixed",
+        "general",
+        "odds-ratio",
+        "inverse-odds-ratio",
+        "direct",
+        "provided",
+    ]
+    if isinstance(occurrence, str) and occurrence not in valid_occ:
+        raise ValueError(
+            f"occurrence should be one of {', '.join(valid_occ)}, not {occurrence!r}"
+        )
+
     # If all zeroes, fallback
     if all(val == 0 for val in data):
         _warn("You have a sample with zeroes only. Your forecast will be zero.", silent)
@@ -64,21 +80,6 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
             "obs_nonzero": obs_nonzero,
             "obs_all": obs_all,
         }
-
-    # Validate the occurrence choice
-    valid_occ = [
-        "none",
-        "auto",
-        "fixed",
-        "general",
-        "odds-ratio",
-        "inverse-odds-ratio",
-        "direct",
-        "provided",
-    ]
-    if occurrence not in valid_occ:
-        _warn(f"Invalid occurrence: {occurrence}. Switching to 'none'.", silent)
-        occurrence = "none"
 
     occurrence_model = occurrence not in ["none", "provided"]
     # Without an occurrence the zeros are values, as in R: the observed values count

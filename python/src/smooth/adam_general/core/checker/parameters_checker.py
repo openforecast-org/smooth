@@ -1164,6 +1164,13 @@ def parameters_checker(
     else:
         xreg_dict = _xreg_dict_none(None)
 
+    # If there is no model, it is a constant level, as in R's parametersChecker
+    no_model = not (model_type_dict["ets_model"] or arima_dict["arima_model"])
+    if no_model and not xreg_dict["xreg_model"]:
+        model_type_dict["models_pool"] = None
+        if not constant_dict["constant_required"]:
+            constant_dict.update(constant_required=True, constant_estimate=True)
+
     # LASSO / RIDGE with lambda=1 is the penalty alone, which is zero with the
     # parameters at their shrinkage targets: no smoothing, phi=1, AR=1 and MA=0. They
     # are set to them, as in R's parametersChecker, leaving the initials and the

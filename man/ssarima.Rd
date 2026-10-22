@@ -86,7 +86,10 @@ the end of the data.}
 
 \item{bounds}{What type of bounds to use in the model estimation. The first
 letter can be used instead of the whole word. In case of \code{ssarima()}, the
-"usual" means restricting AR and MA parameters to lie between -1 and 1.}
+"usual" means restricting AR and MA parameters to lie between -1 and 1. The
+\code{"admissible"} guarantee that the model is forecastable, as in \link[smooth]{adam}:
+the AR polynomial is stationary and the MA polynomial of the whole model invertible, an
+MA root on the unit circle that cancels with a difference being allowed.}
 
 \item{silent}{accepts \code{TRUE} and \code{FALSE}. If FALSE, the function
 will print its progress and produce a plot at the end.}

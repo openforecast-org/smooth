@@ -717,7 +717,19 @@ class ADAM:
         ic : Literal["AIC", "AICc", "BIC", "BICc"], default="AICc"
             Information criterion for model selection.
         bounds : Literal["usual", "admissible", "none"], default="usual"
-            Parameter bounds specification during optimization.
+            Parameter bounds specification during optimization, as R's ``bounds``:
+            ``"usual"`` restricts the smoothing parameters to (0, 1), ``"admissible"``
+            guarantees that the model is forecastable and ``"none"`` sets no
+            restrictions. A model is forecastable when the weights of the past
+            observations in its forecasts decay and the effect of its initial states
+            converges: the MA polynomial of the ARIMA form of the whole model (ETS,
+            ARIMA and regressors together) has its roots outside the unit circle once
+            the unit roots it shares with the AR polynomial are removed. So smoothing
+            parameters equal to zero, a constant and an MA root on the unit circle that
+            cancels with a difference (an over-differenced ARIMA) are allowed. The AR
+            polynomial of ARIMA is also required to be stationary. Forecastability is
+            weaker than stability, which would require the effect of every state to
+            decay.
         occurrence : OCCURRENCE_OPTIONS or fitted OM / OMG, default="none"
             The model of the probability of occurrence, for intermittent data:
 

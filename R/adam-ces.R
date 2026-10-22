@@ -50,8 +50,9 @@
 #' \code{seasonality="partial"}. In case of \code{seasonality="full"} must be
 #' complex number.
 #' @param bounds The type of bounds for the persistence to use in the model
-#' estimation. Can be either \code{admissible} - guaranteeing the stability of the
-#' model, or \code{none} - no restrictions (potentially dangerous).
+#' estimation. Can be either \code{admissible} - guaranteeing that the model is
+#' forecastable (see \link[smooth]{adam}), or \code{none} - no restrictions (potentially
+#' dangerous).
 #' @param model A previously estimated GUM model, if provided, the function
 #' will not estimate anything and will use all its parameters.
 #' @param ...  Other non-documented parameters. See \link[smooth]{adam} for

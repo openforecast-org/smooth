@@ -1,12 +1,15 @@
 {
- "schema_version": "0.18",
+ "schema_version": "0.19",
  "paper": {
-  "title": "Admissibility of lagged single-source-of-error state space models: the per-lag eigenvalue check, the cancelled ARIMA form, the step-down test and their implementation in smooth",
+  "title": "Admissibility of lagged single-source-of-error state space models: the per-lag eigenvalue check, the cancelled ARIMA form of the whole model, the step-down test and their implementation in smooth, for ETS, GUM and ETS+ARIMA",
   "contributions": [
    "C3",
+   "C25",
    "C4",
    "C16",
+   "C26",
    "C1",
+   "C24",
    "C22"
   ],
   "autonomy": "human_supervised",
@@ -14,10 +17,10 @@
   "origin": "native",
   "exploration": {
    "lab_record": "A9",
-   "questions": 1,
+   "questions": 2,
    "hypotheses": {
-    "total": 6,
-    "supported": 6,
+    "total": 9,
+    "supported": 9,
     "not_supported": 0,
     "inconclusive": 0,
     "revised": 0,
@@ -25,16 +28,16 @@
     "open": 0
    },
    "tests": {
-    "total": 6,
-    "supported": 6,
+    "total": 9,
+    "supported": 9,
     "not_supported": 0,
     "inconclusive": 0
    },
    "runs": {
-    "total": 44,
-    "confirmatory": 6,
-    "exploratory": 38,
-    "failed": 4
+    "total": 69,
+    "confirmatory": 9,
+    "exploratory": 60,
+    "failed": 8
    }
   },
   "classification": {
@@ -46,10 +49,13 @@
     "ARIMA reduced form",
     "Schur-Cohn stability test",
     "cyclotomic polynomials",
-    "time series forecasting"
+    "time series forecasting",
+    "ARIMA",
+    "forecastability"
    ]
   },
-  "licence": "CC-BY-4.0"
+  "licence": "CC-BY-4.0",
+  "study": "adam-admissible-bounds"
  },
  "contributors": [
   {
@@ -159,6 +165,38 @@
     "start": "2026-10-21",
     "end": "2026-10-21"
    }
+  },
+  {
+   "id": "P4",
+   "type": "agent",
+   "name": "Independent checker of Q2 (ETS+ARIMA)",
+   "positions": [
+    "contributor"
+   ],
+   "models": [
+    {
+     "model": "M2",
+     "role": "sole"
+    }
+   ],
+   "run_period": {
+    "start": "2026-10-22",
+    "end": "2026-10-22"
+   },
+   "tools": [
+    "code_execution",
+    "file_access"
+   ],
+   "record_source": "self_reported",
+   "credit_roles": [
+    "validation"
+   ],
+   "ai_tasks": [
+    {
+     "task": "review",
+     "extent": "full"
+    }
+   ]
   }
  ],
  "models": [
@@ -1500,6 +1538,427 @@
      "notes": "The ratios matched the table of E19 (0.8247 to 1.1963, hourly 1.0833); noted that the earlier metric, fit time divided by the calls of one check, mixed time and call counts; the claim now reports the ratio of the fit times with both call counts in the table."
     }
    ]
+  },
+  {
+   "id": "C24",
+   "statement": "On 1,000 new random ADAM ETS+ARIMA models (500 with ARIMA at lag 1, 500 with seasonal ARIMA), checking the ETS part and the ARIMA polynomials apart, as adam() did with bounds=\"admissible\", gave an admissibility decision different from the PBH reference of the whole model on 166 and 159 models, accepting 104 and 128 models that are not forecastable and rejecting 62 and 31 that are.",
+   "type": "descriptive",
+   "role": "principal",
+   "novelty": "new",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E20",
+     "results": [
+      "E20.R1",
+      "E20.R2",
+      "E20.R3",
+      "E20.R9",
+      "E20.R10",
+      "E20.R11"
+     ],
+     "artefacts": [
+      "A10",
+      "A1"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H7",
+    "outcome": "supported"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-10-22T15:55:32Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "sample": "500 models per family, one run, no stopping rule",
+     "threshold": 25
+    },
+    "quantities": {
+     "s1": {
+      "quantity": "models whose admissibility decision differs from the PBH reference",
+      "conditions": {
+       "family": "ETS+ARIMA",
+       "check": "split"
+      }
+     },
+     "s2": {
+      "quantity": "models whose admissibility decision differs from the PBH reference",
+      "conditions": {
+       "family": "ETS+SARIMA",
+       "check": "split"
+      }
+     }
+    },
+    "supported": "s1 > threshold and s2 > threshold",
+    "not_supported": "s1 <= 5 and s2 <= 5",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL7",
+    "flags": [
+     "code_changed_after_plan"
+    ]
+   },
+   "scope": {
+    "population": "random ADAM models that combine additive ETS with ARIMA",
+    "conditions": [
+     "ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0",
+     "ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag)",
+     "ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models"
+    ],
+    "excludes": [
+     "regressors",
+     "constant",
+     "multiplicative models",
+     "several seasonal lags",
+     "CES",
+     "GUM"
+    ]
+   },
+   "assumptions": [
+    "C28"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "high",
+     "rationale": "Planned test on new models with a fixed rule; the counts are far from the threshold of 25 per family. The share depends on the generator (wide ranges of the smoothing and MA parameters, 15% over-differenced models, some of which are among those rejected by the parts apart); the models accepted by the parts apart and rejected by the reference alone, 104 and 128, exceed the threshold."
+    }
+   ],
+   "limitations": [
+    "L12"
+   ],
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived and reran. Formal: for ADAM's ARIMA part F = -a 1', g = ma - a, w = 1 (a = ari coefficients per state lag), so phi = det(I + 1' L a) = ari polynomial and D = F - g w' = -ma 1', theta = ma polynomial; checked numerically on 57 and 238 matrices built by adam() itself (AC3.RN3, AC3.RN11: max abs gap of det(I-FL) and det(I-DL) to ari and ma polynomials 1.4e-14). Cross terms: ETS(A,N,N) alpha=1.9 + MA(1) theta=0.1 has whole theta = 1 + B - 0.1 B^2 (exact fractions), the product of the parts' thetas is 1 + B + 0.09 B^2, smallest root modulus 0.916 against 1.111 (AC3.RN3), so the parts-apart check accepts a model that does not forget its states (package modulus 1.0916 whole, 0.9 ETS part alone). Reproduction with new seeds, script unchanged: seed 11 n=200 (AC3.RN1): split check differs from PBH on 65/200 ETS+ARIMA and 71/200 ETS+SARIMA; seed 12 n=200 (AC3.RN2): 67/200 and 58/200; author's RN49 166/500 and 159/500; all far above the 5% rule (25/500). Both directions occur (AC3.RN1: split accepts and PBH rejects 42 and 64; reverse 23 and 7). Review of ets_arima.py: the split baseline matches the old admissible branch of adam_bounds_checker (git 094b76f4~1: smoothEigens on ETS/constant/regressors apart, AR and MA reflections for the ARIMA); generators, AR via reflection coefficients, over-differencing, structure check against adam() (30 models, max gap 4.9e-15, AC3.RN1) are correct. Caveats, not disputes: (1) the percentage depends on the generator (alpha up to 1.9, MA reflection up to 1.5, 15% over-differenced by design), so '>5%' says the parts-apart check is wrong on a non-negligible share of such models, not on real fits; (2) over-differenced MA unit roots that cancel with a difference make the split check reject models PBH accepts, a mechanism other than the ETS-ARIMA cross terms (the cross-term direction alone is 104/500 and 128/500 in RN49 and still above 25); (3) RN49 and RN50 are the same command with the same results.json hash, so they are one data set tested under two plans; (4) the 'code changed after plan' flag is benign: git diff 397f255f..acb23120 touches only lab files."
+    }
+   ]
+  },
+  {
+   "id": "C25",
+   "statement": "On the same 1,000 random ETS+ARIMA models, the criterion of [[C3]] applied to the whole model (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary) gave the same admissibility decision as the [[D5:PBH reference]] on every model, and the same largest modulus within 4.3e-13 and 1.6e-11 on the 341 and 413 models both found inadmissible.",
+   "type": "methodological",
+   "role": "principal",
+   "novelty": "new",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E21",
+     "results": [
+      "E21.R4",
+      "E21.R12",
+      "E21.R7",
+      "E21.R15"
+     ],
+     "artefacts": [
+      "A10",
+      "A1"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H8",
+    "outcome": "supported"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-10-22T15:55:35Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "sample": "500 models per family, one run, no stopping rule",
+     "threshold": 1e-06
+    },
+    "quantities": {
+     "j1": {
+      "quantity": "models whose admissibility decision differs from the PBH reference",
+      "conditions": {
+       "family": "ETS+ARIMA",
+       "check": "joint"
+      }
+     },
+     "j2": {
+      "quantity": "models whose admissibility decision differs from the PBH reference",
+      "conditions": {
+       "family": "ETS+SARIMA",
+       "check": "joint"
+      }
+     },
+     "d1": {
+      "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+      "conditions": {
+       "family": "ETS+ARIMA"
+      }
+     },
+     "d2": {
+      "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+      "conditions": {
+       "family": "ETS+SARIMA"
+      }
+     }
+    },
+    "supported": "j1 == 0 and j2 == 0 and d1 <= threshold and d2 <= threshold",
+    "not_supported": "j1 > 0 or j2 > 0 or d1 > threshold or d2 > threshold",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL8",
+    "flags": [
+     "code_changed_after_plan"
+    ]
+   },
+   "scope": {
+    "population": "random ADAM models that combine additive ETS with ARIMA",
+    "conditions": [
+     "ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0",
+     "ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag)",
+     "ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models"
+    ],
+    "excludes": [
+     "regressors",
+     "constant",
+     "multiplicative models",
+     "several seasonal lags",
+     "CES",
+     "GUM"
+    ]
+   },
+   "assumptions": [
+    "C28"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "high",
+     "rationale": "Planned test on new models with a fixed rule; the reference is exact for these models under the assumption C28. The same run and data as C24, tested under a second plan."
+    }
+   ],
+   "limitations": [
+    "L12"
+   ],
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Reran with new seeds (script unchanged). Whole-model check (cancelled MA polynomial of the ARIMA form, AR stationary) against the PBH reference: seed 11 n=200 (AC3.RN1) 0 differing decisions in 200 ETS+ARIMA and 200 ETS+SARIMA models, max abs difference of the largest modulus 2.9e-13 and 1.5e-12; seed 12 n=200 (AC3.RN2) 0 and 0, max differences 7.9e-13 and 5.7e-9; author's RN50: 0, 0, 4.3e-13, 1.6e-11. Threshold 1e-6 met each time. Stronger test with an independent oracle (AC3.RN4-RN10, 1750 models, 7 seeds): a wider generator (constant state, ETS with two seasonal lags, AR up to 3, I up to 2, MA up to 3 including factors on the unit circle 1+-B, 1+B+B^2, 1+B^2, 1-B+B^2, rational parameters, exact Fraction determinants and exact gcd(theta, phi) instead of cyclotomic-only cancellation): the cyclotomic-cancelled check (the author's functions) disagrees with the exact gcd oracle on 0 of 1750 models, so cancelling only Phi_n is enough here; models whose unit-circle MA factor cancels and which are admissible were 3 to 7 per 250. Limitation of the reference, not of the claim: PBH (tolerance 1e-7 on singular values) accepted one model whose theta* keeps a double root at -1 (AC3.RN9, oracle and cancellation reject it), because repeated unit-circle eigenvalues are defective and the rank tests fail numerically; the author's generator never produces such a case (0 of 2000 differ in RN49/RN50/RN53), but PBH should not be treated as ground truth for repeated unit roots. Formal side (AS1): theta and phi of the whole model share no root inside the circle, so the cyclotomic-only cancellation is complete."
+    }
+   ]
+  },
+  {
+   "id": "C26",
+   "statement": "On 1,000 further random ETS+ARIMA models, the bounds checker of adam() in R and of ADAM in Python with bounds=\"admissible\", which run smoothEigensCpp() on the whole model, gave the same admissibility decision as the prototype check of the whole model on every model, and a penalty slope (the largest root modulus) within 9.54e-7 and 9.48e-7 of it in the two families (the bisection tolerance is 1e-6).",
+   "type": "methodological",
+   "role": "principal",
+   "novelty": "new",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E22",
+     "results": [
+      "E22.R18",
+      "E22.R20",
+      "E22.R22",
+      "E22.R24",
+      "E22.R19",
+      "E22.R21",
+      "E22.R23",
+      "E22.R25"
+     ],
+     "artefacts": [
+      "A10",
+      "A1",
+      "A12",
+      "A13",
+      "A14"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H9",
+    "outcome": "supported"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-10-22T17:19:52Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "sample": "500 models per family, one run, no stopping rule",
+     "threshold": 1.1e-06
+    },
+    "quantities": {
+     "r1": {
+      "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+      "conditions": {
+       "family": "ETS+ARIMA",
+       "language": "R"
+      }
+     },
+     "r2": {
+      "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+      "conditions": {
+       "family": "ETS+SARIMA",
+       "language": "R"
+      }
+     },
+     "p1": {
+      "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+      "conditions": {
+       "family": "ETS+ARIMA",
+       "language": "Python"
+      }
+     },
+     "p2": {
+      "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+      "conditions": {
+       "family": "ETS+SARIMA",
+       "language": "Python"
+      }
+     },
+     "dr1": {
+      "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+      "conditions": {
+       "family": "ETS+ARIMA",
+       "language": "R"
+      }
+     },
+     "dr2": {
+      "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+      "conditions": {
+       "family": "ETS+SARIMA",
+       "language": "R"
+      }
+     },
+     "dp1": {
+      "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+      "conditions": {
+       "family": "ETS+ARIMA",
+       "language": "Python"
+      }
+     },
+     "dp2": {
+      "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+      "conditions": {
+       "family": "ETS+SARIMA",
+       "language": "Python"
+      }
+     }
+    },
+    "supported": "r1 + r2 + p1 + p2 == 0 and dr1 <= threshold and dr2 <= threshold and dp1 <= threshold and dp2 <= threshold",
+    "not_supported": "r1 + r2 + p1 + p2 > 0 or dr1 > threshold or dr2 > threshold or dp1 > threshold or dp2 > threshold",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL9",
+    "flags": [
+     "code_changed_after_plan"
+    ]
+   },
+   "scope": {
+    "population": "random ADAM models that combine additive ETS with ARIMA",
+    "conditions": [
+     "ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0",
+     "ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag)",
+     "ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models",
+     "the checkers called on the matrices of each model, R through pkgload::load_all of the repository"
+    ],
+    "excludes": [
+     "regressors",
+     "constant",
+     "multiplicative models",
+     "several seasonal lags",
+     "CES",
+     "GUM"
+    ]
+   },
+   "assumptions": [
+    "C28"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "high",
+     "rationale": "Planned test of the code in the package on new models; the decisions are exact and the moduli agree within the bisection tolerance. The shortcut for pure ARIMA, added after this run, was tested only by the checker P4."
+    }
+   ],
+   "limitations": [
+    "L11"
+   ],
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Reran the implementation test with another seed: seed 12 n=200 --impl in the project venv (AC3.RN2): R adam_bounds_checker() and Python adam_bounds_checker() both 0 differing decisions against the prototype in 200 ETS+ARIMA and 200 ETS+SARIMA models; max abs difference between penalty/1e100 and the prototype modulus 9.35e-7 (ETS+ARIMA, 118 inadmissible) and 9.53e-7 (ETS+SARIMA, 167 inadmissible), R and Python equal to 8 digits; author's RN53 0 differences and 9.5e-7; all within the 1.1e-6 threshold (the C++ bisection returns the upper end, tolerance 1e-6). Script review: R positional call of adam_bounds_checker() matches its signature, Python dict arguments match, AR reflection computed as in C++; matrices are the author's builder verified against adam() on 30 models (AC3.RN1, gap 4.9e-15), not matrices from adam() fits. Limitations to state with the claim: (1) the prototype decides with a 1e-6 margin (modulus < 1 - 1e-6) and the package with modulus > 1 + 1e-50, so for a root exactly on the unit circle that does not cancel the package's answer is set by roundoff: simple cases (MA(1) theta=+-1, 1 - B + B^2, 1 + B^2) are rejected with modulus 1.00000095 (AC3.RN13), but in 3 of 1750 models of the wider generator the package accepted a model whose theta* keeps a cyclotomic factor, with moduli 0.9999999999999969 (AC3.RN4), 0.9999999999999993 (AC3.RN9) and 0.9999999999970864 (AC3.RN10; the specs are printed in their stdout), while the cancelled-polynomial prototype and the exact oracle reject them. The generator of RN53 has no such models (the only unit-circle MA roots are over-differenced and cancel), so the confirmed statement holds for what it says, random ETS+ARIMA models away from the boundary. (2) RN53 ran at commit 7cf64144, before the shortcut of DC6 (b4a10cc6), and always with ets_model=True, so the pure-ARIMA shortcut branch is not covered by it (see my check of DC6). The compiled _eigenCalc in the venv (built 16:49) is newer than the header's last change (16:48), so RN53 and my AC3.RN2 ran the current C++."
+    }
+   ]
+  },
+  {
+   "id": "C27",
+   "statement": "With the check of the whole model and its shortcut for pure ARIMA, the median time of five fits with bounds=\"admissible\" of two ARIMA and two ETS+ARIMA models was within 6% of that with the check of the parts apart; the log-likelihood of SARIMA(1,1,1)(1,1,1)[12] on AirPassengers rose from -541.84 to -541.38 and that of ETS(A,N,A)+ARIMA(1,0,1) fell from -569.65 to -572.21, another local optimum.",
+   "type": "descriptive",
+   "role": "secondary",
+   "novelty": "new",
+   "planning": "exploratory",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E23",
+     "artefacts": [
+      "A11"
+     ],
+     "results": [
+      "E23.T1"
+     ]
+    }
+   ],
+   "scope": {
+    "population": "fits of adam() and ssarima() on AirPassengers and BJsales",
+    "conditions": [
+     "R 4.3.3, -O2, one x86_64 machine, median of five fits"
+    ]
+   },
+   "limitations": [
+    "L9"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "low",
+     "rationale": "Exploratory timings of four fits on one machine; the optimisation paths differ between the checks."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The shortcut is exact. Derivation: a constant or static regressor has F row e_x, g_x = 0, so row x of D is also e_x and expanding det(I - D L) along it gives theta_whole = theta_ARIMA (1 - B) and phi_whole = phi_ARIMA (1 - B) (checked on adam() matrices of plain, constant and static-regressor ARIMA, 295 models in total, max gap 1.4e-14, AC3.RN3, AC3.RN11). With every MA factor invertible theta_ARIMA has no root on or inside the circle, the (1 - B) factors cancel with phi, so theta* has all roots outside; this holds whether or not the AR is stationary. Code: in R (adam_bounds_checker in R/utils-adam.R and ssarima in R/adam-ssarima.R) and Python (cost_functions.py) the whole check is skipped only when no ETS, no adaptive regressors, arima_model true and ma_reflection < 1, otherwise it runs, so an MA root that cancels with a difference is still accepted (reflection >= 1 goes to the whole check). maReflection is the factor-by-factor Schur-Cohn value, below 1 exactly when every factor is invertible. Tests (mine, the author has no recorded run of the shortcut: RN53 only used ets_model=True and predates b4a10cc6; RN55/RN56 are timing): on 238 adam()-built pure ARIMA models (plain 80, constant 80, static regressor 78; AC3.RN11) 136 have all MA roots outside the circle and smooth_eigens rejects 0 of them; the real R adam_bounds_checker() with etsModel FALSE (AC3.RN12) gives a penalty on 0 of the 136 and its decision equals the forced whole-model check on all 102 non-invertible ones (20 of them are accepted, the cancelling roots). RN55 and RN56 give identical log-likelihoods for the SARIMA (-541.382357389734 both) as the author's NT24 says. Minor: in floating point the shortcut is if anything more robust than the whole check (no cancellation tolerance involved); DC6's text 'the whole model is checked only otherwise' is right but reads as if non-invertible models were rejected, which they are not."
+    }
+   ]
+  },
+  {
+   "id": "C28",
+   "statement": "For ETS+ARIMA models with a stationary AR polynomial, $\\theta(B)$ and $\\phi(B)$ of the whole model share no factor with a root in $|B| \\le 1$ that is not cyclotomic, so the [[D5:PBH reference]] and the cancelled MA polynomial decide the same admissibility.",
+   "type": "methodological",
+   "role": "supporting",
+   "novelty": "new",
+   "support": [
+    {
+     "kind": "assumption"
+    }
+   ],
+   "assumption_category": "theorem_condition",
+   "check": "tested",
+   "provenance": "author_stated",
+   "check_evidence": "E24"
   }
  ],
  "evidence": [
@@ -3012,6 +3471,1011 @@
      "cpus": 4
     }
    }
+  },
+  {
+   "id": "E20",
+   "profile": "simulation",
+   "design": "other",
+   "description": "Planned tests (lab plans PL7 and PL8, runs RN49 and RN50, the same command): ets_arima.py --seed 2 --n 500 --adam 20 generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 2, new against the exploratory runs RN46-RN48, seed 1), built each in ADAM's form, compared the matrices of 20 of them with adam() (0 lags differed, matrices within 4.4e-15), and decided admissibility by the check of the parts apart, the check of the whole model and the PBH reference.",
+   "availability": {
+    "level": "public"
+   },
+   "lab_runs": [
+    "RN49"
+   ],
+   "results": [
+    {
+     "id": "R1",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 166,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R2",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 104,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R3",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 62,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R4",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R5",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R6",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R7",
+     "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+     "value": 4.3076653355456074e-13,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "inadmissible": 341
+     }
+    },
+    {
+     "id": "R8",
+     "quantity": "models found admissible by the PBH reference",
+     "value": 159,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500
+     }
+    },
+    {
+     "id": "R9",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 159,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R10",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 128,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R11",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 31,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R12",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R13",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R14",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R15",
+     "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+     "value": 1.6268764113647194e-11,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "inadmissible": 413
+     }
+    },
+    {
+     "id": "R16",
+     "quantity": "models found admissible by the PBH reference",
+     "value": 87,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500
+     }
+    },
+    {
+     "id": "R17",
+     "quantity": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
+     "value": 2.8171909249863347e-15,
+     "conditions": {
+      "models": 1000
+     }
+    },
+    {
+     "id": "R18",
+     "quantity": "models whose component lags differ from those of adam()",
+     "value": 0,
+     "conditions": {
+      "models": 20
+     }
+    },
+    {
+     "id": "R19",
+     "quantity": "max abs difference between the matrices built here and those of adam()",
+     "value": 4.440892098500626e-15,
+     "conditions": {
+      "models": 20
+     }
+    }
+   ],
+   "execution": {
+    "code_version": "acb23120590a35c6b8b19290dbf861f830965b81",
+    "software": {
+     "python": "3.13.16",
+     "platform": "Linux-6.18.44-fc-v140-x86_64-with-glibc2.39"
+    }
+   },
+   "artefacts": [
+    "A10",
+    "A1"
+   ]
+  },
+  {
+   "id": "E21",
+   "profile": "simulation",
+   "design": "other",
+   "description": "Planned tests (lab plans PL7 and PL8, runs RN49 and RN50, the same command): ets_arima.py --seed 2 --n 500 --adam 20 generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 2, new against the exploratory runs RN46-RN48, seed 1), built each in ADAM's form, compared the matrices of 20 of them with adam() (0 lags differed, matrices within 4.4e-15), and decided admissibility by the check of the parts apart, the check of the whole model and the PBH reference.",
+   "availability": {
+    "level": "public"
+   },
+   "lab_runs": [
+    "RN50"
+   ],
+   "results": [
+    {
+     "id": "R1",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 166,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R2",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 104,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R3",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 62,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R4",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R5",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R6",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R7",
+     "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+     "value": 4.3076653355456074e-13,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "inadmissible": 341
+     }
+    },
+    {
+     "id": "R8",
+     "quantity": "models found admissible by the PBH reference",
+     "value": 159,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500
+     }
+    },
+    {
+     "id": "R9",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 159,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R10",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 128,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R11",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 31,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R12",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R13",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R14",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R15",
+     "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+     "value": 1.6268764113647194e-11,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "inadmissible": 413
+     }
+    },
+    {
+     "id": "R16",
+     "quantity": "models found admissible by the PBH reference",
+     "value": 87,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500
+     }
+    },
+    {
+     "id": "R17",
+     "quantity": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
+     "value": 2.8171909249863347e-15,
+     "conditions": {
+      "models": 1000
+     }
+    },
+    {
+     "id": "R18",
+     "quantity": "models whose component lags differ from those of adam()",
+     "value": 0,
+     "conditions": {
+      "models": 20
+     }
+    },
+    {
+     "id": "R19",
+     "quantity": "max abs difference between the matrices built here and those of adam()",
+     "value": 4.440892098500626e-15,
+     "conditions": {
+      "models": 20
+     }
+    }
+   ],
+   "execution": {
+    "code_version": "acb23120590a35c6b8b19290dbf861f830965b81",
+    "software": {
+     "python": "3.13.16",
+     "platform": "Linux-6.18.44-fc-v140-x86_64-with-glibc2.39"
+    }
+   },
+   "artefacts": [
+    "A10",
+    "A1"
+   ]
+  },
+  {
+   "id": "E22",
+   "profile": "simulation",
+   "design": "other",
+   "description": "Planned test (lab plan PL9, run RN53): ets_arima.py --seed 3 --n 500 --impl generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 3) and passed the matrices of each to adam_bounds_checker() of R (through pkgload::load_all of the repository) and of Python, with the AR reflection of its factors, comparing the penalty (zero, or 1e100 times the largest root modulus) with the prototype check of the whole model.",
+   "availability": {
+    "level": "public"
+   },
+   "lab_runs": [
+    "RN53"
+   ],
+   "results": [
+    {
+     "id": "R1",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 171,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R2",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 115,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R3",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 56,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R4",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R5",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R6",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R7",
+     "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+     "value": 1.3655743202889425e-13,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "inadmissible": 341
+     }
+    },
+    {
+     "id": "R8",
+     "quantity": "models found admissible by the PBH reference",
+     "value": 159,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500
+     }
+    },
+    {
+     "id": "R9",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 150,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R10",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 129,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R11",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 21,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "split"
+     }
+    },
+    {
+     "id": "R12",
+     "quantity": "models whose admissibility decision differs from the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R13",
+     "quantity": "models accepted by the check and rejected by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R14",
+     "quantity": "models rejected by the check and accepted by the PBH reference",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "check": "joint"
+     }
+    },
+    {
+     "id": "R15",
+     "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+     "value": 6.726019741165601e-11,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "inadmissible": 424
+     }
+    },
+    {
+     "id": "R16",
+     "quantity": "models found admissible by the PBH reference",
+     "value": 76,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500
+     }
+    },
+    {
+     "id": "R17",
+     "quantity": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
+     "value": 2.6922908347160046e-15,
+     "conditions": {
+      "models": 1000
+     }
+    },
+    {
+     "id": "R18",
+     "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "language": "R"
+     }
+    },
+    {
+     "id": "R19",
+     "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+     "value": 9.53674319736919e-07,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "language": "R",
+      "inadmissible": 341
+     }
+    },
+    {
+     "id": "R20",
+     "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "language": "Python"
+     }
+    },
+    {
+     "id": "R21",
+     "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+     "value": 9.536743161842054e-07,
+     "conditions": {
+      "family": "ETS+ARIMA",
+      "models": 500,
+      "language": "Python",
+      "inadmissible": 341
+     }
+    },
+    {
+     "id": "R22",
+     "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "language": "R"
+     }
+    },
+    {
+     "id": "R23",
+     "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+     "value": 9.484902201428724e-07,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "language": "R",
+      "inadmissible": 424
+     }
+    },
+    {
+     "id": "R24",
+     "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+     "value": 0,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "language": "Python"
+     }
+    },
+    {
+     "id": "R25",
+     "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+     "value": 9.484902243617199e-07,
+     "conditions": {
+      "family": "ETS+SARIMA",
+      "models": 500,
+      "language": "Python",
+      "inadmissible": 424
+     }
+    }
+   ],
+   "execution": {
+    "code_version": "7cf641447804173fe3c014451e4311970cb65748",
+    "software": {
+     "python": "3.13.16",
+     "platform": "Linux-6.18.44-fc-v140-x86_64-with-glibc2.39"
+    }
+   },
+   "artefacts": [
+    "A10",
+    "A1"
+   ]
+  },
+  {
+   "id": "E23",
+   "profile": "simulation",
+   "lab_runs": [
+    "RN55",
+    "RN56"
+   ],
+   "artefacts": [
+    "A11"
+   ],
+   "parameters": "A11",
+   "model": "fits of adam() and ssarima() with bounds=\"admissible\"",
+   "runs": 2,
+   "availability": {
+    "level": "public"
+   },
+   "description": "Exploratory runs of timing_ets_arima.R: the package installed at -O2 from two worktrees, the check of the parts apart (commit 397f255f) and of the whole model, each fit run five times. RN55 (commit af998d26) ran the check of the whole model on every call: pure ARIMA fits took 1.5 and 1.8 times as long. RN56 (commit b4a10cc6) adds the shortcut that, without ETS and adaptive regressors, accepts invertible MA factors without the check of the whole model; its times and log-likelihoods are in the table.",
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Median time of a fit over five runs and its log-likelihood, check of the parts apart against the whole model (RN56)",
+     "conditions": {
+      "build": "R 4.3.3, -O2",
+      "repeats": 5
+     },
+     "row_labels": [
+      "fit"
+     ],
+     "columns": [
+      "parts apart, seconds",
+      "whole model, seconds",
+      "parts apart, log-likelihood",
+      "whole model, log-likelihood"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ARIMA(1,1,1)(1,1,1)[12]"
+       ],
+       "values": [
+        0.0700000000000001,
+        0.0740000000000001,
+        -541.844444789273,
+        -541.382357389734
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS(A,N,A)+ARIMA(1,0,1)"
+       ],
+       "values": [
+        0.0669999999999997,
+        0.0640000000000001,
+        -569.649169125733,
+        -572.214179521351
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ETS(A,Ad,N)+ARIMA(0,1,2)"
+       ],
+       "values": [
+        0.0779999999999998,
+        0.0780000000000003,
+        -255.264423392167,
+        -255.264424161103
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "ssarima (1,1,1)(1,1,1)[12]"
+       ],
+       "values": [
+        0.0799999999999996,
+        0.0829999999999997,
+        -556.990376211077,
+        -556.990376211077
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "E24",
+   "profile": "simulation",
+   "lab_runs": [
+    "AC3.RN4",
+    "AC3.RN5",
+    "AC3.RN6",
+    "AC3.RN7",
+    "AC3.RN8",
+    "AC3.RN9",
+    "AC3.RN10"
+   ],
+   "artefacts": [
+    "A15"
+   ],
+   "parameters": "A15",
+   "model": "random ADAM ETS+ARIMA models of a wider generator",
+   "runs": 7,
+   "availability": {
+    "level": "public"
+   },
+   "description": "Exploratory runs of the checker P4 (exact_oracle.py, seeds 21-23 and 31-34, 250 models each): admissibility by an exact oracle (rational determinants and the exact greatest common divisor of theta and phi, which cancels any shared factor) against the cancellation of cyclotomic factors ('author'), the PBH reference ('pbh') and the package ('pkg'); the number of models whose decision differs from the oracle.",
+   "results": [
+    {
+     "id": "R1",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 21,
+      "check": "author"
+     }
+    },
+    {
+     "id": "R2",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 21,
+      "check": "pbh"
+     }
+    },
+    {
+     "id": "R3",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 1.0,
+     "conditions": {
+      "models": 250,
+      "seed": 21,
+      "check": "pkg"
+     }
+    },
+    {
+     "id": "R4",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 22,
+      "check": "author"
+     }
+    },
+    {
+     "id": "R5",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 22,
+      "check": "pbh"
+     }
+    },
+    {
+     "id": "R6",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 22,
+      "check": "pkg"
+     }
+    },
+    {
+     "id": "R7",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 23,
+      "check": "author"
+     }
+    },
+    {
+     "id": "R8",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 23,
+      "check": "pbh"
+     }
+    },
+    {
+     "id": "R9",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 23,
+      "check": "pkg"
+     }
+    },
+    {
+     "id": "R10",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 31,
+      "check": "author"
+     }
+    },
+    {
+     "id": "R11",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 31,
+      "check": "pbh"
+     }
+    },
+    {
+     "id": "R12",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 31,
+      "check": "pkg"
+     }
+    },
+    {
+     "id": "R13",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 32,
+      "check": "author"
+     }
+    },
+    {
+     "id": "R14",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 32,
+      "check": "pbh"
+     }
+    },
+    {
+     "id": "R15",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 32,
+      "check": "pkg"
+     }
+    },
+    {
+     "id": "R16",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 33,
+      "check": "author"
+     }
+    },
+    {
+     "id": "R17",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 1.0,
+     "conditions": {
+      "models": 250,
+      "seed": 33,
+      "check": "pbh"
+     }
+    },
+    {
+     "id": "R18",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 1.0,
+     "conditions": {
+      "models": 250,
+      "seed": 33,
+      "check": "pkg"
+     }
+    },
+    {
+     "id": "R19",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 34,
+      "check": "author"
+     }
+    },
+    {
+     "id": "R20",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 0.0,
+     "conditions": {
+      "models": 250,
+      "seed": 34,
+      "check": "pbh"
+     }
+    },
+    {
+     "id": "R21",
+     "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+     "value": 1.0,
+     "conditions": {
+      "models": 250,
+      "seed": 34,
+      "check": "pkg"
+     }
+    }
+   ]
   }
  ],
  "warrants": [],
@@ -3110,6 +4574,50 @@
    ],
    "impact": "reduces_transferability",
    "mitigation": "none"
+  },
+  {
+   "id": "L9",
+   "category": "measurement",
+   "statement": "Estimates with bounds=\"admissible\" change for ETS+ARIMA models, whose admissible region changes, and the likelihood of such models can have several local optima: on ETS(A,N,A)+ARIMA(1,0,1) on AirPassengers the fit with the check of the whole model reached a lower log-likelihood than the fit with the check of the parts apart.",
+   "affects": [
+    "C27"
+   ],
+   "impact": "reduces_precision",
+   "mitigation": "none"
+  },
+  {
+   "id": "L10",
+   "category": "computational",
+   "statement": "Two defects found while testing were fixed before the planned runs: adam() with provided MA parameters added the MA coefficient of a lag without AR or differences twice to the persistence vector (and reapply() did so with the drawn ones, in R and Python), found by the structure check of the exploratory runs RN46 and RN47; and the Python build of smooth crashed at exit after checking a model whose MA polynomial has degree 16 or more (runs RN51 and RN52), because the caches of the check were freed through numpy after it had shut down. The second affected the implementation tested by C16 in Python, not its results. After the fixes the matrices built by the study matched those of adam() within 4.4e-15 (E21), and the planned run of the checkers (E22) exited normally.",
+   "affects": [
+    "C16",
+    "C26"
+   ],
+   "impact": "could_bias_magnitude",
+   "mitigation": "addressed",
+   "mitigation_evidence": "E21"
+  },
+  {
+   "id": "L11",
+   "category": "computational",
+   "statement": "For an MA root exactly on the unit circle that does not cancel, the decision of the package is set by roundoff: the prototype rejects a modulus above 1 - 1e-6 and the package a modulus above 1 + 1e-50, and the checker P4 found three models of a wider generator, with moduli between 0.99999999999 and 1, that the package accepted and the prototype rejected; simple cases such as MA(1) with theta = 1 are rejected. The random models of the planned tests have no such root.",
+   "affects": [
+    "C16",
+    "C26"
+   ],
+   "impact": "reduces_transferability",
+   "mitigation": "none"
+  },
+  {
+   "id": "L12",
+   "category": "measurement",
+   "statement": "The PBH reference is not exact for a repeated unit root: the checker P4 found a model whose cancelled MA polynomial keeps a double root at -1, which the reference accepted and the cancellation and an exact gcd rejected. The random models of the planned tests have no such root.",
+   "affects": [
+    "C24",
+    "C25"
+   ],
+   "impact": "reduces_transferability",
+   "mitigation": "none"
   }
  ],
  "artefacts": [
@@ -3204,13 +4712,101 @@
   {
    "id": "A9",
    "kind": "lab_record",
-   "uri": "https://github.com/openforecast-org/smooth/blob/claimset-lab-eigenChecker/.claude/lab/lab.jsonl",
-   "version": "sha256:9751f4d4eebfeda0f442c2b6fc9caa0a4fddb1eb7609d3d87aafb57c9e88f8d0",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7ce2d2289a703a202595efe25c45aa41ac69ac74/claimset/adam-admissible-bounds/lab/lab.jsonl",
+   "version": "sha256:2319c269f4e3ea0f2e5a109162a2253717a63e9f62913d0a05c80d065d894783",
    "availability": {
     "level": "public"
    },
-   "description": "Lab record of the study: questions, hypotheses, plans, runs, results and decisions, as an append-only, hash-chained event log (Claimset lab record specification v0.5), anchored on the git branch claimset-lab-eigenChecker of openforecast-org/smooth.",
+   "description": "Lab record of the study: questions, hypotheses, plans, runs, results, checks and decisions, as an append-only, hash-chained event log (Claimset lab record specification v0.6), anchored on the git branch claimset-lab-eigenChecker of openforecast-org/smooth; moved from .claude/lab to claimset/adam-admissible-bounds/lab by its relocation event MV1.",
    "licence": "CC-BY-4.0"
+  },
+  {
+   "id": "A10",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/claimset/adam-admissible-bounds/code/ets_arima.py",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:f3e394d5f6563d9f9218c7519977a0227761bcdbf8428c8decd83811fa80f712",
+   "licence": "LGPL-2.1-only",
+   "description": "test script of Q2: random ETS+ARIMA models, the check of the parts apart and of the whole model against the PBH reference, the structure against adam(), and the bounds checkers of the package in R and Python against the prototype"
+  },
+  {
+   "id": "A11",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/claimset/adam-admissible-bounds/code/timing_ets_arima.R",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:b9795e42432bd4d38996d496542ec72913564744d8b080312a5c2506fea25738",
+   "licence": "LGPL-2.1-only",
+   "description": "fit times and log-likelihoods of ARIMA and ETS+ARIMA models with bounds=\"admissible\", the package installed from two commits"
+  },
+  {
+   "id": "A12",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/R/utils-adam.R",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:ca4bd6b7b946ca1b5445aa1d8603aa21649bf908ad27950e44a9022052a5d9bc",
+   "licence": "LGPL-2.1-only",
+   "description": "the bounds checker of adam(), om() and omg() in R (adam_bounds_checker())"
+  },
+  {
+   "id": "A13",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/python/src/smooth/adam_general/core/utils/cost_functions.py",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:5008ff203b1360619fc081fd152a4b586d6218a5ac43d76dbd9089a251103a91",
+   "licence": "LGPL-2.1-only",
+   "description": "the bounds checker of ADAM, OM and OMG in Python (adam_bounds_checker())"
+  },
+  {
+   "id": "A15",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/claimset/adam-admissible-bounds/code/checker/exact_oracle.py",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:f07dd7d664eac2995262cbca9170f347dae9ef9c401645ab7a6259fb35730d75",
+   "licence": "LGPL-2.1-only",
+   "description": "the exact oracle of the checker P4 (with lib.py in the same folder): rational determinants and the exact gcd of theta and phi against the cancellation, the PBH reference and the package"
+  },
+  {
+   "id": "A16",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/claimset/adam-admissible-bounds/code/checker/formal.py",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:93d8218db0821a1d1e5efe153ec0b8f3ebbdda5008a8ded86f29f416c15d925c",
+   "licence": "LGPL-2.1-only",
+   "description": "the checker P4's exact check of the ARIMA form of ADAM's ARIMA part and of the worked example, on matrices of adam()"
+  },
+  {
+   "id": "A17",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/claimset/adam-admissible-bounds/code/checker/r_shortcut.R",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:b5c5b7d689547bb97babb12556e44752157278aecdba0640858c3ed152d90d6e",
+   "licence": "LGPL-2.1-only",
+   "description": "the checker P4's test of the shortcut for pure ARIMA in R's adam_bounds_checker()"
+  },
+  {
+   "id": "A14",
+   "kind": "code",
+   "uri": "https://github.com/openforecast-org/smooth/blob/604dbcac0e3ca9cb0e8c7c228cb11b1d6161594c/src/headers/eigenCalc.h",
+   "availability": {
+    "level": "public"
+   },
+   "version": "sha256:0f5604775db84b6739363561e87a908fb76c683ffcce3e3771a86227ed88f5d4",
+   "licence": "LGPL-2.1-only",
+   "description": "the C++ check shared by R and Python (smoothEigensCpp()), at the version tested by C26"
   }
  ],
  "references": [

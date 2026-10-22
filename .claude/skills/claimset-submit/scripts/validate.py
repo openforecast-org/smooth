@@ -18,11 +18,12 @@ Implements the rules in spec section 10, plus computed verifiability (section 5)
 and heuristic checks of statement text (section 8). Standard library only.
 """
 import json
+from pathlib import Path
 import math
 import re
 import sys
 
-SCHEMA_VERSION = "0.18"
+SCHEMA_VERSION = "0.19"
 
 ENUM = {
     "status": {"active", "corrected", "retracted", "withdrawn", "expression_of_concern"},
@@ -80,8 +81,8 @@ ENUM = {
     "weights": {"open", "api_only"},
     "support_kind": {"empirical_quant", "empirical_qual", "simulation", "demonstration", "formal_proof",
                      "argument", "cited", "consensus", "expert_judgement", "assumption", "unstated"},
-    "id_type": {"doi", "arxiv", "handle", "pmid", "isbn", "url", "physical", "reference"},
-    "rel_id_type": {"claimset", "doi", "arxiv", "handle", "pmid", "isbn", "url", "physical"},
+    "id_type": {"doi", "arxiv", "handle", "pmid", "isbn", "url", "physical", "reference", "claimset_local"},
+    "rel_id_type": {"claimset", "doi", "arxiv", "handle", "pmid", "isbn", "url", "physical", "claimset_local"},
     "by": {"author", "reviewer"},
     "reviewer_type": {"ai", "human"},
     "strength": {"high", "moderate", "low", "very_low"},
@@ -147,7 +148,110 @@ def check_enum(r, rule, where, value, enum_name, required=False):
 PLATFORM_PAPER_FIELDS = ("version", "previous_version", "changes", "date", "status", "status_notice")
 
 
-def validate(doc, published=False):
+NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,59}$")
+LOCAL_RE = re.compile(r"^([a-z][a-z0-9-]{1,59})/([a-z][a-z0-9-]{1,59})\.claimset\.json(?:#(C\d+))?$")
+
+
+def local_targets(doc):
+    """[(where, target)] for every claimset_local reference: references, cited support and relations."""
+    out = []
+    for b in as_list(doc.get("references")):
+        b = as_dict(b)
+        if b.get("id_type") == "claimset_local":
+            out.append((f"references:{b.get('id')}.target", b.get("target")))
+    for c in as_list(doc.get("claims")):
+        c = as_dict(c)
+        for i, s_ in enumerate(as_list(c.get("support"))):
+            s_ = as_dict(s_)
+            if s_.get("id_type") == "claimset_local":
+                out.append((f"claims:{c.get('id')}.support[{i}].target", s_.get("target")))
+        for i, rel in enumerate(as_list(c.get("relations"))):
+            rel = as_dict(rel)
+            if rel.get("id_type") == "claimset_local":
+                out.append((f"claims:{c.get('id')}.relations[{i}].target", rel.get("target")))
+    return out
+
+
+def check_local(r, doc, published, local_root):
+    """Rule 57: references to another paper of the same repository (claimset/<study>/<name>.claimset.json)."""
+    for where, target in local_targets(doc):
+        m = LOCAL_RE.match(target) if isinstance(target, str) else None
+        if not m:
+            r.err("57", where, "a local claimset reference is '<study>/<paper>.claimset.json' or "
+                               "'<study>/<paper>.claimset.json#C3', relative to the repository's claimset/ folder")
+            continue
+        if published:
+            r.err("57", where, "published files cite published claimsets by their global claim IDs "
+                               "(id_type claimset); local references are replaced at publication")
+            continue
+        if local_root is None:
+            continue
+        path = Path(local_root) / m.group(1) / f"{m.group(2)}.claimset.json"
+        try:
+            other = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            r.err("57", where, f"{m.group(1)}/{m.group(2)}.claimset.json is not a readable claimset in "
+                               f"{local_root}")
+            continue
+        if m.group(3) and m.group(3) not in {as_dict(c).get("id") for c in as_list(as_dict(other).get("claims"))}:
+            r.err("57", where, f"{m.group(1)}/{m.group(2)}.claimset.json has no claim {m.group(3)}")
+
+
+def claimset_folder(path):
+    """The nearest folder named claimset/ above a file (the repository's studies), or None."""
+    for d in Path(path).resolve().parents:
+        if d.name == "claimset":
+            return d
+    return None
+
+
+def check_covers(r, exp):
+    """Rule 55: a paper that reports some of its lab's questions says which, with the lab's totals."""
+    cov = exp.get("covers")
+    if cov is None:
+        return
+    cov = as_dict(cov)
+
+    def nonneg(v):
+        return isinstance(v, int) and not isinstance(v, bool) and v >= 0
+    qs = cov.get("questions")
+    if not (isinstance(qs, list) and qs and all(isinstance(q, str) and q for q in qs)):
+        r.err("55", "paper.exploration.covers.questions", "must be a non-empty list of lab question IDs")
+        qs = []
+    elif exp.get("questions") != len(qs):
+        r.err("55", "paper.exploration.questions", "must equal the number of questions in covers.questions")
+    lab = as_dict(cov.get("lab"))
+    if not nonneg(lab.get("questions")):
+        r.err("55", "paper.exploration.covers.lab.questions", "must be a non-negative integer")
+    for part, keys in (("hypotheses", ("total", "supported", "not_supported", "inconclusive", "revised",
+                                       "abandoned", "open")),
+                       ("tests", ("total", "supported", "not_supported", "inconclusive"))):
+        mine, total = as_dict(exp.get(part)), as_dict(lab.get(part))
+        for k in keys:
+            if not nonneg(total.get(k)):
+                r.err("55", f"paper.exploration.covers.lab.{part}.{k}", "must be a non-negative integer")
+            elif nonneg(mine.get(k)) and mine[k] > total[k]:
+                r.err("55", f"paper.exploration.{part}.{k}", f"cannot exceed the lab's count ({total[k]})")
+    if nonneg(lab.get("questions")) and len(qs) > lab["questions"]:
+        r.err("55", "paper.exploration.covers.questions", "cannot exceed the lab's count of questions")
+    seen = set(qs)
+    for i, o in enumerate(as_list(cov.get("other_papers"))):
+        o = as_dict(o)
+        if not (isinstance(o.get("name"), str) and NAME_RE.match(o["name"])):
+            r.err("55", f"paper.exploration.covers.other_papers[{i}].name", "must be a paper name")
+        oq = o.get("questions")
+        if not (isinstance(oq, list) and oq and all(isinstance(q, str) for q in oq)):
+            r.err("55", f"paper.exploration.covers.other_papers[{i}].questions", "must be a non-empty list")
+            continue
+        if seen & set(oq):
+            r.err("55", f"paper.exploration.covers.other_papers[{i}].questions",
+                  f"{', '.join(sorted(seen & set(oq)))} reported in more than one paper")
+        seen |= set(oq)
+
+
+def validate(doc, published=False, local_root=None):
+    """Check a claimset. `local_root`: the repository's claimset/ folder, when the file lies in one, so that
+    local references to other papers can be resolved (rule 57)."""
     r = Report()
     if not isinstance(doc, dict):
         r.err("2", "$", "top level must be a JSON object")
@@ -597,6 +701,14 @@ def validate(doc, published=False):
                 r.err("46", "paper.exploration.tests", f"{nt} planned tests reported as {oc}, but exploration has no tests counts")
             elif nt and nt > limit:
                 r.err("46", "paper.exploration.tests", f"{nt} planned tests reported as {oc}, but the count is {limit}")
+
+    # ---------- Studies and papers in a repository (rules 55-57) ----------
+    if paper.get("study") is not None and not (isinstance(paper["study"], str) and NAME_RE.match(paper["study"])):
+        r.err("56", "paper.study", "must be the study's name: lower-case letters, digits and hyphens, starting "
+                                   "with a letter")
+    if isinstance(paper.get("exploration"), dict):
+        check_covers(r, paper["exploration"])
+    check_local(r, doc, published, local_root)
 
     # ---------- Contributors ----------
     validate_contributors(r, coll["contributors"], paper, ref, converted)
@@ -1270,7 +1382,7 @@ def main(argv):
         print(f"ERROR: cannot read {path}: {exc}")
         return 1
     published = "--published" in argv
-    rep = validate(doc, published=published)
+    rep = validate(doc, published=published, local_root=claimset_folder(path))
     print_report(rep, published=published, as_json="--json" in argv)
     return 1 if rep.errors else 0
 

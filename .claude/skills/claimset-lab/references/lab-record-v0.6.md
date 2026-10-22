@@ -1,8 +1,20 @@
-# Claimset Lab Record — Specification v0.5 (draft)
+# Claimset Lab Record — Specification v0.6 (draft)
 
-Status: working draft · Date: 2026-10-16 · Supersedes v0.4 · Companion to the claimset specification (`spec/claimset-v0.18.md`)
+Status: working draft · Date: 2026-10-22 · Supersedes v0.5 · Companion to the claimset specification (`spec/claimset-v0.19.md`)
 
-## Changes since v0.4
+## Changes since v0.5
+
+A repository can hold several studies, each with its own lab, and a study can give several papers. Where they live and what they are called is fixed, so tools and readers find them.
+
+- Layout: every study lives in `claimset/<study>/` at the top of the repository: its lab in `lab/`, code only it uses in `code/`, its papers as `<paper>.claimset.json` (§3). Study and paper names are lower-case letters, digits and hyphens. `init` records the study's name (§5.1). Tools find the lab of a command by `--lab`, `--study` or the only study in the repository (§3.2).
+- Package builds leave `claimset/` out: the tool adds the lines that do it to the build files a repository has (`.Rbuildignore`, `MANIFEST.in`, `.npmignore`, `.gitattributes`) and `verify` reports a missing one (§3.3).
+- New event `relocation` (prefix `MV`): the lab moved, with the files the record names; anchors and remote checks follow the move (§3.4, §5.18, §7.1).
+- New event `paper` (prefix `PA`): a paper drawn from the record and the questions it reports. A question is reported in one paper; `verify` names hypotheses with a result that no paper reports (§5.17, rule L18).
+- Export by paper: only the paper's questions, with the whole lab's counts beside the paper's (claimset §3.1.1) and the other papers named (§9).
+- Anchor branches are per study: `claimset-lab/<study>` (§7.1).
+- New rules L18 and L19 (§6).
+
+## Changes in v0.5 (since v0.4)
 
 Strict where it matters, light everywhere else. The path from a plan to a claim is strict: every analysis choice that could be tuned after seeing the data is fixed in the plan, each plan gets one attempt, and every planned test that ran is reported with the verdict its rule gives. Exploration is recorded where its results inform decisions, without further restrictions.
 
@@ -10,7 +22,7 @@ Strict where it matters, light everywhere else. The path from a plan to a claim 
 - A plan states how many runs decide it. Every confirmatory run under it counts, whatever its exit status, and further confirmatory runs are refused (§5.7.2). Each run records the plan version in force when it was made (`plan_version`, §5.9).
 - A verdict names the plan and agrees with its rule. Every planned test that ran must have its verdict recorded before export, and each is exported as its own claim, with the hypothesis as it stood when the plan was written; a hypothesis may be tested again under a new plan (§5.5, §5.7.4, §9).
 - Exploration need not be recorded step by step (§2); hypotheses left open are counted as open rather than closed by force (§9).
-- Confirmatory runs in an agent log are made under plans written in that log (§3.1).
+- Confirmatory runs in an agent log are made under plans written in that log (§3.5).
 - Result values are finite numbers (§5.10).
 - Plans record the commit they were written at and may declare held-out data; a test whose code changed after the plan, or whose held-out data was used elsewhere, is flagged rather than refused (§5.7.5).
 - New rules L15–L17 (§6).
@@ -25,7 +37,7 @@ Strict where it matters, light everywhere else. The path from a plan to a claim 
 - Protecting the log: what is prevented and what is detected at each level of protection (§4.5).
 - Git anchoring specified: configuration, what is committed, receipts, automatic anchoring, checking against the remote (§7.1); new rule L14 (§6).
 - Export specified precisely: preconditions, the draft and its completion list, defaults, how planning labels are derived (§9).
-- Agent logs specified precisely: how one is started, what an agent sees and may write, the order and layout of a merge, and when a merge is refused (§3.1, §5.16); rule L10 stated precisely; anchors cover agent logs (§7).
+- Agent logs specified precisely: how one is started, what an agent sees and may write, the order and layout of a merge, and when a merge is refused (§3.5, §5.16); rule L10 stated precisely; anchors cover agent logs (§7).
 
 ## Changes in v0.3 (since v0.2)
 
@@ -40,7 +52,7 @@ Clarifications needed to implement the reference tool. No change to the meaning 
 
 ## Changes in v0.2 (since v0.1)
 
-- Several agents working at once each write their own log, merged into the main log when they finish (§3.1). Event IDs from agent logs carry the actor prefix (`AC2.RN4`); headers gain `origin`.
+- Several agents working at once each write their own log, merged into the main log when they finish (§3.5). Event IDs from agent logs carry the actor prefix (`AC2.RN4`); headers gain `origin`.
 
 ## 1. Purpose
 
@@ -68,19 +80,48 @@ Version 0.1 targets computational research (simulation, analysis of existing dat
 
 ## 3. Layout
 
-A lab lives in a directory, normally inside the project's version-controlled repository:
+A **study** is a piece of research with its own lab record: one or more related questions, and the hypotheses, plans and runs that answer them. A repository can hold several studies, and a study can give several papers. Every study lives in its own folder under `claimset/` at the top of the project's version-controlled repository:
 
 ```
-lab/
-  lab.jsonl              the main event log, one event per line
-  agents/<actor>.jsonl   per-agent logs while agents work concurrently (§3.1)
-  anchors.jsonl          timestamp anchors of the log (§7)
-  runs/<run id>/         per-run outputs: stdout, stderr, results.json, other files
+claimset/
+  <study>/
+    lab/                       the lab record
+      lab.jsonl                the main event log, one event per line
+      agents/<actor>.jsonl     per-agent logs while agents work concurrently (§3.5)
+      anchors.jsonl            timestamp anchors of the log (§7)
+      config.json              the anchoring configuration (§7.1)
+      runs/<run id>/           per-run outputs: stdout, stderr, results.json, other files
+    code/                      code only this study uses: prototypes, experiments, benchmarks (optional)
+    <paper>.claimset.json      a paper drawn from the study (claimset §2.4)
+    <paper>.claimset.txt       its reading view
 ```
+
+- **Names.** A study's and a paper's name is lower-case letters, digits and hyphens, starting with a letter, at most 60 characters (`eigen-checker`). The study's name is the name of its folder and is recorded in `init` (§5.1). A paper's name is unique within its study; the first paper of a study usually takes the study's name.
+- **Code.** Code that belongs to the project itself (a package's source) stays where it belongs; runs record the commit they ran, so the lab need not own that code.
+- Records begun before v0.6 may live elsewhere (`lab/` at the top of the repository); they are moved into this layout with a relocation (§3.4).
+
+### 3.2 Finding the lab
+
+A command works on the lab named by `--lab DIR` or `$CLAIMSET_LAB`; else on the study named by `--study NAME` or `$CLAIMSET_STUDY` (`claimset/NAME/lab`); else on the only study in the repository; else on `lab/` in the working directory (records before v0.6). With several studies and none named, the command is refused and names them.
+
+### 3.3 Package builds
+
+The studies are part of the repository, not of what it ships. When a lab is created in `claimset/`, the tool adds to each of these files the repository already has the line that leaves the folder out, and `verify` reports a file without it:
+
+| File | Line |
+|---|---|
+| `.Rbuildignore` (R packages) | `^claimset$` |
+| `MANIFEST.in` (Python source distributions) | `prune claimset` |
+| `.npmignore` (npm packages) | `claimset/` |
+| `.gitattributes` (repository statistics) | `claimset/** linguist-documentation` |
+
+### 3.4 Moving a lab
+
+A lab is moved only by the tool, which moves the folder, moves any other files the record names (its code), and records a `relocation` event (§5.18) in the moved log. Paths in earlier events are not rewritten: a reader maps them through the relocations. Anchors made before the move hold the log at its old path; remote verification looks for it there (§7.1). A lab moved by other means fails verification once it is in `claimset/` under a name other than its study's (rule L19).
 
 `lab.jsonl` is UTF-8 JSON Lines. Every line is one event.
 
-### 3.1 Several agents
+### 3.5 Several agents
 
 When several agents work on one lab at the same time, each can write its own log instead of the main log, for example in its own working copy of the repository. The agent logs are merged into the main log when the agents finish.
 
@@ -115,7 +156,7 @@ Each event has a **header**, written by the tool, and a **body**, specific to th
 | `prev` | `sha256` of the previous event's header (all header fields, canonical JSON); for `seq` 1, the hash of the empty string |
 | `content_hash` | `sha256` of the body (canonical JSON: sorted keys, no insignificant whitespace) |
 | `supersedes` | ID of the event this one corrects, or `null` |
-| `origin` | For events merged from an agent log: `{log, seq, header_hash}`; otherwise `null` (§3.1) |
+| `origin` | For events merged from an agent log: `{log, seq, header_hash}`; otherwise `null` (§3.5) |
 | `body` | Type-specific content |
 
 The headers form a hash chain. Because each header commits to its body only through `content_hash`, a body can be withheld at publication (§8) without breaking the chain: a reader can still verify the order, timing and integrity of every event.
@@ -131,7 +172,7 @@ The headers form a hash chain. Because each header commits to its body only thro
 ### 4.2 Actors and IDs
 
 - `by` is an actor ID. Two exceptions: the `init` event has `by: null`, and an `actor` event may name its own ID (an actor registering itself).
-- An event ID is its type prefix (§5) followed by a positive integer: `H1`, `H2`, `RN17`. Within each prefix, numbers are allocated in order: the next number is one more than the highest used so far in the log. Events from agent logs carry the actor prefix (`AC2.H1`) and are numbered within their agent log, independently of the main log (§3.1).
+- An event ID is its type prefix (§5) followed by a positive integer: `H1`, `H2`, `RN17`. Within each prefix, numbers are allocated in order: the next number is one more than the highest used so far in the log. Events from agent logs carry the actor prefix (`AC2.H1`) and are numbered within their agent log, independently of the main log (§3.5).
 
 ### 4.3 Corrections
 
@@ -141,7 +182,7 @@ The first event of a chain is the **root**. Other events keep referring to the r
 
 ### 4.4 Writing
 
-Only the tool writes the log. A writer takes an exclusive lock, the file `lab/.lock` created atomically, appends one complete line and releases the lock. A lock older than 60 seconds is treated as stale. Several agents working at the same time write separate logs (§3.1) rather than contending for one lock.
+Only the tool writes the log. A writer takes an exclusive lock, the file `lab/.lock` created atomically, appends one complete line and releases the lock. A lock older than 60 seconds is treated as stale. Several agents working at the same time write separate logs (§3.5) rather than contending for one lock.
 
 ### 4.5 Protecting the log
 
@@ -163,7 +204,7 @@ Locally, the log is tamper-evident. With anchoring, tampering is always detected
 
 `lab_spec_version` records the version of this specification the record follows. Rules introduced in a later version do not apply to records begun under an earlier one.
 
-`{lab_spec_version, working_title, repository, started_at}`. Its `by` is `null`.
+`{lab_spec_version, working_title, repository, started_at, study}`. Its `by` is `null`. `study` is the study's name (§3); records begun before v0.6 may lack it, and a relocation can give it.
 
 ### 5.2 `actor` (prefix `AC`)
 
@@ -352,7 +393,17 @@ Each entry needs `quantity` (text) and `value` (a finite number: not NaN or infi
 
 ### 5.16 `merge` (prefix `MG`), written by the tool
 
-`{agents, events_merged}`: records that the agent logs of the listed actors were merged into the main log (§3.1). The merge event is followed immediately by exactly `events_merged` events, each with an `origin` in one of the listed logs: every listed log whole, from its `seq` 1, in the order of §3.1. A merge event is never withheld (§8).
+`{agents, events_merged}`: records that the agent logs of the listed actors were merged into the main log (§3.5). The merge event is followed immediately by exactly `events_merged` events, each with an `origin` in one of the listed logs: every listed log whole, from its `seq` 1, in the order of §3.5. A merge event is never withheld (§8).
+
+### 5.17 `paper` (prefix `PA`)
+
+`{name, questions, title}`: a paper drawn from the record, with the questions it reports (each by its ID, at least one) and an optional working title. A question is reported in one paper (rule L18); to move a question from one paper to another, correct both (`--supersedes`). Written only to the main log. A record without paper events gives one paper, from all its questions.
+
+Papers split a study's results between them; the split must not decide what is reported. So a paper covers whole questions, never chosen hypotheses; each paper's exploration summary gives the whole lab's counts beside its own and names the other papers (§9); and `verify` names every hypothesis with a result (a verdict, or a final status `supported`, `not_supported` or `inconclusive`) whose question no paper reports.
+
+### 5.18 `relocation` (prefix `MV`), written by the tool
+
+`{from, to, study, moved}`: the lab moved from `from` to `to` (paths of the lab folder relative to the top of the repository); `study` names the study when the move gives it one; `moved` lists other files or folders the record names that moved with it, as `{from, to}`. Written only to the main log, after the move (§3.4).
 
 ## 6. Rules
 
@@ -365,16 +416,18 @@ L6. A `status` event moving a hypothesis to `supported` must not list as evidenc
 L7. Every `status`, `decision` and `deviation` has a rationale or reason; every `revised` status names `revised_to`.
 L8. Every `by` names an `actor` event with a lower `seq`.
 L9. A `check` is not made by the actor who wrote its target.
-L10. Agent logs follow L1–L9 and L11–L12 on their own, starting from their base, and the restrictions of §3.1 (who writes them, what they may refer to and correct, which event types they hold). A merged event equals the event its `origin` names, whose header hash it records; an agent log is merged once, and nothing is added to it afterwards. Only merged events carry an actor prefix in the main log.
+L10. Agent logs follow L1–L9 and L11–L12 on their own, starting from their base, and the restrictions of §3.5 (who writes them, what they may refer to and correct, which event types they hold). A merged event equals the event its `origin` names, whose header hash it records; an agent log is merged once, and nothing is added to it afterwards. Only merged events carry an actor prefix in the main log.
 L11. A `supersedes` reference names an earlier event of the same type that has not already been superseded.
 L12. Every `id` has the prefix of its `type` and is unique in the log; every reference in a body names an event with a lower `seq`.
 L13. The files of a run directory match the hashes in the run's `outputs`. Run directories are never changed after the run.
 L14. Every entry in `anchors.jsonl` names a `seq` present in the log, and its `head_hash` equals the header hash of the event at that `seq`; the same holds for each agent log the entry names. A mismatch means the log was rewritten after it was anchored.
 L15. A confirmatory plan has a complete decision rule (§5.7.1): a framework, the parameters it requires, and both rules; when quantities are given, every quantity is well formed (with `run` when there are several deciding runs) and every rule is a valid expression whose names are defined (§5.7.3); `runs` is a positive integer.
-L16. A confirmatory run is not made under a plan that already has its deciding runs (§5.7.2), or, in an agent log, under a plan written outside that log (§3.1).
+L16. A confirmatory run is not made under a plan that already has its deciding runs (§5.7.2), or, in an agent log, under a plan written outside that log (§3.5).
 L17. A status that names a plan, or that cites a decided plan's deciding runs or their results for a hypothesis the plan names, is a verdict: the plan is decided and names the hypothesis, the deciding runs or their results are cited, and the outcome is the one the plan's rule gives (§5.5).
+L18. A paper has a valid name, unique among the record's papers, and names at least one question; no question is named by two papers (each correction chain counted once, its latest version in force).
+L19. A lab inside `claimset/<name>/lab` belongs to the study `<name>`: its study (from `init` or the latest relocation that names one) is `<name>`, and records begun under v0.6 or later name a study.
 
-The tool enforces L1–L5 and L8–L17 mechanically, and refuses L6 and L7 violations. L15–L17 apply to records begun under v0.5 or later, and to records whose `init` is withheld. Where a check depends on withheld content (a withheld run, result or plan), `verify` does not report it as a violation; withholding lowers verifiability instead (§8).
+The tool enforces L1–L5 and L8–L19 mechanically, and refuses L6 and L7 violations. L15–L17 apply to records begun under v0.5 or later, and to records whose `init` is withheld. Where a check depends on withheld content (a withheld run, result or plan), `verify` does not report it as a violation; withholding lowers verifiability instead (§8).
 
 ## 7. Timestamp anchoring
 
@@ -396,7 +449,7 @@ The anchor level of a plan becomes `planned_at_anchor` in the exported claimset.
 
 ### 7.1 Git anchoring
 
-With `git_remote` anchoring, the head is recorded by pushing the lab's logs to a dedicated branch of a git remote.
+With `git_remote` anchoring, the head is recorded by pushing the lab's logs to a dedicated branch of a git remote. The branch is `claimset-lab/<study>` unless the configuration names another (`claimset-lab` for a record without a study), so the studies of a repository never share one. A relocation keeps the branch the record was anchored on: the tool writes it into the configuration. Anchor commits hold the logs at their paths when they were made; remote verification looks for the main log at its current path and, in commits made before a relocation, at the paths it had before.
 
 - **Configuration** is kept in `lab/config.json`: `{"anchor": {"service": "git_remote", "remote": "origin", "branch": "claimset-lab", "every": "plan"}}`. `every` is `plan` (default) or `event`.
 - **What is committed:** `lab.jsonl`, `anchors.jsonl` and the files in `agents/`, at their paths in the repository. The commit is made on the anchor branch without touching the researcher's working tree or current branch. Run outputs are not committed; they are covered by the hashes in the log.
@@ -404,7 +457,7 @@ With `git_remote` anchoring, the head is recorded by pushing the lab's logs to a
 - **Pushing** never forces. A rejected push means the remote branch has changed in a way the tool did not make, and is reported.
 - **Receipt:** `{remote, branch, commit}` recorded in the `anchors.jsonl` entry, which itself is committed with the next anchor.
 - **Protection of the branch:** to make the remote copy append-only, protect the branch on the host so that force-pushes and deletion are refused, and give the agent credentials that can push but cannot change branch protection. This turns detection into prevention.
-- **Several working copies:** when agents work in their own clones (§3.1), each copy anchors to the same branch. The commit starts from the branch as it is on the remote: a local log that extends its anchored copy replaces it; a log that is behind (another copy has added to it) is kept as anchored; a log that differs is refused. `anchors.jsonl` on the branch holds the receipts of all copies. In the repository, `lab/.gitattributes` (written by `init`) marks `anchors.jsonl` with `merge=union`, so merging the copies' branches combines their receipts without conflicts; agent logs never conflict because each has its own file.
+- **Several working copies:** when agents work in their own clones (§3.5), each copy anchors to the same branch. The commit starts from the branch as it is on the remote: a local log that extends its anchored copy replaces it; a log that is behind (another copy has added to it) is kept as anchored; a log that differs is refused. `anchors.jsonl` on the branch holds the receipts of all copies. In the repository, `lab/.gitattributes` (written by `init`) marks `anchors.jsonl` with `merge=union`, so merging the copies' branches combines their receipts without conflicts; agent logs never conflict because each has its own file.
 - **Checking:** `verify --remote` fetches the branch and checks that each local log agrees with its copy there (a local log that is behind is reported as a note, not an error), that each anchor's commit is on the branch, and that it holds every anchored log as it was at that anchor.
 
 ## 8. Publication and redaction
@@ -425,7 +478,7 @@ The header still carries the original `content_hash`, so the chain verifies and 
 
 **Preconditions.** `export` refuses, and says why, unless:
 - the record verifies (§6);
-- no agent log is unmerged (§3.1);
+- no agent log is unmerged (§3.5);
 - every decided plan has a verdict recorded for each hypothesis it names (§5.7.4).
 
 Hypotheses without a final status are counted as open; they are not forced closed.
@@ -446,7 +499,9 @@ Hypotheses without a final status are counted as open; they are not forced close
 | `assumption` | assumption claim with `assumption_category` and `check`; `check_evidence` when it names a run or result used in an evidence object |
 | `check` | a `checks` entry on the claim whose hypothesis, final status, or evidence run or result it targets. A check by an actor exported as an author is not exported (claimset rule 39) and is named in the completion list |
 | `artefact` | artefact with `kind`, `uri` (the path or URI), `version` (the hash), `licence`, `description` |
-| the whole record | artefact of kind `lab_record`: `uri` (the repository URI from `init` followed by the log's path, or the path alone), `version` (the hash of `lab.jsonl`), `availability: public`, `withheld_events`; referenced from `paper.exploration.lab_record` |
+| the whole record | artefact of kind `lab_record`: `uri` (for a repository on GitHub whose last event is anchored by a git commit, the log in that commit; otherwise the repository URI from `init` followed by the log's path, and the completion list asks for a fixed URI, or the path alone), `version` (the hash of `lab.jsonl`), `availability: public`, `withheld_events`; referenced from `paper.exploration.lab_record` |
+
+**Papers.** With paper events, export makes one paper at a time: `--paper NAME`, or the only paper. It exports the hypotheses of the paper's questions only. `paper.study` is the study's name; the exploration summary counts the paper's questions and hypotheses and its tests, and `covers` gives the questions it reports, the whole lab's counts (`lab`) and the other papers with their questions (`other_papers`), so readers see what the paper does not report (claimset §3.1.1). Runs are not tied to questions and are counted for the whole lab. Assumptions are exported from the whole record, and the completion list asks for those no claim of the paper rests on to be removed. The draft is written to `claimset/<study>/<paper>.claimset.json` unless another file is named.
 
 **Planning label of an exported claim.** A claim from a verdict is `confirmatory`, or `confirmatory_with_deviations` if a deviation is recorded for the plan and one of its deciding runs. Its `planned_at` is the `at` of the plan version that decides the plan (the one its first deciding run names in `plan_version`), and `planned_at_anchor` is the service of the earliest anchor that covers that plan version and was made before the first deciding run started, or `none`. A claim from a hypothesis named by no decided plan is `exploratory`.
 
@@ -462,7 +517,9 @@ The reference tool is part of the `claimset` package. Indicative commands:
 
 | Command | Effect |
 |---|---|
-| `claimset lab init` | creates `lab/`, writes `init` |
+| `claimset lab init --study NAME --title …` | creates `claimset/NAME/lab/`, writes `init`, and leaves `claimset/` out of the package build files (§3.3) |
+| `claimset lab paper NAME --questions Q1 Q2` | records a paper and the questions it reports (§5.17) |
+| `claimset lab move [--to DIR] [--study NAME] [--also OLD=NEW …]` | moves the lab (default `claimset/<study>/lab`) and other files, and records the relocation (§3.4) |
 | `claimset lab actor` | registers an actor |
 | `claimset lab question` / `hypothesis` / `assume` / `note` | writes the corresponding event |
 | `claimset lab status H3 supported --evidence RS12 RS13 --why "…" [--plan PL2] [--rule supported]` | status change, with L6, L7 and L17 checked |
@@ -475,15 +532,16 @@ The reference tool is part of the `claimset` package. Indicative commands:
 | `claimset lab show H3` | one event, with corrections resolved |
 | `claimset lab list [--type hypothesis] [--last 20]` | events in order, one line each |
 | any writing command `--supersedes ID` | writes a correction of `ID` (§4.3) |
-| `claimset lab start --by AC2` | starts an agent log for AC2: its events go there until merged (§3.1) |
-| `claimset lab merge [AC2 AC3]` | merges agent logs (default: all unmerged ones) into the main log (§3.1) |
+| `claimset lab start --by AC2` | starts an agent log for AC2: its events go there until merged (§3.5) |
+| `claimset lab merge [AC2 AC3]` | merges agent logs (default: all unmerged ones) into the main log (§3.5) |
 | `claimset lab verify` | checks the main and agent chains, the rules and the run files |
 | `claimset lab anchor [--git] [--remote origin] [--branch claimset-lab] [--every plan\|event]` | anchors the head of the chain; the first use with `--git` records the configuration (§7.1) |
 | `claimset lab verify --remote` | also checks the log against the anchor branch on the remote |
 | `claimset lab guard` | the guard for agent harnesses: reads a proposed tool call as JSON on standard input and exits with code 2 if it would modify the lab directory (§4.5); `--print-config` prints the Claude Code hook configuration |
 | `claimset lab protect` | sets the operating system's append-only attribute on the log files, or explains how an administrator can (§4.5) |
 | `claimset lab publish --withhold RN7 --reason personal_data --comment "…"` | prepares the publishable record |
-| `claimset lab export [-o FILE]` | writes the draft claimset submission and prints the completion list (§9) |
+| `claimset lab export [--paper NAME] [-o FILE]` | writes the draft claimset submission of one paper (default `claimset/<study>/<paper>.claimset.json`) and prints the completion list (§9) |
+| `claimset tag claimset/<study>/<paper>.claimset.json` | marks the committed version of a paper with the git tag `claimset/<study>/<paper>/v<n>` (claimset §2.4) |
 
 ## 11. Open questions
 

@@ -1,13 +1,13 @@
 ---
 name: claimset-submit
-description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.18 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
+description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.19 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
 ---
 
 # Preparing a Claimset submission
 
 A claimset is a research paper written for LLM readers: a flat JSON file of atomic, self-contained claims plus the definitions, evidence, assumptions, limitations, warrants and artefacts that support, condition and limit them. You write every field. A human decides two things (guarantor and licence), and you ask them before you finish.
 
-The normative rules are in `references/spec-v0.18.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
+The normative rules are in `references/spec-v0.19.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
 
 **Versions.** This skill, its spec and its validator are one version. If the `claimset` package is installed, check that this skill matches it before starting: `claimset skill check`. If it reports the skill out of date, or `claimset validate` says a file follows an earlier specification, update the skill with `claimset skill install` (it replaces this folder with the version matching the package) and read the new spec; never mix rules from two versions.
 
@@ -45,8 +45,8 @@ If the human cannot be asked (unattended run), stop after building and validatin
 
 ### 2a. If the research has a lab record
 
-If the work was done with a lab record (`lab/lab.jsonl`, specified in `references/lab-record-v0.5.md`), start from it rather than from a manuscript:
-- Run `claimset lab export -o claimset.json` if the tool is available. It writes a draft that holds everything the record states and prints a **completion list**: the decisions and wording still needed (licence, guarantor, principal claims, claim types, scopes, evidence profiles and descriptions, statements of negative results). Work through that list; do not change what the record states, such as `hypothesis`, `planning`, `planned_at`, `lab_runs` or the exploration counts. If export refuses (an open hypothesis, an unmerged agent log, a record that does not verify), fix the record with `claimset lab` commands, never by editing it.
+If the work was done with a lab record (`claimset/<study>/lab/lab.jsonl`, or an older `lab/lab.jsonl`; specified in `references/lab-record-v0.6.md`), start from it rather than from a manuscript:
+- Run `claimset lab export [--paper NAME]` if the tool is available (with several papers recorded, one paper at a time). It writes a draft that holds everything the record states and prints a **completion list**: the decisions and wording still needed (licence, guarantor, principal claims, claim types, scopes, evidence profiles and descriptions, statements of negative results). Work through that list; do not change what the record states, such as `hypothesis`, `planning`, `planned_at`, `lab_runs` or the exploration counts. If export refuses (an open hypothesis, an unmerged agent log, a record that does not verify), fix the record with `claimset lab` commands, never by editing it.
 - Without the tool, build the claims from the record by hand, following the mapping in lab record §9.
 - Every hypothesis that reached `supported`, `not_supported` or `inconclusive` becomes a claim with `hypothesis: {lab_event, outcome}`, `planning`, and for planned tests `planned_at`, `planned_at_anchor` and `test` (the decision rule) copied from the record. Never upgrade `exploratory` to `confirmatory`, and never change a `test`: it is what the plan fixed before the data were seen.
 - **Negative results are claims too**, in this claimset: state plainly what was not found, with scope and evidence (see `examples/submission-from-lab.json`, claim C4).
@@ -228,7 +228,9 @@ Re-read the file as a sceptical reviewer who sees only one claim at a time. If t
 
 ### 12. Hand over
 
-Write the file (e.g. `claimset.json`) and give the human a short summary:
+Write the file where it belongs (spec §2.4): `claimset/<study>/<paper>.claimset.json` at the top of the research repository, with its reading view as `claimset/<study>/<paper>.claimset.txt` (`claimset render … -o …`). The name stays the same through revisions; never put a date or version in it. When the human submits a version, commit it and mark it with `claimset tag claimset/<study>/<paper>.claimset.json` (a git tag `claimset/<study>/<paper>/v<n>`). If a claim builds on a paper of the same repository that is not yet published, cite or relate it with `id_type: claimset_local` and the target `<study>/<paper>.claimset.json#C3`; the platform replaces it at publication, so that paper is published first or submitted together.
+
+Give the human a short summary:
 1. Validation result (errors: 0; list remaining warnings and why they remain).
 2. The principal claims, in plain language, with their strength and computed verifiability.
 3. Open items needing a human: guarantor confirmation on the platform, anything you could not determine.

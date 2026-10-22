@@ -14,6 +14,7 @@ S3method(actuals,smooth.forecast)
 S3method(as.data.frame,summary.adam)
 S3method(as.data.frame,summary.omg)
 S3method(coef,adam)
+S3method(coef,omg)
 S3method(coef,smooth)
 S3method(coefbootstrap,adam)
 S3method(coefbootstrap,om)
@@ -239,7 +240,6 @@ importFrom(greybox,
   actuals,
   alm,
   coefbootstrap,
-  dalaplace,
   detectdst,
   dgnorm,
   dlaplace,
@@ -261,11 +261,9 @@ importFrom(greybox,
   pointLik,
   polyprod,
   ps,
-  qalaplace,
   qgnorm,
   qlaplace,
   qs,
-  ralaplace,
   rgnorm,
   rlaplace,
   rs,

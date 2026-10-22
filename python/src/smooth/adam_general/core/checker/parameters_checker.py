@@ -648,6 +648,9 @@ def parameters_checker(
         arima_model=arima_model,
         xreg_model=has_xreg,
         silent=silent,
+        model_do=model_do,
+        lags_model_seasonal=list(lags_model_seasonal),
+        initial_arima_number=arima_info.get("initial_arima_number", 0),
     )
 
     # The gradient initial-state solve profiles the loss in C++, which a custom
@@ -759,9 +762,9 @@ def parameters_checker(
         lags_model_seasonal = []
 
     # One flag per seasonal component, as R's initialSeasonalEstimate
-    init_info["initial_seasonal_estimate"] = [
-        init_info["initial_seasonal_estimate"]
-    ] * len(lags_model_seasonal)
+    init_info["initial_seasonal_estimate"] = init_info["initial_seasonal_estimate"][
+        : len(lags_model_seasonal)
+    ]
 
     n_param_max = _calculate_n_param_max(
         ets_model=ets_model,
@@ -1093,18 +1096,29 @@ def parameters_checker(
         return alm
 
     # Build explanatory variables dictionary
+    # The regressors of the probability of occurrence (OM, OMG) are estimated on all
+    # the observed values, with the occurrence indicator as the response, as R
+    occurrence_indicator = occurrence_model and distribution == "plogis"
     xreg_builder = partial(
         _process_xreg,
         regressors="use" if regressors == "select" else regressors,
-        y_in_sample=observations_dict["y_in_sample"],
+        y_in_sample=np.asarray(observations_dict["ot_logical"], dtype=float)
+        if occurrence_indicator
+        else observations_dict["y_in_sample"],
         obs_in_sample=observations_dict["obs_in_sample"],
         distribution=distribution,
         e_type=ets_info["error_type"],
         ic=ic,
         # The observed (non-zero) values: the missing ones are not in the regression
-        ot_logical=observations_dict["ot_logical"]
+        ot_logical=observed_mask(observations_dict)
+        if occurrence_indicator
+        else observations_dict["ot_logical"]
         if occurrence_model or not np.all(observed_mask(observations_dict))
         else None,
+        # The inverse odds ratio falls with the probability
+        sign=-1.0
+        if occurrence_indicator and occurrence == "inverse-odds-ratio"
+        else 1.0,
     )
     if has_xreg and regressors == "select":
         # As R, the model is estimated without the regressors, and the estimator
@@ -1134,14 +1148,39 @@ def parameters_checker(
             model_type_dict["xreg_model"] = False
         else:
             # Update persistence and initials based on regressors mode
-            if regressors == "adapt":
-                persistence_dict["persistence_xreg_estimate"] = True
-                initials_dict["initial_xreg_estimate"] = True
-            else:
-                persistence_dict["persistence_xreg_estimate"] = False
-                initials_dict["initial_xreg_estimate"] = True
+            # The provided initials of the regressors are not estimated, as R
+            initials_dict["initial_xreg_estimate"] = not initials_dict.get(
+                "initial_xreg_provided", False
+            )
+            # The provided smoothing parameters of the regressors are used, one
+            # for all of them or one each, as R
+            delta = persistence_dict.get("persistence_xreg")
+            delta = None if delta is None else np.ravel(np.asarray(delta, float))
+            n_xreg = xreg_dict["xreg_number"]
+            if delta is not None and len(delta) not in (1, n_xreg):
+                warnings.warn(
+                    "The length of the provided persistence for the xreg variables "
+                    "is wrong. Reverting to the estimation.",
+                    stacklevel=3,
+                )
+                delta = None
+            provided = delta is not None
+            persistence_dict["persistence_xreg"] = (
+                np.resize(delta, n_xreg) if provided else None
+            )
+            persistence_dict["persistence_xreg_provided"] = provided
+            persistence_dict["persistence_xreg_estimate"] = (
+                regressors == "adapt" and not provided
+            )
     else:
         xreg_dict = _xreg_dict_none(None)
+
+    # If there is no model, it is a constant level, as in R's parametersChecker
+    no_model = not (model_type_dict["ets_model"] or arima_dict["arima_model"])
+    if no_model and not xreg_dict["xreg_model"]:
+        model_type_dict["models_pool"] = None
+        if not constant_dict["constant_required"]:
+            constant_dict.update(constant_required=True, constant_estimate=True)
 
     # LASSO / RIDGE with lambda=1 is the penalty alone, which is zero with the
     # parameters at their shrinkage targets: no smoothing, phi=1, AR=1 and MA=0. They
@@ -1328,6 +1367,7 @@ def _process_xreg(
     xreg_names_from_input=None,
     initial_xreg=None,
     ot_logical=None,
+    sign=1.0,
 ):
     """Process explanatory variables and return a populated xreg_dict.
 
@@ -1344,8 +1384,11 @@ def _process_xreg(
         User-supplied initial coefficient values, shape (p, 1). If provided,
         skips ALM computation and uses these values as optimizer seed.
     ot_logical : array-like of bool or None
-        The non-zero in-sample observations of an occurrence model, the only ones
-        the initials are estimated on (R's ``subset``); None uses all of them.
+        The in-sample observations the initials are estimated on (R's ``subset``):
+        the non-zero ones of a demand-sizes model; None uses all of them.
+    sign : float
+        Multiplies the estimated initials: -1 for the inverse odds ratio, which
+        falls with the probability of occurrence.
 
     Returns
     -------
@@ -1374,6 +1417,14 @@ def _process_xreg(
 
     # ---------- initialise coefficients ----------
     if initial_xreg is not None:
+        # The named values are taken by name, the others in the order of the variables
+        if isinstance(initial_xreg, dict):
+            named = set(initial_xreg) == set(names_selected)
+            initial_xreg = (
+                [initial_xreg[name] for name in names_selected]
+                if named
+                else list(initial_xreg.values())
+            )
         initial_xreg_flat = np.asarray(initial_xreg, dtype=float).ravel()
         if len(initial_xreg_flat) != p:
             raise ValueError(
@@ -1388,7 +1439,7 @@ def _process_xreg(
         # As R's xregInitialiser, a trend is added to get rid of the bias and dropped
         # afterwards, unless asked for, or a regressor is a trend itself: alm() drops
         # the first of two variables correlated above 0.999
-        # An occurrence model estimates them on the non-zero demand only, as R's
+        # A demand-sizes model estimates them on the non-zero demand only, as R's
         # subset, so that log(y) of the multiplicative models is defined
         subset = (
             np.ones(obs_in_sample, dtype=bool)
@@ -1415,7 +1466,6 @@ def _process_xreg(
             "dgnorm",
             "dlogis",
             "dt",
-            "dalaplace",
         }
 
         def _resolve_dist_for_alm(etype, dist):
@@ -1433,7 +1483,7 @@ def _process_xreg(
                     y_response,
                     feature_names=[*names_selected, "trend"][: X_aug.shape[1] - 1],
                 )
-                return np.asarray(alm.coef, dtype=float)[:p]
+                return sign * np.asarray(alm.coef, dtype=float)[:p]
             except Exception:
                 return np.zeros(p)
 

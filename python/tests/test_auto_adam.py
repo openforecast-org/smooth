@@ -334,11 +334,12 @@ class TestAutoADAMOutliers:
 
 
 class TestAutoADAMDefaults:
-    def test_default_arima_select_is_false(self):
-        # Per the precedence rule: with orders=None and no scalar orders
-        # provided, AutoADAM defaults to pure ETS — no ARIMA selection.
+    def test_default_selects_the_orders_as_r(self):
+        # With no orders, the orders are selected up to R's auto.adam() defaults
         m = AutoADAM()
-        assert m._auto_arima_select is False
+        assert m._auto_arima_select is True
+        assert (m._auto_max_ar, m._auto_max_i, m._auto_max_ma) == ([3, 3], [2, 1], [3, 3])
+        assert AutoADAM(orders={"ar": 0, "i": 0, "ma": 0})._auto_arima_select is False
 
     def test_arima_select_on_via_orders_dict(self):
         m = AutoADAM(orders={"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True})

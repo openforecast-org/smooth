@@ -281,3 +281,15 @@ class TestRComparisonWithR:
     def test_repr_shows_arima(self, fitted_seasonal):
         """repr() starts with 'AutoMSARIMA: ARIMA('."""
         assert repr(fitted_seasonal).startswith("AutoMSARIMA: ARIMA(")
+
+    @pytest.mark.parametrize("cls", ["ADAM", "MSARIMA"])
+    def test_adam_with_select_selects_as_automsarima(self, fitted_seasonal, cls):
+        """ADAM and MSARIMA with select=True return the orders of AutoMSARIMA."""
+        import smooth
+
+        orders = {"ar": [2, 1], "i": [2, 1], "ma": [2, 1], "select": True}
+        kwargs = {"model": "NNN", "distribution": "dnorm"} if cls == "ADAM" else {}
+        model = getattr(smooth, cls)(lags=[1, 12], orders=orders, **kwargs)
+        model.fit(AIRPASSENGERS)
+        assert model.orders == fitted_seasonal.orders
+        assert model.loglik == pytest.approx(fitted_seasonal.loglik)

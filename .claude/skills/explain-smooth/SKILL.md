@@ -275,7 +275,7 @@ For intermittent series these model the **probability that demand occurs** (the
   `oETS[G](MNN)(MNN)`. Use when a single mechanism does not fit the on/off
   pattern. Each sub-model takes its own regressor spec via the `_a`/`_b`
   suffix (R: `formulaA` / `formulaB`, `regressorsA` / `regressorsB`;
-  Python: `formula_a` / `formula_b`, `regressors_a` / `regressors_b`).
+  Python: `regressors_a` / `regressors_b`, with the data in `X`).
 - **`AutoOM`** — fits an `OM`/`OMG` for each requested `occurrence` type and
   returns the lowest-IC one directly. (In R this is `oes(..., occurrence="auto")`;
   in Python also reachable via `OM(occurrence="auto")`.)

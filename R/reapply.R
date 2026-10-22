@@ -1124,6 +1124,9 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         arrWt <- array(tail(arrWt,1), c(h, ncol(arrWt), nsim), dimnames=list(NULL,colnames(arrWt),NULL));
     }
 
+    # The scale model and forecast() take the newdata as given: their regressors can
+    # differ from the selected ones of the demand
+    newdataProvided <- newdata;
     # Deal with explanatory variables
     if(ncol(object$data)>1){
         newdata <- adam_xregNewdata(object, h, newdata);
@@ -1146,7 +1149,7 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     #### Simulate the data ####
     # The scale, or the scale model's forecasts, de-biased for the simulations
     if(is.scale(object$scale)){
-        scaleValue <- as.vector(forecast(object$scale,h=h,newdata=newdata,interval="none")$mean);
+        scaleValue <- as.vector(forecast(object$scale,h=h,newdata=newdataProvided,interval="none")$mean);
     }
     else{
         scaleValue <- object$scale;
@@ -1294,7 +1297,7 @@ reforecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         paths <- array(apply(paths,c(2,3),sum,na.rm=TRUE), c(1,nsim,nsim));
     }
     yForecast[] <- switch(point,
-                          "skeleton"=forecast(object, h=h, newdata=newdata, occurrence=occurrence,
+                          "skeleton"=forecast(object, h=h, newdata=newdataProvided, occurrence=occurrence,
                                               interval="none", cumulative=cumulative)$mean,
                           "mean"=apply(paths,1,mean,na.rm=TRUE,trim=trim),
                           "median"=apply(paths,1,median,na.rm=TRUE));

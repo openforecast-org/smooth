@@ -814,6 +814,14 @@ test_that("Pure regression stores sigma^2 as the scale, as the other ADAM models
     expect_equal(testModel$scale, mean(residuals(testModel)^2));
 })
 
+test_that("sigma() of the additive distributions is the root of the de-biased mean squared error", {
+    for(distribution in c("dnorm", "dlaplace", "ds", "dgnorm")){
+        testModel <- adam(BJsales, "AAN", distribution=distribution, silent=TRUE);
+        df <- nobs(testModel) - nparam(testModel) + testModel$nParam[1,4];
+        expect_equal(sigma(testModel), sqrt(sum(residuals(testModel)^2)/df));
+    }
+})
+
 test_that("Pure regression is forecasted and predicted by forecast.alm() / predict.alm()", {
     xreg <- data.frame(y=as.vector(BJsales), x=as.vector(BJsales.lead));
     testModel <- adam(xreg, "NNN", h=10, holdout=TRUE, silent=TRUE);
@@ -1400,4 +1408,99 @@ test_that("the approximate intervals of ADAM ETS with the drift", {
         expect_equal(as.vector(testApproximate$upper), as.vector(testSimulated$upper), tolerance=0.05);
         expect_equal(as.vector(testApproximate$lower), as.vector(testSimulated$lower), tolerance=0.05);
     }
+})
+
+# FI=TRUE returns the Fisher Information matrix of the estimated model, not TRUE
+test_that("ADAM with FI=TRUE returns the Fisher Information matrix", {
+    testModel <- adam(BJsales, "AAdN", FI=TRUE);
+    expect_true(is.matrix(testModel$FI));
+    expect_equal(colnames(testModel$FI), names(coef(testModel)));
+    expect_equal(testModel$FI, adam(BJsales, model=testModel, FI=TRUE)$FI);
+})
+
+# The Asymmetric Laplace is not a distribution of adam() and is rejected by it
+test_that("ADAM rejects distribution=\"dalaplace\"", {
+    expect_error(adam(AirPassengers, "MNN", distribution="dalaplace"), "should be one of");
+    expect_error(auto.adam(AirPassengers, "MNN", distribution="dalaplace"));
+})
+
+# The provided initials follow the order of the documentation: level, trend, seasonal, ARIMA, xreg
+test_that("ADAM uses the provided initials of all the components", {
+    seasonals <- c(rep(-10,3), rep(10,3), rep(0,6));
+    y <- ts(100 + rep(seasonals,10) + sin(1:120), frequency=12);
+    testModel <- adam(y, "ANA", initial=c(100,seasonals), persistence=c(0.1,0.1));
+    expect_equal(unname(testModel$initial$level), 100);
+    expect_equal(unname(testModel$initial$seasonal), seasonals);
+    expect_equal(testModel$nParam["Provided","nParamInternal"], 15);
+    expect_equal(unname(adam(y, "ANA", initial=list(100,NULL,seasonals))$initial$seasonal),
+                 seasonals);
+    expect_equal(unname(adam(y, "AAN", initial=list(100,1))$initial$trend), 1);
+
+    xreg <- data.frame(y=as.vector(y), a=cos(1:120), b=sin(1:120/3));
+    testModel <- adam(xreg, "ANN", initial=list(level=100, xreg=c(b=-3,a=2)));
+    expect_equal(testModel$initial$xreg, c(a=2,b=-3));
+    expect_equal(adam(xreg, "ANN", initial=c(100,2,-3))$initial$xreg, c(a=2,b=-3));
+})
+
+# A model that selected no regressors is reused on the response only
+test_that("ADAM reuses a model with no regressors selected", {
+    xreg <- data.frame(y=100+sin(1:120), a=cos(1:120/7), b=sin(1:120/11));
+    testModel <- adam(xreg, "ANN", regressors="select");
+    expect_null(testModel$initial$xreg);
+    testReused <- adam(xreg, model=testModel, regressors="select");
+    expect_equal(as.numeric(logLik(testReused)), as.numeric(logLik(testModel)));
+})
+
+# The formula is applied to the data first, and the regressors are selected over its columns
+test_that("ADAM with formula and regressors='select' selects the transformed regressors", {
+    set.seed(41);
+    x1 <- runif(150, 1, 10);
+    xregData <- data.frame(y=100+8*log(x1)+rnorm(150), x1=x1, x2=rnorm(150), x3=rnorm(150));
+    testModel <- adam(xregData, "ANN", formula=y~log(x1)+x2+x3, regressors="select",
+                      holdout=TRUE, h=10);
+    expect_true("log(x1)" %in% attr(terms(formula(testModel)), "term.labels"));
+    expect_true("log(x1)" %in% names(coef(testModel)));
+    expect_length(forecast(testModel, h=10, newdata=xregData[141:150,])$mean, 10);
+})
+
+test_that("ADAM with formula and regressors='select' refits without regressors when none is selected", {
+    set.seed(41);
+    xregData <- data.frame(y=100+cumsum(rnorm(120)), x1=runif(120, 1, 10), x2=rnorm(120));
+    testModel <- adam(xregData, "ANN", formula=y~log(x1)+x2, regressors="select");
+    expect_equal(names(coef(testModel)), "alpha");
+    expect_equal(formula(testModel), y~1, ignore_attr=TRUE);
+    expect_equal(colnames(coefbootstrap(testModel, nsim=2)$coefficients), "alpha");
+})
+
+# The regressors are selected on the non-zero values, whatever the occurrence model
+test_that("ADAM with an occurrence model and regressors='select'", {
+    set.seed(41);
+    xregData <- data.frame(y=0, a=rnorm(150), n1=rnorm(150), n2=rnorm(150));
+    xregData$y <- rbinom(150, 1, plogis(2*xregData$a)) * (10+3*xregData$a+rnorm(150));
+    omModel <- om(xregData$y[1:140], "MNN", occurrence="odds-ratio");
+    occurrences <- list("auto","fixed","odds-ratio","inverse-odds-ratio","direct","general",omModel);
+    for(occurrence in occurrences){
+        testModel <- adam(xregData[1:140,], "ANN", occurrence=occurrence, regressors="select");
+        expect_true("a" %in% names(coef(testModel)));
+        expect_true(all(is.finite(forecast(testModel, h=10, newdata=xregData[141:150,])$mean)));
+    }
+    testModel <- adam(xregData[1:140,], "MNN", occurrence="auto", regressors="select",
+                      formula=y~a+n1);
+    expect_true("a" %in% names(coef(testModel)));
+    # Without newdata, h beyond the sample takes the last values of the regressors
+    testModel <- adam(xregData, "ANN", occurrence="auto", regressors="select", h=5);
+    expect_length(testModel$forecast, 5);
+    # The occurrence model takes the newdata as given, with its own regressors
+    testModel <- adam(xregData[1:140,], "ANN", occurrence="direct", regressors="select");
+    expect_equal(forecast(testModel, h=10, newdata=xregData[141:150,])$mean,
+                 forecast(testModel, h=10, newdata=xregData[141:150,],
+                          occurrence=forecast(testModel$occurrence, h=10,
+                                              newdata=xregData[141:150,])$mean)$mean);
+})
+
+test_that("ADAM counts the provided initial level as provided and the rest as estimated", {
+    testModel <- adam(AirPassengers, "AAA", lags=12, initial=list(level=100));
+    # alpha, beta, gamma, the trend and 11 seasonal initials
+    expect_equal(testModel$nParam[,"nParamInternal"], c(Estimated=15, Provided=1));
+    expect_equal(dfInitialsETSLevelSeasonal(12, FALSE), 12);
 })

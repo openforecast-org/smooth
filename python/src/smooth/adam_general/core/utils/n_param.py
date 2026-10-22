@@ -9,6 +9,8 @@ from itertools import combinations
 from math import gcd
 from typing import Dict, Sequence
 
+import numpy as np
+
 
 def df_initials_ets_level_seasonal(
     seasonal_lags: Sequence[int], level_estimated: bool
@@ -261,13 +263,11 @@ def count_internal_params(
             else:
                 n_provided += 1
 
-        # Gamma (seasonal) - can be multiple
-        n_seasonal = persistence_checked.get("persistence_seasonal_number", 0)
-        if n_seasonal > 0:
-            if persistence_checked.get("persistence_seasonal_estimate", True):
-                n_estimated += n_seasonal
-            else:
-                n_provided += n_seasonal
+        # Gamma (seasonal), one per seasonal component
+        if model_type_dict.get("season_type", "N") != "N":
+            gammas = persistence_checked.get("persistence_seasonal_estimate", [])
+            n_estimated += sum(map(bool, gammas))
+            n_provided += sum(not estimate for estimate in gammas)
 
     # Phi (damping parameter)
     if phi_dict.get("phi_estimate", False):
@@ -275,39 +275,34 @@ def count_internal_params(
     elif phi_dict.get("phi_required", False):
         n_provided += 1
 
-    # Initial states — counted for the types that estimate them as free
-    # parameters: optimal, two-stage and gradient (gradient solves them by least
-    # squares). Backcasting / complete keep the historical zero-initial-df count.
+    # Initial states — the estimated ones are counted for the types that estimate
+    # them as free parameters: optimal, two-stage and gradient (gradient solves
+    # them by least squares). The provided ones are counted whatever the type, as R
     initial_type = initials_checked.get("initial_type", "optimal")
     initial_counted = initial_type in ["optimal", "two-stage", "gradient"]
-
-    if initial_counted and initials_checked.get("initial_estimate", True):
-        # Level initial
-        if initials_checked.get("initial_level_estimate", True):
-            n_estimated += 1
-        else:
+    ets_model = model_type_dict.get("ets_model", False)
+    trend_model = ets_model and model_type_dict.get("trend_type", "N") != "N"
+    for present, estimate in (
+        (ets_model, initials_checked.get("initial_level_estimate", True)),
+        (trend_model, initials_checked.get("initial_trend_estimate", True)),
+    ):
+        if present and not estimate:
             n_provided += 1
-
-        # Trend initial
-        if initials_checked.get("initial_trend_estimate", False):
+        elif present and initial_counted:
             n_estimated += 1
-        elif model_type_dict.get("trend_type", "N") != "N":
-            n_provided += 1
-
-        # Seasonal initials
-        n_seasonal_init = initials_checked.get("initial_seasonal_number", 0)
-        if n_seasonal_init > 0:
-            if any(initials_checked["initial_seasonal_estimate"]):
-                n_estimated += n_seasonal_init
-            else:
-                n_provided += n_seasonal_init
-    elif not initials_checked.get("initial_estimate", True):
-        # All initials explicitly provided (fixed)
-        if model_type_dict.get("ets_model", False):
-            n_provided += 1  # level
-            if model_type_dict.get("trend_type", "N") != "N":
-                n_provided += 1
-            n_provided += initials_checked.get("initial_seasonal_number", 0)
+    if ets_model and model_type_dict.get("season_type", "N") != "N":
+        n_provided += sum(
+            int(np.size(value))
+            for estimate, value in zip(
+                initials_checked.get("initial_seasonal_estimate", []),
+                initials_checked.get("initial_seasonal") or [],
+            )
+            if not estimate
+        )
+    if arima_checked.get("arima_model", False) and not initials_checked.get(
+        "initial_arima_estimate", True
+    ):
+        n_provided += initials_checked.get("initial_arima_number", 0)
 
     # ARIMA parameters
     if arima_checked.get("arima_model", False):
@@ -422,9 +417,12 @@ def build_n_param_table(
     n_param.provided["internal"] = n_internal_prov
 
     # Count xreg parameters — for "complete" initial type, xreg is estimated via
-    # backcasting (not in B), so R does not count it as a free parameter
+    # backcasting (not in B), so R does not count it as a free parameter, as the
+    # provided initials of the regressors
     n_xreg_est, n_xreg_prov = count_xreg_params(explanatory_checked)
-    if initials_checked.get("initial_type") == "complete":
+    if initials_checked.get("initial_type") == "complete" or not initials_checked.get(
+        "initial_xreg_estimate", True
+    ):
         n_xreg_prov += n_xreg_est
         n_xreg_est = 0
     n_param.estimated["xreg"] = n_xreg_est

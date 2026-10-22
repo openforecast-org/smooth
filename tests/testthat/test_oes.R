@@ -133,3 +133,14 @@ test_that("auto.om() with default orders runs without error", {
     expect_s3_class(m, "om")
     expect_true(m$occurrence %in% c("fixed","odds-ratio","inverse-odds-ratio","direct"))
 })
+
+# oes() passes xreg to om() as data, whether it is a vector, a matrix or a data frame
+test_that("oes() with xreg as a data frame", {
+    set.seed(2);
+    y <- rpois(100, 0.5);
+    xreg <- data.frame(z=rnorm(110));
+    testModel <- oes(y, "MNN", occurrence="odds-ratio", xreg=xreg);
+    expect_equal(names(coef(testModel)), c("alpha","z"));
+    testModelMatrix <- oes(y, "MNN", occurrence="odds-ratio", xreg=as.matrix(xreg));
+    expect_equal(coef(testModel), coef(testModelMatrix));
+})

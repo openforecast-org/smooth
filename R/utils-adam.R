@@ -262,18 +262,7 @@ adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags,
         }
     }
 
-    if(distribution=="dalaplace"){
-        if(is.null(ellipsis$alpha)){
-            other <- 0.5
-            otherParameterEstimate <- TRUE
-        }
-        else{
-            other <- ellipsis$alpha
-            otherParameterEstimate <- FALSE
-        }
-        names(other) <- "alpha"
-    }
-    else if(any(distribution==c("dgnorm","dlgnorm"))){
+    if(any(distribution==c("dgnorm","dlgnorm"))){
         if(is.null(ellipsis$shape)){
             other <- 2
             otherParameterEstimate <- TRUE
@@ -1569,7 +1558,6 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
                   "dlaplace"=sum(abs(errors)/sqrt(gapVariance))/obsInSample,
                   "ds"=sum(sqrt(abs(errors))/gapVariance^(1/4)) / (obsInSample*2),
                   "dgnorm"=(other*sum(abs(errors)^other/gapVariance^(other/2))/obsInSample)^{1/other},
-                  "dalaplace"=sum(errors*(other-(errors<=0)*1))/obsInSample,
                   # Log-domain distributions: route 1+errors (or 1+errors/yFitted)
                   # through as.complex() and take abs() of the resulting log so
                   # the scale stays finite when the argument is non-positive.
@@ -1609,7 +1597,7 @@ adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other
 adam_scalePower <- function(distribution){
     return(switch(distribution,
                   "ds"=,"dls"=4,
-                  "dlaplace"=,"dalaplace"=,"dgnorm"=,"dllaplace"=,"dlgnorm"=,"dlogis"=2,
+                  "dlaplace"=,"dgnorm"=,"dllaplace"=,"dlgnorm"=,"dlogis"=2,
                   1));
 }
 
@@ -1639,7 +1627,6 @@ adam_scaleVariance <- function(scale, distribution, other){
                   "dlaplace"=,"dllaplace"=2*scale^2,
                   "ds"=,"dls"=120*scale^4,
                   "dgnorm"=,"dlgnorm"=scale^2*gamma(3/other$shape)/gamma(1/other$shape),
-                  "dalaplace"=scale^2/(other$alpha^2*(1-other$alpha)^2/(other$alpha^2+(1-other$alpha)^2)),
                   "dlogis"=scale^2*pi^2/3,
                   scale));
 }
@@ -2000,7 +1987,6 @@ adam_errorsSimulate <- function(n, distribution, scale, other, dfT){
                   "dgnorm"=rgnorm(n, 0, scale, other$shape),
                   "dlogis"=rlogis(n, 0, scale),
                   "dt"=rt(n, dfT),
-                  "dalaplace"=ralaplace(n, 0, scale, other$alpha),
                   "dlnorm"=rlnorm(n, -scale/2, sqrt(scale))-1,
                   "dinvgauss"=rinvgauss(n, 1, dispersion=scale)-1,
                   "dgamma"=rgamma(n, shape=scale^{-1}, scale=scale)-1,
@@ -2168,14 +2154,41 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
     return(0);
 }
 
+#### Selection of the regressors of the functions other than adam() ####
+# As adam() does for regressors="select": the model is fitted without the regressors,
+# stepwise() picks them on its errors, and the model is refitted with the selected ones
+# and regressors="use". call is the call of the function (ces(), gum(), ssarima(), om()),
+# env its environment, data its data with the response and the candidate regressors, and
+# dataArg the name of its data argument.
+adam_xreg_selectRefit <- function(call, env, data, responseName, dataArg, ic){
+    colnames(data) <- make.names(colnames(data), unique=TRUE);
+    responseName <- make.names(responseName);
+    callNew <- call;
+    callNew[[dataArg]] <- data[, responseName, drop=FALSE];
+    callNew$xreg <- callNew$formula <- callNew$initialX <- NULL;
+    callNew$regressors <- "use";
+    modelReturned <- eval(callNew, envir=env);
+
+    # The observed values of the in-sample errors
+    errors <- as.vector(residuals(modelReturned));
+    rowsSelected <- !is.na(errors);
+    xregData <- as.data.frame(data)[seq_along(errors), colnames(data)!=responseName, drop=FALSE];
+    xregSelected <- names(adam_xreg_selector(errors[rowsSelected], xregData[rowsSelected,,drop=FALSE],
+                                             sum(rowsSelected), ic, nparam(modelReturned), "dnorm",
+                                             NULL, NULL)$initialXreg);
+    if(length(xregSelected)>0){
+        callNew[[dataArg]] <- data[, c(responseName, xregSelected), drop=FALSE];
+        modelReturned <- eval(callNew, envir=env);
+    }
+    modelReturned$call <- call;
+    return(modelReturned);
+}
+
 #### xreg variable selector using stepwise regression on residuals ####
 adam_xreg_selector <- function(errors, xregData, obsInSample, ic, df, distribution,
                                occurrence, other){
-    alpha <- shape <- nu <- NULL;
-    if(distribution=="dalaplace"){
-        alpha <- other;
-    }
-    else if(any(distribution==c("dgnorm","dlgnorm"))){
+    shape <- nu <- NULL;
+    if(any(distribution==c("dgnorm","dlgnorm"))){
         shape <- other;
     }
     else if(distribution=="dt"){
@@ -2184,7 +2197,7 @@ adam_xreg_selector <- function(errors, xregData, obsInSample, ic, df, distributi
     stepwiseModel <- suppressWarnings(
         stepwise(data.frame(errorsIvan41=errors, xregData[1:obsInSample,,drop=FALSE]),
                  ic=ic, df=df, distribution=distribution, occurrence=occurrence, silent=TRUE,
-                 alpha=alpha, shape=shape, nu=nu)
+                 shape=shape, nu=nu)
     );
     return(list(initialXreg=coef(stepwiseModel)[-1], other=stepwiseModel$other,
                 formula=formula(stepwiseModel)));

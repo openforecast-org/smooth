@@ -300,57 +300,21 @@ def _run_branch_and_bound(
         - pool_trends: updated list of trend components to include in final pool
     """
 
-    # Helper function to get seasonal type from model string (last character)
-    def get_seasonal(model_str):
-        return model_str[-1]
+    cache: dict = {}
 
-    # Helper function to get trend type from model string (second character)
-    def get_trend(model_str):
-        return model_str[1]
-
-    # Helper function to find model index in pool_small
-    def find_model_index(pool, seasonal=None, trend=None, error=None, exclude=None):
-        """Find first model matching criteria, returns 1-indexed position or None."""
-        if exclude is None:
-            exclude = []
-        for k, model in enumerate(pool):
-            if model in exclude:
-                continue
-            if seasonal is not None and get_seasonal(model) != seasonal:
-                continue
-            if trend is not None and get_trend(model) != trend:
-                continue
-            if error is not None and model[0] != error:
-                continue
-            return k + 1  # 1-indexed
-        return None
-
-    # Helper function to estimate a model and store results
-    def estimate_and_store(model_str, results_list, results_dict):
-        """Estimate a model if not already tested, return results index."""
-        if model_str in results_dict:
-            return results_dict[model_str]
-
-        idx = len([r for r in results_list if r is not None])
+    def estimate(model_str):
+        """Estimate a model (once per name) and return its result."""
+        if model_str in cache:
+            return cache[model_str]
 
         model_type_dict_temp = model_type_dict.copy()
         model_type_dict_temp["model"] = model_str
+        model_type_dict_temp["error_type"] = model_str[0]
+        model_type_dict_temp["trend_type"] = model_str[1]
+        model_type_dict_temp["season_type"] = model_str[-1]
         phi_dict_temp = phi_dict.copy()
-
-        e_type = model_str[0]
-        t_type = model_str[1]
-        s_type = model_str[-1]
-
-        model_type_dict_temp["error_type"] = e_type
-        model_type_dict_temp["trend_type"] = t_type
-        model_type_dict_temp["season_type"] = s_type
-
-        if len(model_str) == 4:
-            phi_dict_temp["phi"] = 0.95
-            phi_dict_temp["phi_estimate"] = True
-        else:
-            phi_dict_temp["phi"] = 1
-            phi_dict_temp["phi_estimate"] = False
+        phi_dict_temp["phi_estimate"] = len(model_str) == 4
+        phi_dict_temp["phi"] = 0.95 if phi_dict_temp["phi_estimate"] else 1
 
         result = _estimate_model(
             model_type_dict_temp,
@@ -371,165 +335,85 @@ def _run_branch_and_bound(
             smoother=smoother,
             estimator_function=estimator_function,
         )
-
-        result["Etype"] = e_type
-        result["Ttype"] = t_type
-        result["Stype"] = s_type
+        result["Etype"] = model_str[0]
+        result["Ttype"] = model_str[1]
+        result["Stype"] = model_str[-1]
         result["model"] = model_str
-
         if phi_dict_temp["phi_estimate"]:
             result["phi_dict"]["phi"] = result["adam_estimated"]["B"].get("phi", 0.95)
         else:
             result["phi_dict"]["phi"] = 1
+        cache[model_str] = result
+        return result
 
-        results_list.append(result)
-        results_dict[model_str] = idx
-        return idx
+    def first_or_none(indices):
+        return indices[0] if indices else None
 
-    # Ensure pool_seasonals and pool_trends are lists
-    if isinstance(pool_seasonals, str):
-        pool_seasonals = [pool_seasonals]
-    if isinstance(pool_trends, str):
-        pool_trends = [pool_trends]
+    pool_seasonals = (
+        [pool_seasonals] if isinstance(pool_seasonals, str) else list(pool_seasonals)
+    )
+    pool_trends = [pool_trends] if isinstance(pool_trends, str) else list(pool_trends)
+    n_small = len(pool_small)
 
-    # Make copies to avoid modifying the original lists
-    pool_seasonals = list(pool_seasonals)
-    pool_trends = list(pool_trends)
+    # Port of R's branch and bound in selector() (R/utils-adam.R). Indices are
+    # 0-based here: j and best_j point to pool_small, i and best_i to results.
+    results: list = []
+    models_tested: list = []
+    j: int | None = 0
+    best_i = best_j = 0
+    check = True
 
-    # Initialize
-    results = []
-    results_dict = {}  # model_str -> index in results
-    models_tested = []
+    while check:
+        model_current = pool_small[j]
+        results.append(estimate(model_current))
+        models_tested.append(model_current)
+        i = len(results) - 1
 
-    # Branch and bound algorithm
-    # Step 1: Estimate baseline model (ANN or equivalent)
-    baseline_model = pool_small[0]  # Typically "ANN"
-    baseline_idx = estimate_and_store(baseline_model, results, results_dict)
-    models_tested.append(baseline_model)
-    best_ic = results[baseline_idx]["IC"]
-
-    # Step 2: Check seasonality (if check_seasonal is True)
-    if check_seasonal and len(pool_seasonals) > 1:
-        # Find model with additive seasonality and same trend as baseline
-        seasonal_model_a = find_model_index(
-            pool_small,
-            seasonal="A",
-            trend=get_trend(baseline_model),
-            exclude=models_tested,
-        )
-
-        if seasonal_model_a is not None:
-            model_a = pool_small[seasonal_model_a - 1]
-            idx_a = estimate_and_store(model_a, results, results_dict)
-            models_tested.append(model_a)
-            ic_a = results[idx_a]["IC"]
-
-            if ic_a < best_ic:
-                # Seasonality helps - remove "N" from pool, check multiplicative
-                pool_seasonals = [s for s in pool_seasonals if s != "N"]
-                best_ic = ic_a
-
-                # Check multiplicative seasonality if available
-                if "M" in pool_seasonals:
-                    seasonal_model_m = find_model_index(
-                        pool_small,
-                        seasonal="M",
-                        trend=get_trend(baseline_model),
-                        exclude=models_tested,
+        if j > 0:
+            if results[best_i]["IC"] <= results[i]["IC"]:
+                if model_current[1] == pool_small[best_j][1]:
+                    pool_seasonals = [results[best_i]["Stype"]]
+                    check_seasonal = False
+                    j = first_or_none(
+                        [
+                            k
+                            for k, m in enumerate(pool_small)
+                            if m != pool_small[best_j] and m[-1] == pool_seasonals[0]
+                        ]
                     )
-                    if seasonal_model_m is not None:
-                        model_m = pool_small[seasonal_model_m - 1]
-                        idx_m = estimate_and_store(model_m, results, results_dict)
-                        models_tested.append(model_m)
-                        ic_m = results[idx_m]["IC"]
-
-                        if ic_m < best_ic:
-                            # Multiplicative is better
-                            pool_seasonals = ["M"]
-                            best_ic = ic_m
-                        else:
-                            # Additive is better
-                            pool_seasonals = ["A"]
                 else:
-                    pool_seasonals = ["A"]
-
-                # Now check trend with the selected seasonal
-                if check_trend and len(pool_trends) > 1:
-                    trend_model = find_model_index(
-                        pool_small,
-                        seasonal=pool_seasonals[0],
-                        trend="A",
-                        exclude=models_tested,
+                    pool_trends = [results[best_j]["Ttype"]]
+                    check_trend = False
+            elif model_current[1] == pool_small[best_i][1]:
+                pool_seasonals = [
+                    s for s in pool_seasonals if s != results[best_i]["Stype"]
+                ]
+                best_j, best_i = j, i
+                if len(pool_seasonals) > 1:
+                    j = 2
+                else:
+                    j = first_or_none(
+                        [
+                            k
+                            for k, m in enumerate(pool_small)
+                            if m[-1] in pool_seasonals and m[1] != model_current[1]
+                        ]
                     )
-                    if trend_model is not None:
-                        model_t = pool_small[trend_model - 1]
-                        idx_t = estimate_and_store(model_t, results, results_dict)
-                        models_tested.append(model_t)
-                        ic_t = results[idx_t]["IC"]
-
-                        if ic_t < best_ic:
-                            # Trend helps - keep all trend options
-                            pool_trends = [t for t in pool_trends if t != "N"]
-                        else:
-                            # No trend needed
-                            pool_trends = ["N"]
+                    check_seasonal = False
             else:
-                # No seasonality - pool_seasonals = ["N"]
-                pool_seasonals = ["N"]
+                pool_trends = [t for t in pool_trends if t != results[best_j]["Ttype"]]
+                best_i, best_j = i, j
+                check_trend = False
 
-                # Check trend: AAN vs ANN
-                if check_trend and len(pool_trends) > 1:
-                    trend_model = find_model_index(
-                        pool_small, seasonal="N", trend="A", exclude=models_tested
-                    )
-                    if trend_model is not None:
-                        model_t = pool_small[trend_model - 1]
-                        idx_t = estimate_and_store(model_t, results, results_dict)
-                        models_tested.append(model_t)
-                        ic_t = results[idx_t]["IC"]
-
-                        if ic_t < best_ic:
-                            # Trend helps - keep all trend options
-                            pool_trends = [t for t in pool_trends if t != "N"]
-                            best_ic = ic_t
-                        else:
-                            # No trend helps - only check MNN for error type
-                            pool_trends = ["N"]
-
-                            # Check MNN if multiplicative error is allowed
-                            if model_type_dict.get("allow_multiplicative", True):
-                                error_model = find_model_index(
-                                    pool_small,
-                                    seasonal="N",
-                                    trend="N",
-                                    error="M",
-                                    exclude=models_tested,
-                                )
-                                if error_model is not None:
-                                    model_e = pool_small[error_model - 1]
-                                    estimate_and_store(model_e, results, results_dict)
-                                    models_tested.append(model_e)
-                                    #  IC comparison for error type will be done in full
-                                    # pool estimation
+            if not check_trend and not check_seasonal:
+                check = False
         else:
-            # No seasonal model to test, keep checking trend
-            pool_seasonals = ["N"]
-    elif not check_seasonal:
-        # Seasonality already determined, check trend
-        if check_trend and len(pool_trends) > 1:
-            trend_model = find_model_index(
-                pool_small, seasonal=pool_seasonals[0], trend="A", exclude=models_tested
-            )
-            if trend_model is not None:
-                model_t = pool_small[trend_model - 1]
-                idx_t = estimate_and_store(model_t, results, results_dict)
-                models_tested.append(model_t)
-                ic_t = results[idx_t]["IC"]
+            j = 1
 
-                if ic_t < best_ic:
-                    pool_trends = [t for t in pool_trends if t != "N"]
-                else:
-                    pool_trends = ["N"]
+        if j is None:
+            j = n_small - 1
+        if j > n_small - 1:
+            check = False
 
     return results, models_tested, pool_seasonals, pool_trends
 

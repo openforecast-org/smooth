@@ -506,3 +506,105 @@ test_that("om with a fixed probability has no ARIMA, whatever the orders", {
     expect_equal(modelName(testModel), "oETS(ANN)[F]")
     expect_true(is.finite(logLik(testModel)))
 })
+
+# A constant probability has no regressors, so auto.om() can compare it with the others
+test_that("om(occurrence=\"fixed\") drops the regressors and auto.om() takes them", {
+    set.seed(4)
+    xreg <- data.frame(y=rbinom(120, 1, 0.5), a=rnorm(120))
+    testModel <- om(xreg, occurrence="fixed")
+    expect_equal(modelName(testModel), "oETS(ANN)[F]")
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(om(xreg$y, occurrence="fixed"))))
+    expect_true(is.finite(AICc(auto.om(xreg))))
+})
+
+# The smoother reaches omg() and auto.om() when om() redirects to them
+test_that("om() passes smoother on to omg() and auto.om()", {
+    set.seed(5)
+    y <- ts(rbinom(120, 1, 0.3+0.3*sin(1:120*2*pi/12)), frequency=12)
+    testModel <- om(y, "ANA", occurrence="general", initial="optimal", smoother="global")
+    expect_equal(logLik(testModel), logLik(omg(y, "ANA", "ANA", initial="optimal", smoother="global")))
+    expect_false(isTRUE(all.equal(logLik(testModel), logLik(omg(y, "ANA", "ANA", initial="optimal")))))
+    expect_equal(logLik(om(y, "ANA", occurrence="auto", initial="optimal", smoother="global")),
+                 logLik(auto.om(y, "ANA", initial="optimal", smoother="global")))
+})
+
+# The model without ETS, ARIMA and regressors is a constant level, as in adam()
+test_that("om() names the constant level model as adam()", {
+    set.seed(5)
+    y <- rbinom(120, 1, 0.4)
+    expect_equal(modelName(om(y, "NNN", occurrence="odds-ratio")), "oConstant level[O]")
+})
+
+# regressors="select" keeps the true regressor, drops the noise and never takes the response
+test_that("om() selects the regressors by stepwise() on the occurrence indicator", {
+    set.seed(4)
+    xreg <- data.frame(y=0, a=rnorm(300), n=rnorm(300))
+    xreg$y <- rbinom(300, 1, plogis(2*xreg$a))
+    testModel <- om(xreg, "ANN", regressors="select", occurrence="odds-ratio")
+    expect_true("a" %in% names(coef(testModel)))
+    expect_false(any(c("n","y") %in% names(coef(testModel))))
+    expect_equal(modelName(testModel), "oETSX(ANN)[O]")
+    # The holdout is not used in the selection
+    xreg$y[1:300 > 250] <- 0;
+    testModel <- om(xreg, "ANN", regressors="select", occurrence="odds-ratio", h=50, holdout=TRUE)
+    expect_equal(names(coef(testModel))[-1],
+                 names(coef(stepwise(xreg[1:250,], distribution="plogis")))[-1])
+})
+
+test_that("om() and omg() forecast with the regressors of newdata", {
+    set.seed(41);
+    x <- data.frame(y=0, a=rnorm(220));
+    x$y <- rbinom(220, 1, plogis(2*x$a));
+    testModel <- om(x[1:200,], "ANN", occurrence="odds-ratio");
+    level <- as.numeric(tail(testModel$states[,"level"], 1));
+    expect_equal(as.numeric(forecast(testModel, h=10, newdata=x[201:210,])$mean),
+                 plogis(level + x$a[201:210]*coef(testModel)["a"]), tolerance=1e-8);
+    testModel <- omg(x[1:200,], "ANN", "ANN");
+    forecastA <- forecast.adam(testModel$modelA, h=10, newdata=x[201:210,], interval="none")$mean;
+    expect_equal(as.numeric(forecastA),
+                 as.numeric(tail(testModel$modelA$states[,"level"], 1)) +
+                     x$a[201:210]*coef(testModel$modelA)["a"], tolerance=1e-8);
+})
+
+test_that("om() with regressors takes at least 1000 iterations, as adam()", {
+    set.seed(41);
+    x <- data.frame(y=0, a=rnorm(200), n1=rnorm(200));
+    x$y <- rbinom(200, 1, plogis(2*x$a));
+    testModel <- om(x, "MNN", occurrence="direct");
+    expect_gt(testModel$res$iterations, 3*40);
+})
+
+test_that("om() starts the regressors from the indicator on all the observations", {
+    set.seed(41);
+    x <- data.frame(y=0, a=rnorm(200), n1=rnorm(200));
+    x$y <- (runif(200) < plogis(2*x$a)) * rpois(200, 3);
+    xIndicator <- transform(x, y=(y!=0)*1, trend=1:200);
+    almCoefs <- as.numeric(coef(alm(y~a+n1+trend, xIndicator, distribution="plogis"))[c("a","n1")]);
+    for(occurrence in c("odds-ratio","inverse-odds-ratio")){
+        testModel <- om(x, "ANN", occurrence=occurrence, maxeval=1);
+        sign <- if(occurrence=="odds-ratio") 1 else -1;
+        expect_equal(as.numeric(testModel$B[c("a","n1")]), sign*almCoefs, tolerance=1e-6);
+    }
+    # The general model splits them between its sides
+    testModel <- omg(x, "ANN", "ANN", maxeval=1);
+    expect_equal(as.numeric(testModel$modelA$B[c("a","n1")]), almCoefs/2, tolerance=1e-6);
+    expect_equal(as.numeric(testModel$modelB$B[c("a","n1")]), -almCoefs/2, tolerance=1e-6);
+})
+
+test_that("om() and omg() apply the formula before selecting the regressors", {
+    set.seed(41);
+    x1 <- runif(150, 1, 10);
+    omData <- data.frame(y=rbinom(150, 1, plogis(2*log(x1)-2.5))*rpois(150, 3),
+                         x1=x1, x2=rnorm(150), x3=rnorm(150));
+    testModel <- om(omData, "MNN", occurrence="odds-ratio", formula=y~log(x1)+x2, regressors="select");
+    expect_equal(attr(terms(formula(testModel)), "term.labels"), "log(x1)");
+    testModel <- omg(omData, formulaA=y~log(x1)+x2, regressorsA="select");
+    expect_true(any(grepl("log", names(coef(testModel)))));
+    # No regressor selected: the model is on the response only
+    testModel <- om(omData, "MNN", occurrence="odds-ratio", formula=y~x2+x3, regressors="select");
+    expect_equal(names(coef(testModel)), "alpha");
+    expect_equal(formula(testModel), y~1, ignore_attr=TRUE);
+    testModel <- omg(omData, formulaA=y~x2+x3, regressorsA="select", holdout=TRUE, h=10);
+    expect_equal(names(coef(testModel)), c("A:alpha", "B:alpha"));
+    expect_length(forecast(testModel, h=10)$mean, 10);
+})

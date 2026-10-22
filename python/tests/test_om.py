@@ -581,3 +581,75 @@ def test_om_with_a_fixed_probability_has_no_arima():
     model = OM(model="MNN", orders={"ar": [1], "ma": [1]}, occurrence="fixed").fit(y)
     assert model.model == "oETS(ANN)[F]"
     assert np.isfinite(model.loglik)
+
+
+def test_redirect_passes_the_arguments_of_om():
+    """OM(occurrence="general"/"auto") hands its arguments over, as R's om()."""
+    from smooth import OMG, AutoOM
+
+    general = OM("ANN", occurrence="general", ets="adam", smoother="lowess", ma_order=1)
+    assert isinstance(general, OMG)
+    assert (general.model_a_spec, general.ets, general.smoother) == (
+        "ANN",
+        "adam",
+        "lowess",
+    )
+    assert general.orders_a == {"ar": 0, "i": 0, "ma": 1, "select": False}
+    auto = OM(occurrence="auto", loss="RIDGE", **{"lambda": 0.3})
+    assert isinstance(auto, AutoOM)
+    assert (auto.loss, auto.lambda_param, auto.orders["select"]) == ("RIDGE", 0.3, False)
+    assert OM(occurrence="general", n_iterations=3).n_iterations == 3
+    auto = OM(occurrence="auto", n_iterations=3, smoother="lowess")
+    assert (auto.n_iterations, auto.smoother) == (3, "lowess")
+
+
+def test_name_has_the_x_of_the_regressors():
+    """oETSX / oARIMAX with regressors, as R's adam_model_name."""
+    rng = np.random.default_rng(3)
+    x = rng.normal(size=(200, 1))
+    y = rng.binomial(1, 1 / (1 + np.exp(-x[:, 0]))).astype(float)
+    assert OM("MNN", occurrence="odds-ratio").fit(y, x).model == "oETSX(MNN)[O]"
+    arima = OM("NNN", ar_order=1, occurrence="direct").fit(y, x)
+    assert arima.model == "oARIMAX(1,0,0)[D]"
+    assert OM("MNN", occurrence="odds-ratio").fit(y).model == "oETS(MNN)[O]"
+
+
+def test_holdout_accuracy():
+    """With a holdout, OM and OMG compute accuracy as ADAM, as R."""
+    from smooth import OMG
+
+    rng = np.random.default_rng(3)
+    y = rng.binomial(1, 0.4, 120) * np.exp(rng.normal(2, 0.3, 120))
+    om = OM("MNN", occurrence="odds-ratio", h=10, holdout=True).fit(y)
+    forecast = om.predict(h=10).mean.values
+    assert om.accuracy["ME"] == pytest.approx(np.mean((y[-10:] != 0) - forecast))
+    omg = OMG("MNN", "MNN", h=10, holdout=True).fit(y)
+    assert np.isfinite(omg.accuracy["MASE"])
+
+
+@pytest.mark.parametrize(
+    "occurrence, sign", [("odds-ratio", 1), ("inverse-odds-ratio", -1)]
+)
+def test_the_regressors_start_from_the_indicator_on_all_observations(occurrence, sign):
+    from greybox import ALM
+
+    from smooth import OMG
+
+    rng = np.random.default_rng(41)
+    X = rng.normal(size=(200, 2))  # noqa: N806
+    y = (rng.random(200) < 1 / (1 + np.exp(-2 * X[:, 0]))) * rng.poisson(3, 200) + 0.0
+    om = OM("ANN", occurrence=occurrence).fit(y, X)
+    # The logistic regression of the indicator on zeros and ones, with a trend
+    alm = ALM(distribution="plogis")
+    alm.fit(np.column_stack([np.ones(200), X, np.arange(1.0, 201)]), (y != 0) * 1.0)
+    expected = sign * np.asarray(alm.coef)[:2]
+    np.testing.assert_allclose(
+        om._explanatory["xreg_model_initials"][0]["initial_xreg"].ravel(), expected
+    )
+    # The general model splits them between its sides
+    omg = OMG("ANN", "ANN").fit(y, X)
+    side = omg._side_a if occurrence == "odds-ratio" else omg._side_b
+    np.testing.assert_allclose(
+        side["explanatory"]["xreg_model_initials"][0]["initial_xreg"].ravel(),
+        expected / 2,
+    )

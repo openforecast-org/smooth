@@ -169,7 +169,6 @@ def generate_errors(
     obs_in_sample=None,
     n_param=None,
     shape=None,
-    alpha=None,
     random_state=None,
 ):
     """
@@ -191,8 +190,6 @@ def generate_errors(
         Number of parameters (needed for dt distribution).
     shape : float, optional
         Shape parameter (for dgnorm, dlgnorm).
-    alpha : float, optional
-        Asymmetry parameter (for dalaplace).
     random_state : int or np.random.Generator, optional
         Random state for reproducibility.
 
@@ -230,11 +227,6 @@ def generate_errors(
             raise ValueError("obs_in_sample and n_param required for dt distribution")
         # R draws rt(n, df) without a scale
         return rng.standard_t(obs_in_sample - n_param, n)
-
-    elif distribution == "dalaplace":
-        if alpha is None:
-            raise ValueError("alpha required for dalaplace distribution")
-        return ralaplace(n, 0, scale, alpha, random_state=rng)
 
     elif distribution == "dlnorm":
         # rlnorm(n, -scale/2, sqrt(scale)) - 1

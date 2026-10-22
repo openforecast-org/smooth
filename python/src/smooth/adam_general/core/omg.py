@@ -33,6 +33,7 @@ from smooth.adam_general.core.om import (
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.n_param import NParam
 from smooth.adam_general.core.utils.omg_cost import omg_cf, omg_link_function
+from smooth.adam_general.core.utils.printing import _compute_forecast_errors
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
@@ -84,6 +85,10 @@ class OMG:
         ``loss_value``, ``loglik``, ``aic``/``aicc``/``bic``/``bicc``
         ``coef`` : joint parameter vector ``concat(B_A, B_B)``
         ``model_name`` : ``"oETS[G](MNN)(MNN)"``-style string
+
+    ``initial``, ``n_iterations`` (the backcasting iterations) and ``smoother``
+    (of ``msdecompose`` for the initial states) are those of :class:`OM`, shared
+    by both sub-models, as R's ``omg()``.
     """
 
     def __init__(
@@ -95,8 +100,6 @@ class OMG:
         orders_b: Optional[Dict[str, Any]] = None,
         constant_a: bool = False,
         constant_b: Optional[bool] = None,
-        formula_a: Optional[str] = None,
-        formula_b: Optional[str] = None,
         regressors_a: Literal["use", "select", "adapt"] = "use",
         regressors_b: Optional[str] = None,
         persistence_a: Optional[Dict[str, float]] = None,
@@ -108,6 +111,7 @@ class OMG:
         h: int = 0,
         holdout: bool = False,
         initial: Union[str, Dict[str, Any]] = "backcasting",
+        n_iterations: Optional[int] = None,
         loss: Union[
             Literal["likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE"],
             Callable,
@@ -141,8 +145,6 @@ class OMG:
         self.orders_b = orders_b if orders_b is not None else orders_a
         self.constant_a = constant_a
         self.constant_b = constant_b if constant_b is not None else constant_a
-        self.formula_a = formula_a
-        self.formula_b = formula_b if formula_b is not None else formula_a
         self.regressors_a = regressors_a
         self.regressors_b = regressors_b if regressors_b is not None else regressors_a
         self.persistence_a = persistence_a
@@ -156,6 +158,9 @@ class OMG:
         self.h = h
         self.holdout = holdout
         self.initial = initial
+        # The backcasting iterations of both sub-models, as R's omg() passes its
+        # ellipsis to the checkers of both
+        self.n_iterations = n_iterations
         self.loss = loss
         self.loss_function = loss_function
         self.lambda_param = lambda_param
@@ -257,22 +262,20 @@ class OMG:
             observations_a.get("ot_fit", observations_a["ot"]), dtype=np.float64
         )
         observed = ~np.isnan(ot)
-        self._fitted_combined = np.asarray(
-            omg_cf(
-                B_used,
-                side_a=side_a,
-                side_b=side_b,
-                n_params_a=n_params_a,
-                observations_dict=side_a["observations_dict"],
-                bounds=self.bounds,
-                adam_ets=(self.ets == "adam"),
-                loss=self.loss,  # type: ignore[arg-type]
-                loss_function=self.loss_function,
-                lambda_param=self.lambda_param,
-                return_fitted=True,
-            ),
-            dtype=np.float64,
-        ).ravel()
+        coupled = omg_cf(
+            B_used,
+            side_a=side_a,
+            side_b=side_b,
+            n_params_a=n_params_a,
+            observations_dict=side_a["observations_dict"],
+            bounds=self.bounds,
+            adam_ets=(self.ets == "adam"),
+            loss=self.loss,  # type: ignore[arg-type]
+            loss_function=self.loss_function,
+            lambda_param=self.lambda_param,
+            return_fitted=True,
+        )
+        self._fitted_combined = np.asarray(coupled["fitted"], dtype=np.float64).ravel()
         self._residuals_combined = ot - self._fitted_combined
         self._ot = ot
         p_fit = self._fitted_combined[observed]
@@ -294,9 +297,13 @@ class OMG:
 
         # Build the two OM sub-objects from the joint solution; they expose
         # the standard OM property surface for diagnostics.
-        self.model_a = self._om_from_side(side_a, B_used[:n_params_a], "odds-ratio")
+        # Their states, fitted values and the profiles they are forecast from come
+        # from the coupled recursion (mirrors R's omgFinalFit)
+        self.model_a = self._om_from_side(
+            side_a, B_used[:n_params_a], "odds-ratio", coupled["A"]
+        )
         self.model_b = self._om_from_side(
-            side_b, B_used[n_params_a:], "inverse-odds-ratio"
+            side_b, B_used[n_params_a:], "inverse-odds-ratio", coupled["B"]
         )
         # Preserve the raw input y for ``actuals`` — equivalent to R's
         # storing the original series on the omg object so that ``actuals(omg)``
@@ -307,6 +314,13 @@ class OMG:
         # Auto-forecast if h > 0
         if self.h and self.h > 0:
             self._auto_forecast = self._forecast_combined(self.h, X_future=None)
+            # Against the binary holdout, scaled by the series, as R's omg()
+            if self.holdout:
+                self.accuracy = _compute_forecast_errors(
+                    np.asarray(self.holdout_data),
+                    self._auto_forecast.mean,
+                    self._y_raw[: self._observations_dict["obs_in_sample"]],
+                )
         else:
             self._auto_forecast = None
 
@@ -604,7 +618,7 @@ class OMG:
         ot = np.asarray(self.actuals, dtype=float).ravel()
 
         def point_lik_at(b):
-            p = omg_cf(
+            coupled = omg_cf(
                 B=np.asarray(b, dtype=float),
                 side_a=side_a,
                 side_b=side_b,
@@ -617,7 +631,11 @@ class OMG:
                 lambda_param=self.lambda_param,
                 return_fitted=True,
             )
-            p = np.asarray(p, dtype=float).ravel()
+            # A scalar is the penalty of the parameters out of the bounds
+            p = np.asarray(
+                coupled["fitted"] if isinstance(coupled, dict) else coupled,
+                dtype=float,
+            ).ravel()
             if (
                 p.shape[0] != ot.shape[0]
                 or not np.all(np.isfinite(p))
@@ -811,8 +829,6 @@ class OMG:
             orders_b=self.orders_b,
             constant_a=self.constant_a,
             constant_b=self.constant_b,
-            formula_a=self.formula_a,
-            formula_b=self.formula_b,
             regressors_a=self.regressors_a,
             regressors_b=self.regressors_b,
             persistence_a=self.persistence_a,
@@ -824,6 +840,7 @@ class OMG:
             h=0,
             holdout=False,
             initial=self.initial,
+            n_iterations=self.n_iterations,
             # Carry the callable through so bootstrap refits replay the
             # same custom loss; otherwise the resolved string flag.
             loss=self.loss_function if self.loss_function is not None else self.loss,
@@ -833,6 +850,7 @@ class OMG:
             verbose=0,
             nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
+            smoother=self.smoother,
         )
 
     def coefbootstrap(
@@ -879,13 +897,6 @@ class OMG:
                 "method='dsr' requires greybox.dsrboot which is not yet "
                 "available in Python; use method='cr'."
             )
-        any_regressors = self.regressors_a or self.regressors_b
-        if any_regressors and (self.formula_a or self.formula_b):
-            raise NotImplementedError(
-                "coefbootstrap does not yet support OMG models with external "
-                "regressors. File an issue if you need this."
-            )
-
         y_raw = np.asarray(self._y_raw, dtype=float)
         nobs = int(y_raw.size)
         if size is None:
@@ -1013,6 +1024,7 @@ class OMG:
             persistence=persistence,
             phi=phi,
             initial=self.initial,
+            n_iterations=self.n_iterations,
             arma=arma,
             ic=self.ic,
             bounds=self.bounds,
@@ -1020,13 +1032,28 @@ class OMG:
             ets=self.ets,
             smoother=self.smoother,
         )
-        if isinstance(spec, str) and any(c in spec for c in "ZXYFPS"):
+        # A side with regressors="select" selects them there as OM does, and then
+        # uses the selected columns of X, as R's omg(). Both see the in-sample data
+        columns = None
+        if (isinstance(spec, str) and any(c in spec for c in "ZXYFPS")) or (
+            regressors == "select" and X is not None
+        ):
             loss = self.loss_function if self.loss == "custom" else self.loss
-            spec = (
-                OM(model=spec, loss=loss, lambda_param=self.lambda_param, **common)
-                .fit(y, X)
-                .model_type
+            pre = OM(
+                model=spec,
+                loss=loss,
+                lambda_param=self.lambda_param,
+                holdout=self.holdout,
+                h=self.h,
+                **common,
             )
+            pre = pre.fit(y, X)
+            spec = pre.model_type
+            if regressors == "select" and X is not None:
+                columns = pre._explanatory["xreg_columns"]
+                common["regressors"] = "use"
+                X = (X.iloc if hasattr(X, "iloc") else np.asarray(X))[:, columns]
+                X = X if columns else None
         scaffold = OM(
             model=spec, verbose=self.verbose, holdout=self.holdout, h=self.h, **common
         )
@@ -1037,6 +1064,8 @@ class OMG:
             else None
         )
         scaffold._check_parameters(y, X)
+        if columns is not None:
+            scaffold._explanatory["xreg_columns"] = columns
 
         # Pure-regression early exit: return a minimal marker dict so OMG.fit()
         # can detect and handle both sides without running the ETS machinery.
@@ -1044,11 +1073,25 @@ class OMG:
             return {
                 "scaffold": scaffold,
                 "is_alm": True,
+                "X": X,
                 "occurrence_str": occurrence,
             }
 
         scaffold._restore_user_model_spec(requested)
         scaffold._set_occurrence_series()
+        # The probability depends on the difference of the coefficients of the two
+        # sides, which the regression of the indicator estimates: each side starts
+        # from its half, as R
+        explanatory = scaffold._explanatory
+        if explanatory.get("xreg_model") and not scaffold._initials.get(
+            "initial_xreg_provided"
+        ):
+            explanatory["xreg_model_initials"] = [
+                None
+                if side is None
+                else {**side, "initial_xreg": side["initial_xreg"] / 2}
+                for side in explanatory["xreg_model_initials"]
+            ]
 
         adam_cpp, adam_created, profile_dict = scaffold._build_om_artifacts(
             lags_max_pad
@@ -1237,7 +1280,7 @@ class OMG:
     # Build per-sub-model OM objects from the joint estimate
     # ---------------------------------------------------------------------
 
-    def _om_from_side(self, side, B, occurrence_str) -> OM:
+    def _om_from_side(self, side, B, occurrence_str, coupled) -> OM:
         scaffold: OM = side["scaffold"]
         # Mark this sub-model so ``OM.actuals`` returns the latent
         # (unobservable) reconstruction rather than the binary indicator.
@@ -1259,6 +1302,7 @@ class OMG:
             "log_lik_adam_value": dict(self._log_lik_dict),
             "arima_polynomials": side["matrices_dict"].get("arima_polynomials"),
             "adam_cpp": side["adam_cpp"],
+            "coupled": coupled,
         }
         scaffold._adam_cpp = side["adam_cpp"]
         # Copies: the preparator writes the fitted states into them, and the joint
@@ -1323,8 +1367,9 @@ class OMG:
         scaffold_b = side_b["scaffold"]
         scaffold_b._alm_model = alm_b
 
-        scaffold_a._populate_from_alm(y, X)
-        scaffold_b._populate_from_alm(y, X)
+        # Both on the regressors of A, which B is fitted on
+        scaffold_a._populate_from_alm(y, side_a["X"])
+        scaffold_b._populate_from_alm(y, side_a["X"])
 
         self.model_a = scaffold_a
         self.model_b = scaffold_b
@@ -1444,32 +1489,3 @@ class OMG:
             occurrence_type="general",
             other={"binary_data": occurrence_data},
         )
-
-
-def _build_omg_from_om_kwargs(**om_kwargs) -> OMG:
-    """Construct an OMG from the kwargs supplied to OM(occurrence='general', ...).
-
-    Forwards ``model`` / ``lags`` / ``orders`` as both ``model_a`` and
-    ``model_b`` and delegates to :class:`OMG`.
-    """
-    model = om_kwargs.pop("model", "MNN")
-    return OMG(
-        model_a=model,
-        model_b=model,
-        lags=om_kwargs.pop("lags", None),
-        orders_a=om_kwargs.pop("orders", None),
-        orders_b=None,
-        constant_a=om_kwargs.pop("constant", False),
-        formula_a=om_kwargs.pop("formula", None),
-        regressors_a=om_kwargs.pop("regressors", "use"),
-        persistence_a=om_kwargs.pop("persistence", None),
-        phi_a=om_kwargs.pop("phi", None),
-        arma_a=om_kwargs.pop("arma", None),
-        h=om_kwargs.pop("h", 0),
-        holdout=om_kwargs.pop("holdout", False),
-        initial=om_kwargs.pop("initial", "backcasting"),
-        ic=om_kwargs.pop("ic", "AICc"),
-        bounds=om_kwargs.pop("bounds", "usual"),
-        verbose=om_kwargs.pop("verbose", 0),
-        nlopt_kwargs=om_kwargs.pop("nlopt_kwargs", None),
-    )

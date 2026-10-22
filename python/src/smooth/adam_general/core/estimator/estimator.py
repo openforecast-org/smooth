@@ -668,7 +668,12 @@ def estimator(
                 for est, lag in zip(seasonal_estimate, lags_model_seasonal)
             )
         )
-        ets_redundancy = naive_level_seasonal - df_level_seasonal
+        # B has m-1 initials per seasonal lag: without the level, their span lacks
+        # the constant that the level would take
+        ets_redundancy = naive_level_seasonal - (
+            df_initials_ets_level_seasonal(seasonal_lags_estimated, True)
+            - (not level_est)
+        )
         df_initials = df_level_seasonal + model_type_dict["model_is_trendy"] * bool(
             initials_dict.get("initial_trend_estimate", True)
         )

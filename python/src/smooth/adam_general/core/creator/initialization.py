@@ -175,11 +175,10 @@ def _initialize_ets_states(
             mat_vt[j, 0:lags_model_max] = initials_checked["initial_trend"]
         if model_is_seasonal:
             for i in range(components_number_ets_seasonal):
-                #  This is misaligned, but that's okay, because this goes directly to
-                # profile_recent
-                mat_vt[j + i, 0 : lags_model[j + i]] = initials_checked[
-                    "initial_seasonal"
-                ][i]
+                row = j + 1 + i
+                mat_vt[row, 0 : lags_model[row]] = initials_checked["initial_seasonal"][
+                    i
+                ]
 
     return mat_vt
 

@@ -269,6 +269,11 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
                                        silent, modelDo, ellipsis, fast=FALSE);
     list2env(checkerReturn, envir=environment());
 
+    # The regressors are selected as in adam(): on the errors of the model without them
+    if(xregModel && regressors=="select"){
+        return(adam_xreg_selectRefit(cl, env, data, responseName, "y", ic));
+    }
+
     # Return to the original ones. The parametersChecker will force "admissible"
     bounds <- boundsOriginal
 

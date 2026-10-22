@@ -1,6 +1,6 @@
 commonParametersChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
                                     persistence, phi, initial,
-                                    distribution=c("default","dnorm","dlaplace","dalaplace","ds","dgnorm",
+                                    distribution=c("default","dnorm","dlaplace","ds","dgnorm",
                                                    "dlnorm","dinvgauss","dgamma","plogis"),
                                     loss, h, holdout, occurrence,
                                     ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
@@ -562,7 +562,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
     if(!fast){
         #### Distribution selected ####
-        distribution <- match.arg(distribution[1], c("default","dnorm","dlaplace","dalaplace","ds","dgnorm",
+        distribution <- match.arg(distribution[1], c("default","dnorm","dlaplace","ds","dgnorm",
                                                       "dlnorm","dinvgauss","dgamma","plogis"));
     }
 
@@ -610,6 +610,8 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     #### Explanatory variables: xregModel and regressors ####
     regressors <- match.arg(regressors,c("use","select","adapt"));
     xregModel <- !is.null(xregData);
+    # The formula term of each expanded regressor, for regressors="select" with a formula
+    xregTerms <- NULL;
 
     #### Persistence provided ####
     # Vectors for persistence of different components
@@ -1052,41 +1054,15 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             # If the list is provided, then check what this is.
             # This should be: level, trend, seasonal[[1]], seasonal[[2]], ..., ARIMA, xreg
             if(is.list(initial)){
-                # If this is a named list, then extract stuff using names
-                if(!is.null(names(initial))){
-                    if(!is.null(initial$level)){
-                        initialLevel <- initial$level;
-                    }
-                    if(!is.null(initial$trend)){
-                        initialTrend <- initial$trend;
-                    }
-                    if(!is.null(initial$seasonal)){
-                        initialSeasonal <- initial$seasonal;
-                    }
-                    if(!is.null(initial$arima)){
-                        initialArima <- initial$arima;
-                    }
-                    if(!is.null(initial$xreg)){
-                        initialXreg <- initial$xreg;
-                    }
+                # An unnamed list has the components in this order, possibly fewer of them
+                if(is.null(names(initial))){
+                    names(initial) <- c("level","trend","seasonal","arima","xreg")[seq_along(initial)];
                 }
-                else{
-                    if(!is.null(initial[[1]])){
-                        initialLevel <- initial[[1]];
-                    }
-                    if(!is.null(initial[[2]])){
-                        initialTrend <- initial[[2]];
-                    }
-                    if(!is.null(initial[[3]])){
-                        initialSeasonal <- initial[[3]];
-                    }
-                    if(!is.null(initial[[4]])){
-                        initialArima <- initial[[4]];
-                    }
-                    if(!is.null(initial[[5]])){
-                        initialXreg <- initial[[5]];
-                    }
-                }
+                initialLevel <- initial$level;
+                initialTrend <- initial$trend;
+                initialSeasonal <- initial$seasonal;
+                initialArima <- initial$arima;
+                initialXreg <- initial$xreg;
             }
             else{
                 if(!is.numeric(initial)){
@@ -1106,6 +1082,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         if(etsModel){
                             initialLevel <- initial[1];
                             initialLevelEstimate[] <- FALSE;
+                            j <- 1;
                             if(modelIsTrendy){
                                 j <- 2;
                                 # If there is something in the vector, use it
@@ -1148,7 +1125,6 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                                 initialXregEstimate[] <- FALSE
                             }
                         }
-                        parametersNumber[2,1] <- parametersNumber[2,1] + j;
                     }
                 # }
             }
@@ -1398,6 +1374,13 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 initialXregProvided <- FALSE;
                 # The function returns an ALM model
                 xregInitialiser <- function(Etype,distribution,formulaToUse,subset,responseName){
+                    # The regressors of the probability of occurrence (om(), omg()) are estimated
+                    # on all the observations, with the occurrence indicator as the response
+                    occurrenceIndicator <- occurrenceModel && distribution=="plogis";
+                    if(occurrenceIndicator){
+                        xregData[1:obsInSample,1] <- otLogical*1;
+                        subset <- subsetOccurrence;
+                    }
                     # Fix the default distribution for ALM
                     if(distribution=="default"){
                         distribution <- switch(Etype,
@@ -1428,7 +1411,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     formulaOriginal <- formulaToUse;
                     # If the formula is not provided, construct one
                     if(formulaIsAbsent){
-                        if(Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt","dalaplace"))){
+                        if(Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt"))){
                             if(trendIncluded){
                                 formulaOriginal <- formulaToUse <- as.formula(paste0("log(`",responseName,"`)~."));
                             }
@@ -1451,7 +1434,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         # If formula only contains ".", then just change it
                         if(length(all.vars(formulaToUse))==2 && all.vars(formulaToUse)[2]=="."){
                             # Take logs if the model requires that
-                            if((Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt","dalaplace")))){
+                            if((Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt")))){
                                 if(trendIncluded){
                                     formulaToUse <- as.formula(paste0("log(`",responseName,"`)~."));
                                 }
@@ -1473,7 +1456,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                             # If formula contains only one element, or several, but no logs, then change response formula
                             if((length(formulaToUse[[2]])==1 ||
                                 (length(formulaToUse[[2]])>1 & !any(as.character(formulaToUse[[2]])=="log"))) &&
-                               (Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt","dalaplace")))){
+                               (Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt")))){
                                 if(trendIncluded){
                                     formulaToUse <- update(formulaToUse,log(.)~.);
                                 }
@@ -1501,6 +1484,10 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         }
                         # Reset terms, they are not needed for what comes, but confuse the formula() method
                         almModel$terms <- NULL;
+                    }
+                    # The inverse odds ratio falls with the probability
+                    if(occurrenceIndicator && occurrence=="inverse-odds-ratio"){
+                        almModel$coefficients[] <- -almModel$coefficients;
                     }
                     return(almModel);
                 }
@@ -2063,7 +2050,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     }
                     else{
                         xregModelMatrix <- model.matrix(xregData,data=xregData);
-                        xregNamesModified <- xregNames;
+                        xregNamesModified <- xregNames <- setdiff(colnames(xregModelMatrix), "(Intercept)");
                     }
                     xregData <- as.matrix(xregModelMatrix);
 
@@ -2161,6 +2148,11 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                         }
                     }
                     else{
+                        # The unnamed values are in the order of the variables
+                        if(is.null(names(initialXreg))){
+                            names(initialXreg) <- xregNames[seq_along(initialXreg)];
+                        }
+                        initialXreg <- initialXreg[xregNames];
                         xregModelInitials[[1]]$initialXreg <- initialXreg;
                         if(any(Etype==c("M","Z"))){
                             xregModelInitials[[2]]$initialXreg <- initialXreg;
@@ -2230,9 +2222,13 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 # Evaluate data frame to do transformations of variables
                 xregData <- eval(mf, parent.frame());
 
-                # Remove variables that have "-x" in the formula
+                # Expand the interactions and the factors: the selection runs over the columns
                 dataTerms <- terms(xregData);
-                xregData <- xregData[,colnames(attr(dataTerms,"factors"))];
+                xregData <- model.matrix(dataTerms, xregData);
+                xregAssign <- attr(xregData, "assign");
+                xregData <- xregData[, xregAssign>0, drop=FALSE];
+                xregTerms <- setNames(labels(dataTerms)[xregAssign[xregAssign>0]],
+                                      make.names(colnames(xregData), unique=TRUE));
             }
             xregNumber <- ncol(xregData);
             xregNames <- colnames(xregData);
@@ -2300,9 +2296,12 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         xregData <- as.matrix(xregData);
 
         # If there are no variables after all of that, then xreg doesn't exist
+        # (A formula without regressors, e.g. y~1, asks for none)
         if(xregNumber==0){
-            warning("It looks like there are no suitable explanatory variables. Check the xreg! I dropped them out.",
-                    call.=FALSE);
+            if(is.null(formulaToUse) || length(all.vars(formulaToUse))>1){
+                warning("It looks like there are no suitable explanatory variables. Check the xreg! I dropped them out.",
+                        call.=FALSE);
+            }
             xregModel[] <- FALSE;
             xregData <- NULL;
         }
@@ -2841,7 +2840,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             modelDo <- "estimate";
         }
         Etype <- switch(distribution,
-                        "default"=,"dnorm"=,"dlaplace"=,"ds"=,"dgnorm"=,"dlogis"=,"plogis"=,"dt"=,"dalaplace"="A",
+                        "default"=,"dnorm"=,"dlaplace"=,"ds"=,"dgnorm"=,"dlogis"=,"plogis"=,"dt"="A",
                         "dlnorm"=,"dllaplace"=,"dls"=,"dlgnorm"=,"dinvgauss"=,"dgamma"="M",
                         "A");
         Ttype <- "N";
@@ -3037,6 +3036,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         xregNames = xregNames,
         responseName = responseName,
         formula = formulaToUse,
+        xregTerms = xregTerms,
         xregParametersMissing = xregParametersMissing,
         xregParametersIncluded = xregParametersIncluded,
         xregParametersEstimated = xregParametersEstimated,
@@ -3074,7 +3074,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 adamSpecificChecker <- function(data, model, lags, formulaToUse, orders, constant=FALSE, arma,
                                 outliers=c("ignore","use","select"), level=0.99,
                                 persistence, phi, initial,
-                                distribution=c("default","dnorm","dlaplace","dalaplace",
+                                distribution=c("default","dnorm","dlaplace",
                                                "ds","dgnorm","dlnorm","dinvgauss","dgamma","plogis"),
                                 loss, h, holdout, occurrence,
                                 ic=c("AICc","AIC","BIC","BICc"),
@@ -3085,7 +3085,7 @@ adamSpecificChecker <- function(data, model, lags, formulaToUse, orders, constan
     outliers <- match.arg(outliers)
     if(!fast){
         distribution <- match.arg(distribution[1],
-                                   c("default","dnorm","dlaplace","dalaplace",
+                                   c("default","dnorm","dlaplace",
                                      "ds","dgnorm","dlnorm","dinvgauss","dgamma","plogis"))
     }
 

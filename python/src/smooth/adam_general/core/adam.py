@@ -1,3 +1,4 @@
+import inspect
 import time
 import warnings
 from dataclasses import dataclass
@@ -717,8 +718,26 @@ class ADAM:
             Information criterion for model selection.
         bounds : Literal["usual", "admissible", "none"], default="usual"
             Parameter bounds specification during optimization.
-        occurrence : OCCURRENCE_OPTIONS, default="none"
-            Occurrence model type for intermittent data.
+        occurrence : OCCURRENCE_OPTIONS or fitted OM / OMG, default="none"
+            The model of the probability of occurrence, for intermittent data:
+
+            - ``"none"``: no occurrence model; zeros are ordinary values.
+            - ``"fixed"``: constant probability.
+            - ``"general"``: the general Beta model with two parameters
+              (an :class:`OMG`).
+            - ``"odds-ratio"``: the odds-ratio model, b=1 in the Beta.
+            - ``"inverse-odds-ratio"``: the model with a=1 in the Beta.
+            - ``"direct"``: the TSB-like (Teunter et al., 2011) probability
+              update, a+b=1.
+            - ``"auto"``: the type selected by :class:`AutoOM`.
+
+            The occurrence model takes the ETS form given in ``model``, the
+            ARIMA orders, the lags and the regressors of the demand sizes, and
+            is fitted first; its fitted probabilities then scale the sizes. An
+            already fitted :class:`OM` or :class:`OMG` can be passed instead
+            and is used as it stands (R's ``oes`` / ``om`` object); its
+            parameters are then not counted in ``nparam``. An unknown string
+            switches to ``"none"`` with a warning.
         persistence : Optional[Dict[str, float]], default=None
             Fixed persistence parameters (e.g., {"alpha": 0.5, "beta": 0.5}).
             If None, parameters are estimated.
@@ -727,8 +746,12 @@ class ADAM:
             estimated if applicable.
         initial : INITIAL_OPTIONS, default=None
             Method for initializing states or fixed initial states. Can be a string
-            (e.g., 'optimal', 'backcasting'), a dictionary of initial state values,
-            or a tuple of state names to initialize.
+            (e.g., 'optimal', 'backcasting'), a dictionary of initial state values
+            (``level``, ``trend``, ``seasonal``, ``arima``, ``xreg``; a list of
+            arrays in ``seasonal`` for several seasonal lags), a list of them in
+            that order (``None`` for the ones to estimate), or a vector of the
+            values one after another. The components not provided are estimated,
+            as R's ``initial``.
         arma : Optional[Dict[str, Any]], default=None
             Fixed ARMA parameters specification. If None, estimated if applicable.
         verbose : int, default=0
@@ -845,7 +868,14 @@ class ADAM:
         self.holdout = holdout
         self.fast = fast
         # Handle 'lambda' from kwargs (since 'lambda' is a reserved word in Python)
-        # Users can pass either lambda_param=0.5 or **{'lambda': 0.5}
+        # Users can pass either lambda_param=0.5 or **{'lambda': 0.5}. Any other
+        # keyword is an error, as for a function without **kwargs
+        unknown = sorted(set(kwargs) - {"lambda", "print_level"})
+        if unknown:
+            raise TypeError(
+                f"{type(self).__name__}() got unexpected keyword argument(s): "
+                f"{', '.join(map(repr, unknown))}"
+            )
         if "lambda" in kwargs:
             self.lambda_param = kwargs["lambda"]
         else:
@@ -1087,6 +1117,38 @@ class ADAM:
         # The model as specified: the refit with the dummies of the outliers selects
         # it again, as R's auto.adam() re-evaluates its call
         model_spec = self.model
+
+        # Orders with select=True are selected by AutoADAM, as R's adam() hands
+        # the call to auto.adam() with its distribution
+        from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
+
+        orders, select = resolve_arima_orders(
+            self._init_orders,
+            self.ar_order,
+            self.i_order,
+            self.ma_order,
+            arima_select=self.arima_select,
+            silent=True,
+        )
+        if select:
+            from smooth.adam_general.core.auto_adam import AutoADAM
+
+            remapped = {"ar_order", "i_order", "ma_order", "orders", "arima_select"}
+            remapped |= {"self", "kwargs", "distribution", "outliers_level"}
+            kw = {
+                p: getattr(self, p)
+                for p in inspect.signature(ADAM.__init__).parameters
+                if p not in remapped
+            }
+            auto = AutoADAM(
+                orders=orders,
+                distribution=self.distribution or "default",
+                level=self.outliers_level,
+                **kw,
+            ).fit(y, X)
+            self.__dict__.update(auto.__dict__)
+            return self
+
         # The regressors with the names of the dummies of the outliers are renamed
         if self.outliers != "ignore" and isinstance(X, pd.DataFrame):
             clashes = [str(c) for c in X.columns if OUTLIER_NAMES.match(str(c))]
@@ -1663,7 +1725,7 @@ class ADAM:
         >>> init_level = model.initial_value['level']
         """
         self._check_is_fitted()
-        return self._prepared.get("initial_value", {})
+        return self._prepared.get("initial", self._prepared.get("initial_value", {}))
 
     def _resolve_smoother(self) -> str:
         """The msdecompose smoother to use, resolving "default".
@@ -2420,8 +2482,8 @@ class ADAM:
             errors = np.log(errors)
         if dist == "dlnorm":
             errors = errors + raw_scale / 2
-        # The conventional residuals of Laplace, ALaplace and Logistic are not centred
-        if dist not in ("dlaplace", "dalaplace", "dlogis"):
+        # The conventional residuals of Laplace and Logistic are not centred
+        if dist not in ("dlaplace", "dlogis"):
             errors = errors - np.mean(errors[sizes])
         # sigma for dnorm and dlnorm, s^2 for S, s for the rest
         if dist in ("dt", "dnorm", "dlnorm"):
@@ -2619,12 +2681,9 @@ class ADAM:
         p = np.array([(1 - level) / 2, (1 + level) / 2])
 
         # The quantiles of the standardised distribution, as R's outlierdummy.adam
-        other = getattr(self, "other", None) or {}
         scale = float(np.mean(self.extract_scale()))
         if dist in ("dlaplace", "dllaplace"):
             stat = gb.qlaplace(p, 0, 1)
-        elif dist == "dalaplace":
-            stat = gb.qalaplace(p, 0, 1, other.get("alpha", 0.5))
         elif dist == "dlogis":
             stat = gb.qlogis(p, 0, 1)
         elif dist == "dt":
@@ -3089,7 +3148,7 @@ class ADAM:
         R's convention.
 
         For the common case (``dnorm`` / ``dlaplace`` / ``ds`` / ``dgnorm``
-        / ``dt`` / ``dlogis`` / ``dalaplace``) this is
+        / ``dt`` / ``dlogis``) this is
         ``sqrt(sum(residuals²) / (nobs − nparam + 1))`` when loss is
         likelihood, or ``sqrt(sum(residuals²) / (nobs − nparam))``
         otherwise.
@@ -3136,7 +3195,7 @@ class ADAM:
         elif distribution in ("dinvgauss", "dgamma"):
             ss = float(np.sum((residuals - 1.0) ** 2))
         else:
-            # dnorm, dlaplace, ds, dgnorm, dt, dlogis, dalaplace — plain
+            # dnorm, dlaplace, ds, dgnorm, dt, dlogis — plain
             # sum of squared residuals.
             ss = float(np.sum(residuals**2))
 
@@ -3496,7 +3555,10 @@ class ADAM:
         >>> selected_type = model.model_type  # e.g., 'AAN'
         """
         self._check_is_fitted()
-        return self._model_type.get("model", "")
+        # As R's modelType(): the ETS part of the name of the fitted model
+        if not self._model_type.get("ets_model", False):
+            return "NNN"
+        return self.model_name.split("(", 1)[1].split(")", 1)[0]
 
     @property
     def orders(self) -> Dict[str, List[int]]:
@@ -3685,11 +3747,17 @@ class ADAM:
               ``"approximate"`` depending on the model type.
             - ``"simulated"``: Simulation-based intervals (Monte Carlo).
             - ``"approximate"``: Analytical (parametric) intervals.
-            - ``"semiparametric"``: Not yet implemented.
-            - ``"nonparametric"``: Not yet implemented.
-            - ``"empirical"``: Not yet implemented.
-            - ``"confidence"``: Not yet implemented.
-            - ``"complete"``: Not yet implemented.
+            - ``"semiparametric"``: From the multiple steps ahead forecast
+              errors (see :meth:`rmultistep`) and the assumed distribution of
+              the error term.
+            - ``"nonparametric"``: Taylor & Bunn (1999), quantile regressions
+              of the multiple steps ahead forecast errors.
+            - ``"empirical"``: Empirical quantiles of the multiple steps ahead
+              forecast errors.
+            - ``"confidence"``: Confidence interval of the point forecast, from
+              the uncertainty of the parameters (via :meth:`reforecast`).
+            - ``"complete"``: Prediction interval with the uncertainty of the
+              parameters (via :meth:`reforecast`).
         level : float or list of float, default=0.95
             Confidence level(s) for prediction intervals. Accepts a single
             value (e.g. ``0.95``) or a list for multiple simultaneous levels
@@ -3837,7 +3905,7 @@ class ADAM:
         if occurrence is not None:
             p_forecast_arr = np.ravel(np.asarray(occurrence, dtype=float))
         elif om_model is not None:
-            occ_fc = om_model.predict(h=h)
+            occ_fc = om_model.predict(h=h, X=X)
             p_forecast_arr = np.asarray(occ_fc.mean.values, dtype=float)
             # Store in occurrence_dict so _process_occurrence_forecast can use it
             self._occurrence["p_forecast"] = p_forecast_arr
@@ -4202,7 +4270,13 @@ class ADAM:
             )
         else:
             common.update(model=adam_model, orders=orders, regressors=self.regressors)
-            m = AutoOM(**common) if occ == "auto" else OM(occurrence=occ, **common)
+            if occ == "auto":
+                # As R's adam(), which gives auto.om() its own orders: without ARIMA
+                # there is no orders selection in the occurrence part
+                no_arima = {"ar": 0, "i": 0, "ma": 0, "select": False}
+                m = AutoOM(**{**common, "orders": orders or no_arima})
+            else:
+                m = OM(occurrence=occ, **common)
         # AutoOM returns the selected model
         return m.fit(y, X)
 
@@ -6884,7 +6958,6 @@ class ADAM:
             n_obs=n_obs,
             n_param=int(self.nparam),
             shape=other_dict.get("shape", self._gnorm_shape()),
-            alpha=other_dict.get("alpha"),
             rng=rng,
         )
 
@@ -7230,7 +7303,6 @@ class ADAM:
                 scale_base, distribution, obs_in_sample, self._df_scale
             )
             shape = (self.other or {}).get("shape") if hasattr(self, "other") else None
-            alpha = (self.other or {}).get("alpha") if hasattr(self, "other") else None
             errors_flat = generate_errors(
                 distribution=distribution,
                 n=n_errors,
@@ -7238,7 +7310,6 @@ class ADAM:
                 obs_in_sample=obs_in_sample,
                 n_param=n_param,
                 shape=shape,
-                alpha=alpha,
                 random_state=rng,
             )
         else:

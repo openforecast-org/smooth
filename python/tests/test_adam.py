@@ -11,7 +11,7 @@ Tests cover:
 import numpy as np
 import pytest
 
-from smooth import ADAM
+from smooth import ADAM, ES, MSARIMA, SMA, AutoADAM
 
 
 class TestADAMInitialization:
@@ -216,6 +216,13 @@ class TestADAMModelSelection:
         forecast = model.predict(h=5)
         assert forecast.shape[0] == 5
 
+    @pytest.mark.parametrize("pool", ["PPP", "FFF", ["ANN", "MAN", "MAM"], "CCN"])
+    def test_model_type_is_the_selected_model(self, seasonal_series, pool):
+        """model_type is the ETS part of the model name, as R's modelType()."""
+        model = ADAM(model=pool, lags=[12]).fit(seasonal_series)
+        assert model.model_type == model.model_name.split("(")[1].split(")")[0]
+        assert "P" not in model.model_type and "F" not in model.model_type
+
 
 class TestADAMEdgeCases:
     """Edge case tests for ADAM."""
@@ -253,6 +260,40 @@ class TestADAMEdgeCases:
 
 class TestADAMAttributes:
     """Tests for ADAM attributes after fitting."""
+
+    @pytest.mark.parametrize("initial", ["backcasting", "optimal"])
+    def test_initial_value_is_the_head_of_the_states(self, seasonal_series, initial):
+        """initial_value holds the initial states, as R's $initial."""
+        model = ADAM(model="AAA", lags=[12], initial=initial).fit(seasonal_series)
+        states = np.asarray(model.states)
+        assert list(model.initial_value) == ["level", "trend", "seasonal"]
+        assert model.initial_value["level"] == states[0, 0]
+        assert model.initial_value["trend"] == states[1, 0]
+        np.testing.assert_array_equal(model.initial_value["seasonal"], states[2, :12])
+
+    @pytest.mark.parametrize(
+        "initial",
+        [{"level": 100.0}, {"seasonal": np.ones(12)}, [100.0, None, np.ones(12)]],
+    )
+    def test_partial_initials_are_kept_and_the_rest_estimated(
+        self, seasonal_series, initial
+    ):
+        """The provided initials are used and the others estimated, as R."""
+        model = ADAM(model="AAA", lags=[12], initial=initial).fit(seasonal_series)
+        given = initial if isinstance(initial, dict) else {"level": 100.0}
+        assert model.initial_type == "provided"
+        for key, value in given.items():
+            np.testing.assert_array_equal(model.initial_value[key], value)
+        assert np.isfinite(model.loglik)
+
+    def test_vector_of_initials_is_split_into_components(self, seasonal_series):
+        """A vector holds the level, trend and seasonal initials in turn, as R."""
+        vector = np.r_[100.0, 1.0, np.arange(12.0) - 5.5]
+        model = ADAM(model="AAA", lags=[12], initial=vector).fit(seasonal_series)
+        assert model.initial_type == "provided"
+        assert model.initial_value["level"] == 100.0
+        assert model.initial_value["trend"] == 1.0
+        np.testing.assert_array_equal(model.initial_value["seasonal"], vector[2:])
 
     def test_persistence_level_attribute(self, simple_series):
         """Test that persistence level (alpha) is accessible."""
@@ -1600,3 +1641,43 @@ def test_approximate_intervals_of_adam_ets_take_the_drift(distribution):
             np.ravel(getattr(simulated, bound)),
             rtol=0.05,
         )
+
+
+@pytest.mark.parametrize(
+    "cls", ["ADAM", "ES", "MSARIMA", "SMA", "AutoADAM", "AutoMSARIMA", "AutoCES"]
+)
+def test_unknown_keyword_raises(cls):
+    """An unknown keyword is an error, not silently ignored."""
+    import smooth
+
+    with pytest.raises(TypeError, match="reg_lambda"):
+        getattr(smooth, cls)(reg_lambda=1)
+
+
+def test_lambda_alias_kept():
+    """``**{"lambda": ...}`` and ``print_level`` stay accepted aliases."""
+    model = ADAM(model="ANN", loss="LASSO", print_level=0, **{"lambda": 0.5})
+    assert model.lambda_param == 0.5
+    assert model.nlopt_kwargs == {"print_level": 0}
+
+
+@pytest.mark.parametrize("distribution", ["dalaplace", "dfoo"])
+def test_unknown_distribution_raises(distribution):
+    """dalaplace is not implemented: rejected as any unknown distribution, as R's
+    match.arg() rejects one."""
+    from smooth import AutoADAM
+
+    y = np.random.default_rng(1).normal(10, 1, 50)
+    with pytest.raises(ValueError, match="Unknown distribution"):
+        ADAM(model="ANN", distribution=distribution).fit(y)
+    with pytest.raises(ValueError, match="Unknown distribution"):
+        AutoADAM(distribution=["dnorm", distribution])
+
+
+@pytest.mark.parametrize("cls", [ADAM, AutoADAM, ES, MSARIMA, SMA])
+def test_an_unknown_occurrence_raises(cls):
+    """As R's match.arg(): an unknown occurrence stops, it did not fall back
+    to "none"."""
+    y = np.abs(np.random.default_rng(1).normal(10, 2, 60))
+    with pytest.raises(ValueError, match="occurrence should be one of"):
+        cls(occurrence="foo").fit(y)

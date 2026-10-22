@@ -12,6 +12,7 @@ two-model analogue.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Optional
 
 import numpy as np
@@ -166,11 +167,12 @@ def omg_cf(  # noqa: N802
     """OMG cost function — joint Bernoulli likelihood on combined probability
     (or a single-step / regularised / custom loss).
 
-    With ``return_fitted=True`` the coupled probability vector is returned
-    instead of the scalar loss, so the final object's fitted values (and the
-    Bernoulli logLik computed from them) come from the same coupled recursion
-    the optimiser minimised — not the standalone per-side refit. Mirrors
-    ``omgCF_local``'s ``returnFitted``.
+    With ``return_fitted=True`` a dict of the coupled probability vector
+    (``fitted``) and of the states, fitted values and end-of-sample profile of
+    both sides (``A``, ``B``) is returned instead of the scalar loss, so the
+    final object's fitted values, Bernoulli logLik, sub-models and forecasts come
+    from the same coupled recursion the optimiser minimised — not a standalone
+    per-side refit. Mirrors ``omgCF_local``'s ``returnFitted``.
 
     ``side_a`` and ``side_b`` are dicts collecting everything ``filler`` and
     ``adam_cpp.omfitGeneral`` need for the two sub-models. ``n_params_a``
@@ -323,11 +325,20 @@ def omg_cf(  # noqa: N802
         e_b,
     )
 
-    # The coupled fitted probability, returned directly for the final object so
-    # its fitted values and Bernoulli logLik come from the same recursion the
-    # optimiser minimised (mirrors omgCF_local's returnFitted).
+    # The coupled fitted probability and the states and fitted values of both
+    # sides, returned for the final object so its fitted values, Bernoulli logLik,
+    # sub-models and forecasts come from the same recursion the optimiser
+    # minimised (mirrors omgCF_local's returnFitted).
     if return_fitted:
-        return p_combined
+        return {
+            "fitted": p_combined,
+            "A": SimpleNamespace(
+                states=res.statesA, fitted=res.fittedA, profile=res.profileA
+            ),
+            "B": SimpleNamespace(
+                states=res.statesB, fitted=res.fittedB, profile=res.profileB
+            ),
+        }
 
     # Infeasibility guard: NaN or boundary p means the parameters are
     # inconsistent with the data — return a uniform large penalty so the

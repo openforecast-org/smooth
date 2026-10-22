@@ -181,22 +181,34 @@ omg <- function(data,
 
     lossArg <- if(loss == "likelihood") "likelihood" else loss
 
-    # Pre-select ETS model when wildcard characters (Z/X/Y) are present
-    if(grepl("[ZXYFPS]", modelA)) {
+    # Pre-select ETS model when wildcard characters (Z/X/Y) are present. A side with
+    # regressors="select" selects them there as om() does, and then uses the selected
+    # ones. Both see the in-sample data only
+    force(formulaB)
+    xregSelect <- (NCOL(data)>1) & c(regressorsA, regressorsB)=="select"
+    if(grepl("[ZXYFPS]", modelA) || xregSelect[1]) {
         preA  <- om(data=data, model=modelA, lags=lags, orders=ordersA,
                     constant=constantA, formula=formulaA, regressors=regressorsA,
-                    occurrence="odds-ratio", loss=loss, h=0, holdout=FALSE,
+                    occurrence="odds-ratio", loss=loss, h=h, holdout=holdout,
                     persistence=persistenceA, phi=phiA, initial=initial,
                     arma=armaA, ic=ic, bounds=bounds, ets=etsA, silent=TRUE, ...)
         modelA <- modelType(preA)
+        if(xregSelect[1]) {
+            formulaA <- formula(preA)
+            regressorsA <- "use"
+        }
     }
-    if(grepl("[ZXYFPS]", modelB)) {
+    if(grepl("[ZXYFPS]", modelB) || xregSelect[2]) {
         preB  <- om(data=data, model=modelB, lags=lags, orders=ordersB,
                     constant=constantB, formula=formulaB, regressors=regressorsB,
-                    occurrence="inverse-odds-ratio", loss=loss, h=0, holdout=FALSE,
+                    occurrence="inverse-odds-ratio", loss=loss, h=h, holdout=holdout,
                     persistence=persistenceB, phi=phiB, initial=initial,
                     arma=armaB, ic=ic, bounds=bounds, ets=etsB, silent=TRUE, ...)
         modelB <- modelType(preB)
+        if(xregSelect[2]) {
+            formulaB <- formula(preB)
+            regressorsB <- "use"
+        }
     }
 
     #### parametersChecker for A and B ####
@@ -204,7 +216,7 @@ omg <- function(data,
                                   formulaToUse=formulaA, orders=ordersA,
                                   constant=constantA, arma=armaA,
                                   persistence=persistenceA, phi=phiA,
-                                  initial=initial, distribution="dnorm",
+                                  initial=initial, distribution="plogis",
                                   loss=lossArg,
                                   h=h, holdout=holdout, occurrence="odds-ratio",
                                   ic=ic, bounds=bounds, regressors=regressorsA,
@@ -215,7 +227,7 @@ omg <- function(data,
                                   formulaToUse=formulaB, orders=ordersB,
                                   constant=constantB, arma=armaB,
                                   persistence=persistenceB, phi=phiB,
-                                  initial=initial, distribution="dnorm",
+                                  initial=initial, distribution="plogis",
                                   loss=lossArg,
                                   h=h, holdout=holdout, occurrence="inverse-odds-ratio",
                                   ic=ic, bounds=bounds, regressors=regressorsB,
@@ -227,6 +239,17 @@ omg <- function(data,
     }
     if(isTRUE(checkerB$select)) {
         stop("ARIMA order selection is not supported in omg(). Specify fixed orders.", call.=FALSE)
+    }
+
+    # The probability depends on the difference of the coefficients of the two sides,
+    # which the regression of the indicator estimates: each side starts from its half
+    for(k in seq_along(checkerA$xregModelInitials)){
+        if(!checkerA$initialXregProvided && !is.null(checkerA$xregModelInitials[[k]])){
+            checkerA$xregModelInitials[[k]]$initialXreg <- checkerA$xregModelInitials[[k]]$initialXreg / 2
+        }
+        if(!checkerB$initialXregProvided && !is.null(checkerB$xregModelInitials[[k]])){
+            checkerB$xregModelInitials[[k]]$initialXreg <- checkerB$xregModelInitials[[k]]$initialXreg / 2
+        }
     }
 
     #### Shared binary indicators (same data for A and B) ####
@@ -883,7 +906,6 @@ omg <- function(data,
         adamCreated   <- res$adamCreated
         occurrence    <- res$occurrence
         regressors    <- res$regressors
-        occurrenceChar <- if(occurrence == "odds-ratio") "o" else "i"
 
         adamFilled <- adam_filler(res$B,
                                   checker$etsModel, checker$Etype, checker$Ttype, checker$Stype,
@@ -912,26 +934,9 @@ omg <- function(data,
                                   checker$constantRequired, checker$initialArimaNumber)
 
         prof <- adamFilled$matVt[, seq_len(adamArchitect$lagsModelMax), drop=FALSE]
-        # Each side is reported as a standalone occurrence fit (as for
-        # backcasting/optimal); for initial="gradient" the dispatcher solves the
-        # side's initials by profiling its own occurrence loss. Non-gradient
-        # initials fall straight through to the ordinary fit with the same
-        # backcast flag, so backcasting/optimal are unchanged.
-        adamFitted <- adam_fitOrGradient(
-            adamFilled$matVt, adamFilled$matWt, adamFilled$matF, adamFilled$vecG,
-            adamArchitect$indexLookupTable, prof,
-            otFit, otFit,
-            checker$initialType, nIterations, adamArchitect$adamCpp,
-            checker$etsModel, checker$arimaModel, checker$xregModel,
-            checker$Etype, checker$Ttype, checker$Stype,
-            adamArchitect$componentsNumberETS,
-            adamArchitect$componentsNumberETSSeasonal,
-            adamArchitect$componentsNumberETSNonSeasonal,
-            adamArchitect$lagsModel, adamArchitect$lagsModelMax,
-            obsInSample, loss, oType=occurrenceChar,
-            componentsNumberARIMA=checker$componentsNumberARIMA,
-            lagsModelAll=adamArchitect$lagsModelAll,
-            xregNumber=checker$xregNumber)
+        # The states, fitted values and end-of-sample profile of the side come from
+        # the coupled recursion of the two sides, which the optimiser minimised
+        adamFitted <- res$coupled
 
         yFitted <- adamFitted$fitted
 
@@ -1008,6 +1013,21 @@ omg <- function(data,
             checker$xregModel, checker$initialXregEstimate, checker$xregNumber,
             checker$lagsModelARIMA)
 
+        # The regressors stay with the indicators, forecast() takes them from there by
+        # their names, as from adam()
+        sideData <- replace(yInSample, !otObserved, NA)
+        sideHoldout <- if(holdout) yHoldout else NULL
+        if(checker$xregModel) {
+            names(initialCollected$initialValue$xreg) <- checker$xregNames
+            dataColumns <- c(checker$responseName, setdiff(colnames(data), checker$responseName))
+            sideData <- data[1:obsInSample, dataColumns, drop=FALSE]
+            sideData[,checker$responseName] <- replace(as.numeric(yInSample), !otObserved, NA)
+            if(holdout) {
+                sideHoldout <- data[obsInSample+c(1:h), dataColumns, drop=FALSE]
+                sideHoldout[,checker$responseName] <- as.numeric(yHoldout)
+            }
+        }
+
         if(checker$arimaModel && (checker$arRequired || checker$maRequired)) {
             armaParametersList <- vector("list", checker$arRequired + checker$maRequired)
             j <- 1L
@@ -1041,7 +1061,7 @@ omg <- function(data,
             model       = modelName,
             timeElapsed = Sys.time() - startTime,
             # The missing observations stay missing, as in om()
-            data        = replace(yInSample, !otObserved, NA),
+            data        = sideData,
             fitted      = yFitted,
             residuals   = errors,
             forecast    = yForecast,
@@ -1082,7 +1102,7 @@ omg <- function(data,
             call        = cl)
 
         if(holdout) {
-            subModel$holdout  <- yHoldout
+            subModel$holdout  <- sideHoldout
         }
 
         # Tag the sub-model with an ``omg_submodel`` class ahead of ``om``
@@ -1123,18 +1143,20 @@ omg <- function(data,
         occurrence      = "inverse-odds-ratio",
         regressors      = regressorsB)
 
+    # The fitted probability and the two sub-models come from the coupled
+    # recursion the optimiser minimised (re-run omgCF_local at the final B)
+    coupled <- do.call(omgCF_local,
+                       c(list(B=c(jointResult$B_A, jointResult$B_B)),
+                         modifyList(jointResult$nloptrArgs, list(returnFitted=TRUE))))
+    pCoupled <- coupled$fitted
+    resA$coupled <- coupled$A
+    resB$coupled <- coupled$B
+
     modelA <- omgFinalFit(resA, hLocal=h)
     modelB <- omgFinalFit(resB, hLocal=h)
 
     EtypeA <- errorType(modelA)
     EtypeB <- errorType(modelB)
-
-    # The top-level fitted probability comes from the coupled recursion the
-    # optimiser minimised (re-run omgCF_local at the final B), not the standalone
-    # per-side refits. modelA/modelB are kept only for the sub-model diagnostics.
-    pCoupled  <- do.call(omgCF_local,
-                         c(list(B=c(jointResult$B_A, jointResult$B_B)),
-                           modifyList(jointResult$nloptrArgs, list(returnFitted=TRUE))))
     yFitted   <- modelA$fitted
     yFitted[] <- pCoupled
     # logLik is the Bernoulli of that same coupled probability, so $fitted and
@@ -1437,12 +1459,14 @@ omgCF_local <- function(B,
 
     pCombined <- omgLinkFunction(res$fittedA, res$fittedB, EtypeA, EtypeB)
 
-    # The coupled fitted probability. Returned directly for the final object so
-    # its $fitted (and the Bernoulli logLik computed from it) come from the same
-    # coupled recursion the optimiser minimised — not the standalone per-side
-    # refit, which only approximates it.
+    # The coupled fitted probability and the states and fitted values of both
+    # sides. Returned for the final object, so that its $fitted (and the Bernoulli
+    # logLik computed from it), its sub-models and its forecasts come from the
+    # same coupled recursion the optimiser minimised.
     if(returnFitted){
-        return(pCombined)
+        return(list(fitted=pCombined,
+                    A=list(states=res$statesA, fitted=res$fittedA, profile=res$profileA),
+                    B=list(states=res$statesB, fitted=res$fittedB, profile=res$profileB)))
     }
 
     if(any(is.nan(pCombined)) || any(pCombined <= 0) || any(pCombined >= 1)) {
@@ -1766,6 +1790,15 @@ coefbootstrap.omg <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 }
 
 #' @export
+coef.omg <- function(object, ...){
+    # The parameters of model A followed by those of model B, named as in confint()
+    coefficients <- c(object$modelA$B, object$modelB$B)
+    names(coefficients) <- c(paste0("A:", names(object$modelA$B)),
+                             paste0("B:", names(object$modelB$B)))
+    return(coefficients)
+}
+
+#' @export
 confint.omg <- function(object, parm, level=0.95,
                         type=c("opg","hessian","bootstrap"), bootstrap=FALSE, ...){
     type <- covarTypeResolver(type, bootstrap)
@@ -1954,7 +1987,6 @@ print.omg <- function(x, digits=4, ...) {
                       "dlogis"    = "Logistic",
                       "plogis"    = "Cumulative Logistic",
                       "dt"        = paste0("Student t with df=", round(x$other$nu, digits)),
-                      "dalaplace" = paste0("Asymmetric Laplace with alpha=", round(x$other$alpha, digits)),
                       "dlnorm"    = "Log-Normal",
                       "dllaplace" = "Log-Laplace",
                       "dls"       = "Log-S",

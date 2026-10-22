@@ -21,7 +21,9 @@
 #' @param constant Logical; whether to include a constant term.
 #' @param formula Optional formula for external regressors.
 #' @param regressors How to handle regressors: \code{"use"},
-#'   \code{"select"}, or \code{"adapt"}.
+#'   \code{"select"}, or \code{"adapt"}. \code{"select"} chooses them with
+#'   \link[greybox]{stepwise} (\code{distribution="plogis"}) on the occurrence
+#'   indicator of the in-sample observations.
 #' @param occurrence Type of link function mapping state to probability:
 #'   \code{"fixed"} (constant), \code{"odds-ratio"}, \code{"inverse-odds-ratio"},
 #'   or \code{"direct"}.
@@ -158,7 +160,7 @@ om <- function(data,
                           initial=initial, arma=arma,
                           ic=ic, bounds=bounds, silent=silent, ets=ets,
                           occurrence=c("fixed","general","odds-ratio","inverse-odds-ratio","direct"),
-                          constant=constant, loss=loss, ...)
+                          constant=constant, loss=loss, smoother=smoother, ...)
         result$call <- match.call()
         return(result)
     }
@@ -174,7 +176,7 @@ om <- function(data,
                       etsA=ets, etsB=ets,
                       lags=lags, h=h, holdout=holdout,
                       initial=initial, loss=loss, ic=ic,
-                      bounds=bounds, silent=silent, ...)
+                      bounds=bounds, silent=silent, smoother=smoother, ...)
         result$call <- match.call()
         return(result)
     }
@@ -227,11 +229,8 @@ om <- function(data,
         modelDo <- modelDo_user;
     }
 
-    dataChecked <- adam_checkData(data, lags, h, holdout, yName, modelDo, formula);
-    list2env(dataChecked, envir=environment());
-
     #### Force ETS(A,N,N) with persistence=0 for "fixed" occurrence ####
-    # A constant probability has no ARIMA either
+    # A constant probability has no ARIMA or regressors either
     if(occurrence == "fixed"){
         model <- "ANN";
         persistence <- 0;
@@ -239,7 +238,15 @@ om <- function(data,
         modelDo <- "use";
         orders <- list(ar=0, i=0, ma=0);
         constant <- FALSE;
+        if(!is.null(ncol(data)) && ncol(data)>1){
+            data <- data[, if(is.null(formula)) 1 else all.vars(formula)[1], drop=FALSE];
+        }
+        formula <- NULL;
     }
+
+    dataChecked <- adam_checkData(data, lags, h, holdout, yName, modelDo, formula);
+    list2env(dataChecked, envir=environment());
+
 
     #### Call parametersChecker ####
     checkerReturn <- parametersChecker(data=data, model=model, lags=lags,
@@ -387,6 +394,31 @@ om <- function(data,
     }
 
     list2env(checkerReturn, envir=environment());
+
+    # The regressors (never the response) are selected by stepwise() on the occurrence
+    # indicator of all the in-sample observations, and the model is refitted with them.
+    # A formula is applied to the data first, and the selection runs over its columns
+    if(isTRUE(checkerReturn$xregModel) && regressors=="select"){
+        colnames(data) <- make.names(colnames(data), unique=TRUE);
+        responseName <- make.names(responseName);
+        xregSelect <- if(is.null(xregTerms)) as.data.frame(data)[, colnames(data)!=responseName, drop=FALSE] else xregData;
+        dataSelect <- data.frame(as.data.frame(data)[1:obsInSample, responseName, drop=FALSE],
+                                 xregSelect[1:obsInSample,,drop=FALSE]);
+        xregSelected <- names(coef(suppressWarnings(stepwise(dataSelect, ic=ic, distribution="plogis",
+                                                             silent=TRUE))))[-1];
+        if(is.null(xregTerms)){
+            xregTerms <- setNames(nm=colnames(xregSelect));
+        }
+        # Without the selected regressors, the model is on the response only (y~1)
+        callNew <- cl;
+        callNew$data <- data;
+        callNew$formula <- reformulate(if(length(xregSelected)==0) "1" else unique(xregTerms[xregSelected]),
+                                       response=responseName);
+        callNew$regressors <- "use";
+        modelReturned <- eval(callNew, envir=parent.frame());
+        modelReturned$call <- cl;
+        return(modelReturned);
+    }
     # ``commonParametersChecker`` resets ``lossFunction`` to ``NULL`` for a
     # string-valued loss; restore the user-provided callable captured above
     # so the optimiser-side cost dispatch can call it.
@@ -451,6 +483,17 @@ om <- function(data,
             yHoldout <- ts(yHoldout, start=yForecastStart, frequency=yFrequency);
         } else {
             yHoldout <- zoo(yHoldout, order.by=yForecastIndex);
+        }
+    }
+    # The regressors stay with the indicators, forecast() takes them from there, as
+    # from adam()
+    omHoldout <- yHoldout;
+    if(xregModel){
+        dataColumns <- c(responseName, setdiff(colnames(data), responseName));
+        omData <- data[1:obsInSample,dataColumns,drop=FALSE];
+        if(holdout){
+            omHoldout <- data[obsInSample+c(1:h),dataColumns,drop=FALSE];
+            omHoldout[,responseName] <- as.numeric(yHoldout);
         }
     }
 
@@ -688,7 +731,11 @@ om <- function(data,
                         objective=do.call(omCF_local, c(list(B=B_used), nloptrArgs)));
         }
         else{
-            maxevalUsed <- if(is.null(maxeval)) length(B_used) * 40L else maxeval;
+            maxevalUsed <- maxeval;
+            if(is.null(maxeval)){
+                # As adam(), at least 1000 iterations with the regressors
+                maxevalUsed <- if(xregModel) max(1000, length(B_used) * 100) else length(B_used) * 40;
+            }
             res <- suppressWarnings(do.call(nloptr,
                                             c(list(x0=B_used, eval_f=omCF_local,
                                                    lb=lb, ub=ub,
@@ -740,7 +787,10 @@ om <- function(data,
                                                           as.logical(initialLevelEstimate));
             naiveLevelSeasonal <- initialLevelEstimate +
                 modelIsSeasonal*sum(initialSeasonalEstimate*(lagsModelSeasonal-1));
-            etsRedundancy <- naiveLevelSeasonal - dfLevelSeasonal;
+            # B has m-1 initials per seasonal lag: without the level, their span lacks
+            # the constant that the level would take
+            etsRedundancy <- naiveLevelSeasonal -
+                (dfInitialsETSLevelSeasonal(seasonalLagsEstimated, TRUE) - !initialLevelEstimate);
             dfInitials <- dfLevelSeasonal + modelIsTrendy*initialTrendEstimate;
         }
         if(arimaModel){
@@ -1006,7 +1056,8 @@ om <- function(data,
         }
 
         # Model name
-        modelStr <- paste0(nla$Etype, nla$Ttype, "d"[nla$phiEstimate], nla$Stype);
+        # Without ETS the model is "NNN", as in adam()
+        modelStr <- if(nla$etsModel) paste0(nla$Etype, nla$Ttype, "d"[nla$phiEstimate], nla$Stype) else "NNN";
         modelName <- adam_model_name(nla$etsModel, modelStr, xregModel, nla$arimaModel,
                                      nla$arOrders, nla$iOrders, nla$maOrders, lags,
                                      regressors, constantRequired, constantName,
@@ -1034,6 +1085,10 @@ om <- function(data,
             adamArchitect$componentsNumberETS, componentsNumberARIMA,
             adamFilled$arimaPolynomials, nla$Etype,
             xregModel, nla$initialXregEstimate, xregNumber, lagsModelARIMA);
+        # forecast() takes the regressors from the data by these names
+        if(xregModel){
+            names(initialCollected$initialValue$xreg) <- xregNames;
+        }
 
         # ARMA parameters
         if(nla$arimaModel && (nla$arRequired || nla$maRequired)){
@@ -1072,11 +1127,16 @@ om <- function(data,
             yInSample <- zoo(yInSample, order.by=yInSampleIndex);
         }
 
+        # The missing observations stay missing
+        omDataFinal <- replace(yInSample, !otObserved, NA);
+        if(xregModel){
+            omData[,responseName] <- omDataFinal;
+            omDataFinal <- omData;
+        }
         subModel <- list(
             model = modelName,
             timeElapsed = Sys.time() - startTime,
-            # The missing observations stay missing
-            data = replace(yInSample, !otObserved, NA),
+            data = omDataFinal,
             fitted = yFitted,
             residuals = errors,
             forecast = yForecast,
@@ -1124,7 +1184,7 @@ om <- function(data,
         );
 
         if(holdout){
-            subModel$holdout <- yHoldout;
+            subModel$holdout <- omHoldout;
             subModel$accuracy <- measures(as.vector(yHoldout), yForecast,
                                           as.vector(yInSample));
         }

@@ -10,10 +10,17 @@ import time
 import warnings
 from typing import Any, Dict, List, Literal, Optional, Union
 
+import numpy as np
 from numpy.typing import NDArray
 
+from smooth.adam_general.core.checker.arima_checks import (
+    _R_ORDERS,
+    resolve_arima_orders,
+)
+from smooth.adam_general.core.estimator.arima_selector import arima_selector
 from smooth.adam_general.core.om import OM, _check_om_loss
 from smooth.adam_general.core.omg import OMG
+from smooth.adam_general.core.utils.utils import SMOOTHER_DEFAULT, SmootherType
 
 _VALID_OCCURRENCE = (
     "fixed",
@@ -46,7 +53,15 @@ class AutoOM:
     lags :
         Seasonal lags shared across all candidates.
     orders :
-        ARIMA orders forwarded to every candidate.
+        ARIMA orders, as R's ``auto.om()``: ``{"ar": ..., "i": ..., "ma": ...,
+        "select": ...}``. With ``select=True`` they are the maximum orders, selected
+        for each occurrence type on the residuals of its ETS (except for the
+        general one) by ADAM's ARIMA selector. The default (None, without
+        ``ar_order`` / ``i_order`` / ``ma_order``) is R's
+        ``{"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True}``; pass
+        ``{"ar": 0, "i": 0, "ma": 0}`` for no ARIMA.
+    arima_select, ar_order, i_order, ma_order :
+        The orders as in :class:`AutoADAM`, used when ``orders`` is None.
     occurrence :
         Sequence of occurrence types to try.
     h, holdout :
@@ -56,6 +71,10 @@ class AutoOM:
     loss, lambda_param :
         The loss (and the LASSO / RIDGE weight) of every candidate, as R's
         ``auto.om()`` passes them to ``om()``.
+    n_iterations, smoother :
+        The backcasting iterations and the ``msdecompose`` smoother of the
+        initial states, as in :class:`OM`, passed to every candidate (both
+        sub-models of the general one).
     """
 
     def __init__(
@@ -69,6 +88,7 @@ class AutoOM:
         persistence: Optional[Dict[str, float]] = None,
         phi: Optional[float] = None,
         initial: Union[str, Dict[str, Any]] = "backcasting",
+        n_iterations: Optional[int] = None,
         constant: bool = False,
         arma: Optional[Dict[str, Any]] = None,
         regressors: Literal["use", "select", "adapt"] = "use",
@@ -78,11 +98,12 @@ class AutoOM:
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
         arima_select: bool = False,
-        ar_order: Union[int, List[int]] = 3,
-        i_order: Union[int, List[int]] = 2,
-        ma_order: Union[int, List[int]] = 3,
+        ar_order: Union[int, List[int], None] = None,
+        i_order: Union[int, List[int], None] = None,
+        ma_order: Union[int, List[int], None] = None,
         loss: Any = "likelihood",
         lambda_param: Optional[float] = None,
+        smoother: SmootherType = SMOOTHER_DEFAULT,
     ) -> None:
         _check_om_loss(loss)
         if isinstance(occurrence, str):
@@ -101,6 +122,7 @@ class AutoOM:
         self.persistence = persistence
         self.phi = phi
         self.initial = initial
+        self.n_iterations = n_iterations
         self.constant = constant
         self.arma = arma
         self.regressors = regressors
@@ -111,6 +133,12 @@ class AutoOM:
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
+        if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
+            raise ValueError(
+                f"Invalid smoother: {smoother!r}. Must be one of "
+                "'default', 'ma', 'lowess', 'supsmu', 'global'."
+            )
+        self.smoother = smoother
         self.arima_select = arima_select
         self.ar_order = ar_order
         self.i_order = i_order
@@ -123,12 +151,14 @@ class AutoOM:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _common_kwargs(self) -> Dict[str, Any]:
+    def _common_kwargs(self, lags: Optional[List[int]]) -> Dict[str, Any]:
         return dict(
-            lags=self.lags,
+            lags=lags,
             h=self.h,
             holdout=self.holdout,
             initial=self.initial,
+            n_iterations=self.n_iterations,
+            smoother=self.smoother,
             ic=self.ic,
             bounds=self.bounds,
             verbose=self.verbose,
@@ -137,39 +167,10 @@ class AutoOM:
             lambda_param=self.lambda_param,
         )
 
-    def _build_candidate(self, occ: str) -> Union[OM, OMG]:
-        common = self._common_kwargs()
-        if occ == "general":
-            return OMG(
-                model_a=self.model,
-                model_b=self.model,
-                orders_a=self.orders,
-                constant_a=self.constant,
-                persistence_a=self.persistence,
-                phi_a=self.phi,
-                arma_a=self.arma,
-                regressors_a=self.regressors,
-                ets=self.ets,
-                **common,
-            )
-        return OM(
-            model=self.model,
-            occurrence=occ,
-            orders=self.orders,
-            constant=self.constant,
-            persistence=self.persistence,
-            phi=self.phi,
-            arma=self.arma,
-            regressors=self.regressors,
-            ets=self.ets,
-            **common,
-        )
-
-    def _build_candidate_with_orders(
-        self, occ: str, ar: int, i: int, ma: int
+    def _build_candidate(
+        self, occ: str, orders: Optional[Dict[str, Any]], lags: Optional[List[int]]
     ) -> Union[OM, OMG]:
-        orders = {"ar": ar, "i": i, "ma": ma}
-        common = self._common_kwargs()
+        common = self._common_kwargs(lags)
         if occ == "general":
             return OMG(
                 model_a=self.model,
@@ -197,51 +198,39 @@ class AutoOM:
         )
 
     def _fit_with_arima_selection(
-        self, occ: str, y: NDArray, X: Optional[NDArray]
+        self, occ: str, y: NDArray, X: Optional[NDArray], lags: List[int], maxima
     ) -> Union[OM, OMG]:
-        """Stepwise ARIMA order selection for a fixed occurrence type."""
-        i_max = self.i_order if isinstance(self.i_order, int) else self.i_order[0]
-        ma_max = self.ma_order if isinstance(self.ma_order, int) else self.ma_order[0]
-        ar_max = self.ar_order if isinstance(self.ar_order, int) else self.ar_order[0]
-
-        def _try(ar: int, i: int, ma: int):
-            m = self._build_candidate_with_orders(occ, ar, i, ma)
-            m.fit(y, X)
-            return m, _get_ic(m, self.ic)
-
-        # Step 1: select integration order d by trying (0, d, 0)
-        d_star, best_ic = 0, float("inf")
-        for d in range(i_max + 1):
-            try:
-                _, ic = _try(0, d, 0)
-                if ic < best_ic:
-                    best_ic, d_star = ic, d
-            except Exception:
-                pass
-
-        # Step 2: select MA order q
-        q_star, best_ic = 0, float("inf")
-        for q in range(ma_max + 1):
-            try:
-                _, ic = _try(0, d_star, q)
-                if ic < best_ic:
-                    best_ic, q_star = ic, q
-            except Exception:
-                pass
-
-        # Step 3: select AR order p and keep the fitted model
-        best_ic, best_model = float("inf"), None
-        for p in range(ar_max + 1):
-            try:
-                m, ic = _try(p, d_star, q_star)
-                if ic < best_ic:
-                    best_ic, best_model = ic, m
-            except Exception:
-                pass
-
-        if best_model is None:
+        """The orders of a non-general occurrence type selected by ADAM's ARIMA
+        selector on the residuals of the model without them, as R's auto.om()
+        calls adam_arimaSelector() with om() as the fitter."""
+        no_arima = {"ar": 0, "i": 0, "ma": 0, "select": False}
+        baseline = None
+        if self.model != "NNN" or X is not None:
+            baseline = self._build_candidate(occ, no_arima, lags).fit(y, X)
+        common = self._common_kwargs(lags)
+        for key in ("lags", "ic", "verbose"):
+            common.pop(key)
+        selected = arima_selector(
+            y=y,
+            ets_model=self.model,
+            max_ar_orders=maxima[0],
+            max_i_orders=maxima[1],
+            max_ma_orders=maxima[2],
+            lags=lags,
+            ic=self.ic,
+            X=X,
+            ets_baseline=baseline,
+            fitter=OM,
+            occurrence=occ,
+            persistence=self.persistence,
+            phi=self.phi,
+            regressors=self.regressors,
+            ets=self.ets,
+            **common,
+        )
+        if selected["model"] is None:
             raise RuntimeError(f"AutoOM: arima_select failed for occurrence='{occ}'")
-        return best_model
+        return selected["model"]
 
     # ------------------------------------------------------------------
     # fit
@@ -267,12 +256,44 @@ class AutoOM:
         best_ic = float("inf")
         best_model: Optional[Union[OM, OMG]] = None
 
+        # The orders as R's auto.om() reads them: the maximum orders by lag, with
+        # lag 1, without the lags of no order, unique and sorted
+        orders, select = resolve_arima_orders(
+            self.orders, self.ar_order, self.i_order, self.ma_order, self.arima_select
+        )
+        if orders is None:
+            orders, select = dict(_R_ORDERS), True
+        lags = list(self.lags or [1])
+        maxima = [list(np.atleast_1d(orders.get(k, 0))) for k in ("ar", "i", "ma")]
+        if any(np.any(np.asarray(m) > 0) for m in maxima):
+            lags = [lag for lag in ([1] * (1 not in lags) + lags) if lag != 0]
+            table: Dict[int, List[int]] = {}
+            for k, lag in enumerate(lags):
+                row = [int(m[k]) if k < len(m) else 0 for m in maxima]
+                table[lag] = np.maximum(table.get(lag, row), row).tolist()
+            kept = {lag: row for lag, row in table.items() if sum(row) > 0}
+            lags = sorted(kept or {min(table): table[min(table)]})
+            maxima = [[(kept or table)[lag][j] for lag in lags] for j in range(3)]
+        else:
+            select = False
+            orders = {"ar": 0, "i": 0, "ma": 0, "select": False}
+        if select and self.arma is not None:
+            warnings.warn(
+                "ARIMA order selection cannot be done with provided arma parameters. "
+                "Dropping them.",
+                stacklevel=2,
+            )
+            self.arma = None
+
         for occ in self.occurrence:
             try:
-                if self.arima_select:
-                    m = self._fit_with_arima_selection(occ, y, X)
+                if select and occ != "general":
+                    m = self._fit_with_arima_selection(occ, y, X, lags, maxima)
                 else:
-                    m = self._build_candidate(occ)
+                    no_select = {"ar": 0, "i": 0, "ma": 0, "select": False}
+                    m = self._build_candidate(
+                        occ, no_select if select else orders, lags
+                    )
                     m.fit(y, X)
                 ic_val = _get_ic(m, self.ic)
                 if ic_val < best_ic:

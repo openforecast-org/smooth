@@ -26,7 +26,10 @@ for(version in names(roots)){
         suppressMessages(library(smooth, lib.loc=library))
         lapply(fits, function(fit){
             environment(fit) <- globalenv()
-            times <- sapply(seq_len(repeats), function(i) system.time(model <- fit())["elapsed"])
+            times <- numeric(repeats)
+            for(i in seq_len(repeats)){
+                times[i] <- system.time(model <- fit())["elapsed"]
+            }
             list(time=median(times), logLik=as.numeric(logLik(model)))
         })
     }, args=list(library=library, fits=fits, repeats=repeats))

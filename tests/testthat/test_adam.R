@@ -748,9 +748,11 @@ test_that("confint keeps the ARMA parameters within their stationary / invertibl
     testModel <- msarima(BJsales, orders=list(ar=2, i=1, ma=2))
     phi2 <- coef(testModel)[["phi2[1]"]]
     expect_equal(unname(confint(testModel)["phi1[1]", 2:3]), c(phi2-1, 1-phi2), tolerance=1e-6)
-    # The upper bound of the admissible alpha of ANN, (0, 2), was stuck at 5.01
+    # The upper bound of the admissible alpha of ANN, [0, 2), was stuck at 5.01. The bound is the
+    # first inadmissible value of the grid from above: alpha=2 puts the root of the MA polynomial
+    # 1 + B on the unit circle, so it is not admissible (the per-lag check took it, giving 2.01)
     testModel <- adam(BJsales, "ANN", bounds="admissible")
-    expect_equal(unname(eigenBounds(testModel, as.matrix(testModel$persistence), 1)[2]), 2.01)
+    expect_equal(unname(eigenBounds(testModel, as.matrix(testModel$persistence), 1)), c(-0.01, 2))
 })
 
 test_that("The ARIMA bounds reject exactly the non-invertible MA and non-stationary AR", {

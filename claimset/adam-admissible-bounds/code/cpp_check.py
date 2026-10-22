@@ -1,0 +1,106 @@
+"""The C++ core (smoothEigensR through R) against the numpy prototype on random models."""
+
+import argparse
+import json
+import os
+import subprocess
+import tempfile
+
+import numpy as np
+
+from admissibility import (arima_form, cancel, ets, gum_random, gum_start, max_lambda_roots, pbh_max, trim,
+                           write_results)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", type=int, required=True)
+parser.add_argument("--n", type=int, default=100)
+args = parser.parse_args()
+rng = np.random.default_rng(args.seed)
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+
+def ets_random(seasonalChoices):
+    seasonal = sorted(rng.choice(seasonalChoices, size=rng.integers(0, 3), replace=False).tolist())
+    trend = rng.choice(["N", "A", "Ad"])
+    beta = None if trend == "N" else (0.0 if rng.random() < 0.1 else rng.uniform(0, 0.5))
+    gamma = [0.0 if rng.random() < 0.15 else rng.uniform(0.01, 1.5) for _ in seasonal]
+    return ets(rng.uniform(0.01, 1.9), seasonal, gamma, beta,
+               phi=rng.uniform(0.8, 0.99) if trend == "Ad" else 1.0, constant=rng.random() < 0.3)
+
+
+families = {
+    "ETS": lambda: ets_random((4, 7, 12, 24, 52)),
+    "ETS high degree": lambda: ets_random((24, 168, 365)),
+    "GUM identity": lambda: gum_start(sorted(rng.choice([1, 4, 12], size=rng.integers(2, 5)).tolist()),
+                                      g=rng.uniform(-0.3, 0.6)),
+    "GUM random": lambda: gum_random(sorted(rng.choice([1, 4, 12, 24], size=rng.integers(2, 5)).tolist()), rng,
+                                     sd=0.35),
+}
+models = [(name, make()) for name, make in families.items() for _ in range(args.n)]
+
+# The prototype
+expected = []
+for name, (F, g, w, lags) in models:
+    theta, phi, _ = cancel(*arima_form(F, g, w, lags), lags)
+    expected.append({"family": name, "modulus": max_lambda_roots(theta), "theta": trim(theta).tolist(),
+                     "phi": trim(phi).tolist()})
+
+# The C++ core through R
+with tempfile.TemporaryDirectory() as tmp:
+    inputPath, outputPath = os.path.join(tmp, "models.json"), os.path.join(tmp, "out.json")
+    json.dump([{"F": F.tolist(), "g": g.tolist(), "w": w.tolist(), "lags": lags} for _, (F, g, w, lags) in models],
+              open(inputPath, "w"))
+    script = f"""
+    suppressMessages(pkgload::load_all("{ROOT}", quiet=TRUE))
+    models <- jsonlite::fromJSON("{inputPath}", simplifyVector=FALSE)
+    out <- lapply(models, function(m) {{
+        k <- length(m$lags)
+        F <- matrix(unlist(m$F), k, k, byrow=TRUE)
+        # Three calls: phi computed, then tabulated, then taken from the table
+        r <- lapply(1:3, function(i) smoothEigensR(matrix(unlist(m$g)), F, matrix(unlist(m$w), 1),
+                                                       as.integer(unlist(m$lags)), FALSE, 1L, FALSE))
+        list(modulus=as.numeric(r[[3]]), theta=attr(r[[3]], "maPolynomial"), phi=attr(r[[3]], "ariPolynomial"),
+             repeatDiff=max(sapply(r, function(x) max(abs(as.numeric(x) - as.numeric(r[[1]])),
+                                                       if(length(attr(x, "maPolynomial")) ==
+                                                          length(attr(r[[1]], "maPolynomial")))
+                                                           max(abs(attr(x, "maPolynomial") - attr(r[[1]], "maPolynomial")))
+                                                       else Inf))))
+    }})
+    jsonlite::write_json(out, "{outputPath}", digits=NA, auto_unbox=TRUE)
+    """
+    subprocess.run(["Rscript", "-e", script], check=True)
+    actual = json.load(open(outputPath))
+
+
+def degree(c):
+    return len(trim(np.atleast_1d(c))) - 1
+
+
+results = []
+for name in families:
+    pairs = [(e, a) for e, a in zip(expected, actual) if e["family"] == name]
+    mismatches = sum((e["modulus"] < 1) != (a["modulus"] < 1) for e, a in pairs)
+    inadmissible = [(e, a) for e, a in pairs if e["modulus"] >= 1 and a["modulus"] >= 1]
+    modulusDiff = max([abs(e["modulus"] - a["modulus"]) for e, a in inadmissible], default=0.0)
+    degreeDiffs = sum(degree(e["theta"]) != degree(a["theta"]) or degree(e["phi"]) != degree(a["phi"])
+                      for e, a in pairs)
+    conditions = {"family": name, "models": len(pairs)}
+    results += [{"quantity": "admissibility decisions of the C++ core that differ from the prototype",
+                 "value": int(mismatches), "conditions": conditions},
+                {"quantity": "max abs difference of the largest root modulus on inadmissible models, C++ core "
+                             "against prototype",
+                 "value": float(modulusDiff), "conditions": {**conditions, "inadmissible": len(inadmissible)}},
+                {"quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+                 "value": int(degreeDiffs), "conditions": conditions},
+                {"quantity": "max abs difference between three calls of the C++ core on the same model",
+                 "value": float(max(a["repeatDiff"] for _, a in pairs)), "conditions": conditions}]
+
+# The models on which the two differ, with the PBH reference
+for (name, (F, g, w, lags)), e, a in zip(models, expected, actual):
+    if degree(e["theta"]) != degree(a["theta"]) or degree(e["phi"]) != degree(a["phi"]) or \
+            (e["modulus"] >= 1 and abs(e["modulus"] - a["modulus"]) > 1e-5):
+        print(name, "lags", lags, "g", np.round(g, 4).tolist(), "F", np.round(F, 4).tolist())
+        print("  prototype: degrees", degree(e["theta"]), degree(e["phi"]), "modulus", e["modulus"])
+        print("  C++:       degrees", degree(a["theta"]), degree(a["phi"]), "modulus", a["modulus"])
+        print("  PBH reference", pbh_max(F, g, w, lags))
+write_results(results)

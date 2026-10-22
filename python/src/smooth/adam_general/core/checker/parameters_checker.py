@@ -852,9 +852,9 @@ def parameters_checker(
         new_model += ets_info["season_type"]
         ets_info["model"] = new_model
 
-    # Update persistence if restricted
+    # Update persistence if restricted: alpha is set, as R's persistenceLevel
     if pool_restriction["persistence_level"] is not None:
-        persist_info["persistence"] = pool_restriction["persistence_level"]
+        persist_info["persistence_level"] = pool_restriction["persistence_level"]
     if not pool_restriction["persistence_estimate"]:
         persist_info["persistence_estimate"] = False
         persist_info["persistence_level_estimate"] = False
@@ -865,10 +865,22 @@ def parameters_checker(
 
     # Update initial if restricted
     if pool_restriction["initial_type"] is not None:
-        initial = pool_restriction["initial_type"]
+        init_info["initial_type"] = pool_restriction["initial_type"]
     if not pool_restriction["initial_estimate"]:
         init_info["initial_estimate"] = False
         init_info["initial_level_estimate"] = False
+    # The level of the samples too small to estimate anything, as R: the mean of two
+    # values, the non-zero one of one, zero without any
+    if pool_restriction["model_do"] == "use" and obs_nonzero <= 2:
+        y_is = np.asarray(data, dtype=float).ravel()[:obs_in_sample]
+        y_is = y_is[~np.isnan(y_is)]
+        init_info["initial_level"] = (
+            float(np.mean(y_is))
+            if obs_nonzero == 2
+            else float(y_is[y_is != 0][0])
+            if obs_nonzero == 1
+            else 0.0
+        )
 
     # Setup model type dictionary
     model_type_dict = _organize_model_type_info(

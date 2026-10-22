@@ -24,16 +24,12 @@ py::array_t<double> smooth_eigens_wrapper(
     int xreg_number,
     bool constant_required
 ) {
-    arma::vec result = smoothEigensCpp(persistence, transition, measurement,
-                                        lags_model_all, xreg_model,
-                                        obs_in_sample, has_delta,
-                                        xreg_number, constant_required);
-    size_t n = result.n_elem;
-    py::array_t<double> arr({static_cast<py::ssize_t>(n)});
-    auto buf = arr.mutable_unchecked<1>();
-    for (size_t i = 0; i < n; i++) {
-        buf(i) = result(i);
-    }
+    SmoothEigensResult result = smoothEigensCpp(persistence, transition, measurement,
+                                                lags_model_all, xreg_model,
+                                                obs_in_sample, has_delta,
+                                                xreg_number, constant_required);
+    py::array_t<double> arr({static_cast<py::ssize_t>(1)});
+    arr.mutable_unchecked<1>()(0) = result.modulus;
     return arr;
 }
 

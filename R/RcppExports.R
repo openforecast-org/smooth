@@ -5,12 +5,12 @@ covarAnalCpp <- function(lagsModel, h, measurement, transition, persistence, s2)
     .Call('_smooth_covarAnalCpp', PACKAGE = 'smooth', lagsModel, h, measurement, transition, persistence, s2)
 }
 
-smoothEigensR <- function(persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber = 0L, constantRequired = FALSE) {
-    .Call('_smooth_smoothEigensR', PACKAGE = 'smooth', persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber, constantRequired)
-}
-
 eigenModuliCpp <- function(A) {
     .Call('_smooth_eigenModuliCpp', PACKAGE = 'smooth', A)
+}
+
+smoothEigensR <- function(persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber = 0L, constantRequired = FALSE) {
+    .Call('_smooth_smoothEigensR', PACKAGE = 'smooth', persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber, constantRequired)
 }
 
 hessianCpp <- function(f, x0, h = 1.220703125e-4) {

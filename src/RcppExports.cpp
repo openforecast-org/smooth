@@ -27,8 +27,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// eigenModuliCpp
+arma::vec eigenModuliCpp(const arma::mat& A);
+RcppExport SEXP _smooth_eigenModuliCpp(SEXP ASEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type A(ASEXP);
+    rcpp_result_gen = Rcpp::wrap(eigenModuliCpp(A));
+    return rcpp_result_gen;
+END_RCPP
+}
 // smoothEigensR
-arma::vec smoothEigensR(const arma::mat& persistence, const arma::mat& transition, const arma::mat& measurement, const arma::ivec& lagsModelAll, bool xregModel, int obsInSample, bool hasDelta, int xregNumber, bool constantRequired);
+Rcpp::NumericVector smoothEigensR(const arma::mat& persistence, const arma::mat& transition, const arma::mat& measurement, const arma::ivec& lagsModelAll, bool xregModel, int obsInSample, bool hasDelta, int xregNumber, bool constantRequired);
 RcppExport SEXP _smooth_smoothEigensR(SEXP persistenceSEXP, SEXP transitionSEXP, SEXP measurementSEXP, SEXP lagsModelAllSEXP, SEXP xregModelSEXP, SEXP obsInSampleSEXP, SEXP hasDeltaSEXP, SEXP xregNumberSEXP, SEXP constantRequiredSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -43,17 +54,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type xregNumber(xregNumberSEXP);
     Rcpp::traits::input_parameter< bool >::type constantRequired(constantRequiredSEXP);
     rcpp_result_gen = Rcpp::wrap(smoothEigensR(persistence, transition, measurement, lagsModelAll, xregModel, obsInSample, hasDelta, xregNumber, constantRequired));
-    return rcpp_result_gen;
-END_RCPP
-}
-// eigenModuliCpp
-arma::vec eigenModuliCpp(const arma::mat& A);
-RcppExport SEXP _smooth_eigenModuliCpp(SEXP ASEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::mat& >::type A(ASEXP);
-    rcpp_result_gen = Rcpp::wrap(eigenModuliCpp(A));
     return rcpp_result_gen;
 END_RCPP
 }

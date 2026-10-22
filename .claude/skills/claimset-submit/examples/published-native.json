@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.9",
+  "schema_version": "0.19",
   "paper": {
     "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
     "licence": "CC-BY-4.0",
@@ -100,16 +100,18 @@
       "id": "C1",
       "statement": "Monthly retail sales series exhibit annual seasonality.",
       "type": "descriptive",
-      "role": "background",
-      "novelty": "restatement",
+      "role": "supporting",
+      "novelty": "new",
       "support": [
         {
-          "kind": "consensus"
+          "kind": "assumption"
         }
       ],
       "provenance": "author_stated",
       "verifiability": "not_applicable",
-      "verifiability_flags": []
+      "verifiability_flags": [],
+      "assumption_category": "data",
+      "check": "unchecked"
     },
     {
       "id": "C3",
@@ -157,6 +159,7 @@
         }
       ],
       "assumptions": [
+        "C1",
         "C3"
       ],
       "limitations": [
@@ -168,9 +171,6 @@
           "strength": "moderate",
           "rationale": "Single benchmark collection, no external replication."
         }
-      ],
-      "depends_on": [
-        "C1"
       ],
       "provenance": "author_stated",
       "verifiability": "open",

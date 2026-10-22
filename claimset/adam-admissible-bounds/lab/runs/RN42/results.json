@@ -1,0 +1,84 @@
+[
+ {
+  "quantity": "largest nonzero eigenvalue modulus of the book's per-lag discount matrices",
+  "value": 0.9,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1
+  }
+ },
+ {
+  "quantity": "effect of the initial states on the fitted value at the last period",
+  "value": 1.1870393556989711e-11,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1,
+   "period": 2400
+  }
+ },
+ {
+  "quantity": "growth of the effect of the initial states per period over the second half",
+  "value": 0.9895781239569994,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1
+  }
+ },
+ {
+  "quantity": "largest root modulus of the cancelled MA polynomial",
+  "value": 0.9911267448787717,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1
+  }
+ },
+ {
+  "quantity": "largest nonzero eigenvalue modulus of the book's per-lag discount matrices",
+  "value": 0.19999999999999996,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9
+  }
+ },
+ {
+  "quantity": "effect of the initial states on the fitted value at the last period",
+  "value": 5.968778912343606e+16,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9,
+   "period": 2400
+  }
+ },
+ {
+  "quantity": "growth of the effect of the initial states per period over the second half",
+  "value": 1.0163934504137493,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9
+  }
+ },
+ {
+  "quantity": "largest root modulus of the cancelled MA polynomial",
+  "value": 1.0164568117563233,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9
+  }
+ }
+]

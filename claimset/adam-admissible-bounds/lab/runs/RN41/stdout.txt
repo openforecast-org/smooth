@@ -1,0 +1,51 @@
+mean time per call, microseconds per-lag ETS(A,N,N) 4.85 
+mean time per call, microseconds polynomial ETS(A,N,N) 4.85 
+mean time per call, microseconds per-lag ETS(A,Ad,N) 5.05 
+mean time per call, microseconds polynomial ETS(A,Ad,N) 5.5 
+mean time per call, microseconds per-lag ETS(A,N,A), m=12 4.75 
+mean time per call, microseconds polynomial ETS(A,N,A), m=12 6.1 
+mean time per call, microseconds per-lag ETS(A,Ad,A), m=12 5.25 
+mean time per call, microseconds polynomial ETS(A,Ad,A), m=12 8.4 
+mean time per call, microseconds per-lag ETS(A,N,A,A), m=24 and 168 8.15 
+mean time per call, microseconds polynomial ETS(A,N,A,A), m=24 and 168 63.85 
+mean time per call, microseconds per-lag GUM, orders (1,1), lags (1,12) 5.35 
+mean time per call, microseconds polynomial GUM, orders (1,1), lags (1,12) 6.8 
+mean time per call, microseconds per-lag GUM, orders (2,2), lags (1,12) 8.35 
+mean time per call, microseconds polynomial GUM, orders (2,2), lags (1,12) 10.05 
+mean time per call, microseconds per-lag GUM, orders (1,1,1), lags (1,24,168) 6.65 
+mean time per call, microseconds polynomial GUM, orders (1,1,1), lags (1,24,168) 23.2 
+time of the fit, seconds per-lag gum(AirPassengers, orders=c(1,1), lags=c(1,12)) 0.087 
+calls of smoothEigens() in the fit per-lag gum(AirPassengers, orders=c(1,1), lags=c(1,12)) 484 
+time of the fit per call of smoothEigens(), microseconds per-lag gum(AirPassengers, orders=c(1,1), lags=c(1,12)) 179.7521 
+time of the fit, seconds per-lag gum(AirPassengers, orders=c(2,1), lags=c(1,12)) 0.172 
+calls of smoothEigens() in the fit per-lag gum(AirPassengers, orders=c(2,1), lags=c(1,12)) 964 
+time of the fit per call of smoothEigens(), microseconds per-lag gum(AirPassengers, orders=c(2,1), lags=c(1,12)) 178.4232 
+time of the fit, seconds per-lag adam(AirPassengers, "AAdA") 0.049 
+calls of smoothEigens() in the fit per-lag adam(AirPassengers, "AAdA") 162 
+time of the fit per call of smoothEigens(), microseconds per-lag adam(AirPassengers, "AAdA") 302.4691 
+time of the fit, seconds per-lag adam(hourly, "ANA", lags=c(24,168)) 0.132 
+calls of smoothEigens() in the fit per-lag adam(hourly, "ANA", lags=c(24,168)) 122 
+time of the fit per call of smoothEigens(), microseconds per-lag adam(hourly, "ANA", lags=c(24,168)) 1081.967 
+time of the fit, seconds per-lag ces(AirPassengers, "full") 0.059 
+calls of smoothEigens() in the fit per-lag ces(AirPassengers, "full") 324 
+time of the fit per call of smoothEigens(), microseconds per-lag ces(AirPassengers, "full") 182.0988 
+time of the fit, seconds polynomial gum(AirPassengers, orders=c(1,1), lags=c(1,12)) 0.084 
+calls of smoothEigens() in the fit polynomial gum(AirPassengers, orders=c(1,1), lags=c(1,12)) 484 
+calls of smoothEigens() on inadmissible parameters in the fit polynomial gum(AirPassengers, orders=c(1,1), lags=c(1,12)) 40 
+time of the fit per call of smoothEigens(), microseconds polynomial gum(AirPassengers, orders=c(1,1), lags=c(1,12)) 173.5537 
+time of the fit, seconds polynomial gum(AirPassengers, orders=c(2,1), lags=c(1,12)) 0.167 
+calls of smoothEigens() in the fit polynomial gum(AirPassengers, orders=c(2,1), lags=c(1,12)) 964 
+calls of smoothEigens() on inadmissible parameters in the fit polynomial gum(AirPassengers, orders=c(2,1), lags=c(1,12)) 43 
+time of the fit per call of smoothEigens(), microseconds polynomial gum(AirPassengers, orders=c(2,1), lags=c(1,12)) 173.2365 
+time of the fit, seconds polynomial adam(AirPassengers, "AAdA") 0.044 
+calls of smoothEigens() in the fit polynomial adam(AirPassengers, "AAdA") 162 
+calls of smoothEigens() on inadmissible parameters in the fit polynomial adam(AirPassengers, "AAdA") 60 
+time of the fit per call of smoothEigens(), microseconds polynomial adam(AirPassengers, "AAdA") 271.6049 
+time of the fit, seconds polynomial adam(hourly, "ANA", lags=c(24,168)) 0.153 
+calls of smoothEigens() in the fit polynomial adam(hourly, "ANA", lags=c(24,168)) 122 
+calls of smoothEigens() on inadmissible parameters in the fit polynomial adam(hourly, "ANA", lags=c(24,168)) 52 
+time of the fit per call of smoothEigens(), microseconds polynomial adam(hourly, "ANA", lags=c(24,168)) 1254.098 
+time of the fit, seconds polynomial ces(AirPassengers, "full") 0.053 
+calls of smoothEigens() in the fit polynomial ces(AirPassengers, "full") 310 
+calls of smoothEigens() on inadmissible parameters in the fit polynomial ces(AirPassengers, "full") 68 
+time of the fit per call of smoothEigens(), microseconds polynomial ces(AirPassengers, "full") 170.9677 

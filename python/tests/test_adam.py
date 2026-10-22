@@ -1681,3 +1681,22 @@ def test_an_unknown_occurrence_raises(cls):
     y = np.abs(np.random.default_rng(1).normal(10, 2, 60))
     with pytest.raises(ValueError, match="occurrence should be one of"):
         cls(occurrence="foo").fit(y)
+
+
+# The samples too small to estimate, and the occurrence of data without zeros, as R's adam()
+# (R values: adam(x, occurrence="a", h=2))
+@pytest.mark.parametrize(
+    "y, forecast, loglik",
+    [([30.0, 20.0, 10.0], 20.0, None), ([3.0, 5.0], 4.0, -2.837877), ([7.0], 7.0, None)],
+)
+def test_adam_tiny_samples_as_r(y, forecast, loglik):
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(occurrence="auto").fit(np.array(y))
+    assert model.om_model is None
+    assert model.persistence_vector["alpha"] == 0
+    assert np.allclose(np.asarray(model.predict(h=2).mean), forecast)
+    if loglik is not None:
+        assert model.loglik == pytest.approx(loglik, abs=1e-6)

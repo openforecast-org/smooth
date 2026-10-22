@@ -1,0 +1,21 @@
+coefficient of B^0 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1) {'alpha': 1.9, 'theta': 0.1} 1.0
+coefficient of B^1 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1) {'alpha': 1.9, 'theta': 0.1} 1.0
+coefficient of B^2 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1) {'alpha': 1.9, 'theta': 0.1} -0.1
+coefficient of B^0 in the product of the parts' MA polynomials {'alpha': 1.9, 'theta': 0.1} 1.0
+coefficient of B^1 in the product of the parts' MA polynomials {'alpha': 1.9, 'theta': 0.1} 1.0
+coefficient of B^2 in the product of the parts' MA polynomials {'alpha': 1.9, 'theta': 0.1} 0.09
+coefficient of B^1 in phi of the whole model {'alpha': 1.9, 'theta': 0.1} -1.0
+smallest root modulus of theta of the whole model {'alpha': 1.9, 'theta': 0.1} 0.9160797830996159
+smallest root modulus of the product of the parts' MA polynomials {'alpha': 1.9, 'theta': 0.1} 1.1111111111111112
+package smooth_eigens modulus of the whole model {'alpha': 1.9, 'theta': 0.1} 1.0916080474853516
+package smooth_eigens modulus of the ETS part alone {'alpha': 1.9} 0.8999999999999999
+max |eigenvalue| of D of the whole model (lag 1, so the expanded D) {'alpha': 1.9, 'theta': 0.1} 1.0916079783099617
+max abs difference between det(I - F L) of the adam() matrices and ari polynomial times (1 - B) per constant/regressor {'models': 57} 7.549516567451064e-15
+max abs difference between det(I - D L) of the adam() matrices and MA polynomial times (1 - B) per constant/regressor {'models': 57} 1.1546319456101628e-14
+pure ARIMA models (plain, constant, static regressor) from adam() with all MA roots outside the unit circle {'models': 57} 33.0
+of those, models the whole-model check smooth_eigens rejects (shortcut would be wrong) {'models': 33} 0.0
+models from adam() with an MA root on or inside the unit circle (shortcut runs the whole check) {'models': 57} 24.0
+of those, models the whole-model check accepts (root cancels) {'models': 24} 6.0
+models of the kind {'kind': 'plain', 'invertible': 9} 19.0
+models of the kind {'kind': 'xreg', 'invertible': 19} 27.0
+models of the kind {'kind': 'constant', 'invertible': 5} 11.0

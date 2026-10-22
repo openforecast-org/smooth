@@ -1,0 +1,122 @@
+[
+ {
+  "quantity": "models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "check": "author"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check and rejected by the oracle",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "check": "author"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "check": "pbh"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check and rejected by the oracle",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "check": "pbh"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "check": "pkg"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check and rejected by the oracle",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "check": "pkg"
+  }
+ },
+ {
+  "quantity": "models admissible by the exact oracle",
+  "value": 48.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21
+  }
+ },
+ {
+  "quantity": "models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)",
+  "value": 84.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21
+  }
+ },
+ {
+  "quantity": "of those, admissible by the exact oracle (the root cancelled)",
+  "value": 3.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models",
+  "value": 3.916032387252244e-09,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "inadmissible": 202
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models",
+  "value": 9.506732854269728e-07,
+  "conditions": {
+   "models": 250,
+   "seed": 21,
+   "inadmissible": 202
+  }
+ },
+ {
+  "quantity": "largest number of components in a model",
+  "value": 12.0,
+  "conditions": {
+   "models": 250,
+   "seed": 21
+  }
+ },
+ {
+  "quantity": "seconds",
+  "value": 36.93316149711609,
+  "conditions": {
+   "models": 250,
+   "seed": 21
+  }
+ }
+]

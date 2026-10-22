@@ -1,0 +1,15 @@
+DISAGREE {'oracle': False, 'author': np.False_, 'pbh': np.False_, 'pkg': True, 'border': False, 'cyc': 6, 'unitrootcancelled': True, 'oracleMod': 1.0000000000000007, 'authorMod': np.float64(1.0000000000000004), 'pbhMod': np.float64(0.9999999999999996), 'pkgMod': 0.9999999999999969, 'k': 9, 'deg': 34, 'spec': {'ets_lags': [1, 1], 'g': ['0', '0'], 'F_ets': [['1', '9/10'], ['0', '9/10']], 'ar': [(1, ['3/5']), (4, ['-1/10'])], 'i': [(4, 1)], 'ma': [(1, ['-3/10']), (1, ['-1', '1'])], 'red': ['9/10', '-117/100', '117/100', '-27/100']}}
+models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded) {'models': 250, 'seed': 21} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 21, 'check': 'author'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 21, 'check': 'author'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 21, 'check': 'pbh'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 21, 'check': 'pbh'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 21, 'check': 'pkg'} 1.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 21, 'check': 'pkg'} 1.0
+models admissible by the exact oracle {'models': 250, 'seed': 21} 48.0
+models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal) {'models': 250, 'seed': 21} 84.0
+of those, admissible by the exact oracle (the root cancelled) {'models': 250, 'seed': 21} 3.0
+max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models {'models': 250, 'seed': 21, 'inadmissible': 202} 3.916032387252244e-09
+max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models {'models': 250, 'seed': 21, 'inadmissible': 202} 9.506732854269728e-07
+largest number of components in a model {'models': 250, 'seed': 21} 12.0
+seconds {'models': 250, 'seed': 21} 36.93316149711609

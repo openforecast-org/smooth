@@ -1730,6 +1730,8 @@ def test_adam_reapply_draws_around_the_fitted_arima():
         ),
         # The MA root on the unit circle cancels with the difference
         ("NNN", {"orders": {"i": 1, "ma": 1}, "arma": {"ma": [-1.0]}}, [1], 1.0, True),
+        # Without a difference to cancel with, a non-invertible MA is not admissible
+        ("NNN", {"arma": {"ma": [1.2]}}, [1], 1.2, False),
     ],
 )
 def test_admissible_bounds_check_the_whole_model(

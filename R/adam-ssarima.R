@@ -365,11 +365,16 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         }
         #### The admissible bounds ####
         else if(bounds=="admissible"){
-            # The whole model: its MA polynomial couples the ARIMA with the regressors
-            eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
-                                        lagsModelAll, xregModel, obsInSample);
-            if(any(eigenValues>1+1E-50)){
-                return(1E+100*max(eigenValues));
+            # The whole model: its MA polynomial couples the ARIMA with the regressors. Without
+            # adaptive regressors it is the MA of ARIMA times factors shared with the AR
+            # polynomial, so invertible MA factors are enough
+            if((xregModel && regressors=="adapt") || !arimaModel ||
+               elements$arimaPolynomials$maReflection>=1){
+                eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
+                                            lagsModelAll, xregModel, obsInSample);
+                if(any(eigenValues>1+1E-50)){
+                    return(1E+100*max(eigenValues));
+                }
             }
 
             # # Stability/Invertibility condition of ARIMA

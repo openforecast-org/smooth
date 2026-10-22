@@ -1533,4 +1533,7 @@ test_that("The admissible bounds of ETS+ARIMA check the whole model", {
     # The MA root on the unit circle cancels with the difference: a constant level plus noise
     testModel <- adam(BJsales, "NNN", orders=list(i=1, ma=1), arma=list(ma=-1), h=0);
     expect_equal(checker(testModel, 1, FALSE), 0);
+    # Without a difference to cancel with, a non-invertible MA is not admissible
+    testModel <- adam(BJsales, "NNN", orders=list(ma=1), arma=list(ma=1.2), h=0);
+    expect_gt(checker(testModel, 1.2, FALSE), 0);
 })

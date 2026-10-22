@@ -204,9 +204,15 @@ def adam_bounds_checker(
             if np.any(deltas > 1) or np.any(deltas < 0):
                 return 1e100 * np.max(np.abs(deltas - 0.5))
 
-    elif bounds == "admissible":
+    elif bounds == "admissible" and (
+        model_type_dict["ets_model"]
+        or (explanatory_checked["xreg_model"] and adapt)
+        or not arima_checked["arima_model"]
+        or adam_elements["arima_polynomials"]["ma_reflection"] >= 1
+    ):
         # The whole model: its MA polynomial couples the ETS, ARIMA and the other
-        # components
+        # components. Without ETS and adaptive regressors it is the MA of ARIMA times
+        # factors shared with the AR polynomial, so invertible MA factors are enough
         eigenValues = smooth_eigens(
             persistence=np.asfortranarray(
                 adam_elements["vec_g"].reshape(-1, 1), dtype=np.float64

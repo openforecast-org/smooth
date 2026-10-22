@@ -2140,11 +2140,16 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
         }
     }
     else if(bounds=="admissible"){
-        # The whole model: its MA polynomial couples the ETS, ARIMA and the other components
-        eigenValues <- smoothEigens(adamElements$vecG, adamElements$matF, adamElements$matWt,
-                                    lagsModelAll, xregModel, obsInSample);
-        if(any(eigenValues>1+1E-50)){
-            return(1E+100*max(eigenValues));
+        # The whole model: its MA polynomial couples the ETS, ARIMA and the other components.
+        # Without ETS and adaptive regressors it is the MA of ARIMA times factors shared with
+        # the AR polynomial, so invertible MA factors are enough
+        if(etsModel || (xregModel && regressors=="adapt") || !arimaModel ||
+           arimaPolynomials$maReflection>=1){
+            eigenValues <- smoothEigens(adamElements$vecG, adamElements$matF, adamElements$matWt,
+                                        lagsModelAll, xregModel, obsInSample);
+            if(any(eigenValues>1+1E-50)){
+                return(1E+100*max(eigenValues));
+            }
         }
     }
     return(0);

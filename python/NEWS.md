@@ -82,6 +82,8 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* `ADAM` switches the occurrence model off when the in-sample data (with the missing values filled) has no zeros, as R's `adam()`: `occurrence="auto"` on `1:10` fitted an inverse odds ratio model and selected ETS(MAN) against R's ETS(AAN).
+* A zero scale of the Gamma distribution (e.g. `10:1` with ETS(MAN), `persistence=[1, 0.8535]`) gives the log-likelihood `-1e300`, as R, instead of a `ZeroDivisionError`: the sums of R's accumulator return a double, whose division by zero is IEEE's.
 * `ADAM(regressors="select")` with an occurrence model selects the regressors on the non-zero values, as R's `adam()`: the zeros of the occurrence were included.
 * `ADAM.predict()` forecasts the occurrence model with `X`: the occurrence probabilities ignored the regressors over the horizon.
 * `ADAM(occurrence="auto")` gives `AutoOM` the orders of the demand (none without ARIMA), as R's `adam()`: `AutoOM` selected ARIMA orders of its own for the occurrence part.

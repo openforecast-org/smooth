@@ -20,4 +20,5 @@ CLAUDE.md
 LICENSE
 conda
 ^\.claude$
+^claimset$
 ^\.(ruff|mypy|pytest)_cache$

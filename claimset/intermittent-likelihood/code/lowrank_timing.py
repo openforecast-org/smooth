@@ -22,7 +22,7 @@ PYBIND11_INTERNALS_KIND="_smooth_<variant>", which only separates the pybind11 t
 registries, so that both variants and the package's own _adamCore load in one process
 and the timings can be interleaved. Rebuild (about 3 minutes):
 
-    bash python/docs/claimset/scripts/build_lowrank_variants.sh [OUTPUT_DIR]
+    bash claimset/intermittent-likelihood/code/build_lowrank_variants.sh [OUTPUT_DIR]
 
 OUTPUT_DIR (default $LOWRANK_DIR, else smooth-lowrank in the temporary directory:
 VARIANT_DIR_DEFAULT below) must be outside the repository; this script reads the same
@@ -93,7 +93,7 @@ repository and its dirty state, and the commit the variants were built from.
 Development runs used fewer repetitions (--repetitions); the stated settings are
 REPETITIONS = 25 and k = 1..48 (the defaults). Run (from any directory):
 
-    python/.venv/bin/python python/docs/claimset/scripts/lowrank_timing.py
+    python/.venv/bin/python claimset/intermittent-likelihood/code/lowrank_timing.py
 
 Output: a table on stdout and results/lowrank_timing.csv next to this script (one row
 per k and timed call, settings as columns).
@@ -140,7 +140,7 @@ VARIANTS = ("lowrank", "full", "package")
 MODES = ("filter_pass", "package_call", "likelihood")
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[3]
+REPO = HERE.parents[2]
 VARIANT_DIR_DEFAULT = str(Path(tempfile.gettempdir()) / "smooth-lowrank")
 VARIANT_DIR = Path(os.environ.get("LOWRANK_DIR", VARIANT_DIR_DEFAULT))
 CSV = HERE / "results" / "lowrank_timing.csv"

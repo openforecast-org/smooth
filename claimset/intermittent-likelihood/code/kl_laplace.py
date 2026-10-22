@@ -75,7 +75,7 @@ Versions: smooth 1.2.0 (python, editable from the working tree), greybox 1.0.9, 
 and its dirty state are printed at run time and written into the CSV.
 
 Run from the repository root:
-  python/.venv/bin/python python/docs/claimset/scripts/kl_laplace.py
+  python/.venv/bin/python claimset/intermittent-likelihood/code/kl_laplace.py
 It writes results/kl_laplace.csv next to this script.
 """
 
@@ -93,7 +93,7 @@ from scipy.special import gamma, gammaincc, log_ndtr, logsumexp
 SEED = 20261015
 RNG = np.random.default_rng(SEED)  # not used: the computation is deterministic
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[3]
+REPO = HERE.parents[2]
 F_GRID = np.unique(np.r_[np.geomspace(1.01, 100, 21), 4.0])
 SHAPES = [0.5, 1.0, 1.5, 2.0, 3.0]
 Q_LAPLACE = [8, 16, 32, 64]

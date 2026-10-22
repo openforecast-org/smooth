@@ -74,7 +74,7 @@ prints the versions, the commit of the repository (git rev-parse HEAD) and its
 dirty state, and writes them into the CSVs.
 
 Run from the repository root, with the number of worker processes (default 2):
-  python/.venv/bin/python python/docs/claimset/scripts/kl_mixture.py [workers]
+  python/.venv/bin/python claimset/intermittent-likelihood/code/kl_mixture.py [workers]
 Outputs: results/kl_mixture.csv (one row per grid cell) and
 results/kl_mixture_refine.csv, next to this script.
 """
@@ -112,7 +112,7 @@ TARGETS = {
 }
 KLS = ["kl_mixture", "kl_onestep", "kl_mixture_gh16"]
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[3]
+REPO = HERE.parents[2]
 
 
 def x_functions(dist, s):

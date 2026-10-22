@@ -6,6 +6,7 @@ Release history of the Python implementation of the **smooth** forecasting packa
 ## v1.2.0 (unreleased)
 
 Changes:
+* Requires `greybox>=1.0.10`: MAPE and MPE are `Inf` on a zero actual, as in R.
 * `OM` and `OMG` no longer take `formula` / `formula_a` / `formula_b`, which were ignored; the regressors come from `X`, as in the other models.
 * `AutoADAM` selects the ARIMA orders by default, as R's `auto.adam()`: without `orders` (and `ar_order` / `i_order` / `ma_order`) they are R's `{"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True}`; it fitted no ARIMA (on UKgas it selected ETS(MNM), log-likelihood -495.41, against R's ETS(MNM) with drift, -490.89). Pass `orders={"ar": 0, "i": 0, "ma": 0}` for no ARIMA.
 * `AutoOM` takes `n_iterations` and `smoother`, and `OMG` takes `n_iterations`, as `OM`: they reach every candidate of `AutoOM` and both sub-models of `OMG`, as R's `auto.om()` and `omg()` pass their ellipsis on. `OM(occurrence="auto" | "general")` passes them through instead of raising a `TypeError`.

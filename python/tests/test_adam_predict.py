@@ -699,3 +699,17 @@ def test_the_reforecast_point_forecasts(walk):
             h=5, cumulative=True, nsim=50, seed=41, point=point
         )
         np.testing.assert_allclose(forecasted.mean, skeleton, rtol=1e-2)
+
+
+@pytest.mark.parametrize(
+    "interval", ["semiparametric", "nonparametric", "empirical", "confidence", "complete"]
+)
+def test_documented_intervals_are_implemented(interval):
+    """The intervals the docstring of predict() lists all give bounds."""
+    assert "Not yet implemented" not in ADAM.predict.__doc__
+    y = _make_seasonal()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model="AAA", lags=[12]).fit(y)
+        result = model.predict(h=6, interval=interval, nsim=100)
+    assert np.all(result.lower.to_numpy() <= result.upper.to_numpy())

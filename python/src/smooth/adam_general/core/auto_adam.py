@@ -17,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from smooth.adam_general.core.adam import ADAM, LOSS_OPTIONS
+from smooth.adam_general.core.checker.data_checks import _check_occurrence
 from smooth.adam_general.core.estimator.arima_selector import (
     _normalize_lags_and_orders,
     arima_selector,
@@ -149,26 +150,21 @@ class AutoADAM(ADAM):
     lags : Optional[List[int]], default=None
         Seasonal period(s). Lag 1 is prepended automatically when absent.
 
-    ar_order : Union[int, List[int]], default=[3, 3]
-        Maximum AR order(s) per lag level for ARIMA selection.
-        Defaults to ``[3, 3]`` matching R's ``auto.adam()``.
-
-    i_order : Union[int, List[int]], default=[2, 1]
-        Maximum integration order(s) per lag level for ARIMA selection.
-        Defaults to ``[2, 1]`` matching R's ``auto.adam()``.
-
-    ma_order : Union[int, List[int]], default=[3, 3]
-        Maximum MA order(s) per lag level for ARIMA selection.
+    ar_order, i_order, ma_order : Union[int, List[int], None], default=None
+        Fixed ARIMA orders per lag, as in :class:`ADAM` (selected with
+        ``arima_select=True``), used when ``orders`` is None.
 
     orders : Optional[Dict[str, Any]], default=None
-        Dict-style alternative to the scalar max-order arguments above. A
-        dict with keys ``"ar"``, ``"i"``, ``"ma"`` (each an int or list)
-        and optionally ``"select"`` (bool). When provided,
-        ``ar_order`` / ``i_order`` / ``ma_order`` are ignored.
+        The ARIMA orders as in R's ``auto.adam()``: a dict with keys ``"ar"``,
+        ``"i"``, ``"ma"`` (each an int or list) and optionally ``"select"``
+        (bool); with ``select=True`` they are the maximum orders. When provided,
+        ``ar_order`` / ``i_order`` / ``ma_order`` are ignored. Without any orders
+        (the default) they are R's ``{"ar": [3, 3], "i": [2, 1], "ma": [3, 3],
+        "select": True}``; pass ``{"ar": 0, "i": 0, "ma": 0}`` for no ARIMA.
 
-    arima_select : bool, default=True
-        Whether to perform ARIMA order selection. Unlike :class:`ADAM`,
-        this defaults to ``True``.
+    arima_select : bool, default=False
+        The ``"select"`` of ``orders`` when it does not have one, or the
+        selection of the fixed ``ar_order`` / ``i_order`` / ``ma_order``.
 
     distribution : Union[str, List[str]], default=(all 7 distributions)
         Distribution(s) to try. When a list is supplied every entry is
@@ -287,8 +283,10 @@ class AutoADAM(ADAM):
           ``orders.get("select", arima_select)`` is true.
         - Else if any of the three scalar order arguments has a non-zero value,
           they are used as **fixed** orders (no selection).
-        - Else (the default), no ARIMA component is fitted and no order
-          selection is performed.
+        - Else (the default, none of them given), the orders are selected up to
+          R's ``auto.adam()`` defaults, ``{"ar": [3, 3], "i": [2, 1],
+          "ma": [3, 3], "select": True}``. Pass ``orders={"ar": 0, "i": 0,
+          "ma": 0}`` for no ARIMA.
         """
         # Normalise scalar lags to a list so downstream code is uniform.
         if isinstance(lags, (int, np.integer)):
@@ -304,14 +302,27 @@ class AutoADAM(ADAM):
                 else list(_ALL_DISTRIBUTIONS)
             )
         )
+        unknown = set(self._auto_distribution_spec) - {"default", *_ALL_DISTRIBUTIONS}
+        if unknown:
+            # R stops via match.arg()
+            raise ValueError(
+                f"Unknown distribution(s): {', '.join(map(repr, sorted(unknown)))}. "
+                f"They should be among {', '.join(map(repr, _ALL_DISTRIBUTIONS))}."
+            )
         self._auto_outliers: str = outliers
         self._auto_level: float = level
         self._auto_verbose: int = verbose
 
         # Resolve the ARIMA order specification using the shared helper so
         # ADAM and AutoADAM share the same precedence rule.
-        from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
+        from smooth.adam_general.core.checker.arima_checks import (
+            _R_ORDERS,
+            resolve_arima_orders,
+        )
 
+        # Without any orders, R's auto.adam() selects them up to its defaults
+        if orders is None and ar_order is None and i_order is None and ma_order is None:
+            orders = dict(_R_ORDERS)
         resolved, select_flag = resolve_arima_orders(
             orders, ar_order, i_order, ma_order, arima_select=arima_select
         )
@@ -431,6 +442,9 @@ class AutoADAM(ADAM):
             val = getattr(self, attr, None)
             if val is not None:
                 adam_kw[attr] = val
+
+        # An unknown occurrence is an error, as in R, not a failure of every candidate
+        _check_occurrence(y_arr, adam_kw.get("occurrence", "none"), silent=True)
 
         lags = self.lags  # may be None (handled by ADAM internally)
 

@@ -724,8 +724,6 @@ def calculate_likelihood(
     if distribution == "dgnorm":
         beta = other if other is not None else 2.0
         return gb.dgnorm(y, y_fitted, scale * mult * gap_root, beta, log=True)
-    if distribution == "dalaplace":
-        return gb.dalaplace(y, y_fitted, scale * mult, other, log=True)
     if distribution == "dlogis":
         return gb.dlogis(y, y_fitted, scale * mult, log=True)
     if distribution == "dt":
@@ -1176,9 +1174,6 @@ def scaler(
             beta * _sum_r(_pow_r(np.abs(errors), beta) / gap_power) / obs_in_sample
         ) ** (1 / beta)
 
-    elif distribution == "dalaplace":
-        return _sum_r(errors * (other - (errors <= 0) * 1)) / obs_in_sample
-
     elif distribution == "dlnorm":
         # Cast 1+errors (or 1+errors/yFitted) to complex so log() of negative
         # arguments stays finite; the outer modulus turns the complex log
@@ -1249,7 +1244,6 @@ def scale_power(distribution):
         return 4
     if distribution in (
         "dlaplace",
-        "dalaplace",
         "dgnorm",
         "dllaplace",
         "dlgnorm",
@@ -1274,9 +1268,6 @@ def scale_variance(scale, distribution, other=None):
     if distribution in ("dgnorm", "dlgnorm"):
         shape = other["shape"]
         return scale**2 * gamma(3 / shape) / gamma(1 / shape)
-    if distribution == "dalaplace":
-        alpha = other["alpha"]
-        return scale**2 / (alpha**2 * (1 - alpha) ** 2 / (alpha**2 + (1 - alpha) ** 2))
     if distribution == "dlogis":
         return scale**2 * np.pi**2 / 3
     return scale

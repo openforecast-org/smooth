@@ -19,6 +19,10 @@ def _is_meaningful_order(value):
     return False
 
 
+# The default orders of R's auto.adam() and auto.om()
+_R_ORDERS = {"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True}
+
+
 def resolve_arima_orders(
     orders, ar_order, i_order, ma_order, arima_select=False, silent=False
 ):

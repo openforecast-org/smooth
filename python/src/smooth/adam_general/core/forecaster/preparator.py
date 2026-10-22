@@ -483,6 +483,19 @@ def _process_initial_values(
         initial_value_names[j] = "arima"
         initial_estimated[j] = "arima"
 
+    # Write down the xreg initials, named by the regressors
+    if explanatory_checked["xreg_model"]:
+        j += 1
+        row = components_dict["components_number_ets"]
+        row += components_dict.get("components_number_arima", 0)
+        xreg_values = matrices_dict["mat_vt"][
+            row : row + explanatory_checked["xreg_number"],
+            lags_dict["lags_model_max"] - 1,
+        ]
+        initial_value[j] = dict(zip(explanatory_checked["xreg_names"], xreg_values))
+        initial_value_names[j] = "xreg"
+        initial_estimated[j] = "xreg"
+
     # Set names for initial values
     initial_value = {
         name: value for name, value in zip(initial_value_names, initial_value)
@@ -1177,11 +1190,18 @@ def preparator(
     # 8. Update distribution based on error type and loss function
     general_dict = _update_distribution(general_dict, model_type_dict)
 
-    # 9. Process initial values for all components
+    # 9. Process initial values for all components, from the head of the fitted
+    # states, as R's adam_initial_collector() (backcasting writes it there). If
+    # the backcasting head is longer than one lag cycle, only the last
+    # lags_model_max head states are kept, as in R/adam.R
+    states = adam_fitted.states
+    head_offset = observations_dict.get("head_length", lags_dict["lags_model_max"])
+    if head_offset > lags_dict["lags_model_max"]:
+        states = states[:, head_offset - lags_dict["lags_model_max"] :]
     initial_value, initial_value_names, initial_estimated = _process_initial_values(
         model_type_dict,
         lags_dict,
-        matrices_dict,
+        {**matrices_dict, "mat_vt": states},
         components_dict,
         arima_checked,
         explanatory_checked,
@@ -1234,14 +1254,6 @@ def preparator(
     general_dict["parameters_number"][0][2] = np.sum(
         general_dict["parameters_number"][0][:2]
     )
-
-    # 15. If the backcasting head is longer than one lag cycle, keep only the last
-    # lags_model_max head states, so the returned states and the extracted initials
-    # keep exactly today's dimensions and meaning (R/adam.R).
-    states = adam_fitted.states
-    head_offset = observations_dict.get("head_length", lags_dict["lags_model_max"])
-    if head_offset > lags_dict["lags_model_max"]:
-        states = states[:, head_offset - lags_dict["lags_model_max"] :]
 
     # 16. Return the prepared model
     return {

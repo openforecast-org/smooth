@@ -98,3 +98,14 @@ test_that("reapply() of ces() keeps the draws in the stable region", {
     x <- suppressWarnings(reapply(m, nsim=10));
     expect_equal(unname(x$persistence[1:2,]), matrix(m$persistence[1:2], 2, 10));
 })
+
+# regressors="select" keeps the true regressor and drops the noise, as adam() does
+test_that("ces() selects the regressors as adam()", {
+    set.seed(3)
+    xreg <- data.frame(y=0, a=rnorm(120), b=rnorm(120), c=rnorm(120))
+    xreg$y <- 100 + 5*xreg$a + rnorm(120, 0, 2)
+    xreg <- ts(xreg, frequency=12)
+    testModel <- ces(xreg, regressors="select")
+    expect_equal(names(testModel$initial$xreg), "a")
+    expect_equal(names(testModel$initial$xreg), names(adam(xreg, "ANN", regressors="select")$initial$xreg))
+})

@@ -34,7 +34,8 @@ def _fit_arima_model(
     X=None,
     **adam_kwargs,
 ) -> Tuple[Any, float]:
-    """Fit ADAM with given ARIMA orders; return (model, IC).
+    """Fit ADAM, or the ``fitter`` in ``adam_kwargs`` (``OM``, as R's ``fitter``
+    of adam_arimaSelector()), with given ARIMA orders; return (model, IC).
 
     Returns (None, inf) on failure.
     """
@@ -43,15 +44,16 @@ def _fit_arima_model(
     try:
         kw = {k: v for k, v in adam_kwargs.items() if k != "ic"}
         kw["verbose"] = 0
-        m = ADAM(
+        fitter = kw.pop("fitter", ADAM)
+        if fitter is ADAM:
+            kw.update(distribution=distribution, arima_select=False)
+        m = fitter(
             model=ets_model,
             lags=lags,
             ar_order=ar_orders,
             i_order=i_orders,
             ma_order=ma_orders,
             constant=constant,
-            distribution=distribution,
-            arima_select=False,
             **kw,
         ).fit(y, X)
         return m, _get_ic(m, ic_name)
@@ -153,12 +155,9 @@ def _select_i_orders(
     for constant in (False, True):
         for combo in itertools.product(*[range(m + 1) for m in reversed(max_i)]):
             i_orders = list(reversed(combo))
-            # Skip (0,..,0) + const=False when an ETS baseline already covers it
-            if (
-                all(d == 0 for d in i_orders)
-                and not constant
-                and initial_model is not None
-            ):
+            # (0,..,0) without a constant is R's first row, the original model
+            # (initial_ic), which R does not refit: Inf without an ETS baseline
+            if all(d == 0 for d in i_orders) and not constant:
                 continue
             model, ic = _fit_arima_model(
                 y,
@@ -450,7 +449,7 @@ def arima_selector(
         import re
 
         raw = getattr(ets_baseline, "model", "")
-        m = re.search(r"ETS\(([^)]+)\)", raw)
+        m = re.search(r"ETSX?\(([^)]+)\)", raw)
         if m:
             resolved_ets = m.group(1)  # e.g. "AAA"
 

@@ -23,6 +23,7 @@ fitted values into [0, 1] probabilities, and the model name format.
 
 from __future__ import annotations
 
+import inspect
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Literal, Optional, Union, cast
@@ -33,6 +34,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from smooth.adam_general.core.adam import ADAM
+from smooth.adam_general.core.checker.arima_checks import resolve_arima_orders
 from smooth.adam_general.core.creator import (
     architector,
     creator,
@@ -42,10 +44,15 @@ from smooth.adam_general.core.creator import (
 from smooth.adam_general.core.estimator.optimization import (
     _configure_optimizer,
 )
+from smooth.adam_general.core.estimator.xreg_select import _xreg_select_refit
 from smooth.adam_general.core.forecaster import forecaster
 from smooth.adam_general.core.utils.gradient import adam_fit_or_gradient
 from smooth.adam_general.core.utils.ic import ic_function
 from smooth.adam_general.core.utils.om_cost import om_cf, om_link_function
+from smooth.adam_general.core.utils.printing import (
+    _build_model_name,
+    _compute_forecast_errors,
+)
 from smooth.adam_general.core.utils.utils import (
     SMOOTHER_DEFAULT,
     SmootherType,
@@ -59,14 +66,6 @@ _OCC_TO_CHAR = {
     "odds-ratio": "o",
     "inverse-odds-ratio": "i",
     "direct": "d",
-}
-
-# Uppercase letter shown in the printed model name, e.g. "oETS(MNN)[O]".
-_OCC_TO_BRACKET = {
-    "fixed": "F",
-    "odds-ratio": "O",
-    "inverse-odds-ratio": "I",
-    "direct": "D",
 }
 
 OM_OCCURRENCE_OPTIONS = Literal["fixed", "odds-ratio", "inverse-odds-ratio", "direct"]
@@ -272,7 +271,8 @@ def om_preparator(
             "backcasting",
         )
 
-    adam_fitted = adam_fit_or_gradient(
+    # A side of OMG takes its fit from the coupled recursion of the two sides
+    adam_fitted = adam_estimated.get("coupled") or adam_fit_or_gradient(
         adam_cpp=adam_cpp,
         mat_vt=mat_vt,
         mat_wt=mat_wt,
@@ -461,45 +461,38 @@ class OM(ADAM):
     _OM_DEFAULT_LOSS = "likelihood"
 
     def __new__(cls, *args, **kwargs):
+        # R's om() hands all its arguments to omg() or auto.om(): those the
+        # target does not take raise its TypeError
+        bound = inspect.signature(cls.__init__).bind(None, *args, **kwargs)
+        arguments = dict(bound.arguments)
+        arguments.update(arguments.pop("kwargs", {}))
+        arguments.pop("self")
         # "auto" is the default, as R's om()
-        occ = kwargs.get("occurrence", "auto")
-        if occ == "general":
-            from smooth.adam_general.core.omg import _build_omg_from_om_kwargs
-
-            kwargs.pop("loss", None)
-            kwargs.pop("n_iterations", None)
-            return _build_omg_from_om_kwargs(**kwargs)
+        occ = arguments.pop("occurrence", "auto")
+        if occ not in ("auto", "general"):
+            return super().__new__(cls)
+        if "lambda" in arguments:
+            arguments["lambda_param"] = arguments.pop("lambda")
+        # The orders of om(), never selected unless asked, as R's om() passes
+        # its default orders(select=FALSE) to auto.om()
+        orders, _ = resolve_arima_orders(
+            arguments.pop("orders", None),
+            *(arguments.pop(f"{part}_order", 0) for part in ("ar", "i", "ma")),
+        )
         if occ == "auto":
             from smooth.adam_general.core.auto_om import AutoOM
 
-            kwargs.pop("occurrence", None)
-            return AutoOM(
-                **{
-                    k: v
-                    for k, v in kwargs.items()
-                    if k
-                    in (
-                        "model",
-                        "lags",
-                        "orders",
-                        "h",
-                        "holdout",
-                        "persistence",
-                        "phi",
-                        "initial",
-                        "constant",
-                        "arma",
-                        "regressors",
-                        "ic",
-                        "bounds",
-                        "verbose",
-                        "nlopt_kwargs",
-                        "loss",
-                        "lambda_param",
-                    )
-                }
-            )
-        return super().__new__(cls)
+            no_arima = {"ar": 0, "i": 0, "ma": 0, "select": False}
+            return AutoOM(orders=orders or no_arima, **arguments)
+
+        from smooth.adam_general.core.omg import OMG
+
+        arguments.setdefault("model", "ZXZ")
+        sides = ("model", "constant", "regressors", "persistence")
+        for key in (*sides, "phi", "arma"):
+            if key in arguments:
+                arguments[f"{key}_a"] = arguments.pop(key)
+        return OMG(orders_a=orders, **arguments)
 
     def __getnewargs_ex__(self):
         # copy and pickle call __new__ with these: the fitted type, not the default
@@ -515,7 +508,6 @@ class OM(ADAM):
         ma_order: Union[int, List[int]] = 0,
         orders: Optional[Dict[str, Any]] = None,
         constant: bool = False,
-        formula: Optional[str] = None,
         regressors: Literal["use", "select", "adapt"] = "use",
         # ``str`` (not just the OM_OCCURRENCE_OPTIONS literals) because ``__new__``
         # also routes "general"/"auto", and wrappers pass runtime-validated strings.
@@ -579,7 +571,8 @@ class OM(ADAM):
             orders=orders,
             constant=constant,
             regressors=regressors,
-            distribution="dnorm",
+            # As R's om(), the checker estimates the regressors of the probability
+            distribution="plogis",
             # ADAM.__init__ types `loss` as a string Literal; the callable
             # path is handled by ADAM's parameter_checks (which natively
             # accepts callables and flips the internal flag to "custom").
@@ -610,7 +603,6 @@ class OM(ADAM):
         self._is_omg_submodel: bool = False
         self._om_occurrence = occurrence
         self._occurrence_char = _OCC_TO_CHAR[occurrence]
-        self._formula = formula
 
     # ------------------------------------------------------------------
     # Hook overrides
@@ -718,6 +710,16 @@ class OM(ADAM):
                 nlopt_kwargs=getattr(self, "nlopt_kwargs", None),
             ).fit(y, X)
 
+        # A constant probability has no regressors, as it has no ARIMA
+        if self._om_occurrence == "fixed":
+            X = None
+        # The regressors are selected on the occurrence indicator, as R
+        if X is not None and getattr(self, "regressors", "use") == "select":
+            fitted = _xreg_select_refit(self, y, X, getattr(self, "ic", "AICc"))
+            vars(self).clear()
+            vars(self).update(vars(fitted))
+            return self
+
         self._start_time = time.time()
         # Stash the user's requested model spec so we can restore "M*"
         # components after parameters_checker (which auto-downgrades them when
@@ -806,7 +808,6 @@ class OM(ADAM):
             "arma": self.arma,
             "h": self.h,
             "holdout": self.holdout,
-            "formula": self._formula,
         }
         for key in (
             "lags",
@@ -868,7 +869,11 @@ class OM(ADAM):
                     for est, lag in zip(seas_est, lags_seasonal)
                 )
             )
-            ets_redundancy = naive_level_seasonal - df_level_seasonal
+            # B has m-1 initials per seasonal lag: without the level, their span
+            # lacks the constant that the level would take
+            ets_redundancy = naive_level_seasonal - (
+                df_initials_ets_level_seasonal(seas_lags_est, True) - (not level_est)
+            )
             df_initials = df_level_seasonal + mt.get("model_is_trendy", False) * bool(
                 ini.get("initial_trend_estimate", True)
             )
@@ -1424,22 +1429,16 @@ class OM(ADAM):
         )
 
     def _set_om_fitted_attributes(self):
-        # Build the model name in oETS(...)[X] form
-        e = self._model_type.get("error_type", "")
-        t = self._model_type.get("trend_type", "")
-        s = self._model_type.get("season_type", "")
-        if self._model_type.get("damped", False) and t not in ("", "N"):
-            t = t + "d"
-        ets_str = f"{e}{t}{s}"
-        bracket = _OCC_TO_BRACKET[self._om_occurrence]
-        parts = [f"oETS({ets_str})"]
-        if self._arima.get("arima_model"):
-            ar = (self._arima.get("ar_orders") or [0])[0]
-            i = (self._arima.get("i_orders") or [0])[0]
-            ma = (self._arima.get("ma_orders") or [0])[0]
-            parts.append(f"ARIMA({ar},{i},{ma})")
-        # The type of the occurrence closes the name, as R's adam_model_name
-        self.model = "+".join(parts) + f"[{bracket}]"
+        # The name of the selected ETS, then R's adam_model_name with the "o"
+        # prefix: oETSX(...)[O], oARIMA(...)[O], ...
+        if self._model_type.get("ets_model"):
+            t = self._model_type["trend_type"]
+            if self._model_type.get("damped", False) and t != "N":
+                t += "d"
+            self.model = (
+                f"{self._model_type['error_type']}{t}{self._model_type['season_type']}"
+            )
+        self.model = _build_model_name(self, prefix="o")
 
     def _auto_predict_om(self):
         h = getattr(self, "h", None)
@@ -1451,6 +1450,12 @@ class OM(ADAM):
         # to probabilities; for the raw forecast call we need to re-run the
         # C++ forecaster on the optimal states then apply the link.
         self._auto_forecast = self._om_forecast(h, X_future=None)
+        if self.holdout:
+            self.accuracy = _compute_forecast_errors(
+                self._observations["y_holdout"],
+                self._auto_forecast.mean,
+                self._observations["y_in_sample"],
+            )
 
     def _run_forecaster(self, h: int, X_future=None):
         """Call the C++ forecaster; return ``(fc, raw_array)`` (before link function).
@@ -1498,8 +1503,8 @@ class OM(ADAM):
             "FI": None,
         }
 
-        if X_future is not None and self._explanatory.get("xreg_model"):
-            self._explanatory["new_xreg"] = np.asarray(X_future, dtype=float)
+        if X_future is not None:
+            self._set_new_xreg(np.asarray(X_future, dtype=float))
 
         fc = forecaster(
             model_prepared=model_prepared,

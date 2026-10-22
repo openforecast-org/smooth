@@ -56,13 +56,6 @@ def _format_distribution(distribution: str, other: Optional[Dict] = None) -> str
             if isinstance(nu, float)
             else f"Student t with df={nu}"
         )
-    elif distribution == "dalaplace":
-        alpha = other.get("alpha", "?")
-        return (
-            f"Asymmetric Laplace with alpha={alpha:.4f}"
-            if isinstance(alpha, float)
-            else f"Asymmetric Laplace with alpha={alpha}"
-        )
     elif distribution == "dlgnorm":
         shape = other.get("shape", "?")
         return (
@@ -658,8 +651,10 @@ def model_summary(model: Any, digits: int = 4) -> str:
     return "\n".join(lines)
 
 
-def _build_model_name(model: Any) -> str:
-    """Build the full model name (e.g. 'SARIMA(1,1,2)[1](1,1,2)[12]')."""
+def _build_model_name(model: Any, prefix: str = "i") -> str:
+    """Build the full model name (e.g. 'SARIMA(1,1,2)[1](1,1,2)[12]'), with the
+    ``prefix`` of an occurrence (``"o"`` for an occurrence model), as R's
+    adam_model_name."""
     model_str = getattr(model, "model", "") or ""
     ets_model = False
     arima_model = False
@@ -745,6 +740,7 @@ def _build_model_name(model: Any) -> str:
         name or model_str or "Unknown",
         getattr(model, "_occurrence", None),
         getattr(model, "_om_model", None),
+        prefix,
     )
 
 
@@ -762,7 +758,7 @@ OCCURRENCE_NAME_SUFFIX = {
 }
 
 
-def decorate_occurrence_name(name, occurrence_dict, om_model=None):
+def decorate_occurrence_name(name, occurrence_dict, om_model=None, prefix="i"):
     """Prefix ``i`` and append the occurrence-type letter, as R's adam_model_name.
     The type is that of the fitted occurrence model (``om_model``) when it was
     selected by "auto" or provided, as R takes it from the model."""
@@ -778,7 +774,7 @@ def decorate_occurrence_name(name, occurrence_dict, om_model=None):
         )
     if not isinstance(occurrence, str) or occurrence in ("n", "none"):
         return name
-    return f"i{name}{OCCURRENCE_NAME_SUFFIX.get(occurrence, '')}"
+    return f"{prefix}{name}{OCCURRENCE_NAME_SUFFIX.get(occurrence, '')}"
 
 
 def _get_model_name(model: Any) -> str:

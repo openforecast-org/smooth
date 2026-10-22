@@ -1,0 +1,251 @@
+"""R-Python parity of options of ADAM's fit: the selection of the ARIMA orders
+by orders={"select": True}, as R's adam() hands it to auto.adam()."""
+
+import pathlib
+import warnings
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from smooth import ADAM, MSARIMA
+from tests._r_bridge import r_dict
+
+pytestmark = pytest.mark.r_parity
+
+Y = pd.read_csv(pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv")
+Y = Y["y"].to_numpy(dtype=float)
+
+
+@pytest.mark.parametrize("cls", [ADAM, MSARIMA])
+def test_the_arima_orders_are_selected(cls):
+    r = r_dict(
+        "{ m <- adam(AirPassengers, 'NNN', lags=c(1,12),"
+        " orders=list(ar=c(2,1), i=c(1,1), ma=c(2,1), select=TRUE));"
+        " list(orders=m$orders, logLik=as.numeric(logLik(m))) }"
+    )
+    orders = {"ar": [2, 1], "i": [1, 1], "ma": [2, 1], "select": True}
+    kwargs = dict(model="NNN") if cls is ADAM else {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = cls(lags=[1, 12], orders=orders, **kwargs).fit(Y)
+    for key in ("ar", "i", "ma"):
+        assert list(model.orders[key]) == list(r["orders"][key])
+    np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
+
+
+# (R model, Python model): the pools whose model was reported as asked
+POOLS = {
+    "PPP": ("'PPP'", "PPP"),
+    "FFF": ("'FFF'", "FFF"),
+    "list": ("c('ANN','MAM')", ["ANN", "MAM"]),
+    "CCN": ("'CCN'", "CCN"),
+    "ZXZ": ("'ZXZ'", "ZXZ"),
+}
+
+
+@pytest.mark.parametrize("pool", list(POOLS))
+def test_the_model_type_is_the_selected_one(pool):
+    r_model, python_model = POOLS[pool]
+    r = r_dict(
+        f"{{ m <- adam(AirPassengers, {r_model}, lags=12);"
+        " list(type=modelType(m)) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model=python_model, lags=[12]).fit(Y)
+    assert model.model_type == r["type"][0]
+
+
+# (R call, Python arguments, with the regressor x1)
+INITIALS = {
+    "MAM": ("AirPassengers, 'MAM', lags=12", dict(model="MAM", lags=[12]), False),
+    "ARIMA": (
+        "AirPassengers, 'ANN', lags=c(1,12), initial='optimal',"
+        " orders=list(ar=c(1,1), i=c(1,0), ma=c(0,0))",
+        dict(
+            model="ANN",
+            lags=[1, 12],
+            initial="optimal",
+            orders={"ar": [1, 1], "i": [1, 0], "ma": [0, 0]},
+        ),
+        False,
+    ),
+    "ETSX": ("d, 'MNN', lags=1", dict(model="MNN", lags=[1]), True),
+}
+
+
+@pytest.mark.parametrize("case", list(INITIALS))
+def test_the_initial_values_are_those_of_r(case):
+    r_call, python_arguments, xreg = INITIALS[case]
+    r = r_dict(
+        "{ d <- data.frame(y=as.numeric(AirPassengers), x1=(0:143) %% 5);"
+        f" m <- adam({r_call}); i <- m$initial;"
+        " if(!is.null(i$xreg)) i$xreg <- as.list(i$xreg); list(initial=i) }"
+    )
+    X = pd.DataFrame({"x1": np.arange(144) % 5.0}) if xreg else None
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(**python_arguments).fit(Y, X)
+    initial = model.initial_value
+    assert list(initial) == list(r["initial"])
+    for key, value in r["initial"].items():
+        if key == "xreg":
+            assert list(initial[key]) == list(value)
+            np.testing.assert_allclose(
+                list(initial[key].values()), np.ravel(list(value.values())), rtol=1e-5
+            )
+        else:
+            np.testing.assert_allclose(np.ravel(initial[key]), value, rtol=1e-5)
+
+
+# (R initial, Python initial, model) of the initials provided by the user
+PROVIDED = {
+    "level": ("list(level=100)", {"level": 100.0}, "MAM"),
+    "level-trend": ("list(level=100, trend=2)", {"level": 100.0, "trend": 2.0}, "MAM"),
+    "seasonal": ("list(seasonal=rep(1,12))", {"seasonal": np.ones(12)}, "MAM"),
+    "vector": ("c(100, 2, rep(1,12))", np.r_[100.0, 2.0, np.ones(12)], "MAM"),
+    "unnamed": ("list(100, NULL, rep(1,12), NULL, NULL)", [100.0, None, np.ones(12)], "MAM"),
+    "selection": ("list(level=110)", {"level": 110.0}, "ZZN"),
+}
+
+
+@pytest.mark.parametrize("case", list(PROVIDED))
+def test_the_provided_initials_are_used_as_r(case):
+    r_initial, python_initial, model_type = PROVIDED[case]
+    r = r_dict(
+        f"{{ m <- suppressWarnings(adam(AirPassengers, '{model_type}', lags=12,"
+        f" initial={r_initial})); list(type=m$initialType,"
+        " logLik=as.numeric(logLik(m)), initial=m$initial) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model=model_type, lags=[12], initial=python_initial).fit(Y)
+    assert model.initial_type == r["type"][0]
+    np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
+    for key, value in r["initial"].items():
+        np.testing.assert_allclose(np.ravel(model.initial_value[key]), value, rtol=1e-4)
+
+
+# (R persistence, Python persistence) with the regressors="adapt"
+DELTAS = {
+    "xreg": ("list(xreg=0.01)", {"xreg": 0.01}),
+    "delta": ("list(delta=0.01)", {"delta": [0.01]}),
+    "level-xreg": ("list(level=0.3, xreg=0.01)", {"level": 0.3, "xreg": 0.01}),
+}
+
+
+@pytest.mark.parametrize("case", list(DELTAS))
+def test_the_provided_deltas_are_used_as_r(case):
+    r_persistence, python_persistence = DELTAS[case]
+    r = r_dict(
+        "{ d <- data.frame(y=as.numeric(AirPassengers), x1=(0:143) %% 5);"
+        " m <- adam(d, 'ANN', lags=1, regressors='adapt',"
+        f" persistence={r_persistence}); list(persistence=as.list(m$persistence),"
+        " logLik=as.numeric(logLik(m)), df=nparam(m)) }"
+    )
+    X = pd.DataFrame({"x1": np.arange(144) % 5.0})
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(
+            model="ANN", lags=[1], regressors="adapt", persistence=python_persistence
+        ).fit(Y, X)
+    assert list(model.persistence_vector) == list(r["persistence"])
+    for key, value in r["persistence"].items():
+        assert model.persistence_vector[key] == pytest.approx(value[0], rel=1e-5)
+    np.testing.assert_allclose(model.loglik, r["logLik"], rtol=1e-6)
+    assert model.nparam == r["df"][0]
+
+
+SEASONALS = np.r_[[-10.0] * 3, [10.0] * 3, [0.0] * 6]
+# (R call, Python arguments, whether with the regressors a and b)
+PROVIDED_ALL = {
+    "vector-no-trend": (
+        "adam(y, 'ANA', initial=c(100,seasonals), persistence=c(0.1,0.1))",
+        dict(
+            model="ANA",
+            lags=[12],
+            initial=np.r_[100.0, SEASONALS],
+            persistence=[0.1, 0.1],
+        ),
+        False,
+    ),
+    "short-list-seasonal": (
+        "adam(y, 'ANA', initial=list(100,NULL,seasonals))",
+        dict(model="ANA", lags=[12], initial=[100.0, None, SEASONALS]),
+        False,
+    ),
+    "short-list-trend": (
+        "adam(y, 'AAN', initial=list(100,1))",
+        dict(model="AAN", initial=[100.0, 1.0]),
+        False,
+    ),
+    "level-only-seasonal": (
+        "adam(y, 'AAA', initial=list(level=100))",
+        dict(model="AAA", lags=[12], initial={"level": 100.0}),
+        False,
+    ),
+    "arima": (
+        "adam(y, 'NNN', orders=list(ar=1), initial=list(arima=100))",
+        dict(model="NNN", orders={"ar": 1}, initial={"arima": [100.0]}),
+        False,
+    ),
+    "xreg-named": (
+        "adam(xreg, 'ANN', initial=list(level=100, xreg=c(b=-3,a=2)))",
+        dict(model="ANN", initial={"level": 100.0, "xreg": {"b": -3.0, "a": 2.0}}),
+        True,
+    ),
+    "xreg-unnamed": (
+        "adam(xreg, 'ANN', initial=list(level=100, xreg=c(2,-3)))",
+        dict(model="ANN", initial={"level": 100.0, "xreg": [2.0, -3.0]}),
+        True,
+    ),
+    "xreg-vector": (
+        "adam(xreg, 'ANN', initial=c(100,2,-3))",
+        dict(model="ANN", initial=np.r_[100.0, 2.0, -3.0]),
+        True,
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(PROVIDED_ALL))
+def test_the_provided_initials_are_counted_as_r(case):
+    """R's b41e16fd: the order of a vector without a trend, the count of the
+    provided parameters, the initials of the regressors by name or in their order,
+    and an unnamed list shorter than five elements."""
+    r_call, python_args, with_xreg = PROVIDED_ALL[case]
+    r = r_dict(
+        "{ seasonals <- c(rep(-10,3), rep(10,3), rep(0,6));"
+        " y <- ts(100 + rep(seasonals,10) + sin(1:120), frequency=12);"
+        " xreg <- data.frame(y=as.vector(y), a=cos(1:120), b=sin(1:120/3));"
+        f" m <- suppressWarnings({r_call}); list(y=as.vector(y),"
+        " logLik=as.numeric(logLik(m)), nparam=nparam(m),"
+        " provided=m$nParam['Provided', c('nParamInternal','nParamXreg')]) }"
+    )
+    t = np.arange(1, 121)
+    X = pd.DataFrame({"a": np.cos(t), "b": np.sin(t / 3)}) if with_xreg else None
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(**python_args).fit(np.asarray(r["y"], dtype=float), X)
+    np.testing.assert_allclose(model.loglik, r["logLik"][0], rtol=1e-10)
+    assert model.nparam == r["nparam"][0]
+    provided = model.n_param.provided
+    assert [provided["internal"], provided["xreg"]] == r["provided"]
+
+
+def test_the_provided_level_leaves_the_seasonal_initials_estimated():
+    """A provided level with the seasonal initials estimated: R counted 82
+    internal parameters (combn() of a single lag) and Python 16 (one too many
+    for the m-1 seasonal initials without the level), for the 15 in B."""
+    r = r_dict(
+        "{ m <- adam(AirPassengers, 'AAA', lags=12, initial=list(level=100));"
+        " list(n=m$nParam[, 'nParamInternal'], B=length(m$B)) }"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model="AAA", lags=[12], initial={"level": 100.0}).fit(Y)
+    assert r["n"] == [15, 1] and r["B"] == [15]
+    assert [model.n_param.estimated["internal"], model.n_param.provided["internal"]] == [
+        15,
+        1,
+    ]

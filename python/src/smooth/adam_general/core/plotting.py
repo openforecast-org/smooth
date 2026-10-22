@@ -322,12 +322,6 @@ def _qqplot_quantiles(model):
             lambda p: gb.qgnorm(p, 0.0, scale, shape),
             f"QQ-plot of Generalised Normal (shape={shape:.3f})",
         )
-    if dist == "dalaplace":
-        alpha = other.get("alpha", 0.5)
-        return (
-            lambda p: gb.qalaplace(p, 0.0, scale, alpha),
-            "QQ-plot of Asymmetric Laplace distribution",
-        )
     if dist == "dlogis":
         return (lambda p: gb.qlogis(p, 0.0, scale)), "QQ-plot of Logistic distribution"
     if dist == "dinvgauss":

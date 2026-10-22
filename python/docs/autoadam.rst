@@ -32,8 +32,10 @@ ARIMA-order arguments:
   non-zero value, those are used. They are interpreted as **upper search
   bounds** when ``arima_select=True``, or as **fixed** orders when
   ``arima_select=False`` (the default).
-- With no ARIMA spec at all (``orders=None`` and all three scalars zero/None),
-  the model is pure ETS and no ARIMA selection is performed.
+- With no ARIMA spec at all (``orders=None`` and all three scalars None, the
+  default), the orders are selected up to R's ``auto.adam()`` defaults,
+  ``{"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True}``. Pass
+  ``orders={"ar": 0, "i": 0, "ma": 0}`` for pure ETS.
 
 ``lags`` accepts either a scalar (``lags=12``) or a list (``lags=[12]``).
 

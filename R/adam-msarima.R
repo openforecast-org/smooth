@@ -101,7 +101,11 @@
 #' explanatory variables are optimised. This is recommended for ARIMAX
 #' model. Alternatively, you can set \code{initial="complete"} backcasting,
 #' which means that all states (including explanatory variables) are initialised
-#' via backcasting.
+#' via backcasting. Finally, \code{initial="gradient"} solves for the initial
+#' states by profiling the estimation loss at the current parameters (a linear
+#' solve for the additive models), as in \link[smooth]{adam}; in a model with
+#' multiplicative components, the ARIMA and the explanatory variables fall back
+#' to backcasting.
 #' @param ...  Other non-documented parameters. see \link[smooth]{adam} for
 #' details.
 #'

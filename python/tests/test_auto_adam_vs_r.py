@@ -380,3 +380,18 @@ class TestETSARIMASeasonal:
 
     def test_aicc(self, m, r_outputs):
         assert abs(m.aicc - r_outputs["ets_arima_seasonal"]["aicc"][0]) < 0.05
+
+
+@pytest.mark.parametrize("series,lag", [("UKgas", 4), ("AirPassengers", 12)])
+def test_the_default_selects_the_orders_as_r(series, lag):
+    """auto.adam() selects the ARIMA orders by default, up to ar=c(3,3),
+    i=c(2,1), ma=c(3,3)."""
+    r = r_dict(
+        f"{{ m <- auto.adam({series}, lags={lag}); list(y=as.numeric({series}),"
+        " model=m$model, logLik=as.numeric(logLik(m)),"
+        " mean=as.numeric(forecast(m, h=6)$mean)) }"
+    )
+    fit = AutoADAM(lags=[lag]).fit(np.asarray(r["y"], dtype=float))
+    assert fit.model_name == np.atleast_1d(r["model"])[0]
+    assert fit.loglik == pytest.approx(np.atleast_1d(r["logLik"])[0], rel=1e-6)
+    assert np.allclose(fit.predict(h=6).mean, r["mean"], rtol=1e-6)

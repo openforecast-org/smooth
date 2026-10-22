@@ -119,7 +119,7 @@ def _r_outputs_for(scenario: dict) -> dict:
         "   list(skip=FALSE,"
         "        fitted=as.numeric(m$fitted),"
         "        residuals=ot - as.numeric(m$fitted),"
-        "        coef=c(B_A, B_B),"
+        "        coef=as.numeric(coef(m)), coef_names=names(coef(m)),"
         "        forecast=if (!is.null(fc) && all(is.finite(fc))) fc else NULL,"
         "        loss_value=as.numeric(m$lossValue),"
         "        loglik=as.numeric(m$logLik))"
@@ -197,6 +197,19 @@ class TestOMGRComparison:
             rtol=FITTED_RTOL,
             atol=FITTED_ATOL,
             err_msg=f"fitted mismatch for {scenario['name']}",
+        )
+
+    def test_coef(self, scenario, inputs, r_outputs):
+        _skip_if_degenerate(scenario, r_outputs)
+        m = _python_fit(scenario, inputs)
+        ref = r_outputs[scenario["name"]]
+        assert m.coef_names == ref["coef_names"]
+        np.testing.assert_allclose(
+            m.coef,
+            ref["coef"],
+            rtol=RTOL,
+            atol=ATOL,
+            err_msg=f"coef mismatch for {scenario['name']}",
         )
 
     def test_forecast(self, scenario, inputs, r_outputs):

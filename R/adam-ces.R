@@ -264,6 +264,11 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
                                        silent, modelDo, ellipsis, fast=FALSE);
     list2env(checkerReturn, envir=environment());
 
+    # The regressors are selected as in adam(): on the errors of the model without them
+    if(xregModel && regressors=="select"){
+        return(adam_xreg_selectRefit(cl, env, data, responseName, "y", ic));
+    }
+
     # Fix lagsModel and Ttype for CES. This is needed because the function drops duplicate seasonal lags
     # if(seasonality=="simple"){
     #     # Build our own lags, no non-seasonal ones

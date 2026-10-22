@@ -249,6 +249,13 @@ class TestProperties:
     def test_coef_nonempty(self, fitted_omg):
         assert len(fitted_omg.coef) > 0
 
+    def test_coef_is_model_a_then_model_b(self, fitted_omg):
+        # As R's coef.omg(): the parameters of A followed by those of B
+        np.testing.assert_array_equal(
+            fitted_omg.coef,
+            np.r_[fitted_omg.model_a.coef, fitted_omg.model_b.coef],
+        )
+
     def test_nobs(self, intermittent_y, fitted_omg):
         assert fitted_omg.nobs == len(intermittent_y)
 

@@ -303,7 +303,6 @@ def generate_prediction_interval(
     # (R/adam.R:6600-6725), and taken from greybox so both languages call the
     # same functions with the same arguments. `scale_2d` is R's `vcovMulti`.
     shape = other_params.get("shape")
-    alpha = other_params.get("alpha")
     loc = 1.0 if e_type == "M" else 0.0
     y_lower_mult = None
     y_upper_mult = None
@@ -346,13 +345,6 @@ def generate_prediction_interval(
         df = general.get("df_t", other_params.get("nu"))
         y_lower[:] = loc + np.sqrt(scale_2d) * gb.qt(ll, df)
         y_upper[:] = loc + np.sqrt(scale_2d) * gb.qt(lu, df)
-
-    elif distribution == "dalaplace":
-        sd = np.sqrt(
-            scale_2d * alpha**2 * (1 - alpha) ** 2 / (alpha**2 + (1 - alpha) ** 2)
-        )
-        y_lower[:] = gb.qalaplace(ll, loc, sd, alpha)
-        y_upper[:] = gb.qalaplace(lu, loc, sd, alpha)
 
     elif distribution == "dlnorm":
         # 1+e with the mean of one: scale_2d is the variance of log(1+e)
@@ -570,7 +562,6 @@ def generate_simulation_interval(
             obs_in_sample=obs_in_sample,
             n_param=obs_in_sample - df,
             shape=other_params.get("shape"),
-            alpha=other_params.get("alpha"),
             random_state=rng,
         )
         mat_errors = errors_flat.reshape((h, nsim), order="F")

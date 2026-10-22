@@ -100,7 +100,6 @@ def sample_reforecast_errors(
     n_obs: int,
     n_param: int,
     shape: Optional[float] = None,
-    alpha: Optional[float] = None,
     rng: Optional[np.random.Generator] = None,
 ) -> np.ndarray:
     """Sample ``(h, nsim, nsim)`` error draws for ``reforecast``.
@@ -122,8 +121,6 @@ def sample_reforecast_errors(
         Used by ``"dt"`` for the degrees of freedom.
     shape : float, optional
         Shape parameter for ``"dgnorm"`` / ``"dlgnorm"``.
-    alpha : float, optional
-        Asymmetry parameter for ``"dalaplace"``.
     rng : numpy.random.Generator, optional
         RNG for reproducibility.
 
@@ -151,7 +148,6 @@ def sample_reforecast_errors(
         obs_in_sample=n_obs,
         n_param=n_param,
         shape=shape,
-        alpha=alpha,
         random_state=rng,
     )
     return np.asfortranarray(e.reshape((h, nsim, nsim), order="F"), dtype=np.float64)

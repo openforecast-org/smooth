@@ -64,3 +64,14 @@ test_that("ssarima() reports the likelihood at the fitted parameters, not the lo
         expect_true(as.numeric(logLik(testModel)) < 0);
     }
 })
+
+# regressors="select" keeps the true regressor and drops the noise, as adam() does
+test_that("ssarima() selects the regressors as adam()", {
+    set.seed(3)
+    xreg <- data.frame(y=0, a=rnorm(120), b=rnorm(120), c=rnorm(120))
+    xreg$y <- 100 + 5*xreg$a + rnorm(120, 0, 2)
+    xreg <- ts(xreg, frequency=12)
+    testModel <- ssarima(xreg, regressors="select")
+    expect_equal(names(testModel$initial$xreg), "a")
+    expect_equal(names(testModel$initial$xreg), names(adam(xreg, "ANN", regressors="select")$initial$xreg))
+})

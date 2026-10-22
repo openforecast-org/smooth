@@ -539,6 +539,7 @@ def parameters_checker(
             raise ValueError("Data must be numeric or convertible to numeric values")
 
     occ_info = _check_occurrence(data_values, occurrence, silent, holdout, h)
+    observed_values = data_values
     # The missing values: filled for the initialisation and skipped by the fit, as R
     data, data_values, y_na_values = _fill_missing(
         data,
@@ -546,6 +547,16 @@ def parameters_checker(
         lags,
         len(data_values) - (h if holdout else 0),
     )
+    # Without zeros in the (filled) in-sample data the occurrence was switched on
+    # unintentionally: R's adam() turns it off (R/adamGeneral.R, otLogical)
+    occ_name = occ_info["occurrence"]
+    occ_name = occ_name if isinstance(occ_name, str) else occ_name.occurrence
+    if (
+        occ_info["occurrence_model"]
+        and occ_name != "provided"
+        and np.all(np.asarray(data_values)[: occ_info["obs_in_sample"]] != 0)
+    ):
+        occ_info = _check_occurrence(observed_values, "none", silent, holdout, h)
     obs_in_sample = occ_info["obs_in_sample"]
     obs_nonzero = occ_info["obs_nonzero"]
     occurrence_model = occ_info["occurrence_model"]

@@ -219,8 +219,13 @@ if args.adam:
         if Fa is None or list(map(int, a["lags"])) != lags:
             lagsDiffer += 1
             continue
-        worst = max(worst, np.abs(Fa - F).max(), np.abs(np.array(a["g"]) - g).max(),
-                    np.abs(np.array(a["w"]) - w).max())
+        gap = max(np.abs(Fa - F).max(), np.abs(np.array(a["g"]) - g).max(), np.abs(np.array(a["w"]) - w).max())
+        if gap > 1e-10:
+            print({k: s[k] for k in ("ets", "m", "ar", "i", "ma")}, "lags", lags)
+            print("  F here", np.round(F, 4).tolist(), "\n  F adam", np.round(Fa, 4).tolist())
+            print("  g here", np.round(g, 4).tolist(), "\n  g adam", np.round(a["g"], 4).tolist())
+            print("  w here", np.round(w, 4).tolist(), "\n  w adam", np.round(a["w"], 4).tolist())
+        worst = max(worst, gap)
     results += [{"quantity": "models whose component lags differ from those of adam()", "value": lagsDiffer,
                  "conditions": {"models": len(chosen)}},
                 {"quantity": "max abs difference between the matrices built here and those of adam()",

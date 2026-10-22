@@ -83,6 +83,8 @@ Changes:
 
 Bugfixes:
 * The admissible bounds (`bounds="admissible"`) of `ADAM`, `CES`, the GUM simulation and the bounds of `confint()` and `reapply()` check, as R's, that the model forgets its initial states through its ARIMA form: the roots of theta(B) = det(I - D L(B)), with D = F - g w', must lie outside the unit circle after removing the cyclotomic factors it shares with phi(B) = det(I - F L(B)). The previous per-lag eigenvalues dropped the terms of g w' that link components of different lags and accepted models whose initial states have a growing effect (issue #415). The check is in the C++ header shared with R (`smooth_eigens` returns one value, below one exactly when the model is admissible). Estimates with admissible bounds change.
+* `ADAM` switches the occurrence model off when the in-sample data (with the missing values filled) has no zeros, as R's `adam()`: `occurrence="auto"` on `1:10` fitted an inverse odds ratio model and selected ETS(MAN) against R's ETS(AAN).
+* A zero scale of the Gamma distribution (e.g. `10:1` with ETS(MAN), `persistence=[1, 0.8535]`) gives the log-likelihood `-1e300`, as R, instead of a `ZeroDivisionError`: the sums of R's accumulator return a double, whose division by zero is IEEE's.
 * `ADAM(regressors="select")` with an occurrence model selects the regressors on the non-zero values, as R's `adam()`: the zeros of the occurrence were included.
 * `ADAM.predict()` forecasts the occurrence model with `X`: the occurrence probabilities ignored the regressors over the horizon.
 * `ADAM(occurrence="auto")` gives `AutoOM` the orders of the demand (none without ARIMA), as R's `adam()`: `AutoOM` selected ARIMA orders of its own for the occurrence part.

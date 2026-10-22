@@ -1029,7 +1029,11 @@ def _sum_r(values, axis=None):
     else:
         running = np.cumsum(values, axis=axis, dtype=np.longdouble)
         total = np.take(running, -1, axis=axis)
-    return float(total) if np.ndim(total) == 0 else np.asarray(total, dtype=float)
+    # A double, not a Python float: the arithmetic on it is IEEE's, as R's, so a zero
+    # scale gives 1/0 = Inf and a NaN density rather than a ZeroDivisionError
+    if np.ndim(total) == 0:
+        return np.float64(total)
+    return np.asarray(total, dtype=float)
 
 
 # Overflow here is the infeasibility signal, not a defect. During optimisation

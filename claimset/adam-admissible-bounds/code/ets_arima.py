@@ -19,6 +19,7 @@ parser.add_argument("--seed", type=int, required=True)
 parser.add_argument("--n", type=int, default=300)
 parser.add_argument("--grid", action="store_true", help="the ETS(A,N,N)+MA(1) grid")
 parser.add_argument("--adam", type=int, default=0, help="models compared with the matrices of adam()")
+parser.add_argument("--impl", action="store_true", help="the bounds checkers of the package against the prototype")
 args = parser.parse_args()
 rng = np.random.default_rng(args.seed)
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -126,7 +127,8 @@ for name, seasonal in families.items():
                 break
         arimaPart = arima_part(ar, i, ma)
         rows.append(decisions(etsPart, arimaPart, ar))
-        specs.append({"ets": etsSpec, "m": m, "ar": [(l, c.tolist()) for l, c in ar], "i": i,
+        specs.append({"family": name, "decision": rows[-1], "ets": etsSpec, "m": m,
+                      "ar": [(l, c.tolist()) for l, c in ar], "i": i,
                       "ma": [(l, c.tolist()) for l, c in ma], "arima": arimaPart, "etsPart": etsPart})
     for method in ("split", "joint"):
         cond = {"family": name, "models": len(rows), "check": method}
@@ -230,5 +232,69 @@ if args.adam:
                  "conditions": {"models": len(chosen)}},
                 {"quantity": "max abs difference between the matrices built here and those of adam()",
                  "value": float(worst), "conditions": {"models": len(chosen) - lagsDiffer}}]
+
+# The bounds checkers of adam() (R) and ADAM (Python) on the whole model, against the prototype
+def reflection(coefs):
+    c, largest = np.r_[1.0, -np.asarray(coefs, float)], 0.0
+    for j in range(len(c) - 1, 0, -1):
+        largest = max(largest, abs(c[j]))
+        if abs(c[j]) >= 1:
+            return largest
+        c = (c[:j] - c[j] * c[j:0:-1]) / (1 - c[j] ** 2)
+    return largest
+
+
+if args.impl:
+    import sys
+    sys.path.insert(0, os.path.join(ROOT, "python", "src"))
+    from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
+
+    models = []
+    for s in specs:
+        F, g, w, lags = whole(s["etsPart"], s["arima"])
+        nETS = len(s["etsPart"][3])
+        models.append({"F": F.tolist(), "g": g.tolist(), "w": w.tolist(), "lags": lags, "nETS": nETS,
+                       "nARIMA": len(lags) - nETS, "arReflection": max([reflection(c) for _, c in s["ar"]],
+                                                                       default=0.0)})
+    python = []
+    for mo in models:
+        elements = {"vec_g": np.array(mo["g"]), "mat_f": np.array(mo["F"]), "mat_wt": np.array([mo["w"]]),
+                    "arima_polynomials": {"ar_reflection": mo["arReflection"], "ma_reflection": 0.0}}
+        python.append(adam_bounds_checker(
+            elements, "admissible", {"ets_model": True},
+            {"components_number_ets": mo["nETS"], "components_number_arima": mo["nARIMA"]},
+            {"lags_model_all": mo["lags"]}, {"arima_model": True, "ar_estimate": True, "ma_estimate": True},
+            {"regressors": "use", "xreg_model": False, "xreg_number": 0}, {}, {"constant_required": False}, 1))
+    with tempfile.TemporaryDirectory() as tmp:
+        inputPath, outputPath = os.path.join(tmp, "in.json"), os.path.join(tmp, "out.json")
+        json.dump(models, open(inputPath, "w"))
+        script = f"""
+        suppressMessages(pkgload::load_all("{ROOT}", quiet=TRUE))
+        models <- jsonlite::fromJSON("{inputPath}", simplifyVector=FALSE)
+        out <- sapply(models, function(m) {{
+            k <- length(m$lags)
+            g <- matrix(unlist(m$g), k, 1, dimnames=list(paste0("g", 1:k), NULL))
+            adam_bounds_checker(list(vecG=g, matF=matrix(unlist(m$F), k, k, byrow=TRUE),
+                                     matWt=matrix(unlist(m$w), 1)),
+                                list(arReflection=m$arReflection, maReflection=0), "admissible",
+                                TRUE, FALSE, FALSE, m$nETS, m$nETS, 0, TRUE, TRUE, TRUE, FALSE, "use", 0,
+                                m$nARIMA, unlist(m$lags), 1L, FALSE)
+        }})
+        jsonlite::write_json(out, "{outputPath}", digits=NA)
+        """
+        subprocess.run(["Rscript", "-e", script], check=True)
+        rPenalty = json.load(open(outputPath))
+    for name in families:
+        for language, penalties in (("R", rPenalty), ("Python", python)):
+            pairs = [(s["decision"], p / 1e100) for s, p in zip(specs, penalties) if s["family"] == name]
+            both = [(d, p) for d, p in pairs if not d["joint"] and p > 0]
+            cond = {"family": name, "models": len(pairs), "language": language}
+            results += [{"quantity": "admissibility decisions of the package's bounds checker that differ from the "
+                                     "prototype check of the whole model",
+                         "value": sum(d["joint"] != (p == 0) for d, p in pairs), "conditions": cond},
+                        {"quantity": "max abs difference of the largest modulus, package's bounds checker against "
+                                     "the prototype, on models both find inadmissible",
+                         "value": max([abs(d["jointModulus"] - p) for d, p in both], default=0.0),
+                         "conditions": {**cond, "inadmissible": len(both)}}]
 
 write_results(results)

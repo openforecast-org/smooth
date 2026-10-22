@@ -286,15 +286,15 @@ if args.impl:
         rPenalty = json.load(open(outputPath))
     for name in families:
         for language, penalties in (("R", rPenalty), ("Python", python)):
-            pairs = [(s["decision"], p / 1e100) for s, p in zip(specs, penalties) if s["family"] == name]
+            pairs = [(s["decision"], float(p) / 1e100) for s, p in zip(specs, penalties) if s["family"] == name]
             both = [(d, p) for d, p in pairs if not d["joint"] and p > 0]
             cond = {"family": name, "models": len(pairs), "language": language}
             results += [{"quantity": "admissibility decisions of the package's bounds checker that differ from the "
                                      "prototype check of the whole model",
-                         "value": sum(d["joint"] != (p == 0) for d, p in pairs), "conditions": cond},
+                         "value": int(sum(d["joint"] != (p == 0) for d, p in pairs)), "conditions": cond},
                         {"quantity": "max abs difference of the largest modulus, package's bounds checker against "
                                      "the prototype, on models both find inadmissible",
-                         "value": max([abs(d["jointModulus"] - p) for d, p in both], default=0.0),
+                         "value": float(max([abs(d["jointModulus"] - p) for d, p in both], default=0.0)),
                          "conditions": {**cond, "inadmissible": len(both)}}]
 
 write_results(results)

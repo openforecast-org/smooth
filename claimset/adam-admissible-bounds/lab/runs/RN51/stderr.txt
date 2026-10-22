@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/home/user/smooth/claimset/adam-admissible-bounds/code/ets_arima.py", line 300, in <module>
+    write_results(results)
+    ~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/user/smooth/claimset/adam-admissible-bounds/code/admissibility.py", line 163, in write_results
+    json.dump(results, f, indent=1)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/json/__init__.py", line 181, in dump
+    for chunk in iterable:
+                 ^^^^^^^^
+  File "/usr/lib/python3.13/json/encoder.py", line 433, in _iterencode
+    yield from _iterencode_list(o, _current_indent_level)
+  File "/usr/lib/python3.13/json/encoder.py", line 328, in _iterencode_list
+    yield from chunks
+  File "/usr/lib/python3.13/json/encoder.py", line 409, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.13/json/encoder.py", line 442, in _iterencode
+    o = _default(o)
+  File "/usr/lib/python3.13/json/encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type int64 is not JSON serializable

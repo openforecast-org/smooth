@@ -23,6 +23,13 @@ for alpha, gamma in [(0.1, 0.1), (1.2, 0.9)]:
         effect.append(abs(model[2] @ lagged))
         level, newSeasonal = D @ lagged
         seasonal.append(newSeasonal)
+    # The weights of the past observations: the same recursion from zero states with y = 1 at the start only
+    level, seasonal, weights = 0.0, list(np.zeros(m)), []
+    for t in range(args.periods):
+        lagged = np.array([level, seasonal[-m]])
+        weights.append(abs(model[2] @ lagged))
+        level, newSeasonal = D @ lagged + model[1] * (t == 0)
+        seasonal.append(newSeasonal)
     half = args.periods // 2
     conditions = {"model": "ETS(A,N,A)", "m": m, "alpha": alpha, "gamma": gamma}
     results += [{"quantity": "largest nonzero eigenvalue modulus of the book's per-lag discount matrices",
@@ -31,6 +38,8 @@ for alpha, gamma in [(0.1, 0.1), (1.2, 0.9)]:
                  "value": effect[-1], "conditions": {**conditions, "period": args.periods}},
                 {"quantity": "growth of the effect of the initial states per period over the second half",
                  "value": (effect[-1] / effect[half - 1]) ** (1 / (args.periods - half)), "conditions": conditions},
+                {"quantity": "growth of the weight of an observation per period over the second half",
+                 "value": (weights[-1] / weights[half - 1]) ** (1 / (args.periods - half)), "conditions": conditions},
                 {"quantity": "largest root modulus of the cancelled MA polynomial",
                  "value": max_lambda_roots(cancel(*arima_form(*model), model[3])[0]), "conditions": conditions}]
 write_results(results)

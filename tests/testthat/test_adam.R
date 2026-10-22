@@ -1506,3 +1506,12 @@ test_that("ADAM counts the provided initial level as provided and the rest as es
     expect_equal(testModel$nParam[,"nParamInternal"], c(Estimated=15, Provided=1));
     expect_equal(dfInitialsETSLevelSeasonal(12, FALSE), 12);
 })
+
+test_that("ADAM takes the provided MA once, and reapply() draws around the fitted ARIMA", {
+    # The MA of a lag without ARI was added twice to the persistence (psi = 1 for ma = 0.5)
+    testModel <- adam(BJsales, "NNN", orders=list(ma=1), arma=list(ma=0.5), h=0);
+    expect_equal(unname(testModel$persistence), 0.5);
+    testModel <- adam(BJsales, "NNN", orders=list(ma=1), h=0);
+    testReapply <- reapply(testModel, nsim=20);
+    expect_true(all(abs(testReapply$persistence - testModel$persistence) < 0.2));
+})

@@ -931,7 +931,8 @@ adam_filler <- function(B,
                  componentsNumberETS+1:(componentsNumberARIMA+constantRequired)] <-
                 -arimaPolynomials$ariPolynomial[nonZeroARI[,1]]
         }
-        # Fill in the persistence vector
+        # Fill in the persistence vector, from zero: the creator has filled the provided MA
+        vecG[componentsNumberETS+1:componentsNumberARIMA] <- 0
         if(nrow(nonZeroARI)>0){
             vecG[componentsNumberETS+nonZeroARI[,2]] <-
                 -arimaPolynomials$ariPolynomial[nonZeroARI[,1]]

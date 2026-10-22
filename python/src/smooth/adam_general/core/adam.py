@@ -6444,6 +6444,8 @@ class ADAM:
                 )
                 ari_poly = polys["ari_polynomial"]
                 ma_poly = polys["ma_polynomial"]
+                # The persistence from zero: it holds the fitted one
+                mat_g[n_ets_arima : n_ets_arima + n_arima_comp, s] = 0.0
                 if non_zero_ari.size:
                     for row in non_zero_ari:
                         arr_f[

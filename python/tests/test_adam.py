@@ -1700,3 +1700,17 @@ def test_adam_tiny_samples_as_r(y, forecast, loglik):
     assert np.allclose(np.asarray(model.predict(h=2).mean), forecast)
     if loglik is not None:
         assert model.loglik == pytest.approx(loglik, abs=1e-6)
+
+
+def test_adam_reapply_draws_around_the_fitted_arima():
+    """reapply() added the drawn MA to the fitted persistence of a lag without ARI."""
+    import warnings
+
+    rng = np.random.default_rng(7)
+    e = rng.normal(size=151)
+    y = 100 + e[1:] + 0.6 * e[:-1]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model="NNN", orders={"ma": 1}).fit(y)
+        drawn = np.asarray(model.reapply(nsim=20).persistence, dtype=float)
+    assert np.all(np.abs(drawn - model.persistence_vector["psi"]) < 0.2)

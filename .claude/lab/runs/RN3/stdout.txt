@@ -1,0 +1,6 @@
+models accepted by the per-lag check that do not forget their initial states {'family': 'ETS(A,N,A)', 'models': 3042} 1482.0
+models rejected by the per-lag check that forget their initial states {'family': 'ETS(A,N,A)', 'models': 3042} 0.0
+models accepted by the per-lag check {'family': 'ETS(A,N,A)', 'models': 3042} 3042.0
+models accepted by the per-lag check that do not forget their initial states {'family': 'GUM', 'models': 40} 2.0
+models rejected by the per-lag check that forget their initial states {'family': 'GUM', 'models': 40} 1.0
+models accepted by the per-lag check {'family': 'GUM', 'models': 40} 39.0

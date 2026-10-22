@@ -1,0 +1,137 @@
+[
+ {
+  "quantity": "largest root modulus 1/min|B| of the polynomial",
+  "value": 0.9962080481334653,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), admissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "recursion steps run by the step-down test",
+  "value": 193,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), admissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of the step-down test, ms",
+  "value": 0.7429920399954426,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), admissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of all roots by numpy companion eigenvalues, ms",
+  "value": 23.75985405999927,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), admissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of the coefficients of theta and phi by inverse DFT, ms",
+  "value": 6.57281667999996,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), admissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "largest root modulus 1/min|B| of the polynomial",
+  "value": 1.0002974785198857,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), inadmissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "recursion steps run by the step-down test",
+  "value": 170,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), inadmissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of the step-down test, ms",
+  "value": 0.8138564999990194,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), inadmissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of all roots by numpy companion eigenvalues, ms",
+  "value": 20.8541055600017,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), inadmissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of the coefficients of theta and phi by inverse DFT, ms",
+  "value": 3.8507816799938155,
+  "conditions": {
+   "model": "random GUM, lags (1, 24, 168), inadmissible",
+   "degree": 193,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "largest root modulus 1/min|B| of the polynomial",
+  "value": 0.9999965469723225,
+  "conditions": {
+   "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+   "degree": 168,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "recursion steps run by the step-down test",
+  "value": 168,
+  "conditions": {
+   "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+   "degree": 168,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of the step-down test, ms",
+  "value": 0.4172366199964017,
+  "conditions": {
+   "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+   "degree": 168,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of all roots by numpy companion eigenvalues, ms",
+  "value": 17.457083500003137,
+  "conditions": {
+   "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+   "degree": 168,
+   "repeats": 50
+  }
+ },
+ {
+  "quantity": "mean time of the coefficients of theta and phi by inverse DFT, ms",
+  "value": 4.686060920003001,
+  "conditions": {
+   "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+   "degree": 168,
+   "repeats": 50
+  }
+ }
+]

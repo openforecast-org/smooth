@@ -1,4 +1,4 @@
-"""The C++ core (smoothEigensPolyR through R) against the numpy prototype on random models."""
+"""The C++ core (smoothEigensR through R) against the numpy prototype on random models."""
 
 import argparse
 import json
@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory() as tmp:
         k <- length(m$lags)
         F <- matrix(unlist(m$F), k, k, byrow=TRUE)
         # Three calls: phi computed, then tabulated, then taken from the table
-        r <- lapply(1:3, function(i) smoothEigensPolyR(matrix(unlist(m$g)), F, matrix(unlist(m$w), 1),
+        r <- lapply(1:3, function(i) smoothEigensR(matrix(unlist(m$g)), F, matrix(unlist(m$w), 1),
                                                        as.integer(unlist(m$lags)), FALSE, 1L, FALSE))
         list(modulus=as.numeric(r[[3]]), theta=attr(r[[3]], "maPolynomial"), phi=attr(r[[3]], "ariPolynomial"),
              repeatDiff=max(sapply(r, function(x) max(abs(as.numeric(x) - as.numeric(r[[1]])),

@@ -144,13 +144,13 @@ def adam_bounds_checker(
     Shared by ``CF``, ``om_cf`` and ``omg_cf``: stationarity / invertibility of
     the ARIMA factors, then the ``"usual"`` restrictions of ETS and of the
     ``regressors="adapt"`` smoothing parameters, or the ``"admissible"`` check of
-    the discount matrix of the non-ARIMA components.
+    the whole model.
     """
     adapt = explanatory_checked.get("regressors") == "adapt"
     # Stationary AR and invertible MA, factor by factor
     if bounds != "none":
         penalty = arima_bounds_penalty(
-            arima_checked, adam_elements["arima_polynomials"]
+            arima_checked, adam_elements["arima_polynomials"], bounds
         )
         if penalty > 0:
             return penalty
@@ -205,40 +205,23 @@ def adam_bounds_checker(
                 return 1e100 * np.max(np.abs(deltas - 0.5))
 
     elif bounds == "admissible":
-        # The discount matrix split by lags is meaningless for the lagged ARIMA,
-        # which has one state per lag: its states are checked above instead
-        n_ets = components_dict["components_number_ets"]
-        components_other = np.setdiff1d(
-            np.arange(len(lags_dict["lags_model_all"])),
-            np.arange(n_ets, n_ets + components_dict["components_number_arima"]),
+        # The whole model: its MA polynomial couples the ETS, ARIMA and the other
+        # components
+        eigenValues = smooth_eigens(
+            persistence=np.asfortranarray(
+                adam_elements["vec_g"].reshape(-1, 1), dtype=np.float64
+            ),
+            transition=np.asfortranarray(adam_elements["mat_f"], dtype=np.float64),
+            measurement=np.asfortranarray(adam_elements["mat_wt"], dtype=np.float64),
+            lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32),
+            xreg_model=explanatory_checked["xreg_model"],
+            obs_in_sample=obs_in_sample,
+            has_delta=explanatory_checked["xreg_model"] and adapt,
+            xreg_number=explanatory_checked["xreg_number"],
+            constant_required=constants_checked["constant_required"],
         )
-        if components_other.size > 0 and (
-            model_type_dict["ets_model"] or arima_checked["arima_model"]
-        ):
-            has_delta = explanatory_checked["xreg_model"] and adapt
-            eigenValues = smooth_eigens(
-                persistence=np.asfortranarray(
-                    adam_elements["vec_g"][components_other].reshape(-1, 1),
-                    dtype=np.float64,
-                ),
-                transition=np.asfortranarray(
-                    adam_elements["mat_f"][np.ix_(components_other, components_other)],
-                    dtype=np.float64,
-                ),
-                measurement=np.asfortranarray(
-                    adam_elements["mat_wt"][:, components_other], dtype=np.float64
-                ),
-                lags_model_all=np.asarray(lags_dict["lags_model_all"], dtype=np.int32)[
-                    components_other
-                ],
-                xreg_model=explanatory_checked["xreg_model"],
-                obs_in_sample=obs_in_sample,
-                has_delta=has_delta,
-                xreg_number=explanatory_checked["xreg_number"],
-                constant_required=constants_checked["constant_required"],
-            )
-            if np.any(eigenValues > 1 + 1e-50):
-                return 1e100 * np.max(eigenValues)
+        if np.any(eigenValues > 1 + 1e-50):
+            return 1e100 * np.max(eigenValues)
 
     return 0
 
@@ -417,7 +400,7 @@ def CF(  # noqa: N802
         Type of bounds to enforce:
 
         - "usual": Classical parameter restrictions (default)
-        - "admissible": Admissibility constraints based on eigenvalues
+        - "admissible": Forecastability of the whole model (see ``ADAM``)
         - None: No bounds checking
 
     other : float, optional

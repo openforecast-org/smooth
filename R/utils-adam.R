@@ -2091,10 +2091,11 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
                                 xregModel, regressors, xregNumber, componentsNumberARIMA,
                                 lagsModelAll, obsInSample,
                                 phiEstimate){
-    # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)
+    # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h). With the
+    # admissible bounds the MA is checked with the whole model below
     if(bounds!="none" && arimaModel){
         arimaReflection <- max(arEstimate*arimaPolynomials$arReflection,
-                               maEstimate*arimaPolynomials$maReflection);
+                               (bounds=="usual")*maEstimate*arimaPolynomials$maReflection);
         if(arimaReflection>=1){
             return(1E+100*arimaReflection);
         }
@@ -2139,17 +2140,11 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
         }
     }
     else if(bounds=="admissible"){
-        # The discount matrix split by lags is meaningless for the lagged ARIMA,
-        # which has one state per lag: its states are checked above instead
-        componentsOther <- setdiff(seq_along(lagsModelAll), componentsNumberETS+seq_len(componentsNumberARIMA))
-        if(length(componentsOther)>0){
-            eigenValues <- smoothEigens(adamElements$vecG[componentsOther,,drop=FALSE],
-                                        adamElements$matF[componentsOther,componentsOther,drop=FALSE],
-                                        adamElements$matWt[,componentsOther,drop=FALSE],
-                                        lagsModelAll[componentsOther], xregModel, obsInSample);
-            if(any(eigenValues>1+1E-50)){
-                return(1E+100*max(eigenValues));
-            }
+        # The whole model: its MA polynomial couples the ETS, ARIMA and the other components
+        eigenValues <- smoothEigens(adamElements$vecG, adamElements$matF, adamElements$matWt,
+                                    lagsModelAll, xregModel, obsInSample);
+        if(any(eigenValues>1+1E-50)){
+            return(1E+100*max(eigenValues));
         }
     }
     return(0);

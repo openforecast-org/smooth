@@ -76,7 +76,7 @@ Versions: smooth 1.2.0 (python, editable from the working tree), greybox 1.0.9, 
 and its dirty state are printed at run time and written into the CSV.
 
 Run from the repository root:
-  python/.venv/bin/python python/docs/claimset/scripts/interval_bounds.py
+  python/.venv/bin/python claimset/intermittent-likelihood/code/interval_bounds.py
 It writes results/interval_bounds.csv next to this script."""
 
 import importlib
@@ -96,7 +96,7 @@ from scipy.special import gammaln
 from smooth import ADAM
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[3]
+REPO = HERE.parents[2]
 S, ALPHA, LEVEL, H, K, T, L0 = 0.32, 0.21, 0.9, 12, 6, 100, 10.0
 P = (1 + LEVEL) / 2
 N_OWN, NSIM_PKG, SEED = 1_000_000, 1_000_000, 20261015

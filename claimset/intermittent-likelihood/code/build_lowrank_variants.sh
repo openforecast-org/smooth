@@ -20,7 +20,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+REPO="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 DEFAULT_DIR="${TMPDIR:-/tmp}/smooth-lowrank"
 OUT="${1:-${LOWRANK_DIR:-$DEFAULT_DIR}}"
 PYTHON="$REPO/python/.venv/bin/python"

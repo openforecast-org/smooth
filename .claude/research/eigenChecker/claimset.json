@@ -31,9 +31,9 @@
     "inconclusive": 0
    },
    "runs": {
-    "total": 43,
+    "total": 44,
     "confirmatory": 6,
-    "exploratory": 37,
+    "exploratory": 38,
     "failed": 4
    }
   },
@@ -194,13 +194,13 @@
   },
   {
    "id": "D3",
-   "term": "forget their initial states",
-   "definition": "A lagged SSOE model forgets its initial states when every eigenvalue $\\lambda$ of its expanded discount matrix that is reachable from $\\tilde g$ and observable through $\\tilde w$ has $|\\lambda| < 1$; the largest such $|\\lambda|$ is called its largest mode modulus."
+   "term": "decaying weights",
+   "definition": "A lagged SSOE model has decaying weights when the weights $\\tilde w' \\tilde D^j \\tilde g$ of the past observations in its fitted values tend to zero, that is, when every eigenvalue $\\lambda$ of its expanded discount matrix that is reachable from $\\tilde g$ and observable through $\\tilde w$ has $|\\lambda| < 1$; the largest such $|\\lambda|$ is its largest mode modulus. A mode that $\\tilde g$ does not reach but $\\tilde w$ sees carries an initial state whose effect is not covered: with $|\\lambda| > 1$ it grows."
   },
   {
    "id": "D4",
    "term": "per-lag check",
-   "definition": "The test applied by smoothEigens() of the smooth package (src/headers/eigenCalc.h) to models without adaptive regressors: every eigenvalue of every diagonal block of $D$, one block per unique lag, has modulus below 1; reimplemented in numpy as per_lag_max()."
+   "definition": "The test applied by smoothEigens() of smooth 4.6.0 and of its repository until commit 4a44c1c (src/headers/eigenCalc.h) to models without adaptive regressors: every eigenvalue of every diagonal block of $D$, one block per unique lag, has modulus below 1; reimplemented in numpy as per_lag_max()."
   },
   {
    "id": "D5",
@@ -234,7 +234,7 @@
  "claims": [
   {
    "id": "C1",
-   "statement": "The [[D4:per-lag check]] accepted all 3042 [[D9:ETS(A,N,A)]] grid models, 1482 of which do not [[D3:forget their initial states]], and 193 of 200 random [[D8:GUM]] models with lags (1, 12), 10 of which do not forget their initial states.",
+   "statement": "The [[D4:per-lag check]] accepted all 3042 [[D9:ETS(A,N,A)]] grid models, 1482 of which do not have [[D3:decaying weights]], and 193 of 200 random [[D8:GUM]] models with lags (1, 12), 10 of which do not have decaying weights.",
    "type": "descriptive",
    "role": "principal",
    "novelty": "refutation",
@@ -344,7 +344,7 @@
   },
   {
    "id": "C2",
-   "statement": "The [[D4:per-lag check]] rejected 1 of 200 random [[D8:GUM]] models with lags (1, 12) that [[D3:forget their initial states]].",
+   "statement": "The [[D4:per-lag check]] rejected 1 of 200 random [[D8:GUM]] models with lags (1, 12) that have [[D3:decaying weights]].",
    "type": "descriptive",
    "role": "secondary",
    "novelty": "new",
@@ -579,7 +579,8 @@
    "limitations": [
     "L3",
     "L4",
-    "L5"
+    "L5",
+    "L8"
    ],
    "scope": {
     "population": "pure additive lagged SSOE models",
@@ -723,7 +724,7 @@
   },
   {
    "id": "C16",
-   "statement": "On 800 random additive ETS and [[D8:GUM]] models in four families, the implementation of the check in smooth (smoothEigensCpp() through smoothEigensR()) gave a decision different from the numpy prototype on 0 models, a largest root modulus within 9.53e-7 of it on the models both found inadmissible, and identical results on three consecutive calls with each model.",
+   "statement": "On 800 random additive ETS and [[D8:GUM]] models in four families, the implementation of the check in smooth (smoothEigensCpp() through smoothEigensR()) gave a decision different from the numpy prototype on 0 models, a largest root modulus within 9.53e-7 of it (the bisection tolerance is 1e-6) on the models both found inadmissible, and the same modulus and MA polynomial on three consecutive calls with each model.",
    "type": "methodological",
    "role": "principal",
    "novelty": "new",
@@ -871,13 +872,22 @@
    "limitations": [
     "L2",
     "L3",
-    "L4"
+    "L4",
+    "L8"
    ],
    "assessments": [
     {
      "by": "author",
      "strength": "moderate",
      "rationale": "A planned test on 800 seeded models with exact agreement of the decisions, against a prototype written by the same agent."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "cpp_check.py --seed 2027 --n 200 reproduced E13 to the last digit (0 mismatches; 9.4885e-7, 9.5266e-7, 9.4058e-7, 9.4854e-7; three-call differences 0); smoothEigensR() wraps the polynomial check of eigenCalc.h; 720 more ETS models sharing F in groups of 12 gave 0 mismatches. Noted that 9.5e-7 is the bisection resolution and that the three calls cover the modulus and the MA polynomial only; the statement was reworded."
     }
    ]
   },
@@ -1198,7 +1208,7 @@
   },
   {
    "id": "C13",
-   "statement": "The numpy function per_lag_max() returns the same largest eigenvalue modulus as smoothEigensCpp() of the smooth package for models with a constant measurement vector and without adaptive regressors.",
+   "statement": "The numpy function per_lag_max() returns the same largest eigenvalue modulus as smoothEigensCpp() of smooth 4.6.0 (replaced in commit 4a44c1c) for models with a constant measurement vector and without adaptive regressors.",
    "type": "methodological",
    "role": "supporting",
    "novelty": "new",
@@ -1254,7 +1264,7 @@
   },
   {
    "id": "C17",
-   "statement": "For a [[D1:lagged SSOE model]], the roots of $\\theta(B) / \\gcd(\\theta(B), \\phi(B))$ are exactly the reciprocals $1/\\lambda$ of the nonzero eigenvalues $\\lambda$ of the reachable and observable part of the [[D2:expanded discount matrix]] (its Kalman decomposition), with their multiplicities.",
+   "statement": "For a [[D1:lagged SSOE model]] with $\\theta(B) = \\det(I - D L(B))$ and $\\phi(B) = \\det(I - F L(B))$, the roots of $\\theta(B) / \\gcd(\\theta(B), \\phi(B))$ are exactly the reciprocals $1/\\lambda$ of the nonzero eigenvalues $\\lambda$ of the reachable and observable part of the [[D2:expanded discount matrix]] (its Kalman decomposition), with their multiplicities.",
    "type": "formal",
    "role": "supporting",
    "novelty": "new",
@@ -1277,7 +1287,15 @@
     "C6",
     "C15"
    ],
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived S1-S5; exact rational arithmetic against the Kalman decomposition on 300 random lagged models (159 with an unreachable or unobservable part) agreed; noted that S5 needed the reversal, the normalisation and the coprimality under reversal spelled out, since added."
+    }
+   ]
   },
   {
    "id": "C18",
@@ -1298,11 +1316,19 @@
    "scope": {
     "population": "real polynomials with a nonzero constant term"
    },
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The scaling is correct and the equivalence rests on D7 and B2; noted the missing division by c(0) and the citation of D7 for a substitution in E15, since corrected."
+    }
+   ]
   },
   {
    "id": "C19",
-   "statement": "In additive ETS models (level, trend, seasonal components, constant, persistence fixed at zero) and GUM models, every factor shared by $\\theta(B)$ and $\\phi(B)$ with a root in $|B| \\le 1$ is a product of cyclotomic polynomials $\\Phi_n(B)$ with $n$ dividing a lag of the model.",
+   "statement": "In additive ETS models, and in GUM models with an identity transition or with transition, persistence and measurement in general position, every factor shared by $\\theta(B)$ and $\\phi(B)$ with a root in $|B| \\le 1$ is a product of cyclotomic polynomials $\\Phi_n(B)$ with $n$ dividing a lag of the model.",
    "type": "methodological",
    "role": "supporting",
    "novelty": "new",
@@ -1312,8 +1338,7 @@
     }
    ],
    "assumption_category": "theoretical",
-   "check": "tested",
-   "check_evidence": "E3"
+   "check": "unchecked"
   },
   {
    "id": "C20",
@@ -1333,11 +1358,19 @@
    "scope": {
     "population": "square matrices and positive integer lags"
    },
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps of E16 re-derived; against the determinant at random complex B the relative error was at most 3.0e-15 for real M (200 cases) and complex M (100 cases)."
+    }
+   ]
   },
   {
    "id": "C21",
-   "statement": "The per-lag discount matrices $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ of Section 5.4 of the ADAM monograph have as nonzero eigenvalues those of the diagonal block of $D = F - g w'$ for the lag $m_i$ (the [[D4:per-lag check]]), and their sum is $D + \\sum_{i \\neq j} g_{m_i} w_{m_j}'$, which differs from $D$ whenever $g w'$ links components of different lags.",
+   "statement": "The per-lag discount matrices $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ of Section 5.4 of the ADAM monograph have as nonzero eigenvalues those of the diagonal block of $D = F - g w'$ for the lag $m_i$ (the [[D4:per-lag check]]), and their sum is $D + \\sum_{i \\neq j} g_{m_i} w_{m_j}'$, which differs from $D$ whenever $g w'$ links components of distinct lags.",
    "type": "formal",
    "role": "supporting",
    "novelty": "new",
@@ -1348,16 +1381,24 @@
     }
    ],
    "scope": {
-    "population": "pure additive lagged SSOE models with more than one lag",
+    "population": "pure additive lagged SSOE models with more than one distinct lag",
     "conditions": [
-     "F split by the columns, and g and w by the components, of each lag, as in Section 5.2 of the monograph"
+     "F split by the columns, and g and w by the components, of each lag, as in Section 5.2 of the monograph, which writes g_{m_i} and w_{m_i} without defining their split; with g kept whole the first part holds and the sum equals D"
     ]
    },
-   "verification": "unchecked"
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "500 random models with lags in {1, 3, 12}: the nonzero eigenvalues of each D_{m_i} equal those of the diagonal block of D, and the sum equals D plus the cross terms, never D with distinct lags. Noted the missing step for 'differs from D', the 'distinct lags' wording and the monograph's undefined split of g, since added to the evidence and the scope."
+    }
+   ]
   },
   {
    "id": "C22",
-   "statement": "For ETS(A,N,A) with $m = 12$, $\\alpha = 1.2$ and $\\gamma = 0.9$, the stability condition of Section 5.4 of the ADAM monograph holds (largest nonzero eigenvalue modulus of its per-lag discount matrices 0.2), while in the full discount recursion the effect of the initial states on the fitted values grows by 1.0164 per period, and the largest root modulus of the cancelled MA polynomial is 1.0165.",
+   "statement": "For ETS(A,N,A) with $m = 12$, $\\alpha = 1.2$ and $\\gamma = 0.9$, the stability condition of Section 5.4 of the ADAM monograph holds (largest nonzero eigenvalue modulus of its per-lag discount matrices 0.2), while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow by 1.0164 per period, and the largest root modulus of the cancelled MA polynomial is 1.0165.",
    "type": "descriptive",
    "role": "principal",
    "novelty": "refutation",
@@ -1371,9 +1412,10 @@
       "A6"
      ],
      "results": [
-      "E18.R5",
-      "E18.R7",
-      "E18.R8"
+      "E18.R6",
+      "E18.R8",
+      "E18.R9",
+      "E18.R10"
      ]
     }
    ],
@@ -1381,7 +1423,7 @@
     "population": "ETS(A,N,A) with m = 12",
     "conditions": [
      "alpha = 1.2, gamma = 0.9",
-     "initial states set to one, y = 0, 2400 periods"
+     "initial states set to one or one unit observation, 2400 periods"
     ]
    },
    "depends_on": [
@@ -1396,7 +1438,7 @@
      "reference": "B4",
      "locator": "Section 5.4, equations 5.20 to 5.22",
      "self": true,
-     "note": "The monograph states that the stability condition of the pure additive model is that all the nonzero eigenvalues of the per-lag discount matrices D_{m_i} are below one in absolute value."
+     "note": "The monograph states that the model is stable when all the nonzero eigenvalues of the per-lag discount matrices D_{m_i} are below one in absolute value, and forecastable when the effect of the initial states through each D_{m_i} tends to a constant (eq. 5.22)."
     }
    ],
    "assessments": [
@@ -1405,11 +1447,19 @@
      "strength": "moderate",
      "rationale": "An exploratory but deterministic counterexample, with the growth of the recursion and the root of the polynomial computed separately and agreeing; one parameter pair, chosen from the planned grid test of the per-lag check."
     }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "book_check.py reproduced E18 (0.2, 1.016393, 1.016457); the roots of the cancelled polynomial and the expanded matrix confirm several modes above one; suggested adding the growth of the observation weights (measured at about 1.01642 per period) and naming the forecastability condition in the note, since done with run RN44."
+    }
    ]
   },
   {
    "id": "C23",
-   "statement": "Over five fits with bounds=\"admissible\", the time of the fit per call of smoothEigens() with the polynomial check was between 0.82 and 1.20 times that with the per-lag check, and 1.08 times for adam() with seasonal lags 24 and 168 on hourly data.",
+   "statement": "Over five fits with bounds=\"admissible\", the median time of a fit with the polynomial check was between 0.82 and 1.2 times that with the per-lag check, and 1.08 times for adam() with seasonal lags 24 and 168 on hourly data, with optimisation paths that differ between the checks.",
    "type": "descriptive",
    "role": "secondary",
    "novelty": "new",
@@ -1440,6 +1490,14 @@
      "by": "author",
      "strength": "low",
      "rationale": "Exploratory timings on one machine with a run-to-run noise of about 10%, and optimisation paths that differ between the checks."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The ratios matched the table of E19 (0.8247 to 1.1963, hourly 1.0833); noted that the earlier metric, fit time divided by the calls of one check, mixed time and call counts; the claim now reports the ratio of the fit times with both call counts in the table."
     }
    ]
   }
@@ -2561,7 +2619,7 @@
       "S3",
       "S4"
      ],
-     "rule": "uniqueness of the reduced fraction, with z = 1/B"
+     "rule": "uniqueness of the reduced fraction, with z = 1/B: the eigenvalues at zero give no root, theta(0) = phi(0) = 1 makes theta / gcd the reduced numerator, and the reversal keeps coprimality away from B = 0"
     }
    ]
   },
@@ -2577,9 +2635,7 @@
     {
      "id": "S1",
      "statement": "c(B_i) = 0 \\iff c((r B_i) / r) = 0",
-     "by": [
-      "D7"
-     ],
+     "by": [],
      "rule": "substitution"
     },
     {
@@ -2592,10 +2648,19 @@
     },
     {
      "id": "S3",
+     "statement": "c(B/r) / c(0) = 1 + \\sum_i (c_i / c_0)\\, r^{-i} B^i \\text{ has the roots of } c(B/r)",
+     "by": [
+      "S1"
+     ],
+     "rule": "c(0) \\neq 0"
+    },
+    {
+     "id": "S4",
      "statement": "\\text{the step-down passes on } c(B/r) \\iff |r B_i| > 1\\ \\forall i",
      "by": [
       "D7",
-      "S1"
+      "S1",
+      "S3"
      ],
      "rule": "the step-down test passes exactly when all roots lie outside the unit circle"
     }
@@ -2676,6 +2741,14 @@
       "S1"
      ],
      "rule": "g w' = \\sum_i \\sum_j g_{m_i} w_{m_j}'"
+    },
+    {
+     "id": "S5",
+     "statement": "(a, b) \\text{ with lags } m_i \\neq m_j: \\left(\\sum_{i \\neq j} g_{m_i} w_{m_j}'\\right)_{ab} = g_a w_b",
+     "by": [
+      "S4"
+     ],
+     "rule": "a single term, so the sum differs from D exactly where g w' links components of different lags"
     }
    ]
   },
@@ -2683,7 +2756,7 @@
    "id": "E18",
    "profile": "simulation",
    "lab_runs": [
-    "RN42"
+    "RN44"
    ],
    "artefacts": [
     "A1",
@@ -2696,7 +2769,7 @@
    "availability": {
     "level": "public"
    },
-   "description": "Exploratory run RN42 of book_check.py --periods 2400: for ETS(A,N,A) with m = 12 and (alpha, gamma) = (0.1, 0.1) and (1.2, 0.9), the largest nonzero eigenvalue modulus of the per-lag discount matrices of the monograph, the effect |w' v_{t-l}| of initial states set to one in the full recursion v_t = D v_{t-l} (y = 0) over 2400 periods and its growth per period over the second half, and the largest root modulus of the cancelled MA polynomial.",
+   "description": "Exploratory run RN44 of book_check.py --periods 2400: for ETS(A,N,A) with m = 12 and (alpha, gamma) = (0.1, 0.1) and (1.2, 0.9), the largest nonzero eigenvalue modulus of the per-lag discount matrices of the monograph, the effect |w' v_{t-l}| of initial states set to one in the full recursion v_t = D v_{t-l} (y = 0) over 2400 periods and its growth per period over the second half, the growth of the weight of an observation (the same recursion from zero states with one unit observation), and the largest root modulus of the cancelled MA polynomial.",
    "results": [
     {
      "id": "R1",
@@ -2734,6 +2807,17 @@
     },
     {
      "id": "R4",
+     "quantity": "growth of the weight of an observation per period over the second half",
+     "value": 0.9909168445987553,
+     "conditions": {
+      "model": "ETS(A,N,A)",
+      "m": 12,
+      "alpha": 0.1,
+      "gamma": 0.1
+     }
+    },
+    {
+     "id": "R5",
      "quantity": "largest root modulus of the cancelled MA polynomial",
      "value": 0.9911267448787717,
      "conditions": {
@@ -2744,7 +2828,7 @@
      }
     },
     {
-     "id": "R5",
+     "id": "R6",
      "quantity": "largest nonzero eigenvalue modulus of the book's per-lag discount matrices",
      "value": 0.19999999999999996,
      "conditions": {
@@ -2755,7 +2839,7 @@
      }
     },
     {
-     "id": "R6",
+     "id": "R7",
      "quantity": "effect of the initial states on the fitted value at the last period",
      "value": 5.968778912343606e+16,
      "conditions": {
@@ -2767,7 +2851,7 @@
      }
     },
     {
-     "id": "R7",
+     "id": "R8",
      "quantity": "growth of the effect of the initial states per period over the second half",
      "value": 1.0163934504137493,
      "conditions": {
@@ -2778,7 +2862,18 @@
      }
     },
     {
-     "id": "R8",
+     "id": "R9",
+     "quantity": "growth of the weight of an observation per period over the second half",
+     "value": 1.0163629094999396,
+     "conditions": {
+      "model": "ETS(A,N,A)",
+      "m": 12,
+      "alpha": 1.2,
+      "gamma": 0.9
+     }
+    },
+    {
+     "id": "R10",
      "quantity": "largest root modulus of the cancelled MA polynomial",
      "value": 1.0164568117563233,
      "conditions": {
@@ -2790,7 +2885,7 @@
     }
    ],
    "execution": {
-    "code_version": "0630dbeab5173c2a72c7828fca3f71573fa1ea85",
+    "code_version": "5d5611bcdcce26a3c363352fdd738c14f18c96f4",
     "software": {
      "python": "3.13.16",
      "platform": "Linux-6.18.44-fc-v140-x86_64-with-glibc2.39"
@@ -2815,11 +2910,11 @@
    "availability": {
     "level": "public"
    },
-   "description": "Exploratory run RN40 of bench_eigens.R: the package installed at -O2 from a worktree at commit b963693 (the polynomial check with the step-down multiplying by 1 / (1 - k^2), the algorithm kept in the final code), each fit run seven times with smoothEigens() switched in the namespace between the per-lag and the polynomial check; the median time of a fit divided by its calls of smoothEigens(). The optimisation paths differ between the two checks, whose admissible regions differ.",
+   "description": "Exploratory run RN40 of bench_eigens.R: the package installed at -O2 from a worktree at commit b963693 (the polynomial check with the step-down multiplying by 1 / (1 - k^2), the algorithm kept in the final code), each fit run seven times with smoothEigens() switched in the namespace between the per-lag and the polynomial check; the median time of a fit and its calls of smoothEigens(). The optimisation paths differ between the two checks, whose admissible regions differ.",
    "tables": [
     {
      "id": "T1",
-     "description": "Time of a fit with bounds=\"admissible\" per call of smoothEigens(), per-lag against polynomial check, and the calls of the polynomial run",
+     "description": "Median time of a fit with bounds=\"admissible\" over seven runs and its calls of smoothEigens(), per-lag against polynomial check",
      "conditions": {
       "build": "R 4.3.3, -O2",
       "repeats": 7
@@ -2828,11 +2923,12 @@
       "fit"
      ],
      "columns": [
-      "per-lag, microseconds per call",
-      "polynomial, microseconds per call",
-      "ratio polynomial / per-lag",
-      "inadmissible calls",
-      "calls"
+      "per-lag, seconds",
+      "per-lag, calls",
+      "polynomial, seconds",
+      "polynomial, calls",
+      "polynomial, inadmissible calls",
+      "ratio of the times, polynomial / per-lag"
      ],
      "rows": [
       {
@@ -2841,11 +2937,12 @@
         "gum(AirPassengers, orders=c(1,1), lags=c(1,12))"
        ],
        "values": [
-        200.413223140484,
-        165.289256198344,
-        0.8247,
+        0.0969999999999942,
+        484,
+        0.0799999999999983,
+        484,
         40,
-        484
+        0.8247
        ]
       },
       {
@@ -2854,11 +2951,12 @@
         "gum(AirPassengers, orders=c(2,1), lags=c(1,12))"
        ],
        "values": [
-        169.087136929457,
-        202.282157676341,
-        1.1963,
+        0.162999999999997,
+        964,
+        0.194999999999993,
+        964,
         43,
-        964
+        1.1963
        ]
       },
       {
@@ -2867,11 +2965,12 @@
         "adam(AirPassengers, \"AAdA\")"
        ],
        "values": [
-        320.987654321029,
-        283.950617283903,
-        0.8846,
+        0.0520000000000067,
+        162,
+        0.0459999999999923,
+        162,
         60,
-        162
+        0.8846
        ]
       },
       {
@@ -2880,11 +2979,12 @@
         "adam(hourly, \"ANA\", lags=c(24,168))"
        ],
        "values": [
-        1180.32786885239,
-        1278.6885245901,
-        1.0833,
+        0.143999999999991,
+        122,
+        0.155999999999992,
+        122,
         52,
-        122
+        1.0833
        ]
       },
       {
@@ -2893,11 +2993,12 @@
         "ces(AirPassengers, \"full\")"
        ],
        "values": [
-        185.185185185148,
-        180.645161290314,
-        0.9755,
+        0.0599999999999881,
+        324,
+        0.0559999999999974,
+        310,
         68,
-        310
+        0.9333
        ]
       }
      ]
@@ -2905,7 +3006,11 @@
    ],
    "execution": {
     "code_version": "b963693",
-    "notes": "The lab run records the repository's HEAD at the time (5b9f24a); the benchmark ran the worktree at b963693, whose path is the first argument of the command."
+    "notes": "The lab run records the repository's HEAD at the time (5b9f24a); the benchmark ran the worktree at b963693, whose path is the first argument of the command.",
+    "hardware": {
+     "machine": "x86_64",
+     "cpus": 4
+    }
    }
   }
  ],
@@ -2994,6 +3099,17 @@
    ],
    "impact": "reduces_precision",
    "mitigation": "none"
+  },
+  {
+   "id": "L8",
+   "category": "model_specification",
+   "statement": "For GUM models with structured parameters, such as a state with |F_ii| > 1 and zero persistence, theta and phi can share a factor with a root in |B| <= 1 that is not cyclotomic; the check keeps it and rejects the model although its observation weights decay, because the initial state of that mode has a growing effect.",
+   "affects": [
+    "C4",
+    "C16"
+   ],
+   "impact": "reduces_transferability",
+   "mitigation": "none"
   }
  ],
  "artefacts": [
@@ -3044,7 +3160,7 @@
   {
    "id": "A5",
    "kind": "code",
-   "uri": "https://github.com/openforecast-org/smooth/blob/bdff1efb1f36c930c100f6465373ae1a6a9ee6f1/.claude/research/eigenChecker/cpp_check.py",
+   "uri": "https://github.com/openforecast-org/smooth/blob/5d5611bcdcce26a3c363352fdd738c14f18c96f4/.claude/research/eigenChecker/cpp_check.py",
    "availability": {
     "level": "public"
    },
@@ -3055,18 +3171,18 @@
   {
    "id": "A6",
    "kind": "code",
-   "uri": "https://github.com/openforecast-org/smooth/blob/bdff1efb1f36c930c100f6465373ae1a6a9ee6f1/.claude/research/eigenChecker/book_check.py",
+   "uri": "https://github.com/openforecast-org/smooth/blob/5d5611bcdcce26a3c363352fdd738c14f18c96f4/.claude/research/eigenChecker/book_check.py",
    "availability": {
     "level": "public"
    },
-   "version": "sha256:de0b940a82b3ce3311c1b015bf2ff806dfdab34976ecc56639d57ae589fd7bfe",
+   "version": "sha256:8dde6775d393bf9616aa00483e2c9fc3bd9f480f52ca10e07dd2c8c22cc75473",
    "licence": "LGPL-2.1-only",
-   "description": "check of the per-lag condition of the ADAM monograph (eqs 5.20-5.22) against the full discount recursion of ETS(A,N,A)"
+   "description": "check of the per-lag condition of the ADAM monograph (eqs 5.20-5.22) against the full discount recursion of ETS(A,N,A): the effect of the initial states and the weights of the observations"
   },
   {
    "id": "A7",
    "kind": "code",
-   "uri": "https://github.com/openforecast-org/smooth/blob/bdff1efb1f36c930c100f6465373ae1a6a9ee6f1/.claude/research/eigenChecker/bench_eigens.R",
+   "uri": "https://github.com/openforecast-org/smooth/blob/5d5611bcdcce26a3c363352fdd738c14f18c96f4/.claude/research/eigenChecker/bench_eigens.R",
    "availability": {
     "level": "public"
    },
@@ -3077,7 +3193,7 @@
   {
    "id": "A8",
    "kind": "code",
-   "uri": "https://github.com/openforecast-org/smooth/blob/bdff1efb1f36c930c100f6465373ae1a6a9ee6f1/src/headers/eigenCalc.h",
+   "uri": "https://github.com/openforecast-org/smooth/blob/5d5611bcdcce26a3c363352fdd738c14f18c96f4/src/headers/eigenCalc.h",
    "availability": {
     "level": "public"
    },
@@ -3089,7 +3205,7 @@
    "id": "A9",
    "kind": "lab_record",
    "uri": "https://github.com/openforecast-org/smooth/blob/claimset-lab-eigenChecker/.claude/lab/lab.jsonl",
-   "version": "sha256:8e0421dc3ba2dbc2cf82d2f979ca360725c3a6ff2f07b48f771f3cbf807a8ff6",
+   "version": "sha256:9751f4d4eebfeda0f442c2b6fc9caa0a4fddb1eb7609d3d87aafb57c9e88f8d0",
    "availability": {
     "level": "public"
    },

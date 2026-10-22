@@ -201,6 +201,7 @@ if args.adam:
                            ma=sapply(lags, function(l) orderOf(s$ma, l)))
             arma <- list(ar=coefsOf(s$ar), ma=coefsOf(s$ma))
             arma <- arma[sapply(arma, length) > 0]
+            if(length(arma) == 0) arma <- NULL
             y <- ts(100 + cumsum(rnorm(120)), frequency=s$m)
             m <- suppressWarnings(adam(y, model, orders=orders, lags=lags, persistence=persistence,
                                        phi=if(e$trend=="Ad") e$phi else NULL, arma=arma, h=0))

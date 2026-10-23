@@ -204,15 +204,22 @@ def adam_bounds_checker(
             if np.any(deltas > 1) or np.any(deltas < 0):
                 return 1e100 * np.max(np.abs(deltas - 0.5))
 
-    elif bounds == "admissible" and (
-        model_type_dict["ets_model"]
-        or (explanatory_checked["xreg_model"] and adapt)
-        or not arima_checked["arima_model"]
-        or adam_elements["arima_polynomials"]["ma_reflection"] >= 1
-    ):
-        # The whole model: its MA polynomial couples the ETS, ARIMA and the other
-        # components. Without ETS and adaptive regressors it is the MA of ARIMA times
-        # factors shared with the AR polynomial, so invertible MA factors are enough
+    # The whole model: its MA polynomial couples the ETS, ARIMA and the other
+    # components. Without ETS and adaptive regressors it is the MA of ARIMA times
+    # factors shared with the AR polynomial, so estimated MA factors that are
+    # invertible are enough, and the penalty stays that of the MA factors. A root
+    # within 1e-10 of the unit circle is not admissible: rounding decides on which
+    # side of it the check falls
+    pure_arima = (
+        arima_checked["arima_model"]
+        and not model_type_dict["ets_model"]
+        and not (explanatory_checked["xreg_model"] and adapt)
+    )
+    ma_reflection = 0.0
+    if arima_checked["arima_model"]:
+        polynomials = adam_elements["arima_polynomials"]
+        ma_reflection = arima_checked["ma_estimate"] * polynomials["ma_reflection"]
+    if bounds == "admissible" and (not pure_arima or ma_reflection >= 1):
         eigenValues = smooth_eigens(
             persistence=np.asfortranarray(
                 adam_elements["vec_g"].reshape(-1, 1), dtype=np.float64
@@ -226,8 +233,8 @@ def adam_bounds_checker(
             xreg_number=explanatory_checked["xreg_number"],
             constant_required=constants_checked["constant_required"],
         )
-        if np.any(eigenValues > 1 + 1e-50):
-            return 1e100 * np.max(eigenValues)
+        if np.any(eigenValues > 1 - 1e-10):
+            return 1e100 * (ma_reflection if pure_arima else np.max(eigenValues))
 
     return 0
 

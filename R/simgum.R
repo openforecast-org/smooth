@@ -106,7 +106,7 @@ sim.gum <- function(orders=c(1), lags=c(1),
                                                 matrix(arrF[,,i],componentsNumber,componentsNumber),
                                                 matWt,
                                                 lagsModel, FALSE, obs));
-                if(all(eigenValues<=1)){
+                if(all(eigenValues<=1-1E-10)){
                     GUMNotStable[] <- FALSE;
                 }
             }

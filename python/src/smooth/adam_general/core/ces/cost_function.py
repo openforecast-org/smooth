@@ -128,7 +128,7 @@ def ces_cf(
             xreg_number=xreg_number,
             constant_required=False,
         )
-        if np.any(eigen_values > 1 + 1e-50):
+        if np.any(eigen_values > 1 - 1e-10):
             return 1e100 * np.max(eigen_values)
 
     # Update mat_vt initial columns and profiles — R lines 499-501

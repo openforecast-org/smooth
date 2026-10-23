@@ -4455,7 +4455,7 @@ eigenValues <- function(object, persistence=NULL){
         persistence <- object$persistence;
     }
     return(any(smoothEigens(matrix(persistence), object$transition, object$measurement,
-                            modelLags(object), ncol(object$data)>1, nobs(object))>1+1E-10));
+                            modelLags(object), ncol(object$data)>1, nobs(object))>1-1E-10));
 }
 
 # The function that returns the bounds for persistence parameters, based on eigen values

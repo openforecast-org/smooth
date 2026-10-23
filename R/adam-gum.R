@@ -347,7 +347,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
             # Stability / invertibility condition
             eigenValues <- smoothEigens(elements$vecG, elements$matF, elements$matWt,
                                         lagsModelAll, xregModel, obsInSample);
-            if(any(eigenValues>1+1E-50)){
+            if(any(eigenValues>1-1E-10)){
                 return(1E+100*max(eigenValues));
             }
         }

@@ -344,11 +344,11 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
                            arEstimate=arEstimate, maEstimate=maEstimate);
 
         # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h). With
-        # the admissible bounds the MA is checked with the whole model below
+        # the admissible bounds a stationary AR leaves the MA to the check of the whole model
         if(bounds!="none" && arimaModel){
-            arimaReflection <- max(arEstimate*elements$arimaPolynomials$arReflection,
-                                   (bounds=="usual")*maEstimate*elements$arimaPolynomials$maReflection);
-            if(arimaReflection>=1){
+            arReflection <- arEstimate*elements$arimaPolynomials$arReflection;
+            arimaReflection <- max(arReflection, maEstimate*elements$arimaPolynomials$maReflection);
+            if(arimaReflection>=1 && (bounds=="usual" || arReflection>=1)){
                 return(1E+100*arimaReflection);
             }
         }
@@ -367,13 +367,16 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         else if(bounds=="admissible"){
             # The whole model: its MA polynomial couples the ARIMA with the regressors. Without
             # adaptive regressors it is the MA of ARIMA times factors shared with the AR
-            # polynomial, so invertible MA factors are enough
-            if((xregModel && regressors=="adapt") || !arimaModel ||
-               elements$arimaPolynomials$maReflection>=1){
+            # polynomial, so estimated MA factors that are invertible are enough, and the
+            # penalty stays that of the MA factors. A root within 1e-10 of the unit circle is
+            # not admissible
+            pureARIMA <- arimaModel && !(xregModel && regressors=="adapt");
+            if(!pureARIMA || maEstimate*elements$arimaPolynomials$maReflection>=1){
                 eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
                                             lagsModelAll, xregModel, obsInSample);
-                if(any(eigenValues>1+1E-50)){
-                    return(1E+100*max(eigenValues));
+                if(any(eigenValues>1-1E-10)){
+                    return(1E+100*(if(pureARIMA) elements$arimaPolynomials$maReflection
+                                   else max(eigenValues)));
                 }
             }
 

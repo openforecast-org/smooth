@@ -1885,7 +1885,7 @@
     {
      "by": "author",
      "strength": "high",
-     "rationale": "Planned test of the code in the package on new models; the decisions are exact and the moduli agree within the bisection tolerance. The shortcut for pure ARIMA, added after this run, was tested only by the checker P4."
+     "rationale": "Planned test of the code in the package on new models; the decisions are exact and the moduli agree within the bisection tolerance. The shortcut for pure ARIMA, added after this run, was tested only by the checker P4. Two later changes of the checkers (decision DC8) are not covered by the run: the margin of 1e-10 below one, and the penalty of a rejected pure ARIMA, which stays that of its MA factors."
     }
    ],
    "limitations": [
@@ -4600,13 +4600,14 @@
   {
    "id": "L11",
    "category": "computational",
-   "statement": "For an MA root exactly on the unit circle that does not cancel, the decision of the package is set by roundoff: the prototype rejects a modulus above 1 - 1e-6 and the package a modulus above 1 + 1e-50, and the checker P4 found three models of a wider generator, with moduli between 0.99999999999 and 1, that the package accepted and the prototype rejected; simple cases such as MA(1) with theta = 1 are rejected. The random models of the planned tests have no such root.",
+   "statement": "For an MA root exactly on the unit circle that does not cancel, the decision of the check is set by rounding: the checker P4 found three models of a wider generator, with values of the check between 0.99999999999 and 1, that the package accepted and the prototype rejected. Since this finding the bounds checkers admit a model only when the value is at most 1 - 1e-10 (decision DC8 of the lab record), which rejects these three; the planned tests ran before the margin, and their random models have no such root.",
    "affects": [
     "C16",
     "C26"
    ],
    "impact": "reduces_transferability",
-   "mitigation": "none"
+   "mitigation": "addressed",
+   "mitigation_evidence": "E24"
   },
   {
    "id": "L12",
@@ -4712,8 +4713,8 @@
   {
    "id": "A9",
    "kind": "lab_record",
-   "uri": "https://github.com/openforecast-org/smooth/blob/7ce2d2289a703a202595efe25c45aa41ac69ac74/claimset/adam-admissible-bounds/lab/lab.jsonl",
-   "version": "sha256:2319c269f4e3ea0f2e5a109162a2253717a63e9f62913d0a05c80d065d894783",
+   "uri": "https://github.com/openforecast-org/smooth/blob/794bc59c171c1a85b7736515d55f9d1afc461300/claimset/adam-admissible-bounds/lab/lab.jsonl",
+   "version": "sha256:e16709960cf7a6d1f3e9bb65b4d1e0147d98c412463cc1ae2080bc5edcf1df68",
    "availability": {
     "level": "public"
    },

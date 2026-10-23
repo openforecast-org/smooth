@@ -5091,13 +5091,15 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
             newCall$shape <- object$other$shape;
         }
     }
-    # With missing values only, the occurrence is internal (all ones): the refits make their own
-    if(is.occurrence(object$occurrence) && object$occurrence$occurrence=="provided" &&
-       all(fitted(object$occurrence)==1)){
+    # Provided probabilities of occurrence: each refit takes those of its observations. With
+    # missing values only they are internal (all ones): the refits make their own
+    newCall$occurrence <- object$occurrence;
+    occurrenceProvided <- NULL;
+    if(is.list(object$occurrence) && identical(object$occurrence$occurrence, "provided")){
         newCall$occurrence <- "none";
-    }
-    else{
-        newCall$occurrence <- object$occurrence;
+        if(any(fitted(object$occurrence)!=1)){
+            occurrenceProvided <- as.vector(fitted(object$occurrence));
+        }
     }
 
     # If this is backcasting, do sampling with moving origin
@@ -5167,7 +5169,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         # Do the bootstrap
         if(!parallel){
             for(i in 1:nsim){
-                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]], occurrenceProvided);
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5175,7 +5177,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         else{
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
-                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]], occurrenceProvided);
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })
@@ -5190,7 +5192,8 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         if(!parallel){
             for(i in 1:nsim){
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE],
+                                              occurrenceProvided[subsetValues]);
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5199,7 +5202,8 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE],
+                                              occurrenceProvided[subsetValues]);
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })
@@ -5227,14 +5231,17 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 }
 
 # The data of a refit in coefbootstrap(): tbats() takes the response and the regressors
-# in separate arguments
-adam_bootstrapData <- function(newCall, dataArgument, data){
+# in separate arguments; the provided probabilities of occurrence are those of the data
+adam_bootstrapData <- function(newCall, dataArgument, data, occurrence=NULL){
     if(dataArgument=="y" && NCOL(data)>1){
         newCall$y <- data[,1];
         newCall$xreg <- data[,-1,drop=FALSE];
     }
     else{
         newCall[[dataArgument]] <- data;
+    }
+    if(!is.null(occurrence)){
+        newCall$occurrence <- occurrence;
     }
     return(newCall);
 }

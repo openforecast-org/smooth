@@ -827,3 +827,33 @@ def test_the_scale_model_of_tbats():
     fit.scale_model = fit.sm()
     assert fit.loglik > loglik
     assert np.sum(fit.point_lik()) == pytest.approx(fit.loglik)
+
+
+def test_coefbootstrap_with_provided_occurrence(monkeypatch):
+    """The refits take the provided probabilities of their observations, as R."""
+    from smooth.adam_general.core import tbats_model
+
+    rng = np.random.default_rng(7)
+    y = np.exp(2 + rng.normal(0, 0.3, 150)) * rng.binomial(1, 0.7, 150)
+    probabilities = np.tile([0.6, 0.8], 75)
+    fit = TBATS(
+        lags=[1, 7],
+        occurrence=probabilities,
+        orders={"ar": 0, "ma": 0, "select": False},
+    ).fit(y)
+    bootstrap = fit.coefbootstrap(nsim=5, seed=1)
+    assert bootstrap.nsim_effective == 5
+    assert np.all(np.isfinite(bootstrap.coefficients.to_numpy()))
+    # Each refit takes the probabilities of its observations
+    seen = []
+    original = tbats_model.TBATS.__init__
+
+    def spy(self, *args, **kwargs):
+        seen.append(kwargs.get("occurrence"))
+        original(self, *args, **kwargs)
+
+    monkeypatch.setattr(tbats_model.TBATS, "__init__", spy)
+    tbats_model._refit_one_replicate(
+        fit.actuals, None, probabilities, [np.arange(10, 60)], fit._refit_kwargs(), 2, 0
+    )
+    np.testing.assert_array_equal(seen[0], probabilities[10:60])

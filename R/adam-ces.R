@@ -50,8 +50,9 @@
 #' \code{seasonality="partial"}. In case of \code{seasonality="full"} must be
 #' complex number.
 #' @param bounds The type of bounds for the persistence to use in the model
-#' estimation. Can be either \code{admissible} - guaranteeing the stability of the
-#' model, or \code{none} - no restrictions (potentially dangerous).
+#' estimation. Can be either \code{admissible} - guaranteeing that the model is
+#' forecastable (see \link[smooth]{adam}), or \code{none} - no restrictions (potentially
+#' dangerous).
 #' @param model A previously estimated GUM model, if provided, the function
 #' will not estimate anything and will use all its parameters.
 #' @param ...  Other non-documented parameters. See \link[smooth]{adam} for
@@ -525,7 +526,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
             # Stability / invertibility condition
             eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
                                         lagsModelAll, xregModel, obsInSample);
-            if(any(eigenValues>1+1E-50)){
+            if(any(eigenValues>1-1E-10)){
                 return(1E+100*max(eigenValues));
             }
         }

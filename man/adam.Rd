@@ -248,9 +248,16 @@ The number of elements should correspond to the specified orders e.g.
 procedure.}
 
 \item{bounds}{The type of bounds for the persistence to use in the model
-estimation. Can be either \code{admissible} - guaranteeing the stability of the
-model, \code{usual} - restricting the values with (0, 1) or \code{none} - no
-restrictions (potentially dangerous).}
+estimation. Can be either \code{admissible} - guaranteeing that the model is
+forecastable, \code{usual} - restricting the values with (0, 1) or \code{none} - no
+restrictions (potentially dangerous). A model is forecastable when the weights of the past
+observations in its forecasts decay and the effect of its initial states converges: the MA
+polynomial of the ARIMA form of the whole model (ETS, ARIMA and regressors together) has
+its roots outside the unit circle once the unit roots it shares with the AR polynomial are
+removed. So smoothing parameters equal to zero, a constant and an MA root on the unit
+circle that cancels with a difference (an over-differenced ARIMA) are allowed. The AR
+polynomial of ARIMA is also required to be stationary. Forecastability is weaker than
+stability, which would require the effect of every state to decay.}
 
 \item{smoother}{The smoother used by the \link[smooth]{msdecompose} function to
 obtain the initial states - the level and the trend, together with the initial

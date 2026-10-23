@@ -95,23 +95,27 @@ def adam_polynomialiser(
     }
 
 
-def arima_bounds_penalty(arima_checked, arima_polynomials):
+def arima_bounds_penalty(arima_checked, arima_polynomials, bounds="usual"):
     """Penalty for a not stationary AR or not invertible MA part.
 
     R's ARIMA check in ``adam_bounds_checker()``: the largest reflection
     coefficient of the estimated factors (``src/headers/arimaBounds.h``, returned
     by :func:`adam_polynomialiser`), which is below one exactly when each AR factor
-    is stationary and each MA one invertible.
+    is stationary and each MA one invertible. With ``bounds="admissible"`` a
+    stationary AR leaves the MA to the check of the whole model.
     """
     if not arima_checked["arima_model"] or not (
         arima_checked["ar_estimate"] or arima_checked["ma_estimate"]
     ):
         return 0.0
+    ar_reflection = arima_checked["ar_estimate"] * arima_polynomials["ar_reflection"]
     reflection = max(
-        arima_checked["ar_estimate"] * arima_polynomials["ar_reflection"],
+        ar_reflection,
         arima_checked["ma_estimate"] * arima_polynomials["ma_reflection"],
     )
-    return 1e100 * reflection if reflection >= 1 else 0.0
+    if reflection >= 1 and (bounds == "usual" or ar_reflection >= 1):
+        return 1e100 * reflection
+    return 0.0
 
 
 def arima_initials(ari_polynomial, x, error_type):

@@ -363,12 +363,12 @@ def parameters_checker(
         Parameter constraint type during optimization.
 
         - **"usual"**: Classical restrictions (α,β,γ ∈ [0,1], β ≤ α, γ ≤ 1-α, φ ∈ [0,1])
-        - **"admissible"**: Stability constraints based on eigenvalues of transition
-        matrix
+        - **"admissible"**: Forecastability of the whole model (see ``ADAM``)
         - **"none"**: No constraints (not recommended)
 
         "usual" bounds are recommended for most applications. "admissible" allows more
-        flexibility but may produce unstable forecasts.
+        flexibility (e.g. smoothing parameters above one) and keeps the model
+        forecastable.
 
     silent : bool, default=False
         Whether to suppress warning messages.

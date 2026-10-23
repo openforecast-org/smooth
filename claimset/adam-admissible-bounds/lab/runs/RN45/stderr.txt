@@ -1,0 +1,11 @@
+Error in sum(sapply(arma, length)) : invalid 'type' (list) of argument
+Calls: lapply -> FUN
+Execution halted
+Traceback (most recent call last):
+  File "/home/user/smooth/claimset/adam-admissible-bounds/code/ets_arima.py", line 212, in <module>
+    subprocess.run(["Rscript", "-e", script], check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['Rscript', '-e', '\n        suppressMessages(pkgload::load_all("/home/user/smooth", quiet=TRUE))\n        specs <- jsonlite::fromJSON("/tmp/tmpnfdrlz0u/in.json", simplifyVector=FALSE)\n        orderOf <- function(parts, lag, m) {\n            for(p in parts) if(p[[1]]==lag) return(if(is.list(p[[2]])) length(p[[2]]) else p[[2]])\n            return(0)\n        }\n        coefsOf <- function(parts) unlist(lapply(parts, function(p) unlist(p[[2]])))\n        out <- lapply(specs, function(s) {\n            e <- s$ets\n            model <- paste0("A", switch(e$trend, N="N", A="A", Ad="Ad"), if(length(e$seasonal)) "A" else "N")\n            persistence <- c(alpha=e$alpha)\n            if(e$trend != "N") persistence <- c(persistence, beta=e$beta)\n            if(length(e$seasonal)) persistence <- c(persistence, gamma=unlist(e$gamma))\n            lags <- c(1, s$m)\n            orders <- list(ar=sapply(lags, function(l) orderOf(s$ar, l)), i=sapply(lags, function(l) orderOf(s$i, l)),\n                           ma=sapply(lags, function(l) orderOf(s$ma, l)))\n            arma <- list(ar=coefsOf(s$ar), ma=coefsOf(s$ma))\n            arma <- arma[sapply(arma, length) > 0]\n            y <- ts(100 + cumsum(rnorm(120)), frequency=s$m)\n            m <- suppressWarnings(adam(y, model, orders=orders, lags=lags, persistence=persistence,\n                                       phi=if(e$trend=="Ad") e$phi else NULL, arma=arma, h=0))\n            list(F=m$transition, g=as.numeric(m$persistence), w=as.numeric(tail(m$measurement, 1)),\n                 lags=as.numeric(m$lagsAll))\n        })\n        jsonlite::write_json(out, "/tmp/tmpnfdrlz0u/out.json", digits=NA, auto_unbox=FALSE)\n        ']' returned non-zero exit status 1.

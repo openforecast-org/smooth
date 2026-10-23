@@ -1506,3 +1506,34 @@ test_that("ADAM counts the provided initial level as provided and the rest as es
     expect_equal(testModel$nParam[,"nParamInternal"], c(Estimated=15, Provided=1));
     expect_equal(dfInitialsETSLevelSeasonal(12, FALSE), 12);
 })
+
+test_that("ADAM takes the provided MA once, and reapply() draws around the fitted ARIMA", {
+    # The MA of a lag without ARI was added twice to the persistence (psi = 1 for ma = 0.5)
+    testModel <- adam(BJsales, "NNN", orders=list(ma=1), arma=list(ma=0.5), h=0);
+    expect_equal(unname(testModel$persistence), 0.5);
+    testModel <- adam(BJsales, "NNN", orders=list(ma=1), h=0);
+    testReapply <- reapply(testModel, nsim=20);
+    expect_true(all(abs(testReapply$persistence - testModel$persistence) < 0.2));
+})
+
+test_that("The admissible bounds of ETS+ARIMA check the whole model", {
+    # The penalty of the bounds checker for a model with an estimated MA of the given reflection
+    checker <- function(model, maReflection, etsModel){
+        adamElements <- list(vecG=matrix(model$persistence, dimnames=list(names(model$persistence), NULL)),
+                             matF=model$transition, matWt=model$measurement);
+        return(adam_bounds_checker(adamElements, list(arReflection=0, maReflection=maReflection),
+                                   "admissible", etsModel, FALSE, FALSE, etsModel*1, etsModel*1, 0,
+                                   TRUE, FALSE, TRUE, FALSE, "use", 0, 1,
+                                   modelLags(model), nobs(model), FALSE));
+    }
+    # Each part is admissible (alpha in (0, 2), |theta| < 1), the whole model is not: 1 + B - 0.1 B^2
+    # has a root inside the unit circle
+    testModel <- adam(BJsales, "ANN", orders=list(ma=1), persistence=c(alpha=1.9), arma=list(ma=0.1), h=0);
+    expect_gt(checker(testModel, 0.1, TRUE), 0);
+    # The MA root on the unit circle cancels with the difference: a constant level plus noise
+    testModel <- adam(BJsales, "NNN", orders=list(i=1, ma=1), arma=list(ma=-1), h=0);
+    expect_equal(checker(testModel, 1, FALSE), 0);
+    # Without a difference to cancel with, a non-invertible MA is not admissible
+    testModel <- adam(BJsales, "NNN", orders=list(ma=1), arma=list(ma=1.2), h=0);
+    expect_gt(checker(testModel, 1.2, FALSE), 0);
+})

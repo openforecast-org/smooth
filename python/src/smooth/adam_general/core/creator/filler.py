@@ -272,7 +272,12 @@ def filler(
                     + constants_checked.get("constant_required", 0),
                 ] = -arima_polynomials["ari_polynomial"][poly_idx]
 
-        # Fill in the persistence vector - R lines 1392-1399
+        # Fill in the persistence vector - R lines 1392-1399, from zero as R: the
+        # creator may have filled the provided MA
+        matrices_dict["vec_g"][
+            components_number_ets : components_number_ets
+            + components_dict["components_number_arima"]
+        ] = 0.0
         if len(non_zero_ari) > 0:
             for row_idx in range(len(non_zero_ari)):
                 poly_idx = non_zero_ari[row_idx, 0]

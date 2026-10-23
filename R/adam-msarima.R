@@ -84,7 +84,9 @@
 #' then use \link[smooth]{auto.msarima} function instead.
 #' @param bounds What type of bounds to use in the model estimation. The first
 #' letter can be used instead of the whole word. \code{"admissible"} guarantee
-#' that the model is stable. \code{"usual"} are not supported due to restrictions
+#' that the model is forecastable: its AR polynomial is stationary and its MA polynomial
+#' invertible, an MA root on the unit circle that cancels with a difference being allowed
+#' (see \link[smooth]{adam}). \code{"usual"} are not supported due to restrictions
 #' in \code{adam()}.
 #' @param constant If \code{TRUE}, constant term is included in the model. Can
 #' also be a number (constant value). For \code{auto.msarima}, if \code{NULL},

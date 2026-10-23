@@ -1700,3 +1700,69 @@ def test_adam_tiny_samples_as_r(y, forecast, loglik):
     assert np.allclose(np.asarray(model.predict(h=2).mean), forecast)
     if loglik is not None:
         assert model.loglik == pytest.approx(loglik, abs=1e-6)
+
+
+def test_adam_reapply_draws_around_the_fitted_arima():
+    """reapply() added the drawn MA to the fitted persistence of a lag without ARI."""
+    import warnings
+
+    rng = np.random.default_rng(7)
+    e = rng.normal(size=151)
+    y = 100 + e[1:] + 0.6 * e[:-1]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model="NNN", orders={"ma": 1}).fit(y)
+        drawn = np.asarray(model.reapply(nsim=20).persistence, dtype=float)
+    assert np.all(np.abs(drawn - model.persistence_vector["psi"]) < 0.2)
+
+
+@pytest.mark.parametrize(
+    "model, kwargs, lags, reflection, admissible",
+    [
+        # Each part is admissible (alpha in (0, 2), |theta| < 1), the whole model is
+        # not: 1 + B - 0.1 B^2 has a root inside the unit circle
+        (
+            "ANN",
+            {"persistence": {"alpha": 1.9}, "arma": {"ma": [0.1]}},
+            [1, 1],
+            0.1,
+            False,
+        ),
+        # The MA root on the unit circle cancels with the difference
+        ("NNN", {"orders": {"i": 1, "ma": 1}, "arma": {"ma": [-1.0]}}, [1], 1.0, True),
+        # Without a difference to cancel with, a non-invertible MA is not admissible
+        ("NNN", {"arma": {"ma": [1.2]}}, [1], 1.2, False),
+    ],
+)
+def test_admissible_bounds_check_the_whole_model(
+    model, kwargs, lags, reflection, admissible
+):
+    """The admissible bounds of ETS+ARIMA check the whole model, as R."""
+    import warnings
+
+    from smooth.adam_general.core.utils.cost_functions import adam_bounds_checker
+
+    y = np.random.default_rng(3).normal(100, 1, 60)
+    kwargs.setdefault("orders", {"ma": 1})
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = ADAM(model=model, **kwargs).fit(y)
+    elements = {
+        "vec_g": np.array(list(fit.persistence_vector.values()), dtype=float),
+        "mat_f": np.asarray(fit.transition, dtype=float),
+        "mat_wt": np.asarray(fit.measurement, dtype=float),
+        "arima_polynomials": {"ar_reflection": 0.0, "ma_reflection": reflection},
+    }
+    penalty = adam_bounds_checker(
+        elements,
+        "admissible",
+        {"ets_model": model != "NNN"},
+        {"components_number_ets": int(model != "NNN"), "components_number_arima": 1},
+        {"lags_model_all": lags},
+        {"arima_model": True, "ar_estimate": False, "ma_estimate": True},
+        {"regressors": "use", "xreg_model": False, "xreg_number": 0},
+        {},
+        {"constant_required": False},
+        len(y),
+    )
+    assert (penalty == 0) == admissible

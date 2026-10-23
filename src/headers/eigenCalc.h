@@ -375,8 +375,10 @@ inline arma::vec lagPolynomial(const arma::mat& M, const arma::ivec& lags) {
     if(k < 20 && (arma::uword(1) << k) <= N / 2 + 1) {
         return minorPolynomial(M, lags);
     }
-    // The N-th roots of unity, kept once computed
-    static std::map<arma::uword, arma::cx_vec> unityRoots;
+    // The N-th roots of unity, kept once computed. The caches of this file are never destroyed:
+    // in the Python build Armadillo allocates through numpy, which is gone when the destructors
+    // of the statics run at exit
+    static std::map<arma::uword, arma::cx_vec>& unityRoots = *new std::map<arma::uword, arma::cx_vec>;
     arma::cx_vec& roots = unityRoots[N];
     if(roots.n_elem != N) {
         roots.set_size(N);
@@ -423,7 +425,7 @@ inline bool polynomialDivide(const arma::vec& p, const arma::vec& q, arma::vec& 
 // Integer coefficients of the n-th cyclotomic polynomial, (B^n - 1) divided by those of the
 // proper divisors of n; kept once computed
 inline const arma::vec& cyclotomicPolynomial(arma::uword n) {
-    static std::map<arma::uword, arma::vec> computed;
+    static std::map<arma::uword, arma::vec>& computed = *new std::map<arma::uword, arma::vec>;
     auto found = computed.find(n);
     if(found != computed.end()) {
         return found->second;
@@ -456,7 +458,7 @@ inline void cancelUnitRoots(arma::vec& theta, arma::vec& phi, const arma::ivec& 
         std::vector<std::pair<arma::uword, arma::uword>> factors;
         std::vector<arma::uword> removed;
     };
-    static PhiFactors last;
+    static PhiFactors& last = *new PhiFactors;
     auto small = [&](const arma::vec& p, arma::uword n) {
         const std::complex<double> zeta = std::polar(1.0, 2.0 * arma::datum::pi / double(n));
         std::complex<double> value(0.0, 0.0);

@@ -105,7 +105,8 @@ the end of the data.}
 \item{bounds}{What type of bounds to use in the model estimation. The first
 letter can be used instead of the whole word. \code{"usual"} implies restrictions on
 the smoothing parameter, guaranteeing that the exponential smoothing behaves
-as an averaging model. \code{"admissible"} guarantee that the model is stable.}
+as an averaging model. \code{"admissible"} guarantee that the model is forecastable
+(see \link[smooth]{adam}).}
 
 \item{smoother}{The smoother used by the \link[smooth]{msdecompose} function to
 obtain the initial states - the level and the trend, together with the initial

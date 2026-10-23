@@ -1,0 +1,157 @@
+[
+ {
+  "quantity": "models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "author"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check and rejected by the oracle",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "author"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "pbh"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check and rejected by the oracle",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "pbh"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the exact gcd oracle",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "pkg"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check and rejected by the oracle",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "pkg"
+  }
+ },
+ {
+  "quantity": "models whose reduced theta still has a cyclotomic factor, i.e. a root exactly on the unit circle (inadmissible)",
+  "value": 2.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check",
+  "value": 0.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "author"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "pbh"
+  }
+ },
+ {
+  "quantity": "of those, accepted by the check",
+  "value": 1.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "check": "pkg"
+  }
+ },
+ {
+  "quantity": "models admissible by the exact oracle",
+  "value": 58.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33
+  }
+ },
+ {
+  "quantity": "models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)",
+  "value": 81.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33
+  }
+ },
+ {
+  "quantity": "of those, admissible by the exact oracle (the root cancelled)",
+  "value": 7.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models",
+  "value": 3.779462298680869e-09,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "inadmissible": 192
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models",
+  "value": 9.536743166282946e-07,
+  "conditions": {
+   "models": 250,
+   "seed": 33,
+   "inadmissible": 192
+  }
+ },
+ {
+  "quantity": "largest number of components in a model",
+  "value": 12.0,
+  "conditions": {
+   "models": 250,
+   "seed": 33
+  }
+ },
+ {
+  "quantity": "seconds",
+  "value": 39.13635230064392,
+  "conditions": {
+   "models": 250,
+   "seed": 33
+  }
+ }
+]

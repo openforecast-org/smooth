@@ -31,7 +31,7 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 | `distribution` | `str \| None` | `None` | Error distribution (`"dnorm"`, `"dgamma"`, `"dlaplace"`, `"dlnorm"`, `"dinvgauss"`, `"ds"`, `"dgnorm"`). Auto-selected if `None` |
 | `loss` | `str` | `"likelihood"` | Loss function (`"likelihood"`, `"MSE"`, `"MAE"`, `"HAM"`, `"MSEh"`, `"TMSE"`, `"GTMSE"`, `"GPL"`, `"MSCE"`, `"LASSO"`, `"RIDGE"`, etc.) |
 | `ic` | `"AIC" \| "AICc" \| "BIC" \| "BICc"` | `"AICc"` | Information criterion for model selection |
-| `bounds` | `"usual" \| "admissible" \| "none"` | `"usual"` | Parameter bounds during optimization |
+| `bounds` | `"usual" \| "admissible" \| "none"` | `"usual"` | Parameter bounds during optimization; `"admissible"` keeps the whole model forecastable |
 
 ### Outlier Detection
 

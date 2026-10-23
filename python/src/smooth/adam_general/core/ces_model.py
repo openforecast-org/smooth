@@ -174,7 +174,7 @@ class CES:
     holdout : bool, default=False
         Whether to use holdout sample for validation.
     bounds : str, default="admissible"
-        "admissible" (eigenvalue stability) or "none".
+        "admissible" (forecastability, see ``ADAM``) or "none".
     ic : str, default="AICc"
         Information criterion for model comparison.
     verbose : int, default=0

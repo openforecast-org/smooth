@@ -1,0 +1,407 @@
+CLAIMSET Admissibility of lagged single-source-of-error state space models: the per-lag eigenvalue check, the cancelled ARIMA form of the whole model, the step-down test and their implementation in smooth, for ETS, GUM and ETS+ARIMA
+licence CC-BY-4.0; contributions C3, C25, C4, C16, C26, C1, C24, C22
+exploration {"lab_record": "A9", "questions": 2, "hypotheses": {"total": 9, "supported": 9, "not_supported": 0, "inconclusive": 0, "revised": 0, "abandoned": 0, "open": 0}, "tests": {"total": 9, "supported": 9, "not_supported": 0, "inconclusive": 0}, "runs": {"total": 69, "confirmatory": 9, "exploratory": 60, "failed": 8}}
+
+DEFINITIONS
+D1 lagged SSOE model: A pure additive single-source-of-error state space model $y_t = w' v_{t-l} + \epsilon_t$, $v_t = F v_{t-l} + g \epsilon_t$ with $k$ components, in which component $j$ of $v_{t-l}$ enters with its own lag $l_j$; its discount matrix is $D = F - g w'$ and its lag matrix is $L(B) = \mathrm{diag}(B^{l_1}, \dots, B^{l_k})$ for the backshift operator $B$; $\Lambda(\lambda) = \mathrm{diag}(\lambda^{l_1}, \dots, \lambda^{l_k})$ for a complex number $\lambda$.
+D2 expanded discount matrix: The transition matrix $\tilde D$ of size $\sum_j l_j$ of the lag-1 system equivalent to $v_t = D v_{t-l}$, in which component $j$ carries itself and its $l_j - 1$ lagged copies; $\tilde F$, $\tilde g$ and $\tilde w$ are expanded in the same way, so that $\tilde D = \tilde F - \tilde g \tilde w'$.
+D3 decaying weights: A lagged SSOE model has decaying weights when the weights $\tilde w' \tilde D^j \tilde g$ of the past observations in its fitted values tend to zero, that is, when every eigenvalue $\lambda$ of its expanded discount matrix that is reachable from $\tilde g$ and observable through $\tilde w$ has $|\lambda| < 1$; the largest such $|\lambda|$ is its largest mode modulus. A mode that $\tilde g$ does not reach but $\tilde w$ sees carries an initial state whose effect is not covered: with $|\lambda| > 1$ it grows.
+D4 per-lag check: The test applied by smoothEigens() of smooth 4.6.0 and of its repository until commit 4a44c1c (src/headers/eigenCalc.h) to models without adaptive regressors: every eigenvalue of every diagonal block of $D$, one block per unique lag, has modulus below 1; reimplemented in numpy as per_lag_max().
+D5 PBH reference: The largest modulus among the eigenvalues $\lambda$ of the expanded discount matrix for which the smallest singular values of $[\lambda I - \tilde D;\ \tilde w']$ and of $[\lambda I - \tilde D,\ \tilde g]$ both exceed $10^{-7}(\|\tilde D\|_2 + \|\tilde g\| + \|\tilde w\|)$ (Popov-Belevitch-Hautus rank tests), computed with numpy as pbh_max().
+D6 cyclotomic cancellation: The procedure that computes the coefficients of $\theta(B) = \det(I - D L(B))$ and $\phi(B) = \det(I - F L(B))$ by an inverse discrete Fourier transform of their values at the $N$-th roots of unity ($N$ the smallest power of 2 above $\sum_j l_j$), and divides both by every cyclotomic polynomial $\Phi_n(B)$, $n$ dividing one of the lags, for as long as it divides both with a remainder at most $10^{-9}$ times the sum of absolute coefficients; the quotient of $\theta$ is the cancelled MA polynomial $\theta^*(B)$.
+D7 step-down test: The Levinson-Durbin step-down (Schur-Cohn) recursion on $1 + c_1 B + \dots + c_n B^n$: for $j = n, \dots, 1$, $\kappa_j = c_j$ and $c_i \leftarrow (c_i - \kappa_j c_{j-i}) / (1 - \kappa_j^2)$; the test passes when every $|\kappa_j| < 1$, which holds if and only if all roots lie outside the unit circle (the $\kappa_j$ are the partial autocorrelations of the autoregression with this polynomial). [source B2]
+D8 GUM: Generalised Univariate Model of the smooth package: a lagged SSOE model whose $F$, $g$ and $w$ are all estimated. [source B3]
+D9 ETS(A,N,A): Exponential smoothing with additive error, no trend and additive seasonality of period $m$; here in the lagged form with a level of lag 1 and one seasonal state of lag $m$, $F = I$, $w = (1, 1)'$, $g = (\alpha, \gamma)'$. [source B1]
+
+CLAIMS
+C1 [descriptive; principal; refutation; support: simulation E1 (E1.R1, E1.R3, E1.R4, E1.R6) artefacts A1, A3; assumes C13, C14; limitations L1, L2; strength moderate (author); planning confirmatory; outcome supported]
+  The [[D4:per-lag check]] accepted all 3042 [[D9:ETS(A,N,A)]] grid models, 1482 of which do not have [[D3:decaying weights]], and 193 of 200 random [[D8:GUM]] models with lags (1, 12), 10 of which do not have decaying weights.
+  scope: population: pure additive lagged SSOE models | conditions: ETS(A,N,A) with m = 4 and m = 12, alpha and gamma on the grid 0.05, 0.10, ..., 1.95; GUM with lags (1, 12) and normal random F, g and w (standard deviations 0.35, 0.175, 0.175; mean of w 1); largest mode modulus from the PBH reference, band of 1e-8 around 1 | excludes: models with adaptive regressors; multiplicative models
+  contradicts B3, at gum(), documentation of the argument bounds, own earlier work: The documentation of gum() states that bounds = "admissible" guarantees the stability of the model.
+  test: deterministic; seed 2026; edge_band 1e-08; pbh_tolerance 1e-07; cancellation_tolerance 1e-09; sample 3042 ETS grid models and 200 random GUM models, fixed; no interim analysis; supported if ets_bad > 0 and gum_bad > 0; not supported if ets_bad == 0 and gum_bad == 0; verdict computed
+C3 [methodological; principal; support: simulation E3 (E3.R1, E3.R2) artefacts A1, A3; assumes C14; uses C6, C8, C17; limitations L2, L3; strength moderate (author); planning confirmatory; outcome supported]
+  On 500 random additive ETS and [[D8:GUM]] models, the admissibility decision from the roots of the MA polynomial after [[D6:cyclotomic cancellation]] differed from the [[D5:PBH reference]] on 0 models, and on the 172 models that both found inadmissible the largest mode modulus differed from the reference by at most 4.4e-13.
+  scope: population: pure additive lagged SSOE models | conditions: additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0; GUM with F = I and lags from {1, 4, 12}; GUM with random F and lags from {1, 4, 12, 24}; numpy prototype; models within 1e-8 of the unit circle excluded (none occurred) | excludes: ARIMA components; CES; adaptive regressors; multiplicative models; seasonal harmonics with non-integer periods (TBATS); the largest mode modulus of admissible models, where a common factor that is not cyclotomic can remain in the cancelled MA polynomial; an eigenvalue of modulus above 1 shared by a reachable and observable mode and an unreachable or unobservable one
+  test: deterministic; seed 2026; edge_band 1e-08; pbh_tolerance 1e-07; cancellation_tolerance 1e-09; sample 500 models, fixed; no interim analysis; supported if mism == 0 and diff < 0.000001; not supported if mism > 0 or diff >= 0.000001; verdict computed
+C4 [methodological; principal; support: simulation E4 (E4.R1, E4.R3) artefacts A1, A3, cited B2; assumes C19; uses C3; limitations L3, L4, L5, L8; strength moderate (author); planning confirmatory_with_deviations; outcome supported]
+  On 575 random additive ETS and [[D8:GUM]] models, including ETS models with up to two seasonal lags from {24, 168, 365} whose generator allows MA polynomial degrees up to 536, the [[D7:step-down test]] on the MA polynomial after [[D6:cyclotomic cancellation]] gave an admissibility decision different from the roots of that polynomial on 0 models.
+  scope: population: pure additive lagged SSOE models | conditions: additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0; GUM with F = I and lags from {1, 4, 12}; GUM with random F and lags from {1, 4, 12, 24}; additive ETS with up to two seasonal lags from {24, 168, 365}; GUM with random F and lags (1, 24, 168); numpy prototype | excludes: ARIMA components; CES; adaptive regressors; multiplicative models; seasonal harmonics with non-integer periods (TBATS)
+  test: deterministic; seed 2026; edge_band 1e-08; pbh_tolerance 1e-07; cancellation_tolerance 1e-09; sample 575 models, fixed; no interim analysis; supported if mism == 0; not supported if mism > 0; verdict computed
+C16 [methodological; principal; support: simulation E13 (E13.R1, E13.R5, E13.R9, E13.R13, E13.R2, E13.R6, E13.R10, E13.R14) artefacts A5, A8; assumes C19; uses C3, C4, C18, C20; limitations L2, L3, L4, L8; strength moderate (author); planning confirmatory; outcome supported]
+  On 800 random additive ETS and [[D8:GUM]] models in four families, the implementation of the check in smooth (smoothEigensCpp() through smoothEigensR()) gave a decision different from the numpy prototype on 0 models, a largest root modulus within 9.53e-7 of it (the bisection tolerance is 1e-6) on the models both found inadmissible, and the same modulus and MA polynomial on three consecutive calls with each model.
+  scope: population: pure additive lagged SSOE models | conditions: additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0; additive ETS with 0 to 2 seasonal lags from {24, 168, 365}; GUM with F = I and lags from {1, 4, 12}; GUM with random F and lags from {1, 4, 12, 24}; R 4.3.3, -O0 build of pkgload | excludes: ARIMA components; CES; adaptive regressors; multiplicative models; seasonal harmonics with non-integer periods (TBATS)
+  test: deterministic; seed 2027; tolerance 1.1e-06; sample 800 models, fixed; no interim analysis; supported if m1 == 0 and d1 < 0.0000011 and r1 == 0 and m2 == 0 and d2 < 0.0000011 and r2 == 0 and m3 == 0 and d3 < 0.0000011 and r3 == 0 and m4 == 0 and d4 < 0.0000011 and r4 == 0; not supported if m1 > 0 or d1 >= 0.0000011 or r1 > 0 or m2 > 0 or d2 >= 0.0000011 or r2 > 0 or m3 > 0 or d3 >= 0.0000011 or r3 > 0 or m4 > 0 or d4 >= 0.0000011 or r4 > 0; verdict computed
+C22 [descriptive; principal; refutation; support: simulation E18 (E18.R6, E18.R8, E18.R9, E18.R10) artefacts A1, A6; uses C21; limitations L6; strength moderate (author); planning exploratory]
+  For ETS(A,N,A) with $m = 12$, $\alpha = 1.2$ and $\gamma = 0.9$, the stability condition of Section 5.4 of the ADAM monograph holds (largest nonzero eigenvalue modulus of its per-lag discount matrices 0.2), while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow by 1.0164 per period, and the largest root modulus of the cancelled MA polynomial is 1.0165.
+  scope: population: ETS(A,N,A) with m = 12 | conditions: alpha = 1.2, gamma = 0.9; initial states set to one or one unit observation, 2400 periods
+  contradicts B4, at Section 5.4, equations 5.20 to 5.22, own earlier work: The monograph states that the model is stable when all the nonzero eigenvalues of the per-lag discount matrices D_{m_i} are below one in absolute value, and forecastable when the effect of the initial states through each D_{m_i} tends to a constant (eq. 5.22).
+C24 [descriptive; principal; support: simulation E20 (E20.R1, E20.R2, E20.R3, E20.R9, E20.R10, E20.R11) artefacts A10, A1; assumes C28; limitations L12; strength high (author); planning confirmatory; outcome supported]
+  On 1,000 new random ADAM ETS+ARIMA models (500 with ARIMA at lag 1, 500 with seasonal ARIMA), checking the ETS part and the ARIMA polynomials apart, as adam() did with bounds="admissible", gave an admissibility decision different from the PBH reference of the whole model on 166 and 159 models, accepting 104 and 128 models that are not forecastable and rejecting 62 and 31 that are.
+  scope: population: random ADAM models that combine additive ETS with ARIMA | conditions: ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0; ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag); ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models | excludes: regressors; constant; multiplicative models; several seasonal lags; CES; GUM
+  test: deterministic; sample 500 models per family, one run, no stopping rule; threshold 25; supported if s1 > threshold and s2 > threshold; not supported if s1 <= 5 and s2 <= 5; verdict computed; flags code_changed_after_plan
+C25 [methodological; principal; support: simulation E21 (E21.R4, E21.R12, E21.R7, E21.R15) artefacts A10, A1; assumes C28; limitations L12; strength high (author); planning confirmatory; outcome supported]
+  On the same 1,000 random ETS+ARIMA models, the criterion of [[C3]] applied to the whole model (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary) gave the same admissibility decision as the [[D5:PBH reference]] on every model, and the same largest modulus within 4.3e-13 and 1.6e-11 on the 341 and 413 models both found inadmissible.
+  scope: population: random ADAM models that combine additive ETS with ARIMA | conditions: ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0; ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag); ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models | excludes: regressors; constant; multiplicative models; several seasonal lags; CES; GUM
+  test: deterministic; sample 500 models per family, one run, no stopping rule; threshold 1e-06; supported if j1 == 0 and j2 == 0 and d1 <= threshold and d2 <= threshold; not supported if j1 > 0 or j2 > 0 or d1 > threshold or d2 > threshold; verdict computed; flags code_changed_after_plan
+C26 [methodological; principal; support: simulation E22 (E22.R18, E22.R20, E22.R22, E22.R24, E22.R19, E22.R21, E22.R23, E22.R25) artefacts A10, A1, A12, A13, A14; assumes C28; limitations L11; strength high (author); planning confirmatory; outcome supported]
+  On 1,000 further random ETS+ARIMA models, the bounds checker of adam() in R and of ADAM in Python with bounds="admissible", which run smoothEigensCpp() on the whole model, gave the same admissibility decision as the prototype check of the whole model on every model, and a penalty slope (the largest root modulus) within 9.54e-7 and 9.48e-7 of it in the two families (the bisection tolerance is 1e-6).
+  scope: population: random ADAM models that combine additive ETS with ARIMA | conditions: ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0; ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag); ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models; the checkers called on the matrices of each model, R through pkgload::load_all of the repository | excludes: regressors; constant; multiplicative models; several seasonal lags; CES; GUM
+  test: deterministic; sample 500 models per family, one run, no stopping rule; threshold 1.1e-06; supported if r1 + r2 + p1 + p2 == 0 and dr1 <= threshold and dr2 <= threshold and dp1 <= threshold and dp2 <= threshold; not supported if r1 + r2 + p1 + p2 > 0 or dr1 > threshold or dr2 > threshold or dp1 > threshold or dp2 > threshold; verdict computed; flags code_changed_after_plan
+C6 [formal; supporting; extension; support: formal_proof E6, consensus, simulation E10 artefacts A1, A2; verification agent_checked]
+  For a [[D1:lagged SSOE model]], ignoring the initial states, $\det(I - D L(B))\, \epsilon_t = \det(I - F L(B))\, y_t$, so the model has the ARIMA form with AR polynomial $\phi(B) = \det(I - F L(B))$ and MA polynomial $\theta(B) = \det(I - D L(B))$.
+  scope: population: pure additive lagged SSOE models | conditions: identity of lag-operator polynomials, initial states ignored
+  extends B1, at Chapter 11: Hyndman, Koehler, Ord and Snyder relate the reduced forms of linear innovations state space models to ARIMA models.
+C8 [formal; supporting; support: formal_proof E8; uses C15; verification agent_checked]
+  An eigenvalue $\lambda \neq 0$ of the expanded transition matrix $\tilde F$ with an eigenvector unobservable through $\tilde w$ or a left eigenvector unreachable from $\tilde g$ is an eigenvalue of the [[D2:expanded discount matrix]], and $1/\lambda$ is a common root of $\phi(B) = \det(I - F L(B))$ and $\theta(B) = \det(I - D L(B))$.
+  scope: population: pure additive lagged SSOE models
+C13 [methodological; supporting; assumption (methodological, unchecked)]
+  The numpy function per_lag_max() returns the same largest eigenvalue modulus as smoothEigensCpp() of smooth 4.6.0 (replaced in commit 4a44c1c) for models with a constant measurement vector and without adaptive regressors.
+C14 [methodological; supporting; assumption (methodological, unchecked)]
+  The [[D5:PBH reference]] with relative rank tolerance 1e-7 classifies every eigenvalue of modulus at least 1 of the [[D2:expanded discount matrix]] of the tested models correctly as both reachable and observable or not.
+C15 [formal; supporting; support: formal_proof E11; verification agent_checked]
+  For the lag-1 expansion $\tilde M$ of $v_t = M v_{t-l}$ in a [[D1:lagged SSOE model]], $\det(\lambda I - \tilde M) = \det(\Lambda(\lambda) - M)$, which equals $\lambda^{\sum_j l_j} \det(I - M L(1/\lambda))$ for $\lambda \neq 0$.
+  scope: population: pure additive lagged SSOE models | conditions: any square matrix $M$ of size $k$
+C17 [formal; supporting; support: formal_proof E14, consensus; uses C6, C15; verification agent_checked]
+  For a [[D1:lagged SSOE model]] with $\theta(B) = \det(I - D L(B))$ and $\phi(B) = \det(I - F L(B))$, the roots of $\theta(B) / \gcd(\theta(B), \phi(B))$ are exactly the reciprocals $1/\lambda$ of the nonzero eigenvalues $\lambda$ of the reachable and observable part of the [[D2:expanded discount matrix]] (its Kalman decomposition), with their multiplicities.
+  scope: population: pure additive lagged SSOE models | conditions: the definition D3 agrees with this part unless an eigenvalue is shared by the reachable and observable part and the rest
+C18 [formal; supporting; support: formal_proof E15, cited B2; verification agent_checked]
+  For a polynomial $c$ with $c(0) \neq 0$ and $r > 0$, the [[D7:step-down test]] passes on $c(B/r)$ if and only if $1/|B| < r$ for every root $B$ of $c$.
+  scope: population: real polynomials with a nonzero constant term
+C19 [methodological; supporting; assumption (theoretical, unchecked)]
+  In additive ETS models, and in GUM models with an identity transition or with transition, persistence and measurement in general position, every factor shared by $\theta(B)$ and $\phi(B)$ with a root in $|B| \le 1$ is a product of cyclotomic polynomials $\Phi_n(B)$ with $n$ dividing a lag of the model.
+C20 [formal; supporting; support: formal_proof E16, consensus; verification agent_checked]
+  For a square matrix $M$ of size $k$ and lags $l_1, \dots, l_k$, $\det(I - M L(B)) = \sum_{S \subseteq \{1, \dots, k\}} (-1)^{|S|} \det(M_{SS})\, B^{\sum_{j \in S} l_j}$, with $\det(M_{\emptyset\emptyset}) = 1$.
+  scope: population: square matrices and positive integer lags
+C21 [formal; supporting; support: formal_proof E17; verification agent_checked]
+  The per-lag discount matrices $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ of Section 5.4 of the ADAM monograph have as nonzero eigenvalues those of the diagonal block of $D = F - g w'$ for the lag $m_i$ (the [[D4:per-lag check]]), and their sum is $D + \sum_{i \neq j} g_{m_i} w_{m_j}'$, which differs from $D$ whenever $g w'$ links components of distinct lags.
+  scope: population: pure additive lagged SSOE models with more than one distinct lag | conditions: F split by the columns, and g and w by the components, of each lag, as in Section 5.2 of the monograph, which writes g_{m_i} and w_{m_i} without defining their split; with g kept whole the first part holds and the sum equals D
+C28 [methodological; supporting; assumption (theorem_condition, tested)]
+  For ETS+ARIMA models with a stationary AR polynomial, $\theta(B)$ and $\phi(B)$ of the whole model share no factor with a root in $|B| \le 1$ that is not cyclotomic, so the [[D5:PBH reference]] and the cancelled MA polynomial decide the same admissibility.
+C2 [descriptive; secondary; support: simulation E2 (E2.R5) artefacts A1, A3; assumes C13, C14; limitations L2, L3; strength low (author); planning confirmatory; outcome supported]
+  The [[D4:per-lag check]] rejected 1 of 200 random [[D8:GUM]] models with lags (1, 12) that have [[D3:decaying weights]].
+  scope: population: GUM models | conditions: GUM with lags (1, 12) and normal random F, g and w (standard deviations 0.35, 0.175, 0.175; mean of w 1); PBH reference below 1 - 1e-8 | excludes: models with adaptive regressors
+  test: deterministic; seed 2026; edge_band 1e-08; pbh_tolerance 1e-07; cancellation_tolerance 1e-09; sample 200 random GUM models, fixed; no interim analysis; supported if gum_rej > 0; not supported if gum_rej == 0; verdict computed
+C5 [methodological; secondary; support: simulation E5 (E5.R1) artefacts A1, A3; limitations L3, L4, L5; strength low (author); planning confirmatory_with_deviations; outcome supported]
+  On the 198 models among 575 random additive ETS and [[D8:GUM]] models whose cancelled MA polynomial $\theta^*$ has a root inside the unit circle, bisection on $r$ with the [[D7:step-down test]] applied to $\theta^*(B/r)$ gave $1/\min|B|$ over the roots $B$ of $\theta^*$ within 5.8e-11 of the value from numpy's roots.
+  scope: population: inadmissible pure additive lagged SSOE models | conditions: additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0; GUM with F = I and lags from {1, 4, 12}; GUM with random F and lags from {1, 4, 12, 24}; additive ETS with up to two seasonal lags from {24, 168, 365}; GUM with random F and lags (1, 24, 168); bisection to a width of 1e-10; numpy prototype | excludes: ARIMA components; CES; adaptive regressors; multiplicative models; seasonal harmonics with non-integer periods (TBATS)
+  test: deterministic; seed 2026; edge_band 1e-08; pbh_tolerance 1e-07; cancellation_tolerance 1e-09; sample the inadmissible models among 575, fixed; no interim analysis; supported if diff < 0.00000001; not supported if diff >= 0.00000001; verdict computed
+C7 [formal; secondary; support: formal_proof E7; uses C15; verification agent_checked]
+  If the discount matrix $D$ of a [[D1:lagged SSOE model]] is block-diagonal with one block $D_{ll}$ per unique lag $l$, every eigenvalue of the [[D2:expanded discount matrix]] has modulus $|\mu|^{1/l}$ for an eigenvalue $\mu$ of some $D_{ll}$, so all of them lie inside the unit circle exactly when the [[D4:per-lag check]] passes.
+  scope: population: lagged SSOE models whose discount matrix is block-diagonal across lags
+C9 [formal; secondary; support: formal_proof E9; uses C15; verification agent_checked]
+  For [[D9:ETS(A,N,A)]] with any period $m$ and any $\alpha$ and $\gamma$, $B = 1$ is a root of both $\theta(B) = (1 - (1-\alpha)B)(1 - (1-\gamma)B^m) - \alpha\gamma B^{m+1}$ and $\phi(B) = (1 - B)(1 - B^m)$, so the [[D2:expanded discount matrix]] has an eigenvalue equal to 1.
+  scope: population: ETS(A,N,A) models
+C10 [descriptive; secondary; support: simulation E10 (E10.R1, E10.R2, E10.R4, E10.R5) artefacts A1, A2; assumes C14; limitations L2; strength low (author); planning exploratory]
+  For ETS(A,N,A,A) with seasonal lags 24 and 168, $\alpha = 0.3$ and $\gamma = (0.1, 0.05)$, [[D6:cyclotomic cancellation]] removed a common factor of degree 25 from the MA polynomial of degree 193, and the largest mode modulus after cancellation, 0.9999965, equalled the [[D5:PBH reference]] to 1e-14.
+  scope: population: ETS(A,N,A,A) with seasonal lags 24 and 168 | conditions: alpha = 0.3, gamma = (0.1, 0.05); numpy prototype
+C11 [descriptive; secondary; support: simulation E10 (E10.R6, E10.R7, E10.R9, E10.R10) artefacts A1, A2; assumes C14; limitations L2; strength low (author); planning exploratory]
+  For the default starting point of gum() with orders (2, 2) and lags (1, 12) ($F = I$, $g = 0.1$, $w = 1$), [[D6:cyclotomic cancellation]] removed a common factor of degree 14 from the MA polynomial of degree 26, and the largest mode modulus after cancellation, 0.98294, equalled the [[D5:PBH reference]] to 1e-14.
+  scope: population: GUM with orders (2, 2) and lags (1, 12) | conditions: F = I, g = 0.1, w = 1; numpy prototype
+C12 [descriptive; secondary; support: simulation E12 (E12.R1, E12.R2, E12.R4, E12.R5, E12.R7, E12.R8) artefacts A1, A4; strength low (author); planning exploratory]
+  For an admissible and an inadmissible random GUM model with lags (1, 24, 168) (MA polynomials of degree 193) and the cancelled MA polynomial of degree 168 of an ETS(A,N,A,A) model with seasonal lags 24 and 168, the [[D7:step-down test]] took 0.74, 0.81 and 0.42 ms against 23.8, 20.9 and 17.5 ms for all roots by numpy's companion-matrix eigenvalues.
+  scope: population: GUM with lags (1, 24, 168) and ETS(A,N,A,A) with seasonal lags 24 and 168 | conditions: numpy, Python 3.13, one x86_64 machine with 4 CPUs, mean of 50 repeats; step-down recursions of 193, 170 and 168 steps
+C23 [descriptive; secondary; support: simulation E19 (E19.T1) artefacts A7; limitations L7; strength low (author); planning exploratory]
+  Over five fits with bounds="admissible", the median time of a fit with the polynomial check was between 0.82 and 1.2 times that with the per-lag check, and 1.08 times for adam() with seasonal lags 24 and 168 on hourly data, with optimisation paths that differ between the checks.
+  scope: population: fits of gum(), adam() and ces() on AirPassengers and a synthetic hourly series | conditions: R 4.3.3, -O2, one x86_64 machine with 4 CPUs, median of seven fits
+C27 [descriptive; secondary; support: simulation E23 (E23.T1) artefacts A11; limitations L9; strength low (author); planning exploratory]
+  With the check of the whole model and its shortcut for pure ARIMA, the median time of five fits with bounds="admissible" of two ARIMA and two ETS+ARIMA models was within 6% of that with the check of the parts apart; the log-likelihood of SARIMA(1,1,1)(1,1,1)[12] on AirPassengers rose from -541.84 to -541.38 and that of ETS(A,N,A)+ARIMA(1,0,1) fell from -569.65 to -572.21, another local optimum.
+  scope: population: fits of adam() and ssarima() on AirPassengers and BJsales | conditions: R 4.3.3, -O2, one x86_64 machine, median of five fits
+
+EVIDENCE
+E1 [simulation; runs 1] Planned test of the per-lag check (lab plan PL1, run RN7): confirm.py --test perlag --seed 2026 --n 200 computed, for 3042 ETS(A,N,A) models (m = 4 and 12, alpha and gamma on the grid 0.05, 0.10, ..., 1.95) and 200 GUM models with lags (1, 12) (entries of F normal with mean 0 and standard deviation 0.35, of g with mean 0 and standard deviation 0.175, of w with mean 1 and standard deviation 0.175), the per-lag check's largest eigenvalue modulus and the PBH reference, and counted the models on which the two decisions disagree beyond a band of 1e-8 around 1.
+  E1.R1 models accepted by the per-lag check that do not forget their initial states = 1482 {family: ETS(A,N,A), models: 3042}
+  E1.R2 models rejected by the per-lag check that forget their initial states = 0 {family: ETS(A,N,A), models: 3042}
+  E1.R3 models accepted by the per-lag check = 3042 {family: ETS(A,N,A), models: 3042}
+  E1.R4 models accepted by the per-lag check that do not forget their initial states = 10 {family: GUM, models: 200}
+  E1.R5 models rejected by the per-lag check that forget their initial states = 1 {family: GUM, models: 200}
+  E1.R6 models accepted by the per-lag check = 193 {family: GUM, models: 200}
+  parameters: A3
+  seeds: [2026]
+E2 [simulation; runs 1] Planned test of the per-lag check on GUM models (lab plan PL2, run RN8): the same computation and seed as for plan PL1, counting the GUM models with lags (1, 12) that the per-lag check rejects while their PBH reference lies below 1 - 1e-8.
+  E2.R1 models accepted by the per-lag check that do not forget their initial states = 1482 {family: ETS(A,N,A), models: 3042}
+  E2.R2 models rejected by the per-lag check that forget their initial states = 0 {family: ETS(A,N,A), models: 3042}
+  E2.R3 models accepted by the per-lag check = 3042 {family: ETS(A,N,A), models: 3042}
+  E2.R4 models accepted by the per-lag check that do not forget their initial states = 10 {family: GUM, models: 200}
+  E2.R5 models rejected by the per-lag check that forget their initial states = 1 {family: GUM, models: 200}
+  E2.R6 models accepted by the per-lag check = 193 {family: GUM, models: 200}
+  parameters: A3
+  seeds: [2026]
+E3 [simulation; runs 1] Planned test of the cyclotomic cancellation (lab plan PL3, run RN9): confirm.py --test cancel --seed 2026 --n 200 generated 200 additive ETS models (level; no, additive or damped trend with phi in (0.8, 0.99); 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; a constant with probability 0.3; beta = 0 with probability 0.1 and each gamma = 0 with probability 0.15; alpha in (0.01, 1.9)), 100 GUM models with F = I, lags from {1, 4, 12}, g uniform on (-0.3, 0.6) and w normal with mean 1 and standard deviation 0.3, and 200 GUM models with lags from {1, 4, 12, 24} and normal F (standard deviation 0.35); for each it compared the largest root modulus of the cancelled MA polynomial with the PBH reference.
+  E3.R1 admissibility decisions that differ from the PBH reference = 0
+  E3.R2 max abs difference of max |lambda| from the PBH reference, inadmissible models = 4.39648317751562e-13 {inadmissible_models: 172}
+  E3.R3 models within 1e-8 of the unit circle, excluded = 0
+  E3.R4 models compared = 500
+  parameters: A3
+  seeds: [2026]
+E4 [simulation; runs 1] Planned test of the step-down test (lab plan PL4, run RN10): confirm.py --test stepdown --seed 2026 --n 200 generated the 500 models of plan PL3 afresh plus 50 additive ETS models with seasonal lags from {24, 168, 365} and 25 GUM models with lags (1, 24, 168) and normal F (standard deviation 0.3), and compared the step-down decision on the cancelled MA polynomial with the decision from its roots computed by numpy. The generator allows MA polynomial degrees up to 536 (level, trend, seasonal lags 168 and 365, constant); the realised maximum was not recorded as a result.
+  E4.R1 step-down decisions that differ from the decision by the roots = 0
+  E4.R2 models within 1e-8 of the unit circle, excluded = 0
+  E4.R3 models compared = 575
+  parameters: A3
+  seeds: [2026]
+E5 [simulation; runs 1] Planned test of the bisection (lab plan PL5, run RN11): on the 575 models of plan PL4, for each model whose cancelled MA polynomial has a root-based largest mode modulus above 1 + 1e-8, bisection on r to width 1e-10 with the step-down test on theta*(B/r) was compared with the root-based value. The generator allows MA polynomial degrees up to 536 (level, trend, seasonal lags 168 and 365, constant); the realised maximum was not recorded as a result.
+  E5.R1 max abs difference of max |lambda|, bisection against roots = 5.813682868449632e-11 {inadmissible_models: 198}
+  E5.R2 models within 1e-8 of the unit circle, excluded = 0
+  E5.R3 models compared = 575
+  parameters: A3
+  seeds: [2026]
+E13 [simulation; runs 1] Planned test of the implementation in smooth (lab plan PL6, run RN43): cpp_check.py --seed 2027 --n 200 generated 200 models in each of four families (additive ETS with 0-2 seasonal lags from {4, 7, 12, 24, 52}; additive ETS with 0-2 seasonal lags from {24, 168, 365}; GUM with F = I and lags from {1, 4, 12}; GUM with normal F, standard deviation 0.35, and lags from {1, 4, 12, 24}), called smoothEigensR() of the repository (through pkgload::load_all) three times on each, and compared its decision and modulus with the numpy prototype (roots of the cancelled MA polynomial).
+  E13.R1 admissibility decisions of the C++ core that differ from the prototype = 0 {family: ETS, models: 200}
+  E13.R2 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.48848823512094e-07 {family: ETS, models: 200, inadmissible: 86}
+  E13.R3 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: ETS, models: 200}
+  E13.R4 max abs difference between three calls of the C++ core on the same model = 0 {family: ETS, models: 200}
+  E13.R5 admissibility decisions of the C++ core that differ from the prototype = 0 {family: ETS high degree, models: 200}
+  E13.R6 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.526633371059745e-07 {family: ETS high degree, models: 200, inadmissible: 95}
+  E13.R7 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: ETS high degree, models: 200}
+  E13.R8 max abs difference between three calls of the C++ core on the same model = 0 {family: ETS high degree, models: 200}
+  E13.R9 admissibility decisions of the C++ core that differ from the prototype = 0 {family: GUM identity, models: 200}
+  E13.R10 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.405809149320987e-07 {family: GUM identity, models: 200, inadmissible: 84}
+  E13.R11 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: GUM identity, models: 200}
+  E13.R12 max abs difference between three calls of the C++ core on the same model = 0 {family: GUM identity, models: 200}
+  E13.R13 admissibility decisions of the C++ core that differ from the prototype = 0 {family: GUM random, models: 200}
+  E13.R14 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.485389538266276e-07 {family: GUM random, models: 200, inadmissible: 27}
+  E13.R15 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: GUM random, models: 200}
+  E13.R16 max abs difference between three calls of the C++ core on the same model = 0 {family: GUM random, models: 200}
+  parameters: A5
+  seeds: [2027]
+E10 [simulation; runs 1] Exploratory run RN2 of explore.py --seed 0: the ARIMA-form polynomials, their cyclotomic cancellation and the PBH reference for ETS(A,N,A,A) with seasonal lags 24 and 168 (alpha = 0.3, gamma = (0.1, 0.05)) and for GUM with orders (2, 2), lags (1, 12), F = I, g = 0.1 and w = 1 (the default starting point of gum()); the determinant identity at random complex B on 100 random GUM models; the expanded discount matrix of a block-diagonal D; and mean times over 50 repeats of three computations for a random GUM with lags (1, 24, 168). The result labelled 'block-diagonal D, lags (1,12)' comes from D = [[0.7, 0], [-0.1, 0.3]], which is lower-triangular rather than block-diagonal.
+  E10.R1 degree of theta = 193 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
+  E10.R2 degree of the shared cyclotomic factor = 25 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
+  E10.R3 max |lambda|, roots of theta before cancellation = 1.0000000000000038 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
+  E10.R4 max |lambda|, roots of theta after cancellation = 0.9999965469723225 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
+  E10.R5 max |lambda|, controllable and observable modes (PBH) = 0.9999965469723241 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
+  E10.R6 degree of theta = 26 {model: GUM start, orders (2,2), lags (1,12)}
+  E10.R7 degree of the shared cyclotomic factor = 14 {model: GUM start, orders (2,2), lags (1,12)}
+  E10.R8 max |lambda|, roots of theta before cancellation = 1.0000014857614217 {model: GUM start, orders (2,2), lags (1,12)}
+  E10.R9 max |lambda|, roots of theta after cancellation = 0.9829371631611427 {model: GUM start, orders (2,2), lags (1,12)}
+  E10.R10 max |lambda|, controllable and observable modes (PBH) = 0.9829371631611421 {model: GUM start, orders (2,2), lags (1,12)}
+  E10.R11 max relative error of the determinant identity = 9.171563565208779e-15 {models: 100}
+  E10.R12 max |lambda|, per-lag check = 0.7 {model: block-diagonal D, lags (1,12)}
+  E10.R13 max |lambda|, all modes of the expanded discount matrix = 0.9045379057839597 {model: block-diagonal D, lags (1,12)}
+  E10.R14 mean time, ms = 4.6963541200011605 {task: coefficients by DFT, degree: 193}
+  E10.R15 mean time, ms = 0.006939219999821944 {task: step-down test, degree: 193}
+  E10.R16 mean time, ms = 22.225657179999416 {task: all roots, numpy companion eigenvalues, degree: 193}
+  parameters: A2
+  seeds: [0]
+E6 [formal; foundation linear algebra over the field of rational functions in $B$] Derivation of the ARIMA form of a lagged SSOE model by the matrix determinant lemma.
+  S1 \epsilon_t = y_t - w' v_{t-l} \Rightarrow v_t = D v_{t-l} + g y_t,\ D = F - g w' (by D1; substitution)
+  S2 v_{t-l} = L(B) v_t \Rightarrow (I - D L(B)) v_t = g y_t (by S1, D1; definition of $L(B)$)
+  S3 \det(I - D L(B))|_{B=0} = 1 \Rightarrow I - D L(B) \text{ is invertible over rational functions} (by S2; evaluation at $B = 0$)
+  S4 \epsilon_t = \left(1 - w' L(B) (I - D L(B))^{-1} g\right) y_t (by S1, S2, S3; substitution)
+  S5 I - D L(B) - g\, w' L(B) = I - F L(B) (by D1; definition of $D$)
+  S6 \det(I - F L(B)) = \det(I - D L(B))\left(1 - w' L(B)(I - D L(B))^{-1} g\right) (by S3, S5; matrix determinant lemma $\det(A - g u') = \det(A)(1 - u' A^{-1} g)$)
+  S7 \det(I - D L(B))\, \epsilon_t = \det(I - F L(B))\, y_t (by S4, S6; substitution)
+E7 [formal; foundation linear algebra over the complex numbers] Characteristic polynomial of the expanded matrix and its factorisation for a block-diagonal discount matrix.
+  S1 \det(\lambda I - \tilde M) = \det(\Lambda(\lambda) - M) \text{ for the lag-1 expansion } \tilde M \text{ of } v_t = M v_{t-l} (by C15; identity of the lag-1 expansion)
+  S2 D = \mathrm{blockdiag}(D_{ll}) \Rightarrow \det(\Lambda(\lambda) - D) = \prod_l \det(\lambda^l I - D_{ll}) (by S1, D1; determinant of a block-diagonal matrix)
+  S3 \det(\lambda^l I - D_{ll}) = 0 \iff \lambda^l = \mu,\ \mu \in \mathrm{eig}(D_{ll}) \Rightarrow |\lambda| = |\mu|^{1/l} (by S2; eigenvalue equation)
+  S4 |\lambda| < 1 \iff |\mu| < 1 (by S3; monotonicity of $x \mapsto x^{1/l}$ on $[0, \infty)$)
+E8 [formal; foundation linear algebra over the complex numbers] Unobservable or unreachable modes of the expanded transition matrix are modes of the expanded discount matrix and give common roots of the two ARIMA-form polynomials.
+  S1 \tilde F u = \lambda u,\ \tilde w' u = 0 \Rightarrow \tilde D u = \tilde F u - \tilde g (\tilde w' u) = \lambda u (by D2; substitution of $\tilde D = \tilde F - \tilde g \tilde w'$)
+  S2 u' \tilde F = \lambda u',\ u' \tilde g = 0 \Rightarrow u' \tilde D = u' \tilde F - (u' \tilde g) \tilde w' = \lambda u' (by D2; substitution of $\tilde D = \tilde F - \tilde g \tilde w'$)
+  S3 \det(\lambda I - \tilde M) = \lambda^{\sum_j l_j} \det(I - M L(1/\lambda)),\ \lambda \neq 0 (by C15; identity of the lag-1 expansion)
+  S4 \phi(1/\lambda) = \det(I - F L(1/\lambda)) = 0,\ \theta(1/\lambda) = \det(I - D L(1/\lambda)) = 0 (by S1, S2, S3; substitution)
+E9 [formal; foundation algebra of real polynomials] Evaluation of the ARIMA-form polynomials of ETS(A,N,A) at $B = 1$.
+  S1 D = \begin{pmatrix} 1-\alpha & -\alpha \\ -\gamma & 1-\gamma \end{pmatrix},\ L(B) = \mathrm{diag}(B, B^m) (by D9, D1; definition)
+  S2 \theta(B) = \det(I - D L(B)) = (1 - (1-\alpha)B)(1 - (1-\gamma)B^m) - \alpha\gamma B^{m+1} (by S1; determinant of a $2 \times 2$ matrix)
+  S3 \theta(1) = \alpha\gamma - \alpha\gamma = 0 (by S2; evaluation at $B = 1$)
+  S4 \phi(B) = \det(I - L(B)) = (1 - B)(1 - B^m),\ \phi(1) = 0 (by D9, D1; determinant of a diagonal matrix)
+  S5 \det(I - \tilde D) = 1^{m+1} \theta(1) = 0 (by S3, C15; identity of the lag-1 expansion at $\lambda = 1$)
+E11 [formal; foundation linear algebra over the complex numbers] Schur-complement derivation of the characteristic polynomial of the lag-1 expansion.
+  S1 \lambda I - \tilde M = \begin{pmatrix} \lambda I_k - A & -B \\ -C & \lambda I - S \end{pmatrix} (by D2; partition of the states into the $k$ current values (heads) and the $\sum_j (l_j - 1)$ lagged copies (tails); $S$ shifts each tail chain, $C$ feeds each head into its first copy, $A$ and $B$ hold the entries of $M$ that act on heads with lag 1 and on last copies)
+  S2 \det(\lambda I - S) = \lambda^{\sum_j (l_j - 1)} (by S1; determinant of a lower-triangular matrix with diagonal $\lambda$)
+  S3 A + B (\lambda I - S)^{-1} C = M\, \mathrm{diag}(\lambda^{1 - l_1}, \dots, \lambda^{1 - l_k}),\ \lambda \neq 0 (by S1; $(\lambda I - S)^{-1} C$ maps head $j$ to its copies $\lambda^{-s}$, $s = 1, \dots, l_j - 1$, and $B$ reads copy $l_i - 1$ of component $i$)
+  S4 \det(\lambda I - \tilde M) = \lambda^{\sum_j (l_j - 1)} \det(\lambda I_k - M\, \mathrm{diag}(\lambda^{1 - l_j})) = \det(\Lambda(\lambda) - M),\ \lambda \neq 0 (by S2, S3; Schur complement, then factoring $\lambda\, \Lambda(\lambda)^{-1}$ out on the right)
+  S5 \det(\lambda I - \tilde M) = \det(\Lambda(\lambda) - M) \text{ for all } \lambda (by S4; two polynomials equal on $\lambda \neq 0$ are equal)
+  S6 \det(\lambda I - \tilde M) = \lambda^{\sum_j l_j} \det(I - M L(1/\lambda)),\ \lambda \neq 0 (by S5, D1; factoring $\Lambda(\lambda)$ out on the right: $\Lambda(\lambda) - M = (I - M \Lambda(\lambda)^{-1}) \Lambda(\lambda)$)
+E12 [simulation; runs 1] Exploratory run RN13 of timing.py --seed 3 --repeats 50: for the first admissible and the first inadmissible random GUM with lags (1, 24, 168) (normal F with standard deviation 0.3) and for the cancelled MA polynomial of ETS(A,N,A,A) with seasonal lags 24 and 168 (alpha = 0.3, gamma = (0.1, 0.05)), the number of recursion steps of the step-down test and the mean times over 50 repeats of the step-down test, of all roots by numpy's companion-matrix eigenvalues and of the coefficients by inverse discrete Fourier transform.
+  E12.R1 mean time of the step-down test, ms = 0.7429920399954426 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
+  E12.R2 mean time of all roots by numpy companion eigenvalues, ms = 23.75985405999927 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
+  E12.R3 recursion steps run by the step-down test = 193 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
+  E12.R4 mean time of the step-down test, ms = 0.8138564999990194 {model: random GUM, lags (1, 24, 168), inadmissible, degree: 193, repeats: 50}
+  E12.R5 mean time of all roots by numpy companion eigenvalues, ms = 20.8541055600017 {model: random GUM, lags (1, 24, 168), inadmissible, degree: 193, repeats: 50}
+  E12.R6 recursion steps run by the step-down test = 170 {model: random GUM, lags (1, 24, 168), inadmissible, degree: 193, repeats: 50}
+  E12.R7 mean time of the step-down test, ms = 0.4172366199964017 {model: ETS(A,N,A,A), lags 24 and 168, cancelled theta, degree: 168, repeats: 50}
+  E12.R8 mean time of all roots by numpy companion eigenvalues, ms = 17.457083500003137 {model: ETS(A,N,A,A), lags 24 and 168, cancelled theta, degree: 168, repeats: 50}
+  E12.R9 mean time of the coefficients of theta and phi by inverse DFT, ms = 6.57281667999996 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
+  parameters: A4
+  seeds: [3]
+E14 [formal; foundation linear systems theory over the complex numbers] The reduced form of the ARIMA polynomials through the Kalman decomposition of the expanded system.
+  S1 \exists T: T^{-1}\tilde F T \text{ block-triangular with a reachable and observable block } (F_{co}, g_{co}, w_{co}),\ \tilde w'(zI - \tilde F)^{-1}\tilde g = w_{co}'(zI - F_{co})^{-1} g_{co} (by D2; Kalman canonical decomposition)
+  S2 \tilde D = \tilde F - \tilde g \tilde w' \text{ keeps the reachable and the unobservable subspaces, so } D_{co} = F_{co} - g_{co} w_{co}' (by S1, D2; reachability is invariant under state feedback and observability under output injection)
+  S3 1 + w_{co}'(zI - F_{co})^{-1} g_{co} = \frac{\det(zI - D_{co})}{\det(zI - F_{co})},\ \gcd(\det(zI - D_{co}), \det(zI - F_{co})) = 1 (by S2; matrix determinant lemma; a single-input single-output realisation is minimal if and only if the numerator and denominator of its transfer function are coprime)
+  S4 1 + \tilde w'(zI - \tilde F)^{-1}\tilde g = \frac{\det(zI - \tilde D)}{\det(zI - \tilde F)} = \frac{\theta(1/z)}{\phi(1/z)} (by C15, D1; matrix determinant lemma and the identity of the lag-1 expansion)
+  S5 \frac{\theta(B)}{\gcd(\theta, \phi)}(B) = 0 \iff B = 1/\lambda,\ \lambda \in \mathrm{spec}(D_{co}) \setminus \{0\} \text{ (with multiplicity)} (by S3, S4; uniqueness of the reduced fraction, with z = 1/B: the eigenvalues at zero give no root, theta(0) = phi(0) = 1 makes theta / gcd the reduced numerator, and the reversal keeps coprimality away from B = 0)
+E15 [formal; foundation algebra of complex polynomials] Scaling the argument of a polynomial scales its roots.
+  S1 c(B_i) = 0 \iff c((r B_i) / r) = 0 (by none; substitution)
+  S2 |r B_i| > 1\ \forall i \iff 1/|B_i| < r\ \forall i (by S1; r > 0)
+  S3 c(B/r) / c(0) = 1 + \sum_i (c_i / c_0)\, r^{-i} B^i \text{ has the roots of } c(B/r) (by S1; c(0) \neq 0)
+  S4 \text{the step-down passes on } c(B/r) \iff |r B_i| > 1\ \forall i (by D7, S1, S3; the step-down test passes exactly when all roots lie outside the unit circle)
+E16 [formal; foundation linear algebra over the field of rational functions in $B$] Expansion of det(I - M L(B)) by multilinearity in the columns.
+  S1 \text{column } j \text{ of } I - M L(B) = e_j - B^{l_j} m_j (by D1; definition of $L(B)$)
+  S2 \det(I - M L(B)) = \sum_{S} \det\left[\, e_j\ (j \notin S),\ -B^{l_j} m_j\ (j \in S) \right] (by S1; multilinearity of the determinant in the columns)
+  S3 \det\left[\, e_j\ (j \notin S),\ -B^{l_j} m_j\ (j \in S) \right] = (-1)^{|S|} B^{\sum_{j \in S} l_j} \det(M_{SS}) (by S2; Laplace expansion along the unit columns, and pulling the scalars out of the other columns)
+E17 [formal; foundation linear algebra over the complex numbers] The per-lag discount matrices of Section 5.4 of the ADAM monograph against D.
+  S1 F_{m_i} = F_{\cdot S_i},\ g_{m_i} = g_{S_i},\ w_{m_i} = w_{S_i} \text{ (zero elsewhere), } S_i \text{ the components of lag } m_i (by D1; the split of Section 5.2 of the monograph)
+  S2 D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}' \text{ has non-zero columns only in } S_i (by S1; definition)
+  S3 D_{m_i} \sim \begin{pmatrix} D_{S_i S_i} & 0 \\ \ast & 0 \end{pmatrix} \Rightarrow \mathrm{spec}(D_{m_i}) \setminus \{0\} = \mathrm{spec}(D_{S_i S_i}) \setminus \{0\} (by S2; a symmetric permutation and the eigenvalues of a block-triangular matrix)
+  S4 \sum_i D_{m_i} = F - \sum_i g_{m_i} w_{m_i}' = D + \sum_{i \neq j} g_{m_i} w_{m_j}' (by S1; g w' = \sum_i \sum_j g_{m_i} w_{m_j}')
+  S5 (a, b) \text{ with lags } m_i \neq m_j: \left(\sum_{i \neq j} g_{m_i} w_{m_j}'\right)_{ab} = g_a w_b (by S4; a single term, so the sum differs from D exactly where g w' links components of different lags)
+E18 [simulation; runs 1] Exploratory run RN44 of book_check.py --periods 2400: for ETS(A,N,A) with m = 12 and (alpha, gamma) = (0.1, 0.1) and (1.2, 0.9), the largest nonzero eigenvalue modulus of the per-lag discount matrices of the monograph, the effect |w' v_{t-l}| of initial states set to one in the full recursion v_t = D v_{t-l} (y = 0) over 2400 periods and its growth per period over the second half, the growth of the weight of an observation (the same recursion from zero states with one unit observation), and the largest root modulus of the cancelled MA polynomial.
+  E18.R1 largest nonzero eigenvalue modulus of the book's per-lag discount matrices = 0.9 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
+  E18.R2 effect of the initial states on the fitted value at the last period = 1.1870393556989711e-11 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1, period: 2400}
+  E18.R3 growth of the effect of the initial states per period over the second half = 0.9895781239569994 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
+  E18.R4 growth of the weight of an observation per period over the second half = 0.9909168445987553 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
+  E18.R5 largest root modulus of the cancelled MA polynomial = 0.9911267448787717 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
+  E18.R6 largest nonzero eigenvalue modulus of the book's per-lag discount matrices = 0.19999999999999996 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
+  E18.R7 effect of the initial states on the fitted value at the last period = 5.968778912343606e+16 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9, period: 2400}
+  E18.R8 growth of the effect of the initial states per period over the second half = 1.0163934504137493 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
+  E18.R9 growth of the weight of an observation per period over the second half = 1.0163629094999396 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
+  E18.R10 largest root modulus of the cancelled MA polynomial = 1.0164568117563233 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
+  parameters: A6
+E19 [simulation; runs 1] Exploratory run RN40 of bench_eigens.R: the package installed at -O2 from a worktree at commit b963693 (the polynomial check with the step-down multiplying by 1 / (1 - k^2), the algorithm kept in the final code), each fit run seven times with smoothEigens() switched in the namespace between the per-lag and the polynomial check; the median time of a fit and its calls of smoothEigens(). The optimisation paths differ between the two checks, whose admissible regions differ.
+  E19.T1 Median time of a fit with bounds="admissible" over seven runs and its calls of smoothEigens(), per-lag against polynomial check {build: R 4.3.3, -O2, repeats: 7}
+  | row | fit | per-lag, seconds | per-lag, calls | polynomial, seconds | polynomial, calls | polynomial, inadmissible calls | ratio of the times, polynomial / per-lag |
+  | r1 | gum(AirPassengers, orders=c(1,1), lags=c(1,12)) | 0.0969999999999942 | 484 | 0.0799999999999983 | 484 | 40 | 0.8247 |
+  | r2 | gum(AirPassengers, orders=c(2,1), lags=c(1,12)) | 0.162999999999997 | 964 | 0.194999999999993 | 964 | 43 | 1.1963 |
+  | r3 | adam(AirPassengers, "AAdA") | 0.0520000000000067 | 162 | 0.0459999999999923 | 162 | 60 | 0.8846 |
+  | r4 | adam(hourly, "ANA", lags=c(24,168)) | 0.143999999999991 | 122 | 0.155999999999992 | 122 | 52 | 1.0833 |
+  | r5 | ces(AirPassengers, "full") | 0.0599999999999881 | 324 | 0.0559999999999974 | 310 | 68 | 0.9333 |
+  parameters: A7
+  seeds: [41]
+E20 [simulation; design other] Planned tests (lab plans PL7 and PL8, runs RN49 and RN50, the same command): ets_arima.py --seed 2 --n 500 --adam 20 generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 2, new against the exploratory runs RN46-RN48, seed 1), built each in ADAM's form, compared the matrices of 20 of them with adam() (0 lags differed, matrices within 4.4e-15), and decided admissibility by the check of the parts apart, the check of the whole model and the PBH reference.
+  E20.R1 models whose admissibility decision differs from the PBH reference = 166 {family: ETS+ARIMA, models: 500, check: split}
+  E20.R2 models accepted by the check and rejected by the PBH reference = 104 {family: ETS+ARIMA, models: 500, check: split}
+  E20.R3 models rejected by the check and accepted by the PBH reference = 62 {family: ETS+ARIMA, models: 500, check: split}
+  E20.R4 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E20.R5 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E20.R6 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E20.R7 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 4.3076653355456074e-13 {family: ETS+ARIMA, inadmissible: 341}
+  E20.R8 models found admissible by the PBH reference = 159 {family: ETS+ARIMA, models: 500}
+  E20.R9 models whose admissibility decision differs from the PBH reference = 159 {family: ETS+SARIMA, models: 500, check: split}
+  E20.R10 models accepted by the check and rejected by the PBH reference = 128 {family: ETS+SARIMA, models: 500, check: split}
+  E20.R11 models rejected by the check and accepted by the PBH reference = 31 {family: ETS+SARIMA, models: 500, check: split}
+  E20.R12 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E20.R13 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E20.R14 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E20.R15 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 1.6268764113647194e-11 {family: ETS+SARIMA, inadmissible: 413}
+  E20.R16 models found admissible by the PBH reference = 87 {family: ETS+SARIMA, models: 500}
+  E20.R17 max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials = 2.8171909249863347e-15 {models: 1000}
+  E20.R18 models whose component lags differ from those of adam() = 0 {models: 20}
+  E20.R19 max abs difference between the matrices built here and those of adam() = 4.440892098500626e-15 {models: 20}
+E21 [simulation; design other] Planned tests (lab plans PL7 and PL8, runs RN49 and RN50, the same command): ets_arima.py --seed 2 --n 500 --adam 20 generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 2, new against the exploratory runs RN46-RN48, seed 1), built each in ADAM's form, compared the matrices of 20 of them with adam() (0 lags differed, matrices within 4.4e-15), and decided admissibility by the check of the parts apart, the check of the whole model and the PBH reference.
+  E21.R1 models whose admissibility decision differs from the PBH reference = 166 {family: ETS+ARIMA, models: 500, check: split}
+  E21.R2 models accepted by the check and rejected by the PBH reference = 104 {family: ETS+ARIMA, models: 500, check: split}
+  E21.R3 models rejected by the check and accepted by the PBH reference = 62 {family: ETS+ARIMA, models: 500, check: split}
+  E21.R4 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E21.R5 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E21.R6 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E21.R7 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 4.3076653355456074e-13 {family: ETS+ARIMA, inadmissible: 341}
+  E21.R8 models found admissible by the PBH reference = 159 {family: ETS+ARIMA, models: 500}
+  E21.R9 models whose admissibility decision differs from the PBH reference = 159 {family: ETS+SARIMA, models: 500, check: split}
+  E21.R10 models accepted by the check and rejected by the PBH reference = 128 {family: ETS+SARIMA, models: 500, check: split}
+  E21.R11 models rejected by the check and accepted by the PBH reference = 31 {family: ETS+SARIMA, models: 500, check: split}
+  E21.R12 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E21.R13 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E21.R14 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E21.R15 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 1.6268764113647194e-11 {family: ETS+SARIMA, inadmissible: 413}
+  E21.R16 models found admissible by the PBH reference = 87 {family: ETS+SARIMA, models: 500}
+  E21.R17 max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials = 2.8171909249863347e-15 {models: 1000}
+  E21.R18 models whose component lags differ from those of adam() = 0 {models: 20}
+  E21.R19 max abs difference between the matrices built here and those of adam() = 4.440892098500626e-15 {models: 20}
+E22 [simulation; design other] Planned test (lab plan PL9, run RN53): ets_arima.py --seed 3 --n 500 --impl generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 3) and passed the matrices of each to adam_bounds_checker() of R (through pkgload::load_all of the repository) and of Python, with the AR reflection of its factors, comparing the penalty (zero, or 1e100 times the largest root modulus) with the prototype check of the whole model.
+  E22.R1 models whose admissibility decision differs from the PBH reference = 171 {family: ETS+ARIMA, models: 500, check: split}
+  E22.R2 models accepted by the check and rejected by the PBH reference = 115 {family: ETS+ARIMA, models: 500, check: split}
+  E22.R3 models rejected by the check and accepted by the PBH reference = 56 {family: ETS+ARIMA, models: 500, check: split}
+  E22.R4 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E22.R5 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E22.R6 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
+  E22.R7 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 1.3655743202889425e-13 {family: ETS+ARIMA, inadmissible: 341}
+  E22.R8 models found admissible by the PBH reference = 159 {family: ETS+ARIMA, models: 500}
+  E22.R9 models whose admissibility decision differs from the PBH reference = 150 {family: ETS+SARIMA, models: 500, check: split}
+  E22.R10 models accepted by the check and rejected by the PBH reference = 129 {family: ETS+SARIMA, models: 500, check: split}
+  E22.R11 models rejected by the check and accepted by the PBH reference = 21 {family: ETS+SARIMA, models: 500, check: split}
+  E22.R12 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E22.R13 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E22.R14 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
+  E22.R15 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 6.726019741165601e-11 {family: ETS+SARIMA, inadmissible: 424}
+  E22.R16 models found admissible by the PBH reference = 76 {family: ETS+SARIMA, models: 500}
+  E22.R17 max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials = 2.6922908347160046e-15 {models: 1000}
+  E22.R18 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+ARIMA, models: 500, language: R}
+  E22.R19 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.53674319736919e-07 {family: ETS+ARIMA, models: 500, language: R, inadmissible: 341}
+  E22.R20 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+ARIMA, models: 500, language: Python}
+  E22.R21 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.536743161842054e-07 {family: ETS+ARIMA, models: 500, language: Python, inadmissible: 341}
+  E22.R22 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+SARIMA, models: 500, language: R}
+  E22.R23 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.484902201428724e-07 {family: ETS+SARIMA, models: 500, language: R, inadmissible: 424}
+  E22.R24 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+SARIMA, models: 500, language: Python}
+  E22.R25 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.484902243617199e-07 {family: ETS+SARIMA, models: 500, language: Python, inadmissible: 424}
+E23 [simulation; runs 2] Exploratory runs of timing_ets_arima.R: the package installed at -O2 from two worktrees, the check of the parts apart (commit 397f255f) and of the whole model, each fit run five times. RN55 (commit af998d26) ran the check of the whole model on every call: pure ARIMA fits took 1.5 and 1.8 times as long. RN56 (commit b4a10cc6) adds the shortcut that, without ETS and adaptive regressors, accepts invertible MA factors without the check of the whole model; its times and log-likelihoods are in the table.
+  E23.T1 Median time of a fit over five runs and its log-likelihood, check of the parts apart against the whole model (RN56) {build: R 4.3.3, -O2, repeats: 5}
+  | row | fit | parts apart, seconds | whole model, seconds | parts apart, log-likelihood | whole model, log-likelihood |
+  | r1 | ARIMA(1,1,1)(1,1,1)[12] | 0.0700000000000001 | 0.0740000000000001 | -541.844444789273 | -541.382357389734 |
+  | r2 | ETS(A,N,A)+ARIMA(1,0,1) | 0.0669999999999997 | 0.0640000000000001 | -569.649169125733 | -572.214179521351 |
+  | r3 | ETS(A,Ad,N)+ARIMA(0,1,2) | 0.0779999999999998 | 0.0780000000000003 | -255.264423392167 | -255.264424161103 |
+  | r4 | ssarima (1,1,1)(1,1,1)[12] | 0.0799999999999996 | 0.0829999999999997 | -556.990376211077 | -556.990376211077 |
+  parameters: A11
+E24 [simulation; runs 7] Exploratory runs of the checker P4 (exact_oracle.py, seeds 21-23 and 31-34, 250 models each): admissibility by an exact oracle (rational determinants and the exact greatest common divisor of theta and phi, which cancels any shared factor) against the cancellation of cyclotomic factors ('author'), the PBH reference ('pbh') and the package ('pkg'); the number of models whose decision differs from the oracle.
+  E24.R1 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 21, check: author}
+  E24.R2 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 21, check: pbh}
+  E24.R3 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 21, check: pkg}
+  E24.R4 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 22, check: author}
+  E24.R5 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 22, check: pbh}
+  E24.R6 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 22, check: pkg}
+  E24.R7 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 23, check: author}
+  E24.R8 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 23, check: pbh}
+  E24.R9 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 23, check: pkg}
+  E24.R10 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 31, check: author}
+  E24.R11 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 31, check: pbh}
+  E24.R12 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 31, check: pkg}
+  E24.R13 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 32, check: author}
+  E24.R14 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 32, check: pbh}
+  E24.R15 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 32, check: pkg}
+  E24.R16 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 33, check: author}
+  E24.R17 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 33, check: pbh}
+  E24.R18 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 33, check: pkg}
+  E24.R19 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 34, check: author}
+  E24.R20 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 34, check: pbh}
+  E24.R21 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 34, check: pkg}
+  parameters: A15
+
+LIMITATIONS
+L1 [analytic_flexibility; affects C1; reduces_transferability; mitigation partial] The 3042 ETS(A,N,A) models of the planned test of the per-lag check form the same fixed grid as exploratory run RN3, whose result prompted the hypothesis; only the 200 GUM models of that test were new data.
+L2 [measurement; affects C1, C2, C3, C10, C11, C16; could_reverse; mitigation none] The PBH reference and the cyclotomic cancellation were written by the same agent and share the lag-1 expansion code and numpy's LAPACK eigenvalue routines; no independent implementation was compared.
+L3 [sampling; affects C2, C3, C4, C5, C16; reduces_transferability; mitigation none] The random model sets (persistence ranges, the probabilities of zero persistence and of a constant, the standard deviations of the GUM matrices) were chosen by the agent and not drawn from models estimated on data.
+L4 [measurement; affects C4, C5, C16; could_reverse; mitigation none] The reference decisions use numpy's polynomial roots (companion-matrix eigenvalues) for polynomials of degree up to 535 before cancellation with many roots near the unit circle, whose accuracy there was not checked by a second method.
+L5 [other; affects C4, C5; reduces_transferability; mitigation none] The plans of the tests behind the step-down and bisection claims stated MA polynomial degrees up to 366; the generator code named in the plans, run unchanged, produced degrees up to 535 before cancellation.
+L6 [other; affects C22; reduces_transferability; mitigation partial] The recursion of the counterexample to the monograph's condition was run for one parameter pair, with the initial states set to one and no data.
+L7 [computational; affects C23; reduces_precision; mitigation none] The fit timings come from one machine, seven repeats per fit, with a run-to-run variation of about 10% between benchmark runs of the same code.
+L8 [model_specification; affects C4, C16; reduces_transferability; mitigation none] For GUM models with structured parameters, such as a state with |F_ii| > 1 and zero persistence, theta and phi can share a factor with a root in |B| <= 1 that is not cyclotomic; the check keeps it and rejects the model although its observation weights decay, because the initial state of that mode has a growing effect.
+L9 [measurement; affects C27; reduces_precision; mitigation none] Estimates with bounds="admissible" change for ETS+ARIMA models, whose admissible region changes, and the likelihood of such models can have several local optima: on ETS(A,N,A)+ARIMA(1,0,1) on AirPassengers the fit with the check of the whole model reached a lower log-likelihood than the fit with the check of the parts apart.
+L10 [computational; affects C16, C26; could_bias_magnitude; mitigation addressed] Two defects found while testing were fixed before the planned runs: adam() with provided MA parameters added the MA coefficient of a lag without AR or differences twice to the persistence vector (and reapply() did so with the drawn ones, in R and Python), found by the structure check of the exploratory runs RN46 and RN47; and the Python build of smooth crashed at exit after checking a model whose MA polynomial has degree 16 or more (runs RN51 and RN52), because the caches of the check were freed through numpy after it had shut down. The second affected the implementation tested by C16 in Python, not its results. After the fixes the matrices built by the study matched those of adam() within 4.4e-15 (E21), and the planned run of the checkers (E22) exited normally.
+L11 [computational; affects C16, C26; reduces_transferability; mitigation addressed] For an MA root exactly on the unit circle that does not cancel, the decision of the check is set by rounding: the checker P4 found three models of a wider generator, with values of the check between 0.99999999999 and 1, that the package accepted and the prototype rejected. Since this finding the bounds checkers admit a model only when the value is at most 1 - 1e-10 (decision DC8 of the lab record), which rejects these three; the planned tests ran before the margin, and their random models have no such root.
+L12 [measurement; affects C24, C25; reduces_transferability; mitigation none] The PBH reference is not exact for a repeated unit root: the checker P4 found a model whose cancelled MA polynomial keeps a double root at -1, which the reference accepted and the cancellation and an exact gcd rejected. The random models of the planned tests have no such root.
+
+ARTEFACTS
+A1 [code] numpy prototype of the admissibility check of pure additive lagged SSOE models: lag-1 expansion, the per-lag check of smoothEigens(), the PBH reference, ARIMA-form polynomials by inverse DFT, cyclotomic cancellation, step-down test and bisection; ETS and GUM model builders
+A2 [code] exploratory script: ETS(A,N,A) cases, multiple seasonality and the GUM starting point, determinant identity, step-down and bisection on random GUMs, timings
+A3 [code] test script: per-lag check against the PBH reference, cancellation against the PBH reference, step-down decisions and bisection against roots, on seeded random model sets
+A4 [code] timing script: recursion steps and mean times of the step-down test, of all roots by numpy companion eigenvalues and of the DFT coefficients, for random GUMs with lags (1, 24, 168) and ETS(A,N,A,A) with seasonal lags 24 and 168
+A5 [code] test script of the C++ implementation: smoothEigensR() through pkgload::load_all, called three times per model, against the numpy prototype on seeded random ETS and GUM models
+A6 [code] check of the per-lag condition of the ADAM monograph (eqs 5.20-5.22) against the full discount recursion of ETS(A,N,A): the effect of the initial states and the weights of the observations
+A7 [code] benchmark of the per-lag check against the polynomial check: time per call on fixed models and per fit with bounds=admissible, with smoothEigens() switched in the namespace
+A8 [code] the C++ implementation in smooth: lagPolynomial(), minorPolynomial(), complexDeterminant(), fftCore(), cyclotomicPolynomial(), polynomialDivide(), cancelUnitRoots(), largestRootModulus() and smoothEigensCpp()
+A9 [lab_record] Lab record of the study: questions, hypotheses, plans, runs, results, checks and decisions, as an append-only, hash-chained event log (Claimset lab record specification v0.6), anchored on the git branch claimset-lab-eigenChecker of openforecast-org/smooth; moved from .claude/lab to claimset/adam-admissible-bounds/lab by its relocation event MV1.
+A10 [code] test script of Q2: random ETS+ARIMA models, the check of the parts apart and of the whole model against the PBH reference, the structure against adam(), and the bounds checkers of the package in R and Python against the prototype
+A11 [code] fit times and log-likelihoods of ARIMA and ETS+ARIMA models with bounds="admissible", the package installed from two commits
+A12 [code] the bounds checker of adam(), om() and omg() in R (adam_bounds_checker())
+A13 [code] the bounds checker of ADAM, OM and OMG in Python (adam_bounds_checker())
+A15 [code] the exact oracle of the checker P4 (with lib.py in the same folder): rational determinants and the exact gcd of theta and phi against the cancellation, the PBH reference and the package
+A16 [code] the checker P4's exact check of the ARIMA form of ADAM's ARIMA part and of the worked example, on matrices of adam()
+A17 [code] the checker P4's test of the shortcut for pure ARIMA in R's adam_bounds_checker()
+A14 [code] the C++ check shared by R and Python (smoothEigensCpp()), at the version tested by C26
+
+REFERENCES
+B1 10.1007/978-3-540-71918-2 (doi)
+B2 10.1016/0047-259X(73)90030-4 (doi)
+B3 10.32614/CRAN.package.smooth (doi)
+B4 10.1201/9781003452652 (doi)

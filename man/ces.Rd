@@ -87,8 +87,9 @@ are available: \code{MAEh}, \code{TMAE}, \code{GTMAE}, \code{MACE}, \code{TMAE},
 the end of the data.}
 
 \item{bounds}{The type of bounds for the persistence to use in the model
-estimation. Can be either \code{admissible} - guaranteeing the stability of the
-model, or \code{none} - no restrictions (potentially dangerous).}
+estimation. Can be either \code{admissible} - guaranteeing that the model is
+forecastable (see \link[smooth]{adam}), or \code{none} - no restrictions (potentially
+dangerous).}
 
 \item{silent}{accepts \code{TRUE} and \code{FALSE}. If FALSE, the function
 will print its progress and produce a plot at the end.}

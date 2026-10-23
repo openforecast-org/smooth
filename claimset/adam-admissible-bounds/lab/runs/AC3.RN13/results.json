@@ -1,0 +1,79 @@
+[
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(1) theta=1",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(1) theta=-1",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(2) 1 - B + B^2",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(2) 1 + B^2",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(2) 1 + B + B^2",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: AR(1) 0.5, MA(2) 1 - B + B^2",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(1), MA(2) 1 - B + B^2",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(1), MA(2) 0.6 factor times 1 - B + B^2, with 5 lags",
+  "value": 0.6000000000000001,
+  "conditions": {
+   "admissible": true
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: ETS(A,N,N)+I(1), MA(2) 1 - B + B^2",
+  "value": 1.0000009536743164,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(2) with MA(2) 1 + 2B + B^2 (double unit root, cancels twice)",
+  "value": 1.0000019073486328,
+  "conditions": {
+   "admissible": false
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(1) with MA(2) 1 + 2B + B^2 (double root at -1, one factor of Phi_2 left, no cancel with lag 1)",
+  "value": 1.0000019073486328,
+  "conditions": {
+   "admissible": false
+  }
+ }
+]

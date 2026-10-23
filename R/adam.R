@@ -195,9 +195,16 @@
 #' @param ic The information criterion to use in the model selection / combination
 #' procedure.
 #' @param bounds The type of bounds for the persistence to use in the model
-#' estimation. Can be either \code{admissible} - guaranteeing the stability of the
-#' model, \code{usual} - restricting the values with (0, 1) or \code{none} - no
-#' restrictions (potentially dangerous).
+#' estimation. Can be either \code{admissible} - guaranteeing that the model is
+#' forecastable, \code{usual} - restricting the values with (0, 1) or \code{none} - no
+#' restrictions (potentially dangerous). A model is forecastable when the weights of the past
+#' observations in its forecasts decay and the effect of its initial states converges: the MA
+#' polynomial of the ARIMA form of the whole model (ETS, ARIMA and regressors together) has
+#' its roots outside the unit circle once the unit roots it shares with the AR polynomial are
+#' removed. So smoothing parameters equal to zero, a constant and an MA root on the unit
+#' circle that cancels with a difference (an over-differenced ARIMA) are allowed. The AR
+#' polynomial of ARIMA is also required to be stationary. Forecastability is weaker than
+#' stability, which would require the effect of every state to decay.
 #' @param smoother The smoother used by the \link[smooth]{msdecompose} function to
 #' obtain the initial states - the level and the trend, together with the initial
 #' seasonal indices (and the seasonal profiles in the case of multiple seasonal
@@ -4448,7 +4455,7 @@ eigenValues <- function(object, persistence=NULL){
         persistence <- object$persistence;
     }
     return(any(smoothEigens(matrix(persistence), object$transition, object$measurement,
-                            modelLags(object), ncol(object$data)>1, nobs(object))>1+1E-10));
+                            modelLags(object), ncol(object$data)>1, nobs(object))>1-1E-10));
 }
 
 # The function that returns the bounds for persistence parameters, based on eigen values

@@ -15,7 +15,10 @@ the two implementations produce different replicate *sequences*. What
 To remove one source of divergence we generate ``y`` on the R side and
 feed the *exact same* numbers into the Python fit. The remaining
 divergence is the bootstrap RNG mismatch, which is what the tolerances
-above absorb.
+above absorb. For ARIMA, whose AR estimate near the unit root has a heavy tail
+(a window of five observations moves the variance by a factor of three), the
+R side refits Python's own windows as ``coefbootstrap()`` refits its windows, so
+the two bootstrap the same samples and their variances must agree closely.
 
 Marked ``r_parity``; opt in with ``pytest -m r_parity``. Slow:
 ``nsim=200`` × 5 scenarios × R subprocess + Python fit ≈ 2-3 minutes.
@@ -31,6 +34,7 @@ import numpy as np
 import pytest
 
 from smooth import ADAM, OM, OMG
+from smooth.adam_general.core.utils.bootstrap import time_series_sample_indices
 
 from ._r_bridge import r_dict
 
@@ -96,6 +100,30 @@ def _scenarios() -> List[_Scenario]:
             "coef=as.numeric(coef(m)), names=names(coef(m)), "
             "boot=as.numeric(t(b$coefficients)), boot_dim=dim(b$coefficients), "
             "vcov=as.numeric(b$vcov))"
+            "}"
+        )
+
+    def _adam_block_windows(fit_args: str, sim_code: str, obs_minimum: int) -> str:
+        # Python's windows (seed 101, the origin changing with backcasting), refitted
+        # in R as coefbootstrap.adam() refits its own: from the estimates, unbounded
+        windows = time_series_sample_indices(
+            200, NSIM, obs_minimum, True, np.random.default_rng(101)
+        )
+        starts = ",".join(str(int(w[0])) for w in windows)
+        lengths = ",".join(str(len(w)) for w in windows)
+        return (
+            "{"
+            f"{sim_code}; "
+            f"m <- adam(y, {fit_args}); "
+            f"starts <- c({starts}); lengths <- c({lengths}); "
+            "boot <- t(sapply(seq_along(starts), function(i) "
+            f"coef(adam(y[starts[i] + 1:lengths[i]], {fit_args}, B=m$B, "
+            "lb=rep(-Inf, length(m$B)), ub=rep(Inf, length(m$B)))))); "
+            "deviations <- boot - matrix(coef(m), nrow(boot), ncol(boot), byrow=TRUE); "
+            "list(y=as.numeric(y), "
+            "coef=as.numeric(coef(m)), names=names(coef(m)), "
+            "boot=as.numeric(t(boot)), boot_dim=dim(boot), "
+            "vcov=as.numeric(crossprod(deviations) / nrow(boot)))"
             "}"
         )
 
@@ -168,13 +196,16 @@ def _scenarios() -> List[_Scenario]:
         ),
         _Scenario(
             name="arima",
-            r_expr=_adam_block(
-                "ARIMA(1,0,1)",
+            r_expr=_adam_block_windows(
                 "model='NNN', orders=list(ar=1, i=0, ma=1)",
                 "set.seed(13); y <- as.numeric(arima.sim(list(ar=0.4, ma=0.3), "
                 "n=200)) + 20",
+                # max(lags, number of parameters) + 2, as coefbootstrap()
+                4,
             ),
             py_fit=_fit_adam_arima(),
+            # The same windows on both sides
+            var_factor=1.1,
         ),
         _Scenario(
             name="om",

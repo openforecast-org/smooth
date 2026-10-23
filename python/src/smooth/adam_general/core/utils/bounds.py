@@ -25,7 +25,7 @@ def eigen_values(
     """Whether the discount matrix has an eigenvalue outside the unit circle.
 
     Mirrors R's ``eigenValues`` (``R/adam.R:4332``):
-    ``any(smoothEigens(...) > 1 + 1e-10)``.
+    ``any(smoothEigens(...) > 1 - 1e-10)``.
     """
     eigenvalues = smooth_eigens(
         persistence=np.asfortranarray(
@@ -40,7 +40,7 @@ def eigen_values(
         xreg_number=int(xreg_number),
         constant_required=bool(constant_required),
     )
-    return bool(np.any(np.asarray(eigenvalues) > 1 + 1e-10))
+    return bool(np.any(np.asarray(eigenvalues) > 1 - 1e-10))
 
 
 def eigen_bounds(vec_g, variable_index, **static_args):

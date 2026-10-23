@@ -55,8 +55,9 @@
 #' @param measurement Measurement vector \eqn{w}. If \code{NULL}, then
 #' estimated.
 #' @param bounds The type of bounds for the parameters to use in the model
-#' estimation. Can be either \code{admissible} - guaranteeing the stability of the
-#' model, \code{"usual"} restrict all the parameters with the (0, 1) region,
+#' estimation. Can be either \code{admissible} - guaranteeing that the model is
+#' forecastable (see \link[smooth]{adam}), \code{"usual"} restrict all the parameters with the
+#' (0, 1) region,
 #' or \code{none} - no restrictions (potentially dangerous).
 #' @param model A previously estimated GUM model, if provided, the function
 #' will not estimate anything and will use all its parameters.
@@ -346,7 +347,7 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
             # Stability / invertibility condition
             eigenValues <- smoothEigens(elements$vecG, elements$matF, elements$matWt,
                                         lagsModelAll, xregModel, obsInSample);
-            if(any(eigenValues>1+1E-50)){
+            if(any(eigenValues>1-1E-10)){
                 return(1E+100*max(eigenValues));
             }
         }

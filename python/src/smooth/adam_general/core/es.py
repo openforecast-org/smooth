@@ -95,7 +95,7 @@ class ES(ADAM):
     bounds : Literal["usual", "admissible", "none"], default="usual"
         Parameter bounds type:
         - "usual": Standard smoothing parameter constraints
-        - "admissible": Stability constraints
+        - "admissible": Forecastability (see ``ADAM``)
         - "none": No constraints
 
     verbose : int, default=0

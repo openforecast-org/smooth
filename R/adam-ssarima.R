@@ -78,7 +78,10 @@
 #' will not estimate anything and will use all its parameters.
 #' @param bounds What type of bounds to use in the model estimation. The first
 #' letter can be used instead of the whole word. In case of \code{ssarima()}, the
-#' "usual" means restricting AR and MA parameters to lie between -1 and 1.
+#' "usual" means restricting AR and MA parameters to lie between -1 and 1. The
+#' \code{"admissible"} guarantee that the model is forecastable, as in \link[smooth]{adam}:
+#' the AR polynomial is stationary and the MA polynomial of the whole model invertible, an
+#' MA root on the unit circle that cancels with a difference being allowed.
 #' @param ...  Other non-documented parameters. See \link[smooth]{adam} for
 #' details.
 #'
@@ -340,11 +343,12 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         elements <- filler(B, matVt, matF, vecG, matWt, arRequired=arRequired, maRequired=maRequired,
                            arEstimate=arEstimate, maEstimate=maEstimate);
 
-        # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)
+        # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h). With
+        # the admissible bounds a stationary AR leaves the MA to the check of the whole model
         if(bounds!="none" && arimaModel){
-            arimaReflection <- max(arEstimate*elements$arimaPolynomials$arReflection,
-                                   maEstimate*elements$arimaPolynomials$maReflection);
-            if(arimaReflection>=1){
+            arReflection <- arEstimate*elements$arimaPolynomials$arReflection;
+            arimaReflection <- max(arReflection, maEstimate*elements$arimaPolynomials$maReflection);
+            if(arimaReflection>=1 && (bounds=="usual" || arReflection>=1)){
                 return(1E+100*arimaReflection);
             }
         }
@@ -361,48 +365,54 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         }
         #### The admissible bounds ####
         else if(bounds=="admissible"){
-            if(xregModel){
-                # Stability / invertibility condition
+            # The whole model: its MA polynomial couples the ARIMA with the regressors. Without
+            # adaptive regressors it is the MA of ARIMA times factors shared with the AR
+            # polynomial, so estimated MA factors that are invertible are enough, and the
+            # penalty stays that of the MA factors. A root within 1e-10 of the unit circle is
+            # not admissible
+            pureARIMA <- arimaModel && !(xregModel && regressors=="adapt");
+            if(!pureARIMA || maEstimate*elements$arimaPolynomials$maReflection>=1){
                 eigenValues <- smoothEigens(elements$vecG, elements$matF, matWt,
                                             lagsModelAll, xregModel, obsInSample);
-                if(any(eigenValues>1+1E-50)){
-                    return(1E+100*max(eigenValues));
+                if(any(eigenValues>1-1E-10)){
+                    return(1E+100*(if(pureARIMA) elements$arimaPolynomials$maReflection
+                                   else max(eigenValues)));
                 }
-
-                # # Stability/Invertibility condition of ARIMA
-                # if(xregModel){
-                #     if(regressors=="adapt"){
-                #         # We check the condition on average
-                #         eigenValues <- abs(eigen((elements$matF -
-                #                                       diag(as.vector(elements$vecG)) %*%
-                #                                       t(measurementInverter(elements$matWt[1:obsInSample,,drop=FALSE])) %*%
-                #                                       elements$matWt[1:obsInSample,,drop=FALSE] / obsInSample),
-                #                                  symmetric=FALSE, only.values=TRUE)$values);
-                #     }
-                #     else{
-                #         # We drop the X parts from matrices
-                #         indices <- c(1:(componentsNumberARIMA))
-                #         eigenValues <- abs(eigen(elements$matF[indices,indices,drop=FALSE] -
-                #                                      elements$vecG[indices,,drop=FALSE] %*%
-                #                                      elements$matWt[obsInSample,indices,drop=FALSE],
-                #                                  symmetric=FALSE, only.values=TRUE)$values);
-                #     }
-                # }
-                # else{
-                #     if(arimaModel && maEstimate && (sum(elements$arimaPolynomials$maPolynomial[-1])>=1 |
-                #                                                  sum(elements$arimaPolynomials$maPolynomial[-1])<0)){
-                #         eigenValues <- abs(eigen(elements$matF -
-                #                                      elements$vecG %*% elements$matWt[obsInSample,,drop=FALSE],
-                #                                  symmetric=FALSE, only.values=TRUE)$values);
-                #     }
-                #     else{
-                #         eigenValues <- 0;
-                #     }
-                # }
-                # if(any(eigenValues>1+1E-50)){
-                #     return(1E+100*max(eigenValues));
-                # }
             }
+
+            # # Stability/Invertibility condition of ARIMA
+            # if(xregModel){
+            #     if(regressors=="adapt"){
+            #         # We check the condition on average
+            #         eigenValues <- abs(eigen((elements$matF -
+            #                                       diag(as.vector(elements$vecG)) %*%
+            #                                       t(measurementInverter(elements$matWt[1:obsInSample,,drop=FALSE])) %*%
+            #                                       elements$matWt[1:obsInSample,,drop=FALSE] / obsInSample),
+            #                                  symmetric=FALSE, only.values=TRUE)$values);
+            #     }
+            #     else{
+            #         # We drop the X parts from matrices
+            #         indices <- c(1:(componentsNumberARIMA))
+            #         eigenValues <- abs(eigen(elements$matF[indices,indices,drop=FALSE] -
+            #                                      elements$vecG[indices,,drop=FALSE] %*%
+            #                                      elements$matWt[obsInSample,indices,drop=FALSE],
+            #                                  symmetric=FALSE, only.values=TRUE)$values);
+            #     }
+            # }
+            # else{
+            #     if(arimaModel && maEstimate && (sum(elements$arimaPolynomials$maPolynomial[-1])>=1 |
+            #                                                  sum(elements$arimaPolynomials$maPolynomial[-1])<0)){
+            #         eigenValues <- abs(eigen(elements$matF -
+            #                                      elements$vecG %*% elements$matWt[obsInSample,,drop=FALSE],
+            #                                  symmetric=FALSE, only.values=TRUE)$values);
+            #     }
+            #     else{
+            #         eigenValues <- 0;
+            #     }
+            # }
+            # if(any(eigenValues>1+1E-50)){
+            #     return(1E+100*max(eigenValues));
+            # }
         }
 
         # Write down the initials in the recent profile

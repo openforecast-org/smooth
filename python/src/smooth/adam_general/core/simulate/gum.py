@@ -235,7 +235,7 @@ def sim_gum(
                     xreg_number=0,
                     constant_required=False,
                 )
-                if np.all(np.abs(np.asarray(eig)) <= 1.0):
+                if np.all(np.abs(np.asarray(eig)) <= 1 - 1e-10):
                     break
             else:
                 raise RuntimeError(

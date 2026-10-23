@@ -287,7 +287,7 @@ testModel <- adam(AirPassengers, "NNN", silent=FALSE, lags=c(1,12),
 testModel
 ```
 
-If you work with ADAM ARIMA model, then there is no such thing as "usual" bounds for the parameters, so the function will use the `bounds="admissible"`, checking the AR / MA polynomials in order to make sure that the model is stationary and invertible (aka stable).
+If you work with ADAM ARIMA model, then there is no such thing as "usual" bounds for the parameters, so the function will use the `bounds="admissible"`, checking that the AR polynomial is stationary and that the MA polynomial of the whole model is invertible, so that the model is forecastable: the weights of the past observations in its forecasts decay. An MA root on the unit circle that cancels with a difference (an over-differenced ARIMA) is allowed, as it gives a constant level plus noise. The same check applies to ETS+ARIMA, on the whole model, as its ETS and ARIMA parts interact.
 
 Similarly to ETS, you can use different distributions and losses for the estimation. **Note that the order selection for ARIMA is done in `auto.adam()` function, not in the `adam()`!** However, if you do `orders=list(..., select=TRUE)` in `adam()`, it will call `auto.adam()` and do the selection.
 

@@ -931,7 +931,8 @@ adam_filler <- function(B,
                  componentsNumberETS+1:(componentsNumberARIMA+constantRequired)] <-
                 -arimaPolynomials$ariPolynomial[nonZeroARI[,1]]
         }
-        # Fill in the persistence vector
+        # Fill in the persistence vector, from zero: the creator has filled the provided MA
+        vecG[componentsNumberETS+1:componentsNumberARIMA] <- 0
         if(nrow(nonZeroARI)>0){
             vecG[componentsNumberETS+nonZeroARI[,2]] <-
                 -arimaPolynomials$ariPolynomial[nonZeroARI[,1]]
@@ -2090,11 +2091,12 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
                                 xregModel, regressors, xregNumber, componentsNumberARIMA,
                                 lagsModelAll, obsInSample,
                                 phiEstimate){
-    # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h)
+    # Stationary AR and invertible MA, factor by factor (src/headers/arimaBounds.h). With the
+    # admissible bounds a stationary AR leaves the MA to the check of the whole model below
     if(bounds!="none" && arimaModel){
-        arimaReflection <- max(arEstimate*arimaPolynomials$arReflection,
-                               maEstimate*arimaPolynomials$maReflection);
-        if(arimaReflection>=1){
+        arReflection <- arEstimate*arimaPolynomials$arReflection;
+        arimaReflection <- max(arReflection, maEstimate*arimaPolynomials$maReflection);
+        if(arimaReflection>=1 && (bounds=="usual" || arReflection>=1)){
             return(1E+100*arimaReflection);
         }
     }
@@ -2138,16 +2140,17 @@ adam_bounds_checker <- function(adamElements, arimaPolynomials,
         }
     }
     else if(bounds=="admissible"){
-        # The discount matrix split by lags is meaningless for the lagged ARIMA,
-        # which has one state per lag: its states are checked above instead
-        componentsOther <- setdiff(seq_along(lagsModelAll), componentsNumberETS+seq_len(componentsNumberARIMA))
-        if(length(componentsOther)>0){
-            eigenValues <- smoothEigens(adamElements$vecG[componentsOther,,drop=FALSE],
-                                        adamElements$matF[componentsOther,componentsOther,drop=FALSE],
-                                        adamElements$matWt[,componentsOther,drop=FALSE],
-                                        lagsModelAll[componentsOther], xregModel, obsInSample);
-            if(any(eigenValues>1+1E-50)){
-                return(1E+100*max(eigenValues));
+        # The whole model: its MA polynomial couples the ETS, ARIMA and the other components.
+        # Without ETS and adaptive regressors it is the MA of ARIMA times factors shared with
+        # the AR polynomial, so estimated MA factors that are invertible are enough, and the
+        # penalty stays that of the MA factors. A root within 1e-10 of the unit circle is
+        # not admissible: rounding decides on which side of it the check falls
+        pureARIMA <- arimaModel && !etsModel && !(xregModel && regressors=="adapt");
+        if(!pureARIMA || maEstimate*arimaPolynomials$maReflection>=1){
+            eigenValues <- smoothEigens(adamElements$vecG, adamElements$matF, adamElements$matWt,
+                                        lagsModelAll, xregModel, obsInSample);
+            if(any(eigenValues>1-1E-10)){
+                return(1E+100*(if(pureARIMA) arimaPolynomials$maReflection else max(eigenValues)));
             }
         }
     }

@@ -615,7 +615,9 @@ reapply.adam <- function(object, nsim=1000, type=c("opg","hessian","bootstrap"),
                                                              arOrders, iOrders, maOrders,
                                                              arEstimate, maEstimate, armaParameters, lags), as.vector);
 
-            # Fill in the transition and persistence matrices
+            # Fill in the transition and persistence matrices, the persistence from zero: it
+            # holds the fitted one
+            matG[componentsNumberETS+1:componentsNumberARIMA,i] <- 0;
             if(nrow(nonZeroARI)>0){
                 arrF[componentsNumberETS+nonZeroARI[,2],componentsNumberETS+1:componentsNumberARIMA,i] <-
                     -arimaPolynomials$ariPolynomial[nonZeroARI[,1]];

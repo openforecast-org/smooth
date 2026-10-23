@@ -6484,7 +6484,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             # If this was provided occurrence, then use provided values
             if(!is.null(object$occurrence) && is.list(object$occurrence) &&
                !is.null(object$occurrence$occurrence) &&
-               (object$occurrence$occurrence=="provided") && !is.na(object$occurrence$forecast)){
+               (object$occurrence$occurrence=="provided") && !anyNA(object$occurrence$forecast)){
                 pForecast <- object$occurrence$forecast;
             }
             else{

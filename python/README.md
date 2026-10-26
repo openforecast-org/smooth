@@ -287,3 +287,6 @@ The pages below document the models and their Python classes:
 ## About
 
 `smooth` is developed and maintained by [OpenForecast](https://openforecast.org), a demand forecasting and inventory management consultancy. The package implements the methods we use in our [consulting](https://openforecast.org/consulting/) and teach in our [training courses](https://openforecast.org/training/).
+
+### Acknowledgments
+This package was developed with support from the Centre for Marketing Analytics and Forecasting (CMAF) at Lancaster University and the Predictive AI & Digital Shift research group at VIVES University of Applied Sciences, Belgium.

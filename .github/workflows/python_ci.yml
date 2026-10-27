@@ -19,7 +19,7 @@ env:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -57,16 +57,16 @@ jobs:
       matrix:
         include:
           # Linux
-          - os: ubuntu-latest
+          - os: ubuntu-26.04
             python-version: "3.11"
             cibw-build: "cp311-manylinux*"
-          - os: ubuntu-latest
+          - os: ubuntu-26.04
             python-version: "3.12"
             cibw-build: "cp312-manylinux*"
-          - os: ubuntu-latest
+          - os: ubuntu-26.04
             python-version: "3.13"
             cibw-build: "cp313-manylinux*"
-          - os: ubuntu-latest
+          - os: ubuntu-26.04
             python-version: "3.14"
             cibw-build: "cp314-manylinux*"
           # macOS

@@ -29,7 +29,7 @@ jobs:
     name: Publish to PyPI
     # Skip R-only releases (cran-submit.yml handles those).
     if: contains(join(github.event.release.assets.*.name, ' '), '.whl')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment:
       name: pypi
       url: https://pypi.org/p/smooth

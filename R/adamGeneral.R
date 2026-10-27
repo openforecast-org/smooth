@@ -882,12 +882,14 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
             # "provided", meaning that we have been provided the values of p
             pFitted[] <- occurrence[1:obsInSample];
-            # Create forecasted values for occurrence
+            # Create forecasted values for occurrence: those of the horizon are expected
             if(h>0){
                 if(length(occurrence)>obsInSample){
                     pForecast <- occurrence[-c(1:obsInSample)];
                 }
                 else{
+                    warning(paste0("The occurrence of the horizon is not provided. ",
+                                   "Using the last in-sample value."), call.=FALSE);
                     pForecast <- rep(tail(occurrence,1),h);
                 }
                 if(length(pForecast)>h){
@@ -964,8 +966,10 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     # The observed zeros: a missing observation is neither a demand nor its absence
     obsZero <- obsInSample - obsNonzero - sum(yNAValues[1:obsInSample]);
 
-    # If occurrence is provided, use it as is
-    if(occurrence=="provided"){
+    # A provided occurrence (zeros and ones) is used as is. Provided probabilities make a
+    # mixture with known probabilities: the sizes are fitted to the non-zero values
+    occurrenceProbability <- occurrence=="provided" && any(pFitted>0 & pFitted<1);
+    if(occurrence=="provided" && !occurrenceProbability){
         ot[] <- pFitted;
     }
 
@@ -2324,8 +2328,8 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         xregParametersPersistence <- 0;
     }
 
-    # Fix the occurrenceModel for "provided"
-    if(occurrence=="provided"){
+    # Fix the occurrenceModel for "provided": the provided probabilities stay a mixture
+    if(occurrence=="provided" && !occurrenceProbability){
         occurrenceModel <- FALSE;
     }
 

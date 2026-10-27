@@ -15,8 +15,9 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
     ----------
     data : array-like
         Input time series data
-    occurrence : str
-        Occurrence type ('none', 'auto', 'fixed', etc.)
+    occurrence : str, OM, OMG or array-like
+        Occurrence type ('none', 'auto', 'fixed', etc.), a fitted occurrence model,
+        or the provided occurrence (zeros and ones) or probabilities of occurrence
     silent : bool, optional
         Whether to suppress warnings
     holdout : bool, optional
@@ -66,6 +67,43 @@ def _check_occurrence(data, occurrence, silent=False, holdout=False, h=0):
             "obs_in_sample": obs_in_sample,
             "obs_nonzero": 0,
             "obs_all": obs_all,
+        }
+
+    # The provided occurrence (zeros and ones) or probabilities of occurrence, with
+    # those of the horizon, as R. The probabilities make a mixture with known values
+    values = None
+    if not isinstance(occurrence, str) and not hasattr(occurrence, "occurrence"):
+        values = np.asarray(occurrence, dtype=float).ravel()
+        occurrence = "none" if np.all(values == 1) else "provided"
+    if values is not None and occurrence == "provided":
+        if np.any((values < 0) | (values > 1)):
+            _warn(
+                "Parameter 'occurrence' should contain values between zero and one.\n"
+                "Converting to appropriate vector.",
+                silent,
+            )
+            values = (values != 0) * 1.0
+        h = h or 0
+        p_fitted = values[: obs_in_sample - (h if holdout else 0)]
+        p_forecast = values[len(p_fitted) :][:h] if h > 0 else None
+        if p_forecast is not None and len(p_forecast) < h:
+            if len(p_forecast) == 0:
+                warnings.warn(
+                    "The occurrence of the horizon is not provided. "
+                    "Using the last in-sample value.",
+                    stacklevel=5,
+                )
+            p_forecast = np.concatenate(
+                [p_forecast, np.repeat(values[-1], h - len(p_forecast))]
+            )
+        return {
+            "occurrence": "provided",
+            "occurrence_model": bool(np.any((p_fitted > 0) & (p_fitted < 1))),
+            "obs_in_sample": obs_in_sample,
+            "obs_nonzero": obs_nonzero,
+            "obs_all": obs_all,
+            "p_fitted": p_fitted,
+            "p_forecast": p_forecast,
         }
 
     # A fitted occurrence model rather than a name: reuse it as it stands. R's

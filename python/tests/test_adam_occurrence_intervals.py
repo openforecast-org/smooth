@@ -311,3 +311,57 @@ def test_predict_with_a_fitted_om_scales_by_its_probabilities(y):
     p = occurrence.predict(h=5).mean.values
     assert np.all(np.isfinite(fc.mean.values))
     assert np.all(fc.mean.values <= fc.mean.values / p + 1e-10)
+
+
+PROVIDED = {
+    # Probabilities make a mixture with known probabilities, zeros and ones are used
+    # as they are; those of the horizon are provided
+    "probability": "c(rep(c(0.6, 0.8), 75), rep(0.75, 5))",
+    "occurrence": "c((y != 0) * 1, rep(1, 5))",
+}
+
+
+@pytest.mark.r_parity
+@pytest.mark.parametrize("case", list(PROVIDED))
+def test_the_provided_occurrence_as_r(case):
+    """As R's adam(occurrence=<vector>): the fit, the likelihoods and the forecast."""
+    from ._r_bridge import r_dict
+
+    r = r_dict(
+        "{ set.seed(7); y <- exp(2 + rnorm(150, 0, 0.3)) * rbinom(150, 1, 0.7);"
+        f" o <- {PROVIDED[case]}; m <- adam(y, 'MNN', lags=7, occurrence=o, h=5);"
+        " f <- forecast(m, h=5, interval='approximate');"
+        " list(y=y, o=o, B=unname(m$B), logLik=as.numeric(logLik(m)),"
+        " pointLik=sum(pointLik(m)), fitted=as.vector(fitted(m)), nparam=nparam(m),"
+        " mean=as.vector(f$mean), lower=as.vector(f$lower), upper=as.vector(f$upper)) }"
+    )
+    y = np.asarray(r["y"], dtype=float)
+    model = ADAM(model="MNN", lags=[7], occurrence=np.asarray(r["o"]), h=5).fit(y)
+    fc = model.predict(h=5, interval="approximate")
+    np.testing.assert_allclose(model.b_value, r["B"], rtol=1e-6)
+    assert model.loglik == pytest.approx(r["logLik"][0], rel=1e-8)
+    assert np.sum(model.point_lik()) == pytest.approx(r["pointLik"][0], rel=1e-8)
+    assert model.nparam == r["nparam"][0]
+    np.testing.assert_allclose(model.fitted, r["fitted"], rtol=1e-6)
+    np.testing.assert_allclose(fc.mean.values, r["mean"], rtol=1e-6)
+    np.testing.assert_allclose(fc.lower.values.ravel(), r["lower"], rtol=1e-6)
+    np.testing.assert_allclose(fc.upper.values.ravel(), r["upper"], rtol=1e-6)
+
+
+def test_the_provided_occurrence_of_the_horizon_is_expected(y):
+    """Without the values of the horizon, the last one available, with a warning."""
+    p = np.where(y != 0, 0.8, 0.3)
+    with pytest.warns(UserWarning, match="horizon is not provided"):
+        model = ADAM(model="MNN", occurrence=p, h=3).fit(y)
+    with pytest.warns(UserWarning, match="horizon is not provided"):
+        fc = model.predict(h=5)
+    sizes = fc.mean.values / p[-1]
+    np.testing.assert_allclose(sizes, sizes[0])
+
+
+def test_coefbootstrap_with_provided_probabilities(y):
+    """The refits take the probabilities of their observations."""
+    p = np.where(y != 0, 0.8, 0.3)
+    model = ADAM(model="MNN", occurrence=p).fit(y)
+    boot = model.coefbootstrap(nsim=10, seed=1)
+    assert np.all(np.isfinite(boot.vcov.values))

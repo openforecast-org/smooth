@@ -8,6 +8,8 @@ Tests cover:
 - Different model types (ETS combinations)
 """
 
+import re
+
 import numpy as np
 import pytest
 
@@ -1766,3 +1768,112 @@ def test_admissible_bounds_check_the_whole_model(
         len(y),
     )
     assert (penalty == 0) == admissible
+
+
+class TestADAMPrint:
+    """The printed models, with the values of R's print() of the same models."""
+
+    @pytest.fixture(scope="class")
+    def air(self):
+        import pathlib
+
+        import pandas as pd
+
+        path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+        return pd.read_csv(path)["y"].to_numpy(dtype=float)
+
+    @pytest.fixture(scope="class")
+    def sarima(self, air):
+        orders = {"ar": [1, 0], "i": [1, 1], "ma": [1, 1]}
+        return ADAM(model="NNN", lags=[1, 12], orders=orders).fit(air)
+
+    @pytest.fixture(scope="class")
+    def damped(self):
+        t = np.arange(1, 41)
+        y = 100 + np.cumsum(3 * 0.85**t) + 2 * np.sin(t)
+        return ADAM(model="AAdN", h=6, holdout=True).fit(y)
+
+    def test_the_arma_parameters_are_printed_by_lag(self, sarima):
+        # R: print(adam(AirPassengers, "NNN", lags=c(1,12),
+        #               orders=list(ar=c(1,0), i=c(1,1), ma=c(1,1))))
+        lines = str(sarima).splitlines()
+        assert lines[1].endswith("SARIMA(1,1,1)[1](0,1,1)[12]")
+        start = lines.index("ARMA parameters of the model:")
+        ar_header, ar_row, ma_header, ma_row = lines[start + 1 : start + 5]
+        assert ar_header.split() == ["Lag", "1"]
+        assert ar_row.split()[0] == "AR(1)"
+        assert float(ar_row.split()[1]) == pytest.approx(-0.2403, abs=1e-4)
+        assert ma_header.split() == ["Lag", "1", "Lag", "12"]
+        assert ma_row.split()[0] == "MA(1)"
+        np.testing.assert_allclose(
+            [float(value) for value in ma_row.split()[1:]], [-0.0625, -0.113], atol=1e-4
+        )
+
+    def test_the_arma_parameters_as_r(self, sarima, air):
+        # R: $arma of the model above, and of the same model with
+        # arma=list(ar=-0.2, ma=c(-0.1,-0.3)), whose nparam() is 15
+        arma = sarima.arma_parameters_
+        assert list(arma) == ["ar", "ma"]
+        assert arma["ar"] == pytest.approx({"phi1[1]": -0.2403212}, abs=1e-6)
+        assert arma["ma"] == pytest.approx(
+            {"theta1[1]": -0.06245114, "theta1[12]": -0.11304341}, abs=1e-6
+        )
+        provided = ADAM(
+            model="NNN",
+            lags=[1, 12],
+            orders={"ar": [1, 0], "i": [1, 1], "ma": [1, 1]},
+            arma={"ar": [-0.2], "ma": [-0.1, -0.3]},
+        ).fit(air)
+        assert provided.arma_parameters_ == {
+            "ar": {"phi1[1]": -0.2},
+            "ma": {"theta1[1]": -0.1, "theta1[12]": -0.3},
+        }
+        assert provided.nparam == 15
+
+    def test_the_number_of_parameters_is_printed_as_r(self, sarima):
+        # R: $nParam of the model above: 17 internal and 1 scale estimated
+        header, estimated, provided = str(sarima.n_param).splitlines()
+        assert header.split() == ["internal", "xreg", "occurrence", "scale", "all"]
+        assert estimated.split()[0] == "estimated"
+        assert [float(v) for v in estimated.split()[1:]] == [17, 0, 0, 1, 18]
+        assert provided.split()[0] == "provided"
+        assert [float(v) for v in provided.split()[1:]] == [0, 0, 0, 0, 0]
+
+    def test_the_damping_and_the_holdout_errors_are_printed(self, damped):
+        # R: print(adam(y, "AAdN", h=6, holdout=TRUE)) with
+        # y <- 100 + cumsum(3*0.85^(1:40)) + 2*sin(1:40)
+        text = str(damped)
+        assert "Damping parameter: 0.9732" in text
+        assert "Sample size: 34" in text
+        printed = text.split("Forecast errors:")[1]
+        errors = dict(re.findall(r"(\w+): (-?[\d.]+)", printed))
+        expected = {
+            "ME": -1.376,
+            "MAE": 1.434,
+            "RMSE": 1.757,
+            "sCE": -7.221,
+            "Asymmetry": -91.4,
+            "sMAE": 1.255,
+            "sMSE": 0.024,
+            "MASE": 1.149,
+            "RMSSE": 1.218,
+            "rMAE": 0.949,
+            "rRMSE": 0.978,
+        }
+        assert {name: float(errors[name]) for name in expected} == pytest.approx(
+            expected, abs=1e-3
+        )
+        assert damped.arma_parameters_ is None
+
+    def test_the_combination_is_printed_as_r(self, air):
+        # R: print(adam(AirPassengers, "CCN"))
+        lines = str(ADAM(model="CCN").fit(air)).splitlines()
+        assert "Model estimated: ETS(CCN)" in lines
+        assert "Number of models combined: 10" in lines
+        assert "Sample size: 144" in lines
+        assert "Average number of estimated parameters: 4.4217" in lines
+        assert "Average number of degrees of freedom: 139.5783" in lines
+
+    def test_repr(self, damped):
+        assert repr(ADAM(model="ANN")) == "ADAM(model=ANN, fitted=False)"
+        assert repr(damped) == "ADAM(ETS(AAdN), fitted=True)"

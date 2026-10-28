@@ -141,6 +141,10 @@ They read Python (not R or C++), so they apply to `python/src/` only.
 
 * `crapper --changed` (or the paths): reduce each function under CRAP 10 by testing
   it, by splitting it, or both.
+* CRAP is never below the cyclomatic complexity, so a function with CC 10 or more needs
+  splitting whatever its coverage.
+* Its coverage comes from the default suite, without the R-parity tests: a function
+  tested only through them shows as uncovered (`AutoCES.fit`, 1.1%).
 * Consider whether case statements are worth reducing.
 
 ### Dryer
@@ -149,10 +153,15 @@ They read Python (not R or C++), so they apply to `python/src/` only.
 
 ### Mutator
 
+* It does not work on this package yet: it mutates a copy of the file in
+  `target/mutation-workers`, but the editable install of scikit-build-core sends
+  `import smooth` to `python/src`, where the compiled extensions are, so the tests never
+  load the mutant and every one survives (0 of 84 killed on `utils/bootstrap.py`, where
+  the same mutant applied in place fails `test_coefbootstrap.py`).
+* Until it does, trust no survivor without applying that mutant in place, running the
+  tests and restoring the file with `git checkout`.
 * `mutator --test-command "<repo>/python/.venv/bin/python -m pytest -q tests/<file>.py" <file>`:
   the absolute interpreter of `python/.venv`, and the tests of that file.
-* Check that a mutant on a line you know is tested gets killed before you trust the
-  survivors.
 * Cover the uncovered.
 * Kill the survivors.
 * Delete dead code, unless R still has it.

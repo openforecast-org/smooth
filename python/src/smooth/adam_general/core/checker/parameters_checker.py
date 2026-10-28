@@ -922,6 +922,10 @@ def parameters_checker(
         obs_in_sample=obs_in_sample,
         h=h,
     )
+    # The provided occurrence or probabilities, of the sample and of the horizon
+    occurrence_dict.update(
+        {key: occ_info[key] for key in ("p_fitted", "p_forecast") if key in occ_info}
+    )
 
     # Create phi dictionary
     phi_dict = _organize_phi_info(phi_val=phi_val, phi_estimate=phi_estimate)
@@ -945,6 +949,12 @@ def parameters_checker(
         if hasattr(actual_y_in_sample, "__len__")
         else obs_in_sample
     )
+    # A provided occurrence (zeros and ones) is used as is, as R. The provided
+    # probabilities make a mixture: the sizes are fitted to the non-zero values
+    if isinstance(occurrence_dict["occurrence"], str) and (
+        occurrence_dict["occurrence"] == "provided" and not occurrence_model
+    ):
+        ot_info["ot"] = occurrence_dict["p_fitted"]
     observations_dict = {
         "obs_in_sample": actual_obs_in_sample,
         # Raw user value for the backcasting head; resolved in architector()

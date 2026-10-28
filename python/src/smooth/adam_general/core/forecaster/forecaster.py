@@ -100,12 +100,14 @@ def _check_fitted_values(model_prepared, occurrence_dict, observations_dict):
             model_prepared["y_fitted"] * occurrence_dict["p_fitted"]
         )
 
-    # Fix cases when we have zeroes in the provided occurrence. At the missing
-    # values the fitted is the prediction of the model
-    if isinstance(occurrence_dict["occurrence"], str) and (
-        occurrence_dict["occurrence"] == "provided"
+    # Fix cases when we have zeroes in the provided occurrence (zeros and ones, also
+    # when the occurrence of the horizon replaces it). At the missing values the fitted
+    # is the prediction of the model
+    if (
+        occurrence_dict.get("p_fitted") is not None
+        and not (occurrence_dict["occurrence_model"])
     ):
-        zero = ~occurrence_dict["ot_logical"] & observed_mask(observations_dict)
+        zero = ~observations_dict["ot_logical"] & observed_mask(observations_dict)
         model_prepared["y_fitted"][zero] = (
             model_prepared["y_fitted"][zero] * occurrence_dict["p_fitted"][zero]
         )
@@ -411,6 +413,9 @@ def _process_occurrence_forecast(occurrence_dict, general_dict):
         p_forecast = np.concatenate(
             [p_forecast, np.repeat(p_forecast[-1], general_dict["h"] - len(p_forecast))]
         )
+    # Provided probabilities, rather than the values of the occurrence, make a mixture
+    if not occurrence_model and np.any((p_forecast > 0) & (p_forecast < 1)):
+        occurrence_model = True
 
     return p_forecast, occurrence_model
 

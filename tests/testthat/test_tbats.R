@@ -681,3 +681,11 @@ test_that("tbats() is adam()'s ETS(A,N,N) over the gaps", {
     expect_equal(sum(pointLik(testTBATS)), as.numeric(logLik(testTBATS)));
 })
 
+
+test_that("coefbootstrap() of tbats() refits with the provided probabilities of occurrence", {
+    skip_on_cran();
+    set.seed(7);
+    y <- ts(exp(2 + rnorm(150, 0, 0.3)) * rbinom(150, 1, 0.7), frequency=7);
+    testModel <- tbats(y, occurrence=rep(0.7, 150), orders=list(ar=0, ma=0, select=FALSE));
+    expect_true(all(is.finite(coefbootstrap(testModel, nsim=5)$coefficients)));
+})

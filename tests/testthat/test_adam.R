@@ -1537,3 +1537,39 @@ test_that("The admissible bounds of ETS+ARIMA check the whole model", {
     testModel <- adam(BJsales, "NNN", orders=list(ma=1), arma=list(ma=1.2), h=0);
     expect_gt(checker(testModel, 1.2, FALSE), 0);
 })
+
+test_that("coefbootstrap() refits a model with provided probabilities of occurrence", {
+    set.seed(7);
+    y <- ts(exp(2 + rnorm(150, 0, 0.3)) * rbinom(150, 1, 0.7), frequency=7);
+    probabilities <- rep(c(0.6, 0.8), 75);
+    testModel <- adam(y, "MNN", occurrence=probabilities);
+    expect_true(all(is.finite(coefbootstrap(testModel, nsim=5)$coefficients)));
+    # Each refit takes the probabilities of its observations
+    newCall <- adam_bootstrapData(testModel$call, "data", y[11:60], probabilities[11:60]);
+    expect_equal(newCall$occurrence, probabilities[11:60]);
+})
+
+test_that("adam() with the provided occurrence or probabilities of occurrence", {
+    set.seed(7);
+    y <- ts(exp(2 + rnorm(150, 0, 0.3)) * rbinom(150, 1, 0.7), frequency=7);
+    nonzero <- y != 0;
+    # Probabilities: a mixture with known probabilities, the sizes fitted to the non-zeros
+    probabilities <- rep(c(0.6, 0.8), 75);
+    testModel <- adam(y, "MNN", occurrence=c(probabilities, rep(0.75, 5)), h=5);
+    level <- testModel$states[1:150, 1];
+    sizes <- sum(dgamma(y[nonzero], shape=1/testModel$scale,
+                        scale=testModel$scale*level[nonzero], log=TRUE));
+    expect_equal(as.numeric(logLik(testModel)),
+                 sizes + sum(log(probabilities[nonzero])) + sum(log(1-probabilities[!nonzero])));
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    expect_equal(as.vector(fitted(testModel)), level*probabilities);
+    expect_equal(as.vector(forecast(testModel, h=5)$mean), rep(0.75*tail(level, 1), 5));
+    expect_warning(forecast(testModel, h=7), "horizon is not provided");
+    expect_warning(forecast(adam(y, "MNN", occurrence=probabilities), h=3),
+                   "horizon is not provided");
+    # Zeros and ones: used as they are, without uncertainty
+    testModel <- adam(y, "MNN", occurrence=c(nonzero*1, rep(1, 5)), h=5);
+    expect_equal(sum(pointLik(testModel)), as.numeric(logLik(testModel)));
+    expect_equal(as.vector(fitted(testModel))[!nonzero], rep(0, sum(!nonzero)));
+    expect_warning(adam(y, "MNN", occurrence=probabilities, h=5), "horizon is not provided");
+})

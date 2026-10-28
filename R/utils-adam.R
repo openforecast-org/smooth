@@ -339,6 +339,589 @@ adam_checkPhi <- function(phi, etsModel, modelDo, damped, parametersNumber){
     return(list(phi=phi, phiEstimate=phiEstimate, parametersNumber=parametersNumber));
 }
 
+#### Persistence: provided, estimated, for the components and the regressors ####
+adam_checkPersistence <- function(Stype, Ttype, componentsNumberETSSeasonal, etsModel, lagsLength,
+                                   lagsModelSeasonal, modelDo, modelIsTrendy, parametersNumber,
+                                   persistence, xregModel){
+    # Vectors for persistence of different components
+    persistenceLevel <- NULL;
+    persistenceTrend <- NULL;
+    persistenceSeasonal <- NULL;
+    persistenceXreg <- NULL;
+    # InitialEstimate vectors, defining what needs to be estimated
+    persistenceEstimate <- persistenceLevelEstimate <- persistenceTrendEstimate <-
+        persistenceXregEstimate <- TRUE;
+    # persistence of seasonal is a vector, not a scalar, because we can have several lags
+    persistenceSeasonalEstimate <- rep(TRUE,componentsNumberETSSeasonal);
+    if(!is.null(persistence)){
+        if(all(modelDo!=c("estimate","use"))){
+            warning(paste0("Predefined persistence can only be used with ",
+                           "preselected ETS model.\n",
+                           "Changing to estimation of persistence values."),call.=FALSE);
+            persistence <- NULL;
+            persistenceEstimate <- TRUE;
+        }
+        else{
+            # If it is a list
+            if(is.list(persistence)){
+                # If this is a named list, then extract stuff using names
+                if(!is.null(names(persistence))){
+                    if(!is.null(persistence$level)){
+                        persistenceLevel <- persistence$level;
+                    }
+                    else if(!is.null(persistence$alpha)){
+                        persistenceLevel <- persistence$alpha;
+                    }
+                    if(!is.null(persistence$trend)){
+                        persistenceTrend <- persistence$trend;
+                    }
+                    else if(!is.null(persistence$beta)){
+                        persistenceTrend <- persistence$beta;
+                    }
+                    if(!is.null(persistence$seasonal)){
+                        persistenceSeasonal <- persistence$seasonal;
+                    }
+                    else if(!is.null(persistence$gamma)){
+                        persistenceSeasonal <- persistence$gamma;
+                    }
+                    if(!is.null(persistence$xreg)){
+                        persistenceXreg <- persistence$xreg;
+                    }
+                    else if(!is.null(persistence$delta)){
+                        persistenceXreg <- persistence$delta;
+                    }
+                }
+                else{
+                    if(!is.null(persistence[[1]])){
+                        persistenceLevel <- persistence[[1]];
+                    }
+                    if(!is.null(persistence[[2]])){
+                        persistenceTrend <- persistence[[2]];
+                    }
+                    if(!is.null(persistence[[3]])){
+                        persistenceSeasonal <- persistence[[3]];
+                    }
+                    if(!is.null(persistence[[4]])){
+                        persistenceXreg <- persistence[[4]];
+                    }
+                }
+                # Define estimate variables
+                if(!is.null(persistenceLevel)){
+                    persistenceLevelEstimate[] <- FALSE;
+                    parametersNumber[2,1] <- parametersNumber[2,1] + 1;
+                }
+                if(!is.null(persistenceTrend)){
+                    persistenceTrendEstimate[] <- FALSE;
+                    parametersNumber[2,1] <- parametersNumber[2,1] + 1;
+                }
+                if(!is.null(persistenceSeasonal)){
+                    if(is.list(persistenceSeasonal)){
+                        persistenceSeasonalEstimate[] <- length(persistenceSeasonal)==length(lagsModelSeasonal);
+                    }
+                    else{
+                        persistenceSeasonalEstimate[] <- FALSE;
+                    }
+                    parametersNumber[2,1] <- parametersNumber[2,1] + length(unlist(persistenceSeasonal));
+                }
+                if(!is.null(persistenceXreg)){
+                    persistenceXregEstimate[] <- FALSE;
+                    parametersNumber[2,1] <- parametersNumber[2,1] + length(persistenceXreg);
+                }
+            }
+            else if(is.numeric(persistence)){
+                # If it is smaller... We don't know the length of xreg yet at this stage
+                if(length(persistence)<lagsLength){
+                    warning(paste0("Length of persistence vector is wrong! ",
+                                   "Changing to estimation of persistence vector values."),
+                            call.=FALSE);
+                    persistence <- NULL;
+                    persistenceEstimate <- TRUE;
+                }
+                else{
+                    # If there ARIMA elements, remove them
+                    if(any(substr(names(persistence),1,3)=="psi")){
+                        persistence <- persistence[substr(names(persistence),1,3)!="psi"];
+                    }
+                    j <- 0;
+                    if(etsModel){
+                        j <- j+1;
+                        persistenceLevel <- as.vector(persistence)[1];
+                        names(persistenceLevel) <- "alpha";
+                        if(modelIsTrendy && length(persistence)>j){
+                            j <- j+1;
+                            persistenceTrend <- as.vector(persistence)[j];
+                            names(persistenceTrend) <- "beta";
+                        }
+                        if(Stype!="N" && length(persistence)>j){
+                            persistenceSeasonal <- as.vector(persistence)[j+c(1:length(lagsModelSeasonal))];
+                            names(persistenceSeasonal) <- paste0("gamma",c(1:length(persistenceSeasonal)));
+                            j <- j+length(lagsModelSeasonal);
+                        }
+                    }
+                    if(xregModel && length(persistence)>j){
+                        if(j>0){
+                            persistenceXreg <- persistence[-c(1:j)];
+                        }
+                        else{
+                            persistenceXreg <- persistence;
+                        }
+                        # If there are names, make sure that only deltas are used
+                        if(!is.null(names(persistenceXreg))){
+                            persistenceXreg <- persistenceXreg[substr(names(persistenceXreg),1,5)=="delta"];
+                        }
+                        else{
+                            names(persistenceXreg) <- paste0("delta",c(1:length(persistenceXreg)));
+                        }
+                    }
+
+                    persistenceEstimate[] <- persistenceLevelEstimate[] <- persistenceTrendEstimate[] <-
+                        persistenceXregEstimate[] <- persistenceSeasonalEstimate[] <- FALSE;
+                    parametersNumber[2,1] <- parametersNumber[2,1] + length(persistence);
+                    # bounds <- "none";
+                }
+            }
+            else{
+                warning(paste0("Persistence is not a numeric vector!\n",
+                               "Changing to estimation of persistence vector values."),call.=FALSE);
+                persistence <- NULL;
+                persistenceEstimate <- TRUE;
+            }
+        }
+    }
+    else{
+        persistenceEstimate <- TRUE;
+    }
+
+   # Make sure that only important elements are estimated.
+    if(!etsModel){
+        persistenceLevelEstimate[] <- FALSE;
+    }
+    if(!etsModel || Ttype=="N"){
+        persistenceTrendEstimate[] <- FALSE;
+        persistenceTrend <- NULL;
+    }
+    if(!etsModel || Stype=="N"){
+        persistenceSeasonalEstimate[] <- FALSE;
+        persistenceSeasonal <- NULL;
+    }
+    if(!xregModel){
+        persistenceXregEstimate[] <- FALSE;
+        persistenceXreg <- NULL;
+    }
+    # What the section set, on the branches that ran
+    return(mget(intersect(c("parametersNumber", "persistence", "persistenceEstimate",
+                         "persistenceLevel", "persistenceLevelEstimate", "persistenceSeasonal",
+                         "persistenceSeasonalEstimate", "persistenceTrend",
+                         "persistenceTrendEstimate", "persistenceXreg",
+                         "persistenceXregEstimate"), ls())));
+}
+
+
+#### Occurrence: the provided values or the model, the occurrence variable and its probabilities ####
+adam_checkOccurrence <- function(Etype, Stype, Ttype, etsModel, h, lagsModelMax, model, modelsPool,
+                                  obsInSample, occurrence, y, yClasses, yFrequency, yInSample,
+                                  yNAValues, yStart){
+    if(is.occurrence(occurrence)){
+        omModel <- occurrence;
+        occurrence <- omModel$occurrence;
+        if(occurrence=="provided"){
+            occurrenceModelProvided <- FALSE;
+        }
+        else{
+            occurrenceModelProvided <- TRUE;
+        }
+        pFitted <- matrix(fitted(omModel), obsInSample, 1);
+    }
+    else{
+        occurrenceModelProvided <- FALSE;
+        omModel <- NULL;
+        pFitted <- matrix(1, obsInSample, 1);
+    }
+    pForecast <- rep(NA,h);
+
+    # If it is logical, convert to numeric
+    if(is.logical(occurrence)){
+        occurrence <- occurrence*1;
+    }
+    if(is.numeric(occurrence)){
+        # If it is data, then it should correspond to the in-sample.
+        if(all(occurrence==1)){
+            occurrence <- "none";
+        }
+        else{
+            if(any(occurrence<0,occurrence>1)){
+                warning(paste0("Parameter 'occurrence' should contain values between zero and one.\n",
+                               "Converting to appropriate vector."),call.=FALSE);
+                occurrence[] <- (occurrence!=0)*1;
+            }
+
+            # "provided", meaning that we have been provided the values of p
+            pFitted[] <- occurrence[1:obsInSample];
+            # Create forecasted values for occurrence: those of the horizon are expected
+            if(h>0){
+                if(length(occurrence)>obsInSample){
+                    pForecast <- occurrence[-c(1:obsInSample)];
+                }
+                else{
+                    warning(paste0("The occurrence of the horizon is not provided. ",
+                                   "Using the last in-sample value."), call.=FALSE);
+                    pForecast <- rep(tail(occurrence,1),h);
+                }
+                if(length(pForecast)>h){
+                    pForecast <- pForecast[1:h];
+                }
+                else if(length(pForecast)<h){
+                    pForecast <- c(pForecast,rep(tail(pForecast,1),h-length(pForecast)));
+                }
+            }
+            else{
+                pForecast <- NA;
+            }
+            occurrence <- "provided";
+            omModel <- list(fitted=pFitted,forecast=pForecast,occurrence="provided");
+        }
+    }
+    else if(is.occurrence(occurrence)){
+        omModel <- occurrence;
+        occurrence <- omModel$occurrence;
+    }
+
+    occurrence <- match.arg(occurrence[1],c("none","auto","fixed","general","odds-ratio",
+                                            "inverse-odds-ratio","direct","provided"));
+
+    otLogical <- yInSample!=0;
+
+    # If the data is not occurrence, let's assume that the parameter was switched unintentionally.
+    if(all(otLogical) & all(occurrence!=c("none","provided"))){
+        occurrence <- "none";
+        occurrenceModelProvided <- FALSE;
+    }
+
+    # If there were NAs and the occurrence was not specified, do something with it
+    # In all the other cases, NAs will be sorted out by the model
+    # The internal occurrence of the missing values alone, not an occurrence model
+    occurrenceMissingOnly <- any(yNAValues) && (occurrence=="none");
+    if(occurrenceMissingOnly){
+        otLogical <- (!yNAValues)[1:obsInSample];
+        occurrence[] <- "provided";
+        pFitted[] <- otLogical*1;
+        pForecast[] <- 1;
+        occurrenceModel <- FALSE;
+        # Without an occurrence the probability is one: the fitter skips the missing values
+        # through ot, the occurrence returned has no zeros
+        omModel <- structure(list(y=matrix((otLogical)*1,ncol=1),fitted=rep(1, obsInSample),
+                                   forecast=pForecast, occurrence="provided"),class="occurrence");
+    }
+    else{
+        if(occurrence=="none"){
+            occurrenceModel <- FALSE;
+            otLogical <- rep(TRUE,obsInSample);
+        }
+        else if(occurrence=="provided"){
+            occurrenceModel <- TRUE;
+            omModel$y <- matrix(otLogical*1,ncol=1);
+        }
+        else{
+            occurrenceModel <- TRUE;
+        }
+
+        # Include NAs in the zeroes, so that we avoid weird cases
+        if(any(yNAValues)){
+            otLogical <- !(!otLogical | yNAValues[1:obsInSample]);
+        }
+    }
+
+    if(any(yClasses=="ts")){
+        ot <- ts(matrix(otLogical*1,ncol=1), start=yStart, frequency=yFrequency);
+    }
+    else{
+        ot <- ts(matrix(otLogical*1,ncol=1), start=c(0,0), frequency=lagsModelMax);
+    }
+    obsNonzero <- sum(ot);
+    # The observed zeros: a missing observation is neither a demand nor its absence
+    obsZero <- obsInSample - obsNonzero - sum(yNAValues[1:obsInSample]);
+
+    # A provided occurrence (zeros and ones) is used as is. Provided probabilities make a
+    # mixture with known probabilities: the sizes are fitted to the non-zero values
+    occurrenceProbability <- occurrence=="provided" && any(pFitted>0 & pFitted<1);
+    if(occurrence=="provided" && !occurrenceProbability){
+        ot[] <- pFitted;
+    }
+
+    # Check if multiplicative models can be fitted
+    # on the observed values: the filled ones are not data
+    yObserved <- yInSample[!yNAValues[1:obsInSample]];
+    allowMultiplicative <- !((any(yObserved<=0) && !occurrenceModel) || (occurrenceModel && any(yObserved<0)));
+
+    if(etsModel){
+        # Clean the pool of models if only additive are allowed
+        if(!allowMultiplicative && !is.null(modelsPool)){
+            modelsPoolMultiplicative <- ((substr(modelsPool,1,1)=="M") |
+                                             substr(modelsPool,2,2)=="M" |
+                                             substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="M");
+            if(any(modelsPoolMultiplicative)){
+                modelsPool <- modelsPool[!modelsPoolMultiplicative];
+
+                # This is needed, because PPP and FFF use pool, not Branch and bound
+                if(!any(c(any(unlist(strsplit(model,""))=="P"),any(unlist(strsplit(model,""))=="F")))){
+                    warning("Only additive models are allowed for your data. Amending the pool.",
+                            call.=FALSE);
+                }
+            }
+        }
+        if((any(model==c("PPP","FFF","YYY")) || any(unlist(strsplit(model,""))=="Z")) && !allowMultiplicative){
+            model <- "XXX";
+            Etype[] <- "A";
+            Ttype[] <- switch(Ttype,"Y"=,"Z"=,"P"=,"F"="X",Ttype);
+            Stype[] <- switch(Stype,"Y"=,"Z"=,"P"=,"F"="X",Stype);
+            modelsPool <- NULL;
+            warning("Only additive models are allowed for your data. Changing the selection mechanism.",
+                    call.=FALSE);
+        }
+        else if(!allowMultiplicative && any(c(Etype,Ttype,Stype)=="M")){
+            warning("Your data contains non-positive values, so the ETS(",model,") might break down.",
+                    call.=FALSE);
+        }
+        else if(any(model==c("PPP","FFF")) && allowMultiplicative){
+            model <- "ZZZ";
+        }
+    }
+    # What the section set, on the branches that ran
+    return(mget(intersect(c("Etype", "Stype", "Ttype", "allowMultiplicative", "model",
+                         "modelsPool", "obsNonzero", "obsZero", "occurrence",
+                         "occurrenceMissingOnly", "occurrenceModel", "occurrenceModelProvided",
+                         "occurrenceProbability", "omModel", "ot", "otLogical", "pFitted",
+                         "pForecast"), ls())));
+}
+
+
+#### Initials: their type, the provided values and what is estimated ####
+adam_checkInitial <- function(Etype, Stype, arimaModel, componentsNumberETSSeasonal, distribution,
+                               etsModel, initial, initialArimaNumber, lagsModelSeasonal, loss,
+                               modelDo, modelIsTrendy, parametersNumber, silent, xregModel){
+    # Vectors for initials of different components
+    initialLevel <- NULL;
+    initialTrend <- NULL;
+    initialSeasonal <- NULL;
+    initialArima <- NULL;
+    initialXreg <- NULL;
+    # InitialEstimate vectors, defining what needs to be estimated
+    # NOTE: that initial==c("optimal","complete") means initialEstimate==TRUE!
+    initialEstimate <- initialLevelEstimate <- initialTrendEstimate <-
+        initialArimaEstimate <- initialXregEstimate <- TRUE;
+    # initials of seasonal is a vector, not a scalar, because we can have several lags
+    initialSeasonalEstimate <- rep(TRUE,componentsNumberETSSeasonal);
+
+    # This is an initialisation of the variable
+    initialType <- "backcasting"
+    # initial type can be: "o" - optimal, "b" - backcasting, "p" - provided.
+    if(any(is.character(initial))){
+        initialType[] <- match.arg(initial, c("backcasting","optimal","two-stage","complete","gradient"));
+        # The gradient solve profiles the loss in C++, which a user-provided
+        # loss function cannot cross: the initials are backcast instead, and the
+        # model says so
+        if(initialType=="gradient" && loss=="custom"){
+            warning("initial=\"gradient\" is not available for custom loss functions. ",
+                    "Switching to initial=\"backcasting\".", call.=FALSE);
+            initialType[] <- "backcasting";
+        }
+    }
+    else if(is.null(initial)){
+        if(!silent){
+            message("Initial value is not selected. Switching to backcasting.");
+        }
+        initialType[] <- "backcasting";
+    }
+    else if(!is.null(initial)){
+        if(all(modelDo!=c("estimate","use"))){
+            warning(paste0("Predefined initials vector can only be used with preselected ETS model.\n",
+                           "Changing to estimation of initials."),call.=FALSE);
+            initialType[] <- "optimal";
+            initialEstimate[] <- initialLevelEstimate[] <- initialTrendEstimate[] <-
+                initialSeasonalEstimate[] <- initialArimaEstimate[] <- initialXregEstimate[] <- TRUE;
+        }
+        else{
+            # If the list is provided, then check what this is.
+            # This should be: level, trend, seasonal[[1]], seasonal[[2]], ..., ARIMA, xreg
+            if(is.list(initial)){
+                # An unnamed list has the components in this order, possibly fewer of them
+                if(is.null(names(initial))){
+                    names(initial) <- c("level","trend","seasonal","arima","xreg")[seq_along(initial)];
+                }
+                initialLevel <- initial$level;
+                initialTrend <- initial$trend;
+                initialSeasonal <- initial$seasonal;
+                initialArima <- initial$arima;
+                initialXreg <- initial$xreg;
+            }
+            else{
+                if(!is.numeric(initial)){
+                    warning(paste0("Initial vector is not numeric!\n",
+                                   "Values of initial vector will be backcasted."),call.=FALSE);
+                    initialType[] <- "backcasting";
+                }
+                else{
+                    # If this is a vector, then it should contain values in the order:
+                    # level, trend, seasonal1, seasonal2, ..., ARIMA, xreg
+                    # if(length(initial)<(sum(lagsModelAll))){
+                    #     warning(paste0("The vector of initials contains only values for several components. ",
+                    #                    "We will use what we can."),call.=FALSE);
+                    # }
+                    # else{
+                        j <- 0;
+                        if(etsModel){
+                            initialLevel <- initial[1];
+                            initialLevelEstimate[] <- FALSE;
+                            j <- 1;
+                            if(modelIsTrendy){
+                                j <- 2;
+                                # If there is something in the vector, use it
+                                if(all(!is.na(initial[j]))){
+                                    initialTrend <- initial[j];
+                                    initialTrendEstimate[] <- FALSE;
+                                }
+                            }
+                            if(Stype!="N"){
+                                # If there is something in the vector, use it
+                                if(length(initial[-c(1:j)])>0){
+                                    initialSeasonal <- vector("list",componentsNumberETSSeasonal);
+                                    m <- 0;
+                                    for(i in 1:componentsNumberETSSeasonal){
+                                        if(all(!is.na(initial[j+m+1:lagsModelSeasonal[i]]))){
+                                            initialSeasonal[[i]] <- initial[j+m+1:lagsModelSeasonal[i]];
+                                            m <- m + lagsModelSeasonal[i];
+                                        }
+                                        else{
+                                            break;
+                                        }
+                                    }
+                                    j <- j+m;
+                                    initialSeasonalEstimate[] <- FALSE;
+                                }
+                            }
+                        }
+                        if(arimaModel){
+                            # If there is something else left, this must be ARIMA
+                            if(all(!is.na(initial[j+c(1:initialArimaNumber)]))){
+                                initialArima <- initial[j+c(1:initialArimaNumber)];
+                                j <- j+initialArimaNumber;
+                                initialArimaEstimate[] <- FALSE;
+                            }
+                        }
+                        if(xregModel){
+                            # Something else? xreg for sure!
+                            if(length(initial[-c(1:j)])>0){
+                                initialXreg <- initial[-c(1:j)];
+                                initialXregEstimate[] <- FALSE
+                            }
+                        }
+                    }
+                # }
+            }
+        }
+    }
+
+    # Check the provided initials and define initialEstimate variables
+    if(etsModel){
+        # Level
+        if(!is.null(initialLevel)){
+            if(length(initialLevel)>1){
+                warning("Initial level contains more than one value! Using the first one.",
+                        call.=FALSE);
+                initialLevel <- initialLevel[1];
+            }
+            initialLevelEstimate[] <- FALSE;
+            parametersNumber[2,1] <- parametersNumber[2,1] + 1;
+        }
+        # Trend
+        if(!is.null(initialTrend)){
+            if(length(initialTrend)>1){
+                warning("Initial trend contains more than one value! Using the first one.",
+                        call.=FALSE);
+                initialTrend <- initialTrend[1];
+            }
+            initialTrendEstimate[] <- FALSE;
+            parametersNumber[2,1] <- parametersNumber[2,1] + 1;
+        }
+        # Seasonal
+        if(!is.null(initialSeasonal)){
+            # The list means several seasonal lags
+            if(is.list(initialSeasonal)){
+                # Is the number of seasonal initials correct? If it is bigger, then remove redundant
+                if(length(initialSeasonal)>componentsNumberETSSeasonal){
+                    warning("Initial seasonals contained more elements than needed! Removing redundant ones.",
+                            call.=FALSE);
+                    initialSeasonal <- initialSeasonal[1:componentsNumberETSSeasonal];
+                }
+                # Is the number of initials in each season correct? Use the correct ones only
+                if(any(!(sapply(initialSeasonal,length) %in% lagsModelSeasonal))){
+                    warning(paste0("Some of initial seasonals have a wrong length, ",
+                                   "not corresponding to the provided lags. I will estimate them."),
+                            call.=FALSE);
+                    initialSeasonalToUse <- sapply(initialSeasonal,length) %in% lagsModelSeasonal;
+                    initialSeasonal <- initialSeasonal[initialSeasonalToUse];
+                }
+                initialSeasonalEstimate[] <- !(lagsModelSeasonal %in% sapply(initialSeasonal,length));
+                # If there are some gaps in what to estimate, reform initialSeason to make sense in the future creator function
+                if(!all(initialSeasonalEstimate) && !all(!initialSeasonalEstimate)){
+                    initialSeasonalCorrect <- vector("list",componentsNumberETSSeasonal);
+                    initialSeasonalCorrect[which(!initialSeasonalEstimate)] <- initialSeasonal;
+                    initialSeasonal <- initialSeasonalCorrect;
+                }
+            }
+            # The vector implies only one seasonal
+            else{
+                if(all(length(initialSeasonal)!=lagsModelSeasonal)){
+                    warning(paste0("Wrong length of seasonal initial: ",length(initialSeasonal),
+                                   "Instead of ",lagsModelSeasonal,". Switching to estimation."),
+                            call.=FALSE)
+                    initialSeasonalEstimate[] <- TRUE;
+                }
+                else{
+                    initialSeasonalEstimate[] <- FALSE;
+                }
+                # Create a list from the vector for consistency purposes
+                initialSeasonal <- list(initialSeasonal);
+            }
+            parametersNumber[2,1] <- parametersNumber[2,1] + length(unlist(initialSeasonal));
+        }
+    }
+    else{
+        initialLevel <- initialTrend <- initialSeasonal <- NULL;
+        initialLevelEstimate <- initialTrendEstimate <- initialSeasonalEstimate <- FALSE
+
+        # If ETS is switched off, set error to whatever, based on the used distribution
+        Etype[] <- switch(distribution,
+                          "dinvgauss"=,"dlnorm"=,"dllaplace"=,"dls"=,"dlgnorm"=,"dgamma"="M",
+                          "A");
+    }
+
+    # ARIMA
+    if(!is.null(initialArima)){
+        if(length(initialArima)!=initialArimaNumber){
+            warning(paste0("The length of ARIMA initials is ",length(initialArima),
+                           " instead of ",initialArimaNumber,". Estimating initials instead!"),
+                    call.=FALSE);
+            initialArimaEstimate[] <- TRUE;
+        }
+        else{
+            initialArimaEstimate[] <- FALSE;
+            parametersNumber[2,1] <- parametersNumber[2,1] + length(initialArima);
+        }
+    }
+    # xreg
+    if(!is.null(initialXreg)){
+        initialXregEstimate[] <- FALSE;
+    }
+    # What the section set, on the branches that ran
+    return(mget(intersect(c("Etype", "initial", "initialArima", "initialArimaEstimate",
+                         "initialEstimate", "initialLevel", "initialLevelEstimate",
+                         "initialSeasonal", "initialSeasonalEstimate", "initialTrend",
+                         "initialTrendEstimate", "initialType", "initialXreg",
+                         "initialXregEstimate", "parametersNumber"), ls())));
+}
+
+
 #### Optimiser / ellipsis parameter processing ####
 adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags, arimaModel) {
     if(is.null(ellipsis$maxeval)){

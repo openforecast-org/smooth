@@ -321,8 +321,9 @@ fitted.msdecompose <- function(object, ...){
 #' @export
 forecast.msdecompose <- function(object, h=10,
                                  interval=c("parametric","semiparametric","nonparametric","none"),
-                                 level=0.95, model=NULL, ...){
+                                 level=0.95, side=c("both","upper","lower"), model=NULL, ...){
     interval <- match.arg(interval,c("parametric","semiparametric","nonparametric","none"));
+    side <- match.arg(side);
     if(is.null(model)){
         model <- switch(errorType(object),
                         "A"="XXX",
@@ -344,7 +345,7 @@ forecast.msdecompose <- function(object, h=10,
     }
     yesModel <- suppressWarnings(adam(yDeseasonalised,model=model,h=h,initial="b",...));
     method <- paste0("ETS(",modelType(yesModel),") with decomposition");
-    yesModel <- forecast(yesModel,h=h,interval=interval,level=level);
+    yesModel <- forecast(yesModel,h=h,interval=interval,level=level,side=side);
 
     yValues <- ts(c(yDeseasonalised,yesModel$mean),start=start(yDeseasonalised),frequency=frequency(yDeseasonalised));
     if(interval!="none"){
@@ -383,7 +384,7 @@ forecast.msdecompose <- function(object, h=10,
     }
 
     return(structure(list(model=object, esmodel=yesModel, method=method,
-                          mean=yForecast, forecast=yForecast, lower=lower, upper=upper, side="both",
+                          mean=yForecast, forecast=yForecast, lower=lower, upper=upper, side=side,
                           level=level, interval=interval),class=c("msdecompose.forecast","smooth.forecast","forecast")));
 }
 

@@ -90,6 +90,11 @@ test_that("forecast() of msdecompose() has the horizon and its interval", {
     # the time and the name)
     expect_equal(start(testForecast$mean), c(1961, 1));
     expect_equal(testForecast$method, "ETS(MAN) with decomposition");
+    # One side: the upper bound of the same level is closer, and only it is printed
+    upperForecast <- forecast(testModel, h=12, level=0.9, model="MAN", side="upper");
+    expect_equal(upperForecast$side, "upper");
+    expect_true(all(upperForecast$upper < testForecast$upper));
+    expect_false(any(grepl("Lower bound", capture.output(print(upperForecast)))));
 })
 
 test_that("plot() of msdecompose() draws all its plots", {

@@ -294,28 +294,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     }
 
     #### Check the lags vector ####
-    if(any(c(lags)<0)){
-        stop("Right! Why don't you try complex lags then, mister smart guy?",call.=FALSE);
-    }
-
-    # If there are zero lags, drop them
-    if(any(lags==0)){
-        lags <- lags[lags!=0];
-    }
-
-    # Form the lags based on the provided stuff. Get rid of ones and leave unique seasonals
-    # Add one for the level
-    lags <- c(1,unique(lags[lags>1]));
-
-    # Warning if the lags length is higher than the sample size
-    if(max(lags) > obsInSample){
-        warning("The maximum lags value is ", max(lags),
-                ", while the sample size is ", obsInSample,
-                ". I cannot fit the seasonal model in this case. ",
-                "Dropping the highest lag.",
-                call.=FALSE);
-        lags <- lags[-which.max(lags)];
-    }
+    list2env(adam_checkLags(lags, obsInSample), envir=environment());
 
     #### ARIMA term ####
     # This should be available for pure models only
@@ -571,41 +550,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     }
 
     #### Loss function type ####
-    if(is.function(loss)){
-        lossFunction <- loss;
-        loss <- "custom";
-        multisteps <- FALSE;
-    }
-    else{
-        loss <- match.arg(loss[1],c("likelihood","MSE","MAE","HAM","LASSO","RIDGE",
-                                    "MSEh","TMSE","GTMSE","MSCE",
-                                    "MAEh","TMAE","GTMAE","MACE",
-                                    "HAMh","THAM","GTHAM","CHAM","GPL",
-                                    "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL",
-                                    # "custom" is set upstream by om() / omg()
-                                    # when the user passes a callable — accept
-                                    # it as a valid string so the rest of the
-                                    # checker pipeline doesn't reject the OM
-                                    # custom-loss flow.
-                                    "custom"));
-
-        if(any(loss==c("MSEh","TMSE","GTMSE","MSCE","MAEh","TMAE","GTMAE","MACE",
-                       "HAMh","THAM","GTHAM","CHAM","GPL",
-                       "aMSEh","aTMSE","aGTMSE","aMSCE","aGPL"))){
-            if(!is.null(h) && h>0){
-                multisteps <- TRUE;
-            }
-            else{
-                stop("The horizon \"h\" needs to be specified and be positive in order for the multistep loss to work.",
-                     call.=FALSE);
-                multisteps <- FALSE;
-            }
-        }
-        else{
-            multisteps <- FALSE;
-        }
-        lossFunction <- NULL;
-    }
+    list2env(adam_checkLoss(loss, h), envir=environment());
 
     #### Explanatory variables: xregModel and regressors ####
     regressors <- match.arg(regressors,c("use","select","adapt"));
@@ -781,51 +726,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     }
 
     #### Phi ####
-    if(etsModel){
-        if(!is.null(phi)){
-            if(all(modelDo!=c("estimate","use"))){
-                warning(paste0("Predefined phi can only be used with preselected ETS model.\n",
-                               "Changing to estimation."),call.=FALSE);
-                phi <- 0.95;
-                phiEstimate <- TRUE;
-            }
-            else{
-                if(!is.numeric(phi) & (damped)){
-                    warning(paste0("Provided value of phi is meaningless. phi will be estimated."),
-                            call.=FALSE);
-                    phi <- 0.95;
-                    phiEstimate <- TRUE;
-                }
-                else if(is.numeric(phi) & (phi<0 | phi>2)){
-                    warning(paste0("Damping parameter should lie in (0, 2) region. ",
-                                   "Changing to the estimation of phi."),call.=FALSE);
-                    phi[] <- 0.95;
-                    phiEstimate <- TRUE;
-                }
-                else{
-                    phiEstimate <- FALSE;
-                    if(damped){
-                        parametersNumber[2,1] <- parametersNumber[2,1] + 1;
-                    }
-                }
-            }
-        }
-        else{
-            if(damped){
-                phiEstimate <- TRUE;
-                phi <- 0.95;
-            }
-            else{
-                phiEstimate <- FALSE;
-                phi <- 1;
-            }
-        }
-    }
-    else{
-        phi <- 1;
-        phiEstimate <- FALSE;
-    }
-
+    list2env(adam_checkPhi(phi, etsModel, modelDo, damped, parametersNumber), envir=environment());
 
     #### Lags for ARIMA ####
     if(arimaModel){

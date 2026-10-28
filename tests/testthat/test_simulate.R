@@ -229,3 +229,38 @@ test_that("plot() of the simulated data draws the series", {
     expect_gt(length(recordPlot()[[1]]), 0);
     dev.off();
 })
+
+# The simulations have no actuals: the lags take the frequency of the generated data, and
+# the CES type is read from its name in words (it was "full" for every type but "none")
+test_that("orders() and lags() of the ETS and CES simulations", {
+    expect_equal(lags(sim.es("ANA", obs=40, frequency=4)), c(1, 4));
+    expect_equal(lags(sim.es("ANN", obs=40, frequency=4)), 1);
+    expected <- list(none=list(orders=2, lags=1), simple=list(orders=2, lags=4),
+                     partial=list(orders=c(2,1), lags=c(1,4)), full=list(orders=c(2,2), lags=c(1,4)));
+    for(type in names(expected)){
+        testData <- sim.ces(type, obs=40, frequency=4);
+        expect_equal(modelType(testData), type);
+        expect_equal(orders(testData), expected[[type]]$orders);
+        expect_equal(lags(testData), expected[[type]]$lags);
+    }
+})
+
+# sim.oes() with several series: the probability has a column per series (it failed),
+# and print() counts the observations from it (it printed 0)
+test_that("sim.oes() generates several series and prints their size", {
+    for(occurrence in c("odds-ratio","inverse-odds-ratio","direct","general")){
+        testData <- sim.oes("MNN", obs=50, nsim=3, occurrence=occurrence, initial=0.5);
+        expect_equal(dim(testData$probability), c(50, 3));
+        expect_length(testData$logLik, 3);
+    }
+    expect_true(any(grepl("Number of generated series: 3", capture.output(print(testData)))));
+    expect_true(any(grepl("Number of observations in each series: 50",
+                          capture.output(print(sim.oes("MNN", obs=50, initial=0.5))))));
+})
+
+test_that("print() of a GUM simulation shows its matrices and likelihood", {
+    testData <- sim.gum(orders=c(1,1), lags=c(1,4), obs=40);
+    printed <- capture.output(print(testData));
+    expect_true(all(c("Persistence vector: ", "Transition matrix: ", "Measurement vector: ") %in% printed));
+    expect_true(any(grepl(paste0("True likelihood: ", round(testData$logLik, 4)), printed, fixed=TRUE)));
+})

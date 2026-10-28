@@ -60,7 +60,8 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
     # paste0() is needed in order to avoid line breaks in the name
     yName <- paste0(deparse(substitute(y)),collapse="");
 
-    # Remove the class
+    # Remove the class, keeping the original time series for the object
+    yOriginal <- if(is.ts(y)) y else as.vector(y);
     y <- as.vector(y);
 
     seasonalLags <- any(lags>1);
@@ -284,7 +285,7 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
         states[,2] <- mean(states[,2], na.rm=TRUE);
     }
 
-    return(structure(list(y=y, states=states, initial=initial, seasonal=patterns, fitted=yFitted,
+    return(structure(list(y=yOriginal, states=states, initial=initial, seasonal=patterns, fitted=yFitted,
                           # gta is the Global Trend, Additive. gtm is the Global Trend, Multiplicative
                           # gta=trendDetermAdd, gtm=trendDetermMult,
                           loss="MSE", lags=lags, type=type, yName=yName, smoother=smoother),
@@ -342,6 +343,7 @@ forecast.msdecompose <- function(object, h=10,
         }
     }
     yesModel <- suppressWarnings(adam(yDeseasonalised,model=model,h=h,initial="b",...));
+    method <- paste0("ETS(",modelType(yesModel),") with decomposition");
     yesModel <- forecast(yesModel,h=h,interval=interval,level=level);
 
     yValues <- ts(c(yDeseasonalised,yesModel$mean),start=start(yDeseasonalised),frequency=frequency(yDeseasonalised));
@@ -380,7 +382,7 @@ forecast.msdecompose <- function(object, h=10,
         upper <- window(upper,yForecastStart);
     }
 
-    return(structure(list(model=object, esmodel=yesModel, method=paste0("ETS(",modelType(yesModel),") with decomposition"),
+    return(structure(list(model=object, esmodel=yesModel, method=method,
                           mean=yForecast, forecast=yForecast, lower=lower, upper=upper, side="both",
                           level=level, interval=interval),class=c("msdecompose.forecast","smooth.forecast","forecast")));
 }

@@ -45,15 +45,20 @@ test_that("orders() and lags() of a simulated SMA are those of the simulation", 
     expect_equal(lags(testData), 1);
 })
 
-# cma() of an odd order is the centred moving average of the data
-test_that("cma() of an odd order is the centred moving average", {
+# cma() is the centred moving average of the data, with half weights at the ends for an
+# even order (the even orders were one period late and ignored the weights)
+test_that("cma() is the centred moving average", {
     passengers <- as.vector(AirPassengers);
-    testModel <- cma(passengers, order=3);
-    inner <- 2:(length(passengers)-1);
-    expect_equal(as.vector(fitted(testModel))[inner],
-                 as.vector(stats::filter(passengers, rep(1/3, 3), sides=2))[inner]);
+    for(order in c(3, 4, 12)){
+        weights <- if(order %% 2 == 1) rep(1/order, order) else c(0.5, rep(1, order-1), 0.5)/order;
+        expected <- as.vector(stats::filter(passengers, weights, sides=2));
+        inner <- !is.na(expected);
+        expect_equal(as.vector(fitted(cma(passengers, order=order)))[inner], expected[inner]);
+    }
     expect_error(cma(passengers[1:5], order=10), "enough observations");
     expect_error(cma(passengers, order=0), "positive number");
+    expect_error(cma(passengers, order=c(3, 5)), "single number");
+    expect_error(sma(passengers, order=c(3, 5)), "single number");
 })
 
 # smoothCombine() with the models provided
@@ -81,6 +86,10 @@ test_that("forecast() of msdecompose() has the horizon and its interval", {
     expect_length(testForecast$mean, 12);
     expect_true(all(testForecast$lower < testForecast$mean & testForecast$mean < testForecast$upper));
     expect_equal(testForecast$level, 0.9);
+    # The forecast continues the time of the series and names the model it used (it lost
+    # the time and the name)
+    expect_equal(start(testForecast$mean), c(1961, 1));
+    expect_equal(testForecast$method, "ETS(MAN) with decomposition");
 })
 
 test_that("plot() of msdecompose() draws all its plots", {
@@ -91,5 +100,13 @@ test_that("plot() of msdecompose() draws all its plots", {
         plot(testModel, which=i);
         expect_gt(length(recordPlot()[[1]]), 0);
         dev.off();
+    }
+})
+
+# The methods that a combination of different models cannot have say so
+test_that("smoothCombine() objects refuse the methods of a single model", {
+    testModel <- smoothCombine(BJsales, models=combinedModels);
+    for(method in c("coef", "rstandard", "rstudent", "outlierdummy", "forecast")){
+        expect_error(do.call(method, list(testModel)), "combination of different models");
     }
 })

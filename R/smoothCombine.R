@@ -347,3 +347,11 @@ smoothCombine <- function(y, models=NULL,
     }
     return(model);
 }
+
+# The models of a combination are not kept for a new horizon: the forecasts come from the
+# h of smoothCombine(), or from reusing the combination with models=
+#' @export
+forecast.smoothC <- function(object, ...){
+    stop(paste0("forecast() is not available for a combination of different models. ",
+                "Set h in smoothCombine(), or reuse the combination with models=."), call.=FALSE);
+}

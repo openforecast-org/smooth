@@ -1654,6 +1654,8 @@ test_that("plot() of adam() draws each of its plots", {
     }
     pdf(NULL);
     expect_message(plot(printModels$combined, which=12), "nothing to plot");
+    # The Q-Q plot of a combination said nothing and drew nothing
+    expect_message(plot(printModels$combined, which=6), "nothing to plot");
     dev.off();
 })
 

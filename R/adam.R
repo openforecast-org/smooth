@@ -3627,6 +3627,12 @@ plot.adam <- function(x, which=c(1,2,4,6), level=0.95, legend=FALSE,
     plot4 <- function(x, ...){
         ellipsis <- list(...);
 
+        # The models of a combination can have different distributions: no single Q-Q plot
+        if(x$distribution=="default"){
+            message("Combination of models was done. Sorry, but there is nothing to plot.");
+            return(invisible(NULL));
+        }
+
         # Amend to do analysis of residuals of scale model
         if(is.scale(x$scale)){
             x <- x$scale;

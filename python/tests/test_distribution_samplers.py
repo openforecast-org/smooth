@@ -40,7 +40,9 @@ def test_ralaplace_matches_greybox_alaplace(alpha):
 
 
 def test_provided_gnorm_shape_survives_fit():
-    y = pd.read_csv(DATA / "sm_positive.csv")["y"].to_numpy(float)
+    y = pd.read_csv(
+        DATA / "sm_positive.csv", float_precision="round_trip"
+    )["y"].to_numpy(float)
     model = ADAM(model="ANN", lags=[1], distribution="dgnorm", gnorm_shape=1.5)
     model.fit(y)
     scale = model.scale

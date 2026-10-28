@@ -449,7 +449,9 @@ class TestADAMLags:
         import pandas as pd
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-        return np.log(pd.read_csv(path)["y"].values.astype(float))
+        return np.log(pd.read_csv(
+            path, float_precision="round_trip"
+        )["y"].values.astype(float))
 
     def test_lags_of_pure_arima(self, log_air):
         """A pure SARIMA has no ETS component lags, but its lags are still [1, 12]."""
@@ -505,7 +507,9 @@ class TestADAMRegularisation:
         import pandas as pd
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-        return np.log(pd.read_csv(path)["y"].values.astype(float))
+        return np.log(pd.read_csv(
+            path, float_precision="round_trip"
+        )["y"].values.astype(float))
 
     @pytest.mark.r_parity
     @pytest.mark.parametrize(
@@ -619,7 +623,9 @@ class TestADAMArmaFixed:
         from ._r_bridge import r_array
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        y = np.log(pd.read_csv(
+            path, float_precision="round_trip"
+        )["y"].values.astype(float))
         model = ADAM(
             model="NNN",
             orders={"ar": [1, 1], "i": [1, 1], "ma": [1, 1]},
@@ -915,7 +921,7 @@ class TestADAMARIMAInitialiser:
         import pandas as pd
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-        return pd.read_csv(path)["y"].values.astype(float)
+        return pd.read_csv(path, float_precision="round_trip")["y"].values.astype(float)
 
     @staticmethod
     def _hr(y, ar, ma, lags, ar_est=True, ma_est=True, arma=(), use=None, bounds=True):
@@ -1139,7 +1145,9 @@ class TestARIMABounds:
         from ._r_bridge import r_dict
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        y = np.log(pd.read_csv(
+            path, float_precision="round_trip"
+        )["y"].values.astype(float))
         core = _adamCore.adamCore(
             lags=np.ones(1, dtype=np.uint64),
             E="A",
@@ -1214,7 +1222,9 @@ class TestARIMABounds:
         from ._r_bridge import r_array
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-        y = np.log(pd.read_csv(path)["y"].values.astype(float))
+        y = np.log(pd.read_csv(
+            path, float_precision="round_trip"
+        )["y"].values.astype(float))
         orders = {"ar": [2, 1], "i": [1, 1], "ma": [1, 1]}
         model = ADAM(model="NNN", orders=orders, lags=[1, 12]).fit(y)
         expected = r_array(
@@ -1236,7 +1246,7 @@ class TestADAMARIMAStates:
         import pandas as pd
 
         path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-        return pd.read_csv(path)["y"].values.astype(float)
+        return pd.read_csv(path, float_precision="round_trip")["y"].values.astype(float)
 
     def test_initials_sum_the_ari_states_by_time(self):
         """Initial k sums ari_L * x[m-L+k] over the ARI lags L >= k."""
@@ -1428,7 +1438,9 @@ def test_arma_parameters_are_those_of_r(arma_r, arma):
     from ._r_bridge import r_dict
 
     path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    y = np.log(pd.read_csv(path)["y"].values.astype(float))
+    y = np.log(pd.read_csv(
+        path, float_precision="round_trip"
+    )["y"].values.astype(float))
     expected = r_dict(
         "{m <- adam(ts(y, frequency=12), 'NNN', orders=list(ar=c(0,1), i=c(1,1),"
         f" ma=c(2,0)), lags=c(1,12), arma={arma_r});"
@@ -1460,7 +1472,7 @@ def test_ics_are_those_of_r(model):
     from ._r_bridge import r_dict
 
     path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    y = pd.read_csv(path, float_precision="round_trip")["y"].to_numpy(dtype=float)
     r = r_dict(
         f"{{m <- adam(ts(y, frequency=12), '{model}');"
         " list(names=names(m$ICs), values=unname(m$ICs))}",
@@ -1775,7 +1787,7 @@ def test_repr_names_the_fitted_model():
     import pandas as pd
 
     path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    air = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    air = pd.read_csv(path, float_precision="round_trip")["y"].to_numpy(dtype=float)
     orders = {"ar": [1, 0], "i": [1, 1], "ma": [1, 1]}
     sarima = ADAM(model="NNN", lags=[1, 12], orders=orders).fit(air)
     assert repr(sarima) == "ADAM(SARIMA(1,1,1)[1](0,1,1)[12], fitted=True)"

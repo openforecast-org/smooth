@@ -37,7 +37,7 @@ R_COEF_X2 = -1.461
 
 @pytest.fixture
 def etsx_data():
-    df = pd.read_csv(DATA_PATH)
+    df = pd.read_csv(DATA_PATH, float_precision="round_trip")
     return df["y"].values, df[["x1", "x2"]].values
 
 
@@ -200,7 +200,10 @@ def test_etsx_adapt_dummies_match_r():
     fit agree with R."""
     from ._r_bridge import r_array
 
-    air = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")
+    air = pd.read_csv(
+        Path(__file__).parent / "data" / "ces_airpassengers.csv",
+        float_precision="round_trip",
+    )
     y = air["y"].values.astype(float)
     X = np.zeros((len(y), 11))
     for month in range(1, 12):

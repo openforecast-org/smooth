@@ -18,7 +18,9 @@ _DATA_DIR = Path(__file__).parent / "data"
 class TestCESProvidedB:
     """The provided ``b`` must match the seasonality it belongs to."""
 
-    y = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].values
+    y = pd.read_csv(
+        _DATA_DIR / "ces_airpassengers.csv", float_precision="round_trip"
+    )["y"].values
 
     def test_full_rejects_a_real_b(self):
         with pytest.raises(ValueError, match="complex second smoothing parameter"):
@@ -92,7 +94,9 @@ def test_sum_r_adds_in_order_as_r():
 def test_ces_takes_the_missing_values_for_gaps():
     """The missing values are skipped by the fit and are not in the loss: the
     likelihood is over the observed values, as its per-observation terms."""
-    y = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].values.astype(float)
+    y = pd.read_csv(
+        _DATA_DIR / "ces_airpassengers.csv", float_precision="round_trip"
+    )["y"].values.astype(float)
     y[[9, 49, 50, 89]] = np.nan
     with pytest.warns(UserWarning, match="NAs"):
         model = CES(seasonality="full", lags=[12]).fit(y)
@@ -105,7 +109,9 @@ def test_ces_takes_the_missing_values_for_gaps():
 def test_reapply_warns_about_the_parameters_the_data_does_not_identify():
     """R: reapply(ces(ts(y, frequency=12), seasonality="partial",
     initial="optimal")) warns that the covariance of potential is not finite."""
-    y = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].to_numpy(dtype=float)
+    y = pd.read_csv(
+        _DATA_DIR / "ces_airpassengers.csv", float_precision="round_trip"
+    )["y"].to_numpy(dtype=float)
     model = CES(seasonality="partial", lags=[12], initial="optimal").fit(y)
     with pytest.warns(UserWarning, match="The covariance of potential is not finite"):
         model.reapply(nsim=20, seed=1)

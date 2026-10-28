@@ -31,7 +31,9 @@ OCCURRENCE_CASES = {"occ_dnorm", "occ_MNN_dnorm"}
 
 
 def _series(name):
-    return pd.read_csv(DATA / f"sm_{name}.csv")["y"].to_numpy(float)
+    return pd.read_csv(
+        DATA / f"sm_{name}.csv", float_precision="round_trip"
+    )["y"].to_numpy(float)
 
 
 def _location(case_id, ref):
@@ -89,7 +91,9 @@ def test_scale_model_matches_r(case_id):
 def test_the_scale_model_takes_the_holdout_of_the_location_model():
     """R: sm(adam(y, "ANN", lags=1, distribution="dnorm", h=12, holdout=TRUE)),
     with y from sm_positive.csv: its $holdout and $accuracy."""
-    y = pd.read_csv(DATA / "sm_positive.csv")["y"].to_numpy(float)
+    y = pd.read_csv(
+        DATA / "sm_positive.csv", float_precision="round_trip"
+    )["y"].to_numpy(float)
     location = ADAM(model="ANN", lags=[1], distribution="dnorm", h=12, holdout=True)
     scale_model = sm(location.fit(y))
     np.testing.assert_allclose(

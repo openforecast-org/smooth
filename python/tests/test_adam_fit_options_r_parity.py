@@ -13,7 +13,10 @@ from tests._r_bridge import r_dict
 
 pytestmark = pytest.mark.r_parity
 
-Y = pd.read_csv(pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv")
+Y = pd.read_csv(
+    pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv",
+    float_precision="round_trip",
+)
 Y = Y["y"].to_numpy(dtype=float)
 
 

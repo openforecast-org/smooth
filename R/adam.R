@@ -2059,7 +2059,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
         # Fix the cases, when we have zeroes in the provided occurrence. At the missing
         # values the fitted is the prediction of the model
-        if(occurrence=="provided"){
+        if(occurrence=="provided" && !occurrenceModel){
             zeroObserved <- !otLogical & !yNAValues[1:obsInSample];
             yFitted[zeroObserved] <- yFitted[zeroObserved] * pFitted[zeroObserved];
         }
@@ -2084,7 +2084,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
 
             # Amend forecasts, multiplying by probability
-            if(occurrenceModel && !occurrenceModelProvided){
+            if(occurrenceModel && !occurrenceModelProvided && occurrence!="provided"){
                 yForecast[] <- yForecast * as.numeric(suppressWarnings(forecast(omModel, h=h))$mean);
             }
             else if((occurrenceModel && occurrenceModelProvided) || occurrence=="provided"){
@@ -2233,7 +2233,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
     }
 
     #### Deal with occurrence model ####
-    if(occurrenceModel && !occurrenceModelProvided){
+    if(occurrenceModel && !occurrenceModelProvided && occurrence!="provided"){
         omModel <- suppressWarnings(om(data=data, model=model, lags=lags,
                                         orders=orders, occurrence=occurrence, formula=formula,
                                         ic=ic, h=horizon,
@@ -5091,13 +5091,15 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
             newCall$shape <- object$other$shape;
         }
     }
-    # With missing values only, the occurrence is internal (all ones): the refits make their own
-    if(is.occurrence(object$occurrence) && object$occurrence$occurrence=="provided" &&
-       all(fitted(object$occurrence)==1)){
+    # Provided probabilities of occurrence: each refit takes those of its observations. With
+    # missing values only they are internal (all ones): the refits make their own
+    newCall$occurrence <- object$occurrence;
+    occurrenceProvided <- NULL;
+    if(is.list(object$occurrence) && identical(object$occurrence$occurrence, "provided")){
         newCall$occurrence <- "none";
-    }
-    else{
-        newCall$occurrence <- object$occurrence;
+        if(any(fitted(object$occurrence)!=1)){
+            occurrenceProvided <- as.vector(fitted(object$occurrence));
+        }
     }
 
     # If this is backcasting, do sampling with moving origin
@@ -5167,7 +5169,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         # Do the bootstrap
         if(!parallel){
             for(i in 1:nsim){
-                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]], occurrenceProvided);
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5175,7 +5177,7 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         else{
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
-                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, newData[[i]], occurrenceProvided);
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })
@@ -5190,7 +5192,8 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
         if(!parallel){
             for(i in 1:nsim){
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE],
+                                              occurrenceProvided[subsetValues]);
                 testModel <- suppressWarnings(eval(newCall));
                 coefBootstrap[i,variablesNames %in% names(coef(testModel))] <- coef(testModel);
             }
@@ -5199,7 +5202,8 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
             # We don't do rbind for security reasons - in order to deal with skipped variables
             coefBootstrapParallel <- foreach::`%dopar%`(foreach::foreach(i=1:nsim),{
                 subsetValues <- sampler(indices,size,replace,prob,regressionPure,changeOrigin);
-                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE]);
+                newCall <- adam_bootstrapData(newCall, dataArgument, object$data[subsetValues,,drop=FALSE],
+                                              occurrenceProvided[subsetValues]);
                 testModel <- eval(newCall);
                 return(coef(testModel));
             })
@@ -5227,14 +5231,17 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
 }
 
 # The data of a refit in coefbootstrap(): tbats() takes the response and the regressors
-# in separate arguments
-adam_bootstrapData <- function(newCall, dataArgument, data){
+# in separate arguments; the provided probabilities of occurrence are those of the data
+adam_bootstrapData <- function(newCall, dataArgument, data, occurrence=NULL){
     if(dataArgument=="y" && NCOL(data)>1){
         newCall$y <- data[,1];
         newCall$xreg <- data[,-1,drop=FALSE];
     }
     else{
         newCall[[dataArgument]] <- data;
+    }
+    if(!is.null(occurrence)){
+        newCall$occurrence <- occurrence;
     }
     return(newCall);
 }
@@ -6477,7 +6484,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             # If this was provided occurrence, then use provided values
             if(!is.null(object$occurrence) && is.list(object$occurrence) &&
                !is.null(object$occurrence$occurrence) &&
-               (object$occurrence$occurrence=="provided") && !is.na(object$occurrence$forecast)){
+               (object$occurrence$occurrence=="provided") && !anyNA(object$occurrence$forecast)){
                 pForecast <- object$occurrence$forecast;
             }
             else{
@@ -6485,12 +6492,27 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
             }
         }
     }
+    # The provided occurrence (not the missing values only), whose horizon is expected
+    occurrenceProvided <- is.null(occurrence) && is.list(object$occurrence) &&
+        identical(object$occurrence$occurrence, "provided") && any(fitted(object$occurrence)!=1);
+    if(occurrenceProvided && anyNA(object$occurrence$forecast)){
+        pForecast <- tail(as.vector(fitted(object$occurrence)), 1);
+    }
     # Make sure that the values are of the correct length
     if(h<length(pForecast)){
         pForecast <- pForecast[1:h];
     }
     else if(h>length(pForecast)){
         pForecast <- c(pForecast, rep(tail(pForecast,1), h-length(pForecast)));
+    }
+    if(occurrenceProvided && (anyNA(object$occurrence$forecast) ||
+                              h>length(object$occurrence$forecast))){
+        warning(paste0("The occurrence of the horizon is not provided. ",
+                       "Using the last value available."), call.=FALSE);
+    }
+    # Provided probabilities, rather than the values of the occurrence, make a mixture
+    if(!occurrenceModel && any(pForecast>0 & pForecast<1)){
+        occurrenceModel[] <- TRUE;
     }
 
     # How many levels did user asked to produce
@@ -7632,14 +7654,14 @@ pointLik.adam <- function(object, log=TRUE, ...){
     obsInSample <- nobs(object);
     # The missing observations are not in the likelihood: their values stay zero
     observed <- !is.na(as.vector(yInSample));
-    pOccurrence <- if(is.occurrence(object$occurrence)) as.vector(fitted(object$occurrence)) else
-        rep(1, obsInSample);
+    # The probabilities of an occurrence model, or the provided occurrence or probabilities
+    pOccurrence <- tbats_pFitted(object);
     # With missing values alone, the occurrence is provided as ones at the observed values:
     # no mixture there
-    mixture <- is.occurrence(object$occurrence) && any(pOccurrence[observed]!=1);
+    mixture <- !is.null(object$occurrence) && any(pOccurrence[observed]!=1);
     if(mixture){
         otLogical <- observed & (as.vector(yInSample)!=0);
-        yFitted <- fitted(object) / fitted(object$occurrence);
+        yFitted <- fitted(object) / pOccurrence;
     }
     else{
         otLogical <- observed;

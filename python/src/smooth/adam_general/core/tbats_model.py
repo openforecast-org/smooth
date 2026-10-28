@@ -93,15 +93,19 @@ def _named_b(fitted: Dict[str, Any]) -> Dict[str, float]:
 def _refit_one_replicate(
     actuals: NDArray,
     X: Optional[NDArray],
+    occurrence: Optional[NDArray],
     indices: List[NDArray],
     kwargs: Dict[str, Any],
     k: int,
     i: int,
 ) -> Optional[NDArray]:
-    """One bootstrap replicate: the parameters of the refit, or None. Module-level,
-    so that joblib can pickle it."""
+    """One bootstrap replicate: the parameters of the refit, or None; the provided
+    probabilities of occurrence are those of its observations. Module-level, so that
+    joblib can pickle it."""
     try:
         X_i = None if X is None else X[indices[i]]
+        if occurrence is not None:
+            kwargs = {**kwargs, "occurrence": occurrence[indices[i]]}
         coef = TBATS(**kwargs).fit(actuals[indices[i]], X_i).coef
     except Exception:
         return None
@@ -2453,14 +2457,10 @@ class TBATS:
             kwargs["regressors"] = (
                 "adapt" if self._best["struct"]["xreg_adapt"] else "use"
             )
-        # The occurrence model is refitted on the sample, with its type
+        # The occurrence model is refitted on the sample, with its type; the provided
+        # probabilities are those of the sample (coefbootstrap() passes them)
         model = self._occurrence["model"]
-        if model is not None:
-            if isinstance(model, dict):
-                raise ValueError(
-                    "The refits need an occurrence model, not the provided "
-                    "probabilities."
-                )
+        if model is not None and not isinstance(model, dict):
             kwargs["occurrence"] = model.occurrence
         if self.distribution_ == "dgnorm" and "shape" not in self.coef_names:
             kwargs["gnorm_shape"] = self._best["elements"]["shape"]
@@ -2495,10 +2495,12 @@ class TBATS:
             np.random.default_rng(seed),
         )
         xreg = self._best["struct"]["xreg"]
+        model = self._occurrence["model"]
         worker = partial(
             _refit_one_replicate,
             self.actuals,
             None if xreg is None else xreg["data"],
+            np.asarray(model["fitted"]) if isinstance(model, dict) else None,
             indices,
             self._refit_kwargs(),
             len(names),

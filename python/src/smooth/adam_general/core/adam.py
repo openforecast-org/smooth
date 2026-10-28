@@ -29,6 +29,7 @@ from smooth.adam_general.core.utils.utils import (
     OUTLIER_NAMES,
     SMOOTHER_DEFAULT,
     SmootherType,
+    _log_r,
     observed_mask,
     resolve_smoother,
     scale_debias,
@@ -95,6 +96,7 @@ class OutlierDummy:
 def _adam_refit_one_replicate(
     actuals: NDArray,
     xreg: Optional[NDArray],
+    occurrence: Optional[NDArray],
     idx_matrix: Union[NDArray, list[NDArray]],
     refit_cls_name: str,
     model_spec: Any,
@@ -111,13 +113,16 @@ def _adam_refit_one_replicate(
     pickled payload small and avoids any class-identity issues across
     interpreters. ``i`` is the *last* positional argument so callers can
     bind everything else with :func:`functools.partial` and pass the
-    integer index as the call site.
+    integer index as the call site. The provided probabilities of occurrence are
+    those of the observations of the replicate.
     """
     from smooth.adam_general.core.ces_model import CES as _CES
     from smooth.adam_general.core.om import OM as _OM
 
     refit_cls = {"OM": _OM, "CES": _CES}.get(refit_cls_name, ADAM)
     y_boot = actuals[idx_matrix[i]]
+    if occurrence is not None:
+        refit_kwargs = {**refit_kwargs, "occurrence": occurrence[idx_matrix[i]]}
     try:
         if include_model_kwarg:
             boot_model = refit_cls(model=model_spec, **refit_kwargs)
@@ -615,7 +620,7 @@ class ADAM:
         bounds: Literal["usual", "admissible", "none"] = "usual",
         # ``str`` (not just OCCURRENCE_OPTIONS) so OM/wrappers can forward
         # runtime-validated strings and OM may override it as a property.
-        occurrence: Union[OCCURRENCE_OPTIONS, str] = "none",
+        occurrence: Union[OCCURRENCE_OPTIONS, str, NDArray] = "none",
         # ---- These are the estimated parameters that we can choose to fix ----
         # Dictionary of terms e.g. {"alpha": 0.5, "beta": 0.5}
         persistence: Optional[Union[Dict[str, float], float]] = None,
@@ -730,7 +735,7 @@ class ADAM:
             polynomial of ARIMA is also required to be stationary. Forecastability is
             weaker than stability, which would require the effect of every state to
             decay.
-        occurrence : OCCURRENCE_OPTIONS or fitted OM / OMG, default="none"
+        occurrence : OCCURRENCE_OPTIONS, fitted OM / OMG or array-like, default="none"
             The model of the probability of occurrence, for intermittent data:
 
             - ``"none"``: no occurrence model; zeros are ordinary values.
@@ -750,6 +755,16 @@ class ADAM:
             and is used as it stands (R's ``oes`` / ``om`` object); its
             parameters are then not counted in ``nparam``. An unknown string
             switches to ``"none"`` with a warning.
+
+            An array gives the provided occurrence of the in-sample observations,
+            followed by that of the horizon (R's numeric ``occurrence``). Zeros
+            and ones are used as they are, without uncertainty. Probabilities
+            (values between zero and one) make a mixture with known
+            probabilities: the sizes are fitted to the non-zero values, the
+            likelihood adds that of the occurrence, and the fitted values and
+            forecasts are the probabilities times those of the sizes. Without
+            the values of the horizon, the last one available is used, with a
+            warning.
         persistence : Optional[Dict[str, float]], default=None
             Fixed persistence parameters (e.g., {"alpha": 0.5, "beta": 0.5}).
             If None, parameters are estimated.
@@ -1194,17 +1209,21 @@ class ADAM:
             zero = ~ot_logical if missing is None else ~ot_logical & ~missing
             self._observations["obs_zero"] = int(np.sum(zero))
             occurrence = self._occurrence["occurrence"]
-            # Already fitted: take it as it is, the way R reuses
-            # object$occurrence rather than estimating a second one.
-            self._om_model = (
-                occurrence
-                if not isinstance(occurrence, str)
-                else self._fit_occurrence_model(y, X)
-            )
-            # At a missing observation the probability is the prediction of the
-            # occurrence model: the likelihoods leave the gap out, as R
-            self._occurrence["p_fitted"] = np.array(self._om_model.fitted, dtype=float)
-            self._occurrence["oes_model"] = occurrence
+            # The provided probabilities are known: there is no occurrence model
+            if not (isinstance(occurrence, str) and occurrence == "provided"):
+                # Already fitted: take it as it is, the way R reuses
+                # object$occurrence rather than estimating a second one.
+                self._om_model = (
+                    occurrence
+                    if not isinstance(occurrence, str)
+                    else self._fit_occurrence_model(y, X)
+                )
+                # At a missing observation the probability is the prediction of the
+                # occurrence model: the likelihoods leave the gap out, as R
+                self._occurrence["p_fitted"] = np.array(
+                    self._om_model.fitted, dtype=float
+                )
+                self._occurrence["oes_model"] = occurrence
 
         # Execute model estimation or selection based on model_do
         if self._model_type["model_do"] == "estimate":
@@ -1243,7 +1262,7 @@ class ADAM:
 
         # Scale the demand-sizes fitted values by the occurrence probability
         # so the resulting ``fitted`` series is on the original (mixed) scale.
-        if self._om_model is not None:
+        if self._occurrence.get("occurrence_model"):
             p = self._occurrence["p_fitted"]
             yf = self._prepared["y_fitted"]
             if isinstance(yf, pd.Series):
@@ -1266,15 +1285,19 @@ class ADAM:
             # had no effect: the property reads the table whenever it exists.
             # A *provided* occurrence model was estimated elsewhere, so its
             # parameters go in the provided row and stay out of nparam --
-            # R writes parametersNumber[2,3] for that case (R/adam.R:2235).
-            row = (
-                self._n_param.provided
-                if not isinstance(occurrence, str)
-                else self._n_param.estimated
-            )
-            row["occurrence"] = int(self._om_model.nparam)
-            self._n_param.update_totals()
-            self._adam_estimated["n_param_estimated"] = self._n_param.estimated["all"]
+            # R writes parametersNumber[2,3] for that case (R/adam.R:2235). The
+            # provided probabilities have no parameters
+            if self._om_model is not None:
+                row = (
+                    self._n_param.provided
+                    if not isinstance(occurrence, str)
+                    else self._n_param.estimated
+                )
+                row["occurrence"] = int(self._om_model.nparam)
+                self._n_param.update_totals()
+                self._adam_estimated["n_param_estimated"] = self._n_param.estimated[
+                    "all"
+                ]
 
         # Store fitted parameters with trailing underscores
         self._set_fitted_attributes()
@@ -3335,17 +3358,22 @@ class ADAM:
                 "shape", self.other.get("nu", self.other.get("alpha"))
             )
 
-        occurrence_model = bool(self._occurrence.get("occurrence_model", False))
         # The missing observations are not in the likelihood: their values stay zero
         observed = ~np.isnan(y)
+        # The probabilities of an occurrence model, or the provided occurrence or
+        # probabilities, as R
+        p_fitted = self._occurrence.get("p_fitted")
+        occurrence_model = p_fitted is not None
         if occurrence_model:
-            p_fitted = np.asarray(self._occurrence["p_fitted"], dtype=float).ravel()
-            # The probability is zero at the missing observations, which stay NaN
+            p_fitted = np.asarray(p_fitted, dtype=float).ravel()
+            # The probability is zero at the missing observations and at the provided
+            # zeros, which stay NaN
             y_fitted = np.full(obs, np.nan)
-            y_fitted[observed] = (
-                np.asarray(self.fitted, dtype=float).ravel()[observed]
-                / p_fitted[observed]
-            )
+            with np.errstate(divide="ignore", invalid="ignore"):
+                y_fitted[observed] = (
+                    np.asarray(self.fitted, dtype=float).ravel()[observed]
+                    / p_fitted[observed]
+                )
             ot_logical = observed & (y != 0)
         else:
             y_fitted = np.asarray(self.fitted, dtype=float).ravel()
@@ -3387,7 +3415,12 @@ class ADAM:
                 )
             if hasattr(om_model, "point_lik"):
                 occurrence_lik = np.asarray(om_model.point_lik(), dtype=float).ravel()
-                lik_values[observed] = lik_values[observed] + occurrence_lik[observed]
+            else:
+                with np.errstate(divide="ignore"):
+                    occurrence_lik = np.where(
+                        ot_logical, _log_r(p_fitted), _log_r(1 - p_fitted)
+                    )
+            lik_values[observed] = lik_values[observed] + occurrence_lik[observed]
 
         if not log:
             lik_values = np.exp(lik_values)
@@ -3919,6 +3952,20 @@ class ADAM:
         # and interval adjustment (R: forecast.adam lines 6134-6172, 6204-6210).
         p_forecast_arr = None
         om_model = getattr(self, "_om_model", None)
+        # The provided occurrence of the horizon is expected: without it, the last
+        # value available, as R
+        provided = self._occurrence.get("occurrence")
+        if occurrence is None and isinstance(provided, str) and provided == "provided":
+            occurrence = self._occurrence.get("p_forecast")
+            if occurrence is None or len(occurrence) < h:
+                warnings.warn(
+                    "The occurrence of the horizon is not provided. "
+                    "Using the last value available.",
+                    stacklevel=2,
+                )
+                if occurrence is None:
+                    occurrence = self._occurrence["p_fitted"][-1:]
+            occurrence = np.r_[occurrence, np.repeat(occurrence[-1], h)][:h]
         if occurrence is not None:
             p_forecast_arr = np.ravel(np.asarray(occurrence, dtype=float))
         elif om_model is not None:
@@ -5921,6 +5968,14 @@ class ADAM:
             "ub": np.full(start.shape, np.inf),
         }
 
+        # The provided occurrence or probabilities: each refit takes those of its
+        # observations, without a horizon
+        occurrence = None
+        provided = self._occurrence.get("occurrence")
+        if isinstance(provided, str) and provided == "provided":
+            occurrence = np.asarray(self._occurrence["p_fitted"], dtype=float)
+            refit_kwargs["h"] = 0
+
         actuals = np.asarray(self.actuals, dtype=float)
         # A scale model fitted in logs (sm()) is refitted to the logarithms
         if self._log_model:
@@ -5932,6 +5987,7 @@ class ADAM:
             _adam_refit_one_replicate,
             actuals,
             xreg,
+            occurrence,
             idx_list,
             refit_cls_name,
             model_spec,
@@ -7194,17 +7250,14 @@ class ADAM:
         )
 
         # ---------- occurrence mask --------------------------------------
-        occurrence_model = getattr(self, "occurrence", None)
-        if occurrence_model in (None, "none", "fixed"):
+        # The probabilities of the occurrence model, or the provided occurrence or
+        # probabilities, as R's fitted(object$occurrence)
+        fitted_occ = self._occurrence.get("p_fitted")
+        if fitted_occ is None:
             pt = np.ones(obs, dtype=np.float64)
             mat_ot = np.ones((obs, nsim), dtype=np.float64)
         else:
-            fitted_occ = getattr(self, "occurrence_fitted", None)
-            pt = (
-                np.asarray(fitted_occ, dtype=np.float64).ravel()
-                if fitted_occ is not None
-                else np.ones(obs, dtype=np.float64)
-            )
+            pt = np.asarray(fitted_occ, dtype=np.float64).ravel()
             if pt.size < obs:
                 pt = np.concatenate(
                     [pt, np.full(obs - pt.size, pt[-1] if pt.size else 1.0)]

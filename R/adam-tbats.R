@@ -2020,11 +2020,9 @@ tbats_refitCall <- function(object){
     if(!is.null(object$xregNames)){
         arguments$regressors <- if(object$regressors=="adapt") "adapt" else "use";
     }
-    # The occurrence model is refitted on the sample, with its type
-    if(!is.null(object$occurrence)){
-        if(!is.occurrence(object$occurrence)){
-            stop("The refits need an occurrence model, not the provided probabilities.", call.=FALSE);
-        }
+    # The occurrence model is refitted on the sample, with its type; the provided probabilities
+    # are those of the sample (coefbootstrap.adam() passes them)
+    if(is.occurrence(object$occurrence) && object$occurrence$occurrence!="provided"){
         arguments$occurrence <- object$occurrence$occurrence;
     }
     if(object$distribution=="dgnorm" && !any(names(object$B)=="shape")){

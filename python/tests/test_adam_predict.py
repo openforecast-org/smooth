@@ -3,6 +3,7 @@
 import warnings
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from smooth.adam_general.core.adam import ADAM
@@ -713,3 +714,25 @@ def test_documented_intervals_are_implemented(interval):
         model = ADAM(model="AAA", lags=[12]).fit(y)
         result = model.predict(h=6, interval=interval, nsim=100)
     assert np.all(result.lower.to_numpy() <= result.upper.to_numpy())
+
+
+@pytest.mark.parametrize(
+    "index, start",
+    [
+        # Dates without their frequency, which pandas infers
+        (pd.DatetimeIndex(pd.date_range("2020-01-01", periods=48, freq="MS").values),
+         pd.Timestamp("2024-01-01")),
+        (pd.period_range("2020-01", periods=48, freq="M"), pd.Period("2024-01", "M")),
+    ],
+)
+def test_the_forecast_continues_the_dates_of_the_index(index, start):
+    """The fitted values keep the dates of the series and the forecasts continue
+    them, also for an index without its frequency and for periods."""
+    y = pd.Series(100 + np.cumsum(np.sin(np.arange(48))), index=index)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = ADAM(model="ANN").fit(y)
+        forecast = model.predict(h=3, interval="approximate")
+    assert list(model.fitted.index) == list(index)
+    assert forecast.mean.index[0] == start
+    assert list(forecast.upper.index) == list(forecast.mean.index)

@@ -202,6 +202,13 @@ def sampling_vcov(vcov) -> NDArray:
     vcov_arr = np.array(vcov, dtype=float)
     non_finite = ~np.isfinite(np.diag(vcov_arr))
     if np.any(non_finite):
+        names = np.asarray(getattr(vcov, "index", range(len(vcov_arr))), dtype=str)
+        warnings.warn(
+            f"The covariance of {', '.join(names[non_finite])} is not finite (the "
+            "data does not identify these), so they are held at their estimates "
+            "in the refit.",
+            stacklevel=3,
+        )
         vcov_arr[non_finite, :] = 0.0
         vcov_arr[:, non_finite] = 0.0
     return _psd_correct(vcov_arr)

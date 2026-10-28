@@ -86,6 +86,24 @@ def test_scale_model_matches_r(case_id):
     )
 
 
+def test_the_scale_model_takes_the_holdout_of_the_location_model():
+    """R: sm(adam(y, "ANN", lags=1, distribution="dnorm", h=12, holdout=TRUE)),
+    with y from sm_positive.csv: its $holdout and $accuracy."""
+    y = pd.read_csv(DATA / "sm_positive.csv")["y"].to_numpy(float)
+    location = ADAM(model="ANN", lags=[1], distribution="dnorm", h=12, holdout=True)
+    scale_model = sm(location.fit(y))
+    np.testing.assert_allclose(
+        scale_model.holdout_data,
+        [17.18558, 56.1048, 101.7692, 7.218316, 73.21266, 15.38454, 0.4211838,
+         119.2683, 108.5241, 37.49433, 65.00089, 70.30147],
+        rtol=1e-6,
+    )
+    accuracy = {name: scale_model.accuracy[name] for name in ("ME", "MAE", "MSE")}
+    assert accuracy == pytest.approx(
+        {"ME": -36.03994, "MAE": 44.95167, "MSE": 2832.677}, rel=1e-6
+    )
+
+
 def test_rejects_non_likelihood_loss():
     y = _series("positive")
     model = ADAM(model="ANN", lags=[1], loss="MSE")

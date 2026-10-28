@@ -1,6 +1,8 @@
 import warnings
 
 import numpy as np
+import pandas as pd
+from pandas.tseries.frequencies import to_offset
 
 from smooth.adam_general import _ols  # type: ignore[attr-defined]
 
@@ -311,14 +313,16 @@ def _calculate_ot_logical(
             y_na_values[: len(ot_logical)], dtype=bool
         )
 
-    # Determine frequency from pandas index if available
+    # Determine frequency from pandas index if available: its own, or the one pandas
+    # infers from the dates of an index without it
     freq = "1"
-    if (
-        hasattr(data, "index")
-        and hasattr(data.index, "freq")
-        and data.index.freq is not None
-    ):
-        freq = data.index.freq
+    index = getattr(data, "index", None)
+    index_freq = getattr(index, "freq", None)
+    if index_freq is None and isinstance(index, pd.DatetimeIndex):
+        inferred = pd.infer_freq(index) if len(index) > 2 else None
+        index_freq = None if inferred is None else to_offset(inferred)
+    if index_freq is not None:
+        freq = index_freq
 
     # Get start time if available
     y_start = 0  # Default
@@ -344,15 +348,15 @@ def _calculate_ot_logical(
                     y_forecast_start = last_idx + freq_delta
                 else:
                     # For numeric index
-                    if hasattr(data.index, "freq") and data.index.freq is not None:
-                        y_forecast_start = data.index[-1] + data.index.freq
+                    if index_freq is not None:
+                        y_forecast_start = data.index[-1] + index_freq
                     else:
                         # Fallback for numeric index without freq - use integer
                         y_forecast_start = int(data.index[-1]) + 1
             except (ImportError, AttributeError, ValueError):
                 # Fallback: use the last index + freq
-                if hasattr(data.index, "freq") and data.index.freq is not None:
-                    y_forecast_start = data.index[-1] + data.index.freq
+                if index_freq is not None:
+                    y_forecast_start = data.index[-1] + index_freq
                 else:
                     # Ultimate fallback for numeric index - use integer
                     y_forecast_start = int(data.index[-1]) + 1
@@ -380,8 +384,6 @@ def _calculate_ot_logical(
             result["y_in_sample_index"] = data.index
             # Create forecast index
             try:
-                import pandas as pd
-
                 result["y_forecast_index"] = pd.date_range(
                     start=y_forecast_start, periods=h, freq=freq
                 )

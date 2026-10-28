@@ -1766,3 +1766,17 @@ def test_admissible_bounds_check_the_whole_model(
         len(y),
     )
     assert (penalty == 0) == admissible
+
+
+def test_repr_names_the_fitted_model():
+    """repr() takes the name of the model, as for ETS, also for ARIMA."""
+    import pathlib
+
+    import pandas as pd
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    air = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    orders = {"ar": [1, 0], "i": [1, 1], "ma": [1, 1]}
+    sarima = ADAM(model="NNN", lags=[1, 12], orders=orders).fit(air)
+    assert repr(sarima) == "ADAM(SARIMA(1,1,1)[1](0,1,1)[12], fitted=True)"
+    assert repr(ADAM(model="ANN").fit(air)) == "ADAM(ETS(ANN), fitted=True)"

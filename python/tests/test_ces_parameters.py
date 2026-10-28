@@ -100,3 +100,12 @@ def test_ces_takes_the_missing_values_for_gaps():
     assert np.sum(model.point_lik()) == pytest.approx(model.loglik, rel=1e-12)
     np.testing.assert_array_equal(np.isnan(model.residuals), np.isnan(y))
     assert np.all(np.isfinite(model.predict(h=12, interval="prediction").upper))
+
+
+def test_reapply_warns_about_the_parameters_the_data_does_not_identify():
+    """R: reapply(ces(ts(y, frequency=12), seasonality="partial",
+    initial="optimal")) warns that the covariance of potential is not finite."""
+    y = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].to_numpy(dtype=float)
+    model = CES(seasonality="partial", lags=[12], initial="optimal").fit(y)
+    with pytest.warns(UserWarning, match="The covariance of potential is not finite"):
+        model.reapply(nsim=20, seed=1)

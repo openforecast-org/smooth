@@ -109,3 +109,22 @@ def test_reapply_warns_about_the_parameters_the_data_does_not_identify():
     model = CES(seasonality="partial", lags=[12], initial="optimal").fit(y)
     with pytest.warns(UserWarning, match="The covariance of potential is not finite"):
         model.reapply(nsim=20, seed=1)
+
+
+def test_ces_fits_with_the_coefficients_of_the_regressors_it_reports():
+    """With backcasting, the coefficients went into the states of CES and the
+    regressors kept their starting values (R's filler, R/adam-ces.R, had the same
+    bug)."""
+    rng = np.random.default_rng(41)
+    X = pd.DataFrame({"x1": rng.normal(size=120), "x2": rng.normal(size=120)})
+    y = (
+        10
+        + np.cumsum(rng.normal(0, 0.3, 120))
+        + 2 * X["x1"]
+        - 1.5 * X["x2"]
+        + rng.normal(0, 0.5, 120)
+    )
+    model = CES(regressors="use").fit(y.values, X)
+    coefficients = np.asarray(model.coef)[-2:]
+    np.testing.assert_allclose(np.asarray(model.states)[2:, 0], coefficients)
+    np.testing.assert_allclose(coefficients, [2, -1.5], atol=0.1)

@@ -82,6 +82,7 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* `CES` with regressors and `initial="backcasting"` (the default), `"gradient"` or `"provided"` wrote the estimated coefficients into the states of CES, as R did, so the fit used the starting values of the regressors; they now go into the states of the regressors, as in the fixed R.
 * `sm()` takes the holdout of a location model fitted with `holdout=True`, with its accuracy, as R: it read an attribute the fitted model no longer has, and fitted none.
 * The fitted values and forecasts keep the dates of a `DatetimeIndex` without its frequency (pandas infers it) and of a `PeriodIndex`: they fell back to 0, 1, 2, ...
 * `reapply()` warns, as R, which parameters it holds at their estimates because the data does not identify them (`potential` of `CES`, for example).

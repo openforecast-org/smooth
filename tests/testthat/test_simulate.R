@@ -175,3 +175,15 @@ test_that("sim.es gives each inverse Gaussian simulation its own likelihood", {
     })
     expect_equal(as.numeric(y$logLik), expected)
 })
+
+test_that("sim.ssarima() uses its constant and its generated initial states", {
+    # The constant state was one whatever the constant, and the generated initials
+    # were replaced by ones, which also set the scale of the errors
+    set.seed(1);
+    testData <- sim.ssarima(orders=list(ar=0,i=1,ma=0), obs=2000, constant=5);
+    expect_equal(mean(diff(as.vector(testData$data))), 5, tolerance=0.05);
+    # The errors are scaled by the square root of the first state, drawn in [0, 1000]
+    errorVariances <- replicate(20, var(as.vector(sim.ssarima(orders=list(ar=2,i=0,ma=2),
+                                                              obs=60)$residuals)));
+    expect_gt(median(errorVariances), 10);
+})

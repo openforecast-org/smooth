@@ -922,6 +922,685 @@ adam_checkInitial <- function(Etype, Stype, arimaModel, componentsNumberETSSeaso
 }
 
 
+#### Model: the ETS model or the pool, its components and the error type ####
+adam_checkModel <- function(fast, model, modelDo){
+    if(!is.character(model)){
+        stop(paste0("Something strange is provided instead of character object in model: ",
+                    paste0(model,collapse=",")),call.=FALSE);
+    }
+
+    # Predefine models pool for a model selection
+    modelsPool <- NULL;
+    if(!fast){
+        # Deal with the list of models. Check what has been provided. Stop if there is a mistake.
+        if(length(model)>1){
+            if(any(nchar(model)>4) || any(nchar(model)<3)){
+                stop(paste0("You have defined strange model(s) in the pool: ",
+                            paste0(model[nchar(model)>4 | nchar(model)<3],collapse=",")),call.=FALSE);
+            }
+            else if(any(substr(model,1,1)!="A" & substr(model,1,1)!="M" & substr(model,1,1)!="C")){
+                stop(paste0("You have defined strange model(s) in the pool: ",
+                            paste0(model[substr(model,1,1)!="A" & substr(model,1,1)!="M"],collapse=",")),
+                     call.=FALSE);
+            }
+            else if(any(substr(model,2,2)!="N" & substr(model,2,2)!="A" &
+                        substr(model,2,2)!="M" & substr(model,2,2)!="C")){
+                stop(paste0("You have defined strange model(s) in the pool: ",
+                            paste0(model[substr(model,2,2)!="N" & substr(model,2,2)!="A" &
+                                             substr(model,2,2)!="M"],collapse=",")),call.=FALSE);
+            }
+            else if(any(substr(model,3,3)!="N" & substr(model,3,3)!="A" &
+                        substr(model,3,3)!="M" & substr(model,3,3)!="d" & substr(model,3,3)!="C")){
+                stop(paste0("You have defined strange model(s) in the pool: ",
+                            paste0(model[substr(model,3,3)!="N" & substr(model,3,3)!="A" &
+                                             substr(model,3,3)!="M" & substr(model,3,3)!="d"],collapse=",")),
+                     call.=FALSE);
+            }
+            else if(any(nchar(model)==4 & substr(model,4,4)!="N" & substr(model,4,4)!="A" &
+                        substr(model,4,4)!="M" & substr(model,4,4)!="C")){
+                stop(paste0("You have defined strange model(s) in the pool: ",
+                            paste0(model[nchar(model)==4 & substr(model,4,4)!="N" &
+                                             substr(model,4,4)!="A" & substr(model,4,4)!="M"],collapse=",")),
+                     call.=FALSE);
+            }
+            else{
+                modelsPoolCombiner <- (substr(model,1,1)=="C" | substr(model,2,2)=="C" |
+                                           substr(model,3,3)=="C" | substr(model,4,4)=="C");
+                modelsPool <- model[!modelsPoolCombiner];
+                modelsPool <- unique(modelsPool);
+                if(any(modelsPoolCombiner)){
+                    if(any(substr(model,nchar(model),nchar(model))!="N")){
+                        model <- "CCC";
+                    }
+                    else{
+                        model <- "CCN";
+                    }
+                }
+                else{
+                    model <- c("Z","Z","Z");
+                    if(all(substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N")){
+                        model[3] <- "N";
+                    }
+                    if(all(substr(modelsPool,2,2)=="N")){
+                        model[2] <- "N";
+                    }
+                    model <- paste0(model,collapse="");
+                }
+            }
+        }
+    }
+
+    # If chosen model is "AAdN" or anything like that, we are taking the appropriate values
+    if(nchar(model)==4){
+        Etype <- substr(model,1,1);
+        Ttype <- substr(model,2,2);
+        Stype <- substr(model,4,4);
+        damped <- TRUE;
+        if(substr(model,3,3)!="d"){
+            message(paste0("You have defined a strange model: ", model,
+                           ". Switching to ", paste0(Etype,Ttype,"d",Stype)));
+            model <- paste0(Etype,Ttype,"d",Stype);
+        }
+    }
+    else if(nchar(model)==3){
+        Etype <- substr(model,1,1);
+        Ttype <- substr(model,2,2);
+        Stype <- substr(model,3,3);
+        if(any(Ttype==c("Z","X","Y"))){
+            damped <- TRUE;
+        }
+        else{
+            damped <- FALSE;
+        }
+    }
+    else{
+        message(paste0("You have defined a strange model: ",model));
+        message("Switching to 'ZZZ'");
+        model <- "ZZZ";
+
+        Etype <- "Z";
+        Ttype <- "Z";
+        Stype <- "Z";
+        damped <- TRUE;
+    }
+
+    # Define if we want to select or combine models... or do none of the above.
+    if(is.null(modelsPool)){
+        if(any(unlist(strsplit(model,""))=="C")){
+            modelDo <- "combine";
+            if(Etype=="C"){
+                Etype <- "Z";
+            }
+            if(Ttype=="C"){
+                Ttype <- "Z";
+            }
+            if(Stype=="C"){
+                Stype <- "Z";
+            }
+        }
+        else if(any(unlist(strsplit(model,""))=="Z") ||
+                any(unlist(strsplit(model,""))=="X") ||
+                any(unlist(strsplit(model,""))=="Y") ||
+                any(unlist(strsplit(model,""))=="F") ||
+                any(unlist(strsplit(model,""))=="P") ||
+                any(unlist(strsplit(model,""))=="S")){
+            modelDo <- "select";
+
+            # The full test, sidestepping branch and bound
+            if(any(unlist(strsplit(model,""))=="F")){
+                modelsPool <- c("ANN","AAN","AAdN","AMN","AMdN",
+                                "ANA","AAA","AAdA","AMA","AMdA",
+                                "ANM","AAM","AAdM","AMM","AMdM",
+                                "MNN","MAN","MAdN","MMN","MMdN",
+                                "MNA","MAA","MAdA","MMA","MMdA",
+                                "MNM","MAM","MAdM","MMM","MMdM");
+                # Remove models from pool if specific elements are provided
+                if(Etype!="F"){
+                    modelsPool <- modelsPool[substr(modelsPool,1,1)==Etype];
+                }
+                else{
+                    Etype[] <- "Z"
+                }
+                if(Ttype!="F"){
+                    modelsPool <- modelsPool[substr(modelsPool,2,2)==Ttype];
+                }
+                else{
+                    Ttype[] <- "Z"
+                }
+                if(Stype!="F"){
+                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))==Stype];
+                }
+                else{
+                    Stype[] <- "Z"
+                }
+                model <- "FFF";
+            }
+
+            # The test for pure models only
+            if(any(unlist(strsplit(model,""))=="P")){
+                modelsPool <- c("ANN","AAN","AAdN","ANA","AAA","AAdA",
+                                "MNN","MMN","MMdN","MNM","MMM","MMdM");
+                # Remove models from pool if specific elements are provided
+                if(Etype!="P"){
+                    modelsPool <- modelsPool[substr(modelsPool,1,1)==Etype];
+                }
+                else{
+                    Etype[] <- "Z"
+                }
+                if(Ttype!="P"){
+                    modelsPool <- modelsPool[substr(modelsPool,2,2)==Ttype];
+                }
+                else{
+                    Ttype[] <- "Z"
+                }
+                if(Stype!="P"){
+                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))==Stype];
+                }
+                else{
+                    Stype[] <- "Z"
+                }
+                model <- "PPP";
+            }
+
+            # The pool of sensible/standard models, those that have finite variance
+            if(any(unlist(strsplit(model,""))=="S")){
+                modelsPool <- c("ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA",
+                                "MNN", "MAN", "MAdN", "MNA", "MAA", "MAdA",
+                                "MNM", "MAM", "MAdM", "MMN", "MMdN", "MMM", "MMdM");
+                # Remove models from pool if specific elements are provided
+                if(Etype!="S"){
+                    # Switch is needed here if people want to restrict the basic pool further
+                    modelsPool <- modelsPool[substr(modelsPool,1,1)==switch(Etype,
+                                                                            "X"="A",
+                                                                            "Y"="M",
+                                                                            Etype)];
+                }
+                else{
+                    Etype[] <- "Z"
+                }
+                if(Ttype!="S"){
+                    modelsPool <- modelsPool[substr(modelsPool,2,2) %in% switch(Ttype,
+                                                                                "X"=c("A","N"),
+                                                                                "Y"=c("M","N"),
+                                                                                Ttype)];
+                }
+                else{
+                    Ttype[] <- "Z"
+                }
+                if(Stype!="S"){
+                    modelsPool <- modelsPool[substr(modelsPool,
+                                                    nchar(modelsPool),
+                                                    nchar(modelsPool))==switch(Stype,
+                                                                               "X"=c("A","N"),
+                                                                               "Y"=c("M","N"),
+                                                                               Stype)];
+                }
+                else{
+                    Stype[] <- "Z"
+                }
+                model <- "SSS";
+            }
+        }
+        else{
+            modelDo <- "estimate";
+        }
+
+        if(Etype=="X"){
+            Etype <- "A";
+        }
+        else if(Etype=="Y"){
+            Etype <- "M";
+        }
+    }
+    else{
+        if(any(unlist(strsplit(model,""))=="C")){
+            modelDo <- "combine";
+        }
+        else{
+            modelDo <- "select";
+        }
+    }
+
+    # Check the components of model
+    ### Check error type
+    if(all(Etype!=c("Z","X","Y","A","M","C","N"))){
+        warning(paste0("Wrong error type: ",Etype,". Should be 'Z', 'X', 'Y', 'C', 'A', 'M' or 'N'. ",
+                       "Changing to 'Z'"),call.=FALSE);
+        Etype <- "Z";
+        modelDo <- "select";
+    }
+    # If the error is "N", then switch off the ETS model
+    if(Etype=="N"){
+        componentsNamesETS <- NULL;
+        componentsNumberETS <- 0;
+        Ttype[] <- "N";
+        damped[] <- FALSE;
+        Stype[] <- "N";
+        modelDo[] <- "estimate";
+        modelsPool[] <- NULL;
+        etsModel <- FALSE;
+    }
+    else{
+        componentsNamesETS <- "level";
+        componentsNumberETS <- 1;
+        etsModel <- TRUE;
+    }
+
+    if(etsModel){
+        ### Check trend type
+        if(all(Ttype!=c("Z","X","Y","N","A","M","C"))){
+            warning(paste0("Wrong trend type: ",Ttype,". Should be 'Z', 'X', 'Y', 'C' 'N', 'A', or 'M'. ",
+                           "Changing to 'Z'"),call.=FALSE);
+            Ttype <- "Z";
+            modelDo <- "select";
+        }
+        modelIsTrendy <- (Ttype!="N");
+        if(modelIsTrendy){
+            componentsNamesETS <- c(componentsNamesETS,"trend");
+            componentsNumberETS[] <- componentsNumberETS+1;
+        }
+    }
+    else{
+        modelIsTrendy <- FALSE;
+    }
+    # What the section set, on the branches that ran
+    return(mget(intersect(c("Etype", "Stype", "Ttype", "componentsNamesETS", "componentsNumberETS",
+                         "damped", "etsModel", "model", "modelDo", "modelIsTrendy",
+                         "modelsPool"), ls())));
+}
+
+
+#### ARIMA: the orders and lags, the states, and the provided parameters ####
+adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS, distribution,
+                             etsModel, fast, lags, model, modelDo, modelIsTrendy, modelsPool,
+                             orders, parametersNumber){
+    # This should be available for pure models only
+    if(is.list(orders)){
+        arOrders <- orders$ar;
+        iOrders <- orders$i;
+        maOrders <- orders$ma;
+        select <- orders$select;
+        if(is.null(select)){
+            select <- FALSE;
+        }
+    }
+    else if(is.vector(orders)){
+        arOrders <- orders[1];
+        iOrders <- orders[2];
+        maOrders <- orders[3];
+        select <- FALSE;
+    }
+    else{
+        select <- FALSE;
+    }
+
+    # If there is arima, prepare orders
+    if(sum(c(arOrders,iOrders,maOrders))>0){
+        arimaModel <- TRUE;
+
+        # See if AR is needed
+        arRequired <- FALSE;
+        if(sum(arOrders)>0){
+            arRequired[] <- TRUE;
+        }
+
+        # See if I is needed
+        iRequired <- FALSE;
+        if(sum(iOrders)>0){
+            iRequired[] <- TRUE;
+        }
+
+        # See if I is needed
+        maRequired <- FALSE;
+        if(sum(maOrders)>0){
+            maRequired[] <- TRUE;
+        }
+
+        # Define maxOrder and make all the values look similar (for the polynomials)
+        maxOrder <- max(length(arOrders),length(iOrders),length(maOrders),length(lags));
+        if(length(arOrders)!=maxOrder){
+            arOrders <- c(arOrders,rep(0,maxOrder-length(arOrders)));
+        }
+        if(length(iOrders)!=maxOrder){
+            iOrders <- c(iOrders,rep(0,maxOrder-length(iOrders)));
+        }
+        if(length(maOrders)!=maxOrder){
+            maOrders <- c(maOrders,rep(0,maxOrder-length(maOrders)));
+        }
+        if(length(lags)!=maxOrder){
+            lagsNew <- c(lags,rep(0,maxOrder-length(lags)));
+            arOrders <- arOrders[lagsNew!=0];
+            iOrders <- iOrders[lagsNew!=0];
+            maOrders <- maOrders[lagsNew!=0];
+        }
+
+        # Define the non-zero values. This is done via the calculation of orders of polynomials
+        ariValues <- list(NA);
+        maValues <- list(NA);
+        for(i in 1:length(lags)){
+            ariValues[[i]] <- c(0,min(1,arOrders[i]):arOrders[i])
+            if(iOrders[i]!=0){
+                ariValues[[i]] <- c(ariValues[[i]],1:iOrders[i]+arOrders[i]);
+            }
+            ariValues[[i]] <- unique(ariValues[[i]] * lags[i]);
+            maValues[[i]] <- unique(c(0,min(1,maOrders[i]):maOrders[i]) * lags[i]);
+        }
+
+        # Produce ARI polynomials
+        ariLengths <- unlist(lapply(ariValues,length));
+        ariPolynomial <- array(0,ariLengths);
+        for(i in 1:length(ariValues)){
+            if(i==1){
+                ariPolynomial <- ariPolynomial + array(ariValues[[i]], ariLengths);
+            }
+            else{
+                ariPolynomial <- ariPolynomial + array(rep(ariValues[[i]],each=prod(ariLengths[1:(i-1)])),
+                                                       ariLengths);
+            }
+        }
+
+        # Produce MA polynomials
+        maLengths <- unlist(lapply(maValues,length));
+        maPolynomial <- array(0,maLengths);
+        for(i in 1:length(maValues)){
+            if(i==1){
+                maPolynomial <- maPolynomial + array(maValues[[i]], maLengths);
+            }
+            else{
+                maPolynomial <- maPolynomial + array(rep(maValues[[i]],each=prod(maLengths[1:(i-1)])),
+                                                     maLengths);
+            }
+        }
+
+        # What are the non-zero ARI and MA polynomials?
+        ### What are their positions in transition matrix?
+        nonZeroARI <- unique(matrix(c(ariPolynomial)[-1],ncol=1));
+        nonZeroMA <- unique(matrix(c(maPolynomial)[-1],ncol=1));
+        # Lags for the ARIMA components
+        lagsModelARIMA <- matrix(sort(unique(c(nonZeroARI,nonZeroMA))),ncol=1);
+        nonZeroARI <- cbind(nonZeroARI+1,which(lagsModelARIMA %in% nonZeroARI));
+        nonZeroMA <- cbind(nonZeroMA+1,which(lagsModelARIMA %in% nonZeroMA));
+
+        # Number of components
+        componentsNumberARIMA <- length(lagsModelARIMA);
+        # Their names
+        componentsNamesARIMA <- paste0("ARIMAState",c(1:componentsNumberARIMA));
+
+        # If all orders are zero, drop ARIMA part
+        if(all(c(arOrders,iOrders,maOrders)==0)){
+            arOrders <- NULL;
+            iOrders <- NULL;
+            maOrders <- NULL;
+            arimaModel <- FALSE;
+            arRequired <- arEstimate <- FALSE;
+            iRequired <- FALSE;
+            maRequired <- maEstimate <- FALSE;
+            lagsModelARIMA <- initialArimaNumber <- 0;
+            componentsNumberARIMA <- 0;
+            componentsNamesARIMA <- NULL;
+            nonZeroARI <- NULL;
+            nonZeroMA <- NULL;
+        }
+        else{
+            # Number of initials needed. This is based on the longest one (see adam_arimaInitials)
+            initialArimaNumber <- max(lagsModelARIMA);
+        }
+    }
+    else{
+        arOrders <- NULL;
+        iOrders <- NULL;
+        maOrders <- NULL;
+        arimaModel <- FALSE;
+        arRequired <- arEstimate <- FALSE;
+        iRequired <- FALSE;
+        maRequired <- maEstimate <- FALSE;
+        lagsModelARIMA <- initialArimaNumber <- 0;
+        componentsNumberARIMA <- 0;
+        componentsNamesARIMA <- NULL;
+        nonZeroARI <- NULL;
+        nonZeroMA <- NULL;
+        select <- FALSE;
+    }
+
+    if(etsModel){
+        modelIsSeasonal <- Stype!="N";
+    }
+    else{
+        modelIsSeasonal <- FALSE;
+    }
+
+    # Lags of the model used inside the functions
+    lagsModel <- matrix(lags,ncol=1);
+
+    # If we have a trend add one more lag
+    if(modelIsTrendy){
+        lagsModel <- rbind(1,lagsModel);
+    }
+    # If we don't have seasonality, remove seasonal lag
+    if(!modelIsSeasonal && any(lagsModel>1)){
+        lagsModel <- lagsModel[lagsModel==1,,drop=FALSE];
+    }
+
+    # If this is non-seasonal model and there are no seasonal ARIMA lags, trim the original lags
+    if(!modelIsSeasonal && all(c(arOrders[lags>1],iOrders[lags>1],maOrders[lags>1])==0) && any(lags>1)){
+        arOrders <- arOrders[lags==1];
+        iOrders <- iOrders[lags==1];
+        maOrders <- maOrders[lags==1];
+        lags <- lags[lags==1];
+    }
+
+    # Lags of the model
+    lagsModelSeasonal <- lagsModel[lagsModel>1];
+    lagsModelMax <- max(lagsModel);
+    lagsLength <- length(lagsModel);
+
+    if(etsModel){
+        #### Check the seasonal model vs lags ####
+        if(all(Stype!=c("Z","X","Y","N","A","M","C"))){
+            warning(paste0("Wrong seasonality type: ",Stype,". Should be 'Z', 'X', 'Y', 'C', 'N', 'A' or 'M'. ",
+                           "Setting to 'Z'."),call.=FALSE);
+            if(lagsModelMax==1){
+                Stype <- "N";
+                modelIsSeasonal <- FALSE;
+            }
+            else{
+                Stype <- "Z";
+                modelDo <- "select";
+            }
+        }
+        if(all(modelIsSeasonal,lagsModelMax==1)){
+            if(all(Stype!=c("Z","X","Y"))){
+                warning(paste0("Cannot build the seasonal model on data with the unity lags.\n",
+                               "Switching to non-seasonal model: ETS(",substr(model,1,nchar(model)-1),"N)"),
+                        call.=FALSE);
+            }
+            Stype <- "N";
+            modelIsSeasonal <- FALSE;
+            substr(model,nchar(model),nchar(model)) <- "N";
+        }
+
+        # Check the pool of models to combine if it was decided that the data is not seasonal
+        if(!modelIsSeasonal && !is.null(modelsPool)){
+            modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N"];
+        }
+
+        # Check the type of seasonal
+        if(Stype!="N"){
+            componentsNamesETS <- c(componentsNamesETS,"seasonal");
+            componentsNumberETS[] <- componentsNumberETS+1;
+            componentsNumberETSSeasonal <- 1;
+        }
+        else{
+            componentsNumberETSSeasonal <- 0;
+        }
+
+        # Check, whether the number of lags and the number of components are the same
+        if(lagsLength>componentsNumberETS){
+            if(Stype!="N"){
+                componentsNamesETS <- c(componentsNamesETS[-length(componentsNamesETS)],
+                                        paste0("seasonal",c(1:(lagsLength-componentsNumberETS-1))));
+                componentsNumberETSSeasonal[] <- lagsLength-componentsNumberETS+1;
+                componentsNumberETS[] <- lagsLength;
+            }
+            else{
+                lagsModel <- lagsModel[1:componentsNumberETS,,drop=FALSE];
+                lagsModelMax <- max(lagsModel);
+                lagsLength <- length(lagsModel);
+            }
+        }
+        else if(lagsLength<componentsNumberETS){
+            stop("The number of components of the model is smaller than the number of provided lags", call.=FALSE);
+        }
+    }
+    else{
+        componentsNumberETSSeasonal <- 0;
+    }
+
+    if(!fast){
+        #### Distribution selected ####
+        distribution <- match.arg(distribution[1], c("default","dnorm","dlaplace","ds","dgnorm",
+                                                      "dlnorm","dinvgauss","dgamma","plogis"));
+    }
+
+    if(select){
+        return(list(select=TRUE, distribution=distribution));
+    }
+
+    # Lags for ARIMA
+    if(arimaModel){
+        lagsModelAll <- rbind(lagsModel,lagsModelARIMA);
+        lagsModelMax <- max(lagsModel);
+    }
+    else{
+        lagsModelAll <- lagsModel;
+    }
+
+    # Check ARIMA parameters, if they are provided
+    if(arimaModel){
+        # Check the provided parameters for AR and MA
+        if(!is.null(arma)){
+            arEstimate <- arRequired;
+            maEstimate <- maRequired;
+            # If this is a proper list, extract parameters separately
+            if(is.list(arma)){
+                armaParameters <- vector("numeric",sum(sapply(arma,length)));
+                j <- arIndex <- maIndex <- 0;
+                # The named list (proper thing)
+                if(!is.null(names(arma))){
+                    # Check if the length of the provided parameters is correct
+                    if(arRequired && !is.null(arma$ar) && length(arma$ar)!=sum(arOrders)){
+                        warning(paste0("The number of provided AR parameters is ",length(arma$ar),
+                                       "while I need ",sum(arOrders),". ",
+                                       "Switching to estimation."),call.=FALSE);
+                        arEstimate[] <- TRUE;
+                    }
+                    if(maRequired && !is.null(arma$ma) && length(arma$ma)!=sum(maOrders)){
+                        warning(paste0("The number of provided MA parameters is ",length(arma$ma),
+                                       "while I need ",sum(maOrders),". ",
+                                       "Switching to estimation."),call.=FALSE);
+                        maEstimate[] <- TRUE;
+                    }
+                    for(i in 1:length(lags)){
+                        if(arRequired && !is.null(arma$ar) && arOrders[i]>0){
+                            armaParameters[j+c(1:arOrders[i])] <- arma$ar[arIndex+c(1:arOrders[i])];
+                            names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
+                            j[] <- j+arOrders[i];
+                            arIndex[] <- arIndex+arOrders[i];
+                            arEstimate[] <- FALSE;
+                        }
+                        if(maRequired && !is.null(arma$ma) && maOrders[i]>0){
+                            armaParameters[j+c(1:maOrders[i])] <- arma$ma[maIndex+c(1:maOrders[i])];
+                            names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
+                            j[] <- j+maOrders[i];
+                            maIndex[] <- maIndex+maOrders[i];
+                            maEstimate[] <- FALSE;
+                        }
+                    }
+                }
+                # Just a list. Assume that the first element is ar, and the second is ma
+                else{
+                    for(i in 1:length(lags)){
+                        k <- 1;
+                        if(arRequired && !is.null(arma[[1]]) && arOrders[i]>0){
+                            armaParameters[j+c(1:arOrders[i])] <- arma[[1]][arIndex+c(1:arOrders[i])];
+                            names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
+                            j[] <- j+arOrders[i];
+                            arIndex[] <- arIndex+arOrders[i];
+                            arEstimate[] <- FALSE;
+                            k[] <- 2;
+                        }
+                        if(maRequired && !is.null(arma[[k]]) && maOrders[i]>0){
+                            armaParameters[j+c(1:maOrders[i])] <- arma[[k]][maIndex+c(1:maOrders[i])];
+                            names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
+                            j[] <- j+maOrders[i];
+                            maIndex[] <- maIndex+maOrders[i];
+                            maEstimate[] <- FALSE;
+                        }
+                    }
+                    # Check if the length of the provided parameters is correct
+                    if(length(armaParameters)!=sum(arOrders)+sum(maOrders)){
+                        warning(paste0("The number of provided ARMA parameters is ",length(armaParameters),
+                                       "while I need ",sum(arOrders)+sum(maOrders),". ",
+                                       "Switching to estimation."),call.=FALSE);
+                        maEstimate <- arEstimate[] <- TRUE;
+                        armaParameters <- NULL;
+                    }
+                }
+            }
+            else if(is.vector(arma)){
+                # Check the length of the vector
+                if(length(arma)!=sum(arOrders)+sum(maOrders)){
+                    warning(paste0("The number of provided ARMA parameters is ",length(arma),
+                                   "while I need ",sum(arOrders)+sum(maOrders),". ",
+                                   "Switching to estimation."),call.=FALSE);
+                    maEstimate <- arEstimate[] <- TRUE;
+                    armaParameters <- NULL;
+                }
+                else{
+                    armaParameters <- arma;
+                    j <- 0;
+                    for(i in 1:length(lags)){
+                        if(arOrders[i]>0){
+                            names(armaParameters)[j+1:arOrders[i]] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
+                            j <- j + arOrders[i];
+                        }
+                        if(maOrders[i]>0){
+                            names(armaParameters)[j+1:maOrders[i]] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
+                            j <- j + maOrders[i];
+                        }
+                    }
+                    maEstimate <- arEstimate[] <- FALSE;
+                }
+            }
+            parametersNumber[2,1] <- parametersNumber[2,1] + length(armaParameters);
+        }
+        else{
+            arEstimate <- arRequired;
+            maEstimate <- maRequired;
+            armaParameters <- NULL;
+        }
+    }
+    else{
+        armaParameters <- NULL;
+    }
+
+    # Make armaParameters a zero vector. Needed for C++ code to work
+    if(is.null(armaParameters)){
+        armaParameters <- matrix(0,0,0);
+    }
+    # What the section set, on the branches that ran
+    return(mget(intersect(c("Stype", "arEstimate", "arOrders", "arRequired", "arimaModel",
+                         "armaParameters", "componentsNamesARIMA", "componentsNamesETS",
+                         "componentsNumberARIMA", "componentsNumberETS",
+                         "componentsNumberETSSeasonal", "distribution", "iOrders", "iRequired",
+                         "initialArimaNumber", "lags", "lagsLength", "lagsModel", "lagsModelARIMA",
+                         "lagsModelAll", "lagsModelMax", "lagsModelSeasonal", "maEstimate",
+                         "maOrders", "maRequired", "model", "modelDo", "modelIsSeasonal",
+                         "modelsPool", "nonZeroARI", "nonZeroMA", "parametersNumber",
+                         "select"), ls())));
+}
+
+
 #### Optimiser / ellipsis parameter processing ####
 adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags, arimaModel) {
     if(is.null(ellipsis$maxeval)){

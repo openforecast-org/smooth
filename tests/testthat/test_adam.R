@@ -1573,3 +1573,162 @@ test_that("adam() with the provided occurrence or probabilities of occurrence", 
     expect_equal(as.vector(fitted(testModel))[!nonzero], rep(0, sum(!nonzero)));
     expect_warning(adam(y, "MNN", occurrence=probabilities, h=5), "horizon is not provided");
 })
+
+#### Printing and plotting ####
+set.seed(41);
+xregData <- data.frame(y=rnorm(100, 100, 5), x1=rnorm(100));
+xregData$y <- xregData$y + 3*xregData$x1;
+set.seed(7);
+yIntermittent <- ts(exp(2 + rnorm(120, 0, 0.3)) * rbinom(120, 1, 0.7), frequency=12);
+printModels <- list(ets=adam(BJsales, "AAdN", h=10, holdout=TRUE),
+                    arima=adam(AirPassengers, "NNN", lags=c(1,12),
+                               orders=list(ar=c(1,0), i=c(1,1), ma=c(1,1))),
+                    xreg=adam(xregData, "ANN", regressors="use"),
+                    occurrence=adam(yIntermittent, "MNN", occurrence="fixed"),
+                    combined=adam(BJsales, "CCN", h=10, holdout=TRUE));
+
+test_that("print() of adam() shows the model, its parameters and its holdout errors", {
+    testModel <- printModels$ets;
+    printed <- paste(capture.output(print(testModel)), collapse="\n");
+    expect_match(printed, "Model estimated using adam() function: ETS(AAdN)", fixed=TRUE);
+    expect_match(printed, paste(format(round(testModel$persistence, 4)), collapse=" +"));
+    expect_match(printed, paste0("Damping parameter: ", round(testModel$phi, 4)), fixed=TRUE);
+    expect_match(printed, "Sample size: 140", fixed=TRUE);
+    expect_match(printed, paste0("ME: ", round(testModel$accuracy["ME"], 3), "; MAE: ",
+                                 round(testModel$accuracy["MAE"], 3)), fixed=TRUE);
+    # ARIMA: the AR and MA parameters by lag
+    printed <- paste(capture.output(print(printModels$arima)), collapse="\n");
+    expect_match(printed, "SARIMA(1,1,1)[1](0,1,1)[12]", fixed=TRUE);
+    for(value in round(unlist(printModels$arima$arma), 4)){
+        expect_match(printed, format(value), fixed=TRUE);
+    }
+    expect_match(paste(capture.output(print(printModels$xreg)), collapse="\n"),
+                 "ETSX(ANN)", fixed=TRUE);
+    printed <- paste(capture.output(print(printModels$occurrence)), collapse="\n");
+    expect_match(printed, "iETS(MNN)[F]", fixed=TRUE);
+    expect_match(printed, "Occurrence model type: Fixed probability", fixed=TRUE);
+    expect_match(printed, "Mixture of Bernoulli and Gamma", fixed=TRUE);
+})
+
+test_that("print() of a combination of adam() models shows the combination", {
+    testModel <- printModels$combined;
+    printed <- paste(capture.output(print(testModel)), collapse="\n");
+    expect_match(printed, "Model estimated: ETS(CCN)", fixed=TRUE);
+    expect_match(printed, paste0("Number of models combined: ", length(testModel$models)), fixed=TRUE);
+    expect_match(printed, "Sample size: 140", fixed=TRUE);
+    expect_match(printed, "Forecast errors:", fixed=TRUE);
+})
+
+test_that("summary() of adam() prints the estimates and the scale", {
+    testModel <- printModels$ets;
+    printed <- paste(capture.output(print(summary(testModel))), collapse="\n");
+    expect_match(printed, "ETS(AAdN)", fixed=TRUE);
+    for(value in round(coef(testModel)[c("alpha","beta","phi")], 4)){
+        expect_match(printed, format(value), fixed=TRUE);
+    }
+    expect_match(printed, paste0("Error standard deviation: ", round(sigma(testModel), 4)), fixed=TRUE);
+})
+
+test_that("plot() of adam() draws each of its plots", {
+    for(modelName in c("ets", "arima", "xreg", "occurrence")){
+        for(i in 1:16){
+            pdf(NULL);
+            dev.control("enable");
+            plot(printModels[[modelName]], which=i);
+            expect_gt(length(recordPlot()[[1]]), 0, label=paste(modelName, "plot", i));
+            dev.off();
+        }
+    }
+    pdf(NULL);
+    dev.control("enable");
+    plot(printModels$ets, which=c(1,2,3,7), legend=TRUE, lowess=FALSE, level=0.9);
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+    # A combination has no states of its own
+    for(i in setdiff(1:16, c(6,12))){
+        pdf(NULL);
+        dev.control("enable");
+        plot(printModels$combined, which=i);
+        expect_gt(length(recordPlot()[[1]]), 0, label=paste("combined plot", i));
+        dev.off();
+    }
+    pdf(NULL);
+    expect_message(plot(printModels$combined, which=12), "nothing to plot");
+    dev.off();
+})
+
+test_that("forecast() of a combination is the forecast of its models weighted by IC", {
+    testModel <- printModels$combined;
+    weights <- testModel$ICw;
+    weights[weights<1e-2] <- 0;
+    weights <- weights / sum(weights);
+    testForecast <- forecast(testModel, h=5, interval="prediction");
+    expect_equal(as.vector(testForecast$mean),
+                 Reduce(`+`, Map(function(model, weight){
+                     return(as.vector(forecast(model, h=5)$mean)*weight);
+                 }, testModel$models, weights)));
+    expect_true(all(testForecast$lower < testForecast$mean & testForecast$mean < testForecast$upper));
+    # The forecast of the combination of the occurrence models
+    testModel <- om(yIntermittent, occurrence="odds-ratio", model="CCN");
+    weights <- testModel$ICw;
+    weights[weights<1e-2] <- 0;
+    weights <- weights / sum(weights);
+    expect_equal(as.vector(forecast(testModel, h=5)$mean),
+                 Reduce(`+`, Map(function(model, weight){
+                     return(as.vector(forecast(model, h=5)$mean)*weight);
+                 }, testModel$models, weights)));
+})
+
+test_that("print() and plot() of the forecasts of adam()", {
+    testForecast <- forecast(printModels$ets, h=5, interval="prediction");
+    printed <- capture.output(print(testForecast));
+    expect_true(any(grepl("Point forecast +Lower bound \\(2.5%\\) +Upper bound \\(97.5%\\)", printed)));
+    expect_true(any(grepl(format(round(testForecast$mean[1], 4), nsmall=4), printed, fixed=TRUE)));
+    printed <- capture.output(print(forecast(printModels$ets, h=2, interval="prediction",
+                                             side="upper", level=0.9)));
+    expect_true(any(grepl("Point forecast +Upper bound \\(90%\\)", printed)));
+    printed <- capture.output(print(forecast(printModels$ets, h=2, interval="prediction",
+                                             side="lower", level=c(0.8,0.9))));
+    expect_true(any(grepl("Lower bound \\(20%\\) +Lower bound \\(10%\\)", printed)));
+    printed <- capture.output(print(forecast(printModels$ets, h=2)));
+    expect_false(any(grepl("bound", printed)));
+    for(modelName in c("ets", "occurrence", "combined")){
+        pdf(NULL);
+        dev.control("enable");
+        plot(forecast(printModels[[modelName]], h=10, interval="prediction"));
+        expect_gt(length(recordPlot()[[1]]), 0, label=paste(modelName, "forecast plot"));
+        dev.off();
+    }
+})
+
+test_that("print() of the forecast of msdecompose() shows its intervals", {
+    testForecast <- forecast(msdecompose(AirPassengers, lags=12), h=3, interval="parametric");
+    printed <- capture.output(print(testForecast));
+    expect_true(any(grepl("Point forecast +Lower bound \\(2.5%\\) +Upper bound \\(97.5%\\)", printed)));
+    expect_true(any(grepl(format(round(testForecast$upper[1], 4), nsmall=4), printed, fixed=TRUE)));
+})
+
+test_that("reapply() of adam() and of a combination, and their plots", {
+    set.seed(1);
+    testReapply <- reapply(printModels$combined, nsim=20);
+    expect_s3_class(testReapply, "reapplyCombined");
+    # The models with a weight of at least 0.01, with their weights renormalised
+    weights <- printModels$combined$ICw[printModels$combined$ICw>=1e-2];
+    expect_equal(testReapply$ICw, weights / sum(weights));
+    expect_equal(names(testReapply$refitted), names(weights));
+    for(refitted in testReapply$refitted){
+        expect_equal(dim(refitted), c(nobs(printModels$combined), 20));
+    }
+    pdf(NULL);
+    dev.control("enable");
+    plot(testReapply);
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+    testReapply <- reapply(printModels$ets, nsim=20);
+    expect_equal(dim(testReapply$refitted), c(nobs(printModels$ets), 20));
+    pdf(NULL);
+    dev.control("enable");
+    plot(testReapply);
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+})

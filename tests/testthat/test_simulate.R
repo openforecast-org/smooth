@@ -175,3 +175,57 @@ test_that("sim.es gives each inverse Gaussian simulation its own likelihood", {
     })
     expect_equal(as.numeric(y$logLik), expected)
 })
+
+#### Printing and plotting ####
+test_that("print() of the simulated data shows the model and its parameters", {
+    set.seed(5);
+    testData <- sim.es("AAdN", obs=50, phi=0.9);
+    printed <- paste(capture.output(print(testData)), collapse="\n");
+    expect_match(printed, "Data generated from: ETS(AAdN)", fixed=TRUE);
+    expect_match(printed, "Number of generated series: 1", fixed=TRUE);
+    expect_match(printed, paste(format(round(as.vector(testData$persistence), 4)), collapse=" +"));
+    expect_match(printed, "Phi: 0.9", fixed=TRUE);
+    expect_match(printed, paste0("True likelihood: ", round(testData$logLik, 4)), fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.es("MNN", obs=50, probability=0.5))), collapse="\n"),
+                 "produced based on an occurrence model", fixed=TRUE);
+    # ARIMA: the parameters by lag and the constant
+    testData <- sim.ssarima(orders=list(ar=1,i=1,ma=1), obs=50, arma=list(ar=0.5, ma=-0.3),
+                            constant=2);
+    printed <- capture.output(print(testData));
+    expect_true(any(grepl("ARIMA(1,1,1) with drift", printed, fixed=TRUE)));
+    expect_true(any(grepl("^AR\\(1\\) +0.5$", printed)));
+    expect_true(any(grepl("^MA\\(1\\) +-0.3$", printed)));
+    expect_true(any(grepl("Constant value: 2", printed, fixed=TRUE)));
+    testData <- sim.ces("n", obs=50);
+    printed <- paste(capture.output(print(testData)), collapse="\n");
+    expect_match(printed, "Data generated from: CES(none)", fixed=TRUE);
+    expect_match(printed, paste0("Smoothing parameter a: ", round(testData$a, 4)), fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.gum(orders=c(2), lags=c(1), obs=50))), collapse="\n"),
+                 "Data generated from: GUM(2[1])", fixed=TRUE);
+    testData <- sim.sma(3, obs=50);
+    printed <- paste(capture.output(print(testData)), collapse="\n");
+    expect_match(printed, "Data generated from: SMA(3)", fixed=TRUE);
+    expect_match(printed, paste0("True likelihood: ", round(testData$logLik, 4)), fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.es("ANN", obs=50, nsim=3))), collapse="\n"),
+                 "Number of generated series: 3", fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.oes("MNN", obs=50))), collapse="\n"),
+                 "Data generated from: oETS[O](MNN)", fixed=TRUE);
+})
+
+test_that("plot() of the simulated data draws the series", {
+    set.seed(5);
+    for(testData in list(sim.es("AAdN", obs=50, phi=0.9), sim.ssarima(obs=50), sim.ces("n", obs=50),
+                         sim.gum(orders=c(2), lags=c(1), obs=50), sim.sma(3, obs=50),
+                         sim.oes("MNN", obs=50))){
+        pdf(NULL);
+        dev.control("enable");
+        plot(testData);
+        expect_gt(length(recordPlot()[[1]]), 0, label=testData$model);
+        dev.off();
+    }
+    pdf(NULL);
+    dev.control("enable");
+    expect_message(plot(sim.es("ANN", obs=50, nsim=3)), "Not sure which of them to plot");
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+})

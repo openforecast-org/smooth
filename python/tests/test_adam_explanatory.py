@@ -16,6 +16,7 @@ R reference (adam(df, model="AAN", regressors="use", formula=y~x1+x2)):
     Forecast[1:3]=[10.91767, 7.99035, 9.92983] (using last 12 rows as X_new)
 """
 
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -428,3 +429,76 @@ def test_pure_regression_predict_with_selected_regressors():
     forecast = model.predict(h=3, X=x[90:93], interval="prediction")
     assert np.all(np.isfinite(forecast.lower.values))
     assert np.allclose(forecast.mean.values, x[90:93, 0], atol=3)
+
+
+# --- LASSO with lambda=1: the adaptive regressors at their shrinkage target ---
+
+
+def test_etsx_adapt_lasso_lambda_one_does_not_adapt():
+    """With lambda=1 the deltas of the regressors are zero, as in R.
+
+    R: t <- 1:40; y <- round(100 + cumsum(sin(t/3) + (t %% 5)/5), 3);
+    x <- round(cos(t/2), 3); adam(data.frame(y, x), "ANN", regressors="adapt",
+    loss="LASSO", lambda=1, h=3); forecast(newdata=data.frame(x=c(0.1, 0.2, 0.3)))
+    """
+    t = np.arange(1, 41)
+    y = np.round(100 + np.cumsum(np.sin(t / 3) + (t % 5) / 5), 3)
+    X = pd.DataFrame({"x": np.round(np.cos(t / 2), 3)})
+    model = ADAM(model="ANN", regressors="adapt", loss="LASSO", lambda_param=1)
+    model.fit(y, X)
+    assert model.persistence_vector == {"alpha": 0.0, "delta1": 0.0}
+    assert model.initial_value["xreg"]["x"] == pytest.approx(0.762654, abs=1e-6)
+    forecast = model.predict(h=3, X=pd.DataFrame({"x": [0.1, 0.2, 0.3]}))
+    np.testing.assert_allclose(
+        forecast.mean.values, [111.1203, 111.1966, 111.2729], rtol=1e-6
+    )
+
+
+# --- regressors="select" in the models that select after their fit ---
+
+
+@pytest.fixture
+def select_data():
+    """The ETSX data with a third, irrelevant column (R: d$x3 <- round(sin(1:120), 6))."""
+    df = pd.read_csv(DATA_PATH)
+    df["x3"] = np.round(np.sin(np.arange(1, 121)), 6)
+    return df
+
+
+def test_ces_select_keeps_the_signal(select_data):
+    """CES selects on the errors of the model without regressors, as R.
+
+    R: ces(d, regressors="select", h=3): x1 and x2, logLik -162.171513
+    """
+    from smooth import CES
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = CES(regressors="select", h=3).fit(
+            select_data["y"].values, select_data[["x1", "x2", "x3"]]
+        )
+    assert [name for name in model.coef_names if name.startswith("x")] == ["x1", "x2"]
+    assert model.loglik == pytest.approx(-162.171513, rel=1e-8)
+
+
+def test_om_select_on_the_occurrence(select_data):
+    """OM selects on the occurrence indicator, as R's om().
+
+    R: d2 <- d; d2$y <- ifelse(d$x1 + 1.5*cos(3*(1:120)) > -0.3, d$y, 0);
+    om(d2, "MNN", regressors="select"); forecast(h=3, newdata=d[118:120, ])
+    """
+    from smooth import OM
+
+    t = np.arange(1, 121)
+    y = np.where(select_data["x1"] + 1.5 * np.cos(3 * t) > -0.3, select_data["y"], 0)
+    X = select_data[["x1", "x2", "x3"]]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = OM(model="MNN", regressors="select").fit(y, X)
+        forecast = model.predict(h=3, X=X.iloc[117:120])
+    assert list(model.coef_names) == ["alpha", "x1"]
+    np.testing.assert_allclose(model.coef, [0, 1.322667], atol=1e-6)
+    assert model.loglik == pytest.approx(-63.82436, rel=1e-6)
+    np.testing.assert_allclose(
+        forecast.mean.values, [0.981642, 0.198426, 0.642679], atol=1e-6
+    )

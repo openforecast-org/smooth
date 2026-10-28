@@ -110,3 +110,28 @@ test_that("gum() selects the regressors as adam()", {
     expect_equal(names(testModel$initial$xreg), "a")
     expect_equal(names(testModel$initial$xreg), names(adam(xreg, "ANN", regressors="select")$initial$xreg))
 })
+
+# auto.gum() and the orders and lags of the simulated GUM
+set.seed(41);
+quarterly <- ts(100 + rnorm(48, 0, 3) + rep(c(5,-3,2,-4), 12), frequency=4);
+testModel <- auto.gum(quarterly, orders=2, lags=4);
+test_that("auto.gum() selects the GUM with the lowest information criterion", {
+    # The candidates with one component of each lag; the seasonal one is the best
+    candidates <- sapply(1:4, function(lag) AICc(gum(quarterly, orders=1, lags=lag)));
+    expect_equal(testModel$model, "GUM(1[4])");
+    expect_equal(AICc(testModel), min(candidates));
+    expect_equal(AICc(testModel), AICc(gum(quarterly, orders=1, lags=4)));
+})
+
+test_that("auto.gum() checks its orders and the type of the model", {
+    expect_error(auto.gum(quarterly, orders=0), "zero lags / orders");
+    expect_warning(auto.gum(quarterly-200, orders=1, lags=2, type="multiplicative"),
+                   "Switching to the additive one");
+})
+
+test_that("orders() and lags() of a simulated GUM are those of the simulation", {
+    testData <- sim.gum(orders=c(1,1), lags=c(1,4), obs=40);
+    expect_equal(testData$model, "GUM(1[1],1[4])");
+    expect_equal(orders(testData), c(1,1));
+    expect_equal(lags(testData), c(1,4));
+})

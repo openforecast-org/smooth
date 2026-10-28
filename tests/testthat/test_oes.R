@@ -144,3 +144,29 @@ test_that("oes() with xreg as a data frame", {
     testModelMatrix <- oes(y, "MNN", occurrence="odds-ratio", xreg=as.matrix(xreg));
     expect_equal(coef(testModel), coef(testModelMatrix));
 })
+
+# oesg(), the wrapper of omg() with ETS sub-models only
+set.seed(2);
+intermittent <- rpois(120, 0.6);
+testModel <- oesg(intermittent, modelA="MNN", modelB="MNN", h=5);
+test_that("oesg() is omg() with its ETS sub-models", {
+    reference <- omg(intermittent, modelA="MNN", modelB="MNN", h=5);
+    expect_s3_class(testModel, "omg");
+    expect_equal(fitted(testModel), fitted(reference));
+    expect_equal(logLik(testModel), logLik(reference));
+    expect_true(all(fitted(testModel) > 0 & fitted(testModel) < 1));
+    testForecast <- forecast(testModel, h=5)$mean;
+    expect_length(testForecast, 5);
+    expect_true(all(testForecast > 0 & testForecast < 1));
+})
+
+test_that("plot() of oesg() draws the plots of the fitted values and of the residuals", {
+    # Each plot on a new device, which has nothing drawn before it
+    for(i in c(1:3, 7:9, 13:14)){
+        pdf(NULL);
+        dev.control("enable");
+        plot(testModel, which=i);
+        expect_gt(length(recordPlot()[[1]]), 0);
+        dev.off();
+    }
+})

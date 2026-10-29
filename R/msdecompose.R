@@ -123,6 +123,14 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
                 call.=FALSE);
         smoother <- "lowess";
     }
+    # The centred moving average loses floor(lag/2) values on each side, so the seasonal
+    # indices without a value are left when the sample is shorter than that
+    else if(smoother=="ma" && obsInSample < max(lags) + 2*(max(lags) %/% 2)){
+        warning("The sample is too short for the moving average to give all the seasonal indices. ",
+                "Switching smoother to LOWESS.",
+                call.=FALSE);
+        smoother <- "lowess";
+    }
 
     yNAValues <- is.na(y);
 

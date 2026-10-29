@@ -408,6 +408,18 @@ def msdecompose(y, lags=[12], type="additive", smoother="lowess"):
         )
         smoother = "lowess"
         smoothing_function = smoothing_function_lowess
+    # The centred moving average loses lag // 2 values on each side, so the seasonal
+    # indices without a value are left when the sample is shorter than that, as R
+    elif smoother == "ma" and obs_in_sample < max(lags) + 2 * (max(lags) // 2):
+        import warnings
+
+        warnings.warn(
+            "The sample is too short for the moving average to give all the "
+            "seasonal indices. Switching smoother to LOWESS.",
+            stacklevel=2,
+        )
+        smoother = "lowess"
+        smoothing_function = smoothing_function_lowess
 
     y_na_values = np.isnan(y)
     if type == "multiplicative":

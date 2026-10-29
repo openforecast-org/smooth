@@ -1704,6 +1704,14 @@ def test_adam_tiny_samples_as_r(y, forecast, loglik):
         assert model.loglik == pytest.approx(loglik, abs=1e-6)
 
 
+def test_adam_fits_a_list_as_the_array():
+    y = list(np.arange(1.0, 21.0) + np.sin(np.arange(20)))
+    from_list = ADAM(model="ANN").fit(y)
+    from_array = ADAM(model="ANN").fit(np.array(y))
+    assert from_list.loglik == from_array.loglik
+    assert list(from_list.predict(h=2).mean) == list(from_array.predict(h=2).mean)
+
+
 def test_adam_reapply_draws_around_the_fitted_arima():
     """reapply() added the drawn MA to the fitted persistence of a lag without ARI."""
     import warnings

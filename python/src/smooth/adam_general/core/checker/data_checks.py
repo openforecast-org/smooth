@@ -286,6 +286,8 @@ def _calculate_ot_logical(
         )
     else:
         y_in_sample = np.asarray(data).flatten()
+        # A list has an index() method, not an index of time: use the array
+        data = y_in_sample
 
     # Handle holdout if requested and possible
     y_holdout = None

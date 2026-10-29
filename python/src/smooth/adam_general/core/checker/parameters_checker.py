@@ -34,7 +34,6 @@ from .parameter_checks import (
     _initialize_estimation_params,
 )
 from .sample_size import (
-    _adjust_model_for_sample_size,
     _restrict_models_pool_for_sample_size,
 )
 
@@ -777,7 +776,12 @@ def parameters_checker(
         : len(lags_model_seasonal)
     ]
 
-    n_param_max = _calculate_n_param_max(
+    # The occurrence model is fitted to all the observed values, not to the non-zero
+    # ones, as R
+    if distribution == "plogis":
+        obs_nonzero = obs_in_sample - int(np.sum(y_na_values[:obs_in_sample]))
+
+    n_param_arguments = dict(
         ets_model=ets_model,
         persistence_level_estimate=persist_info.get("persistence_level_estimate", True),
         model_is_trendy=model_is_trendy,
@@ -806,8 +810,64 @@ def parameters_checker(
         persistence_xreg_estimate=(has_xreg and regressors == "adapt"),
     )
 
-    # Restrict models pool based on sample size (R lines 2641-2944)
-    # Only apply if obs_nonzero <= n_param_max (R line 2655)
+    # ARIMA on a small sample, as R: dropped next to ETS; alone, backcast if that
+    # saves enough, else ARIMA(0,1,1)
+    n_param_max = _calculate_n_param_max(**n_param_arguments)
+    initial_optimal = init_info.get("initial_type") in ["optimal", "two-stage"]
+    initial_arima_number = arima_info.get("initial_arima_number", 0)
+    if obs_nonzero <= n_param_max and arima_model and not arima_info["select"]:
+        if ets_model:
+            _warn(
+                "I don't have enough observations to fit ETS with ARIMA terms. "
+                "I will construct the simple ETS."
+            )
+            arima_info = _check_arima(None, validated_lags, silent)
+        elif initial_optimal and (obs_nonzero > n_param_max - initial_arima_number):
+            _warn(
+                f"The number of parameter to estimate is {n_param_max}, while the "
+                f"number of observations is {obs_nonzero}. Switching initial to "
+                "'backcasting' to save some degrees of freedom."
+            )
+            init_info["initial_type"] = "complete"
+            # R sets the iterations from the initial after this check
+            if not init_info["n_iterations_provided"]:
+                init_info["n_iterations"] = 2
+        else:
+            _warn(
+                f"The number of parameter to estimate is {n_param_max}, while the "
+                f"number of observations is {obs_nonzero}. Switching to "
+                "ARIMA(0,1,1) model."
+            )
+            arima_info = _check_arima({"ar": 0, "i": 1, "ma": 1}, [1], silent)
+        arima_model = arima_info["arima_model"]
+        ar_orders = arima_info["ar_orders"]
+        i_orders = arima_info["i_orders"]
+        ma_orders = arima_info["ma_orders"]
+        lags_model_arima = arima_info["lags_model_arima"]
+        init_info["initial_arima_number"] = arima_info["initial_arima_number"]
+        n_param_arguments.update(
+            arima_model=arima_model,
+            initial_arima_number=arima_info["initial_arima_number"],
+            ar_required=arima_info["ar_required"],
+            ar_estimate=arima_info["ar_estimate"],
+            ar_orders=ar_orders,
+            ma_required=arima_info["ma_required"],
+            ma_estimate=arima_info["ma_estimate"],
+            ma_orders=ma_orders,
+            initial_type=init_info["initial_type"],
+        )
+    if (
+        arima_model
+        and obs_nonzero
+        < (init_info.get("initial_type") in ["optimal", "two-stage"])
+        * arima_info.get("initial_arima_number", 0)
+        and not arima_info["select"]
+    ):
+        raise ValueError("Not enough observations for such a complicated model.")
+    n_param_max = _calculate_n_param_max(**n_param_arguments)
+
+    # Restrict models pool based on sample size (R's "Checks for the potential
+    # number of degrees of freedom"), for ETS only
     pool_restriction = _restrict_models_pool_for_sample_size(
         obs_nonzero=obs_nonzero,
         lags_model_max=max_lag,
@@ -817,9 +877,11 @@ def parameters_checker(
         season_type=ets_info["season_type"],
         models_pool=ets_info.get("models_pool"),
         allow_multiplicative=allow_multiplicative,
-        xreg_number=xreg_number,
+        n_param_exo=xreg_number
+        * (int(has_xreg) + int(has_xreg and regressors == "adapt")),
         silent=silent,
-        n_param_max=n_param_max,
+        # R checks the ETS part for an ETS model only
+        n_param_max=n_param_max if ets_model else -1,
         damped=ets_info.get("damped", False),
     )
 
@@ -869,32 +931,21 @@ def parameters_checker(
     if not pool_restriction["initial_estimate"]:
         init_info["initial_estimate"] = False
         init_info["initial_level_estimate"] = False
-    # The level of the samples too small to estimate anything, as R: the mean of two
-    # values, the non-zero one of one, zero without any
+    # The level of the samples too small to estimate anything, as R: the mean of the
+    # values the occurrence marks (all of them without one), zero without any
     if pool_restriction["model_do"] == "use" and obs_nonzero <= 2:
         y_is = np.asarray(data, dtype=float).ravel()[:obs_in_sample]
-        y_is = y_is[~np.isnan(y_is)]
+        no_occurrence = (
+            isinstance(occ_info["occurrence"], str) and occ_info["occurrence"] == "none"
+        )
+        marked = ~np.isnan(y_is) & ((y_is != 0) | no_occurrence)
         init_info["initial_level"] = (
-            float(np.mean(y_is))
-            if obs_nonzero == 2
-            else float(y_is[y_is != 0][0])
-            if obs_nonzero == 1
-            else 0.0
+            float(np.mean(y_is[marked])) if obs_nonzero > 0 else 0.0
         )
 
     # Setup model type dictionary
     model_type_dict = _organize_model_type_info(
         ets_info, arima_info, xreg_model=has_xreg
-    )
-
-    # Apply additional sample size adjustments
-    model_type_dict = _adjust_model_for_sample_size(
-        model_info=model_type_dict,
-        obs_nonzero=obs_nonzero,
-        lags_model_max=max_lag,
-        allow_multiplicative=allow_multiplicative,
-        xreg_number=xreg_number,
-        silent=silent,
     )
 
     # Update models_pool from restriction

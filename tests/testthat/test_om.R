@@ -608,3 +608,13 @@ test_that("om() and omg() apply the formula before selecting the regressors", {
     expect_equal(names(coef(testModel)), c("A:alpha", "B:alpha"));
     expect_length(forecast(testModel, h=10)$mean, 10);
 })
+
+test_that("the occurrence model of two demands is fitted to all the observations", {
+    # Two non-zero values among eight: the probability is their rate, not the sizes' level
+    for(occurrenceType in c("fixed","odds-ratio","inverse-odds-ratio","direct")){
+        testModel <- om(c(0,0,5,0,7,0,0,0), occurrence=occurrenceType);
+        expect_equal(as.vector(fitted(testModel))[1], 0.25, tolerance=1e-6, label=occurrenceType);
+        expect_equal(as.numeric(logLik(testModel)), 2*log(0.25)+6*log(0.75), tolerance=1e-6,
+                     label=occurrenceType);
+    }
+})

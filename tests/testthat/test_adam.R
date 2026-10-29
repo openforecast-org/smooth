@@ -1734,3 +1734,80 @@ test_that("reapply() of adam() and of a combination, and their plots", {
     expect_gt(length(recordPlot()[[1]]), 0);
     dev.off();
 })
+
+#### The sample-size check: the models that fit on small samples ####
+test_that("ETS with ARIMA on a small sample drops the ARIMA", {
+    expect_warning(testModel <- adam(AirPassengers[1:10], "AAN", orders=list(ar=2,i=1,ma=2),
+                                     initial="optimal"),
+                   "enough observations to fit ETS with ARIMA");
+    expect_equal(testModel$model, "ETS(AAN)");
+})
+
+test_that("ARIMA on a small sample switches to backcasting or to ARIMA(0,1,1)", {
+    expect_warning(testModel <- adam(AirPassengers[1:7], "NNN", orders=list(ar=2,i=1,ma=2),
+                                     initial="optimal"),
+                   "Switching initial to 'backcasting'");
+    expect_equal(testModel$initialType, "complete");
+    expect_warning(testModel <- adam(AirPassengers[1:5], "NNN", orders=list(ar=3,i=2,ma=3),
+                                     initial="optimal"),
+                   "Switching to ARIMA\\(0,1,1\\)");
+    expect_equal(orders(testModel), list(ar=0, i=1, ma=1));
+})
+
+test_that("a small sample restricts the pool to the models it can fit", {
+    expect_warning(testModel <- adam(AirPassengers[1:6], "ZZZ", initial="optimal"),
+                   "Fitting what I can");
+    # Six observations fit the level and the undamped trend models, not the damped ones
+    expect_true(all(nchar(names(testModel$ICs))==3));
+    expect_warning(testModel <- adam(AirPassengers[1:6], c("ANN","AAN","AAdN","MMdN"),
+                                     initial="optimal"),
+                   "Fitting what I can");
+    expect_setequal(names(testModel$ICs), c("ANN","AAN"));
+})
+
+test_that("an estimated model loses its damping and then its trend as the sample shrinks", {
+    # Only the steps that apply to the model warn
+    caught <- capture_warnings(testModel <- adam(AirPassengers[1:6], "AAdN", initial="optimal"));
+    expect_equal(modelType(testModel), "AAN");
+    expect_length(grep("Fitting what I can", caught), 1);
+    caught <- capture_warnings(testModel <- adam(AirPassengers[1:5], "AAdN", initial="optimal"));
+    expect_equal(modelType(testModel), "ANN");
+    expect_length(grep("Fitting what I can", caught), 2);
+})
+
+test_that("a seasonal model on less than two seasons drops the trend and uses LOWESS", {
+    caught <- capture_warnings(testModel <- adam(AirPassengers[1:14], "AAA", lags=12,
+                                                    initial="optimal"));
+    expect_equal(modelType(testModel), "ANA");
+    expect_true(any(grepl("Switching smoother to LOWESS", caught)));
+})
+
+test_that("four observations with a regressor fit and name the level model", {
+    expect_no_warning(testModel <- adam(data.frame(y=AirPassengers[1:4], x=c(1,3,2,5)), "AAN",
+                                        initial="optimal"));
+    expect_equal(modelType(testModel), "ANN");
+    expect_equal(testModel$model, "ETSX(ANN)");
+    expect_warning(testModel <- adam(data.frame(y=AirPassengers[1:4], x=c(1,3,2,5)), "ZZN",
+                                     initial="optimal"),
+                   "only available model is level model");
+    expect_true(modelType(testModel) %in% c("ANN","MNN"));
+})
+
+test_that("three observations or fewer fix the persistence and then the initial", {
+    expect_warning(testModel <- adam(AirPassengers[1:3], "ANN", initial="optimal"),
+                   "persistence value was set to zero");
+    expect_equal(unname(testModel$persistence), 0);
+    expect_warning(testModel <- adam(AirPassengers[1:2], "ANN"),
+                   "initial was preset");
+    expect_equal(testModel$initialType, "provided");
+    expect_equal(unname(testModel$initial$level), mean(AirPassengers[1:2]));
+    # With an occurrence, the level of the demand sizes: the mean of the non-zero values
+    expect_warning(testModel <- adam(c(0,0,5,0,7,0,0,0), "ANN", occurrence="fixed"),
+                   "initial was preset");
+    expect_equal(unname(testModel$initial$level), 6);
+    expect_warning(testModel <- adam(AirPassengers[1], "ANN"), "used Naive");
+    expect_equal(unname(testModel$initial$level), AirPassengers[1]);
+    # A single zero is the Naive of zero
+    expect_warning(testModel <- adam(0, "ANN"), "used Naive");
+    expect_equal(unname(testModel$initial$level), 0);
+})

@@ -1136,6 +1136,10 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
     #### Checks for the potential number of degrees of freedom ####
     # This is needed in order to make the function work on small samples
+    # The occurrence model is fitted to all the observed values, not to the non-zero ones
+    if(distribution=="plogis"){
+        obsNonzero[] <- obsInSample - sum(yNAValues[1:obsInSample]);
+    }
     # scale parameter, smoothing parameters and phi
     nParamMax <- (1 +
                       # ETS model
@@ -1163,6 +1167,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             componentsNamesARIMA <- NULL;
             initialArimaNumber <- componentsNumberARIMA <- 0;
             lagsModelMax <- max(lagsModelAll);
+            orders <- list(ar=0, i=0, ma=0);
         }
         else if(arimaModel && !etsModel && !select){
             # If the backacasting helps, switch to it.
@@ -1188,6 +1193,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 componentsNamesARIMA <- 1;
                 initialArimaNumber <- componentsNumberARIMA <- 1;
                 lagsModelMax <- max(lagsModelAll);
+                orders <- list(ar=0, i=1, ma=1);
             }
         }
     }
@@ -1348,48 +1354,36 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             }
             # If the model needs to be estimated / used, not selected
             else if(obsNonzero > (3 + nParamExo) && any(modelDo==c("estimate","use"))){
+                modelIsSeasonal <- substr(model,nchar(model),nchar(model))!="N";
                 # We don't have enough observations for seasonal models with damped trend
-                if((obsNonzero <= (6 + lagsModelMax + 1 + nParamExo))){
-                    if(nchar(model)==4){
-                        warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                                call.=FALSE);
-                        model <- paste0(substr(model,1,2),substr(model,4,4));
-                    }
-                    # model <- model[!(nchar(model)==4 &
-                    #                      substr(model,nchar(model),nchar(model))=="A")];
-                    # model <- model[!(nchar(model)==4 &
-                    #                      substr(model,nchar(model),nchar(model))=="M")];
+                if(nchar(model)==4 && modelIsSeasonal && (obsNonzero <= (6 + lagsModelMax + 1 + nParamExo))){
+                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
+                            call.=FALSE);
+                    model <- paste0(substr(model,1,2),substr(model,4,4));
                 }
                 # We don't have enough observations for seasonal models with trend
-                if((obsNonzero <= (5 + lagsModelMax + 1 + nParamExo))){
+                if(substr(model,2,2)!="N" && modelIsSeasonal && (obsNonzero <= (5 + lagsModelMax + 1 + nParamExo))){
                     warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
                             call.=FALSE);
-                    model <- paste0(substr(model,1,1),"N",substr(model,3,3));
-                    # model <- model[!(substr(model,2,2)!="N" &
-                    #                      substr(model,nchar(model),nchar(model))!="N")];
+                    model <- paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model)));
                 }
                 # We don't have enough observations for seasonal models
-                if(obsNonzero <= lagsModelMax){
+                if(modelIsSeasonal && obsNonzero <= lagsModelMax){
                     warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
                             call.=FALSE);
-                    model <- paste0(substr(model,1,2),"N");
-                    # model <- model[substr(model,nchar(model),nchar(model))=="N"];
+                    model <- paste0(substr(model,1,nchar(model)-1),"N");
                 }
                 # We don't have enough observations for damped trend
-                if(obsNonzero <= (6 + nParamExo)){
-                    if(nchar(model)==4){
-                        warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                                call.=FALSE);
-                        model <- paste0(substr(model,1,2),substr(model,4,4));
-                    }
-                    # model <- model[nchar(model)!=4];
-                }
-                # We don't have enough observations for any trend
-                if(obsNonzero <= (5 + nParamExo)){
+                if(nchar(model)==4 && obsNonzero <= (6 + nParamExo)){
                     warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
                             call.=FALSE);
-                    model <- paste0(substr(model,1,1),"N",substr(model,3,3));
-                    # model <- model[substr(model,2,2)=="N"];
+                    model <- paste0(substr(model,1,2),substr(model,4,4));
+                }
+                # We don't have enough observations for any trend
+                if(substr(model,2,2)!="N" && obsNonzero <= (5 + nParamExo)){
+                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
+                            call.=FALSE);
+                    model <- paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model)));
                 }
                 # Change E,T,S elements based on the trimmed thingy
                 Etype <- substr(model,1,1);
@@ -1408,6 +1402,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     modelDo <- "estimate";
                     Ttype <- "N";
                     Stype <- "N";
+                    model <- paste0(Etype,"NN");
                 }
                 else{
                     modelsPool <- c("ANN");
@@ -1454,7 +1449,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 modelsPool <- NULL;
                 persistenceLevel <- 0;
                 persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- mean(yInSample[!yNAValues[1:obsInSample]]);
+                initialLevel <- mean(yInSample[otLogical]);
                 initialType <- "provided";
                 initialEstimate <- initialLevelEstimate <- FALSE;
                 warning("I did not have enough of non-zero observations, so persistence value was set to zero and initial was preset.",
@@ -1473,7 +1468,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 modelsPool <- NULL;
                 persistenceLevel <- 0;
                 persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- yInSample[yInSample!=0 & !yNAValues[1:obsInSample]];
+                initialLevel <- yInSample[otLogical];
                 initialType <- "provided";
                 initialEstimate <- initialLevelEstimate <- FALSE;
                 warning("I did not have enough of non-zero observations, so I used Naive.",call.=FALSE);
@@ -1745,6 +1740,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         bounds = bounds,
         # ARIMA components
         arimaModel = arimaModel,
+        orders = orders,
         arOrders = arOrders,
         iOrders = iOrders,
         maOrders = maOrders,

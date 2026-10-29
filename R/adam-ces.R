@@ -252,7 +252,7 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
     persistence <- NULL;
     phi <- NULL;
 
-    ##### Set environment for ssInput and make all the checks #####
+    ##### Make all the checks #####
     checkerReturn <- parametersChecker(data=data, model, lags, formulaToUse=formula,
                                        orders=orders,
                                        constant=constant, arma=NULL,

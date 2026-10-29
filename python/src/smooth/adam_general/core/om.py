@@ -941,11 +941,8 @@ class OM(ADAM):
         observations_dict_for_creator["ot_logical"] = np.ones_like(
             original_ot_logical, dtype=bool
         )
-        # ``obs_nonzero`` has to follow ``ot_logical``. On a binary occurrence
-        # series it counts the ones, not the observations, so the creator's
-        # ``obs_nonzero >= 2 * lags_model_max`` guard sends any seasonal
-        # occurrence model with a low rate down the small-sample path -- R's
-        # adam_creator() has no such guard and always decomposes.
+        # ``obs_nonzero`` has to follow ``ot_logical``: on a binary occurrence
+        # series it would count the ones, not the observations.
         observations_dict_for_creator["obs_nonzero"] = int(
             observations_dict["obs_in_sample"]
         )
@@ -1588,6 +1585,10 @@ class OM(ADAM):
                 "Intervals on the probability scale are not implemented for OM "
                 "models; returning point forecasts only."
             )
+        # A pure regression is the ALM of the probability, forecast as it is, as R
+        if getattr(self, "_alm_model", None) is not None:
+            self._general["h"] = h
+            return self._predict_regression(X, "none", level, side)
         return self._om_forecast(h, X_future=X)
 
     # ------------------------------------------------------------------

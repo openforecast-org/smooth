@@ -312,6 +312,15 @@ def test_the_intervals_with_the_uncertainty_of_the_parameters(damped_arma):
     assert np.all(lower < point) and np.all(point < upper)
 
 
+def test_the_arma_parameters_as_r(damped_arma):
+    # R: tbats(y, lags=c(1,12), harmonics=5, trend="damped",
+    #          orders=list(ar=1, ma=1, select=FALSE))$arma
+    arma = damped_arma.arma_parameters_
+    assert list(arma) == ["ar", "ma"]
+    assert arma["ar"] == pytest.approx({"phi1[1]": 0.7918228427}, abs=1e-8)
+    assert arma["ma"] == pytest.approx({"theta1[1]": -0.1624946249}, abs=1e-8)
+
+
 @pytest.mark.parametrize("initial", ["backcasting", "optimal"])
 def test_the_simulations_start_from_the_initials_of_the_model(air, initial):
     fit = TBATS(

@@ -175,3 +175,92 @@ test_that("sim.es gives each inverse Gaussian simulation its own likelihood", {
     })
     expect_equal(as.numeric(y$logLik), expected)
 })
+
+#### Printing and plotting ####
+test_that("print() of the simulated data shows the model and its parameters", {
+    set.seed(5);
+    testData <- sim.es("AAdN", obs=50, phi=0.9);
+    printed <- paste(capture.output(print(testData)), collapse="\n");
+    expect_match(printed, "Data generated from: ETS(AAdN)", fixed=TRUE);
+    expect_match(printed, "Number of generated series: 1", fixed=TRUE);
+    expect_match(printed, paste(format(round(as.vector(testData$persistence), 4)), collapse=" +"));
+    expect_match(printed, "Phi: 0.9", fixed=TRUE);
+    expect_match(printed, paste0("True likelihood: ", round(testData$logLik, 4)), fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.es("MNN", obs=50, probability=0.5))), collapse="\n"),
+                 "produced based on an occurrence model", fixed=TRUE);
+    # ARIMA: the parameters by lag and the constant
+    testData <- sim.ssarima(orders=list(ar=1,i=1,ma=1), obs=50, arma=list(ar=0.5, ma=-0.3),
+                            constant=2);
+    printed <- capture.output(print(testData));
+    expect_true(any(grepl("ARIMA(1,1,1) with drift", printed, fixed=TRUE)));
+    expect_true(any(grepl("^AR\\(1\\) +0.5$", printed)));
+    expect_true(any(grepl("^MA\\(1\\) +-0.3$", printed)));
+    expect_true(any(grepl("Constant value: 2", printed, fixed=TRUE)));
+    testData <- sim.ces("n", obs=50);
+    printed <- paste(capture.output(print(testData)), collapse="\n");
+    expect_match(printed, "Data generated from: CES(none)", fixed=TRUE);
+    expect_match(printed, paste0("Smoothing parameter a: ", round(testData$a, 4)), fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.gum(orders=c(2), lags=c(1), obs=50))), collapse="\n"),
+                 "Data generated from: GUM(2[1])", fixed=TRUE);
+    testData <- sim.sma(3, obs=50);
+    printed <- paste(capture.output(print(testData)), collapse="\n");
+    expect_match(printed, "Data generated from: SMA(3)", fixed=TRUE);
+    expect_match(printed, paste0("True likelihood: ", round(testData$logLik, 4)), fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.es("ANN", obs=50, nsim=3))), collapse="\n"),
+                 "Number of generated series: 3", fixed=TRUE);
+    expect_match(paste(capture.output(print(sim.oes("MNN", obs=50))), collapse="\n"),
+                 "Data generated from: oETS[O](MNN)", fixed=TRUE);
+})
+
+test_that("plot() of the simulated data draws the series", {
+    set.seed(5);
+    for(testData in list(sim.es("AAdN", obs=50, phi=0.9), sim.ssarima(obs=50), sim.ces("n", obs=50),
+                         sim.gum(orders=c(2), lags=c(1), obs=50), sim.sma(3, obs=50),
+                         sim.oes("MNN", obs=50))){
+        pdf(NULL);
+        dev.control("enable");
+        plot(testData);
+        expect_gt(length(recordPlot()[[1]]), 0, label=testData$model);
+        dev.off();
+    }
+    pdf(NULL);
+    dev.control("enable");
+    expect_message(plot(sim.es("ANN", obs=50, nsim=3)), "Not sure which of them to plot");
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+})
+
+# The simulations have no actuals: the lags take the frequency of the generated data, and
+# the CES type is read from its name in words (it was "full" for every type but "none")
+test_that("orders() and lags() of the ETS and CES simulations", {
+    expect_equal(lags(sim.es("ANA", obs=40, frequency=4)), c(1, 4));
+    expect_equal(lags(sim.es("ANN", obs=40, frequency=4)), 1);
+    expected <- list(none=list(orders=2, lags=1), simple=list(orders=2, lags=4),
+                     partial=list(orders=c(2,1), lags=c(1,4)), full=list(orders=c(2,2), lags=c(1,4)));
+    for(type in names(expected)){
+        testData <- sim.ces(type, obs=40, frequency=4);
+        expect_equal(modelType(testData), type);
+        expect_equal(orders(testData), expected[[type]]$orders);
+        expect_equal(lags(testData), expected[[type]]$lags);
+    }
+})
+
+# sim.oes() with several series: the probability has a column per series (it failed),
+# and print() counts the observations from it (it printed 0)
+test_that("sim.oes() generates several series and prints their size", {
+    for(occurrence in c("odds-ratio","inverse-odds-ratio","direct","general")){
+        testData <- sim.oes("MNN", obs=50, nsim=3, occurrence=occurrence, initial=0.5);
+        expect_equal(dim(testData$probability), c(50, 3));
+        expect_length(testData$logLik, 3);
+    }
+    expect_true(any(grepl("Number of generated series: 3", capture.output(print(testData)))));
+    expect_true(any(grepl("Number of observations in each series: 50",
+                          capture.output(print(sim.oes("MNN", obs=50, initial=0.5))))));
+})
+
+test_that("print() of a GUM simulation shows its matrices and likelihood", {
+    testData <- sim.gum(orders=c(1,1), lags=c(1,4), obs=40);
+    printed <- capture.output(print(testData));
+    expect_true(all(c("Persistence vector: ", "Transition matrix: ", "Measurement vector: ") %in% printed));
+    expect_true(any(grepl(paste0("True likelihood: ", round(testData$logLik, 4)), printed, fixed=TRUE)));
+})

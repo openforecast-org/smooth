@@ -923,19 +923,6 @@ def _get_n_params(model: Any) -> int:
     return 0
 
 
-def _format_n_param_table(model: Any) -> str:
-    """Format the n_param table for display."""
-    n_param = None
-
-    if hasattr(model, "_general") and model._general:
-        n_param = model._general.get("n_param")
-
-    if n_param is None:
-        return ""
-
-    return str(n_param)
-
-
 def _can_compute_ic(model: Any) -> bool:
     """Check if information criteria can be computed."""
     loss = "likelihood"

@@ -80,6 +80,11 @@ omg <- function(data,
     startTime <- Sys.time()
     cl        <- match.call()
 
+    # The two sub-models are fitted jointly, which does not combine models
+    if(any(grepl("C", c(modelA, modelB)[sapply(c(modelA, modelB), is.character)], fixed=TRUE))){
+        stop("omg() does not take combinations of models (C in modelA or modelB).", call.=FALSE)
+    }
+
     # Capture ellipsis early so FI / stepSize / B / lb / ub passed via ...
     # are visible to the fitted-object intake below.
     ellipsis <- list(...)
@@ -1159,6 +1164,9 @@ omg <- function(data,
     EtypeB <- errorType(modelB)
     yFitted   <- modelA$fitted
     yFitted[] <- pCoupled
+    # The residuals of the occurrence, as om(): missing where the occurrence is
+    errors   <- yFitted
+    errors[] <- otFit - pCoupled
     # logLik is the Bernoulli of that same coupled probability, so $fitted and
     # $logLik stay mutually consistent for every loss (mirrors om()).
     # The missing observations are not in the likelihood
@@ -1204,6 +1212,7 @@ omg <- function(data,
         # standalone ``actuals.om`` would on a fresh ``om(y, ...)`` call.
         data        = yData,
         fitted      = yFitted,
+        residuals   = errors,
         forecast    = yForecast,
         occurrence  = "general",
         lags        = lags,
@@ -2102,7 +2111,8 @@ rstandard.omg <- function(model, ...){
     obs <- nobs(model);
     df  <- obs - nparam(model);
     p   <- as.numeric(model$fitted);
-    e   <- as.numeric(actuals(model)) - p;
+    # The occurrence minus its probability (the actuals are the data, not the occurrence)
+    e   <- as.numeric(residuals(model));
     return(e / sqrt(p * (1 - p)) * sqrt(obs / df));
 }
 
@@ -2112,8 +2122,28 @@ rstudent.omg <- function(model, ...){
     obs <- nobs(model);
     df  <- obs - nparam(model) - 1;
     p   <- as.numeric(model$fitted);
-    e   <- as.numeric(actuals(model)) - p;
+    # The occurrence minus its probability (the actuals are the data, not the occurrence)
+    e   <- as.numeric(residuals(model));
     return(e / sqrt(p * (1 - p)) * sqrt(obs / df));
+}
+
+# The orders, lags and covariances of the multistep errors of the two sub-models
+#' @export
+orders.omg <- function(object, ...){
+    return(list(A=orders(object$modelA), B=orders(object$modelB)));
+}
+
+#' @export
+lags.omg <- function(object, ...){
+    # The lags each sub-model uses, as lags() of om()
+    return(list(A=as.vector(object$modelA$lagsAll), B=as.vector(object$modelB$lagsAll)));
+}
+
+#' @export
+multicov.omg <- function(object, type=c("analytical","empirical","simulated"), h=10, nsim=1000,
+                         ...){
+    return(list(A=multicov(object$modelA, type=type, h=h, nsim=nsim, ...),
+                B=multicov(object$modelB, type=type, h=h, nsim=nsim, ...)));
 }
 
 #' @rdname simulate.om

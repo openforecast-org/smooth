@@ -3,61 +3,6 @@ import numpy as np
 from ._utils import _warn
 
 
-def _expand_component_code(comp_char, allow_multiplicative=True):
-    """
-    Expand a single component character into a list of valid possibilities.
-
-    Parameters
-    ----------
-    comp_char : str
-        Component character (E, T, S)
-    allow_multiplicative : bool, optional
-        Whether multiplicative models are allowed
-
-    Returns
-    -------
-    list
-        List of possible component values
-    """
-    possible = set()
-
-    # Handle each special case:
-    if comp_char == "Z":
-        # Expand to A,N + M if allowed
-        possible.update(["A", "N"])
-        if allow_multiplicative:
-            possible.add("M")
-    elif comp_char == "C":
-        # "C" is effectively "combine all" in R
-        possible.update(["A", "N"])
-        if allow_multiplicative:
-            possible.add("M")
-    elif comp_char == "F":
-        # "full" => A, N, plus M if multiplicative
-        possible.update(["A", "N"])
-        if allow_multiplicative:
-            possible.add("M")
-    elif comp_char == "P":
-        # "pure" => A plus M if multiplicative
-        possible.update(["A"])
-        if allow_multiplicative:
-            possible.add("M")
-    elif comp_char == "X":
-        # R logic converts X->A
-        possible.update(["A"])
-    elif comp_char == "Y":
-        # R logic converts Y->M if allowed, else A
-        if allow_multiplicative:
-            possible.update(["M"])
-        else:
-            possible.update(["A"])
-    else:
-        # If it's one of 'A','M','N' or an unknown letter, just return that
-        possible.add(comp_char)
-
-    return list(possible)
-
-
 def _build_models_pool_from_components(
     error_type_char,
     trend_type_char,
@@ -68,8 +13,6 @@ def _build_models_pool_from_components(
 ):
     """
     Build a models pool by fully enumerating expansions for E, T, S.
-    This version aims to replicate the pool generation of the older
-    _generate_models_pool.
 
     Parameters
     ----------
@@ -463,113 +406,6 @@ def _check_model_composition(
         "models_pool": models_pool,
         "allow_multiplicative": allow_multiplicative,
     }
-
-
-def _generate_models_pool(
-    error_type, trend_type, season_type, allow_multiplicative, silent=False
-):
-    """
-    Generate a pool of models based on component specifications.
-
-    Parameters
-    ----------
-    error_type : str
-        Error component type
-    trend_type : str
-        Trend component type
-    season_type : str
-        Seasonal component type
-    allow_multiplicative : bool
-        Whether multiplicative models are allowed
-    silent : bool, optional
-        Whether to suppress warnings
-
-    Returns
-    -------
-    tuple
-        (pool_small, pool_errors, pool_trends, pool_seasonals, check_trend,
-        check_seasonal)
-    """
-    # Print status if not silent
-    if not silent:
-        print("Forming the pool of models based on... ", end="")
-
-    # Define the whole pool of errors, trends, and seasonals
-    if not allow_multiplicative:
-        pool_errors = ["A"]
-        pool_trends = ["N", "A", "Ad"]
-        pool_seasonals = ["N", "A"]
-    else:
-        pool_errors = ["A", "M"]
-        pool_trends = ["N", "A", "Ad", "M", "Md"]
-        pool_seasonals = ["N", "A", "M"]
-
-    # Prepare error type
-    if error_type != "Z":
-        pool_errors = [error_type]
-        pool_errors_small = [error_type]
-    else:
-        pool_errors_small = ["A"]
-
-    # Prepare trend type
-    if trend_type != "Z":
-        if trend_type == "X":
-            pool_trends_small = ["N", "A"]
-            pool_trends = ["N", "A", "Ad"]
-            check_trend = True
-        elif trend_type == "Y":
-            pool_trends_small = ["N", "M"]
-            pool_trends = ["N", "M", "Md"]
-            check_trend = True
-        else:
-            damped = "d" in trend_type
-            if damped:
-                pool_trends = pool_trends_small = [trend_type]
-            else:
-                pool_trends = pool_trends_small = [trend_type]
-            check_trend = False
-    else:
-        pool_trends_small = ["N", "A"]
-        check_trend = True
-
-    # Prepare seasonal type
-    if season_type != "Z":
-        if season_type == "X":
-            pool_seasonals = pool_seasonals_small = ["N", "A"]
-            check_seasonal = True
-        elif season_type == "Y":
-            pool_seasonals_small = ["N", "M"]
-            pool_seasonals = ["N", "M"]
-            check_seasonal = True
-        else:
-            pool_seasonals_small = [season_type]
-            pool_seasonals = [season_type]
-            check_seasonal = False
-    else:
-        pool_seasonals_small = ["N", "A", "M"]
-        check_seasonal = True
-
-    # Create the small pool
-    pool_small = []
-    for error in pool_errors_small:
-        for trend in pool_trends_small:
-            for seasonal in pool_seasonals_small:
-                pool_small.append(error + trend + seasonal)
-
-    # Align error and seasonality, if the error was not forced to be additive
-    if any(model[2] == "M" for model in pool_small) and error_type not in ["A", "X"]:
-        for i, model in enumerate(pool_small):
-            if model[2] == "M":
-                pool_small[i] = "M" + model[1:]
-
-    return (
-        pool_small,
-        pool_errors,
-        pool_trends,
-        pool_seasonals,
-        check_trend,
-        check_seasonal,
-    )
 
 
 def _check_ets_model(

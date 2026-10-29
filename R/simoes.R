@@ -115,10 +115,13 @@ sim.oes <- function(model="MNN", obs=10, nsim=1, frequency=1,
                                       randomizer=randomizer, ...),
                      list(data=matrix(0,obs,nsim)));
 
+    # The probability has a column per series
+    probability <- if(nsim==1) ts(numeric(obs), frequency=frequency) else
+        ts(matrix(0, obs, nsim), frequency=frequency);
     # Direct relies on only one model with max / min functions
     if(occurrence=="direct"){
         model <- list(modelA=modelA);
-        model$probability <- ts(vector("numeric",obs), frequency=frequency);
+        model$probability <- probability;
         model$probability[] <- modelA$data;
         model$probability[model$probability>1] <- 1;
         model$probability[model$probability<0] <- 0;
@@ -126,7 +129,7 @@ sim.oes <- function(model="MNN", obs=10, nsim=1, frequency=1,
     # The others do division of A / (A + B)
     else{
         model <- list(modelA=modelA, modelB=modelB);
-        model$probability <- ts(vector("numeric",obs), frequency=frequency);
+        model$probability <- probability;
         # This way we preserve the potential ts structure
         model$probability[] <- modelA$data;
         model$probability[] <- 1 / (1+switch(errorType(modelB), "M"=c(modelB$data), "A"=c(exp(modelB$data))) /

@@ -6,7 +6,10 @@ utils::globalVariables(c(
 
   # Variables injected via list2env() in adam.R, adamGeneral.R, om.R, omg.R, ssarima.R, ces.R, gum.R
   "B", "FI",
+  "denominator",
   "initialXregProvided",
+  "lagsLength",
+  "occurrenceMissingOnly", "occurrenceProbability", "omModel",
   "lb", "ub",
   "otherReturned",
   "persistenceXregProvided",
@@ -57,12 +60,13 @@ utils::globalVariables(c(
   "xregModelInitials",
   "xregParametersEstimated", "xregParametersIncluded",
   "xregParametersMissing", "xregParametersPersistence",
+  "xregTerms",
   "xtol_abs", "xtol_rel",
   "yClasses", "yDenominator",
   "yForecastIndex", "yIndexAll", "yInSampleIndex",
   "yNAValues", "yStart",
 
-  # ssfunctions.R - State space utility functions
+  # Shared by the state space functions of several models
   "AR", "MA",
   "CF",
   "constant", "cumulative",
@@ -108,7 +112,7 @@ utils::globalVariables(c(
   "regressors",
   "updateX",
 
-  # iss.R - Intermittent state space utilities
+  # Shared by the occurrence parts of several models
   "obs",
   "occurrenceModel", "occurrenceModelProvided",
   "yInSample",
@@ -118,62 +122,62 @@ utils::globalVariables(c(
 
   #### Additional variables used across multiple functions
 
-  # cfObjective - Cost/objective function (5 files: adam-sma.R, cma.R, methods.R, ssfunctions.R, RcppExports)
+  # cfObjective - Cost/objective function (5 files: adam-sma.R, cma.R, methods.R, RcppExports)
   "cfObjective",
 
   # dataFreq - Data frequency/periodicity (9 files: adam-ssarima.R, automsarima.R, autossarima.R,
-  #            iss.R, methods.R, oesg.R, oes.R, ssfunctions.R, RcppExports)
+  #            methods.R, oesg.R, oes.R, RcppExports)
   "dataFreq",
 
-  # errors.mat - Multi-step forecasting error matrix (4 files: methods.R, oes.R, ssfunctions.R, C++ interface)
+  # errors.mat - Multi-step forecasting error matrix (4 files: methods.R, oes.R, C++ interface)
   "errors.mat",
 
   # initial - Initial values/states parameter (33 files: ubiquitous across all models, simulations, utilities)
   "initial",
 
   # matw - Measurement vector/matrix (9 files: oesg.R, oes.R, RcppExports.R, simces.R, simes.R,
-  #        simgum.R, simssarima.R, ssfunctions.R, C++ interface)
+  #        simgum.R, simssarima.R, C++ interface)
   "matw",
 
   # nComponents - Number of model components/states (8 files: autogum.R, methods.R, oesg.R, oes.R,
-  #               randomARIMA.R, ssfunctions.R, variance-covariance.R, internal utilities)
+  #               randomARIMA.R, variance-covariance.R, internal utilities)
   "nComponents",
 
   # nParamOccurrence - Number of parameters in occurrence model (5 files: adamGeneral.R, adam.R,
-  #                    iss.R, ssfunctions.R, intermittent demand functions)
+  #                    intermittent demand functions)
   "nParamOccurrence",
 
   # occurrence - Occurrence model type for intermittent demand (30+ files: adam.R, all adam-*.R wrappers,
-  #              oes.R, oesg.R, adamGeneral.R, iss.R, all auto functions with occurrence support)
+  #              oes.R, oesg.R, adamGeneral.R, all auto functions with occurrence support)
   "occurrence",
 
   # persistenceEstimate - Flag for estimating persistence parameters (8 files: adamGeneral.R, adam.R,
-  #                       adam-gum.R, adam-ssarima.R, oesg.R, oes.R, ssfunctions.R, parameter handlers)
+  #                       adam-gum.R, adam-ssarima.R, oesg.R, oes.R, parameter handlers)
   "persistenceEstimate",
 
   # phiEstimate - Flag for estimating phi (damping) parameter (6 files: adamGeneral.R, adam.R,
-  #               oesg.R, oes.R, ssfunctions.R, damping parameter handling)
+  #               oesg.R, oes.R, damping parameter handling)
   "phiEstimate",
 
   # s2 - Variance estimate (sigma-squared) for inference and intervals (14 files: adam.R, adam-es.R,
   #      adam-msarima.R, adam-sma.R, automsarima.R, autossarima.R, cma.R, methods.R, oesg.R,
-  #      oes.R, smoothCombine.R, ssfunctions.R, variance-covariance.R, all interval calculations)
+  #      oes.R, smoothCombine.R, variance-covariance.R, all interval calculations)
   "s2",
 
   # silentText - Text output suppression flag (5 files: automsarima.R, oesg.R, oes.R,
-  #              ssfunctions.R, output control)
+  #              output control)
   "silentText",
 
   # vecg - Persistence vector (lowercase 'g') in state space formulation (6 files: oesg.R, oes.R,
-  #        RcppExports.R, simssarima.R, ssfunctions.R, C++ interface)
+  #        RcppExports.R, simssarima.R, C++ interface)
   "vecg",
 
   # yForecastStart - Starting point for forecast period (14 files: adam.R, adam-ces.R, adam-gum.R,
   #                  adam-ssarima.R, adamGeneral.R, automsarima.R, autossarima.R, msdecompose.R,
-  #                  oesg.R, oes.R, reapply.R, smoothCombine.R, sparma.R, ssfunctions.R)
+  #                  oesg.R, oes.R, reapply.R, smoothCombine.R, sparma.R)
   "yForecastStart",
 
   # yLower, yUpper - Prediction interval bounds (8 files each: adam.R, automsarima.R, autossarima.R,
-  #                  oesg.R, oes.R, reapply.R, ssfunctions.R, all interval calculations)
+  #                  oesg.R, oes.R, reapply.R, all interval calculations)
   "yLower", "yUpper"
 ))

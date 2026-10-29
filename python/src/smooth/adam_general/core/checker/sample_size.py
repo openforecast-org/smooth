@@ -10,7 +10,7 @@ def _restrict_models_pool_for_sample_size(
     season_type,
     models_pool,
     allow_multiplicative=True,
-    xreg_number=0,
+    n_param_exo=0,
     silent=False,
     n_param_max=None,
     damped=False,
@@ -18,7 +18,8 @@ def _restrict_models_pool_for_sample_size(
     """
     Restrict the models pool based on sample size.
 
-    Follows the logic from R's adamGeneral.R lines 2641-2944.
+    Translates the ETS part of R's "Checks for the potential number of degrees of
+    freedom" (R/adamGeneral.R).
     Only applies restrictions when obs_nonzero <= n_param_max.
 
     Parameters
@@ -39,8 +40,8 @@ def _restrict_models_pool_for_sample_size(
         Current models pool
     allow_multiplicative : bool
         Whether multiplicative models are allowed
-    xreg_number : int
-        Number of external regressors
+    n_param_exo : int
+        Number of estimated parameters of the regressors (R's nParamExo)
     silent : bool
         Whether to suppress warnings
     n_param_max : int or None
@@ -54,8 +55,6 @@ def _restrict_models_pool_for_sample_size(
     dict
         Updated model configuration with restricted pool
     """
-    n_param_exo = xreg_number * 2  # xreg coefficients + persistence
-
     result = {
         "model_do": model_do,
         "error_type": error_type,
@@ -82,6 +81,13 @@ def _restrict_models_pool_for_sample_size(
             f"while the maximum number of parameters to estimate is {n_param_max}.\n"
             "Updating pool of models."
         )
+
+    # R's warning, for the model as it is when it is raised
+    model = error_type + trend_type + ("d" if damped else "") + season_type
+    fitting_what_i_can = (
+        "Not enough of non-zero observations for the fit of ETS({})! "
+        "Fitting what I can..."
+    )
 
     # If pool not specified and select/combine mode, build restricted pool
     if (
@@ -150,11 +156,7 @@ def _restrict_models_pool_for_sample_size(
         else:
             result["model_do"] = "select"
 
-        if not silent:
-            _warn(
-                f"Not enough observations for full model pool. "
-                f"Fitting restricted pool: {new_pool}"
-            )
+        _warn(fitting_what_i_can.format(model), silent)
 
     # If pool is provided, filter it based on available observations
     elif obs_nonzero > (3 + n_param_exo) and models_pool is not None:
@@ -184,68 +186,46 @@ def _restrict_models_pool_for_sample_size(
         if obs_nonzero <= (5 + n_param_exo):
             filtered_pool = [m for m in filtered_pool if m[1] == "N"]
 
-        result["models_pool"] = list(set(filtered_pool))
-        if not silent and len(filtered_pool) < len(models_pool):
-            _warn(f"Pool restricted due to sample size: {filtered_pool}")
+        result["models_pool"] = list(dict.fromkeys(filtered_pool))
+        result["model_do"] = "combine" if model_do == "combine" else "select"
+        _warn(fitting_what_i_can.format(model), silent)
 
     # Handle estimate/use mode (R lines 2778-2832)
     elif obs_nonzero > (3 + n_param_exo) and model_do in ["estimate", "use"]:
-        # Build model string: E + T + (d if damped) + S
-        model = error_type + trend_type
-        if damped:
-            model += "d"
-        model += season_type
+        seasonal = season_type != "N"
 
-        # 1. Remove damped from seasonal models if not enough obs (R lines 2780-2790)
-        if obs_nonzero <= (6 + lags_model_max + 1 + n_param_exo):
-            if len(model) == 4:  # Damped model with seasonal
-                if not silent:
-                    _warn(
-                        f"Not enough non-zero observations for ETS({model})! "
-                        "Fitting what I can..."
-                    )
-                model = model[:2] + model[3]  # Remove 'd': AAdA -> AAA
+        # Remove damped from seasonal models if not enough obs
+        if (
+            len(model) == 4
+            and seasonal
+            and obs_nonzero <= (6 + lags_model_max + 1 + n_param_exo)
+        ):
+            _warn(fitting_what_i_can.format(model), silent)
+            model = model[:2] + model[3]
 
-        # 2. Remove trend from seasonal models if not enough obs (R lines 2791-2798)
-        if obs_nonzero <= (5 + lags_model_max + 1 + n_param_exo):
-            if model[1] != "N":  # Has trend
-                if not silent:
-                    _warn(
-                        f"Not enough non-zero observations for ETS({model})! "
-                        "Fitting what I can..."
-                    )
-                model = model[0] + "N" + model[2]  # Remove trend: AAA -> ANA
+        # Remove trend from seasonal models if not enough obs
+        if (
+            model[1] != "N"
+            and seasonal
+            and obs_nonzero <= (5 + lags_model_max + 1 + n_param_exo)
+        ):
+            _warn(fitting_what_i_can.format(model), silent)
+            model = model[0] + "N" + model[-1]
 
-        # 3. Remove seasonal if not enough obs (R lines 2799-2805)
-        if obs_nonzero <= lags_model_max:
-            if model[-1] != "N":  # Has seasonal
-                if not silent:
-                    _warn(
-                        f"Not enough non-zero observations for ETS({model})! "
-                        "Fitting what I can..."
-                    )
-                model = model[:2] + "N"  # Remove seasonal: ANA -> ANN
+        # Remove seasonal if not enough obs
+        if seasonal and obs_nonzero <= lags_model_max:
+            _warn(fitting_what_i_can.format(model), silent)
+            model = model[:-1] + "N"
 
-        #  4. Remove damped from non-seasonal models if not enough obs (R lines
-        # 2806-2814)
-        if obs_nonzero <= (6 + n_param_exo):
-            if len(model) == 4:  # Damped model (non-seasonal at this point)
-                if not silent:
-                    _warn(
-                        f"Not enough non-zero observations for ETS({model})! "
-                        "Fitting what I can..."
-                    )
-                model = model[:2] + model[3]  # Remove 'd': AAdN -> AAN
+        # Remove damped if not enough obs
+        if len(model) == 4 and obs_nonzero <= (6 + n_param_exo):
+            _warn(fitting_what_i_can.format(model), silent)
+            model = model[:2] + model[3]
 
-        # 5. Remove any trend if not enough obs (R lines 2815-2821)
-        if obs_nonzero <= (5 + n_param_exo):
-            if model[1] != "N":  # Has trend
-                if not silent:
-                    _warn(
-                        f"Not enough non-zero observations for ETS({model})! "
-                        "Fitting what I can..."
-                    )
-                model = model[0] + "N" + model[2]  # Remove trend: AAN -> ANN
+        # Remove any trend if not enough obs
+        if model[1] != "N" and obs_nonzero <= (5 + n_param_exo):
+            _warn(fitting_what_i_can.format(model), silent)
+            model = model[0] + "N" + model[-1]
 
         # Update result based on simplified model (R lines 2822-2832)
         result["error_type"] = model[0]
@@ -257,8 +237,8 @@ def _restrict_models_pool_for_sample_size(
         result["damped"] = model_is_trendy and len(model) == 4
         result["phi_estimate"] = result["damped"]
 
-    # Extreme cases
-    if obs_nonzero == 4:
+    # Extreme cases, after the branches above as in R
+    elif obs_nonzero == 4:
         if error_type in ["A", "M"]:
             result["model_do"] = "estimate"
             result["trend_type"] = "N"
@@ -269,8 +249,11 @@ def _restrict_models_pool_for_sample_size(
             result["error_type"] = "Z"
             result["trend_type"] = "N"
             result["season_type"] = "N"
-            if not silent:
-                _warn("Very small sample. Only level models available.")
+            _warn(
+                "You have a very small sample. "
+                "The only available model is level model.",
+                silent,
+            )
         result["phi_estimate"] = False
         result["damped"] = False
 
@@ -289,8 +272,11 @@ def _restrict_models_pool_for_sample_size(
         result["persistence_estimate"] = False
         result["phi_estimate"] = False
         result["damped"] = False
-        if not silent:
-            _warn("Very small sample. Persistence set to zero.")
+        _warn(
+            "I did not have enough of non-zero observations, "
+            "so persistence value was set to zero.",
+            silent,
+        )
 
     elif obs_nonzero == 2:
         result["models_pool"] = None
@@ -304,8 +290,11 @@ def _restrict_models_pool_for_sample_size(
         result["season_type"] = "N"
         result["phi_estimate"] = False
         result["damped"] = False
-        if not silent:
-            _warn("Sample too small. Using fixed ANN model.")
+        _warn(
+            "I did not have enough of non-zero observations, so persistence value "
+            "was set to zero and initial was preset.",
+            silent,
+        )
 
     elif obs_nonzero == 1:
         result["models_pool"] = None
@@ -319,8 +308,10 @@ def _restrict_models_pool_for_sample_size(
         result["season_type"] = "N"
         result["phi_estimate"] = False
         result["damped"] = False
-        if not silent:
-            _warn("Only one observation. Using Naive forecast.")
+        _warn(
+            "I did not have enough of non-zero observations, so I used Naive.",
+            silent,
+        )
 
     elif obs_nonzero == 0:
         result["models_pool"] = None
@@ -334,114 +325,9 @@ def _restrict_models_pool_for_sample_size(
         result["season_type"] = "N"
         result["phi_estimate"] = False
         result["damped"] = False
-        if not silent:
-            _warn("No non-zero observations. Forecast will be zero.")
+        _warn("You have a sample with zeroes only. Your forecast will be zero.", silent)
 
-    elif obs_nonzero <= 3 + n_param_exo:
-        raise ValueError(
-            f"Not enough observations ({obs_nonzero}) for model estimation."
-        )
-
-    return result
-
-
-def _adjust_model_for_sample_size(
-    model_info,
-    obs_nonzero,
-    lags_model_max,
-    allow_multiplicative=True,
-    xreg_number=0,
-    silent=False,
-):
-    """
-    Adjust model complexity based on sample size.
-
-    Parameters
-    ----------
-    model_info : dict
-        Model type information
-    obs_nonzero : int
-        Number of non-zero observations
-    lags_model_max : int
-        Maximum lag value
-    allow_multiplicative : bool, optional
-        Whether multiplicative models are allowed
-    xreg_number : int, optional
-        Number of external regressors
-    silent : bool, optional
-        Whether to suppress warnings
-
-    Returns
-    -------
-    dict
-        Updated model information
-    """
-    result = model_info.copy()
-
-    # Effective sample size after accounting for lags
-    effective_sample = obs_nonzero - lags_model_max
-
-    # Calculate number of parameters needed
-    n_params = 0
-
-    # Level parameter
-    if model_info["ets_model"]:
-        n_params += 1
-
-    # Trend parameter
-    if model_info["ets_model"] and model_info["trend_type"] != "N":
-        n_params += 1
-
-        # Damping parameter
-        if model_info["damped"]:
-            n_params += 1
-
-    # Seasonal parameters
-    if (
-        model_info["ets_model"]
-        and model_info["season_type"] != "N"
-        and model_info.get("model_is_seasonal", False)
-    ):
-        # One parameter per seasonal lag
-        n_params += model_info.get("components_number_ets_seasonal", 0)
-
-    # External regressors
-    n_params += xreg_number
-
-    # Check if we have enough observations
-    if effective_sample <= n_params:
-        # Not enough observations, simplify the model
-        _warn(
-            f"Not enough non-zero observations ({obs_nonzero}) for the model "
-            f"with {n_params} parameters. Switching to a simpler model.",
-            silent,
-        )
-
-        # Start by reducing seasonality
-        if result["season_type"] != "N":
-            result["season_type"] = "N"
-            result["model_is_seasonal"] = False
-            n_params -= model_info.get("components_number_ets_seasonal", 0)
-
-        # Then remove damping
-        if result["damped"] and result["trend_type"] != "N":
-            result["damped"] = False
-            n_params -= 1
-
-        # Finally remove trend
-        if effective_sample <= n_params and result["trend_type"] != "N":
-            result["trend_type"] = "N"
-            result["model_is_trendy"] = False
-            n_params -= 1
-
-        # Update model string
-        if result["damped"] and result["trend_type"] != "N":
-            result["model"] = (
-                f"{result['error_type']}{result['trend_type']}d{result['season_type']}"
-            )
-        else:
-            result["model"] = (
-                f"{result['error_type']}{result['trend_type']}{result['season_type']}"
-            )
+    else:
+        raise ValueError("Not enough observations... Even for fitting of ETS('ANN')!")
 
     return result

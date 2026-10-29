@@ -31,7 +31,7 @@ for(i in seq_len(nrow(spec))){
     out[[i]] <- list(time=as.numeric(Sys.time()-t0, units="secs"), mean=as.numeric(f$mean),
                      upper=as.numeric(f$upper))
 }
-jsonlite::write_json(out, args[3], digits=NA)
+jsonlite::write_json(out, args[3], digits=NA, auto_unbox=TRUE)
 """
 
 

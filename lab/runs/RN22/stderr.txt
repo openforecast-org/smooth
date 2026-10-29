@@ -1,0 +1,12 @@
+TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/claude/smooth/claimset/code/iets-occurrence-bias/m5/timing.py", line 92, in <module>
+    main(*sys.argv[1:4])
+    ~~~~^^^^^^^^^^^^^^^^
+  File "/home/claude/smooth/claimset/code/iets-occurrence-bias/m5/timing.py", line 69, in main
+    times["R"][k] += r[k]["time"]
+    ~~~~~~~~~~^^^
+ValueError: setting an array element with a sequence.

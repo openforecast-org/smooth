@@ -1,0 +1,5 @@
+{'model': 'iETS_I', 'error': 'M', 'p': 0.02, 'alpha': 0.002, 'mean_p_hat': 0.01009139039, 'ratio': 0.5045695195, 'nonfinite': 0, 'predicted': 0.01005050633883342, 'rel_dev': 0.00406785984588761}
+{'model': 'iETS_I', 'error': 'M', 'p': 0.15, 'alpha': 0.002, 'mean_p_hat': 0.07806875024, 'ratio': 0.5204583349333334, 'nonfinite': 0, 'predicted': 0.07804555427071125, 'rel_dev': 0.0002972106419834223}
+{'model': 'iETS_I', 'error': 'M', 'p': 0.4, 'alpha': 0.002, 'mean_p_hat': 0.2259022668, 'ratio': 0.564755667, 'nonfinite': 0, 'predicted': 0.2254033307585166, 'rel_dev': 0.0022135255934524548}
+{'model': 'iETS_I', 'error': 'M', 'p': 0.65, 'alpha': 0.002, 'mean_p_hat': 0.4086262688, 'ratio': 0.6286557981538462, 'nonfinite': 0, 'predicted': 0.4083920216900384, 'rel_dev': 0.0005735839524783986}
+{'model': 'iETS_I', 'error': 'M', 'p': 0.9, 'alpha': 0.002, 'mean_p_hat': 0.6839423395, 'ratio': 0.7599359327777778, 'nonfinite': 0, 'predicted': 0.6837722339831621, 'rel_dev': 0.00024877511601637534}

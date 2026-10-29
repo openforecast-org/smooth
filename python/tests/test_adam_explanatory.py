@@ -374,11 +374,15 @@ def test_initial_xreg_is_kept_and_the_rest_estimated(etsx_data):
 
 
 def test_initial_xreg_wrong_length_raises(etsx_data):
-    """initial={'xreg': [...]} with wrong length raises ValueError."""
+    """initial={'xreg': [...]} with more values than regressors raises ValueError;
+    fewer are those of the first regressors, and the others are estimated, as R."""
     y, X = etsx_data  # X has 2 columns
-    model = ADAM(model="AAN", regressors="use", initial={"xreg": [1.0]})
+    model = ADAM(model="AAN", regressors="use", initial={"xreg": [1.0, 2.0, 3.0]})
     with pytest.raises(ValueError, match="xreg"):
         model.fit(y, X)
+    model = ADAM(model="AAN", regressors="use", initial={"xreg": [1.0]}).fit(y, X)
+    assert list(model.initial_value["xreg"].values())[0] == 1.0
+    assert model.n_param.provided["xreg"] == 1
 
 
 def test_initial_xreg_combined_with_level(etsx_data):

@@ -93,6 +93,17 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
             # The same values in the data, from which the selected regressors are refitted
             data[xregNAs] <- xregData[xregNAs];
         }
+        # The character variables are factors, with all their levels as the other factors,
+        # in the data too
+        if(is.data.frame(xregData) && any(sapply(xregData, is.character))){
+            warning("You have character variables in your data. ",
+                    "I will treat them as factors, but it is advised to convert them to factors manually",
+                    call.=FALSE);
+            for(name in names(which(sapply(xregData, is.character)))){
+                xregData[[name]] <- factor(xregData[[name]]);
+                data[[name]] <- factor(data[[name]]);
+            }
+        }
         # The initials provided for some of the regressors only (the columns of their model
         # matrix): the others are estimated, and the provided ones are set after that
         if(!is.null(initialXreg) && regressors!="select"){
@@ -487,12 +498,6 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 colnames(xreg) <- make.names(colnames(xreg),unique=TRUE);
                 # The names of the original variables
                 xregNamesOriginal <- colnames(xregData)[-1];
-                if((is.matrix(xreg) && any(apply(xreg,2,is.character))) ||
-                   (!is.matrix(xreg) && any(sapply(xreg,is.character)))){
-                    warning("You have character variables in your data. ",
-                            "I will treat them as factors, but it is advised to convert them to factors manually",
-                            call.=FALSE);
-                }
                 # If xreg is data frame or formula is provided, do model.frame
                 additionalManipulations <- (is.data.frame(xreg) || formulaProvided);
                 if(additionalManipulations){
@@ -988,30 +993,28 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                 return(almModel);
             }
 
-            # Include only variables from the formula
+            # Include only variables from the formula, all of them without one
             if(is.null(formulaToUse)){
                 formulaToUse <- as.formula(paste0("`",responseName,"`~."));
             }
-            else{
-                # Do model.frame manipulations
-                # We do it this way to avoid factors expansion into dummies at this stage
-                mf <- as.call(list(quote(stats::model.frame), formula=formulaToUse,
-                                   data=xregData, drop.unused.levels=FALSE));
+            # Do model.frame manipulations
+            # We do it this way to avoid factors expansion into dummies at this stage
+            mf <- as.call(list(quote(stats::model.frame), formula=formulaToUse,
+                               data=xregData, drop.unused.levels=FALSE));
 
-                if(!is.data.frame(xregData)){
-                    mf$data <- as.data.frame(xregData);
-                }
-                # Evaluate data frame to do transformations of variables
-                xregData <- eval(mf, parent.frame());
-
-                # Expand the interactions and the factors: the selection runs over the columns
-                dataTerms <- terms(xregData);
-                xregData <- model.matrix(dataTerms, xregData);
-                xregAssign <- attr(xregData, "assign");
-                xregData <- xregData[, xregAssign>0, drop=FALSE];
-                xregTerms <- setNames(labels(dataTerms)[xregAssign[xregAssign>0]],
-                                      make.names(colnames(xregData), unique=TRUE));
+            if(!is.data.frame(xregData)){
+                mf$data <- as.data.frame(xregData);
             }
+            # Evaluate data frame to do transformations of variables
+            xregData <- eval(mf, parent.frame());
+
+            # Expand the interactions and the factors: the selection runs over the columns
+            dataTerms <- terms(xregData);
+            xregData <- model.matrix(dataTerms, xregData);
+            xregAssign <- attr(xregData, "assign");
+            xregData <- xregData[, xregAssign>0, drop=FALSE];
+            xregTerms <- setNames(labels(dataTerms)[xregAssign[xregAssign>0]],
+                                  make.names(colnames(xregData), unique=TRUE));
             xregNumber <- ncol(xregData);
             xregNames <- colnames(xregData);
             initialXregProvided <- FALSE;

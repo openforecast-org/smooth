@@ -1888,10 +1888,26 @@ test_that("the regressors that cannot be used are dealt with", {
     expect_warning(testModel <- adam(data.frame(y=xregData$y, x=1), "ANN"),
                    "did not have any variability");
     expect_equal(testModel$model, "ETS(ANN)");
-    expect_warning(testModel <- adam(data.frame(xregData, z=rep(c("a","b"), 30)), "ANN"),
-                   "character variables");
-    expect_true("zb" %in% names(testModel$initial$xreg));
+    # A character variable is a factor, with all its levels
+    xregCharacter <- data.frame(xregData, z=rep(c("a","b","c"), 20));
+    expect_warning(testModel <- adam(xregCharacter, "ANN"), "character variables");
+    expect_equal(names(testModel$initial$xreg), c("x1","x2","za","zb","zc"));
+    xregFactor <- transform(xregCharacter, z=factor(z));
+    expect_equal(logLik(testModel), logLik(adam(xregFactor, "ANN")));
+    expect_equal(logLik(suppressWarnings(adam(xregCharacter, "ANN", regressors="select"))),
+                 logLik(adam(xregFactor, "ANN", regressors="select")));
     # Special characters in the names of the variables
     testModel <- adam(setNames(xregData, c("y","x 1","x-2")), "ANN");
     expect_equal(names(testModel$initial$xreg), c("x.1","x.2"));
+})
+
+test_that("the selection of the regressors expands the factors with or without a formula", {
+    set.seed(41);
+    xregZ <- rep(c("a","b","c"), 20);
+    xregFactor <- data.frame(y=50 + 2*xregData$x1 + c(a=0,b=5,c=-4)[xregZ] + cumsum(rnorm(60)),
+                             x1=xregData$x1, x2=rnorm(60), z=factor(xregZ));
+    testModel <- adam(xregFactor, "ANN", regressors="select");
+    expect_true(all(c("x1","za","zb","zc") %in% names(testModel$initial$xreg)));
+    expect_equal(logLik(testModel),
+                 logLik(adam(xregFactor, "ANN", regressors="select", formula=y~x1+x2+z)));
 })

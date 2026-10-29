@@ -170,46 +170,12 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
              envir=environment());
 
     #### Process ellipsis ####
-    list2env(adam_checkOptimizer(ellipsis, loss, distribution, initialType, lags, arimaModel),
+    list2env(adam_checkEllipsis(ellipsis, loss, distribution, initialType, lags, arimaModel,
+                                lagsModelMax, obsInSample),
              envir=environment());
 
-    headLength <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample)$geometry;
-    obsStates <- obsInSample + headLength;
-
-    # Add constant in the model
-    if(is.numeric(constant)){
-        constantRequired <- TRUE;
-        constantEstimate <- FALSE;
-        # This is just in case a vector was provided
-        constantValue <- constant[1];
-        if(any(iOrders!=0) || etsModel){
-            constantName <- "drift";
-        }
-        else{
-            constantName <- "constant";
-        }
-    }
-    else if(is.logical(constant)){
-        constantEstimate <- constantRequired <- constant;
-        constantValue <- NULL;
-        if(constantRequired){
-            if(any(iOrders!=0) || etsModel){
-                constantName <- "drift";
-            }
-            else{
-                constantName <- "constant";
-            }
-        }
-        else{
-            constantName <- NULL;
-        }
-    }
-    else{
-        warning("The parameter constant can only be TRUE or FALSE.",
-                "You have: ",constant,". Switching to FALSE",call.=FALSE);
-        constantEstimate <- constantRequired <- FALSE;
-        constantName <- NULL;
-    }
+    #### Constant ####
+    list2env(adam_checkConstant(constant, iOrders, etsModel), envir=environment());
 
     # If there is no model, return a constant level
     if(!etsModel && !arimaModel && !xregModel){

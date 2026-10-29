@@ -3076,6 +3076,55 @@ adam_checkXreg <- function(Etype, arimaModel, bounds, data, distribution, ellips
 }
 
 
+#### Ellipsis: the settings of the optimiser and the head of backcasting ####
+adam_checkEllipsis <- function(ellipsis, loss, distribution, initialType, lags, arimaModel,
+                               lagsModelMax, obsInSample){
+    optimizer <- adam_checkOptimizer(ellipsis, loss, distribution, initialType, lags, arimaModel);
+    headLength <- adam_headLength(ellipsis$headLength, lagsModelMax, obsInSample)$geometry;
+    return(c(optimizer, list(headLength=headLength, obsStates=obsInSample + headLength)));
+}
+
+#### Constant: whether it is in the model, estimated or provided, and its name ####
+adam_checkConstant <- function(constant, iOrders, etsModel){
+    if(is.numeric(constant)){
+        constantRequired <- TRUE;
+        constantEstimate <- FALSE;
+        # This is just in case a vector was provided
+        constantValue <- constant[1];
+        if(any(iOrders!=0) || etsModel){
+            constantName <- "drift";
+        }
+        else{
+            constantName <- "constant";
+        }
+    }
+    else if(is.logical(constant)){
+        constantEstimate <- constantRequired <- constant;
+        constantValue <- NULL;
+        if(constantRequired){
+            if(any(iOrders!=0) || etsModel){
+                constantName <- "drift";
+            }
+            else{
+                constantName <- "constant";
+            }
+        }
+        else{
+            constantName <- NULL;
+        }
+    }
+    else{
+        warning("The parameter constant can only be TRUE or FALSE.",
+                "You have: ",constant,". Switching to FALSE",call.=FALSE);
+        constantEstimate <- constantRequired <- FALSE;
+        constantName <- NULL;
+    }
+    # What the section set, on the branches that ran
+    return(mget(intersect(c("constantRequired", "constantEstimate", "constantValue", "constantName"),
+                          ls())));
+}
+
+
 #### Optimiser / ellipsis parameter processing ####
 adam_checkOptimizer <- function(ellipsis, loss, distribution, initialType, lags, arimaModel) {
     if(is.null(ellipsis$maxeval)){

@@ -1,0 +1,1 @@
+{'series excluded by few': 0, 'series excluded by zero scale': 0, 'series excluded by failed': 0, 'series evaluated': 20, 'comparisons significant in the predicted direction': 0, 'comparisons significant against the predicted direction': 0}

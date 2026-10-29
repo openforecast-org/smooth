@@ -17,8 +17,8 @@
   point = c("skeleton", "mean", "median"), ...)
 
 \method{forecast}{msdecompose}(object, h = 10, interval = c("parametric",
-  "semiparametric", "nonparametric", "none"), level = 0.95, model = NULL,
-  ...)
+  "semiparametric", "nonparametric", "none"), level = 0.95,
+  side = c("both", "upper", "lower"), model = NULL, ...)
 
 \method{forecast}{om}(object, h = 10, ...)
 

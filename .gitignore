@@ -103,8 +103,10 @@ instance/
 # Sphinx documentation
 docs/_build/
 
-# PyBuilder
+# PyBuilder; also the coverage and mutation workers of crapper and mutator (ub-mode skill)
 target/
+# The snapshots of crapper, dryer and mutator (ub-mode skill)
+.metrics/
 
 # Jupyter Notebook
 .ipynb_checkpoints

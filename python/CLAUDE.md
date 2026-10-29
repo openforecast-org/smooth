@@ -413,6 +413,8 @@ fc.to_dataframe()    # flat pd.DataFrame with prefixed column names
     bindings, both build systems, and the floating-point rules.
   - `explain-smooth` - explaining fitted models and choosing a function, for
     both languages.
+  - `ub-mode` - the reduced engineering principles of unclebob/ub-mode, adapted to
+    these rules, with crapper, dryer and mutator run on `python/src/`.
 - `docs/` - Sphinx documentation. `docs/sm.rst` is the scale model (R's `sm()`); build
   with `.venv/bin/python -m sphinx -b html docs docs/_build/html` after
   `pip install -e ".[docs]"`.

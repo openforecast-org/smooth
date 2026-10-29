@@ -378,6 +378,8 @@ om <- function(data,
         modelReturned$lagsAll       <- rep(1, nParam);
         modelReturned$FI            <- checkerReturn$FI;
         modelReturned$occurrence    <- occurrence;
+        # The alm() model itself, used by forecast()
+        modelReturned$alm           <- checkerReturn;
         if(holdout){
             modelReturned$accuracy <- measures(modelReturned$holdout[, responseName],
                                                modelReturned$forecast,
@@ -2238,6 +2240,11 @@ vcov.om <- function(object, type=c("opg","hessian","bootstrap"),
 #' @rdname forecast.smooth
 #' @export
 forecast.om <- function(object, h=10, ...){
+    # A pure regression is the alm() of the probability: its forecast is the probability
+    if(!is.null(object$alm)){
+        return(forecast.adam(object, h=h, interval="none", level=0.95, side="both",
+                             cumulative=FALSE, ...));
+    }
     # Intervals on the probability scale are not implemented yet, so the
     # underlying forecast.adam() call is forced to interval="none". The
     # remaining slots (level, side, cumulative) are set to their defaults so

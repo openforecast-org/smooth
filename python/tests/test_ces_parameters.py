@@ -1,18 +1,27 @@
-"""Parameter validation for :class:`smooth.CES`.
+"""Tests of :class:`smooth.CES` and :class:`smooth.AutoCES` that need no R.
 
 Kept out of ``test_ces.py`` because that module is marked ``r_parity`` as a
-whole; these check the Python API's own guards and need no R installation.
+whole; these check the Python API's own guards, and its results against values
+taken from R (the R call is in each test).
 """
 
+import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from smooth import CES
+from smooth import CES, AutoCES
 
 _DATA_DIR = Path(__file__).parent / "data"
+
+# The values from R are those of the reference BLAS. The C++ core takes its matrix
+# products from the BLAS of the build, and the CES fits move with their last bits (R
+# moves the same way): the criteria by up to 4e-5 with the OpenBLAS of CI on Windows,
+# the bounds of reapply() by up to 3e-9
+_FIT_TOLERANCE = 1e-4
+_BOUND_TOLERANCE = 1e-6
 
 
 class TestCESProvidedB:
@@ -100,3 +109,91 @@ def test_ces_takes_the_missing_values_for_gaps():
     assert np.sum(model.point_lik()) == pytest.approx(model.loglik, rel=1e-12)
     np.testing.assert_array_equal(np.isnan(model.residuals), np.isnan(y))
     assert np.all(np.isfinite(model.predict(h=12, interval="prediction").upper))
+
+
+_AIR = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].to_numpy(dtype=float)
+
+
+def test_auto_ces_selects_by_the_information_criterion_as_r():
+    """R: auto.ces(ts(y, frequency=12)) picks CES(partial) by AICc."""
+    m = AutoCES(lags=[12]).fit(_AIR)
+    assert m.model_name == "CES(partial)"
+    assert m.loglik == pytest.approx(-573.675717908, rel=_FIT_TOLERANCE)
+    assert m.ICs == pytest.approx(
+        {
+            "none": 1430.97768695,
+            "simple": 1333.66542447,
+            "partial": 1188.82343582,
+            "full": 1252.20790401,
+        },
+        rel=_FIT_TOLERANCE,
+    )
+
+
+def test_auto_ces_takes_the_abbreviated_pool():
+    """R: auto.ces(ts(y, frequency=12), seasonality=c("n", "s"))."""
+    m = AutoCES(lags=[12], seasonality=["n", "s"]).fit(_AIR)
+    assert m.model_name == "CES(simple)"
+    assert m.ICs == pytest.approx(
+        {"none": 1430.97768695, "simple": 1333.66542447}, rel=_FIT_TOLERANCE
+    )
+
+
+def test_auto_ces_reverts_a_strange_pool_to_the_default():
+    with pytest.warns(UserWarning, match="strange type of model"):
+        m = AutoCES(lags=[12], seasonality=["n", "x"]).fit(_AIR)
+    assert sorted(m.ICs) == ["full", "none", "partial", "simple"]
+    assert m.model_name == "CES(partial)"
+
+
+def test_auto_ces_fits_the_non_seasonal_model_on_non_seasonal_data():
+    """R: auto.ces(y) without a frequency fits CES(none) only."""
+    m = AutoCES().fit(_AIR)
+    assert m.model_name == "CES(none)"
+    assert list(m.ICs) == ["none"]
+    assert m.loglik == pytest.approx(-710.258388775, rel=_FIT_TOLERANCE)
+
+
+def test_auto_ces_drops_the_models_a_short_sample_cannot_take():
+    """R: auto.ces(ts(y[1:26], frequency=12)) compares CES(none) and CES(partial)
+    only, warning about the others."""
+    with pytest.warns(UserWarning, match="Not enough observations for CES"):
+        m = AutoCES(lags=[12]).fit(_AIR[:26])
+    assert m.model_name == "CES(none)"
+    assert set(m.ICs) == {"none", "partial"}
+    assert m.ICs["none"] == pytest.approx(222.150196905, rel=_FIT_TOLERANCE)
+    # The fit of the partial CES on 26 observations is on a flat surface, where the
+    # last bits of the matrix products of the BLAS move it: 292.281 with the reference
+    # BLAS (R's here), 291.650 with OpenBLAS (CI's), in R as in Python
+    assert m.ICs["partial"] > m.ICs["none"]
+
+
+@pytest.mark.parametrize(
+    "seasonality, a, name, side, bound, tolerance",
+    [
+        ("none", None, "alpha_0", "max", 2.00026793268, _BOUND_TOLERANCE),
+        ("none", None, "alpha_1", "min", 1.00013497312, _BOUND_TOLERANCE),
+        ("partial", None, "alpha_1", "max", 1.0, _BOUND_TOLERANCE),
+        # The bound of the full CES follows its estimates, which the last bits of the
+        # matrix products of the BLAS move (1.837771 with the reference BLAS, 1.836848
+        # with OpenBLAS)
+        ("full", 1.35 + 1.01j, "beta_0", "max", 1.83777093985, 1e-3),
+        ("full", 1.35 + 1.01j, "beta_1", "min", 0.94, _BOUND_TOLERANCE),
+    ],
+)
+def test_reapply_keeps_the_draws_of_ces_stable(
+    seasonality, a, name, side, bound, tolerance
+):
+    """The draws of the smoothing parameters are cut at the range where the model
+    stays stable, with the others at their estimates, as R's cesBounds(): they
+    pile up at R's bound. R: set.seed(1); m <- ces(ts(y, frequency=12),
+    seasonality=..., initial="optimal", a=...); range(reapply(m,
+    nsim=2000)$randomParameters[, name])."""
+    m = CES(seasonality=seasonality, lags=[12], initial="optimal", a=a).fit(_AIR)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        draws = np.asarray(m.reapply(nsim=2000, seed=1).random_parameters)
+    draws = draws[:, m.coef_names.index(name)]
+    edge = draws.max() if side == "max" else draws.min()
+    assert edge == pytest.approx(bound, rel=tolerance)
+    assert np.sum(draws == edge) > 100

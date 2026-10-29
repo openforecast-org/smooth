@@ -275,14 +275,6 @@ Attaching a scale model is an assignment, not a method: `model.scale_model = mod
 | `_execute_prediction_combined(interval, level, side)` | Forecast each model of the combination with `_execute_prediction()` and average with the IC weights |
 | `_format_prediction_results()` | Return stored `_forecast_results` (not called by current public API) |
 
-### Selection Helpers (legacy/placeholder)
-
-| Method | Description |
-|--------|-------------|
-| `_update_model_from_selection(index, result)` | Update all dicts from a selection result |
-| `_create_matrices_for_selected_model(index)` | Call `creator()` for a selected model |
-| `_update_parameters_for_selected_model(index, result)` | Update parameter counts for a selected model |
-
 ---
 
 ## Internal Attributes (set during `fit()`)

@@ -847,8 +847,12 @@ def initialiser(
                 components_dict["components_number_ets"]
                 + components_dict["components_number_arima"]
             )
+            # The rows of the estimated ones, as R's which(xregParametersEstimated==1)
+            estimated_rows = xreg_start + np.flatnonzero(
+                np.asarray(explanatory_checked["xreg_parameters_estimated"]) == 1
+            )
             B[j : j + xreg_number_to_estimate] = adam_created["mat_vt"][
-                xreg_start : xreg_start + xreg_number_to_estimate, 0
+                estimated_rows, 0
             ]
             # The names of the estimated regressors, as R's
             names.extend(

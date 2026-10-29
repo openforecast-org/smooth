@@ -37,18 +37,24 @@ def fixed_point(model, error, p):
 
 
 def simulate(binary, model, error, p, alpha, grid, seed):
-    out = subprocess.run([binary, model, error, str(p), str(alpha), str(grid["T"]),
-                          str(grid["burnin"]), str(seed)],
+    # The old proxy (smooth's occurrenceError()); the standard error is not used here
+    out = subprocess.run([binary, model, error, "old", str(p), str(alpha), str(grid["T"]),
+                          str(grid["burnin"]), str(seed), "100"],
                          check=True, capture_output=True, text=True).stdout.split()
-    return float(out[0]), int(out[1])
+    return float(out[0]), int(out[2])
 
 
-def main(grid_path):
+def build(outdir):
     here = os.path.dirname(os.path.abspath(__file__))
-    outdir = os.environ.get("CLAIMSET_RUN_DIR") or tempfile.mkdtemp()
     binary = os.path.join(outdir, "filter")
     subprocess.run(["g++", "-O2", "-std=c++11", "-o", binary,
                     os.path.join(here, "filter.cpp")], check=True)
+    return binary
+
+
+def main(grid_path):
+    outdir = os.environ.get("CLAIMSET_RUN_DIR") or tempfile.mkdtemp()
+    binary = build(outdir)
     with open(grid_path) as f:
         grid = json.load(f)
 

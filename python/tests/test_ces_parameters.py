@@ -16,6 +16,13 @@ from smooth import CES, AutoCES
 
 _DATA_DIR = Path(__file__).parent / "data"
 
+# The values from R are those of the reference BLAS. The C++ core takes its matrix
+# products from the BLAS of the build, and the CES fits move with their last bits (R
+# moves the same way): the criteria by up to 4e-5 with the OpenBLAS of CI on Windows,
+# the bounds of reapply() by up to 3e-9
+_FIT_TOLERANCE = 1e-4
+_BOUND_TOLERANCE = 1e-6
+
 
 class TestCESProvidedB:
     """The provided ``b`` must match the seasonality it belongs to."""
@@ -111,7 +118,7 @@ def test_auto_ces_selects_by_the_information_criterion_as_r():
     """R: auto.ces(ts(y, frequency=12)) picks CES(partial) by AICc."""
     m = AutoCES(lags=[12]).fit(_AIR)
     assert m.model_name == "CES(partial)"
-    assert m.loglik == pytest.approx(-573.675717908, rel=1e-9)
+    assert m.loglik == pytest.approx(-573.675717908, rel=_FIT_TOLERANCE)
     assert m.ICs == pytest.approx(
         {
             "none": 1430.97768695,
@@ -119,7 +126,7 @@ def test_auto_ces_selects_by_the_information_criterion_as_r():
             "partial": 1188.82343582,
             "full": 1252.20790401,
         },
-        rel=1e-9,
+        rel=_FIT_TOLERANCE,
     )
 
 
@@ -128,7 +135,7 @@ def test_auto_ces_takes_the_abbreviated_pool():
     m = AutoCES(lags=[12], seasonality=["n", "s"]).fit(_AIR)
     assert m.model_name == "CES(simple)"
     assert m.ICs == pytest.approx(
-        {"none": 1430.97768695, "simple": 1333.66542447}, rel=1e-9
+        {"none": 1430.97768695, "simple": 1333.66542447}, rel=_FIT_TOLERANCE
     )
 
 
@@ -144,7 +151,7 @@ def test_auto_ces_fits_the_non_seasonal_model_on_non_seasonal_data():
     m = AutoCES().fit(_AIR)
     assert m.model_name == "CES(none)"
     assert list(m.ICs) == ["none"]
-    assert m.loglik == pytest.approx(-710.258388775, rel=1e-9)
+    assert m.loglik == pytest.approx(-710.258388775, rel=_FIT_TOLERANCE)
 
 
 def test_auto_ces_drops_the_models_a_short_sample_cannot_take():
@@ -154,7 +161,7 @@ def test_auto_ces_drops_the_models_a_short_sample_cannot_take():
         m = AutoCES(lags=[12]).fit(_AIR[:26])
     assert m.model_name == "CES(none)"
     assert set(m.ICs) == {"none", "partial"}
-    assert m.ICs["none"] == pytest.approx(222.150196905, rel=1e-6)
+    assert m.ICs["none"] == pytest.approx(222.150196905, rel=_FIT_TOLERANCE)
     # The fit of the partial CES on 26 observations is on a flat surface, where the
     # last bits of the matrix products of the BLAS move it: 292.281 with the reference
     # BLAS (R's here), 291.650 with OpenBLAS (CI's), in R as in Python
@@ -164,14 +171,14 @@ def test_auto_ces_drops_the_models_a_short_sample_cannot_take():
 @pytest.mark.parametrize(
     "seasonality, a, name, side, bound, tolerance",
     [
-        ("none", None, "alpha_0", "max", 2.00026793268, 1e-9),
-        ("none", None, "alpha_1", "min", 1.00013497312, 1e-9),
-        ("partial", None, "alpha_1", "max", 1.0, 1e-9),
+        ("none", None, "alpha_0", "max", 2.00026793268, _BOUND_TOLERANCE),
+        ("none", None, "alpha_1", "min", 1.00013497312, _BOUND_TOLERANCE),
+        ("partial", None, "alpha_1", "max", 1.0, _BOUND_TOLERANCE),
         # The bound of the full CES follows its estimates, which the last bits of the
         # matrix products of the BLAS move (1.837771 with the reference BLAS, 1.836848
         # with OpenBLAS)
         ("full", 1.35 + 1.01j, "beta_0", "max", 1.83777093985, 1e-3),
-        ("full", 1.35 + 1.01j, "beta_1", "min", 0.94, 1e-9),
+        ("full", 1.35 + 1.01j, "beta_1", "min", 0.94, _BOUND_TOLERANCE),
     ],
 )
 def test_reapply_keeps_the_draws_of_ces_stable(

@@ -1,0 +1,1 @@
+{'quantity': 'cells where the bias has the wrong direction', 'value': 0, 'conditions': {'model': 'Croston', 'error': 'M', 'proxy': 'old'}}

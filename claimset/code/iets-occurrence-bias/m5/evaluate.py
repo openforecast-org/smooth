@@ -7,6 +7,9 @@ Per series and method (over h = 1-14, in-sample after the leading zeros):
 - scaled pinball at tau, as M5's SPL: mean pinball_tau(y, q_tau) / mean(|diff(y_in)|);
 - coverage at tau: the share of the horizon with y <= q_tau; both also for the quantiles
   rounded up (SB23, eq. 35).
+Every run writes series_measures.csv (each measure per series and method) and
+summary_measures.csv (per method and measure: n, mean, sd, min, quartiles, max) to
+$CLAIMSET_RUN_DIR.
 Exclusions: series with fewer than 5 non-zero in-sample observations ("few"), series where
 the in-sample scale (mean of diff^2) is zero ("zero scale"), and series where any method
 failed or left a forecast it should produce missing ("failed"); each is counted. Tests, by mode:
@@ -14,11 +17,11 @@ failed or left a forecast it should produce missing ("failed"); each is counted.
   iETS_O under conventional and ADAM ETS; predicted: + for I conventional, - for the others;
 - rmsse: RMSSE, score minus ratio, for O, I, G, A under conventional and ADAM ETS; predicted -;
 - pinball: scaled pinball at the four levels for the same eight pairs; predicted -;
-- mcb: rmcb() of greybox (Nemenyi/MCB, 95%) of RMSSE over all methods and of the scaled
+- mcb: rmcb() of greybox (Nemenyi/MCB, 99%) of RMSSE over all methods and of the scaled
   pinball at each level over the methods with quantiles; per measure, the best score-proxy
   model against each benchmark.
 Wilcoxon signed-rank tests are two-sided, zero differences dropped (zero_method="wilcox"),
-with Holm's correction over the tests of the mode at alpha = 0.05; the direction of a
+with Holm's correction over the tests of the mode at alpha = 0.01; the direction of a
 difference is the sign of its median over the non-zero differences.
 """
 
@@ -34,7 +37,7 @@ from scipy.stats import wilcoxon
 from load import H, read_series
 
 LEVELS = [0.8, 0.9, 0.95, 0.99]
-ALPHA = 0.05
+ALPHA = 0.01
 FLAVOURS = [(k, e) for e in ("conv", "adam") for k in "OIGA"]
 POINT_ONLY = {"Croston", "SBA", "TSB"}
 BENCHMARKS = {"RMSSE": ["Croston", "SBA", "TSB", "NegBin", "HSP"],
@@ -109,7 +112,7 @@ def mcb(table):
     for measure, benchmarks in BENCHMARKS.items():
         names = [m for m in methods if measure in table[next(iter(table))][m]]
         data = np.array([[table[r][m][measure] for m in names] for r in table])
-        res = rmcb(data, level=0.95, outplot="none")
+        res = rmcb(data, level=1 - ALPHA, outplot="none")
         mean = dict(zip(names, np.asarray(res.mean)))
         lower = dict(zip(names, np.asarray(res.interval)[:, 0]))
         upper = dict(zip(names, np.asarray(res.interval)[:, 1]))
@@ -118,10 +121,32 @@ def mcb(table):
             good += upper[best] < lower[b]
             bad += upper[b] < lower[best]
         results += [{"quantity": "mean rank, rmcb", "value": float(mean[m]),
-                     "interval": {"level": 0.95, "lower": float(lower[m]), "upper": float(upper[m])},
+                     "interval": {"level": 1 - ALPHA, "lower": float(lower[m]), "upper": float(upper[m])},
                      "conditions": {"measure": measure, "method": m}} for m in names]
         results.append({"quantity": "rmcb p-value", "value": float(res.p_value), "conditions": {"measure": measure}})
     return results, good, bad
+
+
+def write_measures(table, outdir):
+    keys = ["RMSSE", "sCE", "sAPIS"] + [f"{k}{t}{s}" for k in ("pinball", "coverage")
+                                         for t in LEVELS for s in ("", "_rounded")]
+    methods = sorted(next(iter(table.values())))
+    with open(os.path.join(outdir, "series_measures.csv"), "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["row", "method", *keys])
+        for row, by_method in table.items():
+            for m in methods:
+                writer.writerow([row, m, *[by_method[m].get(k, "") for k in keys]])
+    with open(os.path.join(outdir, "summary_measures.csv"), "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["method", "measure", "n", "mean", "sd", "min", "q25", "median",
+                         "q75", "max"])
+        for m in methods:
+            for k in keys:
+                v = np.array([table[r][m][k] for r in table if k in table[r][m]])
+                if v.size:
+                    writer.writerow([m, k, v.size, v.mean(), v.std(ddof=1), v.min(),
+                                     *np.quantile(v, [0.25, 0.5, 0.75]), v.max()])
 
 
 def main(mode, train, test, rows_file, *forecast_files):
@@ -143,6 +168,7 @@ def main(mode, train, test, rows_file, *forecast_files):
             excluded["failed"] += 1
         else:
             table[row] = {m: measures(y, forecasts[(row, m)]) for m in methods}
+    write_measures(table, os.environ.get("CLAIMSET_RUN_DIR", "."))
     results = [{"quantity": f"series excluded by {k}", "value": v} for k, v in excluded.items()]
     results.append({"quantity": "series evaluated", "value": len(table)})
     pairs = [(f"iETS_{k}_score_{e}", f"iETS_{k}_ratio_{e}") for k, e in FLAVOURS]

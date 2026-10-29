@@ -184,3 +184,6 @@ python/tests/notebooks/*-dist-*.npy
 # Rscript's default graphics device: any plotting call (silent=FALSE, for one)
 # drops this in the working directory, and the package root must stay clean
 Rplots.pdf
+# claimset study records live on their own branches (claimset/<study>),
+# checked out here as worktrees; study code stays tracked in claimset/code/
+/claimset/iets-occurrence-bias/

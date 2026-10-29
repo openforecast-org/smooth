@@ -24,6 +24,8 @@
 #' @param bounds Parameter bounds type.
 #' @param etsA ETS type for sub-model A: \code{"conventional"} or \code{"adam"}.
 #' @param etsB ETS type for sub-model B. Defaults to \code{etsA}.
+#' @param proxyOccurrence The proxy of the occurrence error: \code{"ratio"} or
+#' \code{"score"} (see \link[smooth]{om}).
 #' @param smoother The smoother used by \link[smooth]{msdecompose} to obtain the
 #' initial level, trend and seasonal indices (and the seasonal profiles for
 #' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
@@ -58,6 +60,7 @@ oesg <- function(y, modelA="MNN", modelB=modelA,
                  h=0, holdout=FALSE,
                  bounds=c("usual","admissible","none"),
                  etsA=c("conventional","adam"), etsB=etsA,
+                 proxyOccurrence=c("ratio","score"),
                  smoother=c("default","ma","lowess","supsmu","global"),
                  xregA=NULL, xregB=NULL,
                  regressorsA=c("use","select"), regressorsB=regressorsA,
@@ -108,7 +111,8 @@ oesg <- function(y, modelA="MNN", modelB=modelA,
                     persistenceA=persistenceA, persistenceB=persistenceB,
                     phiA=phiA, phiB=phiB,
                     initial=initial, ic=ic, h=h, holdout=holdout,
-                    bounds=bounds, etsA=etsA, etsB=etsB, smoother=smoother,
+                    bounds=bounds, etsA=etsA, etsB=etsB, proxyOccurrence=proxyOccurrence,
+                    smoother=smoother,
                     regressorsA=regressorsA, regressorsB=regressorsB,
                     silent=silent, ...);
     ourModel$call <- cl;

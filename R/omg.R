@@ -23,6 +23,8 @@
 #' @param armaB ARMA parameters for model B.
 #' @param etsA ETS variant for model A (\code{"conventional"} or \code{"adam"}).
 #' @param etsB ETS variant for model B.
+#' @param proxyOccurrence The proxy of the unobservable occurrence error used to update the
+#' states of both models: \code{"ratio"} or \code{"score"} (see \link[smooth]{om}).
 #' @param lags Seasonal lags (shared).
 #' @param h Forecast horizon.
 #' @param holdout If \code{TRUE}, hold out the last \code{h} observations.
@@ -67,6 +69,7 @@ omg <- function(data,
                 armaA = NULL, armaB = armaA,
                 etsA = c("conventional","adam"),
                 etsB = etsA,
+                proxyOccurrence = c("ratio","score"),
                 lags = c(frequency(data)),
                 h = 0, holdout = FALSE,
                 initial = c("backcasting","optimal","two-stage","complete","gradient"),
@@ -125,6 +128,7 @@ omg <- function(data,
         if(is.null(formulaB)) { formulaB <- formula(model$modelB) }
         # Shared
         if(!is.null(model$lags)) { lags <- model$lags }
+        if(!is.null(model$proxyOccurrence)) { proxyOccurrence <- model$proxyOccurrence }
         if(!is.null(model$loss)) { loss <- model$loss }
         if(!is.null(model$modelA$bounds))      { bounds  <- model$modelA$bounds }
         if(!is.null(model$modelA$initialType)) { initial <- model$modelA$initialType }
@@ -167,6 +171,8 @@ omg <- function(data,
     if(!exists("ellipsis", inherits=FALSE)) { ellipsis <- list(...) }
 
     adamETSA <- (etsA == "adam")
+    proxyOccurrence <- match.arg(proxyOccurrence)
+    proxyScore <- (proxyOccurrence == "score")
     adamETSB <- (etsB == "adam")
 
     #### Shared data preparation ####
@@ -303,7 +309,8 @@ omg <- function(data,
             checkerA$xregNumber, obsInSample, checkerA$initialType,
             checkerA$arimaModel, checkerA$lagsModelARIMA,
             checkerA$xregModel, checkerA$constantRequired,
-            checkerA$componentsNumberARIMA, obsAll, yIndexAll, yClasses, adamETSA)
+            checkerA$componentsNumberARIMA, obsAll, yIndexAll, yClasses, adamETSA,
+            proxyScore=proxyScore)
 
         # Architecture for B — pad obsAll so B's lookup table covers A's loop bound
         lagsModelMaxA  <- adamArchitectA$lagsModelMax
@@ -314,7 +321,8 @@ omg <- function(data,
             checkerB$xregNumber, obsInSample, checkerB$initialType,
             checkerB$arimaModel, checkerB$lagsModelARIMA,
             checkerB$xregModel, checkerB$constantRequired,
-            checkerB$componentsNumberARIMA, obsAllB_opt, yIndexAll, yClasses, adamETSB)
+            checkerB$componentsNumberARIMA, obsAllB_opt, yIndexAll, yClasses, adamETSB,
+            proxyScore=proxyScore)
         obsStatesB_opt <- max(adamArchitectB$obsStates, obsInSample + lagsModelMaxA)
 
         adamCppA <- adamArchitectA$adamCpp
@@ -1215,6 +1223,7 @@ omg <- function(data,
         residuals   = errors,
         forecast    = yForecast,
         occurrence  = "general",
+        proxyOccurrence = proxyOccurrence,
         lags        = lags,
         lossValue   = jointResult$CFValue,
         logLik      = logLikOMG,

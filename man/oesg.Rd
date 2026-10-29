@@ -9,8 +9,9 @@ oesg(y, modelA = "MNN", modelB = modelA, lags = c(frequency(y)),
   phiB = phiA, initial = c("backcasting", "optimal", "two-stage",
   "complete", "gradient"), ic = c("AICc", "AIC", "BIC", "BICc"), h = 0,
   holdout = FALSE, bounds = c("usual", "admissible", "none"),
-  etsA = c("conventional", "adam"), etsB = etsA, smoother = c("default",
-  "ma", "lowess", "supsmu", "global"), xregA = NULL, xregB = NULL,
+  etsA = c("conventional", "adam"), etsB = etsA,
+  proxyOccurrence = c("ratio", "score"), smoother = c("default", "ma",
+  "lowess", "supsmu", "global"), xregA = NULL, xregB = NULL,
   regressorsA = c("use", "select"), regressorsB = regressorsA,
   silent = TRUE, ...)
 }
@@ -47,6 +48,9 @@ Defaults to \code{persistenceA}.}
 \item{etsA}{ETS type for sub-model A: \code{"conventional"} or \code{"adam"}.}
 
 \item{etsB}{ETS type for sub-model B. Defaults to \code{etsA}.}
+
+\item{proxyOccurrence}{The proxy of the occurrence error: \code{"ratio"} or
+\code{"score"} (see \link[smooth]{om}).}
 
 \item{smoother}{The smoother used by \link[smooth]{msdecompose} to obtain the
 initial level, trend and seasonal indices (and the seasonal profiles for

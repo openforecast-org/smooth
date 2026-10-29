@@ -23,9 +23,11 @@ inline arma::mat matrixPower(arma::mat const &A, int const &power){
 /* # Function returns multiplicative or additive error for scalar.
  * Optional ot and O parameters extend it to occurrence models:
  * - O='n' (default): demand model; ot==0 returns 0 immediately.
- * - O='d'/'o'/'i': dispatches to occurrenceError() (yact IS the occurrence indicator). */
+ * - O='d'/'o'/'i': dispatches to occurrenceError() (yact IS the occurrence indicator), with the
+ *   score proxy when score=true and its ADAM-ETS form when adamETS=true. */
 inline double errorf(double const &yact, double &yfit, char const &E,
-                     double const &ot = 1.0, char const &O = 'n') {
+                     double const &ot = 1.0, char const &O = 'n',
+                     bool const &score = false, bool const &adamETS = false) {
     if(O == 'n') {
         if(ot == 0) { return 0; }
         if(E=='A') { return yact - yfit; }
@@ -40,7 +42,7 @@ inline double errorf(double const &yact, double &yfit, char const &E,
         return (yact - yfit) / yfit;
     }
     // Occurrence types d/o/i: yact IS the occurrence indicator (ot)
-    return occurrenceError(yact, yfit, 1.0, E, 'M', O)[0];
+    return occurrenceError(yact, yfit, 1.0, E, 'M', O, score, adamETS)[0];
 }
 
 /* # Function is needed to estimate the correct error for ETS when multisteps model selection with r(matvt) is sorted out. */

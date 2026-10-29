@@ -515,13 +515,21 @@ inline void occurrenceLinkJac(double const &yFit, char const &E, char const &O,
 // d(e)/d(yhat) for the occurrence error (mirrors occurrenceError() branch by
 // branch; e is the update-channel error the state recursion consumes).
 inline double occurrenceErrorJac(double const &yAct, double const &yFit,
-                                 char const &E, char const &O){
+                                 char const &E, char const &O,
+                                 bool const &score = false, bool const &adamETS = false){
     // A missing observation has no error (see occurrenceError())
     if(std::isnan(yAct)){
         return 0;
     }
     double p, dpdy;
     occurrenceLinkJac(yFit, E, O, p, dpdy);
+    // Score proxy ('o'/'i'): s = o - p ('o') or p - o ('i'); e = s, or exp(s) - 1 for ADAM
+    // multiplicative ETS, whose derivative is exp(s) ds
+    if(score && O!='d'){
+        double const s = (O=='o') ? yAct - p : p - yAct;
+        double const dsdy = (O=='o') ? -dpdy : dpdy;
+        return (E=='M' && adamETS) ? std::exp(s) * dsdy : dsdy;
+    }
     if(O=='d'){
         if(E=='M'){
             // e = (c - p)/p with c = o(1-2k)+k

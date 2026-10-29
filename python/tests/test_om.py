@@ -653,3 +653,63 @@ def test_the_regressors_start_from_the_indicator_on_all_observations(occurrence,
         side["explanatory"]["xreg_model_initials"][0]["initial_xreg"].ravel(),
         expected / 2,
     )
+
+
+class TestProxyOccurrence:
+    """proxy_occurrence: the proxy of the occurrence error (R's proxyOccurrence)."""
+
+    @pytest.mark.parametrize("proxy", ["ratio", "score"])
+    @pytest.mark.parametrize("ets", ["conventional", "adam"])
+    @pytest.mark.parametrize("model", ["ANN", "MNN"])
+    @pytest.mark.parametrize("occurrence", ["odds-ratio", "inverse-odds-ratio"])
+    @pytest.mark.parametrize("initial", ["optimal", "gradient"])
+    def test_states_follow_the_proxy(self, occurrence, model, ets, proxy, initial):
+        # The fitted probabilities follow the recursion of the proxy from the initial
+        y = np.random.default_rng(7).binomial(1, 0.35, 120).astype(float)
+        alpha = 0.2
+        m = OM(
+            model=model,
+            occurrence=occurrence,
+            ets=ets,
+            persistence={"alpha": alpha},
+            initial=initial,
+            proxy_occurrence=proxy,
+        ).fit(y)
+        odds = occurrence == "odds-ratio"
+        level = float(m.initial_value["level"])
+        p = np.zeros(len(y))
+        for t, o in enumerate(y):
+            mu = np.exp(level) if model == "ANN" else level
+            p[t] = mu / (1 + mu) if odds else 1 / (1 + mu)
+            u = (1 + o - p[t]) / 2
+            s = o - p[t] if odds else p[t] - o
+            ratio = u / (1 - u) if odds else (1 - u) / u
+            if model == "ANN":
+                level += alpha * (s if proxy == "score" else np.log(ratio))
+            else:
+                e = ratio - 1 if proxy == "ratio" else np.expm1(s) if ets == "adam" else s
+                level = level * (1 + e) ** alpha if ets == "adam" else level * (1 + alpha * e)
+        np.testing.assert_allclose(np.asarray(m.fitted, dtype=float), p, atol=1e-10)
+        assert m.proxy_occurrence == proxy
+
+    def test_default_and_invalid(self, binary_y):
+        assert OM(model="MNN", occurrence="odds-ratio").proxy_occurrence == "ratio"
+        with pytest.raises(ValueError, match="proxy_occurrence"):
+            OM(model="MNN", occurrence="odds-ratio", proxy_occurrence="odds")
+
+    @pytest.mark.parametrize("occurrence", ["fixed", "direct"])
+    def test_fixed_and_direct_unchanged(self, intermittent_y, occurrence):
+        fits = [
+            OM(occurrence=occurrence, proxy_occurrence=proxy).fit(intermittent_y).fitted
+            for proxy in ("ratio", "score")
+        ]
+        np.testing.assert_array_equal(fits[0], fits[1])
+
+    def test_passed_on_by_redirects_and_adam(self, intermittent_y):
+        from smooth import ADAM
+
+        for occurrence in ("auto", "general"):
+            m = OM(model="MNN", occurrence=occurrence, proxy_occurrence="score")
+            assert m.proxy_occurrence == "score"
+        adam = ADAM(model="MNN", occurrence="odds-ratio", proxy_occurrence="score")
+        assert adam.fit(intermittent_y).om_model.proxy_occurrence == "score"

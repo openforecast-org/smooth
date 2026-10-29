@@ -530,6 +530,7 @@ class OM(ADAM):
         verbose: int = 0,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
+        proxy_occurrence: Literal["ratio", "score"] = "ratio",
         smoother: SmootherType = SMOOTHER_DEFAULT,
         **kwargs,
     ) -> None:
@@ -590,6 +591,7 @@ class OM(ADAM):
             holdout=holdout,
             nlopt_kwargs=nlopt_kwargs,
             ets=ets,
+            proxy_occurrence=proxy_occurrence,
             smoother=smoother,
             # R's om() takes a missing lambda as zero, without a warning
             lambda_param=0 if lambda_param is None else lambda_param,
@@ -703,6 +705,7 @@ class OM(ADAM):
                 ic=getattr(self, "ic", "AICc"),
                 bounds=getattr(self, "bounds", "usual"),
                 ets=self.ets,
+                proxy_occurrence=self.proxy_occurrence,
                 constant=getattr(self, "constant", False),
                 arma=getattr(self, "arma", None),
                 regressors=getattr(self, "regressors", "use"),
@@ -916,6 +919,7 @@ class OM(ADAM):
             self.profiles_recent_table,
             self.profiles_recent_provided,
             self.ets == "adam",
+            proxy_score=self.proxy_occurrence == "score",
         )
 
         # R: adam_creator() called with Etype="A" so the matrix layout assumes

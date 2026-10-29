@@ -76,6 +76,7 @@ Complete reference for `smooth.adam_general.core.adam.ADAM`.
 | `profiles_recent_table` | `Any \| None` | `None` | Table of recent profile data |
 | `gnorm_shape` | `float \| None` | `None` | Shape parameter for generalized normal distribution |
 | `smoother` | `"lowess" \| "ma" \| "global"` | `"lowess"` | Smoother for decomposition in initial state estimation |
+| `proxy_occurrence` | `"ratio" \| "score"` | `"ratio"` | Proxy of the occurrence error of the estimated occurrence model (R's `proxyOccurrence`): the ratios of Svetunkov & Boylan (2023), or the score of the Bernoulli log-likelihood with respect to the log of the state |
 
 ---
 

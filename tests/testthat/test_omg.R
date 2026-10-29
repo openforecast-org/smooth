@@ -446,3 +446,48 @@ test_that("omg forecasts from the coupled states", {
     expect_equal(as.numeric(fitted(swapped)), as.numeric(fitted(testModel)), tolerance=1e-10)
     expect_equal(as.numeric(swapped$forecast), as.numeric(testModel$forecast), tolerance=1e-10)
 })
+
+# The coupled probability follows the recursion of each proxy on both sides
+test_that("omg() updates both sides with the proxy of proxyOccurrence", {
+    set.seed(7)
+    y <- rbinom(120, 1, 0.35)
+    alpha <- c(0.15, 0.1)
+    grid <- expand.grid(modelA=c("ANN","MNN"), modelB=c("ANN","MNN"),
+                        ets=c("conventional","adam"), proxy=c("ratio","score"),
+                        stringsAsFactors=FALSE)
+    for(i in seq_len(nrow(grid))){
+        g <- grid[i,]
+        testModel <- omg(y, g$modelA, g$modelB, persistenceA=alpha[1], persistenceB=alpha[2],
+                         initial="optimal", etsA=g$ets, proxyOccurrence=g$proxy)
+        models <- c(g$modelA, g$modelB)
+        levels <- c(unlist(testModel$modelA$initial)[1], unlist(testModel$modelB$initial)[1])
+        p <- numeric(length(y))
+        for(t in seq_along(y)){
+            mu <- ifelse(substr(models, 1, 1)=="A", exp(levels), levels)
+            p[t] <- mu[1]/sum(mu)
+            u <- (1 + y[t] - p[t])/2
+            s <- c(y[t] - p[t], p[t] - y[t])
+            ratio <- c(u/(1-u), (1-u)/u)
+            for(j in 1:2){
+                if(substr(models[j], 1, 1)=="A"){
+                    levels[j] <- levels[j] + alpha[j] * (if(g$proxy=="score") s[j] else log(ratio[j]))
+                }
+                else{
+                    e <- if(g$proxy=="ratio") ratio[j] - 1 else if(g$ets=="adam") exp(s[j]) - 1 else s[j]
+                    levels[j] <- if(g$ets=="adam") levels[j] * (1+e)^alpha[j] else levels[j] * (1 + alpha[j]*e)
+                }
+            }
+        }
+        expect_equal(as.numeric(fitted(testModel)), p, tolerance=1e-10,
+                     label=paste(g, collapse=" "))
+        expect_equal(testModel$proxyOccurrence, g$proxy)
+    }
+})
+
+# The general model of om() and oesg() pass the proxy on to omg()
+test_that("proxyOccurrence reaches omg() from om() and oesg()", {
+    set.seed(41)
+    y <- rpois(150, 0.4)
+    expect_equal(om(y, occurrence="general", proxyOccurrence="score")$proxyOccurrence, "score")
+    expect_equal(oesg(y, proxyOccurrence="score")$proxyOccurrence, "score")
+})

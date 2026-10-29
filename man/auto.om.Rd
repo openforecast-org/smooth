@@ -12,7 +12,8 @@ auto.om(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar
   initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
   arma = NULL, ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual",
   "admissible", "none"), silent = TRUE, parallel = FALSE,
-  ets = c("conventional", "adam"), ...)
+  ets = c("conventional", "adam"), proxyOccurrence = c("ratio", "score"),
+  ...)
 }
 \arguments{
 \item{data}{Numeric vector, time series, or data frame. Non-binary input is
@@ -56,6 +57,9 @@ occurrence type.}
 parallel.  Requires \code{foreach} and \code{doMC} / \code{doParallel}.}
 
 \item{ets}{ETS flavour passed to \link{om}: \code{"conventional"} or \code{"adam"}.}
+
+\item{proxyOccurrence}{The proxy of the occurrence error passed to \link{om}:
+\code{"ratio"} or \code{"score"}.}
 
 \item{...}{Additional arguments forwarded to \link{om}.}
 }

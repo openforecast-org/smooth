@@ -219,6 +219,9 @@
 #' that updates multiplicative components differently is used. The latter is closer
 #' to applying ETS to log-transformed data when multiplicative components are used. This helps
 #' makig trend less explosive.
+#' @param proxyOccurrence The proxy of the occurrence error of the occurrence model, when
+#' \code{occurrence} is estimated: \code{"ratio"} (the default) or \code{"score"}. See
+#' \link[smooth]{om} for the details.
 #' @param ...  Other non-documented parameters. For example, \code{FI=TRUE} will
 #' make the function also produce Fisher Information matrix, which then can be
 #' used to calculated variances of smoothing parameters and initial states of
@@ -365,7 +368,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                  initial=c("backcasting","optimal","two-stage","complete","gradient"), arma=NULL,
                  ic=c("AICc","AIC","BIC","BICc"), bounds=c("usual","admissible","none"),
                  smoother=c("default","ma","lowess","supsmu","global"),
-                 silent=TRUE, ets=c("conventional","adam"), ...){
+                 silent=TRUE, ets=c("conventional","adam"), proxyOccurrence=c("ratio","score"), ...){
     # Copyright (C) 2019 - Inf  Ivan Svetunkov
 
     # Start measuring the time of calculations
@@ -525,6 +528,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
     }
 
     ets <- match.arg(ets);
+    proxyOccurrence <- match.arg(proxyOccurrence);
     adamETS <- ets=="adam";
 
     #### Check the parameters of the function and create variables based on them ####
@@ -2257,7 +2261,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                         orders=orders, occurrence=occurrence, formula=formula,
                                         ic=ic, h=horizon,
                                         holdout=holdout, bounds=bounds, regressors=regressors,
-                                        initial=initialType, ets=ets, silent=TRUE));
+                                        initial=initialType, ets=ets,
+                                        proxyOccurrence=proxyOccurrence, silent=TRUE));
         # At a missing observation, neither a demand nor its absence, the probability is
         # the prediction of the occurrence model: the likelihoods leave the gap out
         pFitted[] <- fitted(omModel);

@@ -6,7 +6,10 @@ utils::globalVariables(c(
 
   # Variables injected via list2env() in adam.R, adamGeneral.R, om.R, omg.R, ssarima.R, ces.R, gum.R
   "B", "FI",
+  "denominator",
   "initialXregProvided",
+  "lagsLength",
+  "occurrenceMissingOnly", "occurrenceProbability", "omModel",
   "lb", "ub",
   "otherReturned",
   "persistenceXregProvided",
@@ -57,6 +60,7 @@ utils::globalVariables(c(
   "xregModelInitials",
   "xregParametersEstimated", "xregParametersIncluded",
   "xregParametersMissing", "xregParametersPersistence",
+  "xregTerms",
   "xtol_abs", "xtol_rel",
   "yClasses", "yDenominator",
   "yForecastIndex", "yIndexAll", "yInSampleIndex",

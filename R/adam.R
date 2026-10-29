@@ -345,7 +345,7 @@
 #' @importFrom greybox stepwise alm is.occurrence is.alm polyprod
 #' @importFrom stats dnorm dlogis dt dlnorm dgamma frequency confint vcov predict
 #' @importFrom stats formula update model.frame model.matrix contrasts setNames terms reformulate
-#' @importFrom stats acf pacf
+#' @importFrom stats acf pacf complete.cases
 #' @importFrom statmod dinvgauss
 #' @importFrom nloptr nloptr
 #' @importFrom zoo zoo

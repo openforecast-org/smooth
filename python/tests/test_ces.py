@@ -60,7 +60,7 @@ def _ref():
 def _load_case(case_name):
     """Return (y, ref_dict) for the given case."""
     ref = _ref()[case_name]
-    df = pd.read_csv(_ref_dir() / ref["data_file"])
+    df = pd.read_csv(_ref_dir() / ref["data_file"], float_precision="round_trip")
     y = df["y"].values
     return y, ref
 
@@ -559,7 +559,7 @@ def test_the_attributes_of_adam_agree_with_r(seasonality, initial):
     from tests._r_bridge import r_dict
 
     path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    y = pd.read_csv(path, float_precision="round_trip")["y"].to_numpy(dtype=float)
     r = r_dict(
         f"{{m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
         f" initial='{initial}', FI=TRUE); list(FI=as.vector(m$FI),"
@@ -588,7 +588,7 @@ def test_the_methods_of_adam_agree_with_r(seasonality, initial):
     from tests._r_bridge import r_dict
 
     path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    y = pd.read_csv(path, float_precision="round_trip")["y"].to_numpy(dtype=float)
     r = r_dict(
         f"{{m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
         f" initial='{initial}'); list(opg=as.vector(vcov(m)),"
@@ -639,7 +639,7 @@ def test_reapply_agrees_with_r(seasonality, initial, a):
     from tests._r_bridge import r_dict
 
     path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    y = pd.read_csv(path, float_precision="round_trip")["y"].to_numpy(dtype=float)
     r_a = "NULL" if a is None else f"complex(real={a.real}, imaginary={a.imag})"
     r = r_dict(
         f"{{set.seed(1); m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
@@ -655,7 +655,7 @@ def test_reapply_agrees_with_r(seasonality, initial, a):
 def test_the_refitting_methods_run_on_ces():
     """reforecast(), coefbootstrap() and the confidence interval of predict()."""
     path = Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    y = pd.read_csv(path, float_precision="round_trip")["y"].to_numpy(dtype=float)
     m = CES(seasonality="partial", lags=[12]).fit(y)
     forecast = m.reforecast(h=6, nsim=50, seed=1)
     assert np.all(np.isfinite(np.asarray(forecast.mean, dtype=float)))

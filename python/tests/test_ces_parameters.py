@@ -27,7 +27,9 @@ _BOUND_TOLERANCE = 1e-6
 class TestCESProvidedB:
     """The provided ``b`` must match the seasonality it belongs to."""
 
-    y = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].values
+    y = pd.read_csv(
+        _DATA_DIR / "ces_airpassengers.csv", float_precision="round_trip"
+    )["y"].values
 
     def test_full_rejects_a_real_b(self):
         with pytest.raises(ValueError, match="complex second smoothing parameter"):
@@ -101,7 +103,9 @@ def test_sum_r_adds_in_order_as_r():
 def test_ces_takes_the_missing_values_for_gaps():
     """The missing values are skipped by the fit and are not in the loss: the
     likelihood is over the observed values, as its per-observation terms."""
-    y = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].values.astype(float)
+    y = pd.read_csv(
+        _DATA_DIR / "ces_airpassengers.csv", float_precision="round_trip"
+    )["y"].values.astype(float)
     y[[9, 49, 50, 89]] = np.nan
     with pytest.warns(UserWarning, match="NAs"):
         model = CES(seasonality="full", lags=[12]).fit(y)
@@ -111,7 +115,39 @@ def test_ces_takes_the_missing_values_for_gaps():
     assert np.all(np.isfinite(model.predict(h=12, interval="prediction").upper))
 
 
-_AIR = pd.read_csv(_DATA_DIR / "ces_airpassengers.csv")["y"].to_numpy(dtype=float)
+def test_reapply_warns_about_the_parameters_the_data_does_not_identify():
+    """R: reapply(ces(ts(y, frequency=12), seasonality="partial",
+    initial="optimal")) warns that the covariance of potential is not finite."""
+    y = pd.read_csv(
+        _DATA_DIR / "ces_airpassengers.csv", float_precision="round_trip"
+    )["y"].to_numpy(dtype=float)
+    model = CES(seasonality="partial", lags=[12], initial="optimal").fit(y)
+    with pytest.warns(UserWarning, match="The covariance of potential is not finite"):
+        model.reapply(nsim=20, seed=1)
+
+
+def test_ces_fits_with_the_coefficients_of_the_regressors_it_reports():
+    """With backcasting, the coefficients went into the states of CES and the
+    regressors kept their starting values (R's filler, R/adam-ces.R, had the same
+    bug)."""
+    rng = np.random.default_rng(41)
+    X = pd.DataFrame({"x1": rng.normal(size=120), "x2": rng.normal(size=120)})
+    y = (
+        10
+        + np.cumsum(rng.normal(0, 0.3, 120))
+        + 2 * X["x1"]
+        - 1.5 * X["x2"]
+        + rng.normal(0, 0.5, 120)
+    )
+    model = CES(regressors="use").fit(y.values, X)
+    coefficients = np.asarray(model.coef)[-2:]
+    np.testing.assert_allclose(np.asarray(model.states)[2:, 0], coefficients)
+    np.testing.assert_allclose(coefficients, [2, -1.5], atol=0.1)
+
+
+_AIR = pd.read_csv(
+    _DATA_DIR / "ces_airpassengers.csv", float_precision="round_trip"
+)["y"].to_numpy(dtype=float)
 
 
 def test_auto_ces_selects_by_the_information_criterion_as_r():

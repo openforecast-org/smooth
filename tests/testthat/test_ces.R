@@ -109,3 +109,14 @@ test_that("ces() selects the regressors as adam()", {
     expect_equal(names(testModel$initial$xreg), "a")
     expect_equal(names(testModel$initial$xreg), names(adam(xreg, "ANN", regressors="select")$initial$xreg))
 })
+
+test_that("ces() fits with the coefficients of the regressors it reports", {
+    # With backcasting, the coefficients went into the states of CES, and the
+    # regressors kept their starting values
+    set.seed(41);
+    x <- data.frame(x1=rnorm(120), x2=rnorm(120));
+    y <- 10 + cumsum(rnorm(120, 0, 0.3)) + 2*x$x1 - 1.5*x$x2 + rnorm(120, 0, 0.5);
+    testModel <- ces(data.frame(y=y, x), regressors="use");
+    expect_equal(as.vector(testModel$states[1, c("x1","x2")]), unname(tail(testModel$B, 2)));
+    expect_equal(unname(tail(testModel$B, 2)), c(2, -1.5), tolerance=0.05);
+})

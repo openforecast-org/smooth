@@ -18,7 +18,7 @@ ARMA11 = {"ar": 1, "ma": 1, "select": False}
 @pytest.fixture(scope="module")
 def air():
     path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
-    return pd.read_csv(path)["y"].to_numpy(dtype=float)
+    return pd.read_csv(path, float_precision="round_trip")["y"].to_numpy(dtype=float)
 
 
 def _rotation_form(

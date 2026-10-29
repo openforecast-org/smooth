@@ -83,6 +83,10 @@ def _safe_create_index(start, periods, freq):
     pandas.Index
         Either DatetimeIndex or RangeIndex depending on input types
     """
+    # A period starts a PeriodIndex
+    if isinstance(start, pd.Period):
+        return pd.period_range(start=start, periods=periods, freq=start.freq)
+
     # If start is numeric, use RangeIndex
     if isinstance(start, (int, float, np.integer, np.floating)):
         return pd.RangeIndex(start=int(start), stop=int(start) + periods)

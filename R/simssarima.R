@@ -464,7 +464,7 @@ sim.ssarima <- function(orders=list(ar=0,i=1,ma=1), lags=1,
         return(structure(model,class="smooth.sim"));
     }
 
-    ##### Preset values of matVt and other matrices and arrays ######
+    ##### Preset values of the matrices and arrays ######
     if(componentsNumber > 0){
         # Transition matrix, measurement vector and persistence vector + state vector
         matF <- rbind(cbind(rep(0,componentsNumber-1),diag(componentsNumber-1)),rep(0,componentsNumber));
@@ -480,9 +480,6 @@ sim.ssarima <- function(orders=list(ar=0,i=1,ma=1), lags=1,
 
     persistenceLength <- componentsNumber + constantRequired;
     matWt <- matrix(matWt, obs, persistenceLength, byrow=TRUE);
-
-    # Matrix with some initials. Used as an interim stuff for the arrVt
-    matVt <- matrix(1,persistenceLength,obsStates);
 
     # Define arrays
     arrVt <- array(NA,c(persistenceLength,obsStates,nsim),
@@ -579,14 +576,15 @@ sim.ssarima <- function(orders=list(ar=0,i=1,ma=1), lags=1,
         arrF[,,i] <- elements$matF;
         matG[,i] <- elements$vecG;
 
-        # A correction in order to make sense out of generated initial components
-        if(initialGenerate){
-            arrVt[,,i] <- matVt;
-            arrVt[,1,i] <- matrixPowerWrap(as.matrix(arrF[,,i]),componentsNumber+1) %*% arrVt[,1,i];
+        # A correction in order to make sense out of the generated initial components
+        # (without the constant, which follows)
+        if(initialGenerate && componentsNumber>0){
+            arrVt[,1,i] <- matrixPowerWrap(as.matrix(arrF[,,i]),componentsNumber+1) %*%
+                c(arrVt[1:componentsNumber,1,i], rep(0, constantRequired));
         }
 
         if(constantRequired){
-            arrVt[persistenceLength,1,i] <- matVt[persistenceLength,1];
+            arrVt[persistenceLength,1,i] <- vecConstantValue[i];
         }
     }
 

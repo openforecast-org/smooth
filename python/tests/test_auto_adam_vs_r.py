@@ -218,7 +218,10 @@ def _series_for(case_name, r_outputs):
     from pathlib import Path
 
     if case_name == "etsx":
-        df = pd.read_csv(Path(__file__).parent / "data" / "etsx_data.csv")
+        df = pd.read_csv(
+            Path(__file__).parent / "data" / "etsx_data.csv",
+            float_precision="round_trip",
+        )
         y = df.iloc[:, 0].to_numpy(dtype=float)
         X = df.iloc[:, 1:].to_numpy(dtype=float) if df.shape[1] > 1 else None
         return y, X

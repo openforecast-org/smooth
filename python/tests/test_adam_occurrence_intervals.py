@@ -24,21 +24,33 @@ OM_DIR = DATA_DIR / "om"
 
 @pytest.fixture(scope="module")
 def y():
-    return pd.read_csv(OM_DIR / "intermittent_demand.csv")["y"].to_numpy()
+    return pd.read_csv(
+        OM_DIR / "intermittent_demand.csv", float_precision="round_trip"
+    )["y"].to_numpy()
 
 
 @pytest.fixture(scope="module")
 def r_approx():
-    upper = pd.read_csv(OCC_DIR / "approximate_ann_or_upper.csv")["upper"].to_numpy()
-    lower = pd.read_csv(OCC_DIR / "approximate_ann_or_lower.csv")["lower"].to_numpy()
-    mean_ = pd.read_csv(OCC_DIR / "approximate_ann_or_mean.csv")["mean"].to_numpy()
+    upper = pd.read_csv(
+        OCC_DIR / "approximate_ann_or_upper.csv", float_precision="round_trip"
+    )["upper"].to_numpy()
+    lower = pd.read_csv(
+        OCC_DIR / "approximate_ann_or_lower.csv", float_precision="round_trip"
+    )["lower"].to_numpy()
+    mean_ = pd.read_csv(
+        OCC_DIR / "approximate_ann_or_mean.csv", float_precision="round_trip"
+    )["mean"].to_numpy()
     return {"upper": upper, "lower": lower, "mean": mean_}
 
 
 @pytest.fixture(scope="module")
 def r_sim():
-    upper = pd.read_csv(OCC_DIR / "simulated_ann_or_upper.csv")["upper"].to_numpy()
-    lower = pd.read_csv(OCC_DIR / "simulated_ann_or_lower.csv")["lower"].to_numpy()
+    upper = pd.read_csv(
+        OCC_DIR / "simulated_ann_or_upper.csv", float_precision="round_trip"
+    )["upper"].to_numpy()
+    lower = pd.read_csv(
+        OCC_DIR / "simulated_ann_or_lower.csv", float_precision="round_trip"
+    )["lower"].to_numpy()
     return {"upper": upper, "lower": lower}
 
 

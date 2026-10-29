@@ -352,7 +352,7 @@ def sm(
     # Holdout: append the transformed forecast errors, so the scale model is
     # fitted on the same sample the location model was and scored on the rest.
     h = int(getattr(location, "h", 0) or 0)
-    holdout = bool(getattr(location, "holdout", False)) and h > 0
+    holdout = bool(getattr(location, "_general", {}).get("holdout", False)) and h > 0
     if holdout:
         y_holdout = np.asarray(location.holdout_data, dtype=np.float64).ravel()
         forecast = np.asarray(location.predict(h=h).mean, dtype=np.float64).ravel()

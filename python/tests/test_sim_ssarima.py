@@ -143,6 +143,40 @@ def test_sim_ssarima_intermittent_probability_below_one():
     assert s.occurrence.shape == (80, 1)
 
 
+def test_sim_ssarima_prints_the_parameters_by_lag_as_r():
+    """As R's print.smooth.sim: an AR and an MA table with a row per order and a
+    column per lag with terms, the constant (zero without one) and the true
+    likelihood. R: print(sim.ssarima(orders=list(ar=c(1,1), i=c(0,0),
+    ma=c(0,1)), lags=c(1,4), obs=60))."""
+    drawn = sim_ssarima(
+        orders={"ar": [1, 1], "i": [0, 0], "ma": [0, 1]}, lags=[1, 4], obs=60, seed=3
+    )
+    lines = str(drawn).splitlines()
+    ar, ma = np.ravel(drawn.arma["ar"]), np.ravel(drawn.arma["ma"])
+    start = lines.index("AR parameters:")
+    assert lines[start + 1].split() == ["Lag", "1", "Lag", "4"]
+    assert lines[start + 2].split() == ["AR(1)"] + [str(round(v, 4)) for v in ar]
+    assert lines[start + 4].split() == ["Lag", "4"]
+    assert lines[start + 5].split() == ["MA(1)", str(round(ma[0], 4))]
+    assert "Constant value: 0" in lines
+    assert "True likelihood: NA" not in lines
+
+
+def test_sim_ssarima_has_the_true_likelihood():
+    """The normal likelihood of the drawn errors, as R/simssarima.R; without a
+    burn-in (provided initials) the errors are those returned."""
+    drawn = sim_ssarima(
+        orders={"ar": [1], "i": [0], "ma": [0]},
+        obs=50,
+        arma={"ar": [0.5]},
+        initial=[10.0],
+        seed=1,
+    )
+    errors = np.asarray(drawn.residuals, dtype=float)
+    expected = -50 / 2 * (np.log(2 * np.pi * np.e) + np.log(np.mean(errors**2)))
+    assert float(np.ravel(drawn.log_lik)[0]) == pytest.approx(expected, rel=1e-12)
+
+
 @pytest.mark.parametrize("bounds, stable", [("admissible", True), ("none", False)])
 def test_sim_ssarima_draws_stationary_and_invertible_arma(bounds, stable):
     """With the admissible bounds the drawn AR polynomial 1 - phi(B) is stationary

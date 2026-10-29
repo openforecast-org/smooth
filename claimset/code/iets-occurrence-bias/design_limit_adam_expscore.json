@@ -1,0 +1,27 @@
+{
+ "p_range": [
+  0.02,
+  0.98
+ ],
+ "T": 20000000,
+ "burnin": 2000000,
+ "batches": 100,
+ "mode": "limit",
+ "n_p": 30,
+ "alphas": [
+  0.004,
+  0.002,
+  0.001
+ ],
+ "models": [
+  "i",
+  "o"
+ ],
+ "errors": [
+  "L"
+ ],
+ "proxies": [
+  "expscore"
+ ],
+ "seed": 13
+}

@@ -38,7 +38,10 @@ def cells(design):
     if design["mode"] == "limit":
         ps = [rng.uniform(lo, hi) for _ in range(design["n_p"])]
         return [(p, a) for p in ps for a in design["alphas"]]
-    alo, ahi = (math.log(a) for a in design["alpha_range"])
+    alo, ahi = design["alpha_range"]
+    if design.get("alpha_scale", "log") == "uniform":
+        return [(rng.uniform(lo, hi), rng.uniform(alo, ahi)) for _ in range(design["n_cells"])]
+    alo, ahi = math.log(alo), math.log(ahi)
     return [(rng.uniform(lo, hi), math.exp(rng.uniform(alo, ahi)))
             for _ in range(design["n_cells"])]
 
@@ -61,8 +64,9 @@ def run_all(binary, design):
 
 
 def target(key, p):
+    # The old proxy under ADAM ETS ('L') is the old additive filter (derivations.md §5)
     model, error, proxy = key
-    return fixed_point(model, error, p) if proxy == "old" else p
+    return fixed_point(model, "A" if error == "L" else error, p) if proxy == "old" else p
 
 
 def limits(rows, design):
@@ -94,6 +98,7 @@ def wrong_direction(r, z):
         return d < -tol
     if model == "i" and error == "M":
         return d > tol
+    # Additive old proxy, and the old proxy under ADAM ETS (the same filter): towards 0.5
     toward = 1 if p < 0.5 else -1
     return toward * d < -tol or toward * (r["mean"] - 0.5) > tol
 
@@ -103,11 +108,11 @@ def dominance(rows, z):
     # bias exceeds the old proxy's by more than z combined standard errors.
     old = {(r["model"], r["error"], r["p"], r["alpha"]): r for r in rows if r["proxy"] == "old"}
     out = []
-    for s in (r for r in rows if r["proxy"] == "score"):
+    for s in (r for r in rows if r["proxy"] != "old"):
         o = old[(s["model"], s["error"], s["p"], s["alpha"])]
         gap = abs(s["mean"] - s["p"]) - abs(o["mean"] - o["p"])
         worse = s["nonfinite"] > 0 or gap > z * math.hypot(s["se"], o["se"])
-        out.append({"model": s["model"], "error": s["error"], "p": s["p"],
+        out.append({"model": s["model"], "error": s["error"], "proxy": s["proxy"], "p": s["p"],
                     "alpha": s["alpha"], "bias_score": s["mean"] - s["p"],
                     "bias_old": o["mean"] - o["p"], "score_worse": worse})
     return out
@@ -156,7 +161,7 @@ def main(design_path):
                          lambda r: wrong_direction(r, design["z"]))
         results += [{"quantity": "cells where the bias has the wrong direction", "value": v,
                      "conditions": dict(zip(fkeys, k))} for k, v in wrong.items()]
-        if "score" in design["proxies"]:
+        if any(x != "old" for x in design["proxies"]):
             dom = dominance(rows, design["z"])
             write_csv(outdir, "dominance.csv", dom)
             worse = count_by(dom, ("model", "error"), lambda r: r["score_worse"])

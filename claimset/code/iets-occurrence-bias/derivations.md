@@ -132,6 +132,31 @@ proxies' at every $\alpha$.
 iETS_D ($p = \mu_a$, SB23 eq. 21) has score $(o-p)/(1-p)$ with respect to $\log\mu_a$; it is
 outside this study.
 
+## 5. The ADAM formulation of multiplicative ETS (H13)
+
+With `ets="adam"`, smooth updates a multiplicative level as
+$\mu_t = \mu_{t-1}(1+e_t)^{\alpha}$ (`adamGvalue()` in `src/headers/adamGeneral.h`, case MNN;
+Svetunkov 2023), so that
+$$\log\mu_t = \log\mu_{t-1} + \alpha\log(1+e_t).$$
+The ADAM multiplicative occurrence filter is therefore the additive filter of §1 whose error
+is $\log(1+e_t)$, and its expected update is $\alpha\,\mathrm{E}[\log(1+e_t) \mid \hat p_t = x]$.
+
+1. **Old proxy.** $\log(1+e) = \log\frac{u}{1-u}$ (or its reciprocal): the error of the old
+   additive filter. The ADAM multiplicative filter with the old proxy is the old additive
+   filter, with the zero-drift point of §3 (between $p$ and $1/2$).
+2. **Score proxy, $1+e = 1+s$** ($s = o - \hat p$ for $\mu_a$, $\hat p - o$ for $\mu_b$).
+   Zero drift needs $\mathrm{E}[\log(1+s)] = 0$. At $x = p$, $\mathrm{E}[s] = 0$ and $\log$ is
+   strictly concave, so $\mathrm{E}[\log(1+s)] < 0$: the zero-drift point is not $p$.
+   For iETS_O it solves $p\log(2-x) + (1-p)\log(1-x) = 0$ and lies below $p$; for iETS_I it
+   solves $p\log x + (1-p)\log(1+x) = 0$ and lies above $p$. The bias is of order one, as for
+   the old proxies.
+3. **Exponential score proxy, $1+e = \exp(s)$.** Then $\log(1+e) = s$ and the ADAM
+   multiplicative filter is the additive score filter of §4, with zero-drift point $p$.
+
+The multiplicative proxy has to match the ETS formulation: $1+s$ for conventional ETS (§4),
+$\exp(s)$ for ADAM ETS. With the matching proxy, the conventional filter has an $O(\alpha^2)$
+drift in $\log\mu$ that the ADAM filter does not have.
+
 ## References
 
 - Benveniste, A., Métivier, M. and Priouret, P. (1990). *Adaptive Algorithms and Stochastic
@@ -144,6 +169,8 @@ outside this study.
   Press. doi:10.1017/CBO9781139540933
 - Kushner, H.J. and Yin, G.G. (2003). *Stochastic Approximation and Recursive Algorithms and
   Applications*, 2nd ed. Springer. doi:10.1007/b97441
+- Svetunkov, I. (2023). *Forecasting and Analytics with the Augmented Dynamic Adaptive Model
+  (ADAM)*. Chapman and Hall/CRC. https://openforecast.org/adam/
 - Svetunkov, I. and Boylan, J.E. (2023). iETS: State space model for intermittent demand
   forecasting. *International Journal of Production Economics* 265, 109013.
   doi:10.1016/j.ijpe.2023.109013

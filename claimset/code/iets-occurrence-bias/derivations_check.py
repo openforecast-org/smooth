@@ -1,6 +1,6 @@
 """Checks the derivations in derivations.md: identities symbolically (sympy), inequalities on a
 grid evaluated with 50-digit arithmetic. The first argument picks the section:
-old-drift (§2, H5), fixed-points (§3, H6) or score (§4, H7).
+old-drift (§2, H5), fixed-points (§3, H6), score (§4, H7) or adam-ets (§5, H13).
 Results: the number of identities sympy could not reduce to zero, and the number of numerical
 counterexamples (an identity off by more than 1e-30, or an inequality that fails).
 """
@@ -116,8 +116,32 @@ def score():
     return checks
 
 
+def adam_ets():
+    # §5: E[log(1 + e)] for the ADAM multiplicative filter at p_hat = x
+    log_old = expect(sp.log(old_ratio(1, x)), sp.log(old_ratio(0, x)))
+    log_add = expect(sp.log((1 + 1 - x) / (1 - 1 + x)), sp.log((1 + 0 - x) / (1 - 0 + x)))
+    log_score_a = expect(sp.log(2 - x), sp.log(1 - x))   # 1 + e_a = 1 + o - x
+    log_score_b = expect(sp.log(x), sp.log(1 + x))       # 1 + e_b = 1 + x - o
+    log_exp_a = expect(sp.log(sp.exp(1 - x)), sp.log(sp.exp(-x)))
+
+    def root_of(f, q):
+        return mp.findroot(lambda r: f(q, r), (mp.mpf("1e-40"), 1 - mp.mpf("1e-40")),
+                           solver="anderson")
+
+    fa = sp.lambdify((p, x), log_score_a, "mpmath")
+    fb = sp.lambdify((p, x), log_score_b, "mpmath")
+    checks = [identity(log_old, log_add),           # old proxy = old additive filter
+              identity(log_exp_a, p - x),           # exponential score = additive score
+              inequality(lambda q: fa(q, q) < 0),   # 1+s proxy: negative drift at the truth
+              inequality(lambda q: fb(q, q) < 0),
+              inequality(lambda q: root_of(fa, q) < q),
+              inequality(lambda q: root_of(fb, q) > q)]
+    return checks
+
+
 def main(section):
-    checks = {"old-drift": old_drift, "fixed-points": fixed_points, "score": score}[section]()
+    checks = {"old-drift": old_drift, "fixed-points": fixed_points, "score": score,
+              "adam-ets": adam_ets}[section]()
     unverified = sum(c[0] for c in checks)
     counter = sum(c[1] for c in checks)
     print(section, checks)

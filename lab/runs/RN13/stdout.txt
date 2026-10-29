@@ -1,0 +1,1 @@
+{'quantity': 'max relative deviation of the alpha-to-0 limit from its prediction', 'value': 0.0023119836629011026, 'conditions': {'model': 'Croston', 'error': 'M', 'proxy': 'old'}}

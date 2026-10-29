@@ -186,6 +186,7 @@ test_that("sim.ssarima() uses its constant and its generated initial states", {
     errorVariances <- replicate(20, var(as.vector(sim.ssarima(orders=list(ar=2,i=0,ma=2),
                                                               obs=60)$residuals)));
     expect_gt(median(errorVariances), 10);
+})
 
 #### Printing and plotting ####
 test_that("print() of the simulated data shows the model and its parameters", {

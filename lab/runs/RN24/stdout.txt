@@ -1,0 +1,9 @@
+{'quantity': 'max abs difference of upper quantiles', 'value': 2.7259835424909014, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'score', 'ets': 'adam', 'comparison': 'R seed 1 vs R seed 2'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 1.5102308605840946, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'score', 'ets': 'adam', 'comparison': 'Python seed 1 vs Python seed 2'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 1.9374927485718132, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'score', 'ets': 'adam', 'comparison': 'Python seed 1 vs R seed 1'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 2.7259835424909014, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'ratio', 'ets': 'adam', 'comparison': 'R seed 1 vs R seed 2'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 1.8265160549470778, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'ratio', 'ets': 'adam', 'comparison': 'Python seed 1 vs Python seed 2'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 1.6679009666206142, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'ratio', 'ets': 'adam', 'comparison': 'Python seed 1 vs R seed 1'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 0.0, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'score', 'ets': 'conventional', 'comparison': 'R seed 1 vs R seed 2'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 0.0, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'score', 'ets': 'conventional', 'comparison': 'Python seed 1 vs Python seed 2'}}
+{'quantity': 'max abs difference of upper quantiles', 'value': 6.394884621840902e-14, 'conditions': {'occurrence': 'inverse-odds-ratio', 'proxy': 'score', 'ets': 'conventional', 'comparison': 'Python seed 1 vs R seed 1'}}

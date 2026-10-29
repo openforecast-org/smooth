@@ -1,0 +1,2 @@
+{'quantity': 'cells where the bias has the wrong direction', 'value': 0, 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'cells where the bias has the wrong direction', 'value': 0, 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'old'}}

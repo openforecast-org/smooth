@@ -25,7 +25,9 @@ REFERENCE = json.loads((DATA / "interval_distributions_reference.json").read_tex
 def test_interval_matches_r(case_id):
     ref = REFERENCE[case_id]
     model_spec, distribution = case_id.split("_", 1)
-    y = pd.read_csv(DATA / "sm_positive.csv")["y"].to_numpy(float)
+    y = pd.read_csv(
+        DATA / "sm_positive.csv", float_precision="round_trip"
+    )["y"].to_numpy(float)
 
     model = ADAM(model=model_spec, lags=[1], distribution=distribution)
     model.fit(y)

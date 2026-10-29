@@ -390,9 +390,10 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
             vt[,1:lagsModelMax] <- initialValue;
         }
 
-        # If exogenous are included
+        # If exogenous are included: their states come after those of CES, whether
+        # the initials of CES are in B or not
         if(xregModel && initialXregEstimate && initialType!="complete"){
-            vt[j+(1:xregNumber),] <- B[nCoefficients+(1:xregNumber)];
+            vt[componentsNumber+(1:xregNumber),] <- B[nCoefficients+(1:xregNumber)];
             nCoefficients[] <- nCoefficients + xregNumber;
         }
 

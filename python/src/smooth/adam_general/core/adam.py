@@ -5391,10 +5391,7 @@ class ADAM:
             Brief model representation
         """
         if hasattr(self, "_model_type") and self._model_type:
-            model_str = self._model_type.get("model", self.model)
-            if self._model_type.get("ets_model", False):
-                return f"ADAM(ETS({model_str}), fitted=True)"
-            return f"ADAM({model_str}, fitted=True)"
+            return f"ADAM({self.model_name}, fitted=True)"
         return f"ADAM(model={self.model}, fitted=False)"
 
     def _adam_created_seeded(self):

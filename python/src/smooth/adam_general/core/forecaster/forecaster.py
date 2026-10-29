@@ -48,6 +48,10 @@ def _prepare_forecast_index(observations_dict, general_dict):
             observations_dict["y_forecast_index"] = pd.date_range(
                 start=y_forecast_start, periods=h, freq=freq
             )
+        elif isinstance(y_forecast_start, pd.Period):
+            observations_dict["y_forecast_index"] = pd.period_range(
+                start=y_forecast_start, periods=h, freq=y_forecast_start.freq
+            )
         elif isinstance(y_forecast_start, (int, np.integer)):
             # Numeric index - use RangeIndex
             observations_dict["y_forecast_index"] = pd.RangeIndex(

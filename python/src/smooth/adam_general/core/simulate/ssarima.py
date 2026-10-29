@@ -20,6 +20,7 @@ import pandas as pd
 from smooth.adam_general import _adamCore
 from smooth.adam_general._adam_general import adam_simulator
 from smooth.adam_general.core.creator.architector import adam_profile_creator
+from smooth.adam_general.core.simulate.es import _true_log_lik
 from smooth.adam_general.core.simulate.randomizer import (
     is_default_randomizer,
     resolve_randomizer,
@@ -498,6 +499,16 @@ def sim_ssarima(
         arr_vt.shape, order="F"
     )
 
+    # ---------- the true likelihood, before the burn-in is cut, as R --------
+    # (R/simssarima.R: NA for the other randomizers, Inverse Gaussian included)
+    known = ("rnorm", "rt", "rlaplace", "rs", "rlnorm")
+    log_lik = _true_log_lik(
+        randomizer if randomizer in known else None,
+        mat_errors,
+        mat_yt,
+        mat_yt.shape[0],
+    )
+
     # ---------- 15. strip the burn-in ----------------------------------
     if initial_generate:
         mat_yt = mat_yt[burn_in:, :]
@@ -540,6 +551,7 @@ def sim_ssarima(
         occurrence=mat_ot if not np.all(mat_ot == 1.0) else None,
         probability=probability_arr if probability_arr.size > 1 else None,
         intermittent=("none" if np.all(probability_arr == 1.0) else "tsb"),
+        log_lik=log_lik,
         other=dict(randomizer_kwargs),
     )
 

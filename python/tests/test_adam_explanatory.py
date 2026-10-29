@@ -38,7 +38,7 @@ R_COEF_X2 = -1.461
 
 @pytest.fixture
 def etsx_data():
-    df = pd.read_csv(DATA_PATH)
+    df = pd.read_csv(DATA_PATH, float_precision="round_trip")
     return df["y"].values, df[["x1", "x2"]].values
 
 
@@ -201,7 +201,10 @@ def test_etsx_adapt_dummies_match_r():
     fit agree with R."""
     from ._r_bridge import r_array
 
-    air = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")
+    air = pd.read_csv(
+        Path(__file__).parent / "data" / "ces_airpassengers.csv",
+        float_precision="round_trip",
+    )
     y = air["y"].values.astype(float)
     X = np.zeros((len(y), 11))
     for month in range(1, 12):
@@ -464,7 +467,7 @@ def test_etsx_adapt_lasso_lambda_one_does_not_adapt():
 @pytest.fixture
 def select_data():
     """The ETSX data with a third, irrelevant column (R: d$x3 <- round(sin(1:120), 6))."""
-    df = pd.read_csv(DATA_PATH)
+    df = pd.read_csv(DATA_PATH, float_precision="round_trip")
     df["x3"] = np.round(np.sin(np.arange(1, 121)), 6)
     return df
 
@@ -472,7 +475,10 @@ def select_data():
 def test_ces_select_keeps_the_signal(select_data):
     """CES selects on the errors of the model without regressors, as R.
 
-    R: ces(d, regressors="select", h=3): x1 and x2, logLik -162.171513
+    R: ces(d, regressors="select", h=3): x1 and x2, logLik -162.613656 with the
+    reference BLAS. The starting coefficients of the regressors come from the QR of
+    the BLAS, and the fit moves with their last bits: -162.613674 with OpenBLAS, in R
+    as in Python
     """
     from smooth import CES
 
@@ -482,7 +488,7 @@ def test_ces_select_keeps_the_signal(select_data):
             select_data["y"].values, select_data[["x1", "x2", "x3"]]
         )
     assert [name for name in model.coef_names if name.startswith("x")] == ["x1", "x2"]
-    assert model.loglik == pytest.approx(-162.171513, rel=1e-8)
+    assert model.loglik == pytest.approx(-162.613656, rel=1e-6)
 
 
 def test_om_select_on_the_occurrence(select_data):

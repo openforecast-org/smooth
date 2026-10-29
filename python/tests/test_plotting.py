@@ -79,7 +79,10 @@ def _heteroscedastic_fit():
 
     import pandas as pd
 
-    y = pd.read_csv(Path(__file__).parent / "data" / "sm_heteroscedastic.csv")
+    y = pd.read_csv(
+        Path(__file__).parent / "data" / "sm_heteroscedastic.csv",
+        float_precision="round_trip",
+    )
     model = ADAM(model="ANN", lags=[1], distribution="dnorm")
     model.fit(y["y"].to_numpy(float))
     return model
@@ -220,7 +223,10 @@ def test_no_divider_line_without_a_forecast():
 
     import pandas as pd
 
-    y = pd.read_csv(Path(__file__).parent / "data" / "sm_heteroscedastic.csv")
+    y = pd.read_csv(
+        Path(__file__).parent / "data" / "sm_heteroscedastic.csv",
+        float_precision="round_trip",
+    )
     y = y["y"].to_numpy(float)
 
     def _has_vline(fig):

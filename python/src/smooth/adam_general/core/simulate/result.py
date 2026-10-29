@@ -12,6 +12,7 @@ the layout of R's ``print.smooth.sim`` / ``print.oes.sim``
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Union
 
@@ -187,22 +188,28 @@ class SimulateResult:
     def _format_arima_lines(self, digits: int) -> list:
         """ARIMA block of R's ``print.smooth.sim``.
 
-        Renders an ``AR(i)`` table indexed by lag and an ``MA(i)`` table
-        indexed by lag, matching R's matrix dimnames. ``constant`` and
-        differences (``I(...)``) are appended below if present.
+        Renders an ``AR(i)`` table by the lags with AR terms and an ``MA(i)``
+        table by the lags with MA terms, matching R's matrix dimnames; the orders
+        and lags are read from the name of the model, as R's ``orders()`` and
+        ``lags()``. Then the constant, zero without one, as R's.
         """
+        groups = re.findall(r"\((\d+),\d+,(\d+)\)(?:\[(\d+)\])?", self.model or "")
+        lags = [int(lag or 1) for _, _, lag in groups]
         out = []
         arma = self.arma or {}
-        ar = np.asarray(arma.get("ar", [])).reshape(-1)
-        ma = np.asarray(arma.get("ma", [])).reshape(-1)
-        if ar.size:
-            out.append("AR parameters:")
-            out.append(_format_vector_block("AR", ar, digits))
-        if ma.size:
-            out.append("MA parameters:")
-            out.append(_format_vector_block("MA", ma, digits))
-        if self.constant is not None and not np.isnan(self.constant):
-            out.append(f"Constant value: {round(float(self.constant), digits)}")
+        for prefix, position in (("AR", 0), ("MA", 1)):
+            values = np.asarray(arma.get(prefix.lower(), [])).reshape(-1)
+            if values.size:
+                orders = [int(group[position]) for group in groups]
+                out.append(f"{prefix} parameters:")
+                out.append(_format_vector_block(prefix, values, orders, lags, digits))
+        constant = self.constant
+        if constant is None or np.isnan(constant):
+            constant = 0.0
+        out.append(
+            "Constant value: "
+            + np.format_float_positional(round(float(constant), digits), trim="-")
+        )
         return out
 
 
@@ -229,10 +236,30 @@ def _format_named_vector(names: list, values: np.ndarray, digits: int) -> str:
     return "  ".join(name_cells) + "\n" + "  ".join(val_cells)
 
 
-def _format_vector_block(prefix: str, values: np.ndarray, digits: int) -> str:
-    """Format an AR / MA coefficient vector with R-style row names."""
-    rows = [f"{prefix}({i + 1})" for i in range(values.shape[0])]
-    return _format_named_vector(rows, values, digits)
+def _format_vector_block(
+    prefix: str, values: np.ndarray, orders: list, lags: list, digits: int
+) -> str:
+    """Format the AR / MA coefficients as R's matrix: a row per order, ``AR(1)``,
+    ..., and a column per lag with terms, ``Lag 1``, ..., zero where a lag has
+    fewer terms. The coefficients come lag by lag."""
+    columns = [(order, lag) for order, lag in zip(orders, lags) if order > 0]
+    table = np.zeros((max(order for order, _ in columns), len(columns)))
+    start = 0
+    for j, (order, _) in enumerate(columns):
+        table[:order, j] = values[start : start + order]
+        start += order
+    cells = [
+        [np.format_float_positional(round(float(v), digits), trim="-") for v in row]
+        for row in table
+    ]
+    header = [f"Lag {lag}" for _, lag in columns]
+    width = max(len(text) for text in header + [c for row in cells for c in row])
+    label = len(f"{prefix}({table.shape[0]})")
+    lines = [" " * label + "".join(f" {text:>{width}}" for text in header)]
+    for i, row in enumerate(cells):
+        name = f"{prefix}({i + 1})"
+        lines.append(f"{name:<{label}}" + "".join(f" {text:>{width}}" for text in row))
+    return "\n".join(lines)
 
 
 def _format_loglik(log_lik, digits: int) -> str:

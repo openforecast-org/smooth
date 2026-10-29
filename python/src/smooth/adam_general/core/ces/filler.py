@@ -181,9 +181,10 @@ def ces_filler(
     elif initial_type == "provided" and initial_value is not None:
         vt[:, :lags_model_max] = initial_value
 
-    # --- Xreg initials --- R lines 371-374
+    # --- Xreg initials: their states come after those of CES, whether the initials
+    # of CES are in B or not (R's filler in R/adam-ces.R)
     if xreg_model and initial_xreg_estimate and initial_type != "complete":
-        vt[j : j + xreg_number, :] = B[
+        vt[components_number : components_number + xreg_number, :] = B[
             n_coefficients : n_coefficients + xreg_number, np.newaxis
         ]
         n_coefficients += xreg_number

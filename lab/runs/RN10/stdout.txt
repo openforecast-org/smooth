@@ -1,0 +1,4 @@
+{'quantity': 'max relative deviation of the alpha-to-0 limit from its prediction', 'value': 0.0020834885943211206, 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the alpha-to-0 limit from its prediction', 'value': 0.0009875194413653616, 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the alpha-to-0 limit from its prediction', 'value': 0.0023640751171922383, 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the alpha-to-0 limit from its prediction', 'value': 0.0012722664771159745, 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'score'}}

@@ -11,6 +11,7 @@ Tests cover:
 import re
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from smooth import ADAM, ES, MSARIMA, SMA, AutoADAM
@@ -1710,6 +1711,50 @@ def test_adam_fits_a_list_as_the_array():
     from_array = ADAM(model="ANN").fit(np.array(y))
     assert from_list.loglik == from_array.loglik
     assert list(from_list.predict(h=2).mean) == list(from_array.predict(h=2).mean)
+
+
+def _regressors_data():
+    rng = np.random.default_rng(41)
+    X = pd.DataFrame({"x1": rng.normal(10, 2, 60), "x2": rng.normal(5, 1, 60)})
+    y = 50 + 2 * X["x1"].to_numpy() - 3 * X["x2"].to_numpy() + rng.normal(size=60).cumsum()
+    return y, X
+
+
+def test_adam_fills_a_missing_regressor_with_its_first_value():
+    y, X = _regressors_data()
+    missing, filled = X.copy(), X.copy()
+    missing.loc[4, "x2"] = np.nan
+    filled.loc[4, "x2"] = X.loc[0, "x2"]
+    with pytest.warns(UserWarning, match="Some variables contained NAs"):
+        model = ADAM(model="ANN").fit(y, X=missing)
+    assert model.loglik == pytest.approx(ADAM(model="ANN").fit(y, X=filled).loglik)
+
+
+def test_adam_estimates_the_regressors_without_a_provided_initial():
+    y, X = _regressors_data()
+    model = ADAM(model="ANN", initial={"xreg": {"x1": 2.0}}).fit(y, X=X)
+    assert model.initial_value["xreg"]["x1"] == 2.0
+    assert model.initial_value["xreg"]["x2"] != 0
+    assert model.n_param.provided["xreg"] == 1
+    assert model.nparam == ADAM(model="ANN").fit(y, X=X).nparam - 1
+    assert model.initial_type == "backcasting"
+
+
+def test_a_regression_with_an_occurrence_fits_the_sizes_to_the_non_zero_values():
+    y, X = _regressors_data()
+    y = y * np.random.default_rng(2).binomial(1, 0.7, 60)
+    model = ADAM(model="NNN", occurrence="fixed").fit(y, X=X)
+    nonzero = y != 0
+    p = nonzero.mean()
+    sizes = ADAM(model="NNN").fit(y[nonzero], X=X[nonzero].reset_index(drop=True))
+    np.testing.assert_allclose(model.coef, sizes.coef)
+    occurrence = nonzero.sum() * np.log(p) + (~nonzero).sum() * np.log(1 - p)
+    assert model.loglik == pytest.approx(sizes.loglik + occurrence)
+    assert np.all(np.asarray(model.residuals)[~nonzero] == 0)
+    forecast = model.predict(h=3, X=X.iloc[:3])
+    np.testing.assert_allclose(
+        forecast.mean.values, sizes.predict(h=3, X=X.iloc[:3]).mean.values * p
+    )
 
 
 def test_adam_reapply_draws_around_the_fitted_arima():

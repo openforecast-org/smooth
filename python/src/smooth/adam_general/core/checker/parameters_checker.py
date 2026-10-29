@@ -1163,8 +1163,12 @@ def parameters_checker(
 
         n = observations_dict["obs_in_sample"]
         # The observed values only: the filled ones are for the initialisation of
-        # the states, which a regression does not have
+        # the states, which a regression does not have. With an occurrence model (not
+        # the occurrence of OM), the sizes: the non-zero values, as R
         observed = observed_mask(observations_dict)
+        if occurrence_model and distribution != "plogis":
+            ot_logical = np.asarray(observations_dict["ot_logical"], dtype=bool)
+            observed = observed & ot_logical
         y_is = np.asarray(observations_dict["y_in_sample"], dtype=float)[observed]
         X_is = X[:n][observed]
         dist = _map_distribution_for_greybox(distribution)
@@ -1232,10 +1236,27 @@ def parameters_checker(
             model_type_dict["xreg_model"] = False
         else:
             # Update persistence and initials based on regressors mode
-            # The provided initials of the regressors are not estimated, as R
-            initials_dict["initial_xreg_estimate"] = not initials_dict.get(
-                "initial_xreg_provided", False
+            # The provided initials of the regressors are not estimated, as R: when some
+            # are, the others are
+            partly_provided = 0 in xreg_dict["xreg_parameters_estimated"]
+            initials_dict["initial_xreg_estimate"] = (
+                not initials_dict.get("initial_xreg_provided", False) or partly_provided
             )
+            # The initial is then "provided" only if another block of them is, as R
+            if partly_provided and initials_dict["initial_type"] == "provided":
+                provided = [
+                    ets_model and not initials_dict["initial_level_estimate"],
+                    model_type_dict["model_is_trendy"]
+                    and not initials_dict["initial_trend_estimate"],
+                    model_type_dict["model_is_seasonal"]
+                    and not all(initials_dict["initial_seasonal_estimate"]),
+                    arima_model and not initials_dict["initial_arima_estimate"],
+                ]
+                if not any(provided):
+                    initials_dict["initial_type"] = "backcasting"
+                    # R sets the iterations from the initial after this check
+                    if not initials_dict["n_iterations_provided"]:
+                        initials_dict["n_iterations"] = 2
             # The provided smoothing parameters of the regressors are used, one
             # for all of them or one each, as R
             delta = persistence_dict.get("persistence_xreg")
@@ -1500,24 +1521,30 @@ def _process_xreg(
     p = X_selected.shape[1]
 
     # ---------- initialise coefficients ----------
-    if initial_xreg is not None:
-        # The named values are taken by name, the others in the order of the variables
-        if isinstance(initial_xreg, dict):
-            named = set(initial_xreg) == set(names_selected)
-            initial_xreg = (
-                [initial_xreg[name] for name in names_selected]
-                if named
-                else list(initial_xreg.values())
-            )
-        initial_xreg_flat = np.asarray(initial_xreg, dtype=float).ravel()
-        if len(initial_xreg_flat) != p:
+    # The named values are taken by name, the others in the order of the variables;
+    # the regressors without one are estimated, as R
+    provided = np.full(p, np.nan)
+    if isinstance(initial_xreg, dict) and set(initial_xreg) <= set(names_selected):
+        for name, value in initial_xreg.items():
+            provided[names_selected.index(name)] = value
+    elif initial_xreg is not None:
+        values = np.asarray(
+            list(initial_xreg.values())
+            if isinstance(initial_xreg, dict)
+            else initial_xreg,
+            dtype=float,
+        ).ravel()
+        if len(values) > p:
             raise ValueError(
-                f"initial['xreg'] has {len(initial_xreg_flat)} values "
+                f"initial['xreg'] has {len(values)} values "
                 f"but model has {p} regressors."
             )
+        provided[: len(values)] = values
+    xreg_estimated = np.isnan(provided)
+    if initial_xreg is not None and not np.any(xreg_estimated):
         xreg_initials = [
-            {"initial_xreg": initial_xreg_flat.reshape(-1, 1)},
-            {"initial_xreg": initial_xreg_flat.reshape(-1, 1)},
+            {"initial_xreg": provided.reshape(-1, 1)},
+            {"initial_xreg": provided.reshape(-1, 1)},
         ]
     else:
         # As R's xregInitialiser, a trend is added to get rid of the bias and dropped
@@ -1594,6 +1621,12 @@ def _process_xreg(
                 {"initial_xreg": _fit_alm(y_sub, "A").reshape(-1, 1)},
                 {"initial_xreg": _fit_alm(_mult_response(), "M").reshape(-1, 1)},
             ]
+        # The provided ones replace their estimates, and are not estimated
+        for xreg_initial in xreg_initials:
+            if xreg_initial is not None:
+                xreg_initial["initial_xreg"][~xreg_estimated, 0] = provided[
+                    ~xreg_estimated
+                ]
 
     return {
         "xreg_model": True,
@@ -1606,6 +1639,10 @@ def _process_xreg(
         "formula": None,
         "xreg_parameters_missing": None,
         "xreg_parameters_included": None,
-        "xreg_parameters_estimated": [1] * p,
+        "xreg_parameters_estimated": (
+            [1] * p
+            if initial_xreg is not None and not np.any(xreg_estimated)
+            else xreg_estimated.astype(int).tolist()
+        ),
         "xreg_parameters_persistence": list(range(1, p + 1)),
     }

@@ -573,15 +573,29 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         }
 
         # The fitted values and residuals at their rows: at the missing values, the
-        # prediction of the regression and no residual
+        # prediction of the regression and no residual. With an occurrence model, the
+        # regression is of the sizes (the non-zero values): the fitted values are the sizes
+        # times the probability, and the residuals at the zeros are zero, as in ETSX
         observed <- !is.na(y[1:obsInSample]);
+        # The occurrence model of the sizes, attached by the checker: forecast.alm() does not take it
+        omModel <- checkerReturn$occurrence;
+        checkerReturn$occurrence <- NULL;
+        fittedRows <- observed;
+        if(is.occurrence(omModel)){
+            fittedRows[observed] <- y[1:obsInSample][observed]!=0;
+        }
         fittedValues <- residualValues <- rep(NA, obsInSample);
-        fittedValues[observed] <- fitted(checkerReturn);
-        residualValues[observed] <- residuals(checkerReturn);
-        if(any(!observed)){
-            fittedValues[!observed] <- forecast(checkerReturn, h=sum(!observed),
-                                                newdata=data[which(!observed),,drop=FALSE],
-                                                interval="none")$mean;
+        fittedValues[fittedRows] <- fitted(checkerReturn);
+        residualValues[fittedRows] <- residuals(checkerReturn);
+        if(any(!fittedRows)){
+            fittedValues[!fittedRows] <- forecast(checkerReturn, h=sum(!fittedRows),
+                                                  newdata=data[which(!fittedRows),,drop=FALSE],
+                                                  interval="none")$mean;
+        }
+        if(is.occurrence(omModel)){
+            residualValues[observed & !fittedRows] <- 0;
+            pFitted <- as.vector(fitted(omModel));
+            fittedValues[] <- fittedValues * pFitted;
         }
 
         # Prepare fitted, residuals and the forecasts
@@ -647,8 +661,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                    dimnames=list(c("Estimated","Provided"),
                                                  c("nParamInternal","nParamXreg","nParamOccurrence","nParamScale","nParamAll")));
         parametersNumber[1,2] <- nParam;
-        if(is.occurrence(checkerReturn$occurrence)){
-            parametersNumber[1,3] <- nParam;
+        if(inherits(omModel, "adam")){
+            parametersNumber[1,3] <- nparam(omModel);
         }
         # The scale, as alm() counts it
         parametersNumber[1,4] <- nparam(checkerReturn) - nParam;
@@ -659,7 +673,12 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$loss <- checkerReturn$loss;
         modelReturned$lossValue <- checkerReturn$lossValue;
         modelReturned$lossFunction <- checkerReturn$lossFunction;
-        modelReturned$logLik <- logLik(checkerReturn);
+        modelReturned$logLik <- as.numeric(logLik(checkerReturn));
+        # The likelihood of the occurrence, over the observed values
+        if(is.occurrence(omModel)){
+            modelReturned$logLik[] <- modelReturned$logLik +
+                sum(log(ifelse(y[1:obsInSample][observed]!=0, pFitted[observed], 1-pFitted[observed])));
+        }
         modelReturned$distribution <- checkerReturn$distribution;
         modelReturned$scale <- checkerReturn$scale;
         modelReturned$other <- checkerReturn$other;
@@ -667,7 +686,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$lags <- 1;
         modelReturned$lagsAll <- rep(1,nParam);
         modelReturned$FI <- checkerReturn$FI;
-        modelReturned$occurrence <- checkerReturn$occurrence;
+        modelReturned$occurrence <- omModel;
         # The alm() model itself, used by forecast()
         modelReturned$alm <- checkerReturn;
         if(holdout){
@@ -5952,6 +5971,67 @@ plot.adam.predict <- function(x, ...){
     }
 }
 
+# The probabilities of occurrence of the horizon, and whether the forecast is of a mixture:
+# the provided values, else those of the occurrence model, extended to h
+adam_occurrenceForecast <- function(object, occurrence, h, newdata){
+    occurrenceModel <- FALSE;
+    # If the occurrence values are provided for the holdout
+    if(!is.null(occurrence) && is.logical(occurrence)){
+        pForecast <- occurrence*1;
+    }
+    else if(!is.null(occurrence) && is.numeric(occurrence)){
+        pForecast <- occurrence;
+    }
+    else{
+        # If this is a mixture model, produce forecasts for the occurrence
+        if(is.occurrence(object$occurrence)){
+            occurrenceModel[] <- TRUE;
+            if(object$occurrence$occurrence=="provided"){
+                pForecast <- rep(1,h);
+            }
+            else{
+                pForecast <- forecast(object$occurrence, h=h, newdata=newdata)$mean;
+            }
+        }
+        else{
+            occurrenceModel[] <- FALSE;
+            # If this was provided occurrence, then use provided values
+            if(!is.null(object$occurrence) && is.list(object$occurrence) &&
+               !is.null(object$occurrence$occurrence) &&
+               (object$occurrence$occurrence=="provided") && !anyNA(object$occurrence$forecast)){
+                pForecast <- object$occurrence$forecast;
+            }
+            else{
+                pForecast <- rep(1, h);
+            }
+        }
+    }
+    # The provided occurrence (not the missing values only), whose horizon is expected
+    occurrenceProvided <- is.null(occurrence) && is.list(object$occurrence) &&
+        identical(object$occurrence$occurrence, "provided") && any(fitted(object$occurrence)!=1);
+    if(occurrenceProvided && anyNA(object$occurrence$forecast)){
+        pForecast <- tail(as.vector(fitted(object$occurrence)), 1);
+    }
+    # Make sure that the values are of the correct length
+    if(h<length(pForecast)){
+        pForecast <- pForecast[1:h];
+    }
+    else if(h>length(pForecast)){
+        pForecast <- c(pForecast, rep(tail(pForecast,1), h-length(pForecast)));
+    }
+    if(occurrenceProvided && (anyNA(object$occurrence$forecast) ||
+                              h>length(object$occurrence$forecast))){
+        warning(paste0("The occurrence of the horizon is not provided. ",
+                       "Using the last value available."), call.=FALSE);
+    }
+    # Provided probabilities, rather than the values of the occurrence, make a mixture
+    if(!occurrenceModel && any(pForecast>0 & pForecast<1)){
+        occurrenceModel[] <- TRUE;
+    }
+
+    return(list(pForecast=pForecast, occurrenceModel=occurrenceModel));
+}
+
 # Forecasts of a pure regression, done by forecast.alm() on the alm() model
 # that adam() returned. All the prediction intervals of adam are parametric there.
 adam_forecastRegression <- function(object, h, newdata, occurrence, interval, level, side,
@@ -5966,8 +6046,33 @@ adam_forecastRegression <- function(object, h, newdata, occurrence, interval, le
     }
     almInterval <- switch(interval, "none"=, "confidence"=interval, "prediction");
     almForecast <- forecast(object$alm, h=h, newdata=newdata, interval=almInterval,
-                            level=level, side=side, occurrence=occurrence, ...);
+                            level=level, side=side, ...);
     h <- length(almForecast$mean);
+
+    # With an occurrence model, the mean of the sizes times the probability, and the
+    # interval of the sizes with the level (level-(1-p))/p, as forecast.adam() does
+    list2env(adam_occurrenceForecast(object, occurrence, h, newdata), envir=environment());
+    if(occurrenceModel){
+        almForecast$mean <- almForecast$mean * pForecast;
+        if(interval=="confidence"){
+            almForecast$lower <- almForecast$lower * pForecast;
+            almForecast$upper <- almForecast$upper * pForecast;
+        }
+        else if(interval!="none"){
+            # The bounds named by alm(), with the values of the sizes at their levels
+            almForecast$lower <- as.matrix(almForecast$lower);
+            almForecast$upper <- as.matrix(almForecast$upper);
+            for(l in seq_along(level)){
+                levelSizes <- pmax((level[l]-(1-pForecast))/pForecast, 0);
+                levels <- sort(unique(levelSizes));
+                sizesForecast <- forecast(object$alm, h=h, newdata=newdata, interval="prediction",
+                                          level=levels, side=side, ...);
+                steps <- cbind(1:h, match(levelSizes, levels));
+                almForecast$lower[,l] <- as.matrix(sizesForecast$lower)[steps];
+                almForecast$upper[,l] <- as.matrix(sizesForecast$upper)[steps];
+            }
+        }
+    }
 
     # Put the values in the time structure of the data
     yIndex <- time(actuals(object));
@@ -6466,60 +6571,7 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                 call.=FALSE);
     }
 
-    occurrenceModel <- FALSE;
-    # If the occurrence values are provided for the holdout
-    if(!is.null(occurrence) && is.logical(occurrence)){
-        pForecast <- occurrence*1;
-    }
-    else if(!is.null(occurrence) && is.numeric(occurrence)){
-        pForecast <- occurrence;
-    }
-    else{
-        # If this is a mixture model, produce forecasts for the occurrence
-        if(is.occurrence(object$occurrence)){
-            occurrenceModel[] <- TRUE;
-            if(object$occurrence$occurrence=="provided"){
-                pForecast <- rep(1,h);
-            }
-            else{
-                pForecast <- forecast(object$occurrence, h=h, newdata=newdataProvided)$mean;
-            }
-        }
-        else{
-            occurrenceModel[] <- FALSE;
-            # If this was provided occurrence, then use provided values
-            if(!is.null(object$occurrence) && is.list(object$occurrence) &&
-               !is.null(object$occurrence$occurrence) &&
-               (object$occurrence$occurrence=="provided") && !anyNA(object$occurrence$forecast)){
-                pForecast <- object$occurrence$forecast;
-            }
-            else{
-                pForecast <- rep(1, h);
-            }
-        }
-    }
-    # The provided occurrence (not the missing values only), whose horizon is expected
-    occurrenceProvided <- is.null(occurrence) && is.list(object$occurrence) &&
-        identical(object$occurrence$occurrence, "provided") && any(fitted(object$occurrence)!=1);
-    if(occurrenceProvided && anyNA(object$occurrence$forecast)){
-        pForecast <- tail(as.vector(fitted(object$occurrence)), 1);
-    }
-    # Make sure that the values are of the correct length
-    if(h<length(pForecast)){
-        pForecast <- pForecast[1:h];
-    }
-    else if(h>length(pForecast)){
-        pForecast <- c(pForecast, rep(tail(pForecast,1), h-length(pForecast)));
-    }
-    if(occurrenceProvided && (anyNA(object$occurrence$forecast) ||
-                              h>length(object$occurrence$forecast))){
-        warning(paste0("The occurrence of the horizon is not provided. ",
-                       "Using the last value available."), call.=FALSE);
-    }
-    # Provided probabilities, rather than the values of the occurrence, make a mixture
-    if(!occurrenceModel && any(pForecast>0 & pForecast<1)){
-        occurrenceModel[] <- TRUE;
-    }
+    list2env(adam_occurrenceForecast(object, occurrence, h, newdataProvided), envir=environment());
 
     # How many levels did user asked to produce
     nLevels <- length(level);

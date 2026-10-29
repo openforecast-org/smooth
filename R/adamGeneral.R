@@ -75,6 +75,42 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         formulaToUse <- NULL;
     }
     else{
+        # The missing values of the regressors (not of the response): the first observed
+        # value of each, for all the ways of getting their initials below
+        xregNAs <- which(is.na(xregData),arr.ind=TRUE);
+        xregNAs <- xregNAs[colnames(xregData)[xregNAs[,2]]!=responseName,,drop=FALSE];
+        if(nrow(xregNAs)>0){
+            warning("Some variables contained NAs. This might cause issues in the estimation. ",
+                    "I will substitute those values with the first non-NA values",
+                    call.=FALSE);
+            xregNonNAs <- which(!is.na(xregData),arr.ind=TRUE);
+            # Go through variables and substitute values
+            for(i in unique(xregNAs[,2])){
+                # This split on [row, column] is needed, because data.table is funny with cbind(row,column)
+                xregData[xregNAs[xregNAs[,2]==i,,drop=FALSE]] <- xregData[xregNonNAs[which(xregNonNAs[,2]==i)[1],1],
+                                                       xregNonNAs[which(xregNonNAs[,2]==i)[1],2]];
+            }
+            # The same values in the data, from which the selected regressors are refitted
+            data[xregNAs] <- xregData[xregNAs];
+        }
+        # The initials provided for some of the regressors only (the columns of their model
+        # matrix): the others are estimated, and the provided ones are set after that
+        if(!is.null(initialXreg) && regressors!="select"){
+            xregNamesAll <- make.names(setdiff(colnames(model.matrix(
+                if(is.null(formulaToUse)) reformulate(setdiff(colnames(xregData), responseName),
+                                                      response=responseName) else formulaToUse,
+                data=as.data.frame(xregData))), "(Intercept)"));
+            # The unnamed values are in the order of the variables
+            if(is.null(names(initialXreg))){
+                names(initialXreg) <- xregNamesAll[seq_along(initialXreg)];
+            }
+            if(!all(xregNamesAll %in% names(initialXreg))){
+                initialXregEstimate <- TRUE;
+            }
+            else{
+                initialXreg <- initialXreg[xregNamesAll];
+            }
+        }
         if(regressors=="select"){
             # If this has not happened by chance, then switch to optimisation
             if(!is.null(initialXreg) && any(initialType==c("backcasting","optimal","two-stage"))){
@@ -96,6 +132,16 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
     if(xregModel){
         # List of initials. The first element is additive error, the second is the multiplicative one
         xregModelInitials <- vector("list",2);
+
+        # A regression of the sizes of an occurrence model (not the occurrence of om()) is
+        # fitted to the non-zero values, with the occurrence model fitted as adam() does
+        occurrenceSizes <- (!etsModel && !arimaModel) && regressors!="adapt" && occurrenceModel &&
+            distribution!="plogis" && !occurrenceMissingOnly;
+        if(occurrenceSizes && is.null(omModel)){
+            omModel <- suppressWarnings(om(data=data, model="NNN", occurrence=occurrence,
+                                           formula=formulaToUse, ic=ic, h=h, holdout=holdout,
+                                           bounds=bounds, regressors=regressors, silent=TRUE));
+        }
 
         if(regressors!="select"){
             #### Initial xreg are not provided ####
@@ -304,14 +350,17 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     else{
                         FI <- ellipsis$FI;
                     }
-                    almSubset <- if(occurrenceModel) which(subsetOccurrence) else which(subset);
+                    almSubset <- if(occurrenceModel && !occurrenceSizes) which(subsetOccurrence) else which(subset);
                     almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
                                                     distribution=distribution, loss=loss,
                                                     subset=almSubset,
                                                     # The missing values alone are out of the subset
-                                                    occurrence=if(occurrenceMissingOnly) "none" else omModel,
+                                                    occurrence=if(occurrenceMissingOnly || occurrenceSizes) "none" else omModel,
                                                     FI=FI));
                     almModel$call$data <- as.name(yName);
+                    if(occurrenceSizes){
+                        almModel$occurrence <- omModel;
+                    }
                     return(almModel);
                 }
 
@@ -462,22 +511,6 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     xregNames <- colnames(xregData);
                 }
 
-                # If the number of rows is different, this might be because of NAs
-                if(additionalManipulations && nrow(xregData)!=nrow(xreg)){
-                    warning("Some variables contained NAs. This might cause issues in the estimation. ",
-                            "I will substitute those values with the first non-NA values",
-                            call.=FALSE);
-                    # Get indices of NAs and nonNAs
-                    xregNAs <- which(is.na(xreg),arr.ind=TRUE);
-                    xregNonNAs <- which(!is.na(xreg),arr.ind=TRUE);
-                    # Go through variables and substitute values
-                    for(i in unique(xregNAs[,2])){
-                        # This split on [row, column] is needed, because data.table is funny with cbind(row,column)
-                        xreg[xregNAs[xregNAs[,2]==i,]] <- xreg[xregNonNAs[which(xregNonNAs[,2]==i)[1],1],
-                                                               xregNonNAs[which(xregNonNAs[,2]==i)[1],2]];
-                    }
-                    xregData <- model.frame(formulaToUse,data=as.data.frame(xreg));
-                }
                 # Get the response variable, just in case it was transformed
                 if(additionalManipulations && length(formulaToUse[[2]])>1){
                     y <- xregData[,1];
@@ -672,6 +705,22 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
                     xregParametersEstimated <- setNames(rep(1,xregNumber),xregNames);
                     xregParametersMissing <- setNames(c(1:xregNumber),xregNames);
                     xregParametersIncluded <- setNames(c(1:xregNumber),xregNames);
+                }
+
+                # The initials provided for some of the regressors: their values, not estimated
+                if(!is.null(initialXreg)){
+                    for(k in which(!sapply(xregModelInitials, is.null))){
+                        xregModelInitials[[k]]$initialXreg[names(initialXreg)] <- initialXreg;
+                    }
+                    xregParametersEstimated[names(initialXreg)] <- 0;
+                    parametersNumber[2,2] <- parametersNumber[2,2] + length(initialXreg);
+                    # The level of a factor left out of the regression keeps the levels summing to zero
+                    for(i in which(xregParametersIncluded==0 & xregParametersMissing!=0)){
+                        for(k in which(!sapply(xregModelInitials, is.null))){
+                            xregModelInitials[[k]]$initialXreg[i] <-
+                                -sum(xregModelInitials[[k]]$initialXreg[xregParametersIncluded==i]);
+                        }
+                    }
                 }
 
                 # Remove xreg, just to preserve some memory
@@ -931,8 +980,11 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
 
                 almModel <- do.call("stepwise", list(data=xregData, formula=formulaToUse, subset=subset,
                                                      distribution=distribution,
-                                                     occurrence=if(occurrenceMissingOnly) "none" else omModel));
+                                                     occurrence=if(occurrenceMissingOnly || occurrenceSizes) "none" else omModel));
                 almModel$call$data <- as.name(yName);
+                if(occurrenceSizes){
+                    almModel$occurrence <- omModel;
+                }
                 return(almModel);
             }
 
@@ -1396,6 +1448,7 @@ commonParametersChecker <- function(data, model, lags, formulaToUse, orders, con
         xregModel = xregModel,
         regressors = regressors,
         xregModelInitials = xregModelInitials,
+        data = data,
         xregData = xregData,
         xregNumber = xregNumber,
         xregNames = xregNames,

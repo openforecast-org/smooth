@@ -618,3 +618,12 @@ test_that("the occurrence model of two demands is fitted to all the observations
                      label=occurrenceType);
     }
 })
+
+test_that("the forecast of a regression of the occurrence is the probability of its alm()", {
+    set.seed(41);
+    omData <- data.frame(y=rbinom(60, 1, 0.6)*rnorm(60, 50, 2), x1=rnorm(60), x2=rnorm(60));
+    testModel <- om(omData, model="NNN", occurrence="odds-ratio");
+    expect_equal(testModel$model, "Regression");
+    expect_equal(as.vector(forecast(testModel, h=3, newdata=omData[1:3,])$mean),
+                 as.vector(predict(testModel$alm, omData[1:3,])$mean));
+})

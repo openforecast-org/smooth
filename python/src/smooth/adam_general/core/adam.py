@@ -1176,6 +1176,24 @@ class ADAM:
             self.__dict__.update(auto.__dict__)
             return self
 
+        # The missing values of the regressors: the first observed value of each, as R
+        if X is not None and np.isnan(np.asarray(X, dtype=float)).any():
+            warnings.warn(
+                "Some variables contained NAs. This might cause issues in the "
+                "estimation. I will substitute those values with the first non-NA "
+                "values",
+                stacklevel=2,
+            )
+            values = np.asarray(X, dtype=float).reshape(len(X), -1)
+            missing = np.isnan(values)
+            first = values[np.argmax(~missing, axis=0), np.arange(values.shape[1])]
+            values = np.where(missing, first, values)
+            X = (
+                pd.DataFrame(values, index=X.index, columns=X.columns)
+                if isinstance(X, pd.DataFrame)
+                else values
+            )
+
         # The regressors with the names of the dummies of the outliers are renamed
         if self.outliers != "ignore" and isinstance(X, pd.DataFrame):
             clashes = [str(c) for c in X.columns if OUTLIER_NAMES.match(str(c))]
@@ -4182,17 +4200,21 @@ class ADAM:
         y_in_sample = values[:n]
         observed = ~np.isnan(y_in_sample)
         # The fitted values at their rows: the prediction of the regression at the
-        # missing values, where there is no residual
+        # missing values, where there is no residual. Fitted to the non-zero values
+        # only, it is the regression of the sizes of an occurrence model, as R
+        fitted_rows = observed.copy()
+        if len(alm.fitted_values_) < np.sum(observed):
+            fitted_rows &= y_in_sample != 0
         fitted = np.full(n, np.nan)
-        fitted[observed] = np.asarray(alm.fitted_values_, dtype=float)
-        if not np.all(observed):
-            X_gaps = _validate_x(X, n)[1][~observed]
+        fitted[fitted_rows] = np.asarray(alm.fitted_values_, dtype=float)
+        if not np.all(fitted_rows):
+            X_gaps = _validate_x(X, n)[1][~fitted_rows]
             if alm._feature_names is not None:
                 names_all = _validate_x(X, n)[3] or [
                     f"x{i + 1}" for i in range(X_gaps.shape[1])
                 ]
                 X_gaps = X_gaps[:, [names_all.index(nm) for nm in alm._feature_names]]
-            fitted[~observed] = np.ravel(
+            fitted[~fitted_rows] = np.ravel(
                 alm.predict(
                     np.column_stack([np.ones(len(X_gaps)), X_gaps]), interval="none"
                 ).mean
@@ -4221,20 +4243,47 @@ class ADAM:
             "loss": "likelihood",
             "h": getattr(self, "h", 0),
             "holdout": getattr(self, "holdout", False),
+            "ic": self.ic,
+            "bounds": self.bounds,
         }
+        residuals = y_in_sample - fitted
+        loglik = float(alm.loglik)
+        n_param = int(alm.nparam)
+        # The occurrence model of the sizes, fitted as R's adam() does: the fitted
+        # values are the sizes times the probability, the residuals at the zeros are
+        # zero, and the likelihood and the parameters include the occurrence's
+        self._om_model = None
+        if not np.all(fitted_rows == observed):
+            self._occurrence = {"occurrence": self.occurrence}
+            self._lags_model = {"lags": [1]}
+            self._initials = {"initial_type": "optimal"}
+            self._om_model = (
+                self.occurrence
+                if not isinstance(self.occurrence, str)
+                else self._fit_occurrence_model(y, X)
+            )
+            p_fitted = np.ravel(np.asarray(self._om_model.fitted, dtype=float))
+            residuals[observed & ~fitted_rows] = 0.0
+            fitted = fitted * p_fitted
+            nonzero = y_in_sample[observed] != 0
+            p_observed = p_fitted[observed]
+            loglik += float(
+                np.sum(np.log(np.where(nonzero, p_observed, 1 - p_observed)))
+            )
+            n_param += int(self._om_model.nparam)
         self._prepared = {
             "y_fitted": fitted,
-            "residuals": y_in_sample - fitted,
+            "residuals": residuals,
             # ALM stores the scale as ADAM does (sigma^2 for dnorm and dlnorm)
             "scale": float(alm.scale),
         }
         self._adam_estimated = {
             "B": np.asarray(alm.coefficients),
-            "n_param_estimated": int(alm.nparam),
+            "n_param_estimated": n_param,
             "log_lik_adam_value": {
-                "value": float(alm.loglik),
+                "value": loglik,
                 "nobs": int(np.sum(observed)),
-                "df": int(alm.nparam),
+                "df": n_param,
             },
         }
         self.model = "Regression"
@@ -4259,12 +4308,35 @@ class ADAM:
         level = 0.95 if level is None else level
         bound_low, bound_up = ensure_level_format(level, side)
         levels = bound_up - bound_low
+        X_alm = np.column_stack([np.ones(h), X_new])
         result = alm.predict(
-            np.column_stack([np.ones(h), X_new]),
-            interval=alm_interval,
-            level=list(levels),
-            side=side,
+            X_alm, interval=alm_interval, level=list(levels), side=side
         )
+        # With an occurrence model, the mean of the sizes times the probability, and
+        # the interval of the sizes with the level (level-(1-p))/p, as R
+        om_model = getattr(self, "_om_model", None)
+        if om_model is not None:
+            p = np.asarray(om_model.predict(h=h, X=X).mean, dtype=float)
+            result.mean = np.ravel(result.mean) * p
+            if interval == "confidence":
+                result.lower = np.asarray(result.lower, dtype=float) * p[:, None]
+                result.upper = np.asarray(result.upper, dtype=float) * p[:, None]
+            elif interval != "none":
+                # The bound of a one-sided interval that ALM leaves out stays NaN
+                mixture_lower = np.full((h, len(levels)), np.nan)
+                mixture_upper = np.full((h, len(levels)), np.nan)
+                for k, coverage in enumerate(levels):
+                    sizes = np.maximum((coverage - (1 - p)) / p, 0)
+                    unique = np.unique(sizes)
+                    bounds = alm.predict(
+                        X_alm, interval="prediction", level=list(unique), side=side
+                    )
+                    cells = (np.arange(h), np.searchsorted(unique, sizes))
+                    if side != "upper":
+                        mixture_lower[:, k] = np.reshape(bounds.lower, (h, -1))[cells]
+                    if side != "lower":
+                        mixture_upper[:, k] = np.reshape(bounds.upper, (h, -1))[cells]
+                result.lower, result.upper = mixture_lower, mixture_upper
 
         n = len(self._observations["y_in_sample"])
         index = pd.RangeIndex(n, n + h)

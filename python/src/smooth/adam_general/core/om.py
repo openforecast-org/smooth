@@ -1585,6 +1585,10 @@ class OM(ADAM):
                 "Intervals on the probability scale are not implemented for OM "
                 "models; returning point forecasts only."
             )
+        # A pure regression is the ALM of the probability, forecast as it is, as R
+        if getattr(self, "_alm_model", None) is not None:
+            self._general["h"] = h
+            return self._predict_regression(X, "none", level, side)
         return self._om_forecast(h, X_future=X)
 
     # ------------------------------------------------------------------

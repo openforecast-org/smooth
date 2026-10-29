@@ -1811,3 +1811,87 @@ test_that("three observations or fewer fix the persistence and then the initial"
     expect_warning(testModel <- adam(0, "ANN"), "used Naive");
     expect_equal(unname(testModel$initial$level), 0);
 })
+
+#### The regressors: the missing values, the provided initials and the occurrence ####
+set.seed(41);
+xregX1 <- rnorm(60, 10, 2);
+xregX2 <- rnorm(60, 5, 1);
+xregData <- data.frame(y=50 + 2*xregX1 - 3*xregX2 + cumsum(rnorm(60)), x1=xregX1, x2=xregX2);
+
+test_that("a missing value of a regressor is the first observed value, whatever the way", {
+    xregMissing <- xregFilled <- xregData;
+    xregMissing$x1[5] <- NA;
+    xregFilled$x1[5] <- xregData$x1[1];
+    for(arguments in list(list(model="ANN"), list(model="ANN", regressors="select"),
+                          list(model="ANN", regressors="adapt"), list(model="NNN"),
+                          list(model="ANN", initial=list(xreg=c(x1=2, x2=-3))))){
+        label <- paste(unlist(arguments), collapse=" ");
+        expect_warning(testModel <- do.call(adam, c(list(xregMissing), arguments)),
+                       "Some variables contained NAs", label=label);
+        expect_equal(logLik(testModel), logLik(do.call(adam, c(list(xregFilled), arguments))),
+                     label=label);
+    }
+    # A matrix as a data frame
+    expect_warning(testModel <- adam(as.matrix(xregMissing), "ANN"), "Some variables contained NAs");
+    expect_equal(logLik(testModel), logLik(adam(xregFilled, "ANN")));
+})
+
+test_that("the initials provided for some regressors are kept, the others estimated", {
+    testModel <- adam(xregData, "ANN", initial=list(xreg=c(x1=2)));
+    expect_equal(unname(testModel$initial$xreg["x1"]), 2);
+    expect_false(testModel$initial$xreg["x2"]==0);
+    expect_equal(testModel$nParam[2,2], 1);
+    expect_equal(nparam(testModel), nparam(adam(xregData, "ANN"))-1);
+    # Unnamed values are in the order of the variables
+    expect_equal(testModel$initial$xreg, adam(xregData, "ANN", initial=list(xreg=2))$initial$xreg);
+    # All of them provided
+    testModel <- adam(xregData, "ANN", initial=list(xreg=c(x1=2, x2=-3)));
+    expect_equal(unname(testModel$initial$xreg), c(2, -3));
+    expect_equal(testModel$nParam[2,2], 2);
+})
+
+test_that("a regression with an occurrence model fits the sizes to the non-zero values", {
+    set.seed(2);
+    xregIntermittent <- transform(xregData, y=y*rbinom(60, 1, 0.7));
+    nonZero <- xregIntermittent$y!=0;
+    testModel <- adam(xregIntermittent, "NNN", occurrence="fixed");
+    sizes <- greybox::alm(y~x1+x2, data=xregIntermittent[nonZero,]);
+    occurrenceModel <- om(xregIntermittent$y, occurrence="fixed");
+    expect_equal(coef(testModel), coef(sizes));
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(sizes)+logLik(occurrenceModel)));
+    expect_equal(testModel$nParam[1,3], 1);
+    # The fitted values are the sizes times the probability, the residuals are zero at the zeros
+    expect_equal(as.vector(fitted(testModel))[nonZero], fitted(sizes)*mean(nonZero),
+                 ignore_attr=TRUE);
+    expect_true(all(residuals(testModel)[!nonZero]==0));
+    # The forecast: the sizes times the probability, and the interval of the sizes with the
+    # level (level-(1-p))/p, as forecast.adam()
+    testForecast <- forecast(testModel, h=3, newdata=xregIntermittent[1:3,], interval="prediction");
+    sizesForecast <- forecast(sizes, h=3, newdata=xregIntermittent[1:3,], interval="prediction",
+                              level=(0.95-(1-mean(nonZero)))/mean(nonZero));
+    expect_equal(as.vector(testForecast$mean), as.vector(sizesForecast$mean)*mean(nonZero));
+    expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper));
+    # The same with the selection of the regressors and with a fitted om()
+    expect_equal(logLik(adam(xregIntermittent, "NNN", occurrence="fixed", regressors="select")),
+                 logLik(testModel));
+    expect_equal(logLik(adam(xregIntermittent, "NNN", occurrence=occurrenceModel)), logLik(testModel));
+})
+
+test_that("the regressors that cannot be used are dealt with", {
+    expect_warning(adam(xregData, "ANN", regressors="select", initial=list(xreg=c(x1=2, x2=-3))),
+                   "Variables selection does not work with the provided initials");
+    expect_warning(adam(xregData, "ANN", regressors="select", persistence=list(xreg=c(0.1,0.1))),
+                   "cannot do variables selection with the provided smoothing parameters");
+    expect_warning(testModel <- adam(xregData, "ANN", regressors="adapt", persistence=list(xreg=c(0.1,0.1,0.1))),
+                   "length of the provided persistence for the xreg variables is wrong");
+    expect_equal(testModel$model, "ETSX(ANN){D}");
+    expect_warning(testModel <- adam(data.frame(y=xregData$y, x=1), "ANN"),
+                   "did not have any variability");
+    expect_equal(testModel$model, "ETS(ANN)");
+    expect_warning(testModel <- adam(data.frame(xregData, z=rep(c("a","b"), 30)), "ANN"),
+                   "character variables");
+    expect_true("zb" %in% names(testModel$initial$xreg));
+    # Special characters in the names of the variables
+    testModel <- adam(setNames(xregData, c("y","x 1","x-2")), "ANN");
+    expect_equal(names(testModel$initial$xreg), c("x.1","x.2"));
+})

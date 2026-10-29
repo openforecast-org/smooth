@@ -166,6 +166,10 @@ Bugfixes:
 * `msdecompose(smoother="ma")` on a sample shorter than two seasonal cycles switches to LOWESS with a warning, as R.
 * With one or two non-zero observations, `ADAM` takes the level from the values of the occurrence (it took the mean with the zeros), and `OM` counts all the observed values in the sample-size check, as R: `OM(occurrence="odds-ratio")` (and `"inverse-odds-ratio"`, `"direct"`) on two demands among eight observations had the probability 0.9975 and the log-likelihood -36.02 instead of 0.25 and -4.50.
 * `ADAM.fit()` and the other models failed on a list: its `index()` method was taken for an index of time.
+* `ADAM` with a missing value in a regressor of `X` fitted nothing (log-likelihood -1e300): it is the first observed value, with R's warning.
+* `ADAM` takes the initials provided for some of the regressors (`initial={"xreg": {"x1": 2.0}}`, or fewer values than regressors, in their order) and estimates the others, as R: it raised a `ValueError`. The starting values of the estimated ones are their rows of the states (they were the first rows, which only coincide when all of them are estimated), the provided ones are counted as provided, and the initial is `"provided"` only if another block of initials is, with R's two iterations of backcasting otherwise.
+* `ADAM(model="NNN", occurrence=...)`, a regression with an occurrence model, fits the sizes to the non-zero values and the occurrence model, as R (see the R `NEWS`): it fitted the zeros as values and ignored the occurrence.
+* `OM(model="NNN").predict()`, a regression of the occurrence, failed with a `KeyError`: it is the forecast of the probability by its `ALM`, as R.
 
 
 ## v1.1.1 (unreleased)

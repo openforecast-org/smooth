@@ -95,8 +95,10 @@ oesg <- function(y, modelA="MNN", modelB=modelA,
     } else {
         data <- y;
     }
-    formulaA <- if(!is.null(colsA)) as.formula(paste("~", paste(colsA, collapse="+"))) else NULL;
-    formulaB <- if(!is.null(colsB)) as.formula(paste("~", paste(colsB, collapse="+"))) else NULL;
+    # The formulae of adam() and omg() name the response; a model without its regressors
+    # gets y~1, as the data has the columns of the other one
+    formulaA <- as.formula(paste("y ~", if(is.null(colsA)) 1 else paste(colsA, collapse="+")));
+    formulaB <- as.formula(paste("y ~", if(is.null(colsB)) 1 else paste(colsB, collapse="+")));
 
     ourModel <- omg(data=data, modelA=modelA, modelB=modelB, lags=lags,
                     ordersA=list(ar=0, i=0, ma=0, select=FALSE),

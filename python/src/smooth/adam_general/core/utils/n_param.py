@@ -349,8 +349,12 @@ def count_xreg_params(explanatory_checked: Dict) -> tuple:
 
     if explanatory_checked.get("xreg_model", False):
         n_xreg = explanatory_checked.get("xreg_number", 0)
+        # The regressors whose initials are provided while the others are estimated
+        flags = explanatory_checked.get("xreg_parameters_estimated")
+        n_xreg_estimated = n_xreg if flags is None else min(int(sum(flags)), n_xreg)
         if explanatory_checked.get("xreg_estimate", True):
-            n_estimated += n_xreg
+            n_estimated += n_xreg_estimated
+            n_provided += n_xreg - n_xreg_estimated
         else:
             n_provided += n_xreg
 

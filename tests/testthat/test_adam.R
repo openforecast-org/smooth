@@ -1573,3 +1573,341 @@ test_that("adam() with the provided occurrence or probabilities of occurrence", 
     expect_equal(as.vector(fitted(testModel))[!nonzero], rep(0, sum(!nonzero)));
     expect_warning(adam(y, "MNN", occurrence=probabilities, h=5), "horizon is not provided");
 })
+
+#### Printing and plotting ####
+set.seed(41);
+xregData <- data.frame(y=rnorm(100, 100, 5), x1=rnorm(100));
+xregData$y <- xregData$y + 3*xregData$x1;
+set.seed(7);
+yIntermittent <- ts(exp(2 + rnorm(120, 0, 0.3)) * rbinom(120, 1, 0.7), frequency=12);
+printModels <- list(ets=adam(BJsales, "AAdN", h=10, holdout=TRUE),
+                    arima=adam(AirPassengers, "NNN", lags=c(1,12),
+                               orders=list(ar=c(1,0), i=c(1,1), ma=c(1,1))),
+                    xreg=adam(xregData, "ANN", regressors="use"),
+                    occurrence=adam(yIntermittent, "MNN", occurrence="fixed"),
+                    combined=adam(BJsales, "CCN", h=10, holdout=TRUE));
+
+test_that("print() of adam() shows the model, its parameters and its holdout errors", {
+    testModel <- printModels$ets;
+    printed <- paste(capture.output(print(testModel)), collapse="\n");
+    expect_match(printed, "Model estimated using adam() function: ETS(AAdN)", fixed=TRUE);
+    expect_match(printed, paste(format(round(testModel$persistence, 4)), collapse=" +"));
+    expect_match(printed, paste0("Damping parameter: ", round(testModel$phi, 4)), fixed=TRUE);
+    expect_match(printed, "Sample size: 140", fixed=TRUE);
+    expect_match(printed, paste0("ME: ", round(testModel$accuracy["ME"], 3), "; MAE: ",
+                                 round(testModel$accuracy["MAE"], 3)), fixed=TRUE);
+    # ARIMA: the AR and MA parameters by lag
+    printed <- paste(capture.output(print(printModels$arima)), collapse="\n");
+    expect_match(printed, "SARIMA(1,1,1)[1](0,1,1)[12]", fixed=TRUE);
+    for(value in round(unlist(printModels$arima$arma), 4)){
+        expect_match(printed, format(value), fixed=TRUE);
+    }
+    expect_match(paste(capture.output(print(printModels$xreg)), collapse="\n"),
+                 "ETSX(ANN)", fixed=TRUE);
+    printed <- paste(capture.output(print(printModels$occurrence)), collapse="\n");
+    expect_match(printed, "iETS(MNN)[F]", fixed=TRUE);
+    expect_match(printed, "Occurrence model type: Fixed probability", fixed=TRUE);
+    expect_match(printed, "Mixture of Bernoulli and Gamma", fixed=TRUE);
+})
+
+test_that("print() of a combination of adam() models shows the combination", {
+    testModel <- printModels$combined;
+    printed <- paste(capture.output(print(testModel)), collapse="\n");
+    expect_match(printed, "Model estimated: ETS(CCN)", fixed=TRUE);
+    expect_match(printed, paste0("Number of models combined: ", length(testModel$models)), fixed=TRUE);
+    expect_match(printed, "Sample size: 140", fixed=TRUE);
+    expect_match(printed, "Forecast errors:", fixed=TRUE);
+})
+
+test_that("summary() of adam() prints the estimates and the scale", {
+    testModel <- printModels$ets;
+    printed <- paste(capture.output(print(summary(testModel))), collapse="\n");
+    expect_match(printed, "ETS(AAdN)", fixed=TRUE);
+    for(value in round(coef(testModel)[c("alpha","beta","phi")], 4)){
+        expect_match(printed, format(value), fixed=TRUE);
+    }
+    expect_match(printed, paste0("Error standard deviation: ", round(sigma(testModel), 4)), fixed=TRUE);
+})
+
+test_that("plot() of adam() draws each of its plots", {
+    for(modelName in c("ets", "arima", "xreg", "occurrence")){
+        for(i in 1:16){
+            pdf(NULL);
+            dev.control("enable");
+            plot(printModels[[modelName]], which=i);
+            expect_gt(length(recordPlot()[[1]]), 0, label=paste(modelName, "plot", i));
+            dev.off();
+        }
+    }
+    pdf(NULL);
+    dev.control("enable");
+    plot(printModels$ets, which=c(1,2,3,7), legend=TRUE, lowess=FALSE, level=0.9);
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+    # A combination has no states of its own
+    for(i in setdiff(1:16, c(6,12))){
+        pdf(NULL);
+        dev.control("enable");
+        plot(printModels$combined, which=i);
+        expect_gt(length(recordPlot()[[1]]), 0, label=paste("combined plot", i));
+        dev.off();
+    }
+    pdf(NULL);
+    expect_message(plot(printModels$combined, which=12), "nothing to plot");
+    # The Q-Q plot of a combination said nothing and drew nothing
+    expect_message(plot(printModels$combined, which=6), "nothing to plot");
+    dev.off();
+})
+
+test_that("forecast() of a combination is the forecast of its models weighted by IC", {
+    testModel <- printModels$combined;
+    weights <- testModel$ICw;
+    weights[weights<1e-2] <- 0;
+    weights <- weights / sum(weights);
+    testForecast <- forecast(testModel, h=5, interval="prediction");
+    expect_equal(as.vector(testForecast$mean),
+                 Reduce(`+`, Map(function(model, weight){
+                     return(as.vector(forecast(model, h=5)$mean)*weight);
+                 }, testModel$models, weights)));
+    expect_true(all(testForecast$lower < testForecast$mean & testForecast$mean < testForecast$upper));
+    # The forecast of the combination of the occurrence models
+    testModel <- om(yIntermittent, occurrence="odds-ratio", model="CCN");
+    weights <- testModel$ICw;
+    weights[weights<1e-2] <- 0;
+    weights <- weights / sum(weights);
+    expect_equal(as.vector(forecast(testModel, h=5)$mean),
+                 Reduce(`+`, Map(function(model, weight){
+                     return(as.vector(forecast(model, h=5)$mean)*weight);
+                 }, testModel$models, weights)));
+})
+
+test_that("print() and plot() of the forecasts of adam()", {
+    testForecast <- forecast(printModels$ets, h=5, interval="prediction");
+    printed <- capture.output(print(testForecast));
+    expect_true(any(grepl("Point forecast +Lower bound \\(2.5%\\) +Upper bound \\(97.5%\\)", printed)));
+    expect_true(any(grepl(format(round(testForecast$mean[1], 4), nsmall=4), printed, fixed=TRUE)));
+    printed <- capture.output(print(forecast(printModels$ets, h=2, interval="prediction",
+                                             side="upper", level=0.9)));
+    expect_true(any(grepl("Point forecast +Upper bound \\(90%\\)", printed)));
+    printed <- capture.output(print(forecast(printModels$ets, h=2, interval="prediction",
+                                             side="lower", level=c(0.8,0.9))));
+    expect_true(any(grepl("Lower bound \\(20%\\) +Lower bound \\(10%\\)", printed)));
+    printed <- capture.output(print(forecast(printModels$ets, h=2)));
+    expect_false(any(grepl("bound", printed)));
+    for(modelName in c("ets", "occurrence", "combined")){
+        pdf(NULL);
+        dev.control("enable");
+        plot(forecast(printModels[[modelName]], h=10, interval="prediction"));
+        expect_gt(length(recordPlot()[[1]]), 0, label=paste(modelName, "forecast plot"));
+        dev.off();
+    }
+})
+
+test_that("print() of the forecast of msdecompose() shows its intervals", {
+    testForecast <- forecast(msdecompose(AirPassengers, lags=12), h=3, interval="parametric");
+    printed <- capture.output(print(testForecast));
+    expect_true(any(grepl("Point forecast +Lower bound \\(2.5%\\) +Upper bound \\(97.5%\\)", printed)));
+    expect_true(any(grepl(format(round(testForecast$upper[1], 4), nsmall=4), printed, fixed=TRUE)));
+})
+
+test_that("reapply() of adam() and of a combination, and their plots", {
+    set.seed(1);
+    testReapply <- reapply(printModels$combined, nsim=20);
+    expect_s3_class(testReapply, "reapplyCombined");
+    # The models with a weight of at least 0.01, with their weights renormalised
+    weights <- printModels$combined$ICw[printModels$combined$ICw>=1e-2];
+    expect_equal(testReapply$ICw, weights / sum(weights));
+    expect_equal(names(testReapply$refitted), names(weights));
+    for(refitted in testReapply$refitted){
+        expect_equal(dim(refitted), c(nobs(printModels$combined), 20));
+    }
+    pdf(NULL);
+    dev.control("enable");
+    plot(testReapply);
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+    testReapply <- reapply(printModels$ets, nsim=20);
+    expect_equal(dim(testReapply$refitted), c(nobs(printModels$ets), 20));
+    pdf(NULL);
+    dev.control("enable");
+    plot(testReapply);
+    expect_gt(length(recordPlot()[[1]]), 0);
+    dev.off();
+})
+
+#### The sample-size check: the models that fit on small samples ####
+test_that("ETS with ARIMA on a small sample drops the ARIMA", {
+    expect_warning(testModel <- adam(AirPassengers[1:10], "AAN", orders=list(ar=2,i=1,ma=2),
+                                     initial="optimal"),
+                   "enough observations to fit ETS with ARIMA");
+    expect_equal(testModel$model, "ETS(AAN)");
+})
+
+test_that("ARIMA on a small sample switches to backcasting or to ARIMA(0,1,1)", {
+    expect_warning(testModel <- adam(AirPassengers[1:7], "NNN", orders=list(ar=2,i=1,ma=2),
+                                     initial="optimal"),
+                   "Switching initial to 'backcasting'");
+    expect_equal(testModel$initialType, "complete");
+    expect_warning(testModel <- adam(AirPassengers[1:5], "NNN", orders=list(ar=3,i=2,ma=3),
+                                     initial="optimal"),
+                   "Switching to ARIMA\\(0,1,1\\)");
+    expect_equal(orders(testModel), list(ar=0, i=1, ma=1));
+})
+
+test_that("a small sample restricts the pool to the models it can fit", {
+    expect_warning(testModel <- adam(AirPassengers[1:6], "ZZZ", initial="optimal"),
+                   "Fitting what I can");
+    # Six observations fit the level and the undamped trend models, not the damped ones
+    expect_true(all(nchar(names(testModel$ICs))==3));
+    expect_warning(testModel <- adam(AirPassengers[1:6], c("ANN","AAN","AAdN","MMdN"),
+                                     initial="optimal"),
+                   "Fitting what I can");
+    expect_setequal(names(testModel$ICs), c("ANN","AAN"));
+})
+
+test_that("an estimated model loses its damping and then its trend as the sample shrinks", {
+    # Only the steps that apply to the model warn
+    caught <- capture_warnings(testModel <- adam(AirPassengers[1:6], "AAdN", initial="optimal"));
+    expect_equal(modelType(testModel), "AAN");
+    expect_length(grep("Fitting what I can", caught), 1);
+    caught <- capture_warnings(testModel <- adam(AirPassengers[1:5], "AAdN", initial="optimal"));
+    expect_equal(modelType(testModel), "ANN");
+    expect_length(grep("Fitting what I can", caught), 2);
+})
+
+test_that("a seasonal model on less than two seasons drops the trend and uses LOWESS", {
+    caught <- capture_warnings(testModel <- adam(AirPassengers[1:14], "AAA", lags=12,
+                                                    initial="optimal"));
+    expect_equal(modelType(testModel), "ANA");
+    expect_true(any(grepl("Switching smoother to LOWESS", caught)));
+})
+
+test_that("four observations with a regressor fit and name the level model", {
+    expect_no_warning(testModel <- adam(data.frame(y=AirPassengers[1:4], x=c(1,3,2,5)), "AAN",
+                                        initial="optimal"));
+    expect_equal(modelType(testModel), "ANN");
+    expect_equal(testModel$model, "ETSX(ANN)");
+    expect_warning(testModel <- adam(data.frame(y=AirPassengers[1:4], x=c(1,3,2,5)), "ZZN",
+                                     initial="optimal"),
+                   "only available model is level model");
+    expect_true(modelType(testModel) %in% c("ANN","MNN"));
+})
+
+test_that("three observations or fewer fix the persistence and then the initial", {
+    expect_warning(testModel <- adam(AirPassengers[1:3], "ANN", initial="optimal"),
+                   "persistence value was set to zero");
+    expect_equal(unname(testModel$persistence), 0);
+    expect_warning(testModel <- adam(AirPassengers[1:2], "ANN"),
+                   "initial was preset");
+    expect_equal(testModel$initialType, "provided");
+    expect_equal(unname(testModel$initial$level), mean(AirPassengers[1:2]));
+    # With an occurrence, the level of the demand sizes: the mean of the non-zero values
+    expect_warning(testModel <- adam(c(0,0,5,0,7,0,0,0), "ANN", occurrence="fixed"),
+                   "initial was preset");
+    expect_equal(unname(testModel$initial$level), 6);
+    expect_warning(testModel <- adam(AirPassengers[1], "ANN"), "used Naive");
+    expect_equal(unname(testModel$initial$level), AirPassengers[1]);
+    # A single zero is the Naive of zero
+    expect_warning(testModel <- adam(0, "ANN"), "used Naive");
+    expect_equal(unname(testModel$initial$level), 0);
+})
+
+#### The regressors: the missing values, the provided initials and the occurrence ####
+set.seed(41);
+xregX1 <- rnorm(60, 10, 2);
+xregX2 <- rnorm(60, 5, 1);
+xregData <- data.frame(y=50 + 2*xregX1 - 3*xregX2 + cumsum(rnorm(60)), x1=xregX1, x2=xregX2);
+
+test_that("a missing value of a regressor is the first observed value, whatever the way", {
+    xregMissing <- xregFilled <- xregData;
+    xregMissing$x1[5] <- NA;
+    xregFilled$x1[5] <- xregData$x1[1];
+    for(arguments in list(list(model="ANN"), list(model="ANN", regressors="select"),
+                          list(model="ANN", regressors="adapt"), list(model="NNN"),
+                          list(model="ANN", initial=list(xreg=c(x1=2, x2=-3))))){
+        label <- paste(unlist(arguments), collapse=" ");
+        expect_warning(testModel <- do.call(adam, c(list(xregMissing), arguments)),
+                       "Some variables contained NAs", label=label);
+        expect_equal(logLik(testModel), logLik(do.call(adam, c(list(xregFilled), arguments))),
+                     label=label);
+    }
+    # A matrix as a data frame
+    expect_warning(testModel <- adam(as.matrix(xregMissing), "ANN"), "Some variables contained NAs");
+    expect_equal(logLik(testModel), logLik(adam(xregFilled, "ANN")));
+})
+
+test_that("the initials provided for some regressors are kept, the others estimated", {
+    testModel <- adam(xregData, "ANN", initial=list(xreg=c(x1=2)));
+    expect_equal(unname(testModel$initial$xreg["x1"]), 2);
+    expect_false(testModel$initial$xreg["x2"]==0);
+    expect_equal(testModel$nParam[2,2], 1);
+    expect_equal(nparam(testModel), nparam(adam(xregData, "ANN"))-1);
+    # Unnamed values are in the order of the variables
+    expect_equal(testModel$initial$xreg, adam(xregData, "ANN", initial=list(xreg=2))$initial$xreg);
+    # All of them provided
+    testModel <- adam(xregData, "ANN", initial=list(xreg=c(x1=2, x2=-3)));
+    expect_equal(unname(testModel$initial$xreg), c(2, -3));
+    expect_equal(testModel$nParam[2,2], 2);
+})
+
+test_that("a regression with an occurrence model fits the sizes to the non-zero values", {
+    set.seed(2);
+    xregIntermittent <- transform(xregData, y=y*rbinom(60, 1, 0.7));
+    nonZero <- xregIntermittent$y!=0;
+    testModel <- adam(xregIntermittent, "NNN", occurrence="fixed");
+    sizes <- greybox::alm(y~x1+x2, data=xregIntermittent[nonZero,]);
+    occurrenceModel <- om(xregIntermittent$y, occurrence="fixed");
+    expect_equal(coef(testModel), coef(sizes));
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(sizes)+logLik(occurrenceModel)));
+    expect_equal(testModel$nParam[1,3], 1);
+    # The fitted values are the sizes times the probability, the residuals are zero at the zeros
+    expect_equal(as.vector(fitted(testModel))[nonZero], fitted(sizes)*mean(nonZero),
+                 ignore_attr=TRUE);
+    expect_true(all(residuals(testModel)[!nonZero]==0));
+    # The forecast: the sizes times the probability, and the interval of the sizes with the
+    # level (level-(1-p))/p, as forecast.adam()
+    testForecast <- forecast(testModel, h=3, newdata=xregIntermittent[1:3,], interval="prediction");
+    sizesForecast <- forecast(sizes, h=3, newdata=xregIntermittent[1:3,], interval="prediction",
+                              level=(0.95-(1-mean(nonZero)))/mean(nonZero));
+    expect_equal(as.vector(testForecast$mean), as.vector(sizesForecast$mean)*mean(nonZero));
+    expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper));
+    # The same with the selection of the regressors and with a fitted om()
+    expect_equal(logLik(adam(xregIntermittent, "NNN", occurrence="fixed", regressors="select")),
+                 logLik(testModel));
+    expect_equal(logLik(adam(xregIntermittent, "NNN", occurrence=occurrenceModel)), logLik(testModel));
+})
+
+test_that("the regressors that cannot be used are dealt with", {
+    expect_warning(adam(xregData, "ANN", regressors="select", initial=list(xreg=c(x1=2, x2=-3))),
+                   "Variables selection does not work with the provided initials");
+    expect_warning(adam(xregData, "ANN", regressors="select", persistence=list(xreg=c(0.1,0.1))),
+                   "cannot do variables selection with the provided smoothing parameters");
+    expect_warning(testModel <- adam(xregData, "ANN", regressors="adapt", persistence=list(xreg=c(0.1,0.1,0.1))),
+                   "length of the provided persistence for the xreg variables is wrong");
+    expect_equal(testModel$model, "ETSX(ANN){D}");
+    expect_warning(testModel <- adam(data.frame(y=xregData$y, x=1), "ANN"),
+                   "did not have any variability");
+    expect_equal(testModel$model, "ETS(ANN)");
+    # A character variable is a factor, with all its levels
+    xregCharacter <- data.frame(xregData, z=rep(c("a","b","c"), 20));
+    expect_warning(testModel <- adam(xregCharacter, "ANN"), "character variables");
+    expect_equal(names(testModel$initial$xreg), c("x1","x2","za","zb","zc"));
+    xregFactor <- transform(xregCharacter, z=factor(z));
+    expect_equal(logLik(testModel), logLik(adam(xregFactor, "ANN")));
+    expect_equal(logLik(suppressWarnings(adam(xregCharacter, "ANN", regressors="select"))),
+                 logLik(adam(xregFactor, "ANN", regressors="select")));
+    # Special characters in the names of the variables
+    testModel <- adam(setNames(xregData, c("y","x 1","x-2")), "ANN");
+    expect_equal(names(testModel$initial$xreg), c("x.1","x.2"));
+})
+
+test_that("the selection of the regressors expands the factors with or without a formula", {
+    set.seed(41);
+    xregZ <- rep(c("a","b","c"), 20);
+    xregFactor <- data.frame(y=50 + 2*xregData$x1 + c(a=0,b=5,c=-4)[xregZ] + cumsum(rnorm(60)),
+                             x1=xregData$x1, x2=rnorm(60), z=factor(xregZ));
+    testModel <- adam(xregFactor, "ANN", regressors="select");
+    expect_true(all(c("x1","za","zb","zc") %in% names(testModel$initial$xreg)));
+    expect_equal(logLik(testModel),
+                 logLik(adam(xregFactor, "ANN", regressors="select", formula=y~x1+x2+z)));
+})

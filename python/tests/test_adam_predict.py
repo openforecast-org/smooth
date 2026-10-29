@@ -736,3 +736,72 @@ def test_the_forecast_continues_the_dates_of_the_index(index, start):
     assert list(model.fitted.index) == list(index)
     assert forecast.mean.index[0] == start
     assert list(forecast.upper.index) == list(forecast.mean.index)
+
+
+# ---------------------------------------------------------------------------
+# LASSO / RIDGE with lambda=1: the parameters at their shrinkage targets
+# ---------------------------------------------------------------------------
+
+_SHRINKAGE_Y = np.round(
+    100 + np.cumsum(np.sin(np.arange(1, 41) / 3) + (np.arange(1, 41) % 5) / 5), 3
+)
+
+
+# R: y <- round(100 + cumsum(sin(1:40/3) + (1:40 %% 5)/5), 3);
+# adam(y, model, orders=orders, loss=loss, lambda=1, h=3): persistence,
+# forecast(h=3)$mean (the same for "LASSO" and "RIDGE")
+@pytest.mark.parametrize("loss", ["LASSO", "RIDGE"])
+@pytest.mark.parametrize(
+    "model, orders, persistence, mean",
+    [
+        ("AAdN", None, [0, 0], [118.474385, 118.836839, 119.199293]),
+        ("NNN", {"ar": 1, "i": 1, "ma": 1}, [2, -1], [117.873, 118.567, 119.261]),
+        ("ANN", {"ar": 1, "i": 0, "ma": 1}, [0, 1], [117.179, 117.179, 117.179]),
+    ],
+)
+def test_lasso_ridge_with_lambda_one_use_the_shrinkage_targets(
+    loss, model, orders, persistence, mean
+):
+    """With lambda=1 the loss is the penalty alone, so no smoothing, phi=1, AR=1 and
+    MA=0, as in R."""
+    kwargs = {"orders": orders} if orders else {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fitted = ADAM(model=model, loss=loss, lambda_param=1, **kwargs).fit(
+            _SHRINKAGE_Y
+        )
+        forecast = fitted.predict(h=3)
+    np.testing.assert_allclose(list(fitted.persistence_vector.values()), persistence)
+    if model == "AAdN":
+        assert fitted.phi_ == 1
+    np.testing.assert_allclose(forecast.mean.values, mean, rtol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# The index of the fitted values and of the forecasts
+# ---------------------------------------------------------------------------
+
+
+def test_the_fitted_and_forecast_follow_a_datetime_index():
+    """A monthly series keeps its dates, and the forecasts continue them."""
+    index = pd.date_range("2020-01-01", periods=48, freq="MS")
+    y = pd.Series(_make_simple()[:48], index=index)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fitted = ADAM(model="ANN").fit(y)
+        forecast = fitted.predict(h=3)
+    assert fitted.fitted.index.equals(index)
+    assert forecast.mean.index.equals(
+        pd.date_range("2024-01-01", periods=3, freq="MS")
+    )
+
+
+def test_the_forecast_continues_an_integer_index():
+    """A series indexed by years forecasts the years after its end."""
+    y = pd.Series(_make_simple()[:48], index=pd.RangeIndex(1970, 2018))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fitted = ADAM(model="ANN").fit(y)
+        forecast = fitted.predict(h=3)
+    assert list(fitted.fitted.index[:2]) == [1970, 1971]
+    assert list(forecast.mean.index) == [2018, 2019, 2020]

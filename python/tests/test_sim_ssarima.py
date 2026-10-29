@@ -8,6 +8,8 @@ the callable-randomizer pass-through, ``constant=...`` flag, and the
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -173,3 +175,54 @@ def test_sim_ssarima_has_the_true_likelihood():
     errors = np.asarray(drawn.residuals, dtype=float)
     expected = -50 / 2 * (np.log(2 * np.pi * np.e) + np.log(np.mean(errors**2)))
     assert float(np.ravel(drawn.log_lik)[0]) == pytest.approx(expected, rel=1e-12)
+
+
+@pytest.mark.parametrize("bounds, stable", [("admissible", True), ("none", False)])
+def test_sim_ssarima_draws_stationary_and_invertible_arma(bounds, stable):
+    """With the admissible bounds the drawn AR polynomial 1 - phi(B) is stationary
+    and the MA polynomial 1 + theta(B) invertible, as R's elementsGenerator()
+    draws them; without the bounds some draws are not."""
+    s = sim_ssarima(
+        orders={"ar": [2], "i": [0], "ma": [2]},
+        lags=[1],
+        obs=30,
+        nsim=50,
+        bounds=bounds,
+        seed=7,
+    )
+    ar = np.asarray(s.arma["ar"])
+    ma = np.asarray(s.arma["ma"])
+    moduli = [
+        np.abs(np.roots(np.r_[1.0, sign * coefficients[:, k]][::-1])).min()
+        for coefficients, sign in ((ar, -1.0), (ma, 1.0))
+        for k in range(50)
+    ]
+    assert (min(moduli) > 1) == stable
+
+
+def test_sim_ssarima_prints_the_arma_parameters():
+    """print() of one series lists the drawn AR and MA parameters, rounded to four
+    digits, and the constant, as R's print.smooth.sim()."""
+    drawn = sim_ssarima(
+        orders={"ar": [2], "i": [0], "ma": [2]}, lags=[1], obs=60, seed=3
+    )
+    ar_block, ma_block = str(drawn).split("AR parameters:")[1].split("MA parameters:")
+    for block, coefficients in (
+        (ar_block, drawn.arma["ar"]),
+        (ma_block, drawn.arma["ma"]),
+    ):
+        for value in np.ravel(coefficients):
+            assert str(round(float(value), 4)) in block
+
+    provided = sim_ssarima(
+        orders={"ar": [1], "i": [1], "ma": [1]},
+        lags=[1],
+        obs=60,
+        arma={"ar": [0.5], "ma": [-0.3]},
+        constant=2.0,
+        seed=3,
+    )
+    text = str(provided)
+    assert "Data generated from: ARIMA(1,1,1) with drift" in text
+    assert "-0.3" in text.split("MA parameters:")[1]
+    assert re.search(r"^Constant value: 2(\.0)?$", text, re.M)

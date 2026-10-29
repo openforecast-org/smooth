@@ -75,3 +75,9 @@ test_that("ssarima() selects the regressors as adam()", {
     expect_equal(names(testModel$initial$xreg), "a")
     expect_equal(names(testModel$initial$xreg), names(adam(xreg, "ANN", regressors="select")$initial$xreg))
 })
+
+test_that("orders() and lags() of a simulated SARIMA are those of the simulation", {
+    testData <- sim.ssarima(orders=list(ar=c(1,1), i=c(0,0), ma=c(0,1)), lags=c(1,4), obs=40);
+    expect_equal(orders(testData), list(ar=c(1,1), i=c(0,0), ma=c(0,1)));
+    expect_equal(lags(testData), c(1,4));
+})

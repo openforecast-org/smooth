@@ -60,7 +60,8 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
     # paste0() is needed in order to avoid line breaks in the name
     yName <- paste0(deparse(substitute(y)),collapse="");
 
-    # Remove the class
+    # Remove the class, keeping the original time series for the object
+    yOriginal <- if(is.ts(y)) y else as.vector(y);
     y <- as.vector(y);
 
     seasonalLags <- any(lags>1);
@@ -118,6 +119,14 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
     if(smoother=="ma" && obsInSample <= min(lags)){
         warning("The minimum lag is larger than the sample size. ",
                 "Moving average does not work in this case. ",
+                "Switching smoother to LOWESS.",
+                call.=FALSE);
+        smoother <- "lowess";
+    }
+    # The centred moving average loses floor(lag/2) values on each side, so the seasonal
+    # indices without a value are left when the sample is shorter than that
+    else if(smoother=="ma" && obsInSample < max(lags) + 2*(max(lags) %/% 2)){
+        warning("The sample is too short for the moving average to give all the seasonal indices. ",
                 "Switching smoother to LOWESS.",
                 call.=FALSE);
         smoother <- "lowess";
@@ -284,7 +293,7 @@ msdecompose <- function(y, lags=c(12), type=c("additive","multiplicative"),
         states[,2] <- mean(states[,2], na.rm=TRUE);
     }
 
-    return(structure(list(y=y, states=states, initial=initial, seasonal=patterns, fitted=yFitted,
+    return(structure(list(y=yOriginal, states=states, initial=initial, seasonal=patterns, fitted=yFitted,
                           # gta is the Global Trend, Additive. gtm is the Global Trend, Multiplicative
                           # gta=trendDetermAdd, gtm=trendDetermMult,
                           loss="MSE", lags=lags, type=type, yName=yName, smoother=smoother),
@@ -320,8 +329,9 @@ fitted.msdecompose <- function(object, ...){
 #' @export
 forecast.msdecompose <- function(object, h=10,
                                  interval=c("parametric","semiparametric","nonparametric","none"),
-                                 level=0.95, model=NULL, ...){
+                                 level=0.95, side=c("both","upper","lower"), model=NULL, ...){
     interval <- match.arg(interval,c("parametric","semiparametric","nonparametric","none"));
+    side <- match.arg(side);
     if(is.null(model)){
         model <- switch(errorType(object),
                         "A"="XXX",
@@ -342,7 +352,8 @@ forecast.msdecompose <- function(object, h=10,
         }
     }
     yesModel <- suppressWarnings(adam(yDeseasonalised,model=model,h=h,initial="b",...));
-    yesModel <- forecast(yesModel,h=h,interval=interval,level=level);
+    method <- paste0("ETS(",modelType(yesModel),") with decomposition");
+    yesModel <- forecast(yesModel,h=h,interval=interval,level=level,side=side);
 
     yValues <- ts(c(yDeseasonalised,yesModel$mean),start=start(yDeseasonalised),frequency=frequency(yDeseasonalised));
     if(interval!="none"){
@@ -380,8 +391,8 @@ forecast.msdecompose <- function(object, h=10,
         upper <- window(upper,yForecastStart);
     }
 
-    return(structure(list(model=object, esmodel=yesModel, method=paste0("ETS(",modelType(yesModel),") with decomposition"),
-                          mean=yForecast, forecast=yForecast, lower=lower, upper=upper, side="both",
+    return(structure(list(model=object, esmodel=yesModel, method=method,
+                          mean=yForecast, forecast=yForecast, lower=lower, upper=upper, side=side,
                           level=level, interval=interval),class=c("msdecompose.forecast","smooth.forecast","forecast")));
 }
 

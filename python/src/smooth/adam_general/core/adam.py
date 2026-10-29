@@ -1176,6 +1176,24 @@ class ADAM:
             self.__dict__.update(auto.__dict__)
             return self
 
+        # The missing values of the regressors: the first observed value of each, as R
+        if X is not None and np.isnan(np.asarray(X, dtype=float)).any():
+            warnings.warn(
+                "Some variables contained NAs. This might cause issues in the "
+                "estimation. I will substitute those values with the first non-NA "
+                "values",
+                stacklevel=2,
+            )
+            values = np.asarray(X, dtype=float).reshape(len(X), -1)
+            missing = np.isnan(values)
+            first = values[np.argmax(~missing, axis=0), np.arange(values.shape[1])]
+            values = np.where(missing, first, values)
+            X = (
+                pd.DataFrame(values, index=X.index, columns=X.columns)
+                if isinstance(X, pd.DataFrame)
+                else values
+            )
+
         # The regressors with the names of the dummies of the outliers are renamed
         if self.outliers != "ignore" and isinstance(X, pd.DataFrame):
             clashes = [str(c) for c in X.columns if OUTLIER_NAMES.match(str(c))]
@@ -4182,17 +4200,21 @@ class ADAM:
         y_in_sample = values[:n]
         observed = ~np.isnan(y_in_sample)
         # The fitted values at their rows: the prediction of the regression at the
-        # missing values, where there is no residual
+        # missing values, where there is no residual. Fitted to the non-zero values
+        # only, it is the regression of the sizes of an occurrence model, as R
+        fitted_rows = observed.copy()
+        if len(alm.fitted_values_) < np.sum(observed):
+            fitted_rows &= y_in_sample != 0
         fitted = np.full(n, np.nan)
-        fitted[observed] = np.asarray(alm.fitted_values_, dtype=float)
-        if not np.all(observed):
-            X_gaps = _validate_x(X, n)[1][~observed]
+        fitted[fitted_rows] = np.asarray(alm.fitted_values_, dtype=float)
+        if not np.all(fitted_rows):
+            X_gaps = _validate_x(X, n)[1][~fitted_rows]
             if alm._feature_names is not None:
                 names_all = _validate_x(X, n)[3] or [
                     f"x{i + 1}" for i in range(X_gaps.shape[1])
                 ]
                 X_gaps = X_gaps[:, [names_all.index(nm) for nm in alm._feature_names]]
-            fitted[~observed] = np.ravel(
+            fitted[~fitted_rows] = np.ravel(
                 alm.predict(
                     np.column_stack([np.ones(len(X_gaps)), X_gaps]), interval="none"
                 ).mean
@@ -4221,20 +4243,47 @@ class ADAM:
             "loss": "likelihood",
             "h": getattr(self, "h", 0),
             "holdout": getattr(self, "holdout", False),
+            "ic": self.ic,
+            "bounds": self.bounds,
         }
+        residuals = y_in_sample - fitted
+        loglik = float(alm.loglik)
+        n_param = int(alm.nparam)
+        # The occurrence model of the sizes, fitted as R's adam() does: the fitted
+        # values are the sizes times the probability, the residuals at the zeros are
+        # zero, and the likelihood and the parameters include the occurrence's
+        self._om_model = None
+        if not np.all(fitted_rows == observed):
+            self._occurrence = {"occurrence": self.occurrence}
+            self._lags_model = {"lags": [1]}
+            self._initials = {"initial_type": "optimal"}
+            self._om_model = (
+                self.occurrence
+                if not isinstance(self.occurrence, str)
+                else self._fit_occurrence_model(y, X)
+            )
+            p_fitted = np.ravel(np.asarray(self._om_model.fitted, dtype=float))
+            residuals[observed & ~fitted_rows] = 0.0
+            fitted = fitted * p_fitted
+            nonzero = y_in_sample[observed] != 0
+            p_observed = p_fitted[observed]
+            loglik += float(
+                np.sum(np.log(np.where(nonzero, p_observed, 1 - p_observed)))
+            )
+            n_param += int(self._om_model.nparam)
         self._prepared = {
             "y_fitted": fitted,
-            "residuals": y_in_sample - fitted,
+            "residuals": residuals,
             # ALM stores the scale as ADAM does (sigma^2 for dnorm and dlnorm)
             "scale": float(alm.scale),
         }
         self._adam_estimated = {
             "B": np.asarray(alm.coefficients),
-            "n_param_estimated": int(alm.nparam),
+            "n_param_estimated": n_param,
             "log_lik_adam_value": {
-                "value": float(alm.loglik),
+                "value": loglik,
                 "nobs": int(np.sum(observed)),
-                "df": int(alm.nparam),
+                "df": n_param,
             },
         }
         self.model = "Regression"
@@ -4259,12 +4308,35 @@ class ADAM:
         level = 0.95 if level is None else level
         bound_low, bound_up = ensure_level_format(level, side)
         levels = bound_up - bound_low
+        X_alm = np.column_stack([np.ones(h), X_new])
         result = alm.predict(
-            np.column_stack([np.ones(h), X_new]),
-            interval=alm_interval,
-            level=list(levels),
-            side=side,
+            X_alm, interval=alm_interval, level=list(levels), side=side
         )
+        # With an occurrence model, the mean of the sizes times the probability, and
+        # the interval of the sizes with the level (level-(1-p))/p, as R
+        om_model = getattr(self, "_om_model", None)
+        if om_model is not None:
+            p = np.asarray(om_model.predict(h=h, X=X).mean, dtype=float)
+            result.mean = np.ravel(result.mean) * p
+            if interval == "confidence":
+                result.lower = np.asarray(result.lower, dtype=float) * p[:, None]
+                result.upper = np.asarray(result.upper, dtype=float) * p[:, None]
+            elif interval != "none":
+                # The bound of a one-sided interval that ALM leaves out stays NaN
+                mixture_lower = np.full((h, len(levels)), np.nan)
+                mixture_upper = np.full((h, len(levels)), np.nan)
+                for k, coverage in enumerate(levels):
+                    sizes = np.maximum((coverage - (1 - p)) / p, 0)
+                    unique = np.unique(sizes)
+                    bounds = alm.predict(
+                        X_alm, interval="prediction", level=list(unique), side=side
+                    )
+                    cells = (np.arange(h), np.searchsorted(unique, sizes))
+                    if side != "upper":
+                        mixture_lower[:, k] = np.reshape(bounds.lower, (h, -1))[cells]
+                    if side != "lower":
+                        mixture_upper[:, k] = np.reshape(bounds.upper, (h, -1))[cells]
+                result.lower, result.upper = mixture_lower, mixture_upper
 
         n = len(self._observations["y_in_sample"])
         index = pd.RangeIndex(n, n + h)
@@ -4608,25 +4680,6 @@ class ADAM:
         # Updates parametes with the selected model and updates adam_estimated
         self.select_best_model()
 
-        # print(self._adam_selected["ic_selection"])
-        # Process each selected model
-        # The following commented-out loop and its associated helper method
-        # calls (_update_model_from_selection, _create_matrices_for_selected_model,
-        # _update_parameters_for_selected_model) appear to be placeholders
-        # or remnants of a "combine" functionality that is not fully implemented
-        # yet, as indicated by the NotImplementedError in the fit method for
-        # model_do="combine". These will be kept for now as they might be
-        # relevant for future development.
-        # for i, result in enumerate(self._adam_selected["results"]):
-        #     # Update model parameters with the selected model
-        #     self._update_model_from_selection(i, result)
-        #
-        #     # Create matrices for this model
-        #     self._create_matrices_for_selected_model(i)
-        #
-        #     # Update parameters number for this model
-        #     self._update_parameters_for_selected_model(i, result)
-
     def select_best_model(self):
         """
         Select the best model based on information criteria and update model parameters.
@@ -4826,133 +4879,6 @@ class ADAM:
 
         # Use the best model as the primary model for state-space matrices
         self.select_best_model()
-
-    def _update_model_from_selection(self, index, result):
-        """
-        Update model parameters with the selected model parameters.
-
-        Parameters
-        ----------
-        index : int
-            Index of the selected model in the results list from model selection.
-        result : dict
-            The dictionary containing all parameters and estimation results
-            for the selected model.
-        """
-        # Update global dictionaries with the selected model info
-        self._general.update(result["general"])
-        self._model_type.update(result["model_type_dict"])
-        self._arima.update(result["arima_dict"])
-        self._constant.update(result["constant_dict"])
-        self._persistence.update(result["persistence_dict"])
-        self._initials.update(result["initials_dict"])
-        self._phi_internal.update(result["phi_dict"])
-        self._components.update(result["components_dict"])
-        self._lags_model.update(result["lags_dict"])
-        self._observations.update(result["observations_dict"])
-        self._profile = result.get(
-            "profile_dict",
-            {
-                "profiles_recent_provided": self.profiles_recent_provided,
-                "profiles_recent_table": self.profiles_recent_table,
-            },
-        )
-
-        # Store the estimated model and adam_cpp
-        self._adam_estimated = result["adam_estimated"]
-        self._adam_cpp = self._adam_estimated["adam_cpp"]
-
-    def _create_matrices_for_selected_model(self, index):
-        """
-        Create matrices for a selected model. This is typically used when iterating
-        through models in a selection process, particularly for a "combine" feature.
-
-        Parameters
-        ----------
-        index : int
-            Index of the selected model.
-        """
-        # Create matrices for this model
-        self._adam_created = creator(
-            model_type_dict=self._model_type,
-            lags_dict=self._lags_model,
-            profiles_dict=self._profile,
-            observations_dict=self._observations,
-            persistence_checked=self._persistence,
-            initials_checked=self._initials,
-            arima_checked=self._arima,
-            constants_checked=self._constant,
-            phi_dict=self._phi_internal,
-            components_dict=self._components,
-            explanatory_checked=self._explanatory,
-            smoother=self._resolve_smoother(),
-        )
-
-        # Store created matrices
-        self._adam_selected["results"][index]["adam_created"] = self._adam_created
-
-    def _update_parameters_for_selected_model(self, index, result):
-        """
-        Update parameters number for a selected model.
-
-        This is typically used when iterating through models in a selection
-        process, particularly for a "combine" feature.
-
-        Parameters
-        ----------
-        index : int
-            Index of the selected model.
-        result : dict
-            Selected model result containing `adam_estimated` which has
-            `n_param_estimated`.
-        """
-        # Update parameters number
-        n_param_estimated = result["adam_estimated"]["n_param_estimated"]
-
-        # Update n_param table if available
-        if "n_param" in self._general and self._general["n_param"] is not None:
-            n_param = self._general["n_param"]
-            n_param.estimated["internal"] = n_param_estimated
-
-            # The distribution scale is always estimated (concentrated likelihood).
-            n_param.estimated["scale"] = 1
-
-            n_param.update_totals()
-            self._n_param = n_param
-
-        # Legacy format
-        self._general["parameters_number"] = self._params_info.get(
-            "parameters_number", [[0], [0]]
-        )
-        self._general["parameters_number"][0][0] = n_param_estimated
-
-        # Handle likelihood loss case
-        if self._general["loss"] == "likelihood":
-            if len(self._general["parameters_number"][0]) <= 3:
-                self._general["parameters_number"][0].append(1)
-            else:
-                self._general["parameters_number"][0][3] = 1
-
-        # Calculate row sums
-        if len(self._general["parameters_number"][0]) <= 4:
-            self._general["parameters_number"][0].append(
-                sum(self._general["parameters_number"][0][0:4])
-            )
-            self._general["parameters_number"][1].append(
-                sum(self._general["parameters_number"][1][0:4])
-            )
-        else:
-            self._general["parameters_number"][0][4] = sum(
-                self._general["parameters_number"][0][0:4]
-            )
-            self._general["parameters_number"][1][4] = sum(
-                self._general["parameters_number"][1][0:4]
-            )
-
-        # Store parameters number
-        self._adam_selected["results"][index]["parameters_number"] = self._general[
-            "parameters_number"
-        ]
 
     def _prepare_results(self):
         """

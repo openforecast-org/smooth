@@ -116,22 +116,14 @@ cma <- function(y, order=NULL, silent=TRUE, ...){
 
     # Order of the model
     if(!is.null(order)){
+        if(!is.numeric(order) || length(order)!=1){
+            stop("The order should be a single number.",call.=FALSE);
+        }
+        if(order<1){
+            stop("The order of the model must be a positive number.",call.=FALSE);
+        }
         if(obsInSample < order){
             stop("Sorry, but we don't have enough observations for that order.",call.=FALSE);
-        }
-
-        if(!is.numeric(order)){
-            stop("The provided order is not numeric.",call.=FALSE);
-        }
-        else{
-            if(length(order)!=1){
-                warning("The order should be a scalar. Using the first provided value.",call.=FALSE);
-                order <- order[1];
-            }
-
-            if(order<1){
-                stop("The order of the model must be a positive number.",call.=FALSE);
-            }
         }
         orderSelect <- FALSE;
     }
@@ -150,9 +142,10 @@ cma <- function(y, order=NULL, silent=TRUE, ...){
         errors <- residuals(smaModel);
     }
     else{
-        ssarimaModel <- msarima(yInSample, orders=c(order+1,0,0), AR=c(0.5,rep(1,order-1),0.5)/order,
+        ssarimaModel <- msarima(yInSample, orders=c(order+1,0,0), arma=list(ar=c(0.5,rep(1,order-1),0.5)/order),
                                 h=order, holdout=FALSE, silent=TRUE, initial="backcasting");
-        yFitted <- c(ssarimaModel$fitted[-c(1:(order/2))],ssarimaModel$forecast);
+        # The AR(order+1) fitted value at t is centred at t-order/2-1
+        yFitted <- c(ssarimaModel$fitted[-c(1:(order/2+1))],ssarimaModel$forecast);
         smaModel <- sma(yInSample, order=1, h=order, holdout=FALSE, silent=TRUE);
         logLik <- ssarimaModel$logLik;
         errors <- residuals(ssarimaModel);

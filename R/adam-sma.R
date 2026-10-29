@@ -122,22 +122,14 @@ sma <- function(y, order=NULL, ic=c("AICc","AIC","BIC","BICc"),
     yFrequency <- frequency(y);
 
     if(!is.null(order)){
+        if(!is.numeric(order) || length(order)!=1){
+            stop("The order should be a single number.",call.=FALSE);
+        }
+        if(order<1){
+            stop("The order of the model must be a positive number.",call.=FALSE);
+        }
         if(obsInSample < order){
             stop("Sorry, but we don't have enough observations for that order.",call.=FALSE);
-        }
-
-        if(!is.numeric(order)){
-            stop("The provided order is not numeric.",call.=FALSE);
-        }
-        else{
-            if(length(order)!=1){
-                warning("The order should be a scalar. Using the first provided value.",call.=FALSE);
-                order <- order[1];
-            }
-
-            if(order<1){
-                stop("The order of the model must be a positive number.",call.=FALSE);
-            }
         }
         orderSelect <- FALSE;
     }

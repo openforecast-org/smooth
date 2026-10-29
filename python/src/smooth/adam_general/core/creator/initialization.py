@@ -133,22 +133,15 @@ def _initialize_ets_states(
     lags_model_max = model_params["lags_model_max"]
     components_number_ets_seasonal = model_params["components_number_ets_seasonal"]
     y_in_sample = model_params["y_in_sample"]
-    obs_nonzero = observations_dict["obs_nonzero"]
 
     # If initials need to be estimated
     if initials_checked["initial_estimate"]:
         # For seasonal models
         if model_is_seasonal:
-            # Handle seasonal model initialization
-            if obs_nonzero >= lags_model_max * 2:
-                mat_vt = _initialize_ets_seasonal_states_with_decomp(
-                    mat_vt, model_params, initials_checked, explanatory_checked
-                )
-
-            else:
-                mat_vt = _initialize_ets_seasonal_states_small_sample(
-                    mat_vt, model_params, initials_checked, explanatory_checked
-                )
+            # The decomposition, whatever the sample, as R's adam_creator()
+            mat_vt = _initialize_ets_seasonal_states_with_decomp(
+                mat_vt, model_params, initials_checked, explanatory_checked
+            )
 
         else:
             # Handle non-seasonal model initialization
@@ -364,114 +357,6 @@ def _initialize_ets_seasonal_states_with_decomp(
     # Failsafe in case negatives were produced
     if e_type == "M" and mat_vt[0, 0] <= 0:
         mat_vt[0, 0:lags_model_max] = y_in_sample[0]
-
-    return mat_vt
-
-
-def _initialize_ets_seasonal_states_small_sample(
-    mat_vt, model_params, initials_checked, explanatory_checked
-):
-    """
-    Initialize ETS seasonal model states when limited data is available.
-
-    Args:
-        mat_vt: State matrix
-        model_params: Dictionary containing model parameters
-        initials_checked: Dictionary of initial values
-        explanatory_checked: Dictionary of explanatory variables parameters
-
-    Returns:
-        np.ndarray: Updated state matrix
-    """
-    # Get parameters
-    e_type = model_params["e_type"]
-    t_type = model_params["t_type"]
-    s_type = model_params["s_type"]
-    lags_model = model_params["lags_model"]
-    lags_model_max = model_params["lags_model_max"]
-    model_is_trendy = model_params["model_is_trendy"]
-    components_number_ets_seasonal = model_params["components_number_ets_seasonal"]
-    y_in_sample = model_params["y_in_sample"]
-    ot_logical = model_params["ot_logical"]
-
-    # If either e_type or s_type are multiplicative, do multiplicative decomposition
-    j = 0
-    # level
-    if initials_checked["initial_level_estimate"]:
-        mat_vt[j, 0:lags_model_max] = np.mean(y_in_sample[0:lags_model_max])
-        if explanatory_checked["xreg_model"]:
-            xreg_init = (
-                explanatory_checked["xreg_model_initials"][0]
-                if e_type == "A"
-                or explanatory_checked["xreg_model_initials"][1] is None
-                else explanatory_checked["xreg_model_initials"][1]
-            )
-            xreg_coefs = xreg_init["initial_xreg"].ravel()
-            if e_type == "A":
-                mat_vt[j, 0:lags_model_max] -= np.dot(
-                    xreg_coefs, explanatory_checked["xreg_data"][0]
-                )
-            else:
-                mat_vt[j, 0:lags_model_max] /= np.exp(
-                    np.dot(xreg_coefs, explanatory_checked["xreg_data"][0])
-                )
-    else:
-        mat_vt[j, 0:lags_model_max] = initials_checked["initial_level"]
-    j += 1
-
-    # Initialize trend if needed
-    if model_is_trendy:
-        if initials_checked["initial_trend_estimate"]:
-            if t_type == "A":
-                # trend
-                mat_vt[j, 0:lags_model_max] = y_in_sample[1] - y_in_sample[0]
-            elif t_type == "M":
-                if initials_checked["initial_level_estimate"]:
-                    # level fix
-                    mat_vt[j - 1, 0:lags_model_max] = np.exp(
-                        np.mean(np.log(y_in_sample[ot_logical][0:lags_model_max]))
-                    )
-                # trend
-                mat_vt[j, 0:lags_model_max] = y_in_sample[1] / y_in_sample[0]
-
-        # Safety check for multiplicative trend
-        if t_type == "M" and np.any(mat_vt[j, 0:lags_model_max] > 1.1):
-            mat_vt[j, 0:lags_model_max] = 1
-        else:
-            mat_vt[j, 0:lags_model_max] = initials_checked["initial_trend"]
-        j += 1
-
-    # Initialize seasonal components
-    if s_type == "A":
-        for i in range(components_number_ets_seasonal):
-            if initials_checked["initial_seasonal_estimate"][i]:
-                mat_vt[i + j, 0 : lags_model[i + j]] = (
-                    y_in_sample[0 : lags_model[i + j]] - mat_vt[0, 0]
-                )
-                # Renormalise the initial seasons
-                mat_vt[i + j, 0 : lags_model[i + j]] -= np.mean(
-                    mat_vt[i + j, 0 : lags_model[i + j]]
-                )
-            else:
-                mat_vt[i + j, 0 : lags_model[i + j]] = initials_checked[
-                    "initial_seasonal"
-                ][i]
-    # For mixed models use a different set of initials
-    else:
-        for i in range(components_number_ets_seasonal):
-            if initials_checked["initial_seasonal_estimate"][i]:
-                # abs() is needed for mixed ETS+ARIMA
-                mat_vt[i + j, 0 : lags_model[i + j]] = y_in_sample[
-                    0 : lags_model[i + j]
-                ] / abs(mat_vt[0, 0])
-                # Renormalise the initial seasons
-                mat_vt[i + j, 0 : lags_model[i + j]] /= np.exp(
-                    np.mean(np.log(mat_vt[i + j, 0 : lags_model[i + j]]))
-                )
-            else:
-                mat_vt[i + j, 0 : lags_model[i + j]] = initials_checked[
-                    "initial_seasonal"
-                ][i]
 
     return mat_vt
 

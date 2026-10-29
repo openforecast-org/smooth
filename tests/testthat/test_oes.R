@@ -144,3 +144,70 @@ test_that("oes() with xreg as a data frame", {
     testModelMatrix <- oes(y, "MNN", occurrence="odds-ratio", xreg=as.matrix(xreg));
     expect_equal(coef(testModel), coef(testModelMatrix));
 })
+
+# oesg(), the wrapper of omg() with ETS sub-models only
+set.seed(2);
+intermittent <- rpois(120, 0.6);
+testModel <- oesg(intermittent, modelA="MNN", modelB="MNN", h=5);
+test_that("oesg() is omg() with its ETS sub-models", {
+    reference <- omg(intermittent, modelA="MNN", modelB="MNN", h=5);
+    expect_s3_class(testModel, "omg");
+    expect_equal(fitted(testModel), fitted(reference));
+    expect_equal(logLik(testModel), logLik(reference));
+    expect_true(all(fitted(testModel) > 0 & fitted(testModel) < 1));
+    testForecast <- forecast(testModel, h=5)$mean;
+    expect_length(testForecast, 5);
+    expect_true(all(testForecast > 0 & testForecast < 1));
+})
+
+# The residuals of omg() are those of the probability, as om(): they were missing, so the
+# plots of the residuals failed
+test_that("plot() of oesg() draws every plot, with the residuals of the probability", {
+    expect_equal(as.vector(residuals(testModel)),
+                 (as.vector(actuals(testModel))!=0) - as.vector(fitted(testModel)));
+    # Each plot on a new device, which has nothing drawn before it
+    for(i in 1:16){
+        pdf(NULL);
+        dev.control("enable");
+        plot(testModel, which=i);
+        expect_gt(length(recordPlot()[[1]]), 0);
+        dev.off();
+    }
+})
+
+# oesg() passes each side its own regressors: the formulae were one-sided, which omg()
+# does not take, and a side without regressors took those of the other side
+test_that("oesg() fits each side with its own regressors", {
+    set.seed(3);
+    x <- rnorm(120);
+    y <- rbinom(120, 1, plogis(0.3 + 1.2*x));
+    expect_equal(names(coef(oesg(y, "MNN", xregA=x))), c("A:alpha", "A:xA", "B:alpha"));
+    expect_equal(names(coef(oesg(y, "MNN", xregB=x))), c("A:alpha", "B:alpha", "B:xB"));
+    expect_equal(names(coef(oesg(y, "MNN", xregA=x, xregB=cbind(z=rnorm(120))))),
+                 c("A:alpha", "A:xA", "B:alpha", "B:z"));
+})
+
+# orders(), lags() and multicov() of omg() give those of its two sub-models (they failed or
+# returned a 1x1 zero), and its standardised residuals are those of the occurrence
+test_that("omg() gives the orders, lags and covariances of its sub-models", {
+    set.seed(41);
+    y <- rpois(120, 0.6);
+    testModel <- omg(y, "MNN", "MNA", lags=12);
+    expect_equal(lags(testModel), list(A=1, B=c(1, 12)));
+    expect_equal(orders(testModel), list(A=orders(testModel$modelA), B=orders(testModel$modelB)));
+    expect_equal(lapply(multicov(testModel, h=3), dim), list(A=c(3, 3), B=c(3, 3)));
+    p <- as.vector(fitted(testModel));
+    obs <- nobs(testModel);
+    expect_equal(as.vector(rstandard(testModel)),
+                 ((y!=0) - p)/sqrt(p*(1-p))*sqrt(obs/(obs-nparam(testModel))));
+})
+
+# The general model does not combine: om(occurrence="auto") leaves it out for a
+# combination (it failed), and omg() says so
+test_that("combinations leave the general occurrence model out", {
+    set.seed(7);
+    y <- ts(exp(2+rnorm(120,0,.3))*rbinom(120,1,.7), frequency=12);
+    expect_message(om(y, "CCN", silent=FALSE), "left out");
+    expect_error(omg(y, "CCN", "CCN"), "does not take combinations");
+    expect_error(om(y, "CCN", occurrence="general"), "does not take combinations");
+})

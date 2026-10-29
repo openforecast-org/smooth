@@ -654,6 +654,10 @@ pointLik.om <- function(object, log=TRUE, ...){
 #' @export
 coef.smooth <- function(object, ...)
 {
+    if(is.smoothC(object)){
+        stop("coef() is not available for a combination of different models (smoothCombine()).",
+             call.=FALSE);
+    }
     smoothType <- smoothType(object);
     if(smoothType=="CES"){
         parameters <- c(object$a,object$b);
@@ -760,6 +764,8 @@ lags.Arima <- function(object, ...){
 lags.smooth <- function(object, ...){
     model <- object$model;
     smoothType <- smoothType(object);
+    # A simulation has no actuals: its frequency is that of the data it generated
+    dataFreq <- frequency(if(is.smooth.sim(object)) object$data else actuals(object));
     if(!is.null(model)){
         if(smoothType=="GUM"){
             lags <- as.numeric(substring(model,unlist(gregexpr("\\[",model))+1,unlist(gregexpr("\\]",model))-1));
@@ -784,12 +790,11 @@ lags.smooth <- function(object, ...){
             modelName <- modelType(object);
             lags <- c(1);
             if(substr(modelName,nchar(modelName),nchar(modelName))!="N"){
-                lags <- c(lags,frequency(actuals(object)));
+                lags <- c(lags,dataFreq);
             }
         }
         else if(smoothType=="CES"){
             modelName <- modelType(object);
-            dataFreq <- frequency(actuals(object));
             if(modelName=="none"){
                 lags <- c(1);
             }
@@ -968,19 +973,13 @@ modelType.smooth <- function(object, ...){
         modelType <- substring(model,unlist(gregexpr("\\(",model))+1,unlist(gregexpr("\\)",model))-1);
     }
     else if(smoothType=="CES"){
+        # The type is a letter in the old names (CES(p)) and a word in the new (CES(partial))
         modelType <- substring(model,unlist(gregexpr("\\(",model))+1,unlist(gregexpr("\\)",model))-1);
-        if(modelType=="n"){
-            modelType <- "none";
-        }
-        else if(modelType=="s"){
-            modelType <- "simple";
-        }
-        else if(modelType=="p"){
-            modelType <- "partial";
-        }
-        else{
-            modelType <- "full";
-        }
+        modelType <- switch(substr(modelType,1,1),
+                            "n"="none",
+                            "s"="simple",
+                            "p"="partial",
+                            "full");
     }
     else{
         modelType <- NA;
@@ -2028,6 +2027,16 @@ print.smooth.sim <- function(x, ...){
             }
             cat(paste0("True likelihood: ",round(x$logLik,digits),"\n"));
         }
+        else if(smoothType=="GUM"){
+            nComponents <- length(x$persistence);
+            cat("Persistence vector: \n");
+            print(round(as.vector(x$persistence),digits));
+            cat("Transition matrix: \n");
+            print(round(matrix(x$transition, nComponents, nComponents),digits));
+            cat("Measurement vector: \n");
+            print(round(as.vector(x$measurement[1,]),digits));
+            cat(paste0("True likelihood: ",round(x$logLik,digits),"\n"));
+        }
         else if(smoothType=="SMA"){
             cat(paste0("True likelihood: ",round(x$logLik,digits),"\n"));
         }
@@ -2074,13 +2083,14 @@ print.oes.sim <- function(x, ...){
         digits <- ellipsis$digits;
     }
 
-    if(is.null(dim(x$ot))){
+    # The probability has a column per series
+    if(is.null(dim(x$probability))){
         nsim <- 1;
-        obs <- length(x$ot)
+        obs <- length(x$probability);
     }
     else{
-        nsim <- dim(x$ot)[2];
-        obs <- dim(x$ot)[1];
+        nsim <- dim(x$probability)[2];
+        obs <- dim(x$probability)[1];
     }
 
     cat(paste0("Data generated from: ",x$model,"\n"));
@@ -2095,7 +2105,8 @@ print.oes.sim <- function(x, ...){
 #### Residuals for provided object ####
 #' @export
 residuals.smooth <- function(object, ...){
-    if(errorType(object)=="A"){
+    # The occurrence (omg()) has the residuals of the probability, as om()
+    if(is.occurrence(object) || errorType(object)=="A"){
         return(object$residuals);
     }
     else{
@@ -2106,6 +2117,10 @@ residuals.smooth <- function(object, ...){
 #' @importFrom stats rstandard
 #' @export
 rstandard.smooth <- function(model, ...){
+    if(is.smoothC(model)){
+        stop("rstandard() is not available for a combination of different models (smoothCombine()).",
+             call.=FALSE);
+    }
     obs <- nobs(model);
     df <- obs - nparam(model);
 
@@ -2129,6 +2144,10 @@ rstandard.smooth <- function(model, ...){
 #' @importFrom stats rstudent
 #' @export
 rstudent.smooth <- function(model, ...){
+    if(is.smoothC(model)){
+        stop("rstudent() is not available for a combination of different models (smoothCombine()).",
+             call.=FALSE);
+    }
     obs <- nobs(model);
     df <- obs - nparam(model) - 1;
     # If this is an occurrence model, then only modify the non-zero obs
@@ -2162,6 +2181,10 @@ rstudent.smooth <- function(model, ...){
 #' @importFrom greybox outlierdummy
 #' @export
 outlierdummy.smooth <- function(object, level=0.999, type=c("rstandard","rstudent"), ...){
+    if(is.smoothC(object)){
+        stop("outlierdummy() is not available for a combination of different models (smoothCombine()).",
+             call.=FALSE);
+    }
     # Function returns the matrix of dummies with outliers
     type <- match.arg(type);
     errors <- switch(type,"rstandard"=rstandard(object),"rstudent"=rstudent(object));

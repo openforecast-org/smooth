@@ -77,6 +77,16 @@ auto.om <- function(data,
     else{
         modelDo <- "select";
     }
+    # The general model (omg()) does not combine models, so it is left out of the pool
+    if(modelDo=="combine" && any(occurrence=="general")){
+        occurrence <- occurrence[occurrence!="general"];
+        if(length(occurrence)==0){
+            stop("The general occurrence model does not take combinations of models.", call.=FALSE);
+        }
+        if(!silent){
+            message("The general occurrence model does not take combinations of models: it is left out.");
+        }
+    }
 
     #### Data prep ####
     if(is.adam.sim(data) || is.smooth.sim(data)){

@@ -1,8 +1,70 @@
-# Claimset Lab Record — Specification v0.6 (draft)
+# Claimset Lab Record — Specification v0.14 (draft)
 
-Status: working draft · Date: 2026-10-22 · Supersedes v0.5 · Companion to the claimset specification (`spec/claimset-v0.19.md`)
+Status: working draft · Date: 2026-10-29 · Supersedes v0.13 · Companion to the claimset specification (`spec/claimset-v0.34.md`) and the revision specification (`spec/claimset-revision-v0.2.md`)
 
-## Changes since v0.5
+## Changes since v0.13
+
+The research is done by agents and decided by people (claimset principle 10). An approval was written only by the human, by running the tool themselves; that asked a supervisor to work the tool to give a decision they had already given in words. The decision stays the human's; the agent records it.
+
+- An approval may be written by an agent on behalf of a human actor (`on_behalf_of`), quoting the human's words (`words`) and when they were given (`given_at`). The agent asks, waits for the answer and records it; it never approves on its own judgement, and silence or a general instruction is not approval (§5.8, L22).
+- A plan may require approval (`requires_approval`): no confirmatory run is made under it until an approval of its current version is recorded (§5.7, L23). The agent waits for the supervisor's answer before running.
+- New rules L22 and L23 (§6).
+
+## Changes in v0.13 (since v0.12)
+
+Claimset v0.32 records results as observations of variables in any field.
+
+- The term kind `measure` is `variable` (§5.19, L21), as in claimset §3.2. Terms recorded with `measure` are read as `variable`.
+- Export writes each result as an observation (claimset §3.4): the result's `quantity` becomes the observation's `variable`, the term it names when one matches, and its `conditions` keep their keys and values, with term IDs replaced by definition IDs (§9).
+
+## Changes in v0.12 (since v0.11)
+
+A pre-registration says what will be studied, on what, how and measured how, before the data are seen; the frames that specify studies across fields (PICO for trials, SPIDER for qualitative work) are that list. Claimset v0.30 records the same frame in a claimset: the parts of a study as definitions with a kind, named by role in each evidence object's `setup`, and each claim's atom in `about`. The lab record is where that frame is fixed in advance, so it now records it, and the claimset is exported from it instead of being written afterwards.
+
+- New event `term` (prefix `TM`): a method, data set, population, design, measure, concept or theory the study names, with its kind and definition (§5.19). The claimset's definitions are exported from the terms (§9).
+- Hypotheses gain `about`, the atom of the statement (claimset §3.3.5), with slots that name terms or give text; a statement marks the terms it names, `[[TM3:MASE]]` (§5.4).
+- Plans gain `setup`: the terms of the test by role, `studied`, `cases`, `procedure`, `lens`, `context` (claimset §3.4) (§5.7).
+- New warnings (§5.7.6): a confirmatory plan without a setup; a plan whose setup does not name a method, intervention, population, data set, design or measure that a hypothesis it tests is about, the mark of a test that would decide a hypothesis about something it does not study or measure (a switched outcome or comparator).
+- New rule L21 (§6). Export writes definitions, each claim's `about` and each evidence object's `setup` (§9).
+
+## Changes in v0.11 (since v0.10)
+
+- The completion list asks for the definition of each method the planned tests compare: every defining equation as the code that ran implements it, checked against that code (claimset v0.29, §3.2), and it names definitions among the parts the supervisor's approval covers (§9).
+
+## Changes in v0.10 (since v0.9)
+
+- Export follows claimset v0.22: claims get `novelty: no_prior_found` by default (the authors found no earlier result stating the claim; the completion list asks for the closest one they found), and assumption claims get no novelty (§9).
+
+## Changes in v0.9 (since v0.8)
+
+A published claimset is reviewed, and every review comment says in advance what evidence would settle it (its resolution test, revision §3.4). The lab record is where the author runs that test, so the verdict is computed against a rule the author did not write, at a time the record anchors.
+
+- Plans gain `addresses`: the global IDs of the review comments whose resolution test they run (§5.7.7).
+- `plan --comment ID --review FILE` takes the decision rule from the comment's resolution test (§5.7.7, §10).
+- Export carries `addresses` into the claim's `test` (§9).
+- The record of a revised claimset continues the record of the previous version: new events are appended, nothing before them changes (§5.7.7).
+
+## Changes in v0.8 (since v0.7)
+
+A record can follow every rule and still hide a weak test: a confirmatory run that recomputes the exploration that suggested its hypothesis, units left out of the analysis without a count, one computation run twice under two plans. The tool now says so. Nothing new is required: these are flags and warnings.
+
+- Plans gain `new_data` (what the test uses that the runs which suggested its hypotheses did not) and `exclusions` (rules that leave units out of the analysis, `{name, rule}`) (§5.7).
+- New flag `reproduces_prompting_result`: a result the decision rule uses equals a result of a run that suggested the hypothesis (§5.7.5).
+- New §5.7.6, warnings: at plan time, a hypothesis from exploration without `new_data`, and a parameter that looks like an exclusion without a declared exclusion; at the verdict, an exclusion that no deciding run counts; at a confirmatory run, the same command, code, seeds and parameters as another plan's run.
+- One plan can test several hypotheses (§5.7).
+- Export counts the hypotheses suggested by exploration, `hypotheses.from_exploration` (§9; claimset §3.1.1).
+
+## Changes in v0.7 (since v0.6)
+
+The record and the code are kept apart by the tools, not by care. A study's record copied along code branches diverged, was carried into pull requests, and stopped being kept when the work turned to implementation.
+
+- Each study lives on its own branch, `claimset/<study>`, which holds only the study's folder and shares no history with the code. It is checked out as a git worktree at `claimset/<study>/`; the code branches ignore `claimset/`. Study branches are never merged into code branches, nor code into them (§3).
+- After every command that changes the record, the tool commits the study branch and pushes it; the push is the anchor, so the separate anchor branches go (§7.1). The commit after a run takes the run's code commit as a further parent, so the code it ran stays reachable when its branch is squash-merged or deleted (§5.9).
+- Code only a study uses lives on the code branches, in `claimset-code/<study>/`, left out of package builds like `claimset/` (§3, §3.3).
+- `claimset setup` creates, attaches or adopts study branches; a study committed on a code branch is adopted onto its own branch with a relocation (§3.4, §5.18).
+- New rule L20: a record is written only on its study branch. The guard refuses git commands that would mix study branches and code, a GitHub check refuses pull requests that carry study records, and every session starts with the state of the studies (§4.5).
+
+## Changes in v0.6 (since v0.5)
 
 A repository can hold several studies, each with its own lab, and a study can give several papers. Where they live and what they are called is fixed, so tools and readers find them.
 
@@ -80,25 +142,29 @@ Version 0.1 targets computational research (simulation, analysis of existing dat
 
 ## 3. Layout
 
-A **study** is a piece of research with its own lab record: one or more related questions, and the hypotheses, plans and runs that answer them. A repository can hold several studies, and a study can give several papers. Every study lives in its own folder under `claimset/` at the top of the project's version-controlled repository:
+A **study** is a piece of research with its own lab record: one or more related questions, and the hypotheses, plans and runs that answer them. A repository can hold several studies, and a study can give several papers.
+
+**The record and the code are kept apart.** Each study lives on its own branch of the project's repository, `claimset/<study>`, which holds only the study's folder and shares no history with the code. The branch is checked out as a git worktree at `claimset/<study>/` in the code checkout, and the code branches ignore `claimset/` (`.gitignore`: `/claimset/`). So the code checkout shows every study in one place, while no code branch ever holds a record:
 
 ```
-claimset/
-  <study>/
+claimset/                      ignored by the code branches
+  <study>/                     the checkout of branch claimset/<study>
     lab/                       the lab record
       lab.jsonl                the main event log, one event per line
       agents/<actor>.jsonl     per-agent logs while agents work concurrently (§3.5)
       anchors.jsonl            timestamp anchors of the log (§7)
-      config.json              the anchoring configuration (§7.1)
+      config.json              the study branch and its remote (§7.1)
       runs/<run id>/           per-run outputs: stdout, stderr, results.json, other files
-    code/                      code only this study uses: prototypes, experiments, benchmarks (optional)
     <paper>.claimset.json      a paper drawn from the study (claimset §2.4)
     <paper>.claimset.txt       its reading view
+claimset-code/<study>/         on the code branches: code only this study uses (prototypes, benchmarks)
 ```
 
-- **Names.** A study's and a paper's name is lower-case letters, digits and hyphens, starting with a letter, at most 60 characters (`eigen-checker`). The study's name is the name of its folder and is recorded in `init` (§5.1). A paper's name is unique within its study; the first paper of a study usually takes the study's name.
-- **Code.** Code that belongs to the project itself (a package's source) stays where it belongs; runs record the commit they ran, so the lab need not own that code.
-- Records begun before v0.6 may live elsewhere (`lab/` at the top of the repository); they are moved into this layout with a relocation (§3.4).
+- **Never merged.** A study branch is never merged into a code branch, and nothing is merged into it; it is never rebased, force-pushed or deleted. The code goes through its own pull requests; the record is pushed to its study branch.
+- **Names.** A study's and a paper's name is lower-case letters, digits and hyphens, starting with a letter, at most 60 characters (`eigen-checker`). The study's name is the name of its branch and folder and is recorded in `init` (§5.1). A paper's name is unique within its study; the first paper of a study usually takes the study's name.
+- **Code.** All code is on the code branches. Code that belongs to the project (a package's source) stays where it belongs; code only a study uses goes in `claimset-code/<study>/`. Runs record the commit they ran (§5.9), and the study branch keeps that commit reachable, so the record need not hold code and the code need not reach the main branch.
+- **Setting up.** `claimset setup --study NAME --title …` creates the study branch with its first commit and lab, and checks it out at `claimset/NAME/`; in a fresh clone, `claimset setup` checks out every study branch of the remote. Outside a git repository a study is a plain folder `claimset/<study>/`.
+- Records begun before v0.7 may live on a code branch (in `claimset/<study>/`, `lab/` at the top, or elsewhere); they are moved to their own branch by adoption (§3.4).
 
 ### 3.2 Finding the lab
 
@@ -106,18 +172,20 @@ A command works on the lab named by `--lab DIR` or `$CLAIMSET_LAB`; else on the 
 
 ### 3.3 Package builds
 
-The studies are part of the repository, not of what it ships. When a lab is created in `claimset/`, the tool adds to each of these files the repository already has the line that leaves the folder out, and `verify` reports a file without it:
+The studies are part of the repository, not of what it ships, and a build reads the working directory, worktrees included. When a study is set up, the tool adds `/claimset/` to `.gitignore` and, to each of these files the repository already has, the lines that leave `claimset/` and `claimset-code/` out; `verify` reports a file without them:
 
-| File | Line |
+| File | Lines |
 |---|---|
-| `.Rbuildignore` (R packages) | `^claimset$` |
-| `MANIFEST.in` (Python source distributions) | `prune claimset` |
-| `.npmignore` (npm packages) | `claimset/` |
-| `.gitattributes` (repository statistics) | `claimset/** linguist-documentation` |
+| `.Rbuildignore` (R packages) | `^claimset$`, `^claimset-code$` |
+| `MANIFEST.in` (Python source distributions) | `prune claimset`, `prune claimset-code` |
+| `.npmignore` (npm packages) | `claimset/`, `claimset-code/` |
+| `.gitattributes` (repository statistics) | `claimset/** linguist-documentation`, `claimset-code/** linguist-documentation` |
 
 ### 3.4 Moving a lab
 
 A lab is moved only by the tool, which moves the folder, moves any other files the record names (its code), and records a `relocation` event (§5.18) in the moved log. Paths in earlier events are not rewritten: a reader maps them through the relocations. Anchors made before the move hold the log at its old path; remote verification looks for it there (§7.1). A lab moved by other means fails verification once it is in `claimset/` under a name other than its study's (rule L19).
+
+**Adoption** moves a study committed on a code branch onto its own branch (`claimset setup --study NAME --adopt`). The study's folder must be at `claimset/NAME/` and committed (`claimset lab move` brings a lab from elsewhere there first). The tool makes the study branch from that folder, without its `code/` subfolder, which moves on the code branch to `claimset-code/NAME/`; a second commit on the study branch takes the code branch's commit as a further parent, so the code the record names stays reachable. It removes the folder from the code branch (to be committed with the `.gitignore` change), checks the branch out in its place, and records a `relocation` with the branch. From then on the record is written only there. A study folder without a lab (a paper written before any record) is adopted the same way and gets a new lab, begun at the adoption with the working title given; what was done before it is not recorded, and its papers say so.
 
 `lab.jsonl` is UTF-8 JSON Lines. Every line is one event.
 
@@ -129,7 +197,7 @@ When several agents work on one lab at the same time, each can write its own log
 2. **Chain.** An agent log has its own `seq` (from 1) and its own hash chain. Its first event's `prev` is the header hash of the latest main-log event when that first event was written. That main-log event is the log's **base**: it records which state of the lab the agent worked from.
 3. **IDs.** Event IDs in an agent log are prefixed by the actor ID: `AC2.H1`, `AC2.RN4`, numbered within the log. IDs therefore never collide between agents. Run output directories use the same IDs (`runs/AC2.RN4/`).
 4. **What an agent sees.** An agent's events may refer to main-log events up to its base and to earlier events in its own log, and to nothing else: not to later main-log events, and not to events in other agent logs.
-5. **What an agent may write.** Only its own actor writes an agent log. Its confirmatory runs are made under plans written in the same log, so that two logs never race to run the same planned test. `init`, `actor` and `merge` events are written only to the main log. A correction (`supersedes`) in an agent log corrects only an event of the same agent log; other events are corrected in the main log after merging. Human approvals are therefore given in the main log, after the log they approve is merged.
+5. **What an agent may write.** Only its own actor writes an agent log. Its confirmatory runs are made under plans written in the same log, so that two logs never race to run the same planned test. `init`, `actor` and `merge` events are written only to the main log. A correction (`supersedes`) in an agent log corrects only an event of the same agent log; other events are corrected in the main log after merging. Approvals written by the human are therefore given in the main log, after the log they approve is merged; an agent records an approval of a plan of its own log in that log, on the human's behalf (§5.8).
 6. **Once.** An agent log is merged once. After the merge, the actor's events go to the main log; for new concurrent work, an agent is registered as a new actor.
 7. **Merging.** `merge` appends to the main log a `merge` event (§5.16) followed immediately by the events of the agent logs it names, interleaved in order of `at`, each agent's own order kept, ties broken by actor ID, then `seq`. Each merged event keeps its ID, type, `at`, `by`, `supersedes`, `content_hash` and body, gets a new main-log `seq` and `prev`, and records in `origin` its position and header hash in the agent log: `{log: "agents/AC2.jsonl", seq, header_hash}`. The agent log is kept unchanged, so both chains remain verifiable.
 8. **Refusal.** Before writing anything, the tool verifies each agent log on its own and checks every event against the main log as it will be after the events before it. If any check fails (for example, a status change that is no longer valid because the main log has moved on), nothing is written and the problem is reported.
@@ -196,7 +264,13 @@ An agent that can run commands as the researcher can, in principle, do anything 
 | Anchored | the head of the chain is regularly recorded outside the agent's reach (§7) | any rewriting before an anchor is detected, including a full recomputation of the chain |
 | Remote append-only | the authoritative copy is held by a service that accepts only appends (the Claimset platform; or a git branch protected against force-pushes and deletion, pushed to with credentials that cannot change the protection) | rewriting is prevented, not just detected |
 
-Locally, the log is tamper-evident. With anchoring, tampering is always detected. With a remote append-only copy, it is prevented. A lab that matters should use at least anchoring.
+Locally, the log is tamper-evident. With anchoring, tampering is always detected. With a remote append-only copy, it is prevented. A lab that matters should use at least anchoring; a lab on a study branch is anchored at every event.
+
+**Keeping record and code apart** (§3) is protected in the same layers:
+- the tool refuses to write a record off its study branch (L20), and refuses runs started from the study's folder;
+- the guard refuses git commands that would merge, rebase or cherry-pick between study branches and code, check a study branch out in the code checkout, force-add `claimset/` to a code branch, or force-push, delete or rename a study branch;
+- on the host, protect `claimset/*` against force-pushes and deletion, and add the check that `claimset setup --ci` writes: a pull request fails if it changes `claimset/`, comes from or goes to a study branch, or contains a study branch's own history;
+- the guard's configuration also shows the state of every study (`claimset studies`) at the start of each agent session, so that work, implementation included, begins inside the record.
 
 ## 5. Event types
 
@@ -224,6 +298,7 @@ Registers a person or agent who will write events. Mirrors claimset contributors
 - `question`: the `Q` it addresses.
 - `origin`: `a_priori` (proposed before looking at results) or `from_exploration` (suggested by results).
 - `prompted_by`: required for `from_exploration`: the result, run or note IDs that suggested it.
+- `about`: optional, recommended: the atom of the statement, as in claimset §3.3.5: `{subject, relation, object, comparator, conditions}`. Each slot except `relation` names a term (`TM3`) or gives short text; `object` may be a list of terms of kind `variable`; `object` and `comparator` may be `null`; `conditions` is a list. Every term `about` names is marked in the statement (`[[TM3:MASE]]`), and every mark names a term (L21). Recording the atom when the hypothesis is written fixes what it is about before any test: the measure, the comparator, the cases.
 
 A revised hypothesis is a new `H` event; the old one gets a `status` event with `to: revised` and `revised_to` naming the new one.
 
@@ -249,16 +324,21 @@ A revised hypothesis is a new `H` event; the old one gets a `status` event with 
 
 ### 5.7 `plan` (prefix `PL`)
 
-`{kind, hypotheses, design, analysis, decision, runs, data, holdout, code_version, dirty}`
+`{kind, hypotheses, design, analysis, setup, new_data, exclusions, addresses, decision, runs, requires_approval, data, holdout, code_version, dirty}`
 
 - `kind`: `confirmatory` or `exploratory`. Required.
-- `hypotheses`: hypothesis IDs the plan tests. Required (at least one) for `confirmatory`.
+- `hypotheses`: hypothesis IDs the plan tests. Required (at least one) for `confirmatory`. One plan can test several hypotheses: when one computation decides several, they are named in one plan, with a quantity and rules that decide each (a verdict is recorded for each, §5.7.4), and the computation is run once.
 - `design`: what will be run, on what, with which settings. Required.
+- `setup`: optional, recommended for `confirmatory`: the parts of the test as terms by role, `{studied, cases, procedure, lens, context}`, each a non-empty list of term IDs (claimset §3.4): what is studied or compared, on what cases, by what procedure, measured or read through what. Exported as the setup of the evidence its runs give (§9).
 - `analysis`: what will be computed from the outputs. Required.
+- `new_data`: optional text: what the test uses that the runs which suggested its hypotheses did not (new data, a seed that changes the sample, new models or settings). Recommended when a hypothesis it names is `from_exploration` (§5.7.6): a test on what the exploration already saw can only repeat it.
+- `exclusions`: optional list of `{name, rule}`: each rule that leaves units out of the analysis (models near a boundary, outliers, trimmed observations), with a name and the rule as text. The deciding runs report how many units each excluded, as a result whose `quantity` contains `excluded` or the exclusion's name (§5.7.6), so readers see how much of the sample the verdict rests on.
+- `addresses`: optional list of the global IDs of review comments (`doi:…@v1/RV1.c6`) whose resolution test the plan runs (§5.7.7).
 - `decision`: the decision rule (§5.7.1). Required for `confirmatory`.
 - `runs`: how many successful confirmatory runs decide the plan (§5.7.2). A positive integer; default 1.
 - `data`: optional list of `{description, hash}` for data that exists when the plan is written.
 - `holdout`: optional list of `{path, hash}`: data kept for this test only (§5.7.5).
+- `requires_approval`: optional, `true` when the plan is to be run only after a supervisor approves it (L23). Set it for every confirmatory plan when the study has a supervisor.
 - `code_version`, `dirty`: the commit of the repository when the plan was written, and whether it had uncommitted changes outside the lab directory; recorded by the tool, as for runs (§5.9).
 
 Plans are immutable. A changed plan is a new plan that supersedes the old one; runs already made under the old plan keep pointing at it. The decision rule that decides a plan is the one in the version its first deciding run names in `plan_version` (§5.9); corrections written after that do not change the verdict.
@@ -318,13 +398,41 @@ A hypothesis may be tested again under a new plan (a replication, a larger sampl
 
 #### 5.7.5 Flags
 
-Two things weaken a planned test without making it invalid. The tool does not refuse them; it reports them as flags of the decided plan (in `verify`, in `verdict`, and in the exported claim's `test.flags`):
+Three things weaken a planned test without making it invalid. The tool does not refuse them; it reports them as flags of the decided plan (in `verify`, in `verdict`, and in the exported claim's `test.flags`):
 - `code_changed_after_plan`: a deciding run used a different commit from the one recorded with the plan, or the code had uncommitted changes when the plan was written or a deciding run was made. The analysis was not fixed when the plan was. Commit the analysis code before writing the plan to avoid it.
 - `holdout_used_elsewhere`: a run other than the plan's deciding runs declared a held-out file of the plan (by hash) as input data. The data meant to test the hypothesis was also used to explore it. Only inputs declared to the tool (`run --data`) can be detected.
+- `reproduces_prompting_result`: a plan names a hypothesis recorded `from_exploration`, and a result of a deciding run has the same `quantity`, the same `conditions` and the same `value` as a result of a run that suggested it (a run named in the hypothesis's `prompted_by`, or the run of a result named there). Under a rule with quantities, only the results the quantities bind are compared; under text rules every result is. Results with value 0 are not compared: a count of zero (no mismatches, no failures) is what a correct method gives on any data. The test may have recomputed the exploration (the same data, or data generated by code that a new seed did not change) rather than tested the hypothesis on anything new.
+
+#### 5.7.6 Warnings
+
+The tool warns, and records nothing, when:
+- a plan names a hypothesis recorded `from_exploration` and has no `new_data` (at `plan`);
+- a plan has no `exclusions` and a parameter of its decision rule has a name that suggests one: split at `_`, `-` and spaces, it contains `edge`, `band`, `exclude`, `exclusion`, `excluded`, `trim`, `trimmed`, `outlier`, `outliers` or `cutoff` (at `plan`);
+- a decided plan declares an exclusion and no result of its deciding runs has a `quantity` containing `excluded` or the exclusion's name (at `verdict`);
+- a confirmatory run has the same `command`, `code_version`, `seeds` and `parameters` as a successful confirmatory run of another plan (at `run`, and as a note of `verify`): one computation recorded twice; one plan naming both hypotheses would have needed one run;
+- a confirmatory plan has no `setup` (at `plan`);
+- a plan's `setup` does not name a term that the `about` of a hypothesis it tests names, when the term's kind is `method`, `intervention`, `population`, `data`, `design` or `variable` (at `plan`): the test would decide a hypothesis about something it does not study or measure. A hypothesis about MASE tested by a plan that measures MSIS is a switched outcome; one about a comparison with N tested by a plan that runs only M and P is a switched comparator. Revise the hypothesis, or add the part to the setup.
+
+#### 5.7.7 Plans that answer a review
+
+A review comment on a published claimset carries a resolution test: a procedure and two rules, `upheld` (the comment stands) and `withdrawn` (it falls), fixed before the author answers (revision §3.4). The author runs a computable test as a confirmatory plan:
+- a hypothesis states what the comment questions, as the author holds it (`per_lag_max() reproduces the check of smooth 4.6.0 on the models of C1`);
+- the plan's decision rule is the comment's current test: its framework, parameters and quantities, `supported` its `withdrawn` rule and `not_supported` its `upheld` rule, unchanged; `design` is its procedure;
+- `addresses` names the comment.
+
+The verdict then says which rule of the comment's test the evidence met: `supported` means the comment's `withdrawn` rule was met, `not_supported` its `upheld` rule, `inconclusive` neither. All rules of planned tests apply (L15–L17); a test that comes out against the author is reported like any other. A plan may address several comments when one run settles them all. Tests of the framework `documentary` (decided by what a cited source states) and text rules are not run in the record: the author answers them in the response.
+
+The claimset's next version comes with the record of the previous version followed by the events written since (revision §5.4): the record is never restarted or rewritten for a revision, and the work that answers a review is appended to it.
 
 ### 5.8 `approval` (prefix `AP`)
 
-`{target, comment}`: a human approves a plan (or another event) before it is acted on. The `by` of an approval is an actor of kind `human`. Optional; lets a supervisor sign off confirmatory plans.
+`{target, comment, on_behalf_of, words, given_at, channel}`: a human approves a plan (or another event) before it is acted on. Optional unless the plan requires it (`requires_approval`, L23).
+
+An approval is written in one of two ways:
+- **By the human** (`by` an actor of kind `human`), running the tool themselves.
+- **By an agent on the human's behalf** (`by` an agent actor, `on_behalf_of` the human actor). The agent asked the human, waited, and records the answer: `words` is the human's reply as they gave it, verbatim (`"Yes, go ahead with PL2."`); `given_at` is when they gave it (ISO 8601, UTC; the event's own time when absent); `channel` optionally says where (`conversation`, `email`, `meeting notes`). The human makes the decision; the agent only records it.
+
+An agent never approves on its own judgement. It does not treat silence, a general instruction ("do everything you need"), or an answer to a different question as approval; a standing approval counts only if the human gave it for the plans it is used for ("approve every confirmatory plan for Q2 as written"), and then `words` quotes it and `given_at` is when it was given. The tool cannot tell whether the words are genuine: like every event, a relayed approval is tamper-evident once written, and it is shown as relayed, so a reader sees that the supervisor's words were recorded by the agent. An approval of a plan applies to the version it follows: a plan corrected after its approval needs a new approval (L23).
 
 ### 5.9 `run` (prefix `RN`), written by the tool
 
@@ -334,7 +442,7 @@ Two things weaken a planned test without making it invalid. The tool does not re
 - `plan_version`: the ID of the version of that plan in force for the run's writer when the run was made (the latest correction it could see). The version named by the first deciding run decides the plan (§5.7.2); this holds also for runs merged from agent logs, whose writer may not have seen corrections made meanwhile in the main log.
 - `label`: `confirmatory` (only if rule L5 holds) or `exploratory`.
 - `command`: the command as a list of arguments.
-- `code_version`: commit hash of the working directory's repository, or `null` if it is not a git repository; `dirty`: true if it had uncommitted changes outside the lab directory.
+- `code_version`: commit hash of the working directory's repository, or `null` if it is not a git repository; `dirty`: true if it had uncommitted changes outside the lab directory. A run is made from the code checkout, never from the study's folder. The commit of the study branch that records the run takes `code_version` as a further parent, so the code stays reachable from the record (§7.1).
 - `parameters`: optional object of named settings given to the tool; `seeds`: optional list of random seeds given to the tool.
 - `data`: list of `{path, hash}` for input files declared to the tool.
 - `environment`: `{software: {python, platform}, hardware: {machine, cpus}}`, as recorded by the tool.
@@ -403,7 +511,17 @@ Papers split a study's results between them; the split must not decide what is r
 
 ### 5.18 `relocation` (prefix `MV`), written by the tool
 
-`{from, to, study, moved}`: the lab moved from `from` to `to` (paths of the lab folder relative to the top of the repository); `study` names the study when the move gives it one; `moved` lists other files or folders the record names that moved with it, as `{from, to}`. Written only to the main log, after the move (§3.4).
+`{from, to, study, moved, branch}`: the lab moved from `from` to `to` (paths of the lab folder relative to the top of the repository, or, for `to` with `branch`, to the top of the study branch); `study` names the study when the move gives it one; `moved` lists other files or folders the record names that moved with it, as `{from, to}`; `branch` is the study branch the lab now lives on, after an adoption. Written only to the main log, after the move (§3.4).
+
+### 5.19 `term` (prefix `TM`)
+
+`{term, kind, definition, source}`: a term the study names: what it studies or compares, the cases, the procedure, what it measures, the concepts and theories it uses or finds (claimset §3.2).
+- `term`: the term as the study writes it. Required.
+- `kind`: `method` · `intervention` · `population` · `data` · `setting` · `design` · `variable` · `concept` · `theory` · `other`, as in claimset §3.2 (`measure` in records written under v0.12 is read as `variable`). Required.
+- `definition`: what the term means in this study, with what the study specifies (settings, subset, horizon, aggregation). For the study's own method or model, every equation that defines it, as the code implements it (claimset §3.2). Required.
+- `source`: optional: where a borrowed term is defined (a DOI, an arXiv ID, a citation).
+
+A term is recorded once and corrected with `--supersedes` when what it means changes; the correction keeps its place, so hypotheses and plans that named it keep naming it, and the record shows when its meaning changed. A term changed after a plan that names it in its setup was written is a change to the plan's test, and is recorded as a deviation if the runs used the new meaning.
 
 ## 6. Rules
 
@@ -426,8 +544,12 @@ L16. A confirmatory run is not made under a plan that already has its deciding r
 L17. A status that names a plan, or that cites a decided plan's deciding runs or their results for a hypothesis the plan names, is a verdict: the plan is decided and names the hypothesis, the deciding runs or their results are cited, and the outcome is the one the plan's rule gives (§5.5).
 L18. A paper has a valid name, unique among the record's papers, and names at least one question; no question is named by two papers (each correction chain counted once, its latest version in force).
 L19. A lab inside `claimset/<name>/lab` belongs to the study `<name>`: its study (from `init` or the latest relocation that names one) is `<name>`, and records begun under v0.6 or later name a study.
+L20. A record with a study branch is written only in the checkout of that branch; a lab in `claimset/<study>/lab` inside a git repository is written only on its study branch (adopted, §3.4).
+L21. A hypothesis's `about` and a plan's `setup` name only `term` events; every term mark in a hypothesis's statement (`[[TM3:…]]`) names a term; every term `about` names is marked in the statement; a list in `about.object` names only terms of kind `variable`.
+L22. An approval's `by` is a human actor, or an agent actor with `on_behalf_of` naming a human actor and non-empty `words`; an approval by a human has no `on_behalf_of`.
+L23. A confirmatory run is not made under a plan with `requires_approval` unless an approval of that plan was written after its current version (the version the run names in `plan_version`).
 
-The tool enforces L1–L5 and L8–L19 mechanically, and refuses L6 and L7 violations. L15–L17 apply to records begun under v0.5 or later, and to records whose `init` is withheld. Where a check depends on withheld content (a withheld run, result or plan), `verify` does not report it as a violation; withholding lowers verifiability instead (§8).
+The tool enforces L1–L5 and L8–L23 mechanically, and refuses L6 and L7 violations. L15–L17 apply to records begun under v0.5 or later, and to records whose `init` is withheld. Where a check depends on withheld content (a withheld run, result or plan), `verify` does not report it as a violation; withholding lowers verifiability instead (§8).
 
 ## 7. Timestamp anchoring
 
@@ -449,7 +571,9 @@ The anchor level of a plan becomes `planned_at_anchor` in the exported claimset.
 
 ### 7.1 Git anchoring
 
-With `git_remote` anchoring, the head is recorded by pushing the lab's logs to a dedicated branch of a git remote. The branch is `claimset-lab/<study>` unless the configuration names another (`claimset-lab` for a record without a study), so the studies of a repository never share one. A relocation keeps the branch the record was anchored on: the tool writes it into the configuration. Anchor commits hold the logs at their paths when they were made; remote verification looks for the main log at its current path and, in commits made before a relocation, at the paths it had before.
+**On a study branch** (§3) anchoring is part of keeping the record: after every command that changes it, the tool commits the study's folder (the logs, run outputs, papers) to the study branch and pushes it. Each push is an anchor (`service: git_remote`, with the pushed commit as the receipt), so every event is anchored when it is written. The commit after a run takes the run's `code_version` as a further parent: pushing the study branch pushes the code the run used, and keeps it reachable whatever happens to its own branch. The record's own history is the first-parent history of the branch. Offline, the commits stay local and are pushed with the next command; until then `verify` and `claimset studies` report them as not pushed, and a confirmatory run is refused until its plan is pushed (L5). Configuration in `lab/config.json`: `{"record": {"remote": "origin", "branch": "claimset/<study>"}}`.
+
+**Without a study branch** (records outside the study layout, or before v0.7), the head is recorded by pushing the lab's logs to a dedicated anchor branch of a git remote, as follows. The branch is `claimset-lab/<study>` unless the configuration names another (`claimset-lab` for a record without a study). A relocation keeps the branch the record was anchored on: the tool writes it into the configuration. Anchor commits hold the logs at their paths when they were made; remote verification looks for the main log at its current path and, in commits made before a relocation, at the paths it had before. When such a record is adopted onto a study branch, its earlier receipts keep naming the anchor branch they were pushed to, and are checked there.
 
 - **Configuration** is kept in `lab/config.json`: `{"anchor": {"service": "git_remote", "remote": "origin", "branch": "claimset-lab", "every": "plan"}}`. `every` is `plan` (default) or `event`.
 - **What is committed:** `lab.jsonl`, `anchors.jsonl` and the files in `agents/`, at their paths in the repository. The commit is made on the anchor branch without touching the researcher's working tree or current branch. Run outputs are not committed; they are covered by the hashes in the log.
@@ -458,7 +582,7 @@ With `git_remote` anchoring, the head is recorded by pushing the lab's logs to a
 - **Receipt:** `{remote, branch, commit}` recorded in the `anchors.jsonl` entry, which itself is committed with the next anchor.
 - **Protection of the branch:** to make the remote copy append-only, protect the branch on the host so that force-pushes and deletion are refused, and give the agent credentials that can push but cannot change branch protection. This turns detection into prevention.
 - **Several working copies:** when agents work in their own clones (§3.5), each copy anchors to the same branch. The commit starts from the branch as it is on the remote: a local log that extends its anchored copy replaces it; a log that is behind (another copy has added to it) is kept as anchored; a log that differs is refused. `anchors.jsonl` on the branch holds the receipts of all copies. In the repository, `lab/.gitattributes` (written by `init`) marks `anchors.jsonl` with `merge=union`, so merging the copies' branches combines their receipts without conflicts; agent logs never conflict because each has its own file.
-- **Checking:** `verify --remote` fetches the branch and checks that each local log agrees with its copy there (a local log that is behind is reported as a note, not an error), that each anchor's commit is on the branch, and that it holds every anchored log as it was at that anchor.
+- **Checking:** `verify --remote` fetches the branch and checks that each local log agrees with its copy there (a local log that is behind is reported as a note, not an error), that each anchor's commit is on the branch its receipt names, and that it holds every anchored log as it was at that anchor.
 
 ## 8. Publication and redaction
 
@@ -490,13 +614,14 @@ Hypotheses without a final status are counted as open; they are not forced close
 | `init` | `paper.title` (the working title), `paper.origin: native` |
 | `actor`, agent | contributor of type `agent` with its models (each model defined once in `models`, `accessed` the date of the earliest event by an agent using it), `name`, `record_source`, `run_period` (dates of its first and last events) and `tools: [code_execution]` if it ran commands. Position `author` if it wrote any event other than `actor` and `check`; otherwise `contributor`, with AI task `review` |
 | `actor`, human or organisation | contributor with `name` and `orcid`, position `contributor`. Who is supervisor and guarantor is decided by people (completion list) |
-| a verdict on a planned test (§5.7.4) | a claim per decided plan and hypothesis it names, in the order of the hypotheses and then the plans: `statement` from the hypothesis as it stood when the plan was written, `hypothesis: {lab_event, outcome}` (`lab_event` is that version's ID, `outcome` the verdict), defaults `type: descriptive`, `role: supporting`, `novelty: new`, `provenance: author_stated` |
+| a verdict on a planned test (§5.7.4) | a claim per decided plan and hypothesis it names, in the order of the hypotheses and then the plans: `statement` and `about` from the hypothesis as it stood when the plan was written, `hypothesis: {lab_event, outcome}` (`lab_event` is that version's ID, `outcome` the verdict), defaults `type: descriptive`, `role: supporting`, `novelty: no_prior_found`, `provenance: author_stated` |
+| `term` | a definition (`D1`, `D2`, … in record order, each correction chain once, its latest version) with `term`, `kind`, `definition` and `source` (as text: the completion list asks for it to become an entry of `references`). Term marks and term IDs in statements, `about` and `setup` are replaced by the definition IDs |
 | `hypothesis` named by no decided plan, with final status `supported`, `not_supported` or `inconclusive` | an exploratory claim, the same way, from the latest version of the hypothesis and its final status |
 | `hypothesis` otherwise | not a claim; counted in `paper.exploration` |
-| the runs behind a verdict or final status | one evidence object per claim, from the runs the status names as evidence, directly or through their results: `lab_runs`, `results` (one per `result` event: `quantity`, `value`, `unit`, `interval`, `conditions`), `execution` (`code_version` when the runs share one), default `profile: quant`, `design: other`, `availability: public`. The claim's support is `empirical_quant` pointing to the evidence and its results |
-| `plan` | `planning`, `planned_at`, `planned_at_anchor` and `test` on the claims of its verdicts (below). `test` is the plan's decision rule as written before the run: `framework`, `parameters`, `quantities`, `supported`, `not_supported`, `verdict` (`computed` when the rule has quantities, otherwise `judged`), `runs`, `lab_plan` (the plan's ID) and `flags` (§5.7.5) |
+| the runs behind a verdict or final status | one evidence object per claim, from the runs the status names as evidence, directly or through their results: `lab_runs`, `results` (one per `result` event, as observations: its `quantity` as `variable` (the term's definition ID when a term of kind `variable` has that name), `value`, `unit`, `interval`, `conditions`), `execution` (`code_version` when the runs share one), `setup` (the setups of the plans the runs name, merged by role), default `profile: quant`, `design: other`, `availability: public`. The claim's support is `empirical_quant` pointing to the evidence and its results |
+| `plan` | `planning`, `planned_at`, `planned_at_anchor` and `test` on the claims of its verdicts (below). `test` is the plan's decision rule as written before the run: `framework`, `parameters`, `quantities`, `supported`, `not_supported`, `verdict` (`computed` when the rule has quantities, otherwise `judged`), `runs`, `lab_plan` (the plan's ID), `flags` (§5.7.5) and `addresses` (§5.7.7) |
 | `deviation` | `planning: confirmatory_with_deviations`, and a limitation on the affected claim: `category: analytic_flexibility`, `impact: could_bias_magnitude`, `mitigation: none`, statement naming the run, the plan, what differed and why |
-| `assumption` | assumption claim with `assumption_category` and `check`; `check_evidence` when it names a run or result used in an evidence object |
+| `assumption` | assumption claim (without novelty) with `assumption_category` and `check`; `check_evidence` when it names a run or result used in an evidence object |
 | `check` | a `checks` entry on the claim whose hypothesis, final status, or evidence run or result it targets. A check by an actor exported as an author is not exported (claimset rule 39) and is named in the completion list |
 | `artefact` | artefact with `kind`, `uri` (the path or URI), `version` (the hash), `licence`, `description` |
 | the whole record | artefact of kind `lab_record`: `uri` (for a repository on GitHub whose last event is anchored by a git commit, the log in that commit; otherwise the repository URI from `init` followed by the log's path, and the completion list asks for a fixed URI, or the path alone), `version` (the hash of `lab.jsonl`), `availability: public`, `withheld_events`; referenced from `paper.exploration.lab_record` |
@@ -505,9 +630,9 @@ Hypotheses without a final status are counted as open; they are not forced close
 
 **Planning label of an exported claim.** A claim from a verdict is `confirmatory`, or `confirmatory_with_deviations` if a deviation is recorded for the plan and one of its deciding runs. Its `planned_at` is the `at` of the plan version that decides the plan (the one its first deciding run names in `plan_version`), and `planned_at_anchor` is the service of the earliest anchor that covers that plan version and was made before the first deciding run started, or `none`. A claim from a hypothesis named by no decided plan is `exploratory`.
 
-**Exploration summary.** `questions` counts questions, each correction chain once; `hypotheses` counts hypotheses by final status, each correction chain once, with `open` for those without one; `tests` counts verdicts, one per decided plan and hypothesis it names; `runs` counts all run events by label, and `failed` those whose exit status is not `success`.
+**Exploration summary.** `questions` counts questions, each correction chain once; `hypotheses` counts hypotheses by final status, each correction chain once, with `open` for those without one, and `from_exploration` those whose latest version has `origin: from_exploration`; `tests` counts verdicts, one per decided plan and hypothesis it names; `runs` counts all run events by label, and `failed` those whose exit status is not `success`.
 
-**Defaults the completion list always names:** `paper.licence` and the guarantor (asked of the responsible human), `paper.contributions` and principal roles, `paper.autonomy` (exported as `unknown`), claim types, statements of negative results (to say plainly what was not found), scopes, evidence profiles and descriptions, and links from claims to assumptions.
+**Defaults the completion list always names:** `paper.licence` and the guarantor (asked of the responsible human), `paper.contributions` and principal roles, `paper.autonomy` (exported as `unknown`), claim types, statements of negative results (to say plainly what was not found), scopes, evidence profiles and descriptions, links from claims to assumptions, an `about` for each claim whose hypothesis has none and a `setup` for each evidence object whose plans have none, and the **definitions**, exported from the record's terms: missing ones are added, and the definition of each method or model of the study's own that a planned test compares gives every equation that defines it, as the code of the runs implements it, and is checked against that code (the runs' code versions are in each evidence's `execution`); a variant gives its own equations in full (claimset §3.2, warning 26). The supervisor's approval of the completed claimset covers its definitions as well as its claims.
 
 **Negative results** are exported as claims in the same claimset: the statement says what was not found, under what scope, and `hypothesis.outcome` is `not_supported`.
 
@@ -517,15 +642,23 @@ The reference tool is part of the `claimset` package. Indicative commands:
 
 | Command | Effect |
 |---|---|
-| `claimset lab init --study NAME --title …` | creates `claimset/NAME/lab/`, writes `init`, and leaves `claimset/` out of the package build files (§3.3) |
+| `claimset setup --study NAME --title …` (or `claimset lab init --study NAME --title …`) | creates the study branch `claimset/NAME` with its lab, checks it out at `claimset/NAME/`, and adds the ignore lines (§3, §3.3) |
+| `claimset setup` | in a fresh clone: checks out every study branch of the remote |
+| `claimset setup --study NAME --adopt --by AC2` | moves a study committed on the code branch onto its own branch (§3.4) |
+| `claimset setup --ci` | writes the GitHub check that keeps study records out of pull requests (§4.5) |
+| `claimset studies` | the studies of the repository: events, open hypotheses, pending plans, commits not pushed |
 | `claimset lab paper NAME --questions Q1 Q2` | records a paper and the questions it reports (§5.17) |
 | `claimset lab move [--to DIR] [--study NAME] [--also OLD=NEW …]` | moves the lab (default `claimset/<study>/lab`) and other files, and records the relocation (§3.4) |
 | `claimset lab actor` | registers an actor |
 | `claimset lab question` / `hypothesis` / `assume` / `note` | writes the corresponding event |
+| `claimset lab term MASE --kind measure --definition "…" [--source …]` | records a term (§5.19) |
+| `claimset lab hypothesis "[[TM1:M]] has lower [[TM3:MASE]] than [[TM2:N]]." --question Q1 --subject TM1 --relation "has lower error than" --object TM3 --comparator TM2 --condition TM4` | a hypothesis with its atom (§5.4) |
 | `claimset lab status H3 supported --evidence RS12 RS13 --why "…" [--plan PL2] [--rule supported]` | status change, with L6, L7 and L17 checked |
 | `claimset lab verdict PL2` | the verdict a decided plan's rule gives, with the value bound to each quantity (§5.7.3) |
-| `claimset lab plan --kind confirmatory --hypotheses H1 --design … --analysis … --framework frequentist --parameter alpha=0.05 … --quantity p="…" --supported "p < alpha" --not-supported "…" [--runs N] [--decision FILE]` | writes a plan with its decision rule (§5.7.1) and anchors it |
-| `claimset lab approve PL2` | human approval |
+| `claimset lab plan --kind confirmatory --hypotheses H1 --design … --analysis … --framework frequentist --parameter alpha=0.05 … --quantity p="…" --supported "p < alpha" --not-supported "…" [--runs N] [--decision FILE] [--new-data "…"] [--exclusion name="rule"] [--studied TM1 TM2 --cases TM4 --procedure TM5 --lens TM3]` | writes a plan with its decision rule (§5.7.1) and anchors it; warns as in §5.7.6 |
+| `claimset lab plan --kind confirmatory --hypotheses H9 --comment doi:…@v1/RV1.c6 --review RV1.json --analysis "…"` | writes a plan that runs a review comment's resolution test: the decision rule is the comment's current test and `addresses` names the comment (§5.7.7); `--design` defaults to the test's procedure |
+| `claimset lab approve PL2 --by AC1` | approval by the human, who runs the command |
+| `claimset lab approve PL2 --by AC2 --on-behalf-of AC1 --words "Yes, go ahead with PL2." [--given-at …] [--channel conversation]` | approval recorded by an agent on the human's behalf, with their words (§5.8) |
 | `claimset lab run [--plan PL2] [--exploratory] [--param k=v] [--seed N] [--data FILE] -- <command>` | runs the command, records `run` and `result` events (§5.9.1) |
 | `claimset lab decide` / `deviate` / `check` / `artefact` | writes the corresponding event |
 | `claimset lab summary` | current state: open questions, hypotheses by status, pending plans, recent decisions; for an actor with an open agent log, what that agent sees |
@@ -547,6 +680,6 @@ The reference tool is part of the `claimset` package. Indicative commands:
 
 1. Anchoring service: platform receipts, RFC 3161 providers, or both.
 2. Storage of large run outputs (content-addressed storage, external archives).
-3. Event types for laboratory and qualitative research (data-collection sessions, instruments, coding rounds).
+3. Event types for laboratory and qualitative research (data-collection sessions, instruments, coding rounds). Terms (§5.19) record what a qualitative study's setup is; how its interviews and coding rounds are recorded as runs is still open.
 4. Very long explorations (thousands of runs): summarised export without losing the counts.
 5. Whether abandoned hypotheses with substantial evidence should be exportable as claims.

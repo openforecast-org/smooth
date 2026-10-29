@@ -1,0 +1,5 @@
+{'model': 'Croston', 'error': 'M', 'p': 0.02, 'alpha': 0.002, 'mean_p_hat': 0.02009759055, 'ratio': 1.0048795275, 'nonfinite': 0, 'predicted': 0.02, 'rel_dev': 0.004879527499999925}
+{'model': 'Croston', 'error': 'M', 'p': 0.15, 'alpha': 0.002, 'mean_p_hat': 0.1502230349, 'ratio': 1.0014868993333335, 'nonfinite': 0, 'predicted': 0.15, 'rel_dev': 0.001486899333333347}
+{'model': 'Croston', 'error': 'M', 'p': 0.4, 'alpha': 0.002, 'mean_p_hat': 0.3998624743, 'ratio': 0.9996561857499999, 'nonfinite': 0, 'predicted': 0.4, 'rel_dev': 0.00034381425000007404}
+{'model': 'Croston', 'error': 'M', 'p': 0.65, 'alpha': 0.002, 'mean_p_hat': 0.650017247, 'ratio': 1.0000265338461538, 'nonfinite': 0, 'predicted': 0.65, 'rel_dev': 2.6533846153757696e-05}
+{'model': 'Croston', 'error': 'M', 'p': 0.9, 'alpha': 0.002, 'mean_p_hat': 0.8999029386, 'ratio': 0.999892154, 'nonfinite': 0, 'predicted': 0.9, 'rel_dev': 0.00010784599999998552}

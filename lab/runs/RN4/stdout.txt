@@ -1,0 +1,10 @@
+{'model': 'iETS_I', 'error': 'A', 'p': 0.02, 'alpha': 0.002, 'mean_p_hat': 0.03981214608, 'ratio': 1.9906073039999999, 'nonfinite': 0, 'predicted': 0.03975536093790594, 'rel_dev': 0.0014283643955026676}
+{'model': 'iETS_I', 'error': 'A', 'p': 0.15, 'alpha': 0.002, 'mean_p_hat': 0.1943980205, 'ratio': 1.2959868033333333, 'nonfinite': 0, 'predicted': 0.19423576798165193, 'rel_dev': 0.0008353380020274504}
+{'model': 'iETS_I', 'error': 'A', 'p': 0.4, 'alpha': 0.002, 'mean_p_hat': 0.4169303183, 'ratio': 1.0423257957499998, 'nonfinite': 0, 'predicted': 0.41727409520025727, 'rel_dev': 0.0008238635089300015}
+{'model': 'iETS_I', 'error': 'A', 'p': 0.65, 'alpha': 0.002, 'mean_p_hat': 0.624858362, 'ratio': 0.9613205569230769, 'nonfinite': 0, 'predicted': 0.6247291968424025, 'rel_dev': 0.0002067538355024516}
+{'model': 'iETS_I', 'error': 'A', 'p': 0.9, 'alpha': 0.002, 'mean_p_hat': 0.8579533453, 'ratio': 0.9532814947777778, 'nonfinite': 0, 'predicted': 0.8580755900566559, 'rel_dev': 0.0001424638552505925}
+{'model': 'iETS_O', 'error': 'A', 'p': 0.02, 'alpha': 0.002, 'mean_p_hat': 0.03962957058, 'ratio': 1.981478529, 'nonfinite': 0, 'predicted': 0.03975536093790594, 'rel_dev': 0.003164110573726325}
+{'model': 'iETS_O', 'error': 'A', 'p': 0.15, 'alpha': 0.002, 'mean_p_hat': 0.1939712238, 'ratio': 1.2931414920000002, 'nonfinite': 0, 'predicted': 0.19423576798165193, 'rel_dev': 0.0013619745961357167}
+{'model': 'iETS_O', 'error': 'A', 'p': 0.4, 'alpha': 0.002, 'mean_p_hat': 0.4178566463, 'ratio': 1.04464161575, 'nonfinite': 0, 'predicted': 0.41727409520025727, 'rel_dev': 0.001396087383433615}
+{'model': 'iETS_O', 'error': 'A', 'p': 0.65, 'alpha': 0.002, 'mean_p_hat': 0.6247103267, 'ratio': 0.9610928103076923, 'nonfinite': 0, 'predicted': 0.6247291968424025, 'rel_dev': 3.0205315355522965e-05}
+{'model': 'iETS_O', 'error': 'A', 'p': 0.9, 'alpha': 0.002, 'mean_p_hat': 0.8579842755, 'ratio': 0.9533158616666666, 'nonfinite': 0, 'predicted': 0.8580755900566559, 'rel_dev': 0.00010641784676553712}

@@ -1,0 +1,29 @@
+identity log of ADAM update -> 0
+identity old ADAM error = additive old error, O, o=0 -> 0
+identity old ADAM error = additive old error, O, o=1 -> 0
+identity old ADAM error = additive old error, I, o=0 -> 0
+identity old ADAM error = additive old error, I, o=1 -> 0
+identity log exp s = s -> 0
+identity exp score drift iETS_O = p-x -> 0
+identity exp score drift iETS_I = x-p -> 0
+identity k_O = p log(2-x)+(1-p)log(1-x) -> 0
+identity k_I = p log x+(1-p)log(1+x) -> 0
+identity k_O' = -p/(2-x)-(1-p)/(1-x) (<0 on (0,1)) -> 0
+identity k_I' = p/x+(1-p)/(1+x) (>0 on (0,1)) -> 0
+limits k_O(0+)= p*log(2)  k_O(1-)= oo*sign(p - 1)
+limits k_I(0+)= -oo  k_I(1-)= -p*log(2) + log(2)
+identity E[s] at x=p is 0 (O) -> 0
+identity E[s] at x=p is 0 (I) -> 0
+check E[log(1+s)]<0 at x=p, both models True bad=0
+check enumeration equals closed form True bad=0
+check roots: iETS_O root in (0,p), iETS_I root in (p,1) True bad=0
+check stability of the roots True bad=0
+check exactly one sign change on 2999 x-points, 80 p True bad=0
+check ADAM old drift equals additive old drift True 
+[]
+{'quantity': 'identities sympy could not reduce to zero', 'value': 0, 'conditions': {'claim': 'C13'}}
+{'quantity': 'numerical counterexamples', 'value': 0, 'conditions': {'claim': 'C13'}}
+{'quantity': 'checks performed', 'value': 20, 'conditions': {'claim': 'C13'}}
+{'quantity': 'min over p grid of p - root (iETS_O, mult. score, ADAM)', 'value': 3.068528193337076e-10, 'conditions': {'claim': 'C13'}}
+{'quantity': 'min over p grid of root - p (iETS_I, mult. score, ADAM)', 'value': 3.068528193337076e-10, 'conditions': {'claim': 'C13'}}
+{'quantity': 'root iETS_O at p=0.5', 'value': 0.38196601125010515, 'conditions': {'claim': 'C13'}}

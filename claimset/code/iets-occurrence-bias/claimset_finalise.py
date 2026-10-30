@@ -19,15 +19,13 @@ LEVELS = ["0.8", "0.9", "0.95", "0.99"]
 
 REFERENCES = [
     ("B1", "10.1016/j.ijpe.2023.109013", "doi"),
-    ("B2", "Croston, J.D. (1972). Forecasting and stock control for intermittent demands. "
-           "Operational Research Quarterly 23(3), 289-303.", "reference"),
+    ("B2", "10.2307/3007885", "doi"),
     ("B3", "10.1002/jae.1279", "doi"),
     ("B4", "10.1017/CBO9781139540933", "doi"),
     ("B6", "10.1007/b97441", "doi"),
     ("B7", "10.1016/S0925-5273(00)00143-2", "doi"),
     ("B8", "10.1016/j.ijforecast.2004.10.001", "doi"),
-    ("B9", "Svetunkov, I. (2023). Forecasting and Analytics with the Augmented Dynamic "
-           "Adaptive Model (ADAM). Chapman and Hall/CRC.", "reference"),
+    ("B9", "10.1201/9781003452652", "doi"),
     ("B10", "10.1016/j.ijforecast.2021.11.013", "doi"),
     ("B11", "10.1016/j.ejor.2011.05.018", "doi"),
     ("B12", "10.1016/j.ijforecast.2011.03.009", "doi"),
@@ -556,10 +554,11 @@ def finalise_paper(d):
     p["licence"] = "CC-BY-4.0"
     p["contributions"] = PRINCIPAL
     p["autonomy"] = "human_supervised"
+    p["declarations"] = {"funding": [], "competing_interests": "None declared."}
     p["classification"] = {"keywords": [
         "intermittent demand forecasting", "iETS occurrence model", "occurrence probability bias",
         "score-driven filter", "exponential smoothing", "Croston's method", "M5 competition"]}
-    d["paper"] = {k: p[k] for k in ["title", "licence", "classification", "contributions",
+    d["paper"] = {k: p[k] for k in ["title", "licence", "classification", "declarations", "contributions",
                                     "autonomy", "contribution_record", "origin", "exploration",
                                     "study"] if k in p}
 
@@ -718,7 +717,13 @@ def finalise_claims(d):
             c["type"] = "formal"
             c["support"] = [{"kind": "formal_proof", "evidence": proof},
                             {"kind": "empirical_quant", "evidence": check}]
-            c["verification"] = "unchecked"
+            checks = c.get("checks", [])
+            confirmed = any(x.get("outcome") == "confirmed" and x.get("extent") == "full"
+                            for x in checks)
+            disputed = any(x.get("outcome") == "disputed" and not x.get("resolution")
+                           for x in checks)
+            c["verification"] = ("disputed" if disputed else
+                                 "agent_checked" if confirmed else "unchecked")
     claims["C22"]["limitations"] = ["L1"]
     claims["C9"]["about"]["object"] = "D13"
     claims["C8"]["about"].update({"subject": "D3", "object": "D9"})

@@ -214,14 +214,15 @@ STATEMENTS = {
            "absolute [[D13:bias of the occurrence probability]] is larger in 2 simulated cells "
            "for [[D1:iETS_I]] and 0 for [[D2:iETS_O]].",
     "C19": "On the [[D19:M5 subset]], replacing the [[D3:old error proxy]] with the "
-           "[[D8:score proxy]] in the [[D20:iETS(M,N,N) flavours]] raises the "
-           "[[D32:sum of point forecasts]] of iETS_I under conventional ETS and lowers it for "
-           "iETS_O under conventional ETS and for iETS_I and iETS_O under ADAM ETS, the "
-           "directions predicted by the zero-drift points of the old proxy.",
-    "C20": "On the [[D19:M5 subset]], each of the eight [[D20:iETS(M,N,N) flavours]] with a "
-           "proxy, iETS_O, iETS_I, iETS_G and iETS_A under conventional and ADAM ETS, has a "
-           "lower [[D25:RMSSE]] with the [[D8:score proxy]] than with the [[D3:old error "
-           "proxy]].",
+           "[[D8:score proxy]] in the [[D20:iETS(M,N,N) flavours]] statistically significantly "
+           "raised the [[D32:sum of point forecasts]] of iETS_I and lowered it for iETS_O under "
+           "conventional ETS, the directions predicted by the zero-drift points of the old "
+           "proxy, while the predicted decrease for iETS_I and iETS_O under ADAM ETS was not "
+           "statistically significant at the 1% level.",
+    "C20": "On the [[D19:M5 subset]], the [[D8:score proxy]] gave a statistically "
+           "significantly lower [[D25:RMSSE]] than the [[D3:old error proxy]] for 6 of the eight "
+           "[[D20:iETS(M,N,N) flavours]] with a proxy, all except iETS_G and iETS_A under "
+           "conventional ETS, and a statistically significantly higher RMSSE for 0.",
     "C21": "On the [[D19:M5 subset]], the [[D8:score proxy]] does not give a lower "
            "[[D28:scaled pinball]] than the [[D3:old error proxy]] for every one of the eight "
            "[[D20:iETS(M,N,N) flavours]] with a proxy at every level from 0.80 to 0.99: 11 "
@@ -251,7 +252,7 @@ STATEMENTS = {
            "as alpha tends to 0, as [[D11:constant-gain stochastic approximation]] gives under "
            "regularity conditions that are not verified for these filters.",
 }
-RESULTS = {"C9": ["E9.R801", "E9.R803", "E9.R802", "E9.R804"],
+RESULTS = {"C20": ["E20.R418", "E20.R419"], "C9": ["E9.R801", "E9.R803", "E9.R802", "E9.R804"],
            "C11": ["E11.R1605", "E11.R1607", "E11.R1606", "E11.R1608"],
            "C14": ["E14.R181", "E14.R182"], "C17": ["E17.R1203", "E17.R1204"],
            "C21": ["E21.R490", "E21.R491"], "C22": ["E22.R502", "E22.R503"],

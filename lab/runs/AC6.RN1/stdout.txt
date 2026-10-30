@@ -1,0 +1,4 @@
+1941 (30490, 33) subset 3000
+excluded {'few': 0, 'zero_scale': 0} kept 3000
+{'Croston': 3000, 'HSP': 3000, 'NegBin': 3000, 'SBA': 3000, 'TSB': 3000, 'iETS_A_ratio_adam': 3000, 'iETS_A_ratio_conv': 3000, 'iETS_A_score_adam': 3000, 'iETS_A_score_conv': 3000, 'iETS_D_conv': 3000, 'iETS_F_conv': 3000, 'iETS_G_ratio_adam': 3000, 'iETS_G_ratio_conv': 3000, 'iETS_G_score_adam': 3000, 'iETS_G_score_conv': 3000, 'iETS_I_ratio_adam': 3000, 'iETS_I_ratio_conv': 3000, 'iETS_I_score_adam': 3000, 'iETS_I_score_conv': 3000, 'iETS_O_ratio_adam': 3000, 'iETS_O_ratio_conv': 3000, 'iETS_O_score_adam': 3000, 'iETS_O_score_conv': 3000}
+{'method': 0, 'row': 0, 'sumf': 0, 'rmsse': 0, 'pin0.8': 9000, 'pinr0.8': 9000, 'cov0.8': 9000, 'covr0.8': 9000, 'pin0.9': 9000, 'pinr0.9': 9000, 'cov0.9': 9000, 'covr0.9': 9000, 'pin0.95': 9000, 'pinr0.95': 9000, 'cov0.95': 9000, 'covr0.95': 9000, 'pin0.99': 9000, 'pinr0.99': 9000, 'cov0.99': 9000, 'covr0.99': 9000}

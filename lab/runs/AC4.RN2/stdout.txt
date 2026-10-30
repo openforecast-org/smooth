@@ -1,0 +1,10 @@
+iI numerator of h: -2*(p + x**2 - 2*x)
+ h at predicted point: 0
+iO numerator of h: -2*(-p + x**2)
+ h at predicted point: 0
+ dh/dx at point, iI 4*(-p*sqrt(1 - p) - 2*p + 2*sqrt(1 - p) + 2)/(p**2 - 3*p*sqrt(1 - p) - 5*p + 4*sqrt(1 - p) + 4) [2.052668077979448, 2.34314575050762, 3.038987706591829]
+ dh/dx at point, iO 4*(-p**(3/2) - sqrt(p) - 2*p)/(3*p**(3/2) + sqrt(p) + p**2 + 3*p) [-3.038987706591831, -2.34314575050762, -2.052668077979448]
+hI - claim: 0 ; hO + claim: 0
+d claim/dx: 2*(-2*p*x + p - x**2 + 2*x)/(x*(x**3 - 2*x**2 - x + 2))
+root strictly between p and 0.5 for 400 of 400 p values; at p=.5 root: see below
+claim at p=.5, x=.5: 0.0

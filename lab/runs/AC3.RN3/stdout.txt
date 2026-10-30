@@ -1,0 +1,17 @@
+identity dl/dlog(mu_a) = o-p -> 0
+identity dl/dlog(mu_b) = p-o -> 0
+identity dp/dlog mu_a = p(1-p) -> 0
+identity dp/dlog mu_b = -p(1-p) -> 0
+identity E[o-x]=p-x -> 0
+identity E[x-o]=x-p -> 0
+check sign of drift moves p_hat towards p (both models) True bad=0
+identity 1-alpha x = (1-alpha)+alpha(1-x) -> 0
+identity 1+alpha(x-1) = (1-alpha)+alpha x -> 0
+check 1+alpha e >0 for alpha in (0,1] on 50x999 grid, all 4 cases True bad=0
+check alpha=1.1, x=0.95, O, o=0: 1+alpha e <0 (positivity needs alpha<=1) True 
+double p_hat at mu=1e17: 1.0 state after o=0, alpha=1: 0.0
+[]
+{'quantity': 'double precision: state after o=0, alpha=1, mu=1e17 (iETS_O)', 'value': 0.0, 'conditions': {'claim': 'C11', 'note': 'p_hat rounds to 1.0 in double precision, so the positive state underflows to zero only through rounding'}}
+{'quantity': 'identities sympy could not reduce to zero', 'value': 0, 'conditions': {'claim': 'C11'}}
+{'quantity': 'numerical counterexamples', 'value': 0, 'conditions': {'claim': 'C11'}}
+{'quantity': 'checks performed', 'value': 11, 'conditions': {'claim': 'C11'}}

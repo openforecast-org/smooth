@@ -169,7 +169,8 @@ STATEMENTS = {
           "[[D7:Bernoulli occurrence with constant probability]] p, the [[D6:stationary mean "
           "probability]] as alpha tends to 0 is the same for both models and equals the root x "
           "of $p\\log\\frac{x}{2-x} + (1-p)\\log\\frac{1+x}{1-x} = 0$, a value strictly "
-          "between p and one half.",
+          "between p and one half for p other than one half and equal to one half at p = one "
+          "half.",
     "C5": "For every p in (0,1), with o ~ Bernoulli(p) and the one-step-ahead probability equal "
           "to p, the [[D3:old error proxy]] has a non-zero expected value: $E[1+e_a] = 2 - p + "
           "(1-p)^2/(1+p) > 1$ and $E[1+e_b] = 1 + p + p^2/(2-p) > 1$ for the multiplicative "
@@ -179,7 +180,8 @@ STATEMENTS = {
           "proxy]] have a unique stable [[D9:zero-drift point]]: $1 - \\sqrt{1-p} < p$ for "
           "[[D1:iETS_I]] and $\\sqrt{p} > p$ for [[D2:iETS_O]] with multiplicative error, and "
           "for both models with additive error the root of $p\\log\\frac{x}{2-x} + "
-          "(1-p)\\log\\frac{1+x}{1-x} = 0$, strictly between p and one half.",
+          "(1-p)\\log\\frac{1+x}{1-x} = 0$, strictly between p and one half for p other than one "
+          "half and equal to one half at p = one half.",
     "C7": "The [[D8:score proxy]], $o - \\hat p$ for [[D2:iETS_O]] and $\\hat p - o$ for "
           "[[D1:iETS_I]], is the score of the Bernoulli occurrence log-likelihood with respect "
           "to the log of the state, has the true probability p as its unique stable "

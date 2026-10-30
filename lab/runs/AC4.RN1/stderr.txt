@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/tmp/claude-0/-home-claude/b1bc4455-e770-57c6-ada9-91dcfd104e34/scratchpad/AC4/limit_sim.py", line 41, in <module>
+    pr=pred(t,p); dev=abs(b[0]-pr)/pr; devs.append(dev); dmin=abs(m[0]-pr)/pr; devs_min.append(dmin)
+  File "/tmp/claude-0/-home-claude/b1bc4455-e770-57c6-ada9-91dcfd104e34/scratchpad/AC4/limit_sim.py", line 25, in pred
+    assert len(sg)==1,(type,p,len(sg))   # unique zero
+           ^^^^^^^^^^
+AssertionError: (2, 0.5, 2)

@@ -1,0 +1,22 @@
+identity E[1+e_a] closed form -> 0
+identity E[1+e_b] closed form -> 0
+identity E[1+e_a]-1 = 2(1-p)/(1+p) -> 0
+identity E[1+e_b]-1 = 2p/(2-p) -> 0
+check E[1+e]>1 on grid True bad=0
+identity E log(1+e_a)=g -> 0
+identity E log(1+e_b)=-g -> 0
+identity g(1-p)=-g(p) -> 0
+identity g(1/2)=0 -> 0
+identity g = atanh form -> 0
+check g identities (atanh form, antisymmetry) on 22024 points True bad=0
+check sign of g: >0 below 1/2, 0 at 1/2, <0 above True bad=0
+check g=2p(1-p)[phi(1-p)-phi(p)], phi=atanh(t)/t True bad=0
+check phi increasing on grid True 
+check enumeration from D3 equals closed forms (1999 p) True bad=0
+[]
+{'quantity': 'identities sympy could not reduce to zero', 'value': 0, 'conditions': {'claim': 'C9'}}
+{'quantity': 'numerical counterexamples', 'value': 0, 'conditions': {'claim': 'C9'}}
+{'quantity': 'checks performed', 'value': 15, 'conditions': {'claim': 'C9'}}
+{'quantity': 'smallest E[1+e_a]-1 on grid', 'value': 0.0005001250312578145, 'conditions': {'claim': 'C9'}}
+{'quantity': 'smallest E[1+e_b]-1 on grid', 'value': 0.0005001250312578145, 'conditions': {'claim': 'C9'}}
+{'quantity': 'g(0.25)', 'value': 0.10335831943933531, 'conditions': {'claim': 'C9'}}

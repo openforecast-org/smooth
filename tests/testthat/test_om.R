@@ -627,3 +627,13 @@ test_that("the forecast of a regression of the occurrence is the probability of 
     expect_equal(as.vector(forecast(testModel, h=3, newdata=omData[1:3,])$mean),
                  as.vector(predict(testModel$alm, omData[1:3,])$mean));
 })
+
+test_that("rstudent() of om() and omg() is rstandard() with one degree of freedom fewer", {
+    for(testModel in list(om(yIntermittent, occurrence="o"), omg(yIntermittent))){
+        p <- as.vector(fitted(testModel));
+        obs <- nobs(testModel);
+        expect_equal(as.vector(rstudent(testModel)),
+                     ((yIntermittent!=0) - p)/sqrt(p*(1-p))*sqrt(obs/(obs-nparam(testModel)-1)),
+                     label=class(testModel)[1]);
+    }
+})

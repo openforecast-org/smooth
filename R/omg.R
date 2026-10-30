@@ -2105,27 +2105,6 @@ as.data.frame.summary.omg <- function(x, ...){
     return(rbind(A, B))
 }
 
-#' @importFrom stats rstandard
-#' @export
-rstandard.omg <- function(model, ...){
-    obs <- nobs(model);
-    df  <- obs - nparam(model);
-    p   <- as.numeric(model$fitted);
-    # The occurrence minus its probability (the actuals are the data, not the occurrence)
-    e   <- as.numeric(residuals(model));
-    return(e / sqrt(p * (1 - p)) * sqrt(obs / df));
-}
-
-#' @importFrom stats rstudent
-#' @export
-rstudent.omg <- function(model, ...){
-    obs <- nobs(model);
-    df  <- obs - nparam(model) - 1;
-    p   <- as.numeric(model$fitted);
-    # The occurrence minus its probability (the actuals are the data, not the occurrence)
-    e   <- as.numeric(residuals(model));
-    return(e / sqrt(p * (1 - p)) * sqrt(obs / df));
-}
 
 # The orders, lags and covariances of the multistep errors of the two sub-models
 #' @export

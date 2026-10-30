@@ -2368,6 +2368,7 @@ forecast.omCombined <- function(object, h=NULL, ...){
 #' @importFrom stats rstandard
 #' @export
 rstandard.om <- function(model, ...){
+    # The occurrence minus its probability, of omg() too (its actuals are the data)
     obs <- nobs(model);
     df  <- obs - nparam(model);
     p   <- as.numeric(model$fitted);
@@ -2378,11 +2379,9 @@ rstandard.om <- function(model, ...){
 #' @importFrom stats rstudent
 #' @export
 rstudent.om <- function(model, ...){
-    obs <- nobs(model);
-    df  <- obs - nparam(model) - 1;
-    p   <- as.numeric(model$fitted);
-    e   <- as.numeric(model$residuals);
-    return(e / sqrt(p * (1 - p)) * sqrt(obs / df));
+    # The standardised residuals with one degree of freedom fewer
+    df <- nobs(model) - nparam(model);
+    return(rstandard(model) * sqrt(df / (df - 1)));
 }
 
 #' @title Simulate methods for occurrence (om/omg) state-space models

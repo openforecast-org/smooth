@@ -577,3 +577,11 @@ def test_omg_skips_the_missing_observations():
     # The covariance re-evaluates the cost at the estimates, which the sub-models
     # must not have changed
     assert np.all(np.isfinite(np.diag(model.vcov())))
+
+
+def test_omg_rstudent_has_one_degree_of_freedom_fewer(fitted_omg, intermittent_y):
+    """R: rstudent(omg(y)) is the Pearson residual times sqrt(n / (n - k - 1))."""
+    p = np.asarray(fitted_omg.fitted, dtype=float)
+    n, k = fitted_omg.nobs, fitted_omg.nparam
+    expected = ((intermittent_y != 0) - p) / np.sqrt(p * (1 - p)) * np.sqrt(n / (n - k - 1))
+    np.testing.assert_allclose(np.asarray(fitted_omg.rstudent()), expected, rtol=1e-12)

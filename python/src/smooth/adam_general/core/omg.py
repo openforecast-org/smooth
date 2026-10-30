@@ -517,13 +517,11 @@ class OMG:
         """Pearson studentised residuals for the general occurrence model.
 
         Formula: ``(ot - p) / sqrt(p*(1-p)) * sqrt(n/df)``
-        where ``df = n - k - 1``.
+        where ``df = n - k - 1``: the standardised residuals with one degree of
+        freedom fewer.
         """
-        obs = self.nobs
-        df = obs - self.nparam - 1
-        p = self.fitted
-        e = self.actuals - p
-        return e / np.sqrt(p * (1 - p)) * np.sqrt(obs / df)
+        df = self.nobs - self.nparam
+        return self.rstandard() * np.sqrt(df / (df - 1))
 
     # ---------------------------------------------------------------------
     # Inference — vcov / confint / summary (R: vcov.omg / confint.omg /

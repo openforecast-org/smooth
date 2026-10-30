@@ -1711,14 +1711,12 @@ class OM(ADAM):
         """Pearson studentised (leave-one-out) residuals for the occurrence model.
 
         Formula: ``(ot - p) / sqrt(p*(1-p)) * sqrt(n/df)``
-        where ``df = n - k - 1``.
+        where ``df = n - k - 1``: the standardised residuals with one degree of
+        freedom fewer.
         """
         self._check_is_fitted()
-        obs = self.nobs
-        df = obs - self.nparam - 1
-        p = self.fitted
-        e = self.residuals
-        return e / np.sqrt(p * (1 - p)) * np.sqrt(obs / df)
+        df = self.nobs - self.nparam
+        return self.rstandard() * np.sqrt(df / (df - 1))
 
     @property
     def loglik(self) -> float:

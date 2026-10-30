@@ -1,0 +1,31 @@
+RMSSE n methods 23 series 3000
+  [score-proxy 8] best=iETS_A_score_conv rank=11.088 vs Croston rank=12.946: better  (best CI 10.733,11.443; bench CI 12.591,13.301)
+  [score-proxy 8] best=iETS_A_score_conv rank=11.088 vs SBA rank=13.066: better  (best CI 10.733,11.443; bench CI 12.710,13.421)
+  [score-proxy 8] best=iETS_A_score_conv rank=11.088 vs TSB rank=12.821: better  (best CI 10.733,11.443; bench CI 12.466,13.176)
+  [score-proxy 8] best=iETS_A_score_conv rank=11.088 vs NegBin rank=11.481: n.s.  (best CI 10.733,11.443; bench CI 11.125,11.836)
+  [score-proxy 8] best=iETS_A_score_conv rank=11.088 vs HSP rank=12.128: better  (best CI 10.733,11.443; bench CI 11.772,12.483)
+  [score+F+D] best=iETS_D_conv rank=11.055 vs Croston rank=12.946: better  (best CI 10.700,11.410; bench CI 12.591,13.301)
+  [score+F+D] best=iETS_D_conv rank=11.055 vs SBA rank=13.066: better  (best CI 10.700,11.410; bench CI 12.710,13.421)
+  [score+F+D] best=iETS_D_conv rank=11.055 vs TSB rank=12.821: better  (best CI 10.700,11.410; bench CI 12.466,13.176)
+  [score+F+D] best=iETS_D_conv rank=11.055 vs NegBin rank=11.481: n.s.  (best CI 10.700,11.410; bench CI 11.125,11.836)
+  [score+F+D] best=iETS_D_conv rank=11.055 vs HSP rank=12.128: better  (best CI 10.700,11.410; bench CI 11.772,12.483)
+pinball0.8 n methods 20 series 3000
+  [score-proxy 8] best=iETS_A_score_conv rank=9.834 vs NegBin rank=8.395: worse  (best CI 9.530,10.139; bench CI 8.090,8.700)
+  [score-proxy 8] best=iETS_A_score_conv rank=9.834 vs HSP rank=9.230: n.s.  (best CI 9.530,10.139; bench CI 8.925,9.535)
+  [score+F+D] best=iETS_A_score_conv rank=9.834 vs NegBin rank=8.395: worse  (best CI 9.530,10.139; bench CI 8.090,8.700)
+  [score+F+D] best=iETS_A_score_conv rank=9.834 vs HSP rank=9.230: n.s.  (best CI 9.530,10.139; bench CI 8.925,9.535)
+pinball0.9 n methods 20 series 3000
+  [score-proxy 8] best=iETS_O_score_conv rank=9.505 vs NegBin rank=8.215: worse  (best CI 9.200,9.810; bench CI 7.911,8.520)
+  [score-proxy 8] best=iETS_O_score_conv rank=9.505 vs HSP rank=8.352: worse  (best CI 9.200,9.810; bench CI 8.047,8.657)
+  [score+F+D] best=iETS_O_score_conv rank=9.505 vs NegBin rank=8.215: worse  (best CI 9.200,9.810; bench CI 7.911,8.520)
+  [score+F+D] best=iETS_O_score_conv rank=9.505 vs HSP rank=8.352: worse  (best CI 9.200,9.810; bench CI 8.047,8.657)
+pinball0.95 n methods 20 series 3000
+  [score-proxy 8] best=iETS_O_score_conv rank=9.880 vs NegBin rank=8.913: worse  (best CI 9.575,10.185; bench CI 8.608,9.218)
+  [score-proxy 8] best=iETS_O_score_conv rank=9.880 vs HSP rank=8.859: worse  (best CI 9.575,10.185; bench CI 8.555,9.164)
+  [score+F+D] best=iETS_O_score_conv rank=9.880 vs NegBin rank=8.913: worse  (best CI 9.575,10.185; bench CI 8.608,9.218)
+  [score+F+D] best=iETS_O_score_conv rank=9.880 vs HSP rank=8.859: worse  (best CI 9.575,10.185; bench CI 8.555,9.164)
+pinball0.99 n methods 20 series 3000
+  [score-proxy 8] best=iETS_O_score_conv rank=8.747 vs NegBin rank=11.593: better  (best CI 8.442,9.052; bench CI 11.288,11.898)
+  [score-proxy 8] best=iETS_O_score_conv rank=8.747 vs HSP rank=7.565: worse  (best CI 8.442,9.052; bench CI 7.260,7.870)
+  [score+F+D] best=iETS_O_score_conv rank=8.747 vs NegBin rank=11.593: better  (best CI 8.442,9.052; bench CI 11.288,11.898)
+  [score+F+D] best=iETS_O_score_conv rank=8.747 vs HSP rank=7.565: worse  (best CI 8.442,9.052; bench CI 7.260,7.870)

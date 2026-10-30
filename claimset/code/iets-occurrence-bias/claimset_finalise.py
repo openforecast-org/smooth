@@ -130,6 +130,8 @@ SCOPE = {
     "C13": {"conditions": ["o ~ Bernoulli(p), p in (0,1)", "ADAM multiplicative ETS update "
                            "(ets='adam')"]},
     "C14": sim_scope("ADAM multiplicative ETS update (ets='adam')",
+                     "30 random values of p drawn uniformly on [0.02, 0.98]; the deviation of "
+                     "iETS_I grows as p tends to 0",
                      "limit as alpha tends to 0, extrapolated from alpha in {0.004, 0.002, "
                      "0.001}"),
     "C15": sim_scope("ADAM multiplicative ETS update (ets='adam')",
@@ -205,9 +207,9 @@ STATEMENTS = {
            "[[D17:exponential score proxy]].",
     "C14": "On [[D7:Bernoulli occurrence with constant probability]], under the "
            "[[D16:ADAM multiplicative ETS update]] the [[D18:multiplicative score proxy]] does "
-           "not give an alpha-to-0 limit of the stationary mean probability equal to p: its "
-           "largest relative deviation from p is 1.69 for [[D1:iETS_I]] and 0.30 for "
-           "[[D2:iETS_O]].",
+           "not give an alpha-to-0 limit of the stationary mean probability equal to p: over the "
+           "simulated values of p its largest relative deviation from p is 1.69 for "
+           "[[D1:iETS_I]] and 0.30 for [[D2:iETS_O]].",
     "C17": "On [[D7:Bernoulli occurrence with constant probability]], with conventional "
            "multiplicative occurrence error and alpha up to one half, the [[D18:multiplicative "
            "score proxy]] is not always less biased than the [[D3:old error proxy]]: its "

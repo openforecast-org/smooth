@@ -31,6 +31,7 @@ import os
 import sys
 
 import numpy as np
+import pandas as pd
 from greybox import rmcb
 from scipy.stats import wilcoxon
 
@@ -111,11 +112,12 @@ def mcb(table):
     results, good, bad = [], 0, 0
     for measure, benchmarks in BENCHMARKS.items():
         names = [m for m in methods if measure in table[next(iter(table))][m]]
-        data = np.array([[table[r][m][measure] for m in names] for r in table])
+        data = pd.DataFrame([[table[r][m][measure] for m in names] for r in table], columns=names)
+        # rmcb() returns the means and intervals sorted by mean rank, indexed by method name
         res = rmcb(data, level=1 - ALPHA, outplot="none")
-        mean = dict(zip(names, np.asarray(res.mean)))
-        lower = dict(zip(names, np.asarray(res.interval)[:, 0]))
-        upper = dict(zip(names, np.asarray(res.interval)[:, 1]))
+        mean = res.mean.to_dict()
+        lower = res.interval.iloc[:, 0].to_dict()
+        upper = res.interval.iloc[:, 1].to_dict()
         best = min((m for m in names if "_score_" in m), key=lambda m: mean[m])
         for b in benchmarks:
             good += upper[best] < lower[b]

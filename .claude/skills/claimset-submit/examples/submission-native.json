@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.19",
+  "schema_version": "0.34",
   "paper": {
     "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
     "licence": "CC-BY-4.0",
@@ -7,6 +7,10 @@
       "keywords": [
         "retail demand forecasting"
       ]
+    },
+    "declarations": {
+      "funding": [],
+      "competing_interests": "None declared."
     },
     "contributions": [
       "C2"
@@ -84,7 +88,32 @@
     {
       "id": "D1",
       "term": "forecast skill",
-      "definition": "Relative reduction in mean absolute scaled error against a seasonal naive benchmark."
+      "kind": "variable",
+      "definition": "Relative reduction in mean absolute scaled error against a seasonal naive benchmark, averaged over series and horizons."
+    },
+    {
+      "id": "D2",
+      "term": "method M",
+      "kind": "method",
+      "definition": "The forecasting method studied in this paper, as implemented in version 1.0 of the code."
+    },
+    {
+      "id": "D3",
+      "term": "seasonal naive method",
+      "kind": "method",
+      "definition": "Forecasts each month by the value of the same month one year earlier."
+    },
+    {
+      "id": "D4",
+      "term": "UK monthly retail sales",
+      "kind": "data",
+      "definition": "1,200 monthly sales series of one UK retailer's store network, 2010-2024, each with at least 36 observations."
+    },
+    {
+      "id": "D5",
+      "term": "rolling-origin evaluation",
+      "kind": "design",
+      "definition": "Rolling origin with forecasts for horizons 1 to 12 months from each origin."
     }
   ],
   "claims": [
@@ -93,7 +122,6 @@
       "statement": "Monthly retail sales series exhibit annual seasonality.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -108,7 +136,6 @@
       "statement": "Forecast errors of method M are independent across series.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -120,21 +147,22 @@
     },
     {
       "id": "C2",
-      "statement": "Method M improves [[D1:forecast skill]] over the seasonal naive benchmark on monthly retail sales series.",
+      "statement": "[[D2:Method M]] improves [[D1:forecast skill]] over the [[D3:seasonal naive method]] on the [[D4:UK monthly retail sales]].",
+      "about": {
+        "subject": "D2",
+        "relation": "improves",
+        "object": "D1",
+        "comparator": "D3",
+        "conditions": [
+          "D4"
+        ]
+      },
       "type": "descriptive",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
-        "population": "monthly retail sales series",
-        "geography": "United Kingdom",
-        "language": "not applicable",
-        "period": "2010-2024",
-        "data_type": "aggregate sales counts",
         "conditions": [
-          "horizon of 1 to 12 months"
-        ],
-        "excludes": [
-          "series shorter than 36 observations"
+          "horizons of 1 to 12 months"
         ]
       },
       "support": [
@@ -168,6 +196,21 @@
       "id": "E1",
       "profile": "quant",
       "description": "Benchmark of method M against the seasonal naive method on 1,200 monthly retail sales series, rolling origin, horizons 1 to 12.",
+      "setup": {
+        "studied": [
+          "D2",
+          "D3"
+        ],
+        "cases": [
+          "D4"
+        ],
+        "procedure": [
+          "D5"
+        ],
+        "lens": [
+          "D1"
+        ]
+      },
       "design": "benchmark",
       "estimand": "mean relative MASE reduction",
       "estimate": 0.08,

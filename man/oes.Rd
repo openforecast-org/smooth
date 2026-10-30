@@ -9,9 +9,9 @@ oes(y, model = "MNN", lags = c(frequency(y)), persistence = NULL,
   "complete", "gradient"), occurrence = c("auto", "fixed", "odds-ratio",
   "inverse-odds-ratio", "direct", "general"), ic = c("AICc", "AIC", "BIC",
   "BICc"), h = 0, holdout = FALSE, bounds = c("usual", "admissible",
-  "none"), ets = c("conventional", "adam"), smoother = c("default", "ma",
-  "lowess", "supsmu", "global"), xreg = NULL, regressors = c("use",
-  "select"), silent = TRUE, ...)
+  "none"), ets = c("conventional", "adam"), proxyOccurrence = c("ratio",
+  "score"), smoother = c("default", "ma", "lowess", "supsmu", "global"),
+  xreg = NULL, regressors = c("use", "select"), silent = TRUE, ...)
 }
 \arguments{
 \item{y}{Univariate numeric vector or time-series. Non-binary input is
@@ -44,6 +44,9 @@ withheld.}
 \item{bounds}{Parameter bounds type.}
 
 \item{ets}{Type of ETS model: \code{"conventional"} or \code{"adam"}.}
+
+\item{proxyOccurrence}{The proxy of the occurrence error: \code{"ratio"} or
+\code{"score"} (see \link[smooth]{om}).}
 
 \item{smoother}{The smoother used by \link[smooth]{msdecompose} to obtain the
 initial level, trend and seasonal indices (and the seasonal profiles for

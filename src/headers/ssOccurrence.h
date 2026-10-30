@@ -5,10 +5,15 @@
 
 /* Function returns a and b errors as a vector, depending on the types of E, O and the others.
  * In case of O=="p", the error is provided in the first element of the vector.
- * In case of O=="i", the error is moved in the first element. */
+ * In case of O=="i", the error is moved in the first element.
+ * With score=true (proxyOccurrence="score"), 'o', 'i' and 'g' use the score of the Bernoulli
+ * log-likelihood with respect to the log of the state, s = o - p for a and p - o for b: the error
+ * is s for an additive error and for conventional multiplicative ETS, and exp(s) - 1 for ADAM
+ * multiplicative ETS (adamA / adamB), whose update (1 + e)^alpha then moves log(state) by alpha*s. */
 inline std::vector<double> occurrenceError(
         double const &yAct, double aFit, double bFit,
-        char const &EA, char const &EB, char const &O) {
+        char const &EA, char const &EB, char const &O,
+        bool const &score = false, bool const &adamA = false, bool const &adamB = false) {
 // aFit is the fitted value of a, bFit is the same for b. O is the type of occurrence.
 // In cases of O!="g", aFit is the variable under consideration; bFit is unused.
 
@@ -45,6 +50,10 @@ inline std::vector<double> occurrenceError(
                     break;
             }
             pfit = aFit / (aFit + 1);
+            if(score){
+                output[0] = (EA=='M' && adamA) ? exp(yAct - pfit) - 1 : yAct - pfit;
+                break;
+            }
             error = (1 + yAct - pfit) / 2;
             output[0] = error / (1 - error);
             switch(EA){
@@ -64,6 +73,10 @@ inline std::vector<double> occurrenceError(
                     break;
             }
             pfit = 1 / (1 + aFit);
+            if(score){
+                output[0] = (EA=='M' && adamA) ? exp(pfit - yAct) - 1 : pfit - yAct;
+                break;
+            }
             error = (1 + yAct - pfit) / 2;
             output[0] = (1 - error) / error;
             switch(EA){
@@ -88,6 +101,11 @@ inline std::vector<double> occurrenceError(
                     break;
             }
             pfit = aFit / (aFit + bFit);
+            if(score){
+                output[0] = (EA=='M' && adamA) ? exp(yAct - pfit) - 1 : yAct - pfit;
+                output[1] = (EB=='M' && adamB) ? exp(pfit - yAct) - 1 : pfit - yAct;
+                break;
+            }
             error = (1 + yAct - pfit) / 2;
             output[0] = error / (1 - error);
             output[1] = (1 - error) / error;

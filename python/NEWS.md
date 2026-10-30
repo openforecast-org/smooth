@@ -6,6 +6,7 @@ Release history of the Python implementation of the **smooth** forecasting packa
 ## v1.2.0 (unreleased)
 
 Changes:
+* `ADAM`, `OM`, `OMG` and `AutoOM` take `proxy_occurrence="ratio" | "score"`, as R's `proxyOccurrence`: the proxy of the occurrence error that updates the states of the odds-ratio, inverse-odds-ratio and general models. `"ratio"`, the default, is the proxy used so far; `"score"` is the score of the Bernoulli log-likelihood with respect to the logarithm of the state (o - p for the odds, p - o for the inverse odds), through its exponent with `ets="adam"`. The fitted models keep it in `proxy_occurrence`. The proxy is computed in the shared C++ core (the `proxyScore` field of `adamCore`), so R and Python give the same fits (`tests/test_om_proxy_r_parity.py`).
 * Requires `greybox>=1.0.10`: MAPE and MPE are `Inf` on a zero actual, as in R.
 * `OM` and `OMG` no longer take `formula` / `formula_a` / `formula_b`, which were ignored; the regressors come from `X`, as in the other models.
 * `AutoADAM` selects the ARIMA orders by default, as R's `auto.adam()`: without `orders` (and `ar_order` / `i_order` / `ma_order`) they are R's `{"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True}`; it fitted no ARIMA (on UKgas it selected ETS(MNM), log-likelihood -495.41, against R's ETS(MNM) with drift, -490.89). Pass `orders={"ar": 0, "i": 0, "ma": 0}` for no ARIMA.

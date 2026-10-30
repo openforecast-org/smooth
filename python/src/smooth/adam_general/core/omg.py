@@ -122,6 +122,7 @@ class OMG:
         verbose: int = 0,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
+        proxy_occurrence: Literal["ratio", "score"] = "ratio",
         smoother: SmootherType = SMOOTHER_DEFAULT,
     ) -> None:
         # Accept callable for user-defined custom loss (same API as ADAM,
@@ -171,6 +172,12 @@ class OMG:
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
+        if proxy_occurrence not in ("ratio", "score"):
+            raise ValueError(
+                f"Invalid proxy_occurrence: {proxy_occurrence!r}. "
+                "Must be 'ratio' or 'score'."
+            )
+        self.proxy_occurrence = proxy_occurrence
         if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
             raise ValueError(
                 f"Invalid smoother: {smoother!r}. Must be one of "
@@ -850,6 +857,7 @@ class OMG:
             verbose=0,
             nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
+            proxy_occurrence=self.proxy_occurrence,
             smoother=self.smoother,
         )
 
@@ -1030,6 +1038,7 @@ class OMG:
             bounds=self.bounds,
             nlopt_kwargs=self.nlopt_kwargs,
             ets=self.ets,
+            proxy_occurrence=self.proxy_occurrence,
             smoother=self.smoother,
         )
         # A side with regressors="select" selects them there as OM does, and then

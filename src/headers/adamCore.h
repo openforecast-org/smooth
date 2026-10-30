@@ -144,6 +144,11 @@ public:
     // mostly zero matrices of tbats() and ssarima(). Set from R/Python; false otherwise.
     bool sparseTransition = false;
 
+    // The proxy of the occurrence error of the odds-ratio, inverse-odds-ratio and general models:
+    // false for the ratios of SB23 (proxyOccurrence="ratio"), true for the score of the Bernoulli
+    // log-likelihood (proxyOccurrence="score"; see occurrenceError()). Set from R/Python.
+    bool proxyScore = false;
+
 private:
     arma::uvec lags;
     char E;
@@ -318,7 +323,7 @@ private:
                                      matrixWt.row(idx), E, T, S,
                                      nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
                                      nComponents, constant);
-            double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
+            double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O, proxyScore, adamETS);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
             // A missing observation does not enter the least squares
             vecResiduals(idx) = std::isnan(matrixYt(idx)) ? 0 : matrixYt(idx) - p;
@@ -379,13 +384,13 @@ private:
                                      nComponents, constant);
             arma::rowvec const dyFit = adamWvalueJac(vCurrent, wRow, E, T, S,
                                                      nComponents, nSeasonal) * sensCurrent;
-            double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
+            double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O, proxyScore, adamETS);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
             // A missing observation does not enter the least squares
             bool const missing = std::isnan(matrixYt(idx));
             vecResiduals(idx) = missing ? 0 : matrixYt(idx) - p;
             jacobian.row(idx) = missing ? arma::rowvec(dyFit.n_elem, arma::fill::zeros) : arma::rowvec(-dpdy * dyFit);
-            arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O) * dyFit;
+            arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O, proxyScore, adamETS) * dyFit;
 
             adamGvalueJac(vCurrent, matrixF, wRow, E, T, S,
                           nComponents, nSeasonal, vectorG,
@@ -451,13 +456,13 @@ private:
                                      nETS, nNonSeasonal, nSeasonal, nArima, nXreg,
                                      nComponents, constant);
             arma::rowvec const dyFit = wRow * sensCurrent;   // linear: d(yhat) = w'S
-            double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O);
+            double const error = errorf(matrixYt(idx), yFit, E, matrixYt(idx), O, proxyScore, adamETS);
             occurrenceLinkJac(yFit, E, O, p, dpdy);
             // A missing observation does not enter the least squares
             bool const missing = std::isnan(matrixYt(idx));
             vecResiduals(idx) = missing ? 0 : matrixYt(idx) - p;
             jacobian.row(idx) = missing ? arma::rowvec(dyFit.n_elem, arma::fill::zeros) : arma::rowvec(-dpdy * dyFit);
-            arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O) * dyFit;
+            arma::rowvec const dError = occurrenceErrorJac(matrixYt(idx), yFit, E, O, proxyScore, adamETS) * dyFit;
 
             profilesRecent(cells) =
                 adamFvalue(vCurrent, matrixF, E, T, S, nETS, nNonSeasonal,
@@ -1151,7 +1156,7 @@ public:
                     vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
                 }
                 // errorf() returns 0 when ot==0; dispatches to occurrenceError() when O!='n'
-                vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
+                vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O, proxyScore, adamETS);
                 /* # Transition equation */
                 profilesRecent(indexLookupTable.col(i)) =
                     transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
@@ -1175,7 +1180,7 @@ public:
             if(vectorOt(idx) != 0 && !std::isnan(vectorOt(idx))) {
                 vecYfit(idx) = vectorOt(idx) * vecYfit(idx);
             }
-            vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O);
+            vecErrors(idx) = errorf(vectorYt(idx), vecYfit(idx), E, vectorOt(idx), O, proxyScore, adamETS);
             /* # Transition equation */
             profilesRecent(indexLookupTable.col(i)) =
                 transitionValue(sparseF, profilesRecent(indexLookupTable.col(i)), matrixF) +
@@ -1315,7 +1320,8 @@ public:
                     matrixWtB.row(idx), EB, TB, SB,
                     nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB);
             // Compute errors for both models jointly via occurrenceError(O='g')
-            auto errs = occurrenceError(vectorOt(idx), vecAfit(idx), vecBfit(idx), E, EB, 'g');
+            auto errs = occurrenceError(vectorOt(idx), vecAfit(idx), vecBfit(idx), E, EB, 'g',
+                                        proxyScore, adamETS, adamETSB);
             vecErrorsA(idx) = errs[0];
             vecErrorsB(idx) = errs[1];
             /* # Transition equations for models A and B */
@@ -1345,7 +1351,8 @@ public:
             vecBfit(idx) = adamWvalue(profilesRecentB(indexLookupTableB.col(iB)),
                     matrixWtB.row(idx), EB, TB, SB,
                     nETSB, nNonSeasonalB, nSeasonalB, nArimaB, nXregB, nComponentsB, constantB);
-            auto errs = occurrenceError(vectorOt(idx), vecAfit(idx), vecBfit(idx), E, EB, 'g');
+            auto errs = occurrenceError(vectorOt(idx), vecAfit(idx), vecBfit(idx), E, EB, 'g',
+                                        proxyScore, adamETS, adamETSB);
             vecErrorsA(idx) = errs[0];
             vecErrorsB(idx) = errs[1];
             /* # Transition equations for models A and B */
@@ -1571,12 +1578,17 @@ public:
                 bool const missingObs = std::isnan(vectorOt(idx));
                 jac.row(idx) = -dp;
 
-                // occurrenceError('g'): u=(1+o-p)/2; errorA/errorB per side type.
+                // occurrenceError('g'): u=(1+o-p)/2; errorA/errorB per side type. Both sides are
+                // additive here (bothLinear), so the score proxy is eA = o - p, eB = p - o.
                 double u = (1.0 + vectorOt(idx) - p) / 2.0;
-                double eA = (E=='A')  ? std::log(u/(1-u)) : (u/(1-u) - 1);
-                double eB = (EB=='A') ? std::log((1-u)/u) : ((1-u)/u - 1);
-                double dEAdu = (E=='A')  ?  1.0/(u*(1-u)) : 1.0/((1-u)*(1-u));
-                double dEBdu = (EB=='A') ? -1.0/(u*(1-u)) : -1.0/(u*u);
+                double eA = proxyScore ? vectorOt(idx) - p
+                          : (E=='A')  ? std::log(u/(1-u)) : (u/(1-u) - 1);
+                double eB = proxyScore ? p - vectorOt(idx)
+                          : (EB=='A') ? std::log((1-u)/u) : ((1-u)/u - 1);
+                double dEAdu = proxyScore ? 2.0
+                             : (E=='A')  ?  1.0/(u*(1-u)) : 1.0/((1-u)*(1-u));
+                double dEBdu = proxyScore ? -2.0
+                             : (EB=='A') ? -1.0/(u*(1-u)) : -1.0/(u*u);
                 arma::rowvec dEA = (dEAdu * -0.5) * dp;
                 arma::rowvec dEB = (dEBdu * -0.5) * dp;
                 // A missing observation: no error, no residual, the states move only

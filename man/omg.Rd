@@ -10,13 +10,13 @@ omg(data, modelA = "MNN", modelB = modelA, ordersA = list(ar = c(0), i =
   regressorsA = c("use", "select", "adapt"), regressorsB = regressorsA,
   persistenceA = NULL, persistenceB = persistenceA, phiA = NULL,
   phiB = phiA, armaA = NULL, armaB = armaA, etsA = c("conventional",
-  "adam"), etsB = etsA, lags = c(frequency(data)), h = 0,
-  holdout = FALSE, initial = c("backcasting", "optimal", "two-stage",
-  "complete", "gradient"), loss = c("likelihood", "MSE", "MAE", "HAM",
-  "LASSO", "RIDGE"), ic = c("AICc", "AIC", "BIC", "BICc"),
-  bounds = c("usual", "admissible", "none"), model = NULL,
-  smoother = c("default", "ma", "lowess", "supsmu", "global"),
-  silent = TRUE, ...)
+  "adam"), etsB = etsA, proxyOccurrence = c("ratio", "score"),
+  lags = c(frequency(data)), h = 0, holdout = FALSE,
+  initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
+  loss = c("likelihood", "MSE", "MAE", "HAM", "LASSO", "RIDGE"),
+  ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual", "admissible",
+  "none"), model = NULL, smoother = c("default", "ma", "lowess", "supsmu",
+  "global"), silent = TRUE, ...)
 }
 \arguments{
 \item{data}{Binary time series (0/1), vector or data frame.}
@@ -56,6 +56,9 @@ omg(data, modelA = "MNN", modelB = modelA, ordersA = list(ar = c(0), i =
 \item{etsA}{ETS variant for model A (\code{"conventional"} or \code{"adam"}).}
 
 \item{etsB}{ETS variant for model B.}
+
+\item{proxyOccurrence}{The proxy of the unobservable occurrence error used to update the
+states of both models: \code{"ratio"} or \code{"score"} (see \link[smooth]{om}).}
 
 \item{lags}{Seasonal lags (shared).}
 

@@ -27,6 +27,8 @@
 #' @param parallel If \code{TRUE} (or a core count), fit occurrence types in
 #'   parallel.  Requires \code{foreach} and \code{doMC} / \code{doParallel}.
 #' @param ets ETS flavour passed to \link{om}: \code{"conventional"} or \code{"adam"}.
+#' @param proxyOccurrence The proxy of the occurrence error passed to \link{om}:
+#' \code{"ratio"} or \code{"score"}.
 #' @param ... Additional arguments forwarded to \link{om}.
 #'
 #' @return The best \code{om} object (lowest IC), with \code{$call} set to
@@ -56,6 +58,7 @@ auto.om <- function(data,
                     silent  = TRUE,
                     parallel = FALSE,
                     ets     = c("conventional","adam"),
+                    proxyOccurrence = c("ratio","score"),
                     ...){
     startTime <- Sys.time();
     cl <- match.call();
@@ -65,6 +68,7 @@ auto.om <- function(data,
     IC      <- switch(ic, "AIC"=AIC, "AICc"=AICc, "BIC"=BIC, "BICc"=BICc);
     initial <- match.arg(initial);
     ets     <- match.arg(ets);
+    proxyOccurrence <- match.arg(proxyOccurrence);
     regressors <- match.arg(regressors);
 
     occurrence <- match.arg(occurrence,
@@ -239,7 +243,8 @@ auto.om <- function(data,
                                               initial=initial, arma=arma,
                                               ic=ic, bounds=bounds,
                                               regressors=regressors,
-                                              silent=TRUE, ets=ets, ...);
+                                              silent=TRUE, ets=ets,
+                                              proxyOccurrence=proxyOccurrence, ...);
                 }
                 if(arimaModelSelect && occurrence[i] != "general"){
                     selectedModels[[i]] <- adam_arimaSelector(
@@ -249,7 +254,8 @@ auto.om <- function(data,
                         persistence=persistence, phi=phi, initial=initial,
                         ic=ic, bounds=bounds, silent=silent, regressors=regressors,
                         testModelETS=selectedModels[[i]],
-                        fitter=om, fitter_args=list(occurrence=occurrence[i]),
+                        fitter=om, fitter_args=list(occurrence=occurrence[i],
+                                                   proxyOccurrence=proxyOccurrence),
                         IC=IC, formula=formula, ets=ets,
                         responseName=responseName, obsInSample=obsInSample, ...);
                 }
@@ -268,7 +274,8 @@ auto.om <- function(data,
                                         initial=initial, arma=arma,
                                         ic=ic, bounds=bounds,
                                         regressors=regressors,
-                                        silent=TRUE, ets=ets, ...);
+                                        silent=TRUE, ets=ets,
+                                              proxyOccurrence=proxyOccurrence, ...);
                     }
                     else{
                         testModel <- NULL;
@@ -281,7 +288,8 @@ auto.om <- function(data,
                             persistence=persistence, phi=phi, initial=initial,
                             ic=ic, bounds=bounds, silent=TRUE, regressors=regressors,
                             testModelETS=testModel,
-                            fitter=om, fitter_args=list(occurrence=occurrence[i]),
+                            fitter=om, fitter_args=list(occurrence=occurrence[i],
+                                                   proxyOccurrence=proxyOccurrence),
                             IC=IC, formula=formula, ets=ets,
                             responseName=responseName, obsInSample=obsInSample, ...);
                     }
@@ -325,7 +333,8 @@ auto.om <- function(data,
                         persistence=persistence, phi=phi, initial=initial,
                         ic=ic, bounds=bounds, silent=silent, regressors=regressors,
                         testModelETS=NULL,
-                        fitter=om, fitter_args=list(occurrence=occurrence[i]),
+                        fitter=om, fitter_args=list(occurrence=occurrence[i],
+                                                   proxyOccurrence=proxyOccurrence),
                         IC=IC, formula=formula, ets=ets,
                         responseName=responseName, obsInSample=obsInSample, ...);
                 } else {
@@ -334,7 +343,8 @@ auto.om <- function(data,
                                               formula=formula, h=h, holdout=holdout,
                                               persistence=persistence, phi=phi,
                                               initial=initial, arma=arma, ic=ic, bounds=bounds,
-                                              regressors=regressors, silent=TRUE, ets=ets, ...);
+                                              regressors=regressors, silent=TRUE, ets=ets,
+                                              proxyOccurrence=proxyOccurrence, ...);
                 }
             }
         }
@@ -350,7 +360,8 @@ auto.om <- function(data,
                             persistence=persistence, phi=phi, initial=initial,
                             ic=ic, bounds=bounds, silent=TRUE, regressors=regressors,
                             testModelETS=NULL,
-                            fitter=om, fitter_args=list(occurrence=occurrence[i]),
+                            fitter=om, fitter_args=list(occurrence=occurrence[i],
+                                                   proxyOccurrence=proxyOccurrence),
                             IC=IC, formula=formula, ets=ets,
                             responseName=responseName, obsInSample=obsInSample, ...);
                     } else {
@@ -359,7 +370,8 @@ auto.om <- function(data,
                                         formula=formula, h=h, holdout=holdout,
                                         persistence=persistence, phi=phi,
                                         initial=initial, arma=arma, ic=ic, bounds=bounds,
-                                        regressors=regressors, silent=TRUE, ets=ets, ...);
+                                        regressors=regressors, silent=TRUE, ets=ets,
+                                              proxyOccurrence=proxyOccurrence, ...);
                     }
                     return(testModel);
                 });

@@ -43,6 +43,7 @@ def architector(
     profiles_recent_provided: bool = False,
     adam_ets: bool = False,
     head_length: Optional[int] = None,
+    proxy_score: bool = False,
 ) -> Tuple[Dict[str, Any], Any, Dict[str, Any], Dict[str, Any], Any, Any]:
     """
     Determine and set up ADAM model architecture before matrix creation.
@@ -326,6 +327,9 @@ def architector(
         and arima_checked.get("arima_model", False)
         and sum(arima_checked.get("i_orders") or [0]) % 2 == 1
     )
+    # The score proxy of the occurrence error (proxy_occurrence="score"); the ratios
+    # of SB23 otherwise
+    adam_cpp.proxyScore = proxy_score
     # Head length for backcasting: one full lag cycle by default, so the head is
     # filtered against the model's own backcasts. 0 switches the filtering off.
     adam_cpp.headLength = head_resolved["flag"]

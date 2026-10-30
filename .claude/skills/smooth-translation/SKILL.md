@@ -80,6 +80,7 @@ R-only: `ssarima()`, `gum()`, `sparma()` (see the wiki's Roadmap).
 | `FI=TRUE`, `stepSize` in the ellipsis | `fi`, `step_size` |
 | `headLength`, `nIterations` in the ellipsis | `head_length`, `n_iterations` |
 | `silent` | `verbose` (inverted) |
+| `proxyOccurrence` (`adam()`, `om()`, `omg()`, `auto.om()`, `oes()`, `oesg()`) | `proxy_occurrence` (`ADAM`, `OM`, `OMG`, `AutoOM`) |
 | `modelA`, `modelB`, `ordersA`, … of `omg()` | `model_a`, `model_b`, `orders_a`, … |
 
 ### Fitted attributes
@@ -114,6 +115,7 @@ for the sklearn-style fitted values (`persistence_*_`, `arma_parameters_`,
 | `m$model` | `m.model_name` |
 | `m$lags` / `m$lagsAll` | `m.lags_used` |
 | `m$occurrence` (fitted model) | `m.om_model` |
+| `m$proxyOccurrence` of `om()` / `omg()` | `m.proxy_occurrence` |
 | `m$FI` | `m.fisher_information_` |
 | `m$timeElapsed` | `m.time_elapsed` |
 | `m$constant` | `m.constant_value` |

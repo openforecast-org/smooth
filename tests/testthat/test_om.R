@@ -627,3 +627,63 @@ test_that("the forecast of a regression of the occurrence is the probability of 
     expect_equal(as.vector(forecast(testModel, h=3, newdata=omData[1:3,])$mean),
                  as.vector(predict(testModel$alm, omData[1:3,])$mean));
 })
+
+#### proxyOccurrence: the proxy of the occurrence error ####
+
+# The fitted probabilities follow the recursion of each proxy from the initial state, for
+# the odds and the inverse odds, additive and multiplicative errors, conventional and ADAM ETS
+test_that("om() updates the states with the proxy of proxyOccurrence", {
+    set.seed(7)
+    y <- rbinom(120, 1, 0.35)
+    alpha <- 0.2
+    grid <- expand.grid(occurrence=c("odds-ratio","inverse-odds-ratio"), model=c("ANN","MNN"),
+                        ets=c("conventional","adam"), proxy=c("ratio","score"),
+                        initial=c("optimal","gradient"), stringsAsFactors=FALSE)
+    for(i in seq_len(nrow(grid))){
+        g <- grid[i,]
+        testModel <- om(y, model=g$model, occurrence=g$occurrence, ets=g$ets, persistence=alpha,
+                        initial=g$initial, proxyOccurrence=g$proxy)
+        odds <- g$occurrence=="odds-ratio"
+        additive <- g$model=="ANN"
+        level <- unlist(testModel$initial)[1]
+        p <- numeric(length(y))
+        for(t in seq_along(y)){
+            mu <- if(additive) exp(level) else level
+            p[t] <- if(odds) mu/(1+mu) else 1/(1+mu)
+            u <- (1 + y[t] - p[t])/2
+            s <- if(odds) y[t] - p[t] else p[t] - y[t]
+            ratio <- if(odds) u/(1-u) else (1-u)/u
+            if(additive){
+                level <- level + alpha * (if(g$proxy=="score") s else log(ratio))
+            }
+            else{
+                e <- if(g$proxy=="ratio") ratio - 1 else if(g$ets=="adam") exp(s) - 1 else s
+                level <- if(g$ets=="adam") level * (1+e)^alpha else level * (1 + alpha*e)
+            }
+        }
+        expect_equal(as.numeric(fitted(testModel)), p, tolerance=1e-10,
+                     label=paste(g, collapse=" "))
+        expect_equal(testModel$proxyOccurrence, g$proxy)
+    }
+})
+
+# The default is the ratio of Svetunkov & Boylan (2023), and the proxy does not change the
+# fixed and direct models
+test_that("proxyOccurrence defaults to ratio and leaves fixed and direct models unchanged", {
+    expect_equal(om(yIntermittent, occurrence="odds-ratio")$proxyOccurrence, "ratio")
+    for(occurrence in c("fixed","direct")){
+        expect_equal(as.numeric(fitted(om(yIntermittent, occurrence=occurrence,
+                                          proxyOccurrence="score"))),
+                     as.numeric(fitted(om(yIntermittent, occurrence=occurrence))))
+    }
+})
+
+# The proxy reaches the occurrence model of auto.om(), oes() and adam()
+test_that("proxyOccurrence is passed on by auto.om(), oes() and adam()", {
+    expect_equal(auto.om(yIntermittent, occurrence=c("odds-ratio","inverse-odds-ratio"),
+                         proxyOccurrence="score")$proxyOccurrence, "score")
+    expect_equal(oes(yIntermittent, occurrence="odds-ratio",
+                     proxyOccurrence="score")$proxyOccurrence, "score")
+    expect_equal(adam(yIntermittent, "MNN", occurrence="odds-ratio",
+                      proxyOccurrence="score")$occurrence$proxyOccurrence, "score")
+})

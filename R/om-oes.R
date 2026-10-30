@@ -29,6 +29,8 @@
 #'   withheld.
 #' @param bounds Parameter bounds type.
 #' @param ets Type of ETS model: \code{"conventional"} or \code{"adam"}.
+#' @param proxyOccurrence The proxy of the occurrence error: \code{"ratio"} or
+#' \code{"score"} (see \link[smooth]{om}).
 #' @param smoother The smoother used by \link[smooth]{msdecompose} to obtain the
 #' initial level, trend and seasonal indices (and the seasonal profiles for
 #' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
@@ -62,6 +64,7 @@ oes <- function(y, model="MNN", lags=c(frequency(y)),
                 h=0, holdout=FALSE,
                 bounds=c("usual","admissible","none"),
                 ets=c("conventional","adam"),
+                proxyOccurrence=c("ratio","score"),
                 smoother=c("default","ma","lowess","supsmu","global"),
                 xreg=NULL, regressors=c("use","select"),
                 silent=TRUE, ...){
@@ -98,7 +101,7 @@ oes <- function(y, model="MNN", lags=c(frequency(y)),
                    persistence=persistence, phi=phi,
                    initial=initial, occurrence=occurrence,
                    ic=ic, h=h, holdout=holdout,
-                   bounds=bounds, ets=ets, smoother=smoother,
+                   bounds=bounds, ets=ets, proxyOccurrence=proxyOccurrence, smoother=smoother,
                    regressors=regressors,
                    silent=silent, ...);
     ourModel$call <- cl;

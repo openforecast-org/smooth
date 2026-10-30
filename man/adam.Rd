@@ -20,7 +20,8 @@ adam(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar =
   "complete", "gradient"), arma = NULL, ic = c("AICc", "AIC", "BIC",
   "BICc"), bounds = c("usual", "admissible", "none"),
   smoother = c("default", "ma", "lowess", "supsmu", "global"),
-  silent = TRUE, ets = c("conventional", "adam"), ...)
+  silent = TRUE, ets = c("conventional", "adam"),
+  proxyOccurrence = c("ratio", "score"), ...)
 
 \method{simulate}{adam}(object, nsim = 1, seed = NULL,
   obs = nobs(object), ...)
@@ -278,6 +279,10 @@ the one from Hyndman et al. (2008) is used. In case of \code{ets="adam"}, ADAM r
 that updates multiplicative components differently is used. The latter is closer
 to applying ETS to log-transformed data when multiplicative components are used. This helps
 makig trend less explosive.}
+
+\item{proxyOccurrence}{The proxy of the occurrence error of the occurrence model, when
+\code{occurrence} is estimated: \code{"ratio"} (the default) or \code{"score"}. See
+\link[smooth]{om} for the details.}
 
 \item{...}{Other non-documented parameters. For example, \code{FI=TRUE} will
 make the function also produce Fisher Information matrix, which then can be

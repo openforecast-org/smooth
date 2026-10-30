@@ -40,6 +40,14 @@
 #' @param ic Information criterion for model selection.
 #' @param bounds Parameter bounds type.
 #' @param ets Type of ETS model: \code{"conventional"} or \code{"adam"}.
+#' @param proxyOccurrence The proxy of the unobservable error of the occurrence part, used to
+#' update the states of the odds-ratio, inverse-odds-ratio and general models.
+#' \code{"ratio"} (the default) uses the ratios of Svetunkov & Boylan (2023), built from
+#' \eqn{u_t = (1 + o_t - \hat{p}_t)/2}. \code{"score"} uses the score of the Bernoulli
+#' log-likelihood with respect to the logarithm of the state, \eqn{o_t - \hat{p}_t} for the
+#' odds and \eqn{\hat{p}_t - o_t} for the inverse odds: as the error of an additive model and of
+#' the conventional multiplicative ETS, and through its exponent with \code{ets="adam"}. It does
+#' not change the direct and fixed models.
 #' @param smoother The smoother used by \link[smooth]{msdecompose} to obtain the
 #' initial level, trend and seasonal indices (and the seasonal profiles for
 #' multiple seasonal models). \code{"default"} (the default) uses \code{"ma"} for
@@ -77,6 +85,7 @@ om <- function(data,
                ic = c("AICc","AIC","BIC","BICc"),
                bounds = c("usual","admissible","none"),
                ets = c("conventional","adam"),
+               proxyOccurrence = c("ratio","score"),
                smoother = c("default","ma","lowess","supsmu","global"),
                silent = TRUE, ...){
 
@@ -135,6 +144,9 @@ om <- function(data,
             profilesRecentTable    <- model$profileInitial;
             profilesRecentProvided <- TRUE;
         }
+        if(!is.null(model$proxyOccurrence)){
+            proxyOccurrence <- model$proxyOccurrence;
+        }
         # NOTE: do NOT propagate model$ets — that is the etsModel boolean
         # flag, not the om() `ets` argument (which is a character of
         # c("conventional","adam")). Leave `ets` at the user's default.
@@ -159,6 +171,7 @@ om <- function(data,
                           persistence=persistence, phi=phi,
                           initial=initial, arma=arma,
                           ic=ic, bounds=bounds, silent=silent, ets=ets,
+                          proxyOccurrence=proxyOccurrence,
                           occurrence=c("fixed","general","odds-ratio","inverse-odds-ratio","direct"),
                           constant=constant, loss=loss, smoother=smoother, ...)
         result$call <- match.call()
@@ -173,7 +186,7 @@ om <- function(data,
                       persistenceA=persistence, persistenceB=persistence,
                       phiA=phi, phiB=phi,
                       armaA=arma, armaB=arma,
-                      etsA=ets, etsB=ets,
+                      etsA=ets, etsB=ets, proxyOccurrence=proxyOccurrence,
                       lags=lags, h=h, holdout=holdout,
                       initial=initial, loss=loss, ic=ic,
                       bounds=bounds, silent=silent, smoother=smoother, ...)
@@ -205,6 +218,7 @@ om <- function(data,
     # `regressors` is resolved earlier (above the auto.om/omg forwarding
     # blocks) — no need to repeat.
     ets <- match.arg(ets);
+    proxyOccurrence <- match.arg(proxyOccurrence);
     # Do not overwrite ellipsis here — it may already hold values pulled out
     # of a fitted-object intake at the top of the function (ellipsis$B etc.).
     if(!exists("ellipsis", inherits=FALSE)){
@@ -504,6 +518,7 @@ om <- function(data,
     oesModel <- NULL;
     yFitted <- matrix(rep(mean(yInSample), obsInSample), ncol=1);
     adamETS <- (ets == "adam");
+    proxyScore <- (proxyOccurrence == "score");
 
     #### Optimiser settings ####
     optimSettings <- adam_checkOptimizer(ellipsis=ellipsis, loss=loss, distribution="dnorm",
@@ -556,7 +571,8 @@ om <- function(data,
                                           arimaModel, lagsModelARIMA, xregModel,
                                           constantRequired,
                                           componentsNumberARIMA,
-                                          obsAll, yIndexAll, yClasses, adamETS);
+                                          obsAll, yIndexAll, yClasses, adamETS,
+                                          proxyScore=proxyScore);
         list2env(adamArchitect, environment());
 
         # Etype="A" is needed for the decomposition to work in case of 0/1 data
@@ -869,7 +885,8 @@ om <- function(data,
                                               nla$arimaModel, lagsModelARIMA,
                                               xregModel, constantRequired,
                                               componentsNumberARIMA,
-                                              obsAll, yIndexAll, yClasses, adamETS);
+                                              obsAll, yIndexAll, yClasses, adamETS,
+                                          proxyScore=proxyScore);
             adamCreated <- adam_creator(nla$etsModel, nla$Etype, nla$Ttype, nla$Stype,
                                         nla$modelIsTrendy, nla$modelIsSeasonal,
                                         lags, adamArchitect$lagsModel, lagsModelARIMA,
@@ -1165,6 +1182,7 @@ om <- function(data,
             } else NULL,
             nParam = parNum,
             occurrence = occurrenceType,
+            proxyOccurrence = proxyOccurrence,
             formula = formula,
             regressors = regressors,
             loss = loss,
@@ -1349,7 +1367,8 @@ om <- function(data,
                                           xregNumber, obsInSample, initialType,
                                           arimaModel, lagsModelARIMA, xregModel, constantRequired,
                                           componentsNumberARIMA,
-                                          obsAll, yIndexAll, yClasses, adamETS);
+                                          obsAll, yIndexAll, yClasses, adamETS,
+                                          proxyScore=proxyScore);
         list2env(adamArchitect, environment());
     }
     else if(modelDo == "use"){
@@ -1364,7 +1383,8 @@ om <- function(data,
                                              arimaModel, lagsModelARIMA, xregModel,
                                              constantRequired,
                                              componentsNumberARIMA,
-                                             obsAll, yIndexAll, yClasses, adamETS);
+                                             obsAll, yIndexAll, yClasses, adamETS,
+                                          proxyScore=proxyScore);
 
         # Same Etype="A" decomposition trick as omEstimator (line 479): keeps
         # the matrix structure stable on 0/1 data even when the model is M.
@@ -2029,6 +2049,7 @@ coefbootstrap.om <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
     newCall$holdout <- FALSE;
     newCall$model <- modelType(object);
     newCall$occurrence <- object$occurrence;
+    newCall$proxyOccurrence <- object$proxyOccurrence;
     if(!is.null(object$call$orders$select)){
         newCall$orders <- orders(object);
         newCall$orders$select <- FALSE;

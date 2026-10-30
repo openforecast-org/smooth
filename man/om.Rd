@@ -13,8 +13,8 @@ om(data, model = "ZXZ", lags = c(frequency(data)), orders = list(ar =
   initial = c("backcasting", "optimal", "two-stage", "complete", "gradient"),
   arma = NULL, ic = c("AICc", "AIC", "BIC", "BICc"), bounds = c("usual",
   "admissible", "none"), ets = c("conventional", "adam"),
-  smoother = c("default", "ma", "lowess", "supsmu", "global"),
-  silent = TRUE, ...)
+  proxyOccurrence = c("ratio", "score"), smoother = c("default", "ma",
+  "lowess", "supsmu", "global"), silent = TRUE, ...)
 }
 \arguments{
 \item{data}{Numeric vector, time series, or data frame. Non-binary input is
@@ -63,6 +63,15 @@ for a custom loss or an out-of-scope specification).}
 \item{bounds}{Parameter bounds type.}
 
 \item{ets}{Type of ETS model: \code{"conventional"} or \code{"adam"}.}
+
+\item{proxyOccurrence}{The proxy of the unobservable error of the occurrence part, used to
+update the states of the odds-ratio, inverse-odds-ratio and general models.
+\code{"ratio"} (the default) uses the ratios of Svetunkov & Boylan (2023), built from
+\eqn{u_t = (1 + o_t - \hat{p}_t)/2}. \code{"score"} uses the score of the Bernoulli
+log-likelihood with respect to the logarithm of the state, \eqn{o_t - \hat{p}_t} for the
+odds and \eqn{\hat{p}_t - o_t} for the inverse odds: as the error of an additive model and of
+the conventional multiplicative ETS, and through its exponent with \code{ets="adam"}. It does
+not change the direct and fixed models.}
 
 \item{smoother}{The smoother used by \link[smooth]{msdecompose} to obtain the
 initial level, trend and seasonal indices (and the seasonal profiles for

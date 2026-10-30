@@ -97,6 +97,7 @@ class AutoOM:
         verbose: int = 0,
         nlopt_kwargs: Optional[Dict[str, Any]] = None,
         ets: Literal["conventional", "adam"] = "conventional",
+        proxy_occurrence: Literal["ratio", "score"] = "ratio",
         arima_select: bool = False,
         ar_order: Union[int, List[int], None] = None,
         i_order: Union[int, List[int], None] = None,
@@ -133,6 +134,12 @@ class AutoOM:
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
+        if proxy_occurrence not in ("ratio", "score"):
+            raise ValueError(
+                f"Invalid proxy_occurrence: {proxy_occurrence!r}. "
+                "Must be 'ratio' or 'score'."
+            )
+        self.proxy_occurrence = proxy_occurrence
         if smoother not in ("default", "ma", "lowess", "supsmu", "global"):
             raise ValueError(
                 f"Invalid smoother: {smoother!r}. Must be one of "
@@ -165,6 +172,7 @@ class AutoOM:
             nlopt_kwargs=self.nlopt_kwargs,
             loss=self.loss,
             lambda_param=self.lambda_param,
+            proxy_occurrence=self.proxy_occurrence,
         )
 
     def _build_candidate(

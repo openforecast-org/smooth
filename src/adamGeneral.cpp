@@ -121,6 +121,7 @@ RCPP_MODULE(adamCore_module) {
     class_<adamCore>("adamCore")
     .constructor<arma::uvec, char, char, char, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, bool, bool>()
     .field("flipConstant", &adamCore::flipConstant)
+    .field("proxyScore", &adamCore::proxyScore)
     .field("headLength", &adamCore::headLength)
     .field("sparseTransition", &adamCore::sparseTransition)
     .method("polynomialise", &adamCore::polynomialise)

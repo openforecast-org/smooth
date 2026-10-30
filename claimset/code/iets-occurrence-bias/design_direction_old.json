@@ -1,0 +1,28 @@
+{
+ "p_range": [
+  0.02,
+  0.98
+ ],
+ "T": 20000000,
+ "burnin": 2000000,
+ "batches": 100,
+ "mode": "random",
+ "n_cells": 200,
+ "alpha_range": [
+  0.001,
+  1
+ ],
+ "z": 4,
+ "models": [
+  "i",
+  "o"
+ ],
+ "errors": [
+  "M",
+  "A"
+ ],
+ "proxies": [
+  "old"
+ ],
+ "seed": 8
+}

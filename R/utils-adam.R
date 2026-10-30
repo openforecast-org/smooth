@@ -3286,7 +3286,7 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
                              componentsNumberARIMA,
                              obsAll, yIndexAll, yClasses, adamETS,
                              profilesRecentTable=NULL, profilesRecentProvided=FALSE,
-                             flipConstant=FALSE, headLength=NULL){
+                             flipConstant=FALSE, headLength=NULL, proxyScore=FALSE){
     if(etsModel){
         modelIsTrendy <- Ttype != "N"
         if(modelIsTrendy){
@@ -3365,6 +3365,8 @@ adam_architector <- function(etsModel, Etype, Ttype, Stype, lags, lagsModelSeaso
     # Head length for backcasting: one full lag cycle by default, so the head is
     # filtered against the model's own backcasts. 0 switches the filtering off.
     adamCpp$headLength <- headLengthResolved$flag
+    # The score proxy of the occurrence error (proxyOccurrence="score"); the ratios otherwise
+    adamCpp$proxyScore <- proxyScore
 
     return(list(
         lagsModel = lagsModel,

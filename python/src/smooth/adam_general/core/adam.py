@@ -654,6 +654,7 @@ class ADAM:
         gnorm_shape: Optional[float] = None,
         smoother: SmootherType = SMOOTHER_DEFAULT,
         ets: Literal["conventional", "adam"] = "conventional",
+        proxy_occurrence: Literal["ratio", "score"] = "ratio",
         **kwargs,
     ) -> None:
         """
@@ -838,6 +839,16 @@ class ADAM:
                 })
         gnorm_shape : Optional[float], default=None
             Shape parameter 's' for the generalized normal distribution.
+        proxy_occurrence : {"ratio", "score"}, default="ratio"
+            The proxy of the unobservable error of the occurrence model, when
+            ``occurrence`` is estimated (see ``OM``). "ratio" uses the ratios of
+            Svetunkov & Boylan (2023), built from u = (1 + o - p) / 2. "score" uses
+            the score of the Bernoulli log-likelihood with respect to the logarithm
+            of the state (o - p for the odds, p - o for the inverse odds): as the
+            error of an additive model and of the conventional multiplicative ETS,
+            and through its exponent with ``ets="adam"``. It does not change the
+            direct and fixed models.
+
         smoother : {"default", "ma", "lowess", "supsmu", "global"}, default="default"
             The smoother used by ``msdecompose`` to obtain the initial states -
             the level and the trend, together with the initial seasonal indices
@@ -889,6 +900,12 @@ class ADAM:
         if ets not in ("conventional", "adam"):
             raise ValueError(f"Invalid ets: {ets!r}. Must be 'conventional' or 'adam'.")
         self.ets = ets
+        if proxy_occurrence not in ("ratio", "score"):
+            raise ValueError(
+                f"Invalid proxy_occurrence: {proxy_occurrence!r}. "
+                "Must be 'ratio' or 'score'."
+            )
+        self.proxy_occurrence = proxy_occurrence
 
         # Store parameters that were moved from fit
         self.h = h
@@ -4391,6 +4408,7 @@ class ADAM:
             bounds=self._general.get("bounds", "usual"),
             initial=self._initials.get("initial_type", "backcasting"),
             ets=self.ets,
+            proxy_occurrence=self.proxy_occurrence,
         )
         if occ == "general":
             from smooth.adam_general.core.omg import OMG

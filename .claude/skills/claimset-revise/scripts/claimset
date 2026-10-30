@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Run the claimset tool bundled with this skill, without installing it.
+
+    python3 scripts/claimset lab summary
+
+The package in lib/ is a copy of the `claimset` package; `pip install claimset`
+(or from the repository) gives the same commands as `claimset ...`.
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+
+from claimset.cli import main  # noqa: E402
+
+sys.exit(main())

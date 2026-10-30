@@ -111,6 +111,7 @@ PYBIND11_MODULE(_adamCore, m) {
             py::arg("constant"),
             py::arg("adamETS"))
         .def_readwrite("flipConstant", &adamCore::flipConstant)
+        .def_readwrite("proxyScore", &adamCore::proxyScore)
         .def_readwrite("headLength", &adamCore::headLength)
         .def_readwrite("sparseTransition", &adamCore::sparseTransition)
         .def("polynomialise", &adamCore::polynomialise,

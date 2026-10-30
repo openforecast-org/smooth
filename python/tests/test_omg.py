@@ -577,3 +577,39 @@ def test_omg_skips_the_missing_observations():
     # The covariance re-evaluates the cost at the estimates, which the sub-models
     # must not have changed
     assert np.all(np.isfinite(np.diag(model.vcov())))
+
+
+@pytest.mark.parametrize("proxy", ["ratio", "score"])
+@pytest.mark.parametrize("ets", ["conventional", "adam"])
+@pytest.mark.parametrize("models", [("ANN", "ANN"), ("MNN", "ANN"), ("ANN", "MNN"), ("MNN", "MNN")])
+def test_omg_states_follow_the_proxy(models, ets, proxy):
+    # The coupled probability follows the recursion of the proxy on both sides
+    y = np.random.default_rng(7).binomial(1, 0.35, 120).astype(float)
+    alpha = (0.15, 0.1)
+    m = OMG(
+        model_a=models[0],
+        model_b=models[1],
+        persistence_a={"alpha": alpha[0]},
+        persistence_b={"alpha": alpha[1]},
+        initial="optimal",
+        ets=ets,
+        proxy_occurrence=proxy,
+    ).fit(y)
+    levels = [float(m.model_a.initial_value["level"]), float(m.model_b.initial_value["level"])]
+    p = np.zeros(len(y))
+    for t, o in enumerate(y):
+        mu = [np.exp(lv) if md == "ANN" else lv for lv, md in zip(levels, models)]
+        p[t] = mu[0] / (mu[0] + mu[1])
+        u = (1 + o - p[t]) / 2
+        for j, (s, ratio) in enumerate(((o - p[t], u / (1 - u)), (p[t] - o, (1 - u) / u))):
+            if models[j] == "ANN":
+                levels[j] += alpha[j] * (s if proxy == "score" else np.log(ratio))
+            else:
+                e = ratio - 1 if proxy == "ratio" else np.expm1(s) if ets == "adam" else s
+                levels[j] = (
+                    levels[j] * (1 + e) ** alpha[j]
+                    if ets == "adam"
+                    else levels[j] * (1 + alpha[j] * e)
+                )
+    np.testing.assert_allclose(np.asarray(m.fitted, dtype=float), p, atol=1e-10)
+    assert m.proxy_occurrence == proxy

@@ -14,6 +14,240 @@ covarTypeResolver <- function(type, bootstrap=FALSE){
     return(match.arg(type, c("opg","hessian","bootstrap")));
 }
 
+# The covariance matrix of the parameters of adam() and omg(), the body of their vcov():
+# the heuristics, the bootstrap, the OPG of the scores, else the Hessian path. opg() and
+# hessian() take the step of the derivatives (NULL for their default). As Python's
+# covariance_frame()
+adam_covariance <- function(object, type, heuristics, stepSize, opg, hessian, ...){
+    # Heuristics is to set variance equal to sqrt(heuristics)% of values
+    if(is.numeric(heuristics)){
+        return(diag(abs(coef(object))*heuristics));
+    }
+    if(type=="bootstrap"){
+        return(coefbootstrap(object, ...)$vcov);
+    }
+    if(type=="opg"){
+        vcovOPG <- opg(stepSize);
+        if(!is.null(vcovOPG)){
+            return(vcovOPG);
+        }
+        warning("The OPG covariance could not be computed for this model; ",
+                "falling back to the observed Fisher Information.", call.=FALSE);
+    }
+    return(hessian(stepSize));
+}
+
+# The inverse of the observed Fisher Information from fisherInformation(stepSize), retried
+# with a coarser step when some variables do not impact the likelihood, which are then left
+# out of the inversion with infinite variances. As Python's invert_fisher_information()
+adam_invertFI <- function(fisherInformation, stepSize){
+    FI <- fisherInformation(stepSize);
+    # If any row contains all zeroes, then it means that the variable does not impact the likelihood
+    brokenVariables <- apply(FI==0,1,all) | apply(is.nan(FI),1,any);
+    # If there are issues, try the same stuff, but with a different step size for hessian
+    if(any(brokenVariables)){
+        FI <- fisherInformation(.Machine$double.eps^(1/6));
+        brokenVariables <- apply(FI==0,1,all);
+    }
+    # If there are NaNs, then this has not been estimated well
+    if(any(is.nan(FI))){
+        stop("The Fisher Information cannot be calculated numerically with provided parameters - it contains NaNs.",
+             "Try setting stepSize for the hessian to something like stepSize=1e-6 or using the bootstrap.", call.=FALSE);
+    }
+    if(any(eigen(FI,only.values=TRUE)$values<0)){
+        warning("Observed Fisher Information is not positive semi-definite, ",
+                "which might mean that the likelihood was not maximised properly. ",
+                "There's not much I can do with that. ",
+                "Just keep in mind that there might be some issues ",
+                "with the covariance matrix of parameters.", call.=FALSE);
+    }
+    FIMatrix <- FI[!brokenVariables,!brokenVariables,drop=FALSE];
+
+    vcovMatrix <- try(chol2inv(chol(FIMatrix)), silent=TRUE);
+    if(inherits(vcovMatrix,"try-error")){
+        vcovMatrix <- try(solve(FIMatrix, diag(ncol(FIMatrix)), tol=1e-20), silent=TRUE);
+        if(inherits(vcovMatrix,"try-error")){
+            warning(paste0("Sorry, but the hessian is singular, so I could not invert it.\n",
+                           "I failed to produce the covariance matrix of parameters. Shame on me!"),
+                    call.=FALSE);
+            vcovMatrix <- diag(1e+100,ncol(FIMatrix));
+        }
+    }
+    # If there were broken variables, reproduce the zero elements.
+    # Reuse FI object in order to preserve memory. The names of cols / rows should be fine.
+    FI[!brokenVariables,!brokenVariables] <- vcovMatrix;
+    FI[brokenVariables,] <- FI[,brokenVariables] <- Inf;
+
+    # Just in case, take absolute values for the diagonal (in order to avoid possible issues with FI)
+    diag(FI) <- abs(diag(FI));
+    return(FI);
+}
+
+# The confidence intervals of the parameters of adam() and omg(), the body of their
+# confint(): the quantiles of the bootstrap, or the standard errors of vcov() with the
+# t-quantiles, their half-widths clamped by clamp(parameters, bounds). As Python's
+# confint_frame()
+adam_confint <- function(object, parm, level, type, clamp, ...){
+    parameters <- coef(object);
+    if(type=="bootstrap"){
+        coefValues <- coefbootstrap(object, ...);
+        confintReturn <- cbind(sqrt(diag(coefValues$vcov)),
+                               apply(coefValues$coefficients,2,quantile,probs=(1-level)/2),
+                               apply(coefValues$coefficients,2,quantile,probs=(1+level)/2));
+    }
+    else{
+        parametersSD <- sqrt(abs(diag(vcov(object, type=type, ...))));
+        # R uses asymmetric degrees of freedom for the two tails
+        bounds <- cbind(qt((1-level)/2, df=nobs(object)-nparam(object))*parametersSD,
+                        qt((1+level)/2, df=nobs(object)+nparam(object))*parametersSD);
+        confintReturn <- cbind(parametersSD, clamp(parameters, bounds)+parameters);
+    }
+    dimnames(confintReturn) <- list(names(parameters),
+                                    c("S.E.", paste0((1-level)/2*100,"%"), paste0((1+level)/2*100,"%")));
+    if(!missing(parm)){
+        confintReturn <- confintReturn[parm,,drop=FALSE];
+    }
+    return(confintReturn);
+}
+
+# The half-widths of the confidence intervals of an adam() model, clamped to its region:
+# the smoothing parameters to their bounds, the multiplicative initials above zero, TBATS
+# to its bounds and the ARMA to stationarity and invertibility. omg() clamps each of its
+# models with it. As Python's ADAM._clamp_confint_offsets()
+adam_confintClamp <- function(object, parameters, bounds){
+    parametersNames <- names(parameters);
+    adamCoefBounds <- matrix(bounds, ncol=2, dimnames=list(parametersNames,NULL));
+    etsModel <- etsChecker(object);
+    arimaModel <- arimaChecker(object);
+
+    persistence <- as.matrix(object$persistence);
+    # If there is xreg, but no deltas, increase persistence by including zeroes
+    # This can be considered as a failsafe mechanism
+    if(NCOL(object$data)>1 && !any(substr(names(object$persistence),1,5)=="delta")){
+        persistence <- rbind(persistence,matrix(rep(0,sum(object$nParam[,2])),ncol=1));
+    }
+
+    # Correct the bounds for the ETS model
+    if(etsModel){
+        #### The usual bounds ####
+        if(object$bounds=="usual"){
+            # Check, if there is alpha
+            if(any(parametersNames=="alpha")){
+                adamCoefBounds["alpha",1] <- max(-parameters["alpha"],adamCoefBounds["alpha",1]);
+                adamCoefBounds["alpha",2] <- min(1-parameters["alpha"],adamCoefBounds["alpha",2]);
+            }
+            # Check, if there is beta
+            if(any(parametersNames=="beta")){
+                adamCoefBounds["beta",1] <- max(-parameters["beta"],adamCoefBounds["beta",1]);
+                if(any(parametersNames=="alpha")){
+                    adamCoefBounds["beta",2] <- min(parameters["alpha"]-parameters["beta"],adamCoefBounds["beta",2]);
+                }
+                else{
+                    adamCoefBounds["beta",2] <- min(object$persistence["alpha"]-parameters["beta"],adamCoefBounds["beta",2]);
+                }
+            }
+            # Check, if there are gammas
+            if(any(substr(parametersNames,1,5)=="gamma")){
+                gammas <- which(substr(parametersNames,1,5)=="gamma");
+                adamCoefBounds[gammas,1] <- apply(cbind(adamCoefBounds[gammas,1],-parameters[gammas]),1,max);
+                if(any(parametersNames=="alpha")){
+                    adamCoefBounds[gammas,2] <- apply(cbind(adamCoefBounds[gammas,2],
+                                                            (1-parameters["alpha"])-parameters[gammas]),1,min);
+                }
+                else{
+                    adamCoefBounds[gammas,2] <- apply(cbind(adamCoefBounds[gammas,2],
+                                                            (1-object$persistence["alpha"])-parameters[gammas]),1,min);
+                }
+            }
+            # Check, if there are deltas (for xreg)
+            if(any(substr(parametersNames,1,5)=="delta")){
+                deltas <- which(substr(parametersNames,1,5)=="delta");
+                adamCoefBounds[deltas,1] <- apply(cbind(adamCoefBounds[deltas,1],-parameters[deltas]),1,max);
+                adamCoefBounds[deltas,2] <- apply(cbind(adamCoefBounds[deltas,2],1-parameters[deltas]),1,min);
+            }
+            # These are "usual" bounds for phi. We don't care about other bounds
+            if(any(parametersNames=="phi")){
+                adamCoefBounds["phi",1] <- max(-parameters["phi"],adamCoefBounds["phi",1]);
+                adamCoefBounds["phi",2] <- min(1-parameters["phi"],adamCoefBounds["phi",2]);
+            }
+        }
+        #### Admissible bounds ####
+        else if(object$bounds=="admissible"){
+            # Check, if there is alpha
+            if(any(parametersNames=="alpha")){
+                alphaBounds <- eigenBounds(object, persistence,
+                                           variableNumber=which(names(object$persistence)=="alpha"));
+                adamCoefBounds["alpha",1] <- max(alphaBounds[1]-parameters["alpha"],adamCoefBounds["alpha",1]);
+                adamCoefBounds["alpha",2] <- min(alphaBounds[2]-parameters["alpha"],adamCoefBounds["alpha",2]);
+            }
+            # Check, if there is beta
+            if(any(parametersNames=="beta")){
+                betaBounds <- eigenBounds(object, persistence,
+                                          variableNumber=which(names(object$persistence)=="beta"));
+                adamCoefBounds["beta",1] <- max(betaBounds[1]-parameters["beta"],adamCoefBounds["beta",1]);
+                adamCoefBounds["beta",2] <- min(betaBounds[2]-parameters["beta"],adamCoefBounds["beta",2]);
+            }
+            # Check, if there are gammas
+            if(any(substr(parametersNames,1,5)=="gamma")){
+                gammas <- which(substr(parametersNames,1,5)=="gamma");
+                for(i in 1:length(gammas)){
+                    gammaBounds <- eigenBounds(object, persistence,
+                                               variableNumber=which(substr(names(object$persistence),1,5)=="gamma")[i]);
+                    adamCoefBounds[gammas[i],1] <- max(gammaBounds[1]-parameters[gammas[i]],adamCoefBounds[gammas[i],1]);
+                    adamCoefBounds[gammas[i],2] <- min(gammaBounds[2]-parameters[gammas[i]],adamCoefBounds[gammas[i],2]);
+                }
+            }
+            # Check, if there are deltas (for xreg)
+            if(any(substr(parametersNames,1,5)=="delta")){
+                deltas <- which(substr(parametersNames,1,5)=="delta");
+                for(i in 1:length(deltas)){
+                    deltaBounds <- eigenBounds(object, persistence,
+                                               variableNumber=which(substr(names(object$persistence),1,5)=="delta")[i]);
+                    adamCoefBounds[deltas[i],1] <- max(deltaBounds[1]-parameters[deltas[i]],adamCoefBounds[deltas[i],1]);
+                    adamCoefBounds[deltas[i],2] <- min(deltaBounds[2]-parameters[deltas[i]],adamCoefBounds[deltas[i],2]);
+                }
+            }
+        }
+
+        # Restrictions on the initials for the multiplicative models (greater than zero)
+        # Level
+        # if(errorType(object)=="M" && any(parametersNames=="level")){
+        #     adamCoefBounds["level",1] <- max(-parameters["level"],adamCoefBounds["level",1]);
+        #     adamCoefBounds["level",2] <- max(-parameters["level"],adamCoefBounds["level",2]);
+        # }
+        adamModelType <- modelType(object);
+        # Only the lower bound needs the restriction: the upper one is above
+        # the lower, so it clears -parameters automatically once the lower does.
+        # Trend
+        if(substr(adamModelType,2,2)=="M" && any(parametersNames=="trend")){
+            adamCoefBounds["trend",1] <- max(-parameters["trend"],adamCoefBounds["trend",1]);
+        }
+        # Seasonality. pmax(), not max(): these are vectors, one element per
+        # seasonal initial, and max() would collapse them to a single number
+        # that then gets recycled across every seasonal row.
+        if(substr(adamModelType,nchar(adamModelType),nchar(adamModelType))=="M" &&
+           any(substr(parametersNames,1,8)=="seasonal")){
+            seasonals <- which(substr(parametersNames,1,8)=="seasonal");
+            adamCoefBounds[seasonals,1] <- pmax(-parameters[seasonals],adamCoefBounds[seasonals,1]);
+        }
+    }
+
+    # TBATS: inside the bounds of the model, which its fitter checks
+    if(tbatsChecker(object)){
+        adamCoefBounds[] <- tbats_confintBounds(object, parameters, adamCoefBounds);
+    }
+
+    # Correct the bounds for the ARIMA model: stationarity and invertibility
+    if(arimaModel && object$bounds!="none"){
+        armaBounds <- arimaParameterBounds(object$arma, parametersNames);
+        armaNames <- rownames(armaBounds);
+        adamCoefBounds[armaNames,1] <- pmax(armaBounds[,1]-parameters[armaNames], adamCoefBounds[armaNames,1]);
+        adamCoefBounds[armaNames,2] <- pmin(armaBounds[,2]-parameters[armaNames], adamCoefBounds[armaNames,2]);
+    }
+
+    return(adamCoefBounds);
+}
+
 #### Identifiable degrees of freedom of ETS initial states ####
 # Greatest common divisor (Euclid) -- base R has none.
 dfGCD <- function(a, b){

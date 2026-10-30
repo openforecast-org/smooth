@@ -1537,64 +1537,6 @@ omgCF_local <- function(B,
     }
 }
 
-# Per-side ETS "usual"-bounds confint correction for one omg sub-model.
-# Mirrors the ETS block of confint.adam (R/adam.R:4441-4541). Takes the
-# side's parameter values, their standard errors (from the JOINT vcov) and
-# the two t-quantiles; returns a 2-column [lower, upper] matrix. The
-# admissible-bounds and ARIMA branches of confint.adam are not reproduced
-# here — occurrence sub-models are plain ETS with bounds="usual"; for any
-# other bounds type the plain t-interval is returned.
-omgConfintSide <- function(subModel, params, se, tLo, tHi){
-    pn <- names(params)
-    n  <- length(params)
-    bnd <- matrix(0, n, 2, dimnames=list(pn, NULL))
-    bnd[,1] <- tLo * se
-    bnd[,2] <- tHi * se
-
-    etsModel   <- isTRUE(subModel$ets)
-    boundsType <- subModel$bounds
-
-    if(etsModel && !is.null(boundsType) && boundsType=="usual"){
-        if(any(pn=="alpha")){
-            bnd["alpha",1] <- max(-params["alpha"], bnd["alpha",1])
-            bnd["alpha",2] <- min(1-params["alpha"], bnd["alpha",2])
-        }
-        if(any(pn=="beta")){
-            bnd["beta",1] <- max(-params["beta"], bnd["beta",1])
-            if(any(pn=="alpha")){
-                bnd["beta",2] <- min(params["alpha"]-params["beta"], bnd["beta",2])
-            }
-            else{
-                bnd["beta",2] <- min(subModel$persistence["alpha"]-params["beta"], bnd["beta",2])
-            }
-        }
-        if(any(substr(pn,1,5)=="gamma")){
-            gammas <- which(substr(pn,1,5)=="gamma")
-            bnd[gammas,1] <- apply(cbind(bnd[gammas,1], -params[gammas]),1,max)
-            if(any(pn=="alpha")){
-                bnd[gammas,2] <- apply(cbind(bnd[gammas,2],
-                                             (1-params["alpha"])-params[gammas]),1,min)
-            }
-            else{
-                bnd[gammas,2] <- apply(cbind(bnd[gammas,2],
-                                             (1-subModel$persistence["alpha"])-params[gammas]),1,min)
-            }
-        }
-        if(any(substr(pn,1,5)=="delta")){
-            deltas <- which(substr(pn,1,5)=="delta")
-            bnd[deltas,1] <- apply(cbind(bnd[deltas,1], -params[deltas]),1,max)
-            bnd[deltas,2] <- apply(cbind(bnd[deltas,2], 1-params[deltas]),1,min)
-        }
-        if(any(pn=="phi")){
-            bnd["phi",1] <- max(-params["phi"], bnd["phi",1])
-            bnd["phi",2] <- min(1-params["phi"], bnd["phi",2])
-        }
-    }
-
-    bnd[] <- bnd + params
-    return(bnd)
-}
-
 #' @export
 coefbootstrap.omg <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
                               replace=FALSE, prob=NULL, parallel=FALSE,
@@ -1810,127 +1752,57 @@ coef.omg <- function(object, ...){
 #' @export
 confint.omg <- function(object, parm, level=0.95,
                         type=c("opg","hessian","bootstrap"), bootstrap=FALSE, ...){
-    type <- covarTypeResolver(type, bootstrap)
-    confintNames <- c(paste0((1-level)/2*100,"%"),
-                      paste0((1+level)/2*100,"%"))
-
-    if(type=="bootstrap"){
-        # Empirical bootstrap quantiles, mirroring confint.adam.
-        coefValues <- coefbootstrap(object, ...)
-        out <- cbind(sqrt(diag(coefValues$vcov)),
-                     apply(coefValues$coefficients, 2, quantile, probs=(1-level)/2),
-                     apply(coefValues$coefficients, 2, quantile, probs=(1+level)/2))
-        colnames(out) <- c("S.E.", confintNames)
+    type <- covarTypeResolver(type, bootstrap);
+    # The half-widths of the joint covariance, each model clamped to its own region
+    clamp <- function(parameters, bounds){
+        nParamA <- length(object$modelA$B);
+        indices <- list(seq_len(nParamA), nParamA+seq_len(length(object$modelB$B)));
+        models <- list(object$modelA, object$modelB);
+        for(i in which(lengths(indices)>0)){
+            bounds[indices[[i]],] <- adam_confintClamp(models[[i]], models[[i]]$B,
+                                                       bounds[indices[[i]],,drop=FALSE]);
+        }
+        return(bounds);
     }
-    else{
-        V  <- vcov(object, type=type, ...)    # JOINT covariance (vcov.omg)
-        SE <- sqrt(abs(diag(V)))
-
-        coefJoint <- c(object$modelA$B, object$modelB$B)
-        nParamsA  <- length(object$modelA$B)
-        idxA <- seq_len(nParamsA)
-        idxB <- seq_len(length(coefJoint) - nParamsA) + nParamsA
-
-        # Base t-interval half-widths with the JOINT nobs / nparam, exactly like
-        # confint.adam (R/adam.R:4430-4431).
-        tLo <- qt((1-level)/2, df=nobs(object)-nparam(object))
-        tHi <- qt((1+level)/2, df=nobs(object)+nparam(object))
-
-        sideA <- omgConfintSide(object$modelA, coefJoint[idxA], SE[idxA], tLo, tHi)
-        sideB <- omgConfintSide(object$modelB, coefJoint[idxB], SE[idxB], tLo, tHi)
-
-        out <- rbind(cbind(SE[idxA], sideA),
-                     cbind(SE[idxB], sideB))
-        colnames(out) <- c("S.E.", confintNames)
-        rownames(out) <- c(paste0("A:", names(object$modelA$B)),
-                           paste0("B:", names(object$modelB$B)))
-    }
-
-    if(!missing(parm)){
-        out <- out[parm, , drop=FALSE]
-    }
-    return(out)
+    return(adam_confint(object, parm, level, type, clamp, ...));
 }
 
 #' @export
 vcov.omg <- function(object, type=c("opg","hessian","bootstrap"),
                      bootstrap=FALSE, heuristics=NULL, ...){
-    ellipsis <- list(...)
-    type <- covarTypeResolver(type, bootstrap)
-
-    if(!is.null(heuristics) && is.numeric(heuristics)){
-        # Heuristic shortcut over the joint coef vector
-        return(diag(abs(c(object$modelA$B, object$modelB$B)) * heuristics))
-    }
-
-    if(type=="bootstrap"){
-        return(coefbootstrap(object, ...)$vcov)
-    }
-
-    stepSize <- if(is.null(ellipsis$stepSize)) {
-        .Machine$double.eps^(1/4)
+    ellipsis <- list(...);
+    type <- covarTypeResolver(type, bootstrap);
+    stepSize <- if(is.null(ellipsis$stepSize)){
+        .Machine$double.eps^(1/4);
     } else {
-        ellipsis$stepSize
+        ellipsis$stepSize;
     }
 
-    # OPG / BHHH covariance J = sum_t s_t s_t' over the coupled Bernoulli score.
-    # PSD by construction, so it returns finite standard errors at boundary
-    # estimates where the observed Fisher Information is indefinite. Falls back
-    # to the Hessian if the reproduction guard trips (covarOPGomg returns NULL).
-    if(type=="opg"){
-        vcovOPG <- covarOPGomg(object, stepSize=stepSize)
-        if(!is.null(vcovOPG)){
-            return(vcovOPG)
+    # The observed Fisher Information of the joint likelihood. The data is stored on the
+    # sub-models, not at the omg top level
+    fisherInformation <- function(stepSize){
+        h <- 0;
+        if(any(!is.na(object$forecast))){
+            h <- length(object$forecast);
         }
-        warning("The OPG covariance could not be computed for this omg model; ",
-                "falling back to the observed Fisher Information.", call.=FALSE)
-    }
-
-    h <- if(any(!is.na(object$forecast))) length(object$forecast) else 0
-
-    # Data is stored on the sub-models, not at the omg top level.
-    yData <- object$modelA$data
-
-    modelReturn <- suppressWarnings(
-        omg(yData, h=h, model=object, FI=TRUE, stepSize=stepSize))
-
-    if(is.null(modelReturn$FI)){
-        stop("Could not compute Fisher Information for this omg model. ",
-             "Try a different stepSize.", call.=FALSE)
-    }
-
-    brokenVariables <- apply(modelReturn$FI==0, 1, all) |
-                       apply(is.nan(modelReturn$FI), 1, any)
-    if(any(brokenVariables)){
-        modelReturn <- suppressWarnings(
-            omg(yData, h=h, model=object, FI=TRUE,
-                stepSize=.Machine$double.eps^(1/6)))
-        brokenVariables <- apply(modelReturn$FI==0, 1, all)
-    }
-    if(any(is.nan(modelReturn$FI))){
-        stop("Fisher Information contains NaN; try a different stepSize ",
-             "(e.g. stepSize=1e-6).", call.=FALSE)
-    }
-    if(any(eigen(modelReturn$FI, only.values=TRUE)$values < 0)){
-        warning("Observed Fisher Information is not positive semi-definite; ",
-                "covariance matrix may be unreliable.", call.=FALSE)
-    }
-
-    FIMatrix <- modelReturn$FI[!brokenVariables, !brokenVariables, drop=FALSE]
-    vcovMatrix <- try(chol2inv(chol(FIMatrix)), silent=TRUE)
-    if(inherits(vcovMatrix, "try-error")){
-        vcovMatrix <- try(solve(FIMatrix, diag(ncol(FIMatrix)), tol=1e-20),
-                          silent=TRUE)
-        if(inherits(vcovMatrix, "try-error")){
-            warning("Hessian is singular; cannot invert.", call.=FALSE)
-            vcovMatrix <- diag(1e+100, ncol(FIMatrix))
+        modelReturn <- suppressWarnings(omg(object$modelA$data, h=h, model=object, FI=TRUE, stepSize=stepSize));
+        if(is.null(modelReturn$FI)){
+            stop("Could not compute Fisher Information for this omg model. ",
+                 "Try a different stepSize.", call.=FALSE);
         }
+        return(modelReturn$FI);
     }
-    modelReturn$FI[!brokenVariables, !brokenVariables] <- vcovMatrix
-    modelReturn$FI[brokenVariables, ] <- Inf
-    modelReturn$FI[, brokenVariables] <- Inf
-    diag(modelReturn$FI) <- abs(diag(modelReturn$FI))
-    return(modelReturn$FI)
+
+    # The OPG / BHHH covariance J = sum_t s_t s_t' over the coupled Bernoulli score, PSD by
+    # construction, so it returns finite standard errors at boundary estimates where the
+    # observed Fisher Information is indefinite
+    return(adam_covariance(object, type, heuristics, stepSize,
+                           function(stepSize){
+                               return(covarOPGomg(object, stepSize=stepSize));
+                           },
+                           function(stepSize){
+                               return(adam_invertFI(fisherInformation, stepSize));
+                           }, ...));
 }
 
 #' @rdname forecast.smooth

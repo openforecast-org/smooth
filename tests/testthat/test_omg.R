@@ -266,6 +266,20 @@ test_that("confint.omg returns a finite joint CI table", {
     expect_true(any(grepl("^B:", rownames(ci))));
 })
 
+test_that("confint.omg clamps each model to its admissible bounds, as confint.adam", {
+    # omgConfintSide() clamped the usual bounds only: the lower limits were below the
+    # admissible ones (-0.022 and -0.025 for -0.01)
+    set.seed(41);
+    y <- rpois(120, 0.6);
+    m <- omg(y, modelA="MNN", modelB="MNN", bounds="admissible");
+    ci <- suppressWarnings(confint(m));
+    for(side in c("A","B")){
+        subModel <- m[[paste0("model", side)]];
+        alphaBounds <- eigenBounds(subModel, as.matrix(subModel$persistence), variableNumber=1);
+        expect_equal(ci[paste0(side, ":alpha"), 2], unname(alphaBounds[1]), label=side);
+    }
+})
+
 test_that("summary.omg builds two coefficient sub-tables", {
     set.seed(12);
     y <- rbinom(150, 1, 0.5);

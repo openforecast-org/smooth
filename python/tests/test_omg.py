@@ -585,3 +585,12 @@ def test_omg_rstudent_has_one_degree_of_freedom_fewer(fitted_omg, intermittent_y
     n, k = fitted_omg.nobs, fitted_omg.nparam
     expected = ((intermittent_y != 0) - p) / np.sqrt(p * (1 - p)) * np.sqrt(n / (n - k - 1))
     np.testing.assert_allclose(np.asarray(fitted_omg.rstudent()), expected, rtol=1e-12)
+
+
+def test_omg_vcov_takes_the_heuristics(fitted_omg):
+    """R: vcov(omg(y), heuristics=0.1) is diag(abs(c(modelA$B, modelB$B)) * 0.1)."""
+    covariance = fitted_omg.vcov(heuristics=0.1)
+    np.testing.assert_array_equal(
+        covariance.to_numpy(), np.diag(np.abs(np.asarray(fitted_omg.coef)) * 0.1)
+    )
+    assert list(covariance.index) == fitted_omg.coef_names

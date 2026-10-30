@@ -650,7 +650,14 @@ class OMG:
             self._B_joint, point_lik_at, ot.shape[0], float(self.loglik), step_size
         )
 
-    def vcov(self, type=None, bootstrap: bool = False, step_size=None, **boot_kwargs):  # noqa: A002
+    def vcov(
+        self,
+        type=None,  # noqa: A002
+        bootstrap: bool = False,
+        heuristics=None,
+        step_size=None,
+        **boot_kwargs,
+    ):
         """Joint variance–covariance matrix for both OMG sub-models.
 
         Mirrors R's ``vcov.omg``. ``type`` selects the estimator: ``"opg"`` (the
@@ -664,6 +671,8 @@ class OMG:
             Covariance estimator; defaults to ``"opg"``.
         bootstrap : bool, default=False
             Deprecated alias for ``type="bootstrap"`` (warns).
+        heuristics : float, optional
+            If given, returns ``diag(abs(coef) * heuristics)``, as R.
         step_size : float, optional
             Finite-difference step.
         **boot_kwargs
@@ -674,44 +683,18 @@ class OMG:
         pandas.DataFrame
             Joint covariance matrix with prefixed row/col names.
         """
-        import warnings
-
-        import pandas as pd
-
         from smooth.adam_general.core.utils.var_covar import (
-            invert_fisher_information,
+            covariance_frame,
             resolve_covar_type,
         )
 
-        cov_type = resolve_covar_type(type, bootstrap)
-        names = self.coef_names
-
-        if cov_type == "bootstrap":
-            return self.coefbootstrap(**boot_kwargs).vcov
-
-        if cov_type == "opg":
-            cov_opg = self._opg_covariance(step_size=step_size)
-            if cov_opg is not None:
-                return pd.DataFrame(cov_opg, index=names, columns=names)
-            warnings.warn(
-                "The OPG covariance could not be computed for this omg model; "
-                "falling back to the observed Fisher Information.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-
-        FI = np.asarray(self._fisher_information_matrix(step_size=step_size))  # noqa: N806
-        broken = np.all(FI == 0, axis=1) | np.any(np.isnan(FI), axis=1)
-        if np.any(broken) and step_size is None:
-            FI = np.asarray(  # noqa: N806
-                self._fisher_information_matrix(
-                    step_size=float(np.finfo(float).eps ** (1 / 6))
-                )
-            )
-
-        cov = invert_fisher_information(FI)
-        names = self.coef_names
-        return pd.DataFrame(cov, index=names, columns=names)
+        return covariance_frame(
+            self,
+            resolve_covar_type(type, bootstrap),
+            heuristics,
+            step_size,
+            **boot_kwargs,
+        )
 
     def confint(
         self,
@@ -737,7 +720,7 @@ class OMG:
         level : float, default=0.95
             Confidence level for the interval.
         bootstrap : bool, default=False
-            Not implemented for OMG yet.
+            Deprecated alias for ``type="bootstrap"`` (warns).
         step_size : float, optional
             Finite-difference step forwarded to :meth:`vcov`.
 
@@ -746,57 +729,35 @@ class OMG:
         pandas.DataFrame
             Columns ``["S.E.", "<lo>%", "<hi>%"]`` indexed by prefixed names.
         """
-        import pandas as pd
-        from scipy import stats as scipy_stats
+        from smooth.adam_general.core.utils.var_covar import (
+            confint_frame,
+            resolve_covar_type,
+        )
 
-        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+        return confint_frame(
+            self,
+            parm,
+            level,
+            resolve_covar_type(type, bootstrap),
+            step_size,
+            **boot_kwargs,
+        )
 
-        cov_type = resolve_covar_type(type, bootstrap)
-        names = self.coef_names
-        params = np.asarray(self._B_joint, dtype=float)
-
-        if cov_type == "bootstrap":
-            from smooth.adam_general.core.utils.bootstrap import (
-                bootstrap_confint_frame,
-            )
-
-            boot = self.coefbootstrap(**boot_kwargs)
-            return bootstrap_confint_frame(boot, names, params, level, parm)
+    def _clamp_confint_offsets(self, names, params, lo, hi):
+        """Clamp the half-widths of each sub-model in place, by its own
+        :meth:`~ADAM._clamp_confint_offsets` (``names`` and ``params`` are the
+        joint ones, each sub-model takes its own)."""
         n_a = int(self._n_params_a)
-
-        V = self.vcov(type=cov_type, step_size=step_size).to_numpy()  # noqa: N806
-        se = np.sqrt(np.abs(np.diag(V)))
-
-        nobs = int(self.nobs)
-        nparam = int(self.nparam)
-        # R: asymmetric df for the two tails (omg.R:1611–1612).
-        lo = scipy_stats.t.ppf((1 - level) / 2, df=nobs - nparam) * se
-        hi = scipy_stats.t.ppf((1 + level) / 2, df=nobs + nparam) * se
-
-        # Per-sub-model clamping using each sub-model's own bounds knowledge.
-        # Slicing returns views; in-place mutations propagate back.
-        params_a = np.asarray(self.model_a.coef, dtype=float)
-        params_b = np.asarray(self.model_b.coef, dtype=float)
-        self.model_a._clamp_confint_offsets(
-            self.model_a.coef_names, params_a, lo[:n_a], hi[:n_a]
-        )
-        self.model_b._clamp_confint_offsets(
-            self.model_b.coef_names, params_b, lo[n_a:], hi[n_a:]
-        )
-
-        lo = lo + params
-        hi = hi + params
-
-        lo_name = f"{(1 - level) / 2 * 100:g}%"
-        hi_name = f"{(1 + level) / 2 * 100:g}%"
-        out = pd.DataFrame(
-            np.column_stack([se, lo, hi]),
-            index=names,
-            columns=["S.E.", lo_name, hi_name],
-        )
-        if parm is not None:
-            out = out.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
-        return out
+        for model, part in (
+            (self.model_a, slice(None, n_a)),
+            (self.model_b, slice(n_a, None)),
+        ):
+            model._clamp_confint_offsets(
+                model.coef_names,
+                np.asarray(model.coef, dtype=float),
+                lo[part],
+                hi[part],
+            )
 
     def summary(self, level: float = 0.95, digits: int = 4, type=None):  # noqa: A002
         """Coefficient-table summary for the joint occurrence model.

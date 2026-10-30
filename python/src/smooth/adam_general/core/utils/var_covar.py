@@ -705,3 +705,85 @@ def invert_fisher_information(FI):  # noqa: N803
     diag_idx = np.arange(n)
     out[diag_idx, diag_idx] = np.abs(out[diag_idx, diag_idx])
     return out
+
+
+def covariance_frame(
+    model, covariance_type, heuristics=None, step_size=None, **boot_kwargs
+):
+    """The covariance matrix of the parameters of ``ADAM`` and ``OMG``.
+
+    The body of their ``vcov()``, as R's ``vcov.adam`` and ``vcov.omg``: the
+    heuristic diagonal, the bootstrap, the OPG of the scores, or the inverse of the
+    observed Fisher Information, retried with a coarser step when it has broken
+    variables. ``covariance_type`` is resolved by the caller.
+    """
+    import warnings
+
+    import pandas as pd
+
+    names = model.coef_names
+    if heuristics is not None:
+        covariance = np.diag(np.abs(np.asarray(model.coef, dtype=float)) * heuristics)
+        return pd.DataFrame(covariance, index=names, columns=names)
+
+    if covariance_type == "bootstrap":
+        return model.coefbootstrap(**boot_kwargs).vcov
+
+    if covariance_type == "opg":
+        covariance = model._opg_covariance(step_size=step_size)
+        if covariance is not None:
+            return pd.DataFrame(covariance, index=names, columns=names)
+        warnings.warn(
+            "The OPG covariance could not be computed for this model; "
+            "falling back to the observed Fisher Information.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
+    FI = np.asarray(model._fisher_information_matrix(step_size=step_size))  # noqa: N806
+    # R retries with a coarser step when variables look "broken"
+    broken = np.all(FI == 0, axis=1) | np.any(np.isnan(FI), axis=1)
+    if np.any(broken) and step_size is None:
+        FI = np.asarray(  # noqa: N806
+            model._fisher_information_matrix(
+                step_size=float(np.finfo(float).eps ** (1 / 6))
+            )
+        )
+    return pd.DataFrame(invert_fisher_information(FI), index=names, columns=names)
+
+
+def confint_frame(model, parm, level, covariance_type, step_size=None, **boot_kwargs):
+    """The confidence intervals of the parameters of ``ADAM`` and ``OMG``.
+
+    The body of their ``confint()``, as R's ``confint.adam`` and ``confint.omg``:
+    the quantiles of the bootstrap, or the standard errors of ``vcov()`` with the
+    t-quantiles of R's asymmetric degrees of freedom, clamped to the admissible
+    region by the model's ``_clamp_confint_offsets()``.
+    """
+    import pandas as pd
+    from scipy import stats as scipy_stats
+
+    names = model.coef_names
+    params = np.asarray(model.coef, dtype=float)
+    if covariance_type == "bootstrap":
+        from smooth.adam_general.core.utils.bootstrap import bootstrap_confint_frame
+
+        boot = model.coefbootstrap(**boot_kwargs)
+        return bootstrap_confint_frame(boot, names, params, level, parm)
+
+    V = model.vcov(type=covariance_type, step_size=step_size).to_numpy()  # noqa: N806
+    se = np.sqrt(np.abs(np.diag(V)))
+    nobs, nparam = int(model.nobs), int(model.nparam)
+    # R uses asymmetric degrees of freedom for the two tails
+    lo = scipy_stats.t.ppf((1 - level) / 2, df=nobs - nparam) * se
+    hi = scipy_stats.t.ppf((1 + level) / 2, df=nobs + nparam) * se
+    model._clamp_confint_offsets(names, params, lo, hi)
+
+    out = pd.DataFrame(
+        np.column_stack([se, lo + params, hi + params]),
+        index=names,
+        columns=["S.E.", f"{(1 - level) / 2 * 100:g}%", f"{(1 + level) / 2 * 100:g}%"],
+    )
+    if parm is not None:
+        out = out.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
+    return out

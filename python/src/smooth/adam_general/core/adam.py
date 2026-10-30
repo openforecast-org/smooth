@@ -5577,49 +5577,19 @@ class ADAM:
         pandas.DataFrame
             Covariance matrix indexed/columned by :attr:`coef_names`.
         """
-        import warnings
-
-        import pandas as pd
-
         from smooth.adam_general.core.utils.var_covar import (
-            invert_fisher_information,
+            covariance_frame,
             resolve_covar_type,
         )
 
         self._check_is_fitted()
-        names = self.coef_names
-        cov_type = resolve_covar_type(type, bootstrap)
-
-        if heuristics is not None:
-            cov = np.diag(np.abs(np.asarray(self.coef, dtype=float)) * heuristics)
-            return pd.DataFrame(cov, index=names, columns=names)
-
-        if cov_type == "bootstrap":
-            return self.coefbootstrap(**boot_kwargs).vcov
-
-        if cov_type == "opg":
-            cov_opg = self._opg_covariance(step_size=step_size)
-            if cov_opg is not None:
-                return pd.DataFrame(cov_opg, index=names, columns=names)
-            warnings.warn(
-                "The OPG covariance could not be computed for this model; "
-                "falling back to the observed Fisher Information.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-
-        FI = np.asarray(self._fisher_information_matrix(step_size=step_size))
-        # R retries with a coarser step when variables look "broken".
-        broken = np.all(FI == 0, axis=1) | np.any(np.isnan(FI), axis=1)
-        if np.any(broken) and step_size is None:
-            FI = np.asarray(
-                self._fisher_information_matrix(
-                    step_size=float(np.finfo(float).eps ** (1 / 6))
-                )
-            )
-
-        cov = invert_fisher_information(FI)
-        return pd.DataFrame(cov, index=names, columns=names)
+        return covariance_frame(
+            self,
+            resolve_covar_type(type, bootstrap),
+            heuristics,
+            step_size,
+            **boot_kwargs,
+        )
 
     def _persistence_index(self, name):
         """vec_g row for a named persistence parameter (alpha/beta/gamma*/delta*)."""
@@ -5678,47 +5648,20 @@ class ADAM:
         pandas.DataFrame
             Columns ``["S.E.", "<lo>%", "<hi>%"]`` indexed by :attr:`coef_names`.
         """
-        import pandas as pd
-
-        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+        from smooth.adam_general.core.utils.var_covar import (
+            confint_frame,
+            resolve_covar_type,
+        )
 
         self._check_is_fitted()
-        cov_type = resolve_covar_type(type, bootstrap)
-        names = self.coef_names
-        params = np.asarray(self.coef, dtype=float)
-
-        if cov_type == "bootstrap":
-            from smooth.adam_general.core.utils.bootstrap import (
-                bootstrap_confint_frame,
-            )
-
-            boot = self.coefbootstrap(**boot_kwargs)
-            return bootstrap_confint_frame(boot, names, params, level, parm)
-
-        V = self.vcov(type=cov_type, step_size=step_size).to_numpy()
-        se = np.sqrt(np.abs(np.diag(V)))
-
-        nobs = self.nobs
-        nparam = self.nparam
-        # R uses asymmetric degrees of freedom for the two tails.
-        lo = scipy_stats.t.ppf((1 - level) / 2, df=nobs - nparam) * se
-        hi = scipy_stats.t.ppf((1 + level) / 2, df=nobs + nparam) * se
-
-        self._clamp_confint_offsets(names, params, lo, hi)
-
-        lo = lo + params
-        hi = hi + params
-
-        lo_name = f"{(1 - level) / 2 * 100:g}%"
-        hi_name = f"{(1 + level) / 2 * 100:g}%"
-        out = pd.DataFrame(
-            np.column_stack([se, lo, hi]),
-            index=names,
-            columns=["S.E.", lo_name, hi_name],
+        return confint_frame(
+            self,
+            parm,
+            level,
+            resolve_covar_type(type, bootstrap),
+            step_size,
+            **boot_kwargs,
         )
-        if parm is not None:
-            out = out.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
-        return out
 
     def _eigen_static_args(self):
         """Static arguments forwarded to ``eigen_bounds``/``eigen_values``."""

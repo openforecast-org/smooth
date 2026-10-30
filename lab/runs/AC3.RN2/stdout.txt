@@ -1,0 +1,28 @@
+identity h_b closed form -> 0
+identity h_a closed form -> 0
+identity h_b(1-sqrt(1-p))=0 -> 0
+identity h_b factorised: h_b(2-x)(1-x)=2(x-x*)(1+q-x) -> 0
+identity p-x* = q(1-q) -> 0
+identity h_a(sqrt p)=0 -> 0
+identity h_a factorised: h_a x(1+x)=2(s-x)(s+x) -> 0
+identity sqrt p - p = s(1-s) -> 0
+[1 - sqrt(1 - p), sqrt(1 - p) + 1]
+check multiplicative: order x*<p, sqrt p>p True bad=0
+check multiplicative: sign pattern of h (=> unique, stable) on x-grid True bad=0
+identity h_b = 2atanh(x)[(1-p)-pR(x)] -> 0
+check additive: root found, residual<1e-25 (max res 6.89e-41) True bad=0
+check additive: iETS_O and iETS_I share the root, h_a=-h_b True bad=0
+check additive: R(x*)=(1-p)/p True bad=0
+check additive: x* strictly between p and 1/2 for p!=1/2; =1/2 at 1/2 True bad=0
+check additive: stability (sign change) at the root True bad=0
+check additive: exactly one sign change of h on 2999 x-points, 80 p values True bad=0
+check R decreasing on grid True 
+limits R at 0+,1-: oo 0
+root at p=1/2: 0.5
+[]
+{'quantity': 'identities sympy could not reduce to zero', 'value': 0, 'conditions': {'claim': 'C10'}}
+{'quantity': 'numerical counterexamples', 'value': 0, 'conditions': {'claim': 'C10'}}
+{'quantity': 'checks performed', 'value': 18, 'conditions': {'claim': 'C10'}}
+{'quantity': 'additive root at p=1/2', 'value': 0.5, 'conditions': {'claim': 'C10', 'note': 'equals p, so not strictly between p and 1/2'}}
+{'quantity': 'additive root at p=0.1', 'value': 0.1419244099433441, 'conditions': {'claim': 'C10'}}
+{'quantity': 'additive root at p=0.9', 'value': 0.8580755900566559, 'conditions': {'claim': 'C10'}}

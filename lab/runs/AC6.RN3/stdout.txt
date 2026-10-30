@@ -1,0 +1,125 @@
+C20 sumf I conv padj=2.44e-299 med=1.901 meandiff=3.371 zero=0.019 sig=True dir=1
+C20 sumf I adam padj=0.032 med=-0.1687 meandiff=0.3131 zero=0.082 sig=False dir=0
+C20 sumf O conv padj=0 med=-3.668 meandiff=-3.552 zero=0.018 sig=True dir=-1
+C20 sumf O adam padj=0.032 med=-0.1687 meandiff=0.3131 zero=0.082 sig=False dir=0
+C20 good 2 bad 0 nsig 2 of 4
+C21 rmsse O conv padj=3.08e-84 med=-0.01491 meandiff=-0.05752 zero=0.018 sig=True dir=-1
+C21 rmsse O adam padj=4.26e-05 med=-0.0003586 meandiff=-0.0004249 zero=0.082 sig=True dir=-1
+C21 rmsse I conv padj=4.51e-11 med=-0.004537 meandiff=0.007875 zero=0.019 sig=True dir=-1
+C21 rmsse I adam padj=4.26e-05 med=-0.0003586 meandiff=-0.0004249 zero=0.082 sig=True dir=-1
+C21 rmsse G conv padj=0.019 med=0.0001791 meandiff=0.001841 zero=0.003 sig=False dir=0
+C21 rmsse G adam padj=2.33e-06 med=-0.0004326 meandiff=-0.003642 zero=0.004 sig=True dir=-1
+C21 rmsse A conv padj=0.199 med=4.07e-05 meandiff=0.001312 zero=0.173 sig=False dir=0
+C21 rmsse A adam padj=0.00121 med=-0.0003009 meandiff=-0.001702 zero=0.111 sig=True dir=-1
+C21 good 6 bad 0 nsig 6 of 8
+C22 pin0.8 O conv padj=6.45e-42 med=-0.009464 meandiff=-0.03962 zero=0.148 sig=True dir=-1
+C22 pin0.9 O conv padj=1.8e-37 med=-0.006476 meandiff=-0.01862 zero=0.067 sig=True dir=-1
+C22 pin0.95 O conv padj=6.34e-28 med=-0.003744 meandiff=-0.01486 zero=0.033 sig=True dir=-1
+C22 pin0.99 O conv padj=2.69e-63 med=-0.002055 meandiff=-0.005088 zero=0.019 sig=True dir=-1
+C22 pin0.8 O adam padj=0.0627 med=-0.0006258 meandiff=0.0008447 zero=0.193 sig=False dir=0
+C22 pin0.9 O adam padj=0.0183 med=-0.000502 meandiff=0.001024 zero=0.054 sig=False dir=0
+C22 pin0.95 O adam padj=0.0627 med=-0.0001079 meandiff=0.003464 zero=0.014 sig=False dir=0
+C22 pin0.99 O adam padj=1.55e-10 med=-0.0001232 meandiff=0.000826 zero=0.002 sig=True dir=-1
+C22 pin0.8 I conv padj=3.56e-13 med=-0.001546 meandiff=-0.02605 zero=0.230 sig=True dir=-1
+C22 pin0.9 I conv padj=0.000888 med=-0.0001145 meandiff=-0.03063 zero=0.088 sig=True dir=-1
+C22 pin0.95 I conv padj=0.25 med=-0.0001835 meandiff=-0.02185 zero=0.038 sig=False dir=0
+C22 pin0.99 I conv padj=1e-34 med=0.002063 meandiff=-0.008957 zero=0.020 sig=True dir=1
+C22 pin0.8 I adam padj=0.226 med=-0.0003843 meandiff=0.000982 zero=0.191 sig=False dir=0
+C22 pin0.9 I adam padj=0.0401 med=-0.0004053 meandiff=0.001376 zero=0.055 sig=False dir=0
+C22 pin0.95 I adam padj=0.25 med=-3.931e-05 meandiff=0.003611 zero=0.014 sig=False dir=0
+C22 pin0.99 I adam padj=1.19e-07 med=-8.571e-05 meandiff=0.0005896 zero=0.002 sig=True dir=-1
+C22 pin0.8 G conv padj=0.25 med=9.185e-05 meandiff=0.001659 zero=0.229 sig=False dir=0
+C22 pin0.9 G conv padj=0.0727 med=0.0002276 meandiff=0.004066 zero=0.073 sig=False dir=0
+C22 pin0.95 G conv padj=1 med=3.869e-05 meandiff=0.002248 zero=0.022 sig=False dir=0
+C22 pin0.99 G conv padj=0.25 med=7.698e-05 meandiff=0.002119 zero=0.004 sig=False dir=0
+C22 pin0.8 G adam padj=0.031 med=-0.0006728 meandiff=-0.0006082 zero=0.179 sig=False dir=0
+C22 pin0.9 G adam padj=0.0207 med=-0.0005854 meandiff=0.002287 zero=0.048 sig=False dir=0
+C22 pin0.95 G adam padj=0.0509 med=-0.0001406 meandiff=0.004566 zero=0.012 sig=False dir=0
+C22 pin0.99 G adam padj=5.55e-22 med=-0.0002477 meandiff=0.001972 zero=0.002 sig=True dir=-1
+C22 pin0.8 A conv padj=1 med=2.672e-05 meandiff=0.0001341 zero=0.325 sig=False dir=0
+C22 pin0.9 A conv padj=1 med=0.0001194 meandiff=0.001502 zero=0.219 sig=False dir=0
+C22 pin0.95 A conv padj=1 med=-2.237e-05 meandiff=0.002986 zero=0.186 sig=False dir=0
+C22 pin0.99 A conv padj=1 med=4.375e-05 meandiff=0.002964 zero=0.174 sig=False dir=0
+C22 pin0.8 A adam padj=0.00559 med=-0.000755 meandiff=-0.0007615 zero=0.200 sig=True dir=-1
+C22 pin0.9 A adam padj=0.0426 med=-0.0004388 meandiff=0.0007721 zero=0.059 sig=False dir=0
+C22 pin0.95 A adam padj=0.325 med=-5.703e-05 meandiff=0.003353 zero=0.016 sig=False dir=0
+C22 pin0.99 A adam padj=0.000347 med=-5.73e-05 meandiff=0.001831 zero=0.002 sig=True dir=-1
+C22 good 11 bad 1 nsig 12 of 32
+['pin0.8 O conv', 'pin0.9 O conv', 'pin0.95 O conv', 'pin0.99 O conv', 'pin0.99 O adam', 'pin0.8 I conv', 'pin0.9 I conv', 'pin0.99 I adam', 'pin0.99 G adam', 'pin0.8 A adam', 'pin0.99 A adam']
+['pin0.99 I conv']
+C25 iETS_A_ratio_adam 0.8 padj=1 med=-0.00155 meandiff=0.006154 zero=0.207 sig=False dir=0
+C25 iETS_A_ratio_adam 0.9 padj=0.00766 med=0.006692 meandiff=0.004493 zero=0.066 sig=True dir=1
+C25 iETS_A_ratio_adam 0.95 padj=4.92e-06 med=0.006724 meandiff=0.001894 zero=0.017 sig=True dir=1
+C25 iETS_A_ratio_adam 0.99 padj=1.97e-98 med=0.004795 meandiff=-0.005024 zero=0.002 sig=True dir=1
+C25 iETS_A_ratio_conv 0.8 padj=7.5e-27 med=0.00605 meandiff=0.02099 zero=0.240 sig=True dir=1
+C25 iETS_A_ratio_conv 0.9 padj=8.98e-45 med=0.01108 meandiff=0.02109 zero=0.081 sig=True dir=1
+C25 iETS_A_ratio_conv 0.95 padj=7.86e-35 med=0.007642 meandiff=0.01376 zero=0.022 sig=True dir=1
+C25 iETS_A_ratio_conv 0.99 padj=3.48e-121 med=0.004755 meandiff=-0.00121 zero=0.003 sig=True dir=1
+C25 iETS_A_score_adam 0.8 padj=1 med=-0.002447 meandiff=-0.0003447 zero=0.250 sig=False dir=0
+C25 iETS_A_score_adam 0.9 padj=1 med=0.005397 meandiff=-9.189e-05 zero=0.090 sig=False dir=0
+C25 iETS_A_score_adam 0.95 padj=0.00998 med=0.005569 meandiff=-0.001752 zero=0.025 sig=True dir=1
+C25 iETS_A_score_adam 0.99 padj=1.08e-85 med=0.00468 meandiff=-0.005579 zero=0.002 sig=True dir=1
+C25 iETS_A_score_conv 0.8 padj=1.32e-29 med=0.007304 meandiff=0.02219 zero=0.253 sig=True dir=1
+C25 iETS_A_score_conv 0.9 padj=1.54e-42 med=0.01075 meandiff=0.02013 zero=0.090 sig=True dir=1
+C25 iETS_A_score_conv 0.95 padj=1.4e-32 med=0.007245 meandiff=0.01316 zero=0.029 sig=True dir=1
+C25 iETS_A_score_conv 0.99 padj=1.17e-123 med=0.004621 meandiff=-0.001795 zero=0.004 sig=True dir=1
+C25 iETS_D_conv 0.8 padj=6.17e-28 med=0.006769 meandiff=0.02167 zero=0.241 sig=True dir=1
+C25 iETS_D_conv 0.9 padj=8.26e-41 med=0.01092 meandiff=0.01999 zero=0.082 sig=True dir=1
+C25 iETS_D_conv 0.95 padj=7.82e-32 med=0.007236 meandiff=0.01316 zero=0.025 sig=True dir=1
+C25 iETS_D_conv 0.99 padj=1.1e-128 med=0.004661 meandiff=-0.0004972 zero=0.006 sig=True dir=1
+C25 iETS_F_conv 0.8 padj=1 med=-0.002388 meandiff=0.0009014 zero=0.235 sig=False dir=0
+C25 iETS_F_conv 0.9 padj=3.71e-12 med=0.007024 meandiff=0.006714 zero=0.069 sig=True dir=1
+C25 iETS_F_conv 0.95 padj=2.75e-15 med=0.004296 meandiff=0.00742 zero=0.010 sig=True dir=1
+C25 iETS_F_conv 0.99 padj=2.26e-106 med=0.004589 meandiff=-0.001352 zero=0.001 sig=True dir=1
+C25 iETS_G_ratio_adam 0.8 padj=0.145 med=-0.0004154 meandiff=0.009276 zero=0.183 sig=False dir=0
+C25 iETS_G_ratio_adam 0.9 padj=2.97e-07 med=0.008267 meandiff=0.01207 zero=0.048 sig=True dir=1
+C25 iETS_G_ratio_adam 0.95 padj=2.68e-09 med=0.007488 meandiff=0.005614 zero=0.012 sig=True dir=1
+C25 iETS_G_ratio_adam 0.99 padj=1.27e-96 med=0.004832 meandiff=-0.004627 zero=0.002 sig=True dir=1
+C25 iETS_G_ratio_conv 0.8 padj=1.02e-26 med=0.005764 meandiff=0.02081 zero=0.235 sig=True dir=1
+C25 iETS_G_ratio_conv 0.9 padj=1.49e-47 med=0.01136 meandiff=0.02112 zero=0.075 sig=True dir=1
+C25 iETS_G_ratio_conv 0.95 padj=9.01e-39 med=0.008206 meandiff=0.01577 zero=0.026 sig=True dir=1
+C25 iETS_G_ratio_conv 0.99 padj=3.65e-119 med=0.004688 meandiff=-0.001278 zero=0.002 sig=True dir=1
+C25 iETS_G_score_adam 0.8 padj=1 med=-0.003114 meandiff=-0.001138 zero=0.249 sig=False dir=0
+C25 iETS_G_score_adam 0.9 padj=1 med=0.00546 meandiff=5.215e-05 zero=0.087 sig=False dir=0
+C25 iETS_G_score_adam 0.95 padj=0.0433 med=0.005693 meandiff=-0.001921 zero=0.026 sig=False dir=0
+C25 iETS_G_score_adam 0.99 padj=5.59e-85 med=0.00474 meandiff=-0.005649 zero=0.002 sig=True dir=1
+C25 iETS_G_score_conv 0.8 padj=1.8e-33 med=0.008221 meandiff=0.02417 zero=0.261 sig=True dir=1
+C25 iETS_G_score_conv 0.9 padj=8.93e-45 med=0.011 meandiff=0.02095 zero=0.095 sig=True dir=1
+C25 iETS_G_score_conv 0.95 padj=8.56e-33 med=0.007076 meandiff=0.01338 zero=0.029 sig=True dir=1
+C25 iETS_G_score_conv 0.99 padj=9.38e-119 med=0.004646 meandiff=-0.002314 zero=0.003 sig=True dir=1
+C25 iETS_I_ratio_adam 0.8 padj=1 med=-0.0007007 meandiff=0.00708 zero=0.201 sig=False dir=0
+C25 iETS_I_ratio_adam 0.9 padj=1.78e-05 med=0.007844 meandiff=0.008902 zero=0.059 sig=True dir=1
+C25 iETS_I_ratio_adam 0.95 padj=1.53e-06 med=0.006524 meandiff=0.003332 zero=0.015 sig=True dir=1
+C25 iETS_I_ratio_adam 0.99 padj=2.81e-101 med=0.00482 meandiff=-0.004531 zero=0.002 sig=True dir=1
+C25 iETS_I_ratio_conv 0.8 padj=0.269 med=-0.00404 meandiff=-0.001653 zero=0.401 sig=False dir=0
+C25 iETS_I_ratio_conv 0.9 padj=1 med=0.002371 meandiff=-0.004078 zero=0.192 sig=False dir=0
+C25 iETS_I_ratio_conv 0.95 padj=1 med=-0.001474 meandiff=-0.001617 zero=0.070 sig=False dir=0
+C25 iETS_I_ratio_conv 0.99 padj=2.52e-59 med=0.003958 meandiff=-0.00461 zero=0.006 sig=True dir=1
+C25 iETS_I_score_adam 0.8 padj=1 med=-0.002738 meandiff=-0.0006812 zero=0.244 sig=False dir=0
+C25 iETS_I_score_adam 0.9 padj=1 med=0.005426 meandiff=-6.676e-05 zero=0.086 sig=False dir=0
+C25 iETS_I_score_adam 0.95 padj=0.0129 med=0.005727 meandiff=-0.001629 zero=0.024 sig=False dir=0
+C25 iETS_I_score_adam 0.99 padj=5.81e-84 med=0.004794 meandiff=-0.00579 zero=0.002 sig=True dir=1
+C25 iETS_I_score_conv 0.8 padj=6.5e-48 med=0.01045 meandiff=0.02989 zero=0.230 sig=True dir=1
+C25 iETS_I_score_conv 0.9 padj=5.66e-58 med=0.01248 meandiff=0.02513 zero=0.081 sig=True dir=1
+C25 iETS_I_score_conv 0.95 padj=3.37e-43 med=0.008558 meandiff=0.0157 zero=0.023 sig=True dir=1
+C25 iETS_I_score_conv 0.99 padj=2.09e-129 med=0.004676 meandiff=-0.0006179 zero=0.002 sig=True dir=1
+C25 iETS_O_ratio_adam 0.8 padj=1 med=-0.00185 meandiff=0.006967 zero=0.202 sig=False dir=0
+C25 iETS_O_ratio_adam 0.9 padj=3.34e-05 med=0.007231 meandiff=0.008607 zero=0.059 sig=True dir=1
+C25 iETS_O_ratio_adam 0.95 padj=1.33e-06 med=0.006543 meandiff=0.003272 zero=0.015 sig=True dir=1
+C25 iETS_O_ratio_adam 0.99 padj=1.53e-95 med=0.004782 meandiff=-0.005102 zero=0.002 sig=True dir=1
+C25 iETS_O_ratio_conv 0.8 padj=1.08e-171 med=0.03344 meandiff=0.07924 zero=0.147 sig=True dir=1
+C25 iETS_O_ratio_conv 0.9 padj=9.2e-140 med=0.02005 meandiff=0.04232 zero=0.077 sig=True dir=1
+C25 iETS_O_ratio_conv 0.95 padj=6.26e-74 med=0.01155 meandiff=0.0178 zero=0.035 sig=True dir=1
+C25 iETS_O_ratio_conv 0.99 padj=8.44e-147 med=0.004837 meandiff=-0.001028 zero=0.005 sig=True dir=1
+C25 iETS_O_score_adam 0.8 padj=1 med=-0.002494 meandiff=-0.0008633 zero=0.246 sig=False dir=0
+C25 iETS_O_score_adam 0.9 padj=1 med=0.005337 meandiff=-0.0006954 zero=0.084 sig=False dir=0
+C25 iETS_O_score_adam 0.95 padj=0.0186 med=0.005714 meandiff=-0.001489 zero=0.024 sig=False dir=0
+C25 iETS_O_score_adam 0.99 padj=6.5e-85 med=0.004673 meandiff=-0.005569 zero=0.002 sig=True dir=1
+C25 iETS_O_score_conv 0.8 padj=6.7e-12 med=0.0001254 meandiff=0.01445 zero=0.280 sig=True dir=1
+C25 iETS_O_score_conv 0.9 padj=1.35e-20 med=0.008119 meandiff=0.01316 zero=0.102 sig=True dir=1
+C25 iETS_O_score_conv 0.95 padj=2.25e-21 med=0.005796 meandiff=0.01004 zero=0.031 sig=True dir=1
+C25 iETS_O_score_conv 0.99 padj=3.2e-106 med=0.004514 meandiff=-0.001925 zero=0.002 sig=True dir=1
+C25 good 0 bad 53 nsig 53 of 72
+n sig up 53 down 0 ns ['iETS_A_ratio_adam 0.8', 'iETS_A_score_adam 0.8', 'iETS_A_score_adam 0.9', 'iETS_F_conv 0.8', 'iETS_G_ratio_adam 0.8', 'iETS_G_score_adam 0.8', 'iETS_G_score_adam 0.9', 'iETS_G_score_adam 0.95', 'iETS_I_ratio_adam 0.8', 'iETS_I_ratio_conv 0.8', 'iETS_I_ratio_conv 0.9', 'iETS_I_ratio_conv 0.95', 'iETS_I_score_adam 0.8', 'iETS_I_score_adam 0.9', 'iETS_I_score_adam 0.95', 'iETS_O_ratio_adam 0.8', 'iETS_O_score_adam 0.8', 'iETS_O_score_adam 0.9', 'iETS_O_score_adam 0.95']
+sumf I_score_adam==O_score_adam False ratio False
+rmsse I_score_adam==O_score_adam False ratio False

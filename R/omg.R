@@ -1796,11 +1796,11 @@ vcov.omg <- function(object, type=c("opg","hessian","bootstrap"),
     # The OPG / BHHH covariance J = sum_t s_t s_t' over the coupled Bernoulli score, PSD by
     # construction, so it returns finite standard errors at boundary estimates where the
     # observed Fisher Information is indefinite
-    return(adam_covariance(object, type, heuristics, stepSize,
-                           function(stepSize){
+    return(adam_covariance(object, type, heuristics,
+                           function(){
                                return(covarOPGomg(object, stepSize=stepSize));
                            },
-                           function(stepSize){
+                           function(){
                                return(adam_invertFI(fisherInformation, stepSize));
                            }, ...));
 }

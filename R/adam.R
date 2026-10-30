@@ -5136,7 +5136,8 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
     # implementation (CES has its own parameterisation); everything else
     # (adam, ssarima) uses covarOPG. Falls back to the Hessian path (below)
     # when the reconstruction cannot be reproduced or numerically fails.
-    covarianceOPG <- function(stepSize){
+    covarianceOPG <- function(){
+        stepSize <- ellipsis$stepSize;
         if(is.null(stepSize)){
             stepSize <- .Machine$double.eps^(1/4);
         }
@@ -5184,16 +5185,18 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
         return(modelReturn$FI);
     }
 
-    covarianceHessian <- function(stepSize){
+    covarianceHessian <- function(){
+        stepSize <- ellipsis$stepSize;
         # sparma stores a sparse-order ARIMA that adam(model=object) cannot rebuild
         # (its ARIMA-polynomial reconstruction yields an NA), so the observed Fisher
         # Information is computed natively via a numerical Hessian of the sparma
         # log-likelihood rather than the adam FI path below.
         if(sparmaChecker(object)){
-            if(is.null(stepSize)){
-                stepSize <- .Machine$double.eps^(1/4);
+            sparmaStepSize <- stepSize;
+            if(is.null(sparmaStepSize)){
+                sparmaStepSize <- .Machine$double.eps^(1/4);
             }
-            vcovSparmaFI <- covarFIsparma(object, stepSize=stepSize);
+            vcovSparmaFI <- covarFIsparma(object, stepSize=sparmaStepSize);
             if(!is.null(vcovSparmaFI)){
                 return(vcovSparmaFI);
             }
@@ -5217,8 +5220,7 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
         return(adam_invertFI(fisherInformation, stepSize));
     }
 
-    return(adam_covariance(object, type, heuristics, ellipsis$stepSize,
-                           covarianceOPG, covarianceHessian, ...));
+    return(adam_covariance(object, type, heuristics, covarianceOPG, covarianceHessian, ...));
 }
 
 #### Residuals and actuals functions ####

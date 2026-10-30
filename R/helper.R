@@ -15,10 +15,9 @@ covarTypeResolver <- function(type, bootstrap=FALSE){
 }
 
 # The covariance matrix of the parameters of adam() and omg(), the body of their vcov():
-# the heuristics, the bootstrap, the OPG of the scores, else the Hessian path. opg() and
-# hessian() take the step of the derivatives (NULL for their default). As Python's
-# covariance_frame()
-adam_covariance <- function(object, type, heuristics, stepSize, opg, hessian, ...){
+# the heuristics, the bootstrap, the OPG of the scores from opg(), else the Hessian path of
+# hessian(). The ellipsis goes to coefbootstrap(). As Python's covariance_frame()
+adam_covariance <- function(object, type, heuristics, opg, hessian, ...){
     # Heuristics is to set variance equal to sqrt(heuristics)% of values
     if(is.numeric(heuristics)){
         return(diag(abs(coef(object))*heuristics));
@@ -27,14 +26,14 @@ adam_covariance <- function(object, type, heuristics, stepSize, opg, hessian, ..
         return(coefbootstrap(object, ...)$vcov);
     }
     if(type=="opg"){
-        vcovOPG <- opg(stepSize);
+        vcovOPG <- opg();
         if(!is.null(vcovOPG)){
             return(vcovOPG);
         }
         warning("The OPG covariance could not be computed for this model; ",
                 "falling back to the observed Fisher Information.", call.=FALSE);
     }
-    return(hessian(stepSize));
+    return(hessian());
 }
 
 # The inverse of the observed Fisher Information from fisherInformation(stepSize), retried

@@ -1,0 +1,169 @@
+iETS_I M old 0.02 pred=0.01005 limit=0.01005(se 0.00001) a001=0.01005 reldev=0.0004 reldev001=0.0001
+iETS_I M old 0.07 pred=0.03563 limit=0.03562(se 0.00002) a001=0.03562 reldev=0.0005 reldev001=0.0004
+iETS_I M old 0.17 pred=0.08896 limit=0.08893(se 0.00003) a001=0.08897 reldev=0.0003 reldev001=0.0002
+iETS_I M old 0.31 pred=0.16934 limit=0.16937(se 0.00004) a001=0.16944 reldev=0.0002 reldev001=0.0006
+iETS_I M old 0.5 pred=0.29289 limit=0.29285(se 0.00004) a001=0.29295 reldev=0.0001 reldev001=0.0002
+iETS_I M old 0.66 pred=0.41690 limit=0.41692(se 0.00006) a001=0.41713 reldev=0.0000 reldev001=0.0005
+iETS_I M old 0.83 pred=0.58769 limit=0.58760(se 0.00006) a001=0.58778 reldev=0.0001 reldev001=0.0002
+iETS_I M old 0.93 pred=0.73542 limit=0.73545(se 0.00007) a001=0.73560 reldev=0.0000 reldev001=0.0002
+iETS_I M old 0.98 pred=0.85858 limit=0.85852(se 0.00007) a001=0.85878 reldev=0.0001 reldev001=0.0002
+iETS_O M old 0.02 pred=0.14142 limit=0.14148(se 0.00007) a001=0.14124 reldev=0.0004 reldev001=0.0013
+iETS_O M old 0.07 pred=0.26458 limit=0.26456(se 0.00007) a001=0.26441 reldev=0.0001 reldev001=0.0006
+iETS_O M old 0.17 pred=0.41231 limit=0.41240(se 0.00006) a001=0.41228 reldev=0.0002 reldev001=0.0001
+iETS_O M old 0.31 pred=0.55678 limit=0.55670(se 0.00006) a001=0.55668 reldev=0.0001 reldev001=0.0002
+iETS_O M old 0.5 pred=0.70711 limit=0.70717(se 0.00005) a001=0.70701 reldev=0.0001 reldev001=0.0001
+iETS_O M old 0.66 pred=0.81240 limit=0.81246(se 0.00004) a001=0.81236 reldev=0.0001 reldev001=0.0001
+iETS_O M old 0.83 pred=0.91104 limit=0.91103(se 0.00003) a001=0.91099 reldev=0.0000 reldev001=0.0001
+iETS_O M old 0.93 pred=0.96437 limit=0.96436(se 0.00002) a001=0.96434 reldev=0.0000 reldev001=0.0000
+iETS_O M old 0.98 pred=0.98995 limit=0.98994(se 0.00001) a001=0.98995 reldev=0.0000 reldev001=0.0000
+iETS_I A old 0.02 pred=0.03976 limit=0.03979(se 0.00003) a001=0.03979 reldev=0.0008 reldev001=0.0008
+iETS_I A old 0.07 pred=0.10752 limit=0.10751(se 0.00004) a001=0.10752 reldev=0.0000 reldev001=0.0000
+iETS_I A old 0.17 pred=0.21396 limit=0.21403(se 0.00005) a001=0.21406 reldev=0.0004 reldev001=0.0005
+iETS_I A old 0.31 pred=0.34109 limit=0.34108(se 0.00005) a001=0.34111 reldev=0.0000 reldev001=0.0001
+iETS_I A old 0.5 pred=0.50000 limit=0.50013(se 0.00005) a001=0.50010 reldev=0.0003 reldev001=0.0002
+iETS_I A old 0.66 pred=0.63322 limit=0.63318(se 0.00005) a001=0.63321 reldev=0.0001 reldev001=0.0000
+iETS_I A old 0.83 pred=0.78604 limit=0.78604(se 0.00005) a001=0.78607 reldev=0.0000 reldev001=0.0000
+iETS_I A old 0.93 pred=0.89248 limit=0.89258(se 0.00004) a001=0.89257 reldev=0.0001 reldev001=0.0001
+iETS_I A old 0.98 pred=0.96024 limit=0.96028(se 0.00003) a001=0.96024 reldev=0.0000 reldev001=0.0000
+iETS_O A old 0.02 pred=0.03976 limit=0.03973(se 0.00003) a001=0.03971 reldev=0.0007 reldev001=0.0011
+iETS_O A old 0.07 pred=0.10752 limit=0.10750(se 0.00004) a001=0.10747 reldev=0.0002 reldev001=0.0004
+iETS_O A old 0.17 pred=0.21396 limit=0.21392(se 0.00005) a001=0.21393 reldev=0.0002 reldev001=0.0001
+iETS_O A old 0.31 pred=0.34109 limit=0.34103(se 0.00005) a001=0.34106 reldev=0.0002 reldev001=0.0001
+iETS_O A old 0.5 pred=0.50000 limit=0.49997(se 0.00006) a001=0.49997 reldev=0.0001 reldev001=0.0001
+iETS_O A old 0.66 pred=0.63322 limit=0.63322(se 0.00006) a001=0.63320 reldev=0.0000 reldev001=0.0000
+iETS_O A old 0.83 pred=0.78604 limit=0.78614(se 0.00005) a001=0.78612 reldev=0.0001 reldev001=0.0001
+iETS_O A old 0.93 pred=0.89248 limit=0.89252(se 0.00004) a001=0.89252 reldev=0.0000 reldev001=0.0000
+iETS_O A old 0.98 pred=0.96024 limit=0.96025(se 0.00003) a001=0.96028 reldev=0.0000 reldev001=0.0000
+iETS_I M score 0.02 pred=0.02000 limit=0.02000(se 0.00002) a001=0.02004 reldev=0.0000 reldev001=0.0018
+iETS_I M score 0.07 pred=0.07000 limit=0.06993(se 0.00003) a001=0.06990 reldev=0.0009 reldev001=0.0014
+iETS_I M score 0.17 pred=0.17000 limit=0.17000(se 0.00005) a001=0.17007 reldev=0.0000 reldev001=0.0004
+iETS_I M score 0.31 pred=0.31000 limit=0.30994(se 0.00006) a001=0.31008 reldev=0.0002 reldev001=0.0003
+iETS_I M score 0.5 pred=0.50000 limit=0.50005(se 0.00007) a001=0.50013 reldev=0.0001 reldev001=0.0003
+iETS_I M score 0.66 pred=0.66000 limit=0.66011(se 0.00006) a001=0.66021 reldev=0.0002 reldev001=0.0003
+iETS_I M score 0.83 pred=0.83000 limit=0.82998(se 0.00005) a001=0.83006 reldev=0.0000 reldev001=0.0001
+iETS_I M score 0.93 pred=0.93000 limit=0.92997(se 0.00003) a001=0.92999 reldev=0.0000 reldev001=0.0000
+iETS_I M score 0.98 pred=0.98000 limit=0.98000(se 0.00002) a001=0.98001 reldev=0.0000 reldev001=0.0000
+iETS_O M score 0.02 pred=0.02000 limit=0.02000(se 0.00002) a001=0.01996 reldev=0.0000 reldev001=0.0020
+iETS_O M score 0.07 pred=0.07000 limit=0.07004(se 0.00004) a001=0.06998 reldev=0.0006 reldev001=0.0004
+iETS_O M score 0.17 pred=0.17000 limit=0.16995(se 0.00005) a001=0.16986 reldev=0.0003 reldev001=0.0008
+iETS_O M score 0.31 pred=0.31000 limit=0.30998(se 0.00006) a001=0.30982 reldev=0.0001 reldev001=0.0006
+iETS_O M score 0.5 pred=0.50000 limit=0.50002(se 0.00007) a001=0.49984 reldev=0.0000 reldev001=0.0003
+iETS_O M score 0.66 pred=0.66000 limit=0.65997(se 0.00007) a001=0.66000 reldev=0.0001 reldev001=0.0000
+iETS_O M score 0.83 pred=0.83000 limit=0.83006(se 0.00005) a001=0.83000 reldev=0.0001 reldev001=0.0000
+iETS_O M score 0.93 pred=0.93000 limit=0.92997(se 0.00004) a001=0.92995 reldev=0.0000 reldev001=0.0001
+iETS_O M score 0.98 pred=0.98000 limit=0.97998(se 0.00002) a001=0.97995 reldev=0.0000 reldev001=0.0000
+iETS_I A score 0.02 pred=0.02000 limit=0.02003(se 0.00002) a001=0.02000 reldev=0.0016 reldev001=0.0000
+iETS_I A score 0.07 pred=0.07000 limit=0.07001(se 0.00004) a001=0.07004 reldev=0.0002 reldev001=0.0006
+iETS_I A score 0.17 pred=0.17000 limit=0.16994(se 0.00005) a001=0.17003 reldev=0.0004 reldev001=0.0002
+iETS_I A score 0.31 pred=0.31000 limit=0.30999(se 0.00006) a001=0.30994 reldev=0.0000 reldev001=0.0002
+iETS_I A score 0.5 pred=0.50000 limit=0.49996(se 0.00006) a001=0.49996 reldev=0.0001 reldev001=0.0001
+iETS_I A score 0.66 pred=0.66000 limit=0.65999(se 0.00006) a001=0.65995 reldev=0.0000 reldev001=0.0001
+iETS_I A score 0.83 pred=0.83000 limit=0.83005(se 0.00005) a001=0.83006 reldev=0.0001 reldev001=0.0001
+iETS_I A score 0.93 pred=0.93000 limit=0.93000(se 0.00003) a001=0.92996 reldev=0.0000 reldev001=0.0000
+iETS_I A score 0.98 pred=0.98000 limit=0.97999(se 0.00002) a001=0.98000 reldev=0.0000 reldev001=0.0000
+iETS_O A score 0.02 pred=0.02000 limit=0.02004(se 0.00002) a001=0.02004 reldev=0.0018 reldev001=0.0022
+iETS_O A score 0.07 pred=0.07000 limit=0.06998(se 0.00004) a001=0.06994 reldev=0.0003 reldev001=0.0009
+iETS_O A score 0.17 pred=0.17000 limit=0.16999(se 0.00005) a001=0.17000 reldev=0.0001 reldev001=0.0000
+iETS_O A score 0.31 pred=0.31000 limit=0.31004(se 0.00006) a001=0.31001 reldev=0.0001 reldev001=0.0000
+iETS_O A score 0.5 pred=0.50000 limit=0.50001(se 0.00007) a001=0.50003 reldev=0.0000 reldev001=0.0001
+iETS_O A score 0.66 pred=0.66000 limit=0.66008(se 0.00007) a001=0.66003 reldev=0.0001 reldev001=0.0000
+iETS_O A score 0.83 pred=0.83000 limit=0.83001(se 0.00005) a001=0.82992 reldev=0.0000 reldev001=0.0001
+iETS_O A score 0.93 pred=0.93000 limit=0.92996(se 0.00003) a001=0.92993 reldev=0.0000 reldev001=0.0001
+iETS_O A score 0.98 pred=0.98000 limit=0.98001(se 0.00002) a001=0.98001 reldev=0.0000 reldev001=0.0000
+iETS_I ADAM expscore 0.02 pred=0.02000 limit=0.01997(se 0.00002) a001=0.01998 reldev=0.0017 reldev001=0.0009
+iETS_I ADAM expscore 0.07 pred=0.07000 limit=0.06999(se 0.00004) a001=0.06999 reldev=0.0001 reldev001=0.0001
+iETS_I ADAM expscore 0.17 pred=0.17000 limit=0.17004(se 0.00005) a001=0.17008 reldev=0.0003 reldev001=0.0005
+iETS_I ADAM expscore 0.31 pred=0.31000 limit=0.31004(se 0.00006) a001=0.31004 reldev=0.0001 reldev001=0.0001
+iETS_I ADAM expscore 0.5 pred=0.50000 limit=0.49998(se 0.00006) a001=0.49999 reldev=0.0000 reldev001=0.0000
+iETS_I ADAM expscore 0.66 pred=0.66000 limit=0.65988(se 0.00006) a001=0.65990 reldev=0.0002 reldev001=0.0001
+iETS_I ADAM expscore 0.83 pred=0.83000 limit=0.82994(se 0.00005) a001=0.82997 reldev=0.0001 reldev001=0.0000
+iETS_I ADAM expscore 0.93 pred=0.93000 limit=0.92998(se 0.00003) a001=0.92999 reldev=0.0000 reldev001=0.0000
+iETS_I ADAM expscore 0.98 pred=0.98000 limit=0.97998(se 0.00002) a001=0.97997 reldev=0.0000 reldev001=0.0000
+iETS_O ADAM expscore 0.02 pred=0.02000 limit=0.02000(se 0.00002) a001=0.01998 reldev=0.0001 reldev001=0.0011
+iETS_O ADAM expscore 0.07 pred=0.07000 limit=0.07005(se 0.00003) a001=0.07005 reldev=0.0007 reldev001=0.0007
+iETS_O ADAM expscore 0.17 pred=0.17000 limit=0.16995(se 0.00005) a001=0.16995 reldev=0.0003 reldev001=0.0003
+iETS_O ADAM expscore 0.31 pred=0.31000 limit=0.30998(se 0.00006) a001=0.31007 reldev=0.0001 reldev001=0.0002
+iETS_O ADAM expscore 0.5 pred=0.50000 limit=0.49994(se 0.00006) a001=0.50000 reldev=0.0001 reldev001=0.0000
+iETS_O ADAM expscore 0.66 pred=0.66000 limit=0.65996(se 0.00007) a001=0.65992 reldev=0.0001 reldev001=0.0001
+iETS_O ADAM expscore 0.83 pred=0.83000 limit=0.83002(se 0.00005) a001=0.83001 reldev=0.0000 reldev001=0.0000
+iETS_O ADAM expscore 0.93 pred=0.93000 limit=0.93006(se 0.00003) a001=0.93005 reldev=0.0001 reldev001=0.0001
+iETS_O ADAM expscore 0.98 pred=0.98000 limit=0.98003(se 0.00002) a001=0.98002 reldev=0.0000 reldev001=0.0000
+iETS_I ADAM multscore 0.02 pred=0.05934 limit=0.05941(se 0.00004) a001=0.05945 reldev=0.0012 reldev001=0.0019
+iETS_I ADAM multscore 0.07 pred=0.15222 limit=0.15228(se 0.00006) a001=0.15229 reldev=0.0004 reldev001=0.0005
+iETS_I ADAM multscore 0.17 pred=0.28926 limit=0.28926(se 0.00006) a001=0.28930 reldev=0.0000 reldev001=0.0001
+iETS_I ADAM multscore 0.31 pred=0.44246 limit=0.44253(se 0.00006) a001=0.44262 reldev=0.0002 reldev001=0.0004
+iETS_I ADAM multscore 0.5 pred=0.61803 limit=0.61797(se 0.00006) a001=0.61794 reldev=0.0001 reldev001=0.0002
+iETS_I ADAM multscore 0.66 pred=0.74963 limit=0.74960(se 0.00005) a001=0.74960 reldev=0.0000 reldev001=0.0000
+iETS_I ADAM multscore 0.83 pred=0.87883 limit=0.87883(se 0.00004) a001=0.87885 reldev=0.0000 reldev001=0.0000
+iETS_I ADAM multscore 0.93 pred=0.95094 limit=0.95093(se 0.00002) a001=0.95091 reldev=0.0000 reldev001=0.0000
+iETS_I ADAM multscore 0.98 pred=0.98609 limit=0.98608(se 0.00001) a001=0.98607 reldev=0.0000 reldev001=0.0000
+iETS_O ADAM multscore 0.02 pred=0.01391 limit=0.01390(se 0.00001) a001=0.01389 reldev=0.0005 reldev001=0.0010
+iETS_O ADAM multscore 0.07 pred=0.04906 limit=0.04908(se 0.00002) a001=0.04907 reldev=0.0004 reldev001=0.0002
+iETS_O ADAM multscore 0.17 pred=0.12117 limit=0.12113(se 0.00004) a001=0.12115 reldev=0.0004 reldev001=0.0002
+iETS_O ADAM multscore 0.31 pred=0.22688 limit=0.22693(se 0.00005) a001=0.22686 reldev=0.0002 reldev001=0.0001
+iETS_O ADAM multscore 0.5 pred=0.38197 limit=0.38196(se 0.00006) a001=0.38188 reldev=0.0000 reldev001=0.0002
+iETS_O ADAM multscore 0.66 pred=0.52792 limit=0.52790(se 0.00006) a001=0.52788 reldev=0.0000 reldev001=0.0001
+iETS_O ADAM multscore 0.83 pred=0.71074 limit=0.71070(se 0.00006) a001=0.71075 reldev=0.0001 reldev001=0.0000
+iETS_O ADAM multscore 0.93 pred=0.84778 limit=0.84770(se 0.00006) a001=0.84768 reldev=0.0001 reldev001=0.0001
+iETS_O ADAM multscore 0.98 pred=0.94066 limit=0.94068(se 0.00004) a001=0.94069 reldev=0.0000 reldev001=0.0000
+Croston   0.02 pred=0.02000 limit=0.01999(se 0.00002) a001=0.02001 reldev=0.0004 reldev001=0.0004
+Croston   0.07 pred=0.07000 limit=0.07006(se 0.00003) a001=0.07009 reldev=0.0008 reldev001=0.0013
+Croston   0.17 pred=0.17000 limit=0.16998(se 0.00005) a001=0.17009 reldev=0.0001 reldev001=0.0005
+Croston   0.31 pred=0.31000 limit=0.30996(se 0.00006) a001=0.31011 reldev=0.0001 reldev001=0.0004
+Croston   0.5 pred=0.50000 limit=0.49995(se 0.00006) a001=0.50006 reldev=0.0001 reldev001=0.0001
+Croston   0.66 pred=0.66000 limit=0.65995(se 0.00007) a001=0.66010 reldev=0.0001 reldev001=0.0002
+Croston   0.83 pred=0.83000 limit=0.82999(se 0.00005) a001=0.83008 reldev=0.0000 reldev001=0.0001
+Croston   0.93 pred=0.93000 limit=0.92999(se 0.00003) a001=0.92998 reldev=0.0000 reldev001=0.0000
+Croston   0.98 pred=0.98000 limit=0.98002(se 0.00002) a001=0.98000 reldev=0.0000 reldev001=0.0000
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.000508132120852503), 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0005848097752109057), 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.49747468305833115, 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.4972790523492171), 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.00041556959844409844), 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.001266202234753476), 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 6.071067811865477, 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(6.074006332676626), 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0007612468016440779), 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0007523295320843937), 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.987768046895387, 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.9892812289634965), 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0006830904147541566), 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0011051283869979362), 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.9877680468953915, 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.9864102215958027), 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'old'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.000943487139961777), 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0018216050000000386), 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.0, 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.000943487139961777), 'conditions': {'model': 'iETS_I', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0005555963496457562), 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0019926065000000145), 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.0, 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.0005555963496457562), 'conditions': {'model': 'iETS_O', 'error': 'M', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.001610165448462375), 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0006342694285712705), 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.0, 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.001610165448462375), 'conditions': {'model': 'iETS_I', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0017884472804416407), 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0022184865000000192), 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.0, 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.0017884472804416407), 'conditions': {'model': 'iETS_O', 'error': 'A', 'proxy': 'score'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.001741869967103113), 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0009086115000001005), 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.0, 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.001741869967103113), 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0007035094754099881), 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0011475910000001074), 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.0, 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.0007035094754099881), 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'expscore'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0011892318765047347), 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.001916082506036619), 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 1.9668527139168765, 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(1.970380989737161), 'conditions': {'model': 'iETS_I', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0004888583430483496), 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0009985854451802076), 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.3047061977289281, 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.3050460979050381), 'conditions': {'model': 'iETS_O', 'error': 'ADAM', 'proxy': 'multscore'}}
+{'quantity': 'max relative deviation of the intercept-at-alpha=0 limit from the zero-drift prediction over p grid', 'value': np.float64(0.0008357842272571635), 'conditions': {'model': 'Croston', 'error': '', 'proxy': ''}}
+{'quantity': 'max relative deviation of the smallest-alpha (0.001) mean from the prediction over p grid', 'value': np.float64(0.0013489567142855952), 'conditions': {'model': 'Croston', 'error': '', 'proxy': ''}}
+{'quantity': 'max relative deviation of the predicted limit from p over p grid', 'value': 0.0, 'conditions': {'model': 'Croston', 'error': '', 'proxy': ''}}
+{'quantity': 'max relative deviation of the simulated limit from p over p grid', 'value': np.float64(0.0008357842272571635), 'conditions': {'model': 'Croston', 'error': '', 'proxy': ''}}

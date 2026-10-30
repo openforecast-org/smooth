@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/claude-0/-home-claude/b1bc4455-e770-57c6-ada9-91dcfd104e34/scratchpad/AC5/repro.py", line 15, in <module>
+    if wrong_dir(M[c["model"]],"M",c["p"],r["value"],se(r),0): cand9.append((c,r["value"],se(r)))
+                                   ~^^^^^
+KeyError: 'p'

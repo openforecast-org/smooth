@@ -1,6 +1,7 @@
 CLAIMSET Bias of the occurrence probability in iETS odds-ratio and inverse-odds-ratio models, and a score-based occurrence error proxy
 licence CC-BY-4.0; contributions C1, C2, C3, C4
-exploration {"lab_record": "A16", "questions": 2, "hypotheses": {"total": 25, "supported": 14, "not_supported": 8, "inconclusive": 2, "revised": 0, "abandoned": 0, "open": 1, "from_exploration": 13}, "tests": {"total": 25, "supported": 14, "not_supported": 9, "inconclusive": 2}, "runs": {"total": 41, "confirmatory": 29, "exploratory": 12, "failed": 1}}
+declarations funding: none | competing interests: None declared.
+exploration {"lab_record": "A16", "questions": 2, "hypotheses": {"total": 25, "supported": 14, "not_supported": 8, "inconclusive": 2, "revised": 0, "abandoned": 0, "open": 1, "from_exploration": 13}, "tests": {"total": 25, "supported": 14, "not_supported": 9, "inconclusive": 2}, "runs": {"total": 59, "confirmatory": 29, "exploratory": 30, "failed": 4}}
 
 DEFINITIONS
 D1 [method] iETS_I: Inverse odds ratio occurrence model (SB23, eq. 18): o_t ~ Bernoulli(p_t), p_t = 1/(1+mu_b,t), mu_b,t = l_b,t-1, l_b,t = l_b,t-1 (1 + alpha_b e_b,t) (multiplicative error) or log l_b,t = log l_b,t-1 + alpha_b e_b,t (additive error); in smooth: occurrence='inverse-odds-ratio' (C++ case 'i' in src/headers/ssOccurrence.h). [source B1]
@@ -71,7 +72,7 @@ C6 [descriptive; supporting; support: simulation E2 artefacts A17; strength high
   extends B1, at eqs. 24-25, own earlier work: Svetunkov and Boylan (2023) define the iETS occurrence models and the ratio proxies of their unobservable occurrence error (eqs. 24-25), the old error proxy of this paper.
   test: deterministic; tolerance 0.02; refutation 0.05; sample 5 values of p, alpha = 0.002, one run of 4,000,000 observations per cell; no interim analysis; supported if d < tolerance; not supported if d > refutation; verdict computed
 C7 [descriptive; supporting; support: simulation E3 artefacts A17; strength high (author); planning confirmatory; outcome supported]
-  For [[D1:iETS_I]] and [[D2:iETS_O]] with additive occurrence error, applied to [[D7:Bernoulli occurrence with constant probability]] p, the [[D6:stationary mean probability]] as alpha tends to 0 is the same for both models and equals the root x of $p\log\frac{x}{2-x} + (1-p)\log\frac{1+x}{1-x} = 0$, a value strictly between p and one half.
+  For [[D1:iETS_I]] and [[D2:iETS_O]] with additive occurrence error, applied to [[D7:Bernoulli occurrence with constant probability]] p, the [[D6:stationary mean probability]] as alpha tends to 0 is the same for both models and equals the root x of $p\log\frac{x}{2-x} + (1-p)\log\frac{1+x}{1-x} = 0$, a value strictly between p and one half for p other than one half and equal to one half at p = one half.
   scope: data_type: simulated Bernoulli occurrence series with a constant probability | excludes: time-varying occurrence probabilities; smoothing parameters estimated from data | conditions: additive occurrence error (state on the log scale); limit as alpha tends to 0; simulated at alpha = 0.002
   extends B1, at eqs. 24-25, own earlier work: Svetunkov and Boylan (2023) define the iETS occurrence models and the ratio proxies of their unobservable occurrence error (eqs. 24-25), the old error proxy of this paper.
   test: deterministic; tolerance 0.02; refutation 0.05; sample 5 values of p, alpha = 0.002, one run of 4,000,000 observations per cell; no interim analysis; supported if di < tolerance and do < tolerance; not supported if di > refutation or do > refutation; verdict computed
@@ -80,17 +81,17 @@ C8 [descriptive; supporting; replication; support: simulation E4 artefacts A17; 
   scope: data_type: simulated Bernoulli occurrence series with a constant probability | excludes: time-varying occurrence probabilities; smoothing parameters estimated from data | conditions: alpha = 0.002
   replicates B7: Syntetos and Boylan (2001) show that Croston's estimator is biased upwards by the inversion of the smoothed inter-demand interval, by an amount that grows with the smoothing parameter.
   test: deterministic; tolerance 0.02; refutation 0.05; sample 5 values of p, alpha = 0.002, one run of 4,000,000 observations per cell; no interim analysis; supported if d < tolerance; not supported if d > refutation; verdict computed
-C9 [formal; supporting; support: formal_proof E26, empirical_quant E5; verification unchecked; planning confirmatory; outcome supported]
+C9 [formal; supporting; support: formal_proof E26, empirical_quant E5; verification agent_checked; planning confirmatory; outcome supported]
   For every p in (0,1), with o ~ Bernoulli(p) and the one-step-ahead probability equal to p, the [[D3:old error proxy]] has a non-zero expected value: $E[1+e_a] = 2 - p + (1-p)^2/(1+p) > 1$ and $E[1+e_b] = 1 + p + p^2/(2-p) > 1$ for the multiplicative error, and $E[\log(1+e_a)] = -E[\log(1+e_b)]$ is positive below one half, zero at one half and negative above it for the additive error.
   scope: conditions: o ~ Bernoulli(p), p in (0,1); one-step-ahead probability equal to the true probability
   extends B1, at eqs. 24-25, own earlier work: Svetunkov and Boylan (2023) define the iETS occurrence models and the ratio proxies of their unobservable occurrence error (eqs. 24-25), the old error proxy of this paper.
   test: formal; sample one run; grid of p from 0.0005 to 0.9995 in steps of 0.0005; supported if u < 1 and c < 1; not supported if c > 0; verdict computed
-C10 [formal; supporting; support: formal_proof E27, empirical_quant E6; uses C9; verification unchecked; planning confirmatory; outcome supported]
-  For every p in (0,1), the [[D4:occurrence filters]] with the [[D3:old error proxy]] have a unique stable [[D9:zero-drift point]]: $1 - \sqrt{1-p} < p$ for [[D1:iETS_I]] and $\sqrt{p} > p$ for [[D2:iETS_O]] with multiplicative error, and for both models with additive error the root of $p\log\frac{x}{2-x} + (1-p)\log\frac{1+x}{1-x} = 0$, strictly between p and one half.
+C10 [formal; supporting; support: formal_proof E27, empirical_quant E6; uses C9; verification agent_checked; planning confirmatory; outcome supported]
+  For every p in (0,1), the [[D4:occurrence filters]] with the [[D3:old error proxy]] have a unique stable [[D9:zero-drift point]]: $1 - \sqrt{1-p} < p$ for [[D1:iETS_I]] and $\sqrt{p} > p$ for [[D2:iETS_O]] with multiplicative error, and for both models with additive error the root of $p\log\frac{x}{2-x} + (1-p)\log\frac{1+x}{1-x} = 0$, strictly between p and one half for p other than one half and equal to one half at p = one half.
   scope: conditions: o ~ Bernoulli(p), p in (0,1); expected update of the state given the one-step-ahead probability
   extends B1, at eqs. 24-25, own earlier work: Svetunkov and Boylan (2023) define the iETS occurrence models and the ratio proxies of their unobservable occurrence error (eqs. 24-25), the old error proxy of this paper.
   test: formal; sample one run; grid of p from 0.0005 to 0.9995 in steps of 0.0005; supported if u < 1 and c < 1; not supported if c > 0; verdict computed
-C11 [formal; supporting; support: formal_proof E28, empirical_quant E7; verification unchecked; planning confirmatory; outcome supported]
+C11 [formal; supporting; support: formal_proof E28, empirical_quant E7; verification agent_checked; planning confirmatory; outcome supported]
   The [[D8:score proxy]], $o - \hat p$ for [[D2:iETS_O]] and $\hat p - o$ for [[D1:iETS_I]], is the score of the Bernoulli occurrence log-likelihood with respect to the log of the state, has the true probability p as its unique stable [[D9:zero-drift point]] for every p in (0,1), and keeps a multiplicatively updated state positive for every alpha in (0,1].
   scope: conditions: o ~ Bernoulli(p), p in (0,1); alpha in (0,1]
   extends B3: Creal, Koopman and Lucas (2013) define score-driven filters, which update a time-varying parameter by the scaled score of the observation density.
@@ -100,7 +101,7 @@ C12 [descriptive; supporting; replication; support: simulation E12 artefacts A17
   scope: data_type: simulated Bernoulli occurrence series with a constant probability | excludes: time-varying occurrence probabilities; smoothing parameters estimated from data | conditions: all alpha in (0,1] for the direction; limit as alpha tends to 0
   replicates B7: Syntetos and Boylan (2001) show that Croston's estimator is biased upwards by the inversion of the smoothed inter-demand interval, by an amount that grows with the smoothing parameter.
   test: deterministic; tolerance 0.02; refutation 0.05; z 4; sample fixed by the two design files; two runs, no interim analysis; supported if l < tolerance and w < 1; not supported if l > refutation or w > 0; verdict computed
-C13 [formal; supporting; support: formal_proof E29, empirical_quant E13; verification unchecked; planning confirmatory; outcome supported]
+C13 [formal; supporting; support: formal_proof E29, empirical_quant E13; verification agent_checked; planning confirmatory; outcome supported]
   Under the [[D16:ADAM multiplicative ETS update]] the occurrence filter is the additive filter with error $\log(1+e)$, so that its [[D9:zero-drift point]] is that of the additive old filter with the [[D3:old error proxy]], differs from p for every p in (0,1) with the [[D18:multiplicative score proxy]] (below p for [[D2:iETS_O]], above p for [[D1:iETS_I]]), and equals p with the [[D17:exponential score proxy]].
   scope: conditions: o ~ Bernoulli(p), p in (0,1); ADAM multiplicative ETS update (ets='adam')
   extends B9, own earlier work: Svetunkov (2023) defines the ADAM form of multiplicative ETS, which updates a level as mu_t = mu_{t-1} (1 + e_t)^alpha.
@@ -118,8 +119,8 @@ C15 [descriptive; secondary; support: simulation E11 (E11.R1605, E11.R1607, E11.
   extends B1, at eqs. 24-25, own earlier work: Svetunkov and Boylan (2023) define the iETS occurrence models and the ratio proxies of their unobservable occurrence error (eqs. 24-25), the old error proxy of this paper.
   test: deterministic; z 4; sample fixed by the design file; one run, no interim analysis; supported if w < 1; not supported if w > 0; verdict computed
 C16 [descriptive; secondary; support: simulation E14 (E14.R181, E14.R182) artefacts A17; strength high (author); planning confirmatory; outcome not_supported]
-  On [[D7:Bernoulli occurrence with constant probability]], under the [[D16:ADAM multiplicative ETS update]] the [[D18:multiplicative score proxy]] does not give an alpha-to-0 limit of the stationary mean probability equal to p: its largest relative deviation from p is 1.69 for [[D1:iETS_I]] and 0.30 for [[D2:iETS_O]].
-  scope: data_type: simulated Bernoulli occurrence series with a constant probability | excludes: time-varying occurrence probabilities; smoothing parameters estimated from data | conditions: ADAM multiplicative ETS update (ets='adam'); limit as alpha tends to 0, extrapolated from alpha in {0.004, 0.002, 0.001}
+  On [[D7:Bernoulli occurrence with constant probability]], under the [[D16:ADAM multiplicative ETS update]] the [[D18:multiplicative score proxy]] does not give an alpha-to-0 limit of the stationary mean probability equal to p: over the simulated values of p its largest relative deviation from p is 1.69 for [[D1:iETS_I]] and 0.30 for [[D2:iETS_O]].
+  scope: data_type: simulated Bernoulli occurrence series with a constant probability | excludes: time-varying occurrence probabilities; smoothing parameters estimated from data | conditions: ADAM multiplicative ETS update (ets='adam'); 30 random values of p drawn uniformly on [0.02, 0.98]; the deviation of iETS_I grows as p tends to 0; limit as alpha tends to 0, extrapolated from alpha in {0.004, 0.002, 0.001}
   extends B9, own earlier work: Svetunkov (2023) defines the ADAM form of multiplicative ETS, which updates a level as mu_t = mu_{t-1} (1 + e_t)^alpha.
   supports C13
   test: deterministic; tolerance 0.02; refutation 0.05; sample fixed by the design file; one run, no interim analysis; supported if a < tolerance and b < tolerance; not supported if a > refutation or b > refutation; verdict computed
@@ -142,12 +143,12 @@ C19 [descriptive; secondary; support: simulation E18 artefacts A17; strength mod
   refines C14
   test: deterministic; z 4; sample fixed by the two design files; two runs, no interim analysis; supported if a + b + c + d < 1; not supported if a + b + c + d > 0; verdict computed
 C20 [descriptive; secondary; support: empirical_quant E19; strength low (author); planning confirmatory; outcome inconclusive]
-  On the [[D19:M5 subset]], replacing the [[D3:old error proxy]] with the [[D8:score proxy]] in the [[D20:iETS(M,N,N) flavours]] raises the [[D32:sum of point forecasts]] of iETS_I under conventional ETS and lowers it for iETS_O under conventional ETS and for iETS_I and iETS_O under ADAM ETS, the directions predicted by the zero-drift points of the old proxy.
+  On the [[D19:M5 subset]], replacing the [[D3:old error proxy]] with the [[D8:score proxy]] in the [[D20:iETS(M,N,N) flavours]] statistically significantly raised the [[D32:sum of point forecasts]] of iETS_I and lowered it for iETS_O under conventional ETS, the directions predicted by the zero-drift points of the old proxy, while the predicted decrease for iETS_I and iETS_O under ADAM ETS was not statistically significant at the 1% level.
   scope: data_type: daily unit sales of retail products | setting: Walmart stores in the M5 competition data | geography: United States (California, Texas, Wisconsin) | period: 1,969 days from 29 January 2011 | conditions: last 14 days held out; horizons 1 to 14; iETS(M,N,N) with Gamma demand sizes, parameters estimated by likelihood; series with at least 5 non-zero in-sample observations; measure: sum of the 14 point forecasts, score proxy minus old proxy
   extends B1, at section 5, own earlier work: Svetunkov and Boylan (2023, section 5) compare iETS models with Croston's method, TSB, NegBin and HSP on the M5 data, with the upper quantiles rounded up (eq. 35).
   test: frequentist; alpha 0.01; sample the 3,000 pre-registered series of subset.csv, less the exclusions; one run of each step, no interim analysis; test Wilcoxon signed-rank; sides two_sided; correction holm; supported if g > 3; not supported if b > 0; verdict computed
-C21 [descriptive; secondary; support: empirical_quant E20; strength low (author); planning confirmatory; outcome inconclusive]
-  On the [[D19:M5 subset]], each of the eight [[D20:iETS(M,N,N) flavours]] with a proxy, iETS_O, iETS_I, iETS_G and iETS_A under conventional and ADAM ETS, has a lower [[D25:RMSSE]] with the [[D8:score proxy]] than with the [[D3:old error proxy]].
+C21 [descriptive; secondary; support: empirical_quant E20 (E20.R418, E20.R419); strength low (author); planning confirmatory; outcome inconclusive]
+  On the [[D19:M5 subset]], the [[D8:score proxy]] gave a statistically significantly lower [[D25:RMSSE]] than the [[D3:old error proxy]] for 6 of the eight [[D20:iETS(M,N,N) flavours]] with a proxy, all except iETS_G and iETS_A under conventional ETS, and a statistically significantly higher RMSSE for 0.
   scope: data_type: daily unit sales of retail products | setting: Walmart stores in the M5 competition data | geography: United States (California, Texas, Wisconsin) | period: 1,969 days from 29 January 2011 | conditions: last 14 days held out; horizons 1 to 14; iETS(M,N,N) with Gamma demand sizes, parameters estimated by likelihood; series with at least 5 non-zero in-sample observations; measure: RMSSE, score proxy minus old proxy
   extends B1, at section 5, own earlier work: Svetunkov and Boylan (2023, section 5) compare iETS models with Croston's method, TSB, NegBin and HSP on the M5 data, with the upper quantiles rounded up (eq. 35).
   test: frequentist; alpha 0.01; sample the 3,000 pre-registered series of subset.csv, less the exclusions; one run of each step, no interim analysis; test Wilcoxon signed-rank; sides two_sided; correction holm; supported if g > 7; not supported if b > 0; verdict computed
@@ -11234,13 +11235,13 @@ A18 [software] The smooth package at the commit of the study, with the argument 
 
 REFERENCES
 B1 10.1016/j.ijpe.2023.109013 (doi)
-B2 Croston, J.D. (1972). Forecasting and stock control for intermittent demands. Operational Research Quarterly 23(3), 289-303.
+B2 10.2307/3007885 (doi)
 B3 10.1002/jae.1279 (doi)
 B4 10.1017/CBO9781139540933 (doi)
 B6 10.1007/b97441 (doi)
 B7 10.1016/S0925-5273(00)00143-2 (doi)
 B8 10.1016/j.ijforecast.2004.10.001 (doi)
-B9 Svetunkov, I. (2023). Forecasting and Analytics with the Augmented Dynamic Adaptive Model (ADAM). Chapman and Hall/CRC.
+B9 10.1201/9781003452652 (doi)
 B10 10.1016/j.ijforecast.2021.11.013 (doi)
 B11 10.1016/j.ejor.2011.05.018 (doi)
 B12 10.1016/j.ijforecast.2011.03.009 (doi)

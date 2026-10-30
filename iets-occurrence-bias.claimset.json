@@ -14,6 +14,10 @@
     "M5 competition"
    ]
   },
+  "declarations": {
+   "funding": [],
+   "competing_interests": "None declared."
+  },
   "contributions": [
    "C1",
    "C2",
@@ -43,10 +47,10 @@
     "inconclusive": 2
    },
    "runs": {
-    "total": 41,
+    "total": 59,
     "confirmatory": 29,
-    "exploratory": 12,
-    "failed": 1
+    "exploratory": 30,
+    "failed": 4
    }
   },
   "study": "iets-occurrence-bias"
@@ -120,6 +124,134 @@
      "extent": "assisted"
     }
    ]
+  },
+  {
+   "id": "P3",
+   "type": "agent",
+   "name": "Checker: derivations",
+   "positions": [
+    "contributor"
+   ],
+   "models": [
+    {
+     "model": "M2",
+     "role": "sole"
+    }
+   ],
+   "run_period": {
+    "start": "2026-10-30",
+    "end": "2026-10-30"
+   },
+   "tools": [
+    "code_execution",
+    "file_access"
+   ],
+   "record_source": "harness",
+   "credit_roles": [
+    "validation"
+   ],
+   "ai_tasks": [
+    {
+     "task": "review",
+     "extent": "full"
+    }
+   ]
+  },
+  {
+   "id": "P4",
+   "type": "agent",
+   "name": "Checker: limit simulations",
+   "positions": [
+    "contributor"
+   ],
+   "models": [
+    {
+     "model": "M2",
+     "role": "sole"
+    }
+   ],
+   "run_period": {
+    "start": "2026-10-30",
+    "end": "2026-10-30"
+   },
+   "tools": [
+    "code_execution",
+    "file_access"
+   ],
+   "record_source": "harness",
+   "credit_roles": [
+    "validation"
+   ],
+   "ai_tasks": [
+    {
+     "task": "review",
+     "extent": "full"
+    }
+   ]
+  },
+  {
+   "id": "P5",
+   "type": "agent",
+   "name": "Checker: direction and comparison simulations",
+   "positions": [
+    "contributor"
+   ],
+   "models": [
+    {
+     "model": "M2",
+     "role": "sole"
+    }
+   ],
+   "run_period": {
+    "start": "2026-10-30",
+    "end": "2026-10-30"
+   },
+   "tools": [
+    "code_execution",
+    "file_access"
+   ],
+   "record_source": "harness",
+   "credit_roles": [
+    "validation"
+   ],
+   "ai_tasks": [
+    {
+     "task": "review",
+     "extent": "full"
+    }
+   ]
+  },
+  {
+   "id": "P6",
+   "type": "agent",
+   "name": "Checker: M5 evaluation",
+   "positions": [
+    "contributor"
+   ],
+   "models": [
+    {
+     "model": "M2",
+     "role": "sole"
+    }
+   ],
+   "run_period": {
+    "start": "2026-10-30",
+    "end": "2026-10-30"
+   },
+   "tools": [
+    "code_execution",
+    "file_access"
+   ],
+   "record_source": "harness",
+   "credit_roles": [
+    "validation"
+   ],
+   "ai_tasks": [
+    {
+     "task": "review",
+     "extent": "full"
+    }
+   ]
   }
  ],
  "models": [
@@ -130,6 +262,15 @@
    "version": "5.5",
    "identifier": "claude-opus-5-5",
    "accessed": "2026-10-29",
+   "weights": "api_only"
+  },
+  {
+   "id": "M2",
+   "provider": "Anthropic",
+   "name": "Claude Sonnet",
+   "version": "5.5",
+   "identifier": "claude-sonnet-5-5",
+   "accessed": "2026-10-30",
    "weights": "api_only"
   }
  ],
@@ -453,6 +594,14 @@
     "runs": 1,
     "lab_plan": "PL11"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "AC4.CK5: Independent implementation: my own C++ filter from the definitions D3/D4/D5/D8/D16-D18 (not the study's filter.cpp), 9 values of p of my own choosing (0.02,0.07,0.17,0.31,0.5,0.66,0.83,0.93,0.98), alpha in {0.008,0.004,0.002,0.001}, 4e7 observations per cell after burn-in, filter started at the true value, batch-means SE; limit = intercept at alpha=0 of the least-squares line of the stationary mean on alpha (AC4.RN3); predictions from the definitions by root-finding of the expected update at phat=x (unique zero checked on a grid). Claim C1 (old proxy, both models, both error types): max relative deviation of the extrapolated limit from the zero-drift point is 0.0005 (iETS_I M, AC4.RS5), 0.0004 (iETS_O M, AC4.RS9), 0.0008 (iETS_I A, AC4.RS13), 0.0007 (iETS_O A, AC4.RS17), all far below the 0.02 tolerance; using only the smallest alpha=0.001 the deviations are 0.0006, 0.0013, 0.0008, 0.0011 (AC4.RS6, RS10, RS14, RS18), so the smallest alpha suffices on this grid. The limits are not p: max relative distance of the simulated limit from p is 0.50, 6.07, 0.99, 0.99 (AC4.RS8, RS12, RS16, RS20). Zero-drift points are exact algebra for M error (AC4.RN2) and the stated root for A error. Partial only because 'every p in (0,1)' was checked at 9 values in [0.02,0.98] and not at p near 0 or 1; the tolerance rule of the claim is met."
+    }
+   ],
    "depends_on": [
     "C10",
     "C5",
@@ -569,6 +718,14 @@
     "runs": 1,
     "lab_plan": "PL12"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "AC4.CK6: Independent implementation: my own C++ filter from the definitions D3/D4/D5/D8/D16-D18 (not the study's filter.cpp), 9 values of p of my own choosing (0.02,0.07,0.17,0.31,0.5,0.66,0.83,0.93,0.98), alpha in {0.008,0.004,0.002,0.001}, 4e7 observations per cell after burn-in, filter started at the true value, batch-means SE; limit = intercept at alpha=0 of the least-squares line of the stationary mean on alpha (AC4.RN3); predictions from the definitions by root-finding of the expected update at phat=x (unique zero checked on a grid). Claim C2 (score proxy, conventional M and A error, both models; predicted limit p): max relative deviation of the extrapolated limit from p is 0.0009 (iETS_I M, AC4.RS21), 0.0006 (iETS_O M, AC4.RS25), 0.0016 (iETS_I A, AC4.RS29), 0.0018 (iETS_O A, AC4.RS33), all below the 0.02 tolerance by more than a factor of 10; at the single smallest alpha=0.001 the deviations are 0.0018, 0.0020, 0.0006, 0.0022 (AC4.RS22, RS26, RS30, RS34), so the smallest alpha also suffices. The expected update at phat=x is exactly zero at x=p in the definition (score o-x or x-o), unique on my grid. Partial only because 'every p in (0,1)' was sampled at 9 values in [0.02,0.98] (largest deviations occur at p=0.02 and are within 3 batch-means SE of zero)."
+    }
+   ],
    "depends_on": [
     "C11"
    ],
@@ -719,6 +876,14 @@
     "runs": 1,
     "lab_plan": "PL18"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "AC4.CK9: Independent implementation: my own C++ filter from the definitions D3/D4/D5/D8/D16-D18 (not the study's filter.cpp), 9 values of p of my own choosing (0.02,0.07,0.17,0.31,0.5,0.66,0.83,0.93,0.98), alpha in {0.008,0.004,0.002,0.001}, 4e7 observations per cell after burn-in, filter started at the true value, batch-means SE; limit = intercept at alpha=0 of the least-squares line of the stationary mean on alpha (AC4.RN3); predictions from the definitions by root-finding of the expected update at phat=x (unique zero checked on a grid). Claim C4 (ADAM update, exponential score proxy 1+e=exp(s), log mu += alpha*s; predicted limit p): max relative deviation of the extrapolated limit from p is 0.0017 for iETS_I (AC4.RS37) and 0.0007 for iETS_O (AC4.RS41), far below the 0.02 tolerance; at the single smallest alpha=0.001 the deviations are 0.0009 and 0.0011 (AC4.RS38, RS42), so the smallest alpha suffices. The expected update at phat=x is zero at x=p and nowhere else on my grid. Partial only because 'every p in (0,1)' was sampled at 9 values in [0.02,0.98]; the filter coincides with the additive score filter of C2 (same recursion), which gives an independent consistency check (deviations 0.0016/0.0018 in AC4.RS29/RS33)."
+    }
+   ],
    "depends_on": [
     "C13"
    ],
@@ -806,6 +971,14 @@
     "runs": 1,
     "lab_plan": "PL2"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC4.CK1: Independent implementation: my own C++ filter written from the definitions D3/D4/D5/D8/D16-D18 (not the study's filter.cpp), 9 values of p of my own choosing (0.02,0.07,0.17,0.31,0.5,0.66,0.83,0.93,0.98), alpha in {0.008,0.004,0.002,0.001}, 4e7 observations per cell after burn-in, filter started at the true value, batch-means SE; the alpha-to-0 limit is the intercept of the least-squares line of the stationary mean on alpha (run AC4.RN3); predictions computed from the definitions by root-finding of the expected update at phat=x (unique zero checked on a 20000-point grid). Algebra and stability in AC4.RN2 (sympy). Claim C5 (iETS_I, multiplicative error, old proxy): sympy gives the numerator of E[e|x] as -2(p + x^2 - 2x), whose root in (0,1) is 1 - sqrt(1-p), and the residual at the claimed point is exactly 0 (AC4.RS1); dh/dx>0 at the point for p=0.1,0.5,0.9, so the point is stable for phat=1/(1+mu) (AC4.RN2). Simulation: max relative deviation of the extrapolated limit from 1 - sqrt(1-p) over the 9 p is 0.0005 (AC4.RS5); at the single smallest alpha=0.001 the max deviation is 0.0006 (AC4.RS6), so the smallest alpha also suffices; max deviation of the limit from p is 0.497 (AC4.RS8), below p at every p. Rule of the claim (d<0.02) met by a wide margin; the claimed limit holds. Note the study's own alpha=0.002 was within the range I checked."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -888,6 +1061,14 @@
     "runs": 1,
     "lab_plan": "PL3"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC4.CK2: Independent implementation: my own C++ filter written from the definitions D3/D4/D5/D8/D16-D18 (not the study's filter.cpp), 9 values of p of my own choosing (0.02,0.07,0.17,0.31,0.5,0.66,0.83,0.93,0.98), alpha in {0.008,0.004,0.002,0.001}, 4e7 observations per cell after burn-in, filter started at the true value, batch-means SE; the alpha-to-0 limit is the intercept of the least-squares line of the stationary mean on alpha (run AC4.RN3); predictions computed from the definitions by root-finding of the expected update at phat=x (unique zero checked on a 20000-point grid). Algebra and stability in AC4.RN2 (sympy). Claim C6 (iETS_O, multiplicative error, old proxy): sympy numerator of E[e|x] is -2(x^2 - p), root sqrt(p), residual exactly 0 (AC4.RS2); dh/dx<0 at the point for p=0.1,0.5,0.9 so stable for phat=mu/(1+mu) (AC4.RN2). Simulation: max relative deviation of extrapolated limit from sqrt(p) is 0.0004 (AC4.RS9), at alpha=0.001 alone 0.0013 (AC4.RS10); the limit exceeds p at every p (max relative excess 6.07 at p=0.02, AC4.RS12). The claim holds; rule d<0.02 met."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -918,7 +1099,7 @@
   },
   {
    "id": "C7",
-   "statement": "For [[D1:iETS_I]] and [[D2:iETS_O]] with additive occurrence error, applied to [[D7:Bernoulli occurrence with constant probability]] p, the [[D6:stationary mean probability]] as alpha tends to 0 is the same for both models and equals the root x of $p\\log\\frac{x}{2-x} + (1-p)\\log\\frac{1+x}{1-x} = 0$, a value strictly between p and one half.",
+   "statement": "For [[D1:iETS_I]] and [[D2:iETS_O]] with additive occurrence error, applied to [[D7:Bernoulli occurrence with constant probability]] p, the [[D6:stationary mean probability]] as alpha tends to 0 is the same for both models and equals the root x of $p\\log\\frac{x}{2-x} + (1-p)\\log\\frac{1+x}{1-x} = 0$, a value strictly between p and one half for p other than one half and equal to one half at p = one half.",
    "about": {
     "subject": "iETS_I and iETS_O, additive occurrence error",
     "relation": "has stationary mean probability equal to",
@@ -977,6 +1158,20 @@
     "runs": 1,
     "lab_plan": "PL4"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC4.CK3: Independent implementation: my own C++ filter written from the definitions D3/D4/D5/D8/D16-D18 (not the study's filter.cpp), 9 values of p of my own choosing (0.02,0.07,0.17,0.31,0.5,0.66,0.83,0.93,0.98), alpha in {0.008,0.004,0.002,0.001}, 4e7 observations per cell after burn-in, filter started at the true value, batch-means SE; the alpha-to-0 limit is the intercept of the least-squares line of the stationary mean on alpha (run AC4.RN3); predictions computed from the definitions by root-finding of the expected update at phat=x (unique zero checked on a 20000-point grid). Algebra and stability in AC4.RN2 (sympy). Claim C7 (additive error, both models): symbolically, the expected update of the log-state for iETS_I equals p log(x/(2-x)) + (1-p) log((1+x)/(1-x)) exactly and for iETS_O equals minus the same expression, so both have the same zero x (AC4.RN2 output 'hI - claim: 0; hO + claim: 0'). Numerically the root lies strictly between p and 0.5 for all 400 values of p in (0,1) except 0.5 (AC4.RS3 = 0 exceptions). Simulation: iETS_I additive max relative deviation of the limit from the root 0.0008 (AC4.RS13), iETS_O additive 0.0007 (AC4.RS17), both far below 0.02. Minor wording point: at p=0.5 exactly the root is 0.5 = p (AC4.RS4 residual 0), so 'strictly between p and one half' is vacuous or false at that single p; it holds for every p different from 0.5."
+    },
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC4.CK10: Supersedes my earlier check AC4.CK3 for the revised wording of C7 ('strictly between p and one half for p other than one half and equal to one half at p = one half'). Nothing new was run; same evidence as CK3. Both models have the same zero of the additive expected update (symbolic, AC4.RN2). The root is strictly between p and 0.5 for 400 of 400 values of p different from 0.5 (AC4.RS3 = 0 exceptions), and equals 0.5 at p = 0.5 (residual of the equation at x=p=0.5 is exactly 0, AC4.RS4). Simulated limits deviate from the root by at most 0.0008 (iETS_I, AC4.RS13) and 0.0007 (iETS_O, AC4.RS17). The wording point of CK3 is resolved."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -1059,6 +1254,14 @@
     "runs": 1,
     "lab_plan": "PL5"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC4.CK4: Croston's method, own implementation (SES of the intervals, updated at occurrences, forecast 1/q_hat each period, time average), same p grid, N=4e7 (AC4.RN3): at alpha=0.002 and also at 0.008..0.001 the mean of 1/q_hat is within 0.0013 relative of p at every p (max relative deviation of the extrapolated limit 0.0008, AC4.RS56; smallest-alpha mean max 0.0013-ish, AC4.RS54). Independently, an exact (non-simulated) computation of E[1/q_hat] by the Laplace-transform identity 1/q=int exp(-s q) ds and the product form of the SES of iid geometric intervals (AC4.RN4; checked against the closed form -p ln p/(1-p) at alpha=1, equal to 10 digits) gives a relative bias of at most 0.0010 over p in 0.001..0.999 at alpha<=0.002 (AC4.RS58; e.g. 5.0e-4 at p=0.5, alpha=0.002, AC4.RS59) and the bias matches the first-order value (1-p)alpha/(2-alpha), i.e. order alpha. Within 2%: yes (d<0.02 met by a factor of 15 or more)."
+    }
+   ],
    "relations": [
     {
      "type": "replicates",
@@ -1141,7 +1344,15 @@
     "runs": 1,
     "lab_plan": "PL9"
    },
-   "verification": "unchecked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC3.CK1: Re-derived C9 from D3 by my own enumeration over o in {0,1} at x=p (AC3.RN1, results AC3.RS1-RS6; own code, study code not used). Sympy: E[1+e_a]=2-p+(1-p)^2/(1+p) and E[1+e_b]=1+p+p^2/(2-p) reduce to zero difference; E[1+e_a]-1=2(1-p)/(1+p)>0 and E[1+e_b]-1=2p/(2-p)>0 for all p in (0,1) (analytic, positive factors). Additive: E log(1+e_a)=g(p)=p log((2-p)/p)+(1-p)log((1-p)/(1+p)), E log(1+e_b)=-g, g(1-p)=-g(p), g(1/2)=0 (sympy). Sign of g proved analytically by my own route: g=2p atanh(1-p)-2(1-p)atanh(p)=2p(1-p)[phi(1-p)-phi(p)] with phi(t)=atanh(t)/t strictly increasing (power series with positive coefficients), so g>0 for p<1/2, <0 for p>1/2. Also checked at 50 digits on 22,024 points (grid, fine grid, p down to 1e-40 and up to 1-1e-40): 0 unreduced identities, 0 counterexamples (AC3.RS1, RS2). No disagreement with derivations.md section 2."
+    }
+   ],
+   "verification": "agent_checked",
    "relations": [
     {
      "type": "extends",
@@ -1160,7 +1371,7 @@
   },
   {
    "id": "C10",
-   "statement": "For every p in (0,1), the [[D4:occurrence filters]] with the [[D3:old error proxy]] have a unique stable [[D9:zero-drift point]]: $1 - \\sqrt{1-p} < p$ for [[D1:iETS_I]] and $\\sqrt{p} > p$ for [[D2:iETS_O]] with multiplicative error, and for both models with additive error the root of $p\\log\\frac{x}{2-x} + (1-p)\\log\\frac{1+x}{1-x} = 0$, strictly between p and one half.",
+   "statement": "For every p in (0,1), the [[D4:occurrence filters]] with the [[D3:old error proxy]] have a unique stable [[D9:zero-drift point]]: $1 - \\sqrt{1-p} < p$ for [[D1:iETS_I]] and $\\sqrt{p} > p$ for [[D2:iETS_O]] with multiplicative error, and for both models with additive error the root of $p\\log\\frac{x}{2-x} + (1-p)\\log\\frac{1+x}{1-x} = 0$, strictly between p and one half for p other than one half and equal to one half at p = one half.",
    "about": {
     "subject": "old error proxy filters",
     "relation": "have unique stable zero-drift point",
@@ -1214,7 +1425,22 @@
     "runs": 1,
     "lab_plan": "PL7"
    },
-   "verification": "unchecked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "disputed",
+     "extent": "full",
+     "notes": "AC3.CK5: Everything checked holds except one wording point. AC3.RN2 (results AC3.RS7-RS12; own code): multiplicative case from D3/D9 by enumeration: h_b=-2(x^2-2x+p)/((2-x)(1-x)) and h_a=2(p-x^2)/(x(1+x)) (sympy), only root in (0,1) is 1-sqrt(1-p) resp. sqrt(p); with q=sqrt(1-p), p-x*=q(1-q)>0 and sqrt(p)-p=s(1-s)>0; sign of h follows (x-x*), so unique and stable. Additive case, own proof: h_b=2atanh(x)[(1-p)-pR(x)], R=atanh(1-x)/atanh(x) strictly decreasing from +inf to 0, so unique stable root with R(x*)=(1-p)/p; x*>p iff p<1/2; R(1/2)=1 gives x*<1/2 for p<1/2 (mirror for p>1/2). Numerics at 40 digits on 1,999 p plus 1e-9, 1-1e-9: 0 unreduced identities, 0 counterexamples. DISPUTE: the claim says for every p in (0,1) the additive root is strictly between p and one half, but at p=1/2 the root is exactly 1/2 (AC3.RS10 = 0.5), equal to p, so not strictly between. Correction: strictly between for p != 1/2, equal to 1/2 at p = 1/2.",
+     "resolution": "The revised statement adds 'strictly between p and one half for p other than one half and equal to one half at p = one half', which is the correction proposed here; it answers the dispute."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC3.CK6: Re-check of the revised C10 statement against AC3.RN2 (no new run). Multiplicative parts, uniqueness and stability unchanged and confirmed (AC3.RS7, RS8, RS9). The added clause is exactly what the runs show: root equals 1/2 at p=1/2 (AC3.RS10 = 0.5) and lies strictly between p and 1/2 for every other p on the 1,999-point grid plus p=1e-9 and 1-1e-9 (0 counterexamples, AC3.RS8), e.g. 0.1419244 at p=0.1 and 0.8580756 at p=0.9 (AC3.RS11, RS12); also proved analytically via R(x)=atanh(1-x)/atanh(x) and the monotonicity of atanh(t)/t. The earlier dispute no longer applies."
+    }
+   ],
+   "verification": "agent_checked",
    "depends_on": [
     "C9"
    ],
@@ -1290,7 +1516,15 @@
     "runs": 1,
     "lab_plan": "PL10"
    },
-   "verification": "unchecked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC3.CK3: AC3.RN3 (results AC3.RS13-RS16; own code). Sympy: with mu=exp(m), p_O=mu/(1+mu), p_I=1/(1+mu), d/dm of o log p+(1-o)log(1-p) equals o-p_O and p_I-o; dp/dlog mu = +-p(1-p). E[o-x]=p-x, E[x-o]=x-p, so the zero is x=p only (linear) and the drift sign moves p_hat towards p for both models (iETS_O: x<p raises mu_a and p; iETS_I: x<p lowers mu_b and raises p); checked on grid with no failures. Positivity: 1+alpha*e equals (1-alpha)+alpha(1-x) (iETS_O,o=0), 1+alpha(1-x) (O,o=1), 1+alpha x (I,o=0), (1-alpha)+alpha x (I,o=1), all >0 for alpha in (0,1], x in (0,1) (sympy identity, analytic; also 50x999 grid, 0 failures); fails for alpha>1 (e.g. alpha=1.1,x=0.95). 0 unreduced identities, 0 counterexamples. Caveat only: in double precision p_hat=mu/(1+mu) rounds to exactly 1.0 for mu>~1e17 and then alpha=1,o=0 gives state 0 (AC3.RS13), a rounding artefact, not a failure of the formal statement."
+    }
+   ],
+   "verification": "agent_checked",
    "relations": [
     {
      "type": "extends",
@@ -1372,6 +1606,14 @@
     "runs": 2,
     "lab_plan": "PL15"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC4.CK7: Direction and limit of Croston's 1/q_hat. (a) Proof: q_hat_t is a convex combination of iid geometric intervals with weights alpha(1-alpha)^k, so E[q_hat]=E[q]=1/p, and q_hat is non-degenerate for p<1 and alpha>0; 1/x is strictly convex, so Jensen gives E[1/q_hat] > 1/E[q_hat] = p for every p in (0,1) and alpha in (0,1]. The time-average of 1/q_hat over periods equals the average over intervals because each interval length is independent of the q_hat in force. (b) Exact numerical check (not a simulation) of E[1/q_hat] by 1/q=int exp(-s q) ds and the product form of the SES of iid geometric intervals (AC4.RN4): closed form -p ln p/(1-p) reproduced to 10 digits at alpha=1; over 10 values of p (0.001..0.999) times 11 values of alpha (0.001..1) the minimum relative bias is +5.0e-7 > 0 (AC4.RS57), so no wrong-direction cell; the bias tracks (1-p)alpha/(2-alpha) for small alpha (ratio 0.999-1.001 at alpha<=0.002), hence tends to 0 as alpha->0. (c) Own simulation, own C++ Croston, 9 p, 4 alphas, 4e7 observations (AC4.RN3): max relative deviation of the extrapolated limit from p is 0.0008 (AC4.RS56), simulated bias positive in all but the cells where it is below Monte Carlo error (expected since the bias at alpha<=0.008 is at most 0.8%/few e-3 relative); the exact computation, not the simulation, decides the direction at small alpha."
+    }
+   ],
    "depends_on": [
     "C8"
    ],
@@ -1460,7 +1702,15 @@
     "runs": 1,
     "lab_plan": "PL16"
    },
-   "verification": "unchecked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC3.CK4: AC3.RN4 (results AC3.RS17-RS22; own code). (1) D16: log mu_t = log mu_{t-1}+alpha log(1+e), so the filter is additive with error log(1+e); for the old proxy log(1+e)=log(u/(1-u)) (resp. reciprocal) is the additive old error, hence identical drift and zero-drift point. (2) Multiplicative score proxy 1+e=1+s: iETS_O k_O(x)=p log(2-x)+(1-p)log(1-x), k_O'=-p/(2-x)-(1-p)/(1-x)<0, k_O(0+)=p log2>0, k_O(1-)=-inf, so unique root; k_O(p)<0 strictly (log y<y-1, E[s]=0, s non-degenerate), so root<p; stable (positive left, negative right, mu_a up raises p). iETS_I k_I=p log x+(1-p)log(1+x), k_I'>0, k_I(0+)=-inf, k_I(1-)=(1-p)log2>0, k_I(p)<0, so unique root >p; stable. Sympy identities and limits agree. At 40 digits for 1,999 p plus p=1e-9,1-1e-9: roots found with root<p (O) and root>p (I), smallest gaps 3.07e-10 (at p=1e-9, still positive), stability and single sign change (80 p) confirmed; e.g. iETS_O root at p=0.5 is 0.38197. (3) Exponential score: log(1+e)=s, drift +-(p-x), zero-drift point p. 0 unreduced identities, 0 counterexamples (AC3.RS17, RS18). The claim's text is accurate; the old-proxy statement is true by definition (tautological once D16 is applied)."
+    }
+   ],
+   "verification": "agent_checked",
    "relations": [
     {
      "type": "extends",
@@ -1560,6 +1810,14 @@
     "runs": 1,
     "lab_plan": "PL13"
    },
+   "checks": [
+    {
+     "by": "P5",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC5.CK1: C14 own C++ filter (xoshiro RNG, written from D3/D4/D8; study code not used). AC5.RN1 (T=1e7, 100 batches, 4-SE rule): 300 log-uniform-alpha pairs: wrong-direction cells iETS_I M=2, iETS_O M=3 (AC5.RS4, RS6), additive 0 and 0 (RS3, RS5); all wrong cells have alpha 0.84-0.999. Dense alpha in [0.8,1] (400 pairs): 95 (I) and 91 (O) wrong cells (AC5.RS1, RS2), so the sign flip is real and common at large alpha. AC5.RN4: re-ran at T=2e7 the 3 M cells that I recomputed as wrong from E9 results (I: p=0.268 alpha=0.944; O: p=0.910 alpha=0.881; O: p=0.769 alpha=0.953): my means 0.28196, 0.90275, 0.74607 vs recorded 0.28206, 0.90277, 0.74613, same wrong sign at about 1e-4 SE, so the claimed counts 1 (I) and 2 (O) reproduce for that design (my fresh design gives 2 and 3; counts are design-dependent). Additive error: 0 wrong in 300+300 (RS9, RS10) plus 300 log-uniform. Claim confirmed."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -1647,6 +1905,14 @@
     "runs": 1,
     "lab_plan": "PL14"
    },
+   "checks": [
+    {
+     "by": "P5",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC5.CK2: C15 own filter. AC5.RN2 (T=4e6, paired old vs score, score worse if |bias| larger by >4 combined SE or non-finite). Multiplicative error: log-alpha design 200 pairs: score worse in 7 cells for iETS_I and 7 for iETS_O (AC5.RS14, RS16); alpha in [0.5,1] 150 pairs: 76 and 76 (RS11, RS12); all at alpha >= 0.5 except one iETS_O cell at alpha 0.499 (RS18). Additive: 0 worse in 1200 comparisons across log, uniform and tail designs (RS13, RS15, RS19-22). So score proxy is not less biased everywhere, only under multiplicative error, as claimed. AC5.RN4 reproduced two recorded E17 iETS_I cells (p=0.086 alpha=0.4999: old bias -0.0263, score +0.0283). The exact counts 10 and 12 are design-specific; my design gives other counts, same qualitative result."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -1676,7 +1942,7 @@
   },
   {
    "id": "C16",
-   "statement": "On [[D7:Bernoulli occurrence with constant probability]], under the [[D16:ADAM multiplicative ETS update]] the [[D18:multiplicative score proxy]] does not give an alpha-to-0 limit of the stationary mean probability equal to p: its largest relative deviation from p is 1.69 for [[D1:iETS_I]] and 0.30 for [[D2:iETS_O]].",
+   "statement": "On [[D7:Bernoulli occurrence with constant probability]], under the [[D16:ADAM multiplicative ETS update]] the [[D18:multiplicative score proxy]] does not give an alpha-to-0 limit of the stationary mean probability equal to p: over the simulated values of p its largest relative deviation from p is 1.69 for [[D1:iETS_I]] and 0.30 for [[D2:iETS_O]].",
    "about": {
     "subject": "multiplicative score proxy under the ADAM update",
     "relation": "has alpha-to-0 limit of the stationary mean equal to",
@@ -1741,6 +2007,20 @@
     "runs": 1,
     "lab_plan": "PL17"
    },
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "AC4.CK8: Independent implementation: my own C++ filter from the definitions D3/D4/D5/D8/D16-D18 (not the study's filter.cpp), 9 values of p of my own choosing (0.02,0.07,0.17,0.31,0.5,0.66,0.83,0.93,0.98), alpha in {0.008,0.004,0.002,0.001}, 4e7 observations per cell after burn-in, filter started at the true value, batch-means SE; limit = intercept at alpha=0 of the least-squares line of the stationary mean on alpha (AC4.RN3); predictions from the definitions by root-finding of the expected update at phat=x (unique zero checked on a grid). ADAM update, multiplicative score proxy 1+e=1+s (iETS_I s=phat-o, iETS_O s=o-phat), state update log mu += alpha*log(1+s). Zero-drift points from p log(1+s1)+(1-p) log(1+s0)=0: iETS_I p log x+(1-p) log(1+x)=0, iETS_O p log(2-x)+(1-p) log(1-x)=0. Simulated limits agree with these (max relative deviation from the zero-drift point 0.0012 for iETS_I, AC4.RS45, and 0.0005 for iETS_O, AC4.RS49), and they differ from p: the largest relative deviation from p over my 9 p values is 1.970 for iETS_I (AC4.RS48) and 0.305 for iETS_O (AC4.RS52), both attained at p=0.02, far beyond the 0.05 refutation bound at every p (iETS_I limit above p, iETS_O below p at every p). So the substantive claim (limit is not p) holds. Partial because the quoted figures 1.69 and 0.30 depend on the p values drawn: on the whole range [0.02,0.98] the supremum is 1.967 for iETS_I and 0.3047 for iETS_O, both at p=0.02 (AC4.RS60, RS61, RS62 in AC4.RN5), 1.69 corresponds to p about 0.0303 (AC4.RS70), and the iETS_I deviation is unbounded as p->0 (4.27 at p=0.001, AC4.RS64). The statement gives no p set or range for 'largest', so 1.69 is a property of the random sample of p, not of the filter; 0.30 is robust (0.305 at most)."
+    },
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC4.CK11: Supersedes my earlier check AC4.CK8 for the revised wording of C16 (figures refer to the simulated values of p; scope names the 30 random p in [0.02,0.98]; iETS_I deviation grows as p tends to 0). No new run. Substance: the limit under the ADAM update with the multiplicative score proxy is the zero of p log(1+s1)+(1-p) log(1+s0), simulated limits match it (deviation 0.0012 iETS_I, AC4.RS45; 0.0005 iETS_O, AC4.RS49) and differ from p at every p (iETS_I above, iETS_O below). The figures 1.69 and 0.30 are consistent with that: the iETS_I deviation is 1.967 at p=0.02 and 1.69 at p about 0.0303 (AC4.RS60, RS70), i.e. 1.69 is the maximum for a sample whose smallest p is about 0.03, which is compatible with 30 random values in [0.02,0.98]; the iETS_O maximum over the range is 0.3047 (AC4.RS61), consistent with 0.30; the iETS_I deviation grows as p goes to 0 (4.27 at p=0.001, 2.98 at 0.005, AC4.RS64 and RN5 output). I did not reproduce the study's own 30 draws, so 'largest over the simulated p' = 1.69 is checked for consistency (it needs a smallest p of about 0.0303), not recomputed from their draws; the claim as now worded is within that."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -1762,6 +2042,7 @@
     ],
     "conditions": [
      "ADAM multiplicative ETS update (ets='adam')",
+     "30 random values of p drawn uniformly on [0.02, 0.98]; the deviation of iETS_I grows as p tends to 0",
      "limit as alpha tends to 0, extrapolated from alpha in {0.004, 0.002, 0.001}"
     ]
    },
@@ -1826,6 +2107,14 @@
     "runs": 1,
     "lab_plan": "PL19"
    },
+   "checks": [
+    {
+     "by": "P5",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "AC5.CK3: C17 own filter. AC5.RN2: additive error, score vs old, 4-SE rule, 1200 comparisons (200 log-alpha pairs x2 models, 200 uniform-alpha pairs x2, 100 pairs with p in [0.002,0.02] or [0.98,0.998] x2): score worse in 0 (AC5.RS13, RS15, RS19, RS20, RS21, RS22). Partial because a universal claim over all p in (0,1), alpha in (0,1] can only be sampled; T=4e6 per cell, no formal proof checked."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -1916,6 +2205,14 @@
     "runs": 1,
     "lab_plan": "PL20"
    },
+   "checks": [
+    {
+     "by": "P5",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC5.CK4: C18 own filter. AC5.RN2: conventional M error, alpha uniform [0.001,0.5], 200 pairs x2 models: score worse in 0 for iETS_I and 1 for iETS_O (p=0.954 alpha=0.4992, 13.9 SE; AC5.RS17, RS18), so 'not always less biased' holds; the specific counts (2 I, 0 O) are design-specific: AC5.RN4 re-ran the two recorded E17 iETS_I cells at T=2e7 and reproduced them (p=0.086 alpha=0.4999: |bias| old 0.0263 vs score 0.0283; p=0.0306 alpha=0.4845: old 0.0095 vs score 0.0206 approx; score worse by far more than 4 SE). Counterexamples sit at alpha near 0.5, as stated. Correction recorded by the checker: Correction to AC5.CK4 (C18 check): for the cell p=0.0306 alpha=0.4845 the |bias| values from AC5.RN4 are old 0.0096 (mean 0.020960) and score 0.0107 (mean 0.041296 minus p... score mean 0.0413 vs p 0.0306); the figure '0.0206' in the note was a slip. Outcome unchanged."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -2031,6 +2328,14 @@
     "runs": 2,
     "lab_plan": "PL21"
    },
+   "checks": [
+    {
+     "by": "P5",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "AC5.CK5: C19 own filter. AC5.RN1: additive error alpha uniform [0.001,1], 300 pairs x2 models: 0 wrong-direction cells (AC5.RS9, RS10); multiplicative alpha uniform [0.001,0.8], 300 pairs x2: 0 (AC5.RS7, RS8); the sign flips begin at alpha ~0.84 (RS1, RS2: 95 and 91 of 400 pairs wrong at alpha in [0.8,1]), consistent with the 0.8 bound. Partial: universal over p, alpha only sampled (p in [0.02,0.98]); bias near alpha 0.8-0.84 not densely probed."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -2065,7 +2370,7 @@
   },
   {
    "id": "C20",
-   "statement": "On the [[D19:M5 subset]], replacing the [[D3:old error proxy]] with the [[D8:score proxy]] in the [[D20:iETS(M,N,N) flavours]] raises the [[D32:sum of point forecasts]] of iETS_I under conventional ETS and lowers it for iETS_O under conventional ETS and for iETS_I and iETS_O under ADAM ETS, the directions predicted by the zero-drift points of the old proxy.",
+   "statement": "On the [[D19:M5 subset]], replacing the [[D3:old error proxy]] with the [[D8:score proxy]] in the [[D20:iETS(M,N,N) flavours]] statistically significantly raised the [[D32:sum of point forecasts]] of iETS_I and lowered it for iETS_O under conventional ETS, the directions predicted by the zero-drift points of the old proxy, while the predicted decrease for iETS_I and iETS_O under ADAM ETS was not statistically significant at the 1% level.",
    "about": {
     "subject": "D8",
     "relation": "shifts the point forecasts, relative to the ratio proxy, in the direction predicted by its zero-drift point",
@@ -2117,6 +2422,21 @@
     "runs": 3,
     "lab_plan": "PL29"
    },
+   "checks": [
+    {
+     "by": "P6",
+     "outcome": "disputed",
+     "extent": "full",
+     "notes": "AC6.CK7: Recomputed with own code (AC6.RN1 builds per-series measures from RN32/RN33 files and the M5 data; AC6.RN3 tests). Data complete: 18 iETS and 5 benchmark methods x 3000 series x 14 horizons, all status ok, no missing mean, 0 exclusions (AC6.RS1-RS5). Wilcoxon (two-sided, zero dropped) with Holm over the 4 at 1%: I conv sum score-ratio median +1.90, p_adj 2e-299 (up, as predicted); O conv median -3.67, p_adj 0 (down, as predicted); I adam median -0.169, p_adj 0.032, not significant; O adam identical (I and O are numerically the same model under ADAM), p_adj 0.032, not significant; mean differences under ADAM are positive (+0.31) though medians are negative. g=2, b=0: the plan's rule gives inconclusive, matching the record and the recorded Holm p-values. Numbers agree. Disputed because the original statement asserted the shifts for all four flavours, whereas only the two conventional-ETS shifts are significant at 1%.",
+     "resolution": "The revised statement (C20) says the sum was significantly raised for iETS_I and lowered for iETS_O under conventional ETS, and that the predicted decrease under ADAM ETS was not significant at the 1% level. This matches AC6.RN3 (2 significant in the predicted direction, ADAM adjusted p 0.032), so the overstatement is removed."
+    },
+    {
+     "by": "P6",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC6.CK9: Revised C20 statement checked against AC6.RN3 (AC6.RS6 onward): significantly raised for iETS_I conv (median +1.90, p_adj 2e-299) and lowered for iETS_O conv (median -3.67, p_adj 0) at Holm 1%; ADAM I and O not significant (p_adj 0.032). All parts of the revised text hold."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -2148,7 +2468,7 @@
   },
   {
    "id": "C21",
-   "statement": "On the [[D19:M5 subset]], each of the eight [[D20:iETS(M,N,N) flavours]] with a proxy, iETS_O, iETS_I, iETS_G and iETS_A under conventional and ADAM ETS, has a lower [[D25:RMSSE]] with the [[D8:score proxy]] than with the [[D3:old error proxy]].",
+   "statement": "On the [[D19:M5 subset]], the [[D8:score proxy]] gave a statistically significantly lower [[D25:RMSSE]] than the [[D3:old error proxy]] for 6 of the eight [[D20:iETS(M,N,N) flavours]] with a proxy, all except iETS_G and iETS_A under conventional ETS, and a statistically significantly higher RMSSE for 0.",
    "about": {
     "subject": "D8",
     "relation": "gives lower RMSSE than",
@@ -2164,7 +2484,11 @@
    "support": [
     {
      "kind": "empirical_quant",
-     "evidence": "E20"
+     "evidence": "E20",
+     "results": [
+      "E20.R418",
+      "E20.R419"
+     ]
     }
    ],
    "provenance": "author_stated",
@@ -2198,6 +2522,21 @@
     "runs": 1,
     "lab_plan": "PL30"
    },
+   "checks": [
+    {
+     "by": "P6",
+     "outcome": "disputed",
+     "extent": "full",
+     "notes": "AC6.CK8: Recomputed with own code (AC6.RN1 measures, AC6.RN3 tests). RMSSE, score minus ratio, Wilcoxon two-sided, Holm over 8 at 1%: O conv p_adj 3e-84, I conv 4.5e-11, O adam 4.3e-5, I adam 4.3e-5, G adam 2.3e-6, A adam 0.0012 (all significant, negative median); G conv p_adj 0.019 and A conv 0.199 not significant. g=6, b=0, below the rule g>7: inconclusive, as recorded; numbers agree. Disputed because the original statement said each of the eight flavours has lower RMSSE; not shown for G and A under conventional ETS (G conv median +0.00018, mean +0.0018; A conv mean +0.0013).",
+     "resolution": "The revised statement (C21) says the score proxy gave significantly lower RMSSE for 6 of the eight flavours, all except iETS_G and iETS_A under conventional ETS, and significantly higher for 0. This matches AC6.RN3 (g=6, b=0, G conv and A conv not significant), so the overstatement is removed."
+    },
+    {
+     "by": "P6",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC6.CK10: Revised C21 statement checked against AC6.RN3: significantly lower RMSSE for O conv, I conv, O adam, I adam, G adam, A adam (6 of 8, p_adj <= 0.0012); G conv (0.019) and A conv (0.199) not significant; 0 significantly higher. All parts of the revised text hold."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -2283,6 +2622,14 @@
     "runs": 1,
     "lab_plan": "PL31"
    },
+   "checks": [
+    {
+     "by": "P6",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC6.CK3: Recomputed with own code (AC6.RN1, AC6.RN3). Scaled pinball (upper quantile, mean over h=1-14, divided by in-sample mean abs first difference), score minus ratio, 32 two-sided Wilcoxon tests (8 flavours x 4 levels), Holm over 32 at 1%: 11 significant with negative median (O conv 0.80, 0.90, 0.95, 0.99; O adam 0.99; I conv 0.80, 0.90; I adam 0.99; G adam 0.99; A adam 0.80, 0.99), 1 significant with positive median (iETS_I conv 0.99: median +0.0021, p_adj 1e-34, while its mean difference is -0.009), 20 not significant. g=11, b=1, so the rule (g>31 supported, b>0 not supported) gives not supported; matches the claim's 11 and 1 and the named exception. The claim statement (not lower for every flavour and level; 11 lower, 1 higher) holds."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -2456,6 +2803,14 @@
     "runs": 1,
     "lab_plan": "PL34"
    },
+   "checks": [
+    {
+     "by": "P6",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC6.CK4: Recomputed with own code (AC6.RN4) with Python greybox rmcb(level=0.99), mean ranks and intervals labelled by the output index, on RMSSE of 23 methods and scaled pinball of the 20 methods with quantiles at each level; significance as non-overlap of 99% intervals. Best score-proxy iETS (lowest mean rank among the 8 score-proxy models): RMSSE iETS_A_score_conv (11.09), pinball 0.80 iETS_A_score_conv (9.83), 0.90/0.95/0.99 iETS_O_score_conv (9.51, 9.88, 8.75). Better than Croston, SBA, TSB, HSP on RMSSE (4) and than NegBin on pinball 0.99 (5); worse than NegBin and HSP at 0.90 and 0.95, NegBin at 0.80 and HSP at 0.99 (6); not significant vs NegBin on RMSSE and vs HSP at 0.80. Total 13 comparisons, g=5 (predicted direction) b=6, so not supported. All numbers in the claim agree; the result is the same if the best is chosen among score-proxy models plus F and D (RMSSE best is then iETS_D_conv, same classifications). Note: statement leaves 'best-ranked' to vary by measure, which it does."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -2541,6 +2896,14 @@
     "runs": 1,
     "lab_plan": "PL35"
    },
+   "checks": [
+    {
+     "by": "P6",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC6.CK5: Recomputed with own code (AC6.RN1, AC6.RN3). Per series scaled pinball of ceil(q) minus raw q for 18 iETS methods x 4 levels = 72 two-sided Wilcoxon tests (zero dropped), Holm over 72 at 1%: 53 significant with positive median non-zero difference (rounding raises the pinball), 0 significant with negative, 19 not significant (mostly level 0.80 and the score-proxy ADAM models). Matches the claim's 53 and 0; rule g>71 not met and b>0, so not supported."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -2626,6 +2989,14 @@
     "runs": 1,
     "lab_plan": "PL36"
    },
+   "checks": [
+    {
+     "by": "P6",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "AC6.CK6: Recomputed with own code (AC6.RN1 measures, AC6.RN5 bootstrap): D = |mean coverage of ceil(q) - tau| - |mean raw coverage - tau|, 72 method-level pairs, 10,000-draw percentile bootstrap over series at level 1-0.01/72. Seed 20261030 with numpy default_rng (shared draws across pairs): interval above 0 (deviation grows) in 34 pairs, below 0 (shrinks) in 18, 20 contain 0. Seeds 1-5 and independent draws per pair (seeds 20261030, 11) give exactly the same 34/18 and no pair changes class across the 6 shared-draw seeds, so Monte Carlo error does not affect the counts. Matches the claim (34 grow, 18 shrink); with b>0 the rule gives not supported."
+    }
+   ],
    "relations": [
     {
      "type": "extends",
@@ -160301,7 +160672,7 @@
   {
    "id": "A6",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN34/summary_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN34/summary_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160312,7 +160683,7 @@
   {
    "id": "A7",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN34/series_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN34/series_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160323,7 +160694,7 @@
   {
    "id": "A8",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN35/summary_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN35/summary_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160334,7 +160705,7 @@
   {
    "id": "A9",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN35/series_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN35/series_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160345,7 +160716,7 @@
   {
    "id": "A10",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN36/summary_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN36/summary_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160356,7 +160727,7 @@
   {
    "id": "A11",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN36/series_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN36/series_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160367,7 +160738,7 @@
   {
    "id": "A12",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN38/summary_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN38/summary_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160378,7 +160749,7 @@
   {
    "id": "A13",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN38/series_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN38/series_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160389,7 +160760,7 @@
   {
    "id": "A14",
    "kind": "figure",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN39/rmcb.png",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN39/rmcb.png",
    "availability": {
     "level": "public"
    },
@@ -160512,7 +160883,7 @@
   {
    "id": "A15",
    "kind": "table",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/runs/RN39/aggregate_measures.csv",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/runs/RN39/aggregate_measures.csv",
    "availability": {
     "level": "public"
    },
@@ -160523,8 +160894,8 @@
   {
    "id": "A16",
    "kind": "lab_record",
-   "uri": "https://github.com/openforecast-org/smooth/blob/e22ae31ccec1690cfcf51476419859bac9f1c4ed/lab/lab.jsonl",
-   "version": "sha256:0b62fe89056e5b8070a258d755a93e6f53af57a62d0ee21dc39e4e381080ad80",
+   "uri": "https://github.com/openforecast-org/smooth/blob/7b9bb5cb0dbeaba5e481cb2bc78e472ee00ed235/lab/lab.jsonl",
+   "version": "sha256:e79356355989c6c0d11eebebbe3aeaae652dd91dcaa32295fbe9f1f961a37454",
    "availability": {
     "level": "public"
    },
@@ -160562,8 +160933,8 @@
   },
   {
    "id": "B2",
-   "target": "Croston, J.D. (1972). Forecasting and stock control for intermittent demands. Operational Research Quarterly 23(3), 289-303.",
-   "id_type": "reference"
+   "target": "10.2307/3007885",
+   "id_type": "doi"
   },
   {
    "id": "B3",
@@ -160592,8 +160963,8 @@
   },
   {
    "id": "B9",
-   "target": "Svetunkov, I. (2023). Forecasting and Analytics with the Augmented Dynamic Adaptive Model (ADAM). Chapman and Hall/CRC.",
-   "id_type": "reference"
+   "target": "10.1201/9781003452652",
+   "id_type": "doi"
   },
   {
    "id": "B10",

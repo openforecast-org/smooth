@@ -19,7 +19,12 @@ failed or left a forecast it should produce missing ("failed"); each is counted.
 - pinball: scaled pinball at the four levels for the same eight pairs; predicted -;
 - mcb: rmcb() of greybox (Nemenyi/MCB, 99%) of RMSSE over all methods and of the scaled
   pinball at each level over the methods with quantiles; per measure, the best score-proxy
-  model against each benchmark.
+  model against each benchmark;
+- rounding_pinball: scaled pinball at the four levels, quantile rounded up minus the raw
+  quantile, for each of the 18 iETS methods; predicted -;
+- rounding_coverage: per iETS method and level, the absolute deviation of the mean coverage
+  from the level, rounded minus raw, with a 10,000-draw percentile bootstrap interval over
+  series at level 1 - 0.01/72 (Bonferroni); predicted -.
 Wilcoxon signed-rank tests are two-sided, zero differences dropped (zero_method="wilcox"),
 with Holm's correction over the tests of the mode at alpha = 0.01; the direction of a
 difference is the sign of its median over the non-zero differences.
@@ -39,6 +44,7 @@ from load import H, read_series
 
 LEVELS = [0.8, 0.9, 0.95, 0.99]
 ALPHA = 0.01
+BOOT, BOOT_SEED = 10000, 20261030
 FLAVOURS = [(k, e) for e in ("conv", "adam") for k in "OIGA"]
 POINT_ONLY = {"Croston", "SBA", "TSB"}
 BENCHMARKS = {"RMSSE": ["Croston", "SBA", "TSB", "NegBin", "HSP"],
@@ -129,6 +135,41 @@ def mcb(table):
     return results, good, bad
 
 
+def iets(methods):
+    return [m for m in methods if m.startswith("iETS_")]
+
+
+def rounded_table(table):
+    # Adds "<method>|rounded", whose pinball at each level is that of the quantile rounded up
+    return {r: {**by, **{f"{m}|rounded": {f"pinball{t}": v[f"pinball{t}_rounded"] for t in LEVELS}
+                         for m, v in by.items() if m.startswith("iETS_")}}
+            for r, by in table.items()}
+
+
+def rounding_coverage(table, methods):
+    # Per method and level, D = |mean rounded coverage - tau| - |mean coverage - tau| over
+    # the series, with a percentile bootstrap interval over series (B draws, Bonferroni over
+    # the tests of the mode); significant when the interval excludes 0
+    rows = list(table)
+    tests = [(m, t) for t in LEVELS for m in methods]
+    level = 1 - ALPHA / len(tests)
+    draws = np.random.default_rng(BOOT_SEED).integers(0, len(rows), (BOOT, len(rows)))
+    results, good, bad = [], 0, 0
+    for m, t in tests:
+        raw = np.array([table[r][m][f"coverage{t}"] for r in rows])
+        up = np.array([table[r][m][f"coverage{t}_rounded"] for r in rows])
+        d = abs(up.mean() - t) - abs(raw.mean() - t)
+        boot = np.abs(up[draws].mean(1) - t) - np.abs(raw[draws].mean(1) - t)
+        lower, upper = np.quantile(boot, [(1 - level) / 2, (1 + level) / 2])
+        good += upper < 0
+        bad += lower > 0
+        results.append({"quantity": "coverage deviation from the level, rounded minus raw",
+                        "value": float(d), "interval": {"level": level, "lower": float(lower),
+                                                         "upper": float(upper)},
+                        "conditions": {"method": m, "level": t}})
+    return results, good, bad
+
+
 def write_measures(table, outdir):
     keys = ["RMSSE", "sCE", "sAPIS"] + [f"{k}{t}{s}" for k in ("pinball", "coverage")
                                          for t in LEVELS for s in ("", "_rounded")]
@@ -183,6 +224,11 @@ def main(mode, train, test, rows_file, *forecast_files):
         res, good, bad = paired(table, [(s, b, "RMSSE", -1) for s, b in pairs])
     elif mode == "pinball":
         res, good, bad = paired(table, [(s, b, f"pinball{t}", -1) for t in LEVELS for s, b in pairs])
+    elif mode == "rounding_pinball":
+        res, good, bad = paired(rounded_table(table), [(f"{m}|rounded", m, f"pinball{t}", -1)
+                                                       for t in LEVELS for m in iets(methods)])
+    elif mode == "rounding_coverage":
+        res, good, bad = rounding_coverage(table, iets(methods))
     else:
         res, good, bad = mcb(table)
     for m in methods:

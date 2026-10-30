@@ -162,7 +162,8 @@ RESPONSE_ID_RE = re.compile(r"^(\S+)@v([1-9]\d*)/RP[1-9]\d*$")
 
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,59}$")
-LOCAL_RE = re.compile(r"^([a-z][a-z0-9-]{1,59})/([a-z][a-z0-9-]{1,59})\.claimset\.json(?:#(C\d+))?$")
+LOCAL_RE = re.compile(r"^([a-z][a-z0-9-]{1,59})/([a-z][a-z0-9-]*)\.claimset\.json(?:#(C\d+))?$")
+SOURCE_PREFIX_RE = re.compile(r"^(?:https?://(?:dx\.)?doi\.org/|https?://arxiv\.org/abs/|doi:|arxiv:)", re.I)
 
 
 def local_targets(doc):
@@ -208,6 +209,20 @@ def check_local(r, doc, published, local_root):
             continue
         if m.group(3) and m.group(3) not in {as_dict(c).get("id") for c in as_list(as_dict(other).get("claims"))}:
             r.err("57", where, f"{m.group(1)}/{m.group(2)}.claimset.json has no claim {m.group(3)}")
+
+
+def source_name(converted_from):
+    """The name of a converted paper's files, made from its source's identifier (§2.4), or None."""
+    cf = as_dict(converted_from)
+    kind, sid = cf.get("id_type"), cf.get("source_id")
+    if not (isinstance(kind, str) and kind and isinstance(sid, str) and sid.strip()):
+        return None
+    sid = SOURCE_PREFIX_RE.sub("", sid.strip())
+    version = cf.get("source_version")
+    if kind == "arxiv" and isinstance(version, str) and version and not sid.lower().endswith(version.lower()):
+        sid += version
+    name = re.sub(r"[^a-z0-9]+", "-", f"{kind}-{sid}".lower()).strip("-")
+    return name or None
 
 
 def claimset_folder(path):
@@ -316,9 +331,9 @@ def process_warnings(r, doc, claims, coll, by_id, converted):
                                                            "commit hash")
 
 
-def validate(doc, published=False, local_root=None, revision=False):
+def validate(doc, published=False, local_root=None, revision=False, file_name=None):
     """Check a claimset. `local_root`: the repository's claimset/ folder, when the file lies in one, so that
-    local references to other papers can be resolved (rule 57). `revision`: the file is a revision submission,
+    local references to other papers can be resolved (rule 57); `file_name`: the file's name there (warning 31). `revision`: the file is a revision submission,
     which names the claimset it revises in paper.id (rule 25; revision spec §5.1)."""
     r = Report()
     if not isinstance(doc, dict):
@@ -913,6 +928,11 @@ def validate(doc, published=False, local_root=None, revision=False):
     if isinstance(paper.get("exploration"), dict):
         check_covers(r, paper["exploration"])
     check_local(r, doc, published, local_root)
+    if local_root is not None and file_name and paper.get("origin") == "converted":
+        name = source_name(paper.get("converted_from"))
+        if name and file_name != f"{name}.claimset.json":
+            r.warn("W31", "paper.converted_from", f"a converted paper in a claimset/ folder is named from its source: "
+                                                  f"{name}.claimset.json, not {file_name} (§2.4)")
 
     # ---------- Contributors ----------
     validate_contributors(r, coll["contributors"], paper, ref, converted)
@@ -2441,7 +2461,8 @@ def validate_path(path, published=False, revision=False):
     except (OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: cannot read {path}: {exc}", file=sys.stderr)
         return None
-    return validate(doc, published=published, local_root=claimset_folder(path), revision=revision)
+    return validate(doc, published=published, local_root=claimset_folder(path), revision=revision,
+                    file_name=Path(path).name)
 
 
 def print_report(rep, published=False, as_json=False):

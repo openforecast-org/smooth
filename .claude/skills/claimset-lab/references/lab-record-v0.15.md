@@ -1,8 +1,16 @@
-# Claimset Lab Record — Specification v0.14 (draft)
+# Claimset Lab Record — Specification v0.15 (draft)
 
-Status: working draft · Date: 2026-10-29 · Supersedes v0.13 · Companion to the claimset specification (`spec/claimset-v0.34.md`) and the revision specification (`spec/claimset-revision-v0.2.md`)
+Status: working draft · Date: 2026-10-30 · Supersedes v0.14 · Companion to the claimset specification (`spec/claimset-v0.34.md`) and the revision specification (`spec/claimset-revision-v0.2.md`)
 
-## Changes since v0.13
+## Changes since v0.14
+
+On a study branch the tool committed and pushed the record after every command, then wrote the push's receipt into `anchors.jsonl`. A commit cannot hold the receipt of its own push, so the receipt stayed in the checkout, uncommitted: every command left the study checkout dirty, and tools that require a clean checkout (a hook that stops on uncommitted changes) failed after every command.
+
+- §7.1, *Receipts on a study branch*: the receipt of a push is kept in the checkout's git directory, outside the working tree, and the next commit carries it into `anchors.jsonl`: the receipt of push n is in commit n+1. The receipt of the newest pushed commit, which no commit holds yet, is the one kept locally, or, in a checkout that did not push it, is derived from the remote-tracking branch. A command that succeeds leaves the study checkout clean.
+- L14 applies to every receipt, committed, kept locally or derived (§6).
+- Records kept by earlier tools have the receipt of their last push uncommitted in `anchors.jsonl`; the next command commits it (*Records from before v0.15*, §7.1). `anchors.jsonl` keeps its format, and the receipts already in it keep their meaning.
+
+## Changes in v0.14 (since v0.13)
 
 The research is done by agents and decided by people (claimset principle 10). An approval was written only by the human, by running the tool themselves; that asked a supervisor to work the tool to give a decision they had already given in words. The decision stays the human's; the agent records it.
 
@@ -152,7 +160,7 @@ claimset/                      ignored by the code branches
     lab/                       the lab record
       lab.jsonl                the main event log, one event per line
       agents/<actor>.jsonl     per-agent logs while agents work concurrently (§3.5)
-      anchors.jsonl            timestamp anchors of the log (§7)
+      anchors.jsonl            timestamp anchors of the log (§7); on a study branch, receipts of earlier pushes
       config.json              the study branch and its remote (§7.1)
       runs/<run id>/           per-run outputs: stdout, stderr, results.json, other files
     <paper>.claimset.json      a paper drawn from the study (claimset §2.4)
@@ -538,7 +546,7 @@ L10. Agent logs follow L1–L9 and L11–L12 on their own, starting from their b
 L11. A `supersedes` reference names an earlier event of the same type that has not already been superseded.
 L12. Every `id` has the prefix of its `type` and is unique in the log; every reference in a body names an event with a lower `seq`.
 L13. The files of a run directory match the hashes in the run's `outputs`. Run directories are never changed after the run.
-L14. Every entry in `anchors.jsonl` names a `seq` present in the log, and its `head_hash` equals the header hash of the event at that `seq`; the same holds for each agent log the entry names. A mismatch means the log was rewritten after it was anchored.
+L14. Every anchor receipt (committed in `anchors.jsonl`, kept in the checkout's git directory, or derived from the remote-tracking branch, §7.1) names a `seq` present in the log, and its `head_hash` equals the header hash of the event at that `seq`; the same holds for each agent log the entry names. A mismatch means the log was rewritten after it was anchored.
 L15. A confirmatory plan has a complete decision rule (§5.7.1): a framework, the parameters it requires, and both rules; when quantities are given, every quantity is well formed (with `run` when there are several deciding runs) and every rule is a valid expression whose names are defined (§5.7.3); `runs` is a positive integer.
 L16. A confirmatory run is not made under a plan that already has its deciding runs (§5.7.2), or, in an agent log, under a plan written outside that log (§3.5).
 L17. A status that names a plan, or that cites a decided plan's deciding runs or their results for a hypothesis the plan names, is a verdict: the plan is decided and names the hypothesis, the deciding runs or their results are cited, and the outcome is the one the plan's rule gives (§5.5).
@@ -573,13 +581,23 @@ The anchor level of a plan becomes `planned_at_anchor` in the exported claimset.
 
 **On a study branch** (§3) anchoring is part of keeping the record: after every command that changes it, the tool commits the study's folder (the logs, run outputs, papers) to the study branch and pushes it. Each push is an anchor (`service: git_remote`, with the pushed commit as the receipt), so every event is anchored when it is written. The commit after a run takes the run's `code_version` as a further parent: pushing the study branch pushes the code the run used, and keeps it reachable whatever happens to its own branch. The record's own history is the first-parent history of the branch. Offline, the commits stay local and are pushed with the next command; until then `verify` and `claimset studies` report them as not pushed, and a confirmatory run is refused until its plan is pushed (L5). Configuration in `lab/config.json`: `{"record": {"remote": "origin", "branch": "claimset/<study>"}}`.
 
+**Receipts on a study branch.** The receipt of a push names the commit pushed, so that commit cannot hold it, and writing it into the checkout after the push would leave the checkout with an uncommitted change after every command. So:
+
+- After a push, the tool keeps its receipt (`{seq, head_hash, service: "git_remote", receipt: {remote, branch, commit}, at, agents}`) in the checkout's git directory (`claimset-anchors-pending.jsonl` in the directory `git rev-parse --absolute-git-dir` names), which no commit and no `git status` sees.
+- The next commit appends the kept receipts to `anchors.jsonl` and commits them with whatever else changed: the receipt of push n is in commit n+1. Receipts alone are not a change: a command that records nothing makes no commit, and pushing a commit already received adds no receipt.
+- The receipt of the newest pushed commit is in no commit yet. In the checkout that pushed it, it is the receipt kept locally. In another checkout (a fresh clone, an agent's copy) it is derived: the remote-tracking branch `refs/remotes/<remote>/<branch>` names a commit the remote has; when that commit is in the checkout's history and no receipt names it, its receipt is made from the logs in that commit (the last event's `seq` and header hash, and each agent log's), with the commit's date as `at` and `"derived": true`. The next commit made in that checkout commits the derived receipt like a kept one.
+- Every reader of the anchors (coverage of events and plans, L5, L14, `verify --remote`, export's `planned_at_anchor` and the pinned version of the exported lab record) reads the committed receipts, then the kept ones, then the derived one. A receipt is never trusted for more than it is: `verify --remote` checks every commit a receipt names against the remote branch.
+- A command that succeeds leaves the study checkout clean: nothing it wrote is uncommitted.
+
+**Records from before v0.15.** Earlier tools wrote the receipt of each push into `anchors.jsonl` after the push, so a study checkout holds that line uncommitted. Before any command that writes, the tool commits it on its own (`claimset lab: commit anchor receipts (lab record v0.15)`), and the command's push sends it to the remote; `claimset lab anchor` does the same when there is nothing else to record. Receipts already committed are read as before.
+
 **Without a study branch** (records outside the study layout, or before v0.7), the head is recorded by pushing the lab's logs to a dedicated anchor branch of a git remote, as follows. The branch is `claimset-lab/<study>` unless the configuration names another (`claimset-lab` for a record without a study). A relocation keeps the branch the record was anchored on: the tool writes it into the configuration. Anchor commits hold the logs at their paths when they were made; remote verification looks for the main log at its current path and, in commits made before a relocation, at the paths it had before. When such a record is adopted onto a study branch, its earlier receipts keep naming the anchor branch they were pushed to, and are checked there.
 
 - **Configuration** is kept in `lab/config.json`: `{"anchor": {"service": "git_remote", "remote": "origin", "branch": "claimset-lab", "every": "plan"}}`. `every` is `plan` (default) or `event`.
 - **What is committed:** `lab.jsonl`, `anchors.jsonl` and the files in `agents/`, at their paths in the repository. The commit is made on the anchor branch without touching the researcher's working tree or current branch. Run outputs are not committed; they are covered by the hashes in the log.
 - **Order:** before committing, the tool checks that each log already on the remote branch (main and agent logs) is a prefix of the local one. If it is not, the local log has been rewritten since the last anchor; the tool refuses to anchor and reports it.
 - **Pushing** never forces. A rejected push means the remote branch has changed in a way the tool did not make, and is reported.
-- **Receipt:** `{remote, branch, commit}` recorded in the `anchors.jsonl` entry, which itself is committed with the next anchor.
+- **Receipt:** `{remote, branch, commit}` recorded in the `anchors.jsonl` entry, which itself is committed with the next anchor. (This mode writes the receipt into `anchors.jsonl` in the working tree, which is the researcher's own checkout, not a study checkout.)
 - **Protection of the branch:** to make the remote copy append-only, protect the branch on the host so that force-pushes and deletion are refused, and give the agent credentials that can push but cannot change branch protection. This turns detection into prevention.
 - **Several working copies:** when agents work in their own clones (§3.5), each copy anchors to the same branch. The commit starts from the branch as it is on the remote: a local log that extends its anchored copy replaces it; a log that is behind (another copy has added to it) is kept as anchored; a log that differs is refused. `anchors.jsonl` on the branch holds the receipts of all copies. In the repository, `lab/.gitattributes` (written by `init`) marks `anchors.jsonl` with `merge=union`, so merging the copies' branches combines their receipts without conflicts; agent logs never conflict because each has its own file.
 - **Checking:** `verify --remote` fetches the branch and checks that each local log agrees with its copy there (a local log that is behind is reported as a note, not an error), that each anchor's commit is on the branch its receipt names, and that it holds every anchored log as it was at that anchor.

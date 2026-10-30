@@ -1,6 +1,6 @@
 # Claimset — Specification v0.34 (draft)
 
-Status: working draft · Date: 2026-10-29 · Supersedes v0.33 (`spec/claimset-v0.33.md`) · Companions: lab record specification (`spec/lab-record-v0.14.md`), revision specification (`spec/claimset-revision-v0.2.md`)
+Status: working draft · Date: 2026-10-29 · Supersedes v0.33 (`spec/claimset-v0.33.md`) · Companions: lab record specification (`spec/lab-record-v0.15.md`), revision specification (`spec/claimset-revision-v0.2.md`)
 
 Claimset is the name of both the open format and the platform.
 
@@ -13,6 +13,8 @@ Anyone in any field should be able to write a claimset, and search should rest o
 - §3.10: `availability` is required on every evidence object and artefact, with the new level `not_stated` for material whose availability the paper does not state, so that a paper's silence is recorded rather than guessed. New rule 75; rule 12 revised; new verifiability flag `availability_not_stated` (§5).
 - §8 rule 4: qualifiers that bound where a claim holds go in `scope`; epistemic qualifiers ("suggests", "may") and magnitude ("slightly") are part of what is claimed and stay in the statement. Qualitative and humanities work state claims with such qualifiers as a matter of method.
 - Companion lab record v0.14: a supervisor's approval can be recorded by an agent on the supervisor's behalf, with the supervisor's words.
+- §2.4: converted papers are kept in a collection folder, `claimset/<collection>/<name>.claimset.json`, named from the source's identifier (`doi-10-1016-j-ejor-2022-04-040`, `arxiv-2401-01234v2`). New warning 31.
+- §7: the claimset's DOI: registered with DataCite, one DOI for all versions of a claimset, with the suffix `claimset.<year>.<number>` that carries no other information.
 
 ## Changes in v0.33 (since v0.32)
 
@@ -366,6 +368,11 @@ claimset/
 - A study and a paper are named with lower-case letters, digits and hyphens, starting with a letter (`eigen-checker`, `eigen-checker-cpp`). A study can give several papers; each reports whole questions of the study's lab (lab record §5.17). Papers from different studies are independent unless their claims link to each other.
 - A paper may cite or relate to a paper of the same repository that is not yet published, with `id_type: claimset_local` and the target `<study>/<paper>.claimset.json#C3` (a claim) or `<study>/<paper>.claimset.json` (the paper), relative to `claimset/` (§4). The validator checks that the file and the claim exist when the file lies in a `claimset/` folder. At publication the platform replaces each local reference with the global ID of the published claim, so the cited paper is published first, or both are submitted together.
 - The file keeps its name through revisions: the date and version of a submitted or published version are recorded by the platform (§9) and in git. A version is marked with the git tag `claimset/<study>/<paper>/v<n>` (`claimset tag`), made on the commit that holds it.
+- **Converted papers.** A converted paper comes from no study of the repository and has no lab. Converted papers are kept in a collection folder, named as a study is: `claimset/<collection>/<name>.claimset.json`, with the reading view beside it (`<name>.claimset.txt`). The name is made from the source's identifier, so that a conversion of the same source has the same name in every repository and no two sources share a name:
+  1. the identifier type (`converted_from.id_type`), a hyphen, and the identifier (`converted_from.source_id`) without a prefix (`doi:`, `arXiv:`) or a resolver address (`https://doi.org/`, `https://arxiv.org/abs/`); for arXiv, followed by the version (`converted_from.source_version`) when the identifier does not end with it;
+  2. in lower case, with every run of characters other than the letters a–z and the digits 0–9 replaced by one hyphen, and no hyphen at the end.
+
+  The DOI `10.1016/j.ejor.2022.04.040` gives `doi-10-1016-j-ejor-2022-04-040`; the arXiv identifier `2401.01234` with version `v2` gives `arxiv-2401-01234v2`. Other files a repository keeps for the conversion (the source text its `source_spans` point into, a conversion report) carry the same name with their own extension. Warning 31 flags a converted paper in a `claimset/` folder whose file is named otherwise.
 - The `claimset/` folder is left out of package builds (lab record §3.3).
 
 ### 2.5 Submission package
@@ -1069,7 +1076,15 @@ Reviews of a published claimset, the author's responses, human resolutions of di
 
 ## 7. Identifiers and source trust
 
-The platform mints a DOI for every published claimset. The file records identifier type and venue facts for cited works only. Trust in a source is a derived score computed by the platform. Papers published on Claimset are scored by the same rules as all others.
+**The claimset's DOI.** The platform mints a DOI for every published claimset, at publication, and registers it with DataCite under the platform's DOI prefix.
+
+- **Form:** `doi:<prefix>/claimset.<year>.<number>`. `<year>` is the year of first publication; `<number>` is the claimset's sequence number among those first published that year, with at least six digits, zero-padded. Example: `doi:10.0000/claimset.2026.000123`, where `10.0000` stands for the platform's prefix throughout this specification. The suffix holds nothing else (no title, author, subject or source), so nothing in it can later become wrong.
+- **One DOI for all versions.** Corrections and revisions keep the DOI; a version is named by appending `@v<n>`, and an object by appending its local ID: `doi:10.0000/claimset.2026.000123@v2#C3` (§2, §9). The DOI resolves to the claimset's page on the platform, which shows the latest version, its status and the list of earlier versions.
+- **Converted papers** get a DOI of their own by the same rule; a claimset never takes its source's DOI (rule 30), and the source is recorded in `converted_from`. A conversion of a new version of the source is a new claimset with a new DOI (§9).
+- **Never reused.** A DOI is never deleted or given to another claimset. A retracted or withdrawn claimset keeps its DOI, which resolves to the claimset and its status (§9).
+- Before publication a submission has only the platform's internal submission ID (§2.2), which is never cited. In a repository, a paper that is not yet published is named by its path (§2.4).
+
+The file records identifier type and venue facts for cited works only. Trust in a source is a derived score computed by the platform. Papers published on Claimset are scored by the same rules as all others.
 
 ## 8. Statement text rules
 
@@ -1269,12 +1284,13 @@ The platform mints a DOI for every published claimset. The file records identifi
 28. A definition is named in a claim's `about` and in no setup of the non-formal evidence that claim's support cites, although its kind is `method`, `intervention`, `population`, `data`, `design` or `variable` (a part of the study that the setup leaves out). A definition counts as named when the setup names it, names a group it is a member of, or names every member of it (§3.2, *Groups*). (Revised in v0.31.) In v0.34 an evidence object without a setup is an error (rule 61).
 29. A native paper has no `declarations`, or its declarations leave out `funding` or `competing_interests`: ask the guarantor and record what they declare (an empty funding list and "None declared." are declarations).
 30. A `data_plot` figure without `shows` or `underlying_data`; a `specimen` from which no observation is read (`read_from`); or a result whose `variable` or a table column whose variable is text equal, ignoring case, to the `term` of a definition in the file (give the ID).
+31. A converted paper lies in a `claimset/` folder and its file is not named `<name>.claimset.json` with the name made from its source's identifier (§2.4). The message gives the name.
 
 ## 11. Platform dependencies
 
 Platform functionality is specified in the platform requirements document. The file format depends on the platform for:
 
-- **Identifiers and publication facts:** minting the DOI at publication, and assigning version, dates and status (§2.2).
+- **Identifiers and publication facts:** minting the DOI at publication and registering it with DataCite (§7), and assigning version, dates and status (§2.2).
 - **Guarantor consent:** a paper is not published until every human guarantor has confirmed through their ORCID-linked account, and every organisation guarantor through an authorised account.
 - **Classification:** assigning the OpenAlex subfield and topics.
 - **Derived data:** verifiability computation and recomputation, trust scores, claim weights, contradictions, replication status and assessments, stored outside the file.

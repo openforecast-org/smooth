@@ -2,7 +2,7 @@
 decisions and wording the export leaves to the authors (claim roles, statements of negative
 results, scopes, strengths, novelty and relations, references, formal evidence, artefact
 locations and licences, contributors). Usage:
-    claimset_finalise.py <exported draft.json> <aggregate_measures.csv> <output.json>
+    claimset_finalise.py <exported draft.json> <aggregate_measures.csv> <lab.jsonl> <output.json>
 Everything the record states (hypotheses, outcomes, planning, tests, lab runs, results) is
 kept as exported.
 """
@@ -581,7 +581,44 @@ def finalise_people(d):
                           ("json_preparation", "full"), ("literature_search", "assisted")]]
     agent["tools"] = ["code_execution", "file_access", "web_search"]
     agent["record_source"] = "harness"
-    d["models"][0]["weights"] = "api_only"
+    for m in d["models"]:
+        m["weights"] = "api_only"
+    for person in d["contributors"]:
+        if person.get("name", "").startswith("Checker"):
+            person["positions"] = ["contributor"]
+            person["credit_roles"] = ["validation"]
+            person["ai_tasks"] = [{"task": "review", "extent": "full"}]
+            person["tools"] = ["code_execution", "file_access"]
+            person["record_source"] = "harness"
+
+
+def attach_checks(d, lab_path):
+    # The checks of the independent checkers, from the lab record's check events (a corrected
+    # check replaced by its correction), on the claim whose hypothesis or evidence run they target
+    events = [json.loads(line) for line in open(lab_path)]
+    names = {e["id"]: e["body"].get("name") for e in events if e["type"] == "actor"}
+    people = {p.get("name"): p["id"] for p in d["contributors"]}
+    notes = {e["body"]["text"].split(" ")[2]: e["body"]["text"] for e in events
+             if e["type"] == "note" and e["body"]["text"].startswith("Correction to AC")}
+    checks = [e for e in events if e["type"] == "check"]
+    replaced = {e["supersedes"] for e in checks if e.get("supersedes")}
+    for e in checks:
+        if e["id"] in replaced:
+            continue
+        b = e["body"]
+        claim = next(c for c in d["claims"]
+                     if c.get("hypothesis", {}).get("lab_event") == b["target"]
+                     and c.get("planning") == "confirmatory"
+                     or b["target"] in {r for s in c.get("support", [])
+                                        for x in d["evidence"] if x["id"] == s.get("evidence")
+                                        for r in x.get("lab_runs", [])})
+        entry = {"by": people[names[e["by"]]], "outcome": b["outcome"], "extent": b["extent"],
+                 "notes": f"{e['id']}: {b['notes']}"}
+        if e["id"] in notes:
+            entry["notes"] += f" Correction recorded by the checker: {notes[e['id']]}"
+        if b.get("resolution"):
+            entry["resolution"] = b["resolution"]
+        claim.setdefault("checks", []).append(entry)
 
 
 def finalise_definitions(d):
@@ -758,7 +795,7 @@ def finalise_claims(d):
     d["claims"] = [claims[i] for i in order]
 
 
-def main(draft, table_path, out):
+def main(draft, table_path, lab_path, out):
     d = json.load(open(draft))
     finalise_paper(d)
     finalise_people(d)
@@ -766,6 +803,7 @@ def main(draft, table_path, out):
     formal_evidence(d)
     finalise_evidence(d)
     finalise_artefacts(d, table_path)
+    attach_checks(d, lab_path)
     finalise_claims(d)
     d["warrants"] = WARRANTS
     d["limitations"][0]["statement"] = (
@@ -781,4 +819,4 @@ def main(draft, table_path, out):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    main(*sys.argv[1:5])

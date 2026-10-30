@@ -1,0 +1,81 @@
+seed 20261030 shared draws: grows 34 shrinks 18
+seed 1 shared draws: grows 34 shrinks 18
+seed 2 shared draws: grows 34 shrinks 18
+seed 3 shared draws: grows 34 shrinks 18
+seed 4 shared draws: grows 34 shrinks 18
+seed 5 shared draws: grows 34 shrinks 18
+seed 20261030 independent draws per pair: grows 34 shrinks 18
+seed 11 independent draws per pair: grows 34 shrinks 18
+pairs whose class varies across the 6 seeds: []
+('iETS_A_ratio_adam', 0.8) D=0.04290 CI=(0.02189,0.06610) up
+('iETS_A_ratio_adam', 0.9) D=-0.00398 CI=(-0.02189,0.01298) ns
+('iETS_A_ratio_adam', 0.95) D=-0.01702 CI=(-0.03174,-0.00450) down
+('iETS_A_ratio_adam', 0.99) D=-0.01062 CI=(-0.01285,-0.00502) down
+('iETS_A_ratio_conv', 0.8) D=0.08281 CI=(0.07684,0.09005) up
+('iETS_A_ratio_conv', 0.9) D=0.05188 CI=(0.03799,0.05622) up
+('iETS_A_ratio_conv', 0.95) D=0.02024 CI=(0.00887,0.02913) up
+('iETS_A_ratio_conv', 0.99) D=-0.00238 CI=(-0.00833,0.00235) ns
+('iETS_A_score_adam', 0.8) D=0.03288 CI=(0.01138,0.05524) up
+('iETS_A_score_adam', 0.9) D=-0.01233 CI=(-0.02982,0.00443) ns
+('iETS_A_score_adam', 0.95) D=-0.02200 CI=(-0.03702,-0.00921) down
+('iETS_A_score_adam', 0.99) D=-0.01143 CI=(-0.01370,-0.00679) down
+('iETS_A_score_conv', 0.8) D=0.08183 CI=(0.07564,0.08837) up
+('iETS_A_score_conv', 0.9) D=0.05010 CI=(0.03590,0.05547) up
+('iETS_A_score_conv', 0.95) D=0.01750 CI=(0.00604,0.02806) up
+('iETS_A_score_conv', 0.99) D=-0.00474 CI=(-0.01088,0.00112) ns
+('iETS_D_conv', 0.8) D=0.08312 CI=(0.07634,0.08961) up
+('iETS_D_conv', 0.9) D=0.05236 CI=(0.03906,0.05670) up
+('iETS_D_conv', 0.95) D=0.02038 CI=(0.01024,0.02907) up
+('iETS_D_conv', 0.99) D=-0.00460 CI=(-0.00999,0.00183) ns
+('iETS_F_conv', 0.8) D=0.06471 CI=(0.04617,0.08343) up
+('iETS_F_conv', 0.9) D=0.04390 CI=(0.03251,0.05586) up
+('iETS_F_conv', 0.95) D=0.02186 CI=(0.01446,0.02938) up
+('iETS_F_conv', 0.99) D=-0.00036 CI=(-0.00419,0.00309) ns
+('iETS_G_ratio_adam', 0.8) D=0.04710 CI=(0.02541,0.07081) up
+('iETS_G_ratio_adam', 0.9) D=0.00131 CI=(-0.01744,0.01777) ns
+('iETS_G_ratio_adam', 0.95) D=-0.01514 CI=(-0.02975,-0.00241) down
+('iETS_G_ratio_adam', 0.99) D=-0.01074 CI=(-0.01295,-0.00490) down
+('iETS_G_ratio_conv', 0.8) D=0.08383 CI=(0.07727,0.09115) up
+('iETS_G_ratio_conv', 0.9) D=0.05288 CI=(0.04033,0.05630) up
+('iETS_G_ratio_conv', 0.95) D=0.02064 CI=(0.00952,0.02877) up
+('iETS_G_ratio_conv', 0.99) D=-0.00231 CI=(-0.00803,0.00232) ns
+('iETS_G_score_adam', 0.8) D=0.03276 CI=(0.01109,0.05562) up
+('iETS_G_score_adam', 0.9) D=-0.01226 CI=(-0.03018,0.00447) ns
+('iETS_G_score_adam', 0.95) D=-0.02224 CI=(-0.03723,-0.00947) down
+('iETS_G_score_adam', 0.99) D=-0.01155 CI=(-0.01384,-0.00664) down
+('iETS_G_score_conv', 0.8) D=0.07905 CI=(0.07268,0.08636) up
+('iETS_G_score_conv', 0.9) D=0.04814 CI=(0.03426,0.05491) up
+('iETS_G_score_conv', 0.95) D=0.01726 CI=(0.00582,0.02812) up
+('iETS_G_score_conv', 0.99) D=-0.00376 CI=(-0.01020,0.00155) ns
+('iETS_I_ratio_adam', 0.8) D=0.04471 CI=(0.02316,0.06834) up
+('iETS_I_ratio_adam', 0.9) D=-0.00148 CI=(-0.01969,0.01553) ns
+('iETS_I_ratio_adam', 0.95) D=-0.01595 CI=(-0.03035,-0.00348) down
+('iETS_I_ratio_adam', 0.99) D=-0.01069 CI=(-0.01288,-0.00515) down
+('iETS_I_ratio_conv', 0.8) D=0.01552 CI=(-0.00587,0.03745) ns
+('iETS_I_ratio_conv', 0.9) D=-0.01362 CI=(-0.03110,0.00129) ns
+('iETS_I_ratio_conv', 0.95) D=-0.01562 CI=(-0.02900,-0.00338) down
+('iETS_I_ratio_conv', 0.99) D=-0.01312 CI=(-0.01546,-0.00606) down
+('iETS_I_score_adam', 0.8) D=0.03264 CI=(0.01047,0.05500) up
+('iETS_I_score_adam', 0.9) D=-0.01233 CI=(-0.02975,0.00385) ns
+('iETS_I_score_adam', 0.95) D=-0.02155 CI=(-0.03631,-0.00894) down
+('iETS_I_score_adam', 0.99) D=-0.01164 CI=(-0.01403,-0.00659) down
+('iETS_I_score_conv', 0.8) D=0.07936 CI=(0.07292,0.08607) up
+('iETS_I_score_conv', 0.9) D=0.05019 CI=(0.04505,0.05474) up
+('iETS_I_score_conv', 0.95) D=0.02417 CI=(0.01342,0.02998) up
+('iETS_I_score_conv', 0.99) D=-0.00083 CI=(-0.00591,0.00346) ns
+('iETS_O_ratio_adam', 0.8) D=0.04476 CI=(0.02328,0.06827) up
+('iETS_O_ratio_adam', 0.9) D=-0.00160 CI=(-0.02043,0.01487) ns
+('iETS_O_ratio_adam', 0.95) D=-0.01640 CI=(-0.03070,-0.00387) down
+('iETS_O_ratio_adam', 0.99) D=-0.01114 CI=(-0.01339,-0.00532) down
+('iETS_O_ratio_conv', 0.8) D=0.06552 CI=(0.06003,0.07069) up
+('iETS_O_ratio_conv', 0.9) D=0.03943 CI=(0.03529,0.04327) up
+('iETS_O_ratio_conv', 0.95) D=0.02395 CI=(0.01265,0.02652) up
+('iETS_O_ratio_conv', 0.99) D=-0.00271 CI=(-0.00935,0.00323) ns
+('iETS_O_score_adam', 0.8) D=0.03274 CI=(0.01111,0.05524) up
+('iETS_O_score_adam', 0.9) D=-0.01157 CI=(-0.02886,0.00465) ns
+('iETS_O_score_adam', 0.95) D=-0.02160 CI=(-0.03644,-0.00898) down
+('iETS_O_score_adam', 0.99) D=-0.01181 CI=(-0.01422,-0.00703) down
+('iETS_O_score_conv', 0.8) D=0.08410 CI=(0.06692,0.08894) up
+('iETS_O_score_conv', 0.9) D=0.03431 CI=(0.01937,0.04935) up
+('iETS_O_score_conv', 0.95) D=0.01117 CI=(-0.00116,0.02212) ns
+('iETS_O_score_conv', 0.99) D=-0.00345 CI=(-0.00941,0.00117) ns

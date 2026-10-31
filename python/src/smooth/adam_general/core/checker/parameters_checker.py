@@ -583,8 +583,15 @@ def parameters_checker(
     data_observed = np.asarray(data_values, dtype=float)[:obs_in_sample][
         ~y_na_values[:obs_in_sample]
     ]
+    # Zeros are expected with a provided occurrence too, as in R, where it is an
+    # occurrence model at this point: only negative values rule multiplicative out
     ets_info = _check_ets_model(
-        model, distribution, data_observed, silent, max_lag, occurrence_model
+        model,
+        distribution,
+        data_observed,
+        silent,
+        max_lag,
+        occurrence_model or occ_info["occurrence"] == "provided",
     )
     ets_model = ets_info["ets_model"]
     model_do = ets_info.get("model_do", "estimate")

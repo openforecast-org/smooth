@@ -84,6 +84,8 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* `sm()` takes the errors of the location model equal to zero as missing values of the scale model, with a warning, as in R: its states are not updated on them, while the likelihood of the location model keeps them.
+* With a provided occurrence (zeros and ones), only negative values rule the multiplicative models out, as in R: the zeros did, so `model="YYY"` selected additive models.
 * `rstandard()` and `rstudent()` take the errors at the location the model assumes (zero, and -sigma^2/2 for the logarithms of `dlnorm`), as in R: they subtracted the sample mean of the errors (except `rstandard()` for `dlaplace`), and `rstudent()` of `dlnorm` subtracted sigma^2/2 after it.
 * The degrees of freedom that de-bias the scale of a scale model (`sm()`) leave out its scale, as in R, where its loss is the likelihood: its `rstandard()` was 0.25% smaller than R's on 200 observations.
 * `phi` of a model without the damped trend is ignored with a warning (printed with `verbose`), as in R.

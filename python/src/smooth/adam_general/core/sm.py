@@ -187,13 +187,15 @@ def make_scale_loss(
     ot_logical: NDArray,
     other: Optional[float],
     log_model: bool,
+    best: Optional[Dict[str, Any]] = None,
 ) -> Callable[..., float]:
     """Build the custom loss ``sm()`` hands to ``ADAM``.
 
     The closure is called as ``loss(actual=, fitted=, B=)`` where ``fitted`` is
     the *scale* model's fitted vector. ``actual`` is ignored: the objective is
     the location model's negative log-likelihood, evaluated at the scale the
-    scale model currently proposes.
+    scale model currently proposes. ``best`` keeps the fitted vector of the lowest
+    loss, which the estimates give (the scale at the errors equal to zero).
     """
     # The zeros of an occurrence model are missing values of the response, as the
     # missing ones: ADAM hands the custom loss the observed values only, so its
@@ -209,7 +211,10 @@ def make_scale_loss(
 
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
             ll = _log_density(distribution, error_type, y, mu, scale, other)
-        return -float(_sum_r(ll))
+        value = -float(_sum_r(ll))
+        if best is not None and np.isfinite(value) and value < best["loss"]:
+            best.update(loss=value, fitted=np.asarray(fitted, dtype=np.float64).copy())
+        return value
 
     return loss
 
@@ -348,6 +353,20 @@ def sm(
 
     info = build_scale_response(location, distribution, error_type, other)
     response = info["response"]
+    # The errors equal to zero, which a continuous distribution does not produce (an
+    # exact fit, or discrete data): the scale model takes them as missing values,
+    # through a provided occurrence of zeros there, so that its states are not updated
+    # on them, while the likelihood of the location model keeps them, with the scale
+    # predicted there
+    zero_errors = info["ot_logical"] & (np.nan_to_num(response, nan=1.0) == 0)
+    if np.any(zero_errors):
+        warnings.warn(
+            f"The location model has {int(np.sum(zero_errors))} errors equal to zero, "
+            "which its distribution does not produce (an exact fit, or discrete data). "
+            "The scale model treats them as missing values: it does not update its "
+            "states on them.",
+            stacklevel=2,
+        )
 
     # Holdout: append the transformed forecast errors, so the scale model is
     # fitted on the same sample the location model was and scored on the rest.
@@ -376,7 +395,10 @@ def sm(
             stacklevel=2,
         )
         response = np.log(response)
+        # A placeholder for the logarithms of the zeros, which the fit does not read
+        response[: zero_errors.size][zero_errors] = 0.0
 
+    best: Dict[str, Any] = {"loss": np.inf, "fitted": None}
     loss = make_scale_loss(
         distribution,
         error_type,
@@ -385,6 +407,7 @@ def sm(
         info["ot_logical"],
         other,
         log_model,
+        best,
     )
 
     args: Dict[str, Any] = {
@@ -403,13 +426,40 @@ def sm(
     if distribution in ("dgnorm", "dlgnorm") and other is not None:
         args["gnorm_shape"] = other
     args.update(kwargs)
+    if np.any(zero_errors):
+        args["occurrence"] = np.concatenate([(~zero_errors).astype(float), np.ones(h)])
 
-    scale_model = ADAM(**args)
-    # The zeros of an occurrence model are the missing values of the response
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="Data contains NAs")
-        warnings.filterwarnings("ignore", message="More than half")
-        scale_model.fit(response, X)
+    # The scale at the zeros of the errors comes from the call of the loss at the
+    # estimates, the lowest of the selected model: after a selection, it is fitted alone
+    for _ in range(2):
+        scale_model = ADAM(**args)
+        # The zeros of an occurrence model are the missing values of the response
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Data contains NAs")
+            warnings.filterwarnings("ignore", message="More than half")
+            scale_model.fit(response, X)
+        if not (np.any(zero_errors) and any(c in "ZXYCFP" for c in args["model"])):
+            break
+        args["model"] = scale_model.model_type
+        best.update(loss=np.inf, fitted=None)
+    # Without the occurrence that made them gaps, as R's: the scale predicted at the
+    # zeros of the errors, and the observations counted
+    if np.any(zero_errors):
+        scale_model._prepared["y_fitted"][zero_errors] = best["fitted"][
+            zero_errors[info["ot_logical"]]
+        ]
+        scale_model._occurrence = {
+            "occurrence": "none",
+            "occurrence_model": False,
+            "oes_model": "none",
+            "p_fitted": None,
+        }
+        observations = scale_model._observations
+        observations["ot_logical"] = observations["ot_logical"] | zero_errors
+        observations["ot"] = observations["ot_logical"].astype(float)
+        observations["obs_nonzero"] = int(np.sum(observations["ot_logical"]))
+        observations["obs_zero"] = 0
+        scale_model.model = scale_model.model_name.removeprefix("i")
 
     _finalise(scale_model, location, distribution, other, log_model)
     return scale_model

@@ -93,10 +93,18 @@ sm.adam <- function(object, model="YYY", lags=NULL,
 
     #### The custom loss function to estimate parameters of the model ####
     lossFunction <- function(actual,fitted,B,xreg=NULL){
+        fittedValues <- fitted;
         if(logModelSM){
             fitted[] <- exp(fitted);
         }
-        return(-sum(sm_logDensities(ySM, fSM, fitted, distribution, EtypeSM, other, otSM)));
+        lossValue <- -sum(sm_logDensities(ySM, fSM, fitted, distribution, EtypeSM, other, otSM));
+        # The scale at the zeros of the errors, which adam() does not return (see below): that
+        # of the lowest loss, which the estimates give
+        if(is.finite(lossValue) && lossValue < lossBest){
+            lossBest <<- lossValue;
+            fittedLoss <<- fittedValues;
+        }
+        return(lossValue);
     }
 
     # Remove sm.adam and "object"
@@ -118,6 +126,20 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                    "dlnorm"=log(et[otLogical])^2,
                    "dgamma"=(et[otLogical]-1)^2,
                    "dinvgauss"=(et[otLogical]-1)^2/et[otLogical]);
+
+    # The errors equal to zero, which a continuous distribution does not produce (an exact fit,
+    # or discrete data): the scale model takes them as missing values, through a provided
+    # occurrence of zeros there, so that its states are not updated on them, while the likelihood
+    # of the location model keeps them, with the scale predicted there
+    zeroErrors <- otLogical & et %in% 0;
+    if(any(zeroErrors)){
+        warning(paste0("The location model has ", sum(zeroErrors), " errors equal to zero, which ",
+                       "its distribution does not produce (an exact fit, or discrete data). ",
+                       "The scale model treats them as missing values: it does not update its ",
+                       "states on them."), call.=FALSE);
+    }
+    fittedLoss <- NULL;
+    lossBest <- Inf;
 
     # Substitute the original data with the error term, missing where there is no size
     et[!otLogical] <- NA;
@@ -207,6 +229,13 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     newCall$holdout <- holdout;
     newCall$loss <- lossFunction;
     newCall$occurrence <- "none";
+    if(any(zeroErrors)){
+        newCall$occurrence <- c(as.numeric(!zeroErrors), rep(1, h));
+        # A placeholder for the logarithms of the zeros, which the fit does not read
+        if(logModelSM){
+            newCall$data[which(zeroErrors),responseName] <- 0;
+        }
+    }
     newCall$distribution <- object$distribution;
     newCall$outliers <- "ignore";
     newCall$silent <- TRUE;
@@ -214,14 +243,32 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         newCall$shape <- other;
     }
 
-    # The zeros of an occurrence model are the missing values of the response
-    adamModel <- withCallingHandlers(do.call(adam, as.list(newCall)),
-        warning=function(w){
-            if(grepl("Data contains NAs|More than half of the in-sample data is missing",
-                     conditionMessage(w))){
-                invokeRestart("muffleWarning");
-            }
-        });
+    # The scale at the zeros of the errors comes from the call of the loss at the estimates, the
+    # lowest of the selected model: after a selection, it is fitted alone
+    for(i in 1:2){
+        # The zeros of an occurrence model are the missing values of the response
+        adamModel <- withCallingHandlers(do.call(adam, as.list(newCall)),
+            warning=function(w){
+                if(grepl("Data contains NAs|More than half of the in-sample data is missing",
+                         conditionMessage(w))){
+                    invokeRestart("muffleWarning");
+                }
+            });
+        if(!any(zeroErrors) || !grepl("[ZXYCFP]", newCall$model)){
+            break;
+        }
+        newCall$model <- modelType(adamModel);
+        lossBest <- Inf;
+    }
+
+    # adam() multiplies its fitted values at the zeros of the errors by the provided occurrence:
+    # the scale predicted there is the one the loss saw. The occurrence was only the means of
+    # the gaps
+    if(any(zeroErrors)){
+        adamModel$fitted[zeroErrors] <- fittedLoss[zeroErrors[otLogical]];
+        adamModel$occurrence <- NULL;
+        adamModel$model <- sub("^i", "", adamModel$model);
+    }
 
     nVariables <- nparam(adamModel);
     # Replace the logLik first: assigning the attribute before this line set it

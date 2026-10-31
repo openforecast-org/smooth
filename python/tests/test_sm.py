@@ -108,6 +108,38 @@ def test_the_scale_model_takes_the_holdout_of_the_location_model():
     )
 
 
+@pytest.mark.parametrize(
+    "distribution, lags, model_name, loglik, scale_at_zeros",
+    [
+        # R: sm(adam(AirPassengers, "ANN", distribution=...)), with lags=c(1,12)
+        ("dlaplace", None, "ETS(MMN)", -694.415719,
+         [10.69107, 11.43929, 13.00021, 14.79168, 17.7274]),
+        ("dnorm", None, "ETS(MMN)", -680.149280,
+         [162.15817, 184.17658, 235.63298, 305.07965, 434.65093]),
+        ("dlaplace", [1, 12], "ETS(MNM)", -667.764586, None),
+    ],
+)
+def test_the_errors_equal_to_zero_are_gaps_of_the_scale_model(
+    distribution, lags, model_name, loglik, scale_at_zeros
+):
+    """The random walk of ANN on AirPassengers gives five errors equal to zero: the
+    scale model skips them, stays multiplicative and keeps them in its likelihood,
+    as R's."""
+    y = pd.read_csv(DATA / "ces_airpassengers.csv")["y"].to_numpy(float)
+    location = ADAM(model="ANN", distribution=distribution).fit(y)
+    zeros = np.flatnonzero(np.asarray(location.residuals) == 0)
+    assert len(zeros) == 5
+    with pytest.warns(UserWarning, match="errors equal to zero"):
+        scale_model = sm(location, lags=lags)
+    assert scale_model.model_name == model_name
+    assert scale_model.loglik == pytest.approx(loglik, abs=1e-5)
+    assert np.sum(scale_model.point_lik()) == pytest.approx(scale_model.loglik)
+    if scale_at_zeros is not None:
+        np.testing.assert_allclose(
+            np.asarray(scale_model.fitted)[zeros], scale_at_zeros, rtol=1e-6
+        )
+
+
 def test_rejects_non_likelihood_loss():
     y = _series("positive")
     model = ADAM(model="ANN", lags=[1], loss="MSE")

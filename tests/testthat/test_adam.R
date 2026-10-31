@@ -1057,14 +1057,33 @@ test_that("sm() and pls() take the missing values for gaps", {
                      sum(log(holdout[-c(3, 5)])));
 })
 
+test_that("sm() takes the errors equal to zero as its missing values", {
+    testModel <- adam(AirPassengers, "ANN", distribution="dlaplace");
+    zeros <- which(residuals(testModel)==0);
+    expect_length(zeros, 5);
+    # A seasonal scale model stays multiplicative, its states are not updated on the zeros, and
+    # its likelihood keeps them
+    expect_warning(scaleModel <- sm(testModel, lags=c(1,12)), "errors equal to zero");
+    expect_match(scaleModel$model, "^ETS\\(M");
+    expect_null(scaleModel$occurrence);
+    expect_true(all(is.finite(fitted(scaleModel)) & fitted(scaleModel)>0));
+    expect_equal(sum(pointLik(scaleModel)), as.numeric(logLik(scaleModel)));
+    # The same as the data of the scale model missing there, for the fixed model
+    expect_warning(scaleModel <- sm(testModel, model="MNN", persistence=0.3), "errors equal to zero");
+    gapModel <- suppressWarnings(adam(replace(abs(residuals(testModel)), zeros, NA), "MNN",
+                                      persistence=0.3, initial=scaleModel$initial$level,
+                                      distribution="dlaplace"));
+    expect_equal(as.vector(fitted(scaleModel)), as.vector(fitted(gapModel)));
+})
+
 test_that("The point likelihoods of sm() sum to its log-likelihood", {
     set.seed(41);
     yIntermittent <- rbinom(200, 1, 0.6) * exp(rnorm(200, 2, 0.3));
     for(testModel in list(adam(AirPassengers, "MAM"), adam(AirPassengers, "ANN", distribution="dlaplace"),
                           adam(yIntermittent, "MNN", occurrence="odds-ratio"))){
-        # The absolute errors of Laplace have exact zeros, which the scale model warns about
+        # The random walk of ANN gives errors equal to zero, the gaps of the scale model
         if(testModel$distribution=="dlaplace"){
-            expect_warning(scaleModel <- sm(testModel), "non-positive values");
+            expect_warning(scaleModel <- sm(testModel), "errors equal to zero");
         }
         else{
             scaleModel <- sm(testModel);
@@ -2079,11 +2098,11 @@ test_that("extractSigma() of adam() is sigma() or the one implied by the scale m
     testModel <- adam(BJsales, "ANN");
     expect_equal(extractSigma(testModel), sigma(testModel));
     # The scale of the normal distribution is the variance, the one of Laplace is sigma/sqrt(2)
-    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "non-positive values");
+    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "errors equal to zero");
     expect_length(extractSigma(scaleModel), nobs(testModel));
     expect_equal(extractSigma(scaleModel), sqrt(extractScale(scaleModel)));
     testModel <- adam(BJsales, "ANN", distribution="dlaplace");
-    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "non-positive values");
+    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "errors equal to zero");
     expect_equal(extractSigma(scaleModel), sqrt(2)*extractScale(scaleModel));
 })
 

@@ -471,15 +471,17 @@ test_that("Detect outliers for ETS(ZZZ) on BJsales", {
 # Best ARIMA on the 2568
 test_that("Best auto.adam ARIMA on AirPassengers", {
     skip_on_cran()
-    testModel <- auto.adam(AirPassengers, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE))
+    expect_warning(testModel <- auto.adam(AirPassengers, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE)),
+                   "Not all distributions make sense for the pure ARIMA")
     expect_match(testModel$loss, "likelihood")
 })
 
 # Outliers detection for ARIMA on series BJsales of M1 in parallel
 test_that("Detect outliers for ARIMA on BJsales", {
     skip_on_cran()
-    testModel <- auto.adam(BJsales, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE),
-                           outliers="use")
+    expect_warning(testModel <- auto.adam(BJsales, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE),
+                                          outliers="use"),
+                   "Not all distributions make sense for the pure ARIMA")
     expect_match(modelType(testModel),"NNN")
 })
 
@@ -570,7 +572,8 @@ test_that("Hannan-Rissanen falls back to the defaults and respects the provided 
 test_that("ARIMA starting values with missing and intermittent data", {
     y <- AirPassengers
     y[c(10,50,90)] <- NA
-    expect_true(all(is.finite(msarima(y, orders=list(ar=1,i=1,ma=1), maxeval=1)$B)))
+    expect_warning(testModel <- msarima(y, orders=list(ar=1,i=1,ma=1), maxeval=1), "Data contains NAs")
+    expect_true(all(is.finite(testModel$B)))
     set.seed(44)
     y <- ts(rpois(120, 0.7) * (1 + rnorm(120)^2))
     expect_true(all(is.finite(adam(y, "MNN", orders=list(ar=1), occurrence="odds-ratio", maxeval=1)$B)))
@@ -1059,7 +1062,13 @@ test_that("The point likelihoods of sm() sum to its log-likelihood", {
     yIntermittent <- rbinom(200, 1, 0.6) * exp(rnorm(200, 2, 0.3));
     for(testModel in list(adam(AirPassengers, "MAM"), adam(AirPassengers, "ANN", distribution="dlaplace"),
                           adam(yIntermittent, "MNN", occurrence="odds-ratio"))){
-        scaleModel <- sm(testModel);
+        # The absolute errors of Laplace have exact zeros, which the scale model warns about
+        if(testModel$distribution=="dlaplace"){
+            expect_warning(scaleModel <- sm(testModel), "non-positive values");
+        }
+        else{
+            scaleModel <- sm(testModel);
+        }
         expect_equal(sum(pointLik(scaleModel)), as.numeric(logLik(scaleModel)));
     }
 })

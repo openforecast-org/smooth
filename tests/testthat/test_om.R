@@ -469,8 +469,9 @@ test_that("om gradient falls back to backcasting for a custom loss", {
     lossCustom <- function(actual, fitted, B){ sum(abs(actual - fitted)) }
     mB <- om(ot, model="MNN", occurrence="odds-ratio", initial="backcasting",
              loss=lossCustom, silent=TRUE)
-    mG <- suppressMessages(om(ot, model="MNN", occurrence="odds-ratio",
-                              initial="gradient", loss=lossCustom, silent=TRUE))
+    expect_warning(mG <- suppressMessages(om(ot, model="MNN", occurrence="odds-ratio",
+                                             initial="gradient", loss=lossCustom, silent=TRUE)),
+                   "not available for custom loss functions")
     expect_equal(mG$lossValue, mB$lossValue, tolerance = 1e-8)
 })
 

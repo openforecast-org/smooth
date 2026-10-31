@@ -710,7 +710,7 @@ def invert_fisher_information(FI):  # noqa: N803
 def covariance_frame(
     model, covariance_type, heuristics=None, step_size=None, **boot_kwargs
 ):
-    """The covariance matrix of the parameters of ``ADAM`` and ``OMG``.
+    """The covariance matrix of the parameters of ``ADAM``, ``OMG`` and ``TBATS``.
 
     The body of their ``vcov()``, as R's ``vcov.adam`` and ``vcov.omg``: the
     heuristic diagonal, the bootstrap, the OPG of the scores, or the inverse of the
@@ -753,7 +753,7 @@ def covariance_frame(
 
 
 def confint_frame(model, parm, level, covariance_type, step_size=None, **boot_kwargs):
-    """The confidence intervals of the parameters of ``ADAM`` and ``OMG``.
+    """The confidence intervals of the parameters of ``ADAM``, ``OMG`` and ``TBATS``.
 
     The body of their ``confint()``, as R's ``confint.adam`` and ``confint.omg``:
     the quantiles of the bootstrap, or the standard errors of ``vcov()`` with the

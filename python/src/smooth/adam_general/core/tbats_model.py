@@ -1489,45 +1489,28 @@ class TBATS:
         ``"opg"`` (the default) from the scores of the log-densities,
         ``"hessian"`` from the observed Fisher Information, or ``"bootstrap"``
         from :meth:`coefbootstrap` (``boot_kwargs`` go there)."""
-        import warnings
-
         from smooth.adam_general.core.utils.var_covar import (
-            covar_opg,
-            invert_fisher_information,
+            covariance_frame,
             resolve_covar_type,
         )
 
         self._check_fitted()
-        names = self.coef_names
-        B = self.coef
-        if heuristics is not None:
-            return pd.DataFrame(
-                np.diag(np.abs(B) * heuristics), index=names, columns=names
-            )
-        covariance_type = resolve_covar_type(type)
-        if covariance_type == "bootstrap":
-            return self.coefbootstrap(**boot_kwargs).vcov
-        if covariance_type == "opg":
-            covariance = None
-            if self.loss == "likelihood":
-                covariance = covar_opg(
-                    B, self._best["point_lik"], self.nobs, self.loglik, step_size
-                )
-            if covariance is not None:
-                return pd.DataFrame(covariance, index=names, columns=names)
-            warnings.warn(
-                "The OPG covariance could not be computed for this model; "
-                "falling back to the observed Fisher Information.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-        fi = self._fisher_information(step_size)
-        broken = np.all(fi == 0, axis=1) | np.any(np.isnan(fi), axis=1)
-        if np.any(broken) and step_size is None:
-            fi = self._fisher_information(float(np.finfo(float).eps ** (1 / 6)))
-        return pd.DataFrame(invert_fisher_information(fi), index=names, columns=names)
+        return covariance_frame(
+            self, resolve_covar_type(type), heuristics, step_size, **boot_kwargs
+        )
 
-    def _fisher_information(self, step_size: Optional[float]) -> NDArray:
+    def _opg_covariance(self, step_size: Optional[float] = None) -> Optional[NDArray]:
+        """The OPG covariance from the scores of the log-densities, or None (for a
+        loss other than the likelihood, or when it cannot be computed)."""
+        from smooth.adam_general.core.utils.var_covar import covar_opg
+
+        if self.loss != "likelihood":
+            return None
+        return covar_opg(
+            self.coef, self._best["point_lik"], self.nobs, self.loglik, step_size
+        )
+
+    def _fisher_information_matrix(self, step_size: Optional[float] = None) -> NDArray:
         """The observed Fisher Information at the estimates."""
         from smooth.adam_general._numDeriv import hessian
 
@@ -2283,44 +2266,26 @@ class TBATS:
         bounds from :meth:`vcov` moved inside the bounds of the model, one
         parameter at a time; the quantiles of :meth:`coefbootstrap` with
         ``type="bootstrap"``."""
-        from scipy import stats as scipy_stats
-
-        from smooth.adam_general.core.utils.bootstrap import bootstrap_confint_frame
-        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+        from smooth.adam_general.core.utils.var_covar import (
+            confint_frame,
+            resolve_covar_type,
+        )
 
         self._check_fitted()
-        names = self.coef_names
-        parameters = self.coef
-        covariance_type = resolve_covar_type(type)
-        if covariance_type == "bootstrap":
-            boot = self.coefbootstrap(**boot_kwargs)
-            return bootstrap_confint_frame(boot, names, parameters, level, parm)
-        se = np.sqrt(
-            np.abs(np.diag(self.vcov(type=covariance_type, step_size=step_size)))
+        return confint_frame(
+            self, parm, level, resolve_covar_type(type), step_size, **boot_kwargs
         )
-        bounds = np.column_stack(
-            [
-                scipy_stats.t.ppf((1 - level) / 2, df=self.nobs - self.nparam) * se,
-                scipy_stats.t.ppf((1 + level) / 2, df=self.nobs + self.nparam) * se,
-            ]
-        )
-        for j in range(len(parameters)):
-            for side in range(2):
-                point = parameters.copy()
-                point[j] += bounds[j, side]
-                bounds[j, side] = self._pull_back(parameters, point)[j] - parameters[j]
-        result = pd.DataFrame(
-            np.column_stack([se, bounds + parameters[:, None]]),
-            index=names,
-            columns=[
-                "S.E.",
-                f"{(1 - level) / 2 * 100:g}%",
-                f"{(1 + level) / 2 * 100:g}%",
-            ],
-        )
-        if parm is not None:
-            result = result.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
-        return result
+
+    def _clamp_confint_offsets(
+        self, names: List[str], params: NDArray, lo: NDArray, hi: NDArray
+    ) -> None:
+        """Move the half-widths inside the bounds of the model in place, one
+        parameter at a time, by :meth:`_pull_back`."""
+        for offsets in (lo, hi):
+            for j in range(len(params)):
+                point = params.copy()
+                point[j] += offsets[j]
+                offsets[j] = self._pull_back(params, point)[j] - params[j]
 
     def sm(self, X: Optional[Any] = None, **kwargs: Any) -> "TBATS":
         """The model of the scale of the error term (R's ``sm()``): TBATS on the

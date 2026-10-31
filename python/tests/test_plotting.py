@@ -185,10 +185,10 @@ def test_standardised_residuals_are_actually_standardised():
     standardised = np.asarray(scale_model.rstandard(), dtype=float)
 
     assert scale_model.extract_scale() == pytest.approx(1.0)
-    # R: sd 1.0711, 8.0% outside +-1.96, range [-4.49, 3.20]
-    assert standardised.std(ddof=1) == pytest.approx(1.0711, abs=1e-3)
-    assert np.mean(np.abs(standardised) > 1.96) == pytest.approx(0.08, abs=0.005)
-    assert standardised.min() == pytest.approx(-4.49, abs=0.01)
+    # R: sd 1.0738, 8.5% outside +-1.96, minimum -4.1179
+    assert standardised.std(ddof=1) == pytest.approx(1.0738, abs=1e-4)
+    assert np.mean(np.abs(standardised) > 1.96) == pytest.approx(0.085, abs=0.001)
+    assert standardised.min() == pytest.approx(-4.1179, abs=1e-4)
 
 
 def test_qqline_uses_quartiles_not_least_squares():

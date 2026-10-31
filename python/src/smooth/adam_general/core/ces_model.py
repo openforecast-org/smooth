@@ -1046,6 +1046,8 @@ class CES:
     _check_is_fitted = _check_fitted
     _log_model = ADAM._log_model
     _gap_residuals = ADAM._gap_residuals
+    _resids_to_go = ADAM._resids_to_go
+    _rstandard_errors = ADAM._rstandard_errors
     rstandard = ADAM.rstandard
     rstudent = ADAM.rstudent
     outlierdummy = ADAM.outlierdummy

@@ -84,6 +84,8 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* `rstandard()` and `rstudent()` take the errors at the location the model assumes (zero, and -sigma^2/2 for the logarithms of `dlnorm`), as in R: they subtracted the sample mean of the errors (except `rstandard()` for `dlaplace`), and `rstudent()` of `dlnorm` subtracted sigma^2/2 after it.
+* The degrees of freedom that de-bias the scale of a scale model (`sm()`) leave out its scale, as in R, where its loss is the likelihood: its `rstandard()` was 0.25% smaller than R's on 200 observations.
 * `phi` of a model without the damped trend is ignored with a warning (printed with `verbose`), as in R.
 * The pool of the small samples has ETS(M,A,A) for an additive seasonality (`"X"`, `"Z"` or `"A"` in the model), not for the multiplicative one (`"Y"`), as in R.
 * `SMA` evaluates the order equal to the frequency of a dated index (12 for monthly data, ...), as R's `sma()`: it never recognised the frequency.

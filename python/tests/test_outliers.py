@@ -75,8 +75,11 @@ class TestRstandard:
     def test_approximately_standard_normal(self, ann_model):
         """For a dnorm model, rstandard() ≈ N(0, 1)."""
         std_res = ann_model.rstandard()
-        # Mean should be near zero (by construction — mean is subtracted)
-        assert abs(np.mean(std_res)) < 1e-10
+        # The errors at the location the model assumes (zero), divided by sigma:
+        # not centred by their mean
+        std_res, residuals = np.asarray(std_res), np.asarray(ann_model.residuals)
+        sigma = np.dot(std_res, residuals) / np.dot(std_res, std_res)
+        np.testing.assert_allclose(std_res * sigma, residuals, atol=1e-10)
         # Std should be close to 1 for a well-specified model
         assert 0.5 < np.std(std_res) < 2.0
 
@@ -143,60 +146,60 @@ class TestRstudent:
 Y_SHORT = AIRPASSENGERS[:12]
 R_RSTUDENT = {
     ("ANN", "dlaplace"): [
-        -0.3702514194,
-        0.1523406905,
-        1.227052376,
-        0.5303276411,
-        -0.2842159524,
-        0.8630135764,
-        1.724056985,
-        1.09681182,
-        -0.2364376182,
-        -1.698637745,
-        -2.754659957,
-        -0.5528707113,
+        -0.2254430076,
+        0.2950715645,
+        1.401861412,
+        0.6839649569,
+        -0.1417838419,
+        1.026587405,
+        1.914817144,
+        1.267557761,
+        -0.09531677356,
+        -1.51468356,
+        -2.536306111,
+        -0.402954129,
     ],
     ("ANN", "ds"): [
-        -1.535087563,
-        0.6179506919,
-        5.168040122,
-        2.216591879,
-        -1.170736752,
-        3.63380556,
-        7.213383796,
-        4.622058811,
-        -0.9694549319,
-        -7.110395905,
-        -11.22374894,
-        -2.312739293,
+        -0.9548428807,
+        1.258474534,
+        6.110779462,
+        2.973591201,
+        -0.5935920001,
+        4.482252746,
+        8.278049381,
+        5.531618985,
+        -0.3954421396,
+        -6.593765311,
+        -10.79694549,
+        -1.732206423,
     ],
     ("ANN", "dgnorm"): [
-        -0.2622302011,
-        0.109147276,
-        0.8534146585,
-        0.3732870584,
-        -0.2021148279,
-        0.6024129039,
-        1.201987215,
-        0.7633835956,
-        -0.1685617859,
-        -1.183900257,
-        -1.973779856,
-        -0.3888647734,
+        -0.159183735,
+        0.2075750777,
+        0.9637173336,
+        0.4741816513,
+        -0.1006222788,
+        0.7071148991,
+        1.322274261,
+        0.8715171567,
+        -0.06786017264,
+        -1.041611544,
+        -1.777953624,
+        -0.2820533693,
     ],
     ("MNN", "dlnorm"): [
-        0.694941679,
-        1.140849234,
-        2.766952515,
-        1.54327801,
-        0.7606619776,
-        1.974300539,
-        3.518299333,
-        2.169802502,
-        0.8007612479,
-        0.2417111758,
-        0.0641768014,
-        0.6005822574,
+        0.8482186119,
+        1.38430057,
+        3.443623373,
+        1.878882139,
+        0.9264612572,
+        2.41981531,
+        4.44707016,
+        2.668895352,
+        0.9743272018,
+        0.3138096449,
+        0.1006795107,
+        0.7363101366,
     ],
     ("MNN", "dgamma"): [
         0.9534246126,
@@ -239,21 +242,21 @@ R_RSTUDENT_OCCURRENCE = {
     ],
     ("ANN", "dnorm"): [
         0,
-        -0.566819329,
+        -0.5655173879,
         0,
         0,
-        0.7397629764,
-        -0.1227421165,
+        0.7411461062,
+        -0.1215516923,
         0,
-        -1.348560762,
+        -1.34667079,
         0,
         0,
-        1.743064506,
-        -0.8750888859,
+        1.745475279,
+        -0.8736199014,
         0,
-        0.02487757242,
+        0.02606258751,
         0,
-        0.5666153477,
+        0.5679150353,
     ],
 }
 
@@ -574,15 +577,17 @@ class TestRComparisonWithR:
         expected = stats.norm.ppf(p)
         np.testing.assert_allclose(od.statistic, expected, rtol=1e-6)
 
-    def test_rstandard_mean_zero(self, ann_model):
+    def test_rstandard_is_not_centred(self, ann_model):
         """
-        rstandard() for dnorm mean-centers the errors.
+        rstandard() for dnorm takes the errors at the location the model assumes.
 
-        R's rstandard.adam() subtracts mean(errors) before scaling,
-        so the result always has mean = 0 (up to floating-point precision).
+        R's rstandard.adam() divides the errors by sigma without subtracting their
+        mean, so the mean of the result shows a bias of the model.
         """
-        std_res = ann_model.rstandard()
-        assert abs(np.mean(std_res)) < 1e-10
+        std_res = np.asarray(ann_model.rstandard())
+        residuals = np.asarray(ann_model.residuals)
+        sigma = np.dot(std_res, residuals) / np.dot(std_res, std_res)
+        np.testing.assert_allclose(np.mean(std_res) * sigma, np.mean(residuals))
 
     def test_rstandard_length_equals_nobs(self, ann_model):
         """Length of rstandard() equals nobs (144 for full AirPassengers)."""

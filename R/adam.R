@@ -5261,44 +5261,20 @@ residuals.adam <- function(object, ...){
 #' @importFrom stats rstandard
 #' @export
 rstandard.adam <- function(model, ...){
-    obs <- nobs(model);
     distribution <- model$distribution;
     errors <- residuals(model);
-    # If this is an occurrence model, then only modify the non-zero obs
-    # Also, if there are NAs in actuals, consider them as occurrence
-    if(is.occurrence(model$occurrence)){
-        residsToGo <- which(actuals(model$occurrence)!=0 & !is.na(actuals(model)));
-    }
-    else{
-        residsToGo <- which(!is.na(actuals(model)));
-    }
-
     if(any(distribution==c("dinvgauss","dgamma"))){
-        return(errors / mean(errors[residsToGo]));
+        return(errors / mean(errors[adam_residsToGo(model)]));
     }
-    # Each error as the one-step one, after the periods without an observed size
-    errors[] <- adam_gapResiduals(model);
-
-    # The scale, de-biased in the variance space
-    scale <- adam_scaleDebias(extractScale(model), distribution, adam_nobsObserved(model), adam_dfScale(model));
-    logDistribution <- any(distribution==c("dlnorm","dllaplace","dls","dlgnorm"));
-    if(logDistribution){
-        errors[] <- log(errors);
-    }
+    # The scale, de-biased in the variance space: sigma for dnorm and dlnorm, s^2 for S, s for
+    # the rest
+    scale <- adam_scaleDebias(extractScale(model), distribution, adam_nobsObserved(model),
+                              adam_dfScale(model));
+    errors[] <- adam_rstandardErrors(model) / switch(distribution,
+                                                     "dnorm"=,"dlnorm"=sqrt(scale),
+                                                     "ds"=scale^2,
+                                                     scale);
     if(distribution=="dlnorm"){
-        # Debias the residuals
-        errors[] <- errors + extractScale(model)/2;
-    }
-    # The conventional residuals of Laplace and Logistic are not centred
-    if(all(distribution!=c("dlaplace","dlogis"))){
-        errors[] <- errors - mean(errors[residsToGo]);
-    }
-    # sigma for dnorm and dlnorm, s^2 for S, s for the rest
-    errors[] <- errors / switch(distribution,
-                                "dt"=,"dnorm"=,"dlnorm"=sqrt(scale),
-                                "ds"=,"dls"=scale^2,
-                                scale);
-    if(logDistribution){
         errors[] <- exp(errors);
     }
     return(errors);
@@ -5307,86 +5283,45 @@ rstandard.adam <- function(model, ...){
 #' @importFrom stats rstudent
 #' @export
 rstudent.adam <- function(model, ...){
-    obs <- nobs(model);
+    distribution <- model$distribution;
     # The missing values are not observations
     df <- adam_nobsObserved(model) - nparam(model) - 1;
-    rstudentised <- errors <- residuals(model);
-    # Each error as the one-step one, after the periods without an observed size
-    errors[] <- adam_gapResiduals(model);
-    # If this is an occurrence model, then only modify the non-zero obs
-    # Also, if there are NAs in actuals, consider them as occurrence
-    if(is.occurrence(model$occurrence)){
-        residsToGo <- which(actuals(model$occurrence)!=0 & !is.na(actuals(model)));
-    }
-    else{
-        residsToGo <- which(!is.na(actuals(model)));
-    }
-    if(any(model$distribution==c("dt","dnorm"))){
-        errors[] <- errors - mean(errors, na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- errors[i] / sqrt(sum(errors[-i]^2,na.rm=TRUE) / df);
-        }
-    }
-    else if(model$distribution=="dlaplace"){
-        errors[] <- errors - mean(errors, na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- errors[i] / (sum(abs(errors[-i]),na.rm=TRUE) / df);
-        }
-    }
-    else if(model$distribution=="dlnorm"){
-        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE) - extractScale(model)/2;
-        for(i in residsToGo){
-            rstudentised[i] <- exp(errors[i] / sqrt(sum(errors[-i]^2,na.rm=TRUE) / df));
-        }
-    }
-    else if(model$distribution=="dllaplace"){
-        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- exp(errors[i] / (sum(abs(errors[-i]),na.rm=TRUE) / df));
-        }
-    }
-    else if(model$distribution=="ds"){
-        errors[] <- errors - mean(errors, na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- errors[i] / (sum(sqrt(abs(errors[-i])),na.rm=TRUE) / (2*df))^2;
-        }
-    }
-    else if(model$distribution=="dls"){
-        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- exp(errors[i] / (sum(sqrt(abs(errors[-i])),na.rm=TRUE) / (2*df))^2);
-        }
-    }
-    else if(model$distribution=="dgnorm"){
-        errors[] <- errors - mean(errors, na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- errors[i] /  (sum(abs(errors[-i])^model$other$shape, na.rm=TRUE) * (model$other$shape/df))^{1/model$other$shape};
-        }
-    }
-    else if(model$distribution=="dlgnorm"){
-        errors[] <- log(errors) - mean(log(errors), na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- errors[i] /  (sum(abs(errors[-i])^model$other$shape, na.rm=TRUE) * (model$other$shape/df))^{1/model$other$shape};
-        }
-    }
-    else if(model$distribution=="dlogis"){
-        errors[] <- errors - mean(errors, na.rm=TRUE);
-        for(i in residsToGo){
-            rstudentised[i] <- errors[i] / (sqrt(sum(errors[-i]^2,na.rm=TRUE) / df) * sqrt(3) / pi);
-        }
-    }
-    else if(any(model$distribution==c("dinvgauss","dgamma"))){
-        for(i in residsToGo){
-            # Leave the observation i out, not the i-th of residsToGo
-            rstudentised[i] <- errors[i] / mean(errors[residsToGo[residsToGo!=i]],na.rm=TRUE);
-        }
-    }
-    else{
-        for(i in residsToGo){
-            rstudentised[i] <- errors[i] / sqrt(sum(errors[-i]^2,na.rm=TRUE) / df);
-        }
+    residsToGo <- adam_residsToGo(model);
+    rstudentised <- residuals(model);
+    errors <- adam_rstandardErrors(model)[residsToGo];
+    # The scale of each error, estimated without it
+    shape <- model$other$shape;
+    scaleLOO <- switch(distribution,
+                       "dlaplace"=(sum(abs(errors)) - abs(errors)) / df,
+                       "ds"=((sum(sqrt(abs(errors))) - sqrt(abs(errors))) / (2*df))^2,
+                       "dgnorm"=((sum(abs(errors)^shape) - abs(errors)^shape) * shape/df)^(1/shape),
+                       "dinvgauss"=,"dgamma"=(sum(errors) - errors) / (length(errors)-1),
+                       sqrt((sum(errors^2) - errors^2) / df));
+    rstudentised[residsToGo] <- errors / scaleLOO;
+    if(distribution=="dlnorm"){
+        rstudentised[residsToGo] <- exp(rstudentised[residsToGo]);
     }
     return(rstudentised);
+}
+
+# The observations of the residuals of rstandard() and rstudent(): the observed values, the
+# non-zero ones with an occurrence model
+adam_residsToGo <- function(model){
+    if(is.occurrence(model$occurrence)){
+        return(which(actuals(model$occurrence)!=0 & !is.na(actuals(model))));
+    }
+    return(which(!is.na(actuals(model))));
+}
+
+# The errors of rstandard() and rstudent() before their scale: the one-step ones after the
+# periods without an observed size, at the location the model assumes, which is zero, and
+# -sigma^2/2 for the logarithms of dlnorm, so that the mean of 1+e is one
+adam_rstandardErrors <- function(model){
+    errors <- adam_gapResiduals(model);
+    if(model$distribution=="dlnorm"){
+        errors[] <- log(errors) + extractScale(model)/2;
+    }
+    return(errors);
 }
 
 #' @importFrom greybox outlierdummy

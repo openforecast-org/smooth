@@ -630,7 +630,9 @@ def parameters_checker(
     #####################
     # 7) Check Phi
     #####################
-    phi_info = _check_phi(phi, ets_info["damped"], silent, ets_info["model_do"])
+    phi_info = _check_phi(
+        phi, ets_info["damped"], silent, ets_info.get("model_do", "estimate")
+    )
     phi_val = phi_info["phi"]
     phi_estimate = phi_info["phi_estimate"]
 

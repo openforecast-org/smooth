@@ -2478,12 +2478,15 @@ class ADAM:
         scale parameters under likelihood), so ``s_df = s (n/df)^(1/p)`` with
         ``p`` the power of the scale in the variance:
 
-        - **dnorm**: ``(e - ē) / sqrt(s_df)``, as the scale is σ²
+        - **dnorm**: ``e / sqrt(s_df)``, as the scale is σ²
         - **dlaplace**: ``e / s_df``
-        - **ds**: ``(e - ē) / s_df²``
-        - **dgnorm**: ``(e - ē) / s_df``
-        - **dlnorm**: ``exp((log(e) + s/2 - mean(·)) / sqrt(s_df))``
+        - **ds**: ``e / s_df²``
+        - **dgnorm**: ``e / s_df``
+        - **dlnorm**: ``exp((log(e) + s/2) / sqrt(s_df))``
         - **dinvgauss / dgamma**: ``e / ē``
+
+        The errors are taken at the location the model assumes (zero, and -σ²/2
+        for the logarithms of dlnorm), not centred by their mean, as in R.
 
         For a correctly specified model the result should be approximately
         distributed as the standardised version of the fitted distribution.
@@ -2513,44 +2516,24 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        # The missing values (NaN residuals) are not observations
-        obs = self._nobs_observed()
-        errors = self.residuals.copy().astype(float)
         dist = self.distribution_
-        # The observed sizes (R's residsToGo): the zeros of an occurrence model have
-        # no size, and their residuals are not in the mean
-        sizes = np.isfinite(errors)
-        if hasattr(self, "_observations"):
-            sizes &= np.asarray(self._observations["ot_logical"], dtype=bool)
-        elif hasattr(self, "_ot"):
-            sizes &= np.asarray(self._ot, dtype=bool)
         if dist in ("dinvgauss", "dgamma"):
-            return errors / np.mean(errors[sizes])
-        # Each error as the one-step one, after the periods without an observed size
-        errors = self._gap_residuals()
-
+            errors = np.asarray(self.residuals, dtype=float)
+            return errors / np.mean(errors[self._resids_to_go()])
         # R's rstandard.adam standardises by extractScale(), de-biased in the
         # variance space. extract_scale() is a vector when a scale model is
         # attached, so each residual gets its own scale; a scale model itself
         # returns 1, because its residuals are already standardised.
-        raw_scale = self.extract_scale()
-        scale = scale_debias(raw_scale, dist, obs, self._df_scale)
-        log_dist = dist in ("dlnorm", "dllaplace", "dls", "dlgnorm")
-        if log_dist:
-            errors = np.log(errors)
-        if dist == "dlnorm":
-            errors = errors + raw_scale / 2
-        # The conventional residuals of Laplace and Logistic are not centred
-        if dist not in ("dlaplace", "dlogis"):
-            errors = errors - np.mean(errors[sizes])
+        scale = scale_debias(
+            self.extract_scale(), dist, self._nobs_observed(), self._df_scale
+        )
         # sigma for dnorm and dlnorm, s^2 for S, s for the rest
-        if dist in ("dt", "dnorm", "dlnorm"):
-            errors = errors / np.sqrt(scale)
-        elif dist in ("ds", "dls"):
-            errors = errors / scale**2
-        else:
-            errors = errors / scale
-        return np.exp(errors) if log_dist else errors
+        if dist in ("dnorm", "dlnorm"):
+            scale = np.sqrt(scale)
+        elif dist == "ds":
+            scale = scale**2
+        errors = self._rstandard_errors() / scale
+        return np.exp(errors) if dist == "dlnorm" else errors
 
     def rstudent(self) -> NDArray:
         """
@@ -2568,13 +2551,17 @@ class ADAM:
 
         Standardisation by distribution:
 
-        - **dnorm**: ``(e[i] - ē) / √(Σe[-i]² / df)``
-        - **dlaplace**: ``(e[i] - ē) / (Σ|e[-i]| / df)``
-        - **ds**: ``(e[i] - ē) / (Σ√|e[-i]| / (2 df))²``
-        - **dgnorm**: ``(e[i] - ē) / (Σ|e[-i]|^β · β/df)^(1/β)``
+        - **dnorm**: ``e[i] / √(Σe[-i]² / df)``
+        - **dlaplace**: ``e[i] / (Σ|e[-i]| / df)``
+        - **ds**: ``e[i] / (Σ√|e[-i]| / (2 df))²``
+        - **dgnorm**: ``e[i] / (Σ|e[-i]|^β · β/df)^(1/β)``
         - **dlnorm**: ``exp(log_e[i] / √(Σlog_e[-i]² / df))``,
-          where ``log_e = log(e) - mean(log e) - σ²/2``
+          where ``log_e = log(e) + σ²/2``
         - **dinvgauss / dgamma**: ``e[i] / mean(e[-i])``
+
+        The sums run over the observed sizes (the non-zero values with an
+        occurrence model), whose errors are taken at the location the model
+        assumes, as in :meth:`rstandard`; the others keep their residuals, as in R.
 
         Returns
         -------
@@ -2601,53 +2588,52 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        # The missing values (NaN residuals) are not observations
-        obs = self._nobs_observed()
-        df = obs - self.nparam - 1
-        # Each error as the one-step one, after the periods without an observed size
-        errors = self._gap_residuals()
         dist = self.distribution_
-        # The observed sizes, as R's residsToGo (and rstandard()); the others keep
-        # their residuals
-        residuals = np.asarray(self.residuals, dtype=float)
-        used = np.isfinite(residuals)
+        # The missing values are not observations
+        df = self._nobs_observed() - self.nparam - 1
+        used = self._resids_to_go()
+        rstudentised = np.asarray(self.residuals, dtype=float).copy()
+        errors = self._rstandard_errors()[used]
+
+        # The scale of each error, estimated without it
+        if dist == "dlaplace":
+            scale_loo = (np.sum(np.abs(errors)) - np.abs(errors)) / df
+        elif dist == "ds":
+            root = np.sqrt(np.abs(errors))
+            scale_loo = ((np.sum(root) - root) / (2 * df)) ** 2
+        elif dist == "dgnorm":
+            beta = self._gnorm_shape() or 2.0
+            power = np.abs(errors) ** beta
+            scale_loo = ((np.sum(power) - power) * beta / df) ** (1.0 / beta)
+        elif dist in ("dinvgauss", "dgamma"):
+            scale_loo = (np.sum(errors) - errors) / (len(errors) - 1)
+        else:  # dnorm, dlnorm
+            scale_loo = np.sqrt((np.sum(errors**2) - errors**2) / df)
+        rstudentised[used] = errors / scale_loo
+        if dist == "dlnorm":
+            rstudentised[used] = np.exp(rstudentised[used])
+        return rstudentised
+
+    def _resids_to_go(self) -> NDArray:
+        """The observations of the residuals of :meth:`rstandard` and
+        :meth:`rstudent` (R's ``adam_residsToGo``): the observed values, the non-zero
+        ones with an occurrence model."""
+        used = np.isfinite(np.asarray(self.residuals, dtype=float))
         if hasattr(self, "_observations"):
             used &= np.asarray(self._observations["ot_logical"], dtype=bool)
         elif hasattr(self, "_ot"):
             used &= np.asarray(self._ot, dtype=bool)
+        return used
 
-        if dist == "dlaplace":
-            errors -= np.nanmean(errors)
-            total_abs = np.nansum(np.abs(errors))
-            values = errors / ((total_abs - np.abs(errors)) / df)
-        elif dist == "ds":
-            errors -= np.nanmean(errors)
-            total_sqrt_abs = np.nansum(np.sqrt(np.abs(errors)))
-            denom = ((total_sqrt_abs - np.sqrt(np.abs(errors))) / (2 * df)) ** 2
-            values = errors / denom
-        elif dist == "dgnorm":
-            beta = self._gnorm_shape() or 2.0
-            errors -= np.nanmean(errors)
-            total_pow = np.nansum(np.abs(errors) ** beta)
-            denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
-            values = errors / denom
-        elif dist in ("dinvgauss", "dgamma"):
-            # Each leaves itself out of the mean of the used ones
-            total = np.sum(errors[used])
-            mean_loo = (total - np.where(used, errors, 0.0)) / (
-                np.sum(used) - used.astype(float)
-            )
-            values = errors / mean_loo
-        elif dist == "dlnorm":
-            scale = self.extract_scale()
-            log_e = np.log(errors) - np.nanmean(np.log(errors)) - scale / 2
-            total_sq = np.nansum(log_e**2)
-            values = np.exp(log_e / np.sqrt((total_sq - log_e**2) / df))
-        else:  # dnorm, and the default of R
-            errors -= np.nanmean(errors)
-            total_sq = np.nansum(errors**2)
-            values = errors / np.sqrt((total_sq - errors**2) / df)
-        return np.where(used, values, residuals)
+    def _rstandard_errors(self) -> NDArray:
+        """The errors of :meth:`rstandard` and :meth:`rstudent` before their scale
+        (R's ``adam_rstandardErrors``): the one-step ones after the periods without
+        an observed size, at the location the model assumes, which is zero, and
+        -sigma^2/2 for the logarithms of dlnorm, so that the mean of 1+e is one."""
+        errors = self._gap_residuals()
+        if self.distribution_ == "dlnorm":
+            errors = np.log(errors) + self.extract_scale() / 2
+        return errors
 
     def outlierdummy(
         self,
@@ -2875,7 +2861,10 @@ class ADAM:
         when one is attached, as ``implant()`` puts them in the scale column.
         """
         n_param = float(self.nparam)
-        if (self._general or {}).get("loss") == "likelihood":
+        # A scale model (sm()) is scored by the likelihood of its location model, as
+        # R's, whose loss is "likelihood"
+        likelihood = (self._general or {}).get("loss") == "likelihood"
+        if likelihood or getattr(self, "is_scale_", False):
             if self.scale_model is not None:
                 n_param -= float(self.scale_model.nparam)
             elif getattr(self, "_n_param", None) is not None:

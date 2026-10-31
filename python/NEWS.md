@@ -84,6 +84,13 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* `SMA` evaluates the order equal to the frequency of a dated index (12 for monthly data, ...), as R's `sma()`: it never recognised the frequency.
+* `ES` with a dict `initial` ignores `initial_season` and `initial_X`, as R's `es()` with a list; it fixed the states to them.
+* `rstudent()` of `ADAM` (and `TBATS`) with an occurrence model leaves the residuals of the zeros as they are for every distribution, as R; it studentised them except for `dinvgauss` and `dgamma`.
+* `predict()` of a pure regression with an occurrence model and `interval="confidence"` with one level failed with a shape error.
+* An invalid `n_iterations` with `initial="gradient"` falls back to 2, the default, rather than 1.
+* `sim_ces()` returns the true log-likelihood (`log_lik`), as R's `sim.ces()`; it was None.
+* The shape of `dgnorm` (and the degrees of freedom of `dt`) print as R's `round(value, 4)`, without trailing zeros.
 * `CES` with regressors and `initial="backcasting"` (the default), `"gradient"` or `"provided"` wrote the estimated coefficients into the states of CES, as R did, so the fit used the starting values of the regressors; they now go into the states of the regressors, as in the fixed R.
 * `sm()` takes the holdout of a location model fitted with `holdout=True`, with its accuracy, as R: it read an attribute the fitted model no longer has, and fitted none.
 * The fitted values and forecasts keep the dates of a `DatetimeIndex` without its frequency (pandas infers it) and of a `PeriodIndex`: they fell back to 0, 1, 2, ...

@@ -104,3 +104,62 @@ def test_sim_ces_repr_shows_smoothing_params():
     assert "Data generated from: CES(full)" in out
     assert "Smoothing parameter a:" in out
     assert "Smoothing parameter b:" in out
+
+
+def test_sim_ces_prints_the_rounded_smoothing_parameters():
+    """R: print(sim.ces("partial", obs=10, frequency=4, a=1.31234567+0.98765432i,
+    b=0.41234567)) gives "Smoothing parameter a: 1.3123+0.9877i" and
+    "Smoothing parameter b: 0.4123"."""
+    s = sim_ces(
+        seasonality="partial",
+        obs=10,
+        frequency=4,
+        a=complex(1.31234567, 0.98765432),
+        b=0.41234567,
+        seed=1,
+    )
+    lines = str(s).splitlines()
+    assert "Smoothing parameter a: (1.3123+0.9877j)" in lines
+    assert "Smoothing parameter b: 0.4123" in lines
+
+
+def test_sim_ces_has_the_true_likelihood_as_r():
+    # R/simces.R:423-425 for rnorm: -obs/2 * (log(2*pi*e) + log(mean(errors^2)))
+    s = sim_ces(
+        seasonality="partial",
+        obs=10,
+        frequency=4,
+        a=complex(1.31234567, 0.98765432),
+        b=0.41234567,
+        seed=1,
+    )
+    errors = np.asarray(s.residuals, dtype=float)
+    expected = -10 / 2 * (np.log(2 * np.pi * np.e) + np.log(np.mean(errors**2)))
+    assert s.log_lik is not None
+    assert float(np.ravel(s.log_lik)[0]) == pytest.approx(expected, rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (complex(1.23456, -0.98765), complex(1.2346, -0.9877)),
+        (np.complex64(1.5 + 0.25j), complex(1.5, 0.25)),
+        (np.array([1.23456 + 2.00004j]), complex(1.2346, 2.0)),
+        (0.41234567, 0.4123),
+        (np.array([0.41234567]), 0.4123),
+    ],
+)
+def test_round_c_of_a_single_value(value, expected):
+    """A single real or complex value rounded as R's round(x, 4)."""
+    from smooth.adam_general.core.simulate.result import _round_c
+
+    rounded = _round_c(value, 4)
+    assert type(rounded) is type(expected)
+    assert rounded == expected
+
+
+def test_round_c_of_several_values():
+    from smooth.adam_general.core.simulate.result import _round_c
+
+    rounded = _round_c(np.array([0.12345, 1.98765, 2.5]), 2)
+    np.testing.assert_array_equal(rounded, [0.12, 1.99, 2.5])

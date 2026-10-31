@@ -810,6 +810,167 @@ def test_the_outliers_of_the_global_model_become_regressors(air):
     assert fit.coefbootstrap(nsim=2, seed=1).vcov.shape == (len(fit.coef),) * 2
 
 
+# R: set.seed(11); y <- round(20 + 0.2*(1:48) + 3*sin(2*pi*(1:48)/12) + rnorm(48), 2)
+OUTLIERS_Y = np.array(
+    [
+        21.11,
+        23.02,
+        22.08,
+        22.04,
+        23.68,
+        20.27,
+        21.22,
+        19.63,
+        18.75,
+        18.4,
+        19.87,
+        22.05,
+        22.56,
+        25.14,
+        24.85,
+        25.81,
+        24.68,
+        24.49,
+        21.71,
+        20.75,
+        20.52,
+        21.79,
+        22.66,
+        25.15,
+        26.57,
+        27.81,
+        28.21,
+        27.43,
+        27.08,
+        25.02,
+        23.6,
+        22.86,
+        24.28,
+        22.62,
+        24.63,
+        27.68,
+        28.71,
+        31.74,
+        30.19,
+        30.25,
+        28.06,
+        28.42,
+        27.99,
+        25.33,
+        26.89,
+        26.26,
+        25.71,
+        30.48,
+    ]
+)
+
+
+def _outlier_dummies(y, distribution, level, outliers, h=3):
+    """st.outlier_dummies() as R's tbats_outliers(y, rep(TRUE, n), TRUE,
+    tbats_harmonics(12, 1), list(estimate=FALSE, value=1), NULL, distribution,
+    level, outliers, "AICc", h)."""
+    dummies = st.outlier_dummies(
+        y,
+        np.ones(len(y), dtype=bool),
+        True,
+        st.harmonics_table([12], [1]),
+        {"estimate": False, "value": 1.0},
+        None,
+        distribution,
+        level,
+        outliers,
+        "AICc",
+        h,
+    )
+    if dummies is None:
+        return None
+    rows = [np.flatnonzero(column).tolist() for column in dummies["data"].T]
+    return dummies["names"], rows, dummies["data"].shape[0]
+
+
+# (shocks at observations 10 and 30, distribution, outliers, R's dummies: the
+# names, the observations of their ones (zero-based) and the rows, None for NULL)
+OUTLIERS_R = [
+    ((9, -8), "dnorm", "use", (["outlier1", "outlier2"], [[9], [29]], 51)),
+    ((9, -8), "dnorm", "select", (["outlier2", "outlier1"], [[29], [9]], 51)),
+    ((9, -8), "dlaplace", "use", (["outlier1", "outlier2"], [[9], [29]], 51)),
+    (
+        (9, -8),
+        "dlaplace",
+        "select",
+        (["outlier2", "outlier1", "outlier1Lag1"], [[29], [9], [10]], 51),
+    ),
+    ((9, -8), "dgnorm", "use", (["outlier1", "outlier2"], [[9], [29]], 51)),
+    (
+        (9, -8),
+        "dgnorm",
+        "select",
+        (["outlier2", "outlier1", "outlier1Lag1"], [[29], [9], [10]], 51),
+    ),
+    # The S distribution has the heavier tails: these shocks are no outliers
+    ((9, -8), "ds", "use", None),
+    ((30, -25), "ds", "use", (["outlier1", "outlier2"], [[9], [29]], 51)),
+    (
+        (30, -25),
+        "ds",
+        "select",
+        (
+            ["outlier1", "outlier2", "outlier1Lag1", "outlier1Lead1", "outlier2Lead1"],
+            [[9], [29], [10], [8], [28]],
+            51,
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("shocks, distribution, outliers, expected", OUTLIERS_R)
+def test_the_outlier_dummies_are_those_of_r(shocks, distribution, outliers, expected):
+    y = OUTLIERS_Y.copy()
+    y[[9, 29]] += shocks
+    assert _outlier_dummies(y, distribution, 0.99, outliers) == expected
+
+
+@pytest.mark.parametrize("distribution", ["dnorm", "dlaplace", "ds", "dgnorm"])
+def test_no_outlier_dummies_on_the_clean_series(distribution):
+    # R: tbats_outliers(y, ...) at level 0.999 is NULL
+    assert _outlier_dummies(OUTLIERS_Y, distribution, 0.999, "use") is None
+
+
+def test_no_outlier_dummies_when_none_is_selected():
+    """The one outlier at level 0.9 is dropped by the selection, as in R:
+    set.seed(10); y <- round(20 + 3*sin(2*pi*(1:24)/12) + rnorm(24), 2)."""
+    y = np.array(
+        [
+            21.52,
+            22.41,
+            21.63,
+            22,
+            21.79,
+            20.39,
+            17.29,
+            17.04,
+            15.37,
+            17.15,
+            19.6,
+            20.76,
+            21.26,
+            23.59,
+            23.74,
+            22.69,
+            20.55,
+            19.8,
+            19.43,
+            17.88,
+            16.4,
+            15.22,
+            17.83,
+            17.88,
+        ]
+    )
+    assert _outlier_dummies(y, "dnorm", 0.9, "use", h=0) == (["outlier1"], [[23]], 24)
+    assert _outlier_dummies(y, "dnorm", 0.9, "select", h=0) is None
+
+
 def test_the_scale_model_of_tbats():
     """sm() models the scale by TBATS; attached, it raises the likelihood, its terms
     sum to it, and the intervals follow the scale, with an occurrence model too."""

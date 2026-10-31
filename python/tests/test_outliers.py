@@ -137,6 +137,167 @@ class TestRstudent:
         assert np.max(np.abs(stu_res)) >= np.max(np.abs(std_res)) * 0.9
 
 
+# R's rstudent() of adam(Y_SHORT, model, distribution=..., persistence=0.3,
+# initial=115) (with shape=1.5 for dgnorm): all parameters provided, so both
+# languages fit the same model
+Y_SHORT = AIRPASSENGERS[:12]
+R_RSTUDENT = {
+    ("ANN", "dlaplace"): [
+        -0.3702514194,
+        0.1523406905,
+        1.227052376,
+        0.5303276411,
+        -0.2842159524,
+        0.8630135764,
+        1.724056985,
+        1.09681182,
+        -0.2364376182,
+        -1.698637745,
+        -2.754659957,
+        -0.5528707113,
+    ],
+    ("ANN", "ds"): [
+        -1.535087563,
+        0.6179506919,
+        5.168040122,
+        2.216591879,
+        -1.170736752,
+        3.63380556,
+        7.213383796,
+        4.622058811,
+        -0.9694549319,
+        -7.110395905,
+        -11.22374894,
+        -2.312739293,
+    ],
+    ("ANN", "dgnorm"): [
+        -0.2622302011,
+        0.109147276,
+        0.8534146585,
+        0.3732870584,
+        -0.2021148279,
+        0.6024129039,
+        1.201987215,
+        0.7633835956,
+        -0.1685617859,
+        -1.183900257,
+        -1.973779856,
+        -0.3888647734,
+    ],
+    ("MNN", "dlnorm"): [
+        0.694941679,
+        1.140849234,
+        2.766952515,
+        1.54327801,
+        0.7606619776,
+        1.974300539,
+        3.518299333,
+        2.169802502,
+        0.8007612479,
+        0.2417111758,
+        0.0641768014,
+        0.6005822574,
+    ],
+    ("MNN", "dgamma"): [
+        0.9534246126,
+        1.017883776,
+        1.138394289,
+        1.059141584,
+        0.9647210806,
+        1.092952406,
+        1.169447373,
+        1.105817133,
+        0.971247406,
+        0.8431121409,
+        0.7616438623,
+        0.9357172008,
+    ],
+}
+R_RSTUDENT[("MNN", "dinvgauss")] = R_RSTUDENT[("MNN", "dgamma")]
+
+# R's rstudent() of adam(Y_INTERMITTENT, model, distribution=..., persistence=0.3,
+# initial=6, occurrence="fixed"): only the non-zero observations are studentised
+Y_INTERMITTENT = np.array([0, 5, 0, 0, 7, 6, 0, 4, 0, 0, 8, 5, 0, 6, 0, 7], float)
+R_RSTUDENT_OCCURRENCE = {
+    ("MNN", "dgamma"): [
+        1,
+        0.7942530193,
+        1,
+        1,
+        1.256463588,
+        0.9363955956,
+        1,
+        0.6058719097,
+        1,
+        1,
+        1.588224263,
+        0.7360949527,
+        1,
+        0.9929397713,
+        1,
+        1.177226032,
+    ],
+    ("ANN", "dnorm"): [
+        0,
+        -0.566819329,
+        0,
+        0,
+        0.7397629764,
+        -0.1227421165,
+        0,
+        -1.348560762,
+        0,
+        0,
+        1.743064506,
+        -0.8750888859,
+        0,
+        0.02487757242,
+        0,
+        0.5666153477,
+    ],
+}
+
+
+class TestRstudentAsR:
+    """rstudent() of the other distributions, against R's rstudent.adam()."""
+
+    @pytest.mark.parametrize("model, distribution", list(R_RSTUDENT))
+    def test_the_values_are_those_of_r(self, model, distribution):
+        extra = {"gnorm_shape": 1.5} if distribution == "dgnorm" else {}
+        fit = ADAM(
+            model=model,
+            distribution=distribution,
+            persistence={"level": 0.3},
+            initial={"level": 115.0},
+            **extra,
+        ).fit(Y_SHORT)
+        np.testing.assert_allclose(
+            np.asarray(fit.rstudent()), R_RSTUDENT[(model, distribution)], rtol=1e-8
+        )
+
+    @pytest.mark.parametrize(
+        "model, distribution",
+        [
+            ("MNN", "dgamma"),
+            ("ANN", "dnorm"),
+        ],
+    )
+    def test_the_occurrence_values_are_those_of_r(self, model, distribution):
+        fit = ADAM(
+            model=model,
+            distribution=distribution,
+            persistence={"level": 0.3},
+            initial={"level": 6.0},
+            occurrence="fixed",
+        ).fit(Y_INTERMITTENT)
+        np.testing.assert_allclose(
+            np.asarray(fit.rstudent()),
+            R_RSTUDENT_OCCURRENCE[(model, distribution)],
+            rtol=1e-8,
+            atol=1e-12,
+        )
+
+
 class TestOutlierdummy:
     """Tests for the outlierdummy() method."""
 

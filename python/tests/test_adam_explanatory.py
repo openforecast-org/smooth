@@ -428,6 +428,253 @@ def test_pure_regression_predict_is_alm_predict(interval, side):
         assert np.allclose(forecast.upper.values.ravel(), np.ravel(expected.upper))
 
 
+# A regression with an occurrence model. R:
+# set.seed(41); x <- round(rnorm(30, 10, 2), 2)
+# set.seed(2); y <- round((5 + 2*x + rnorm(30)) * rbinom(30, 1, 0.7), 2)
+# m <- adam(data.frame(y=y, x=x), "NNN", occurrence=occurrence)
+# forecast(m, h=3, newdata=data.frame(x=c(9, 11.5, 13)), interval=..., level=...)
+OCC_X = np.array(
+    [
+        8.41,
+        10.39,
+        12,
+        12.58,
+        11.81,
+        10.99,
+        11.2,
+        6.84,
+        12,
+        14.38,
+        7.58,
+        8.83,
+        12.11,
+        9.37,
+        9.89,
+        10.66,
+        11.33,
+        11.76,
+        10.41,
+        14.55,
+        8.2,
+        14.28,
+        7.67,
+        9.91,
+        10.83,
+        13.44,
+        8.43,
+        7.39,
+        9.1,
+        6.45,
+    ]
+).reshape(-1, 1)
+OCC_Y = np.array(
+    [
+        0,
+        0,
+        30.59,
+        29.03,
+        0,
+        27.11,
+        28.11,
+        18.44,
+        30.98,
+        33.62,
+        20.58,
+        23.64,
+        28.83,
+        22.7,
+        26.56,
+        0,
+        28.54,
+        0,
+        26.83,
+        34.53,
+        23.49,
+        32.36,
+        21.93,
+        26.77,
+        26.66,
+        0,
+        0,
+        19.18,
+        0,
+        18.19,
+    ]
+)
+OCC_X_NEW = np.array([[9.0], [11.5], [13.0]])
+# R's mean, and the lower and upper bounds of levels 0.8 and 0.95 (column-major)
+OCC_R = {
+    "fixed": {
+        "mean": [17.32126553, 20.8362183, 22.94518997],
+        "both": (
+            [22.368357, 27.16501939, 30.0148061, 21.47728738, 26.27647369, 29.10768949],
+            [
+                24.87145807,
+                29.66103053,
+                32.56298473,
+                25.76252769,
+                30.54957623,
+                33.47010134,
+            ],
+        ),
+        "upper": (
+            None,
+            [
+                24.30201435,
+                29.09319973,
+                31.98328607,
+                25.3432504,
+                30.13148653,
+                33.04327342,
+            ],
+        ),
+        "lower": (
+            [
+                22.93780072,
+                27.73285019,
+                30.59450476,
+                21.89656467,
+                26.69456339,
+                29.53451741,
+            ],
+            None,
+        ),
+        # R's confidence fails with two levels; these are its levels 0.8 and 0.95
+        # one at a time
+        "confidence": (
+            [
+                17.06222664,
+                20.59021595,
+                22.61443515,
+                16.91291794,
+                20.44842144,
+                22.42378974,
+            ],
+            [
+                17.58030441,
+                21.08222066,
+                23.27594479,
+                17.72961312,
+                21.22401517,
+                23.4665902,
+            ],
+        ),
+    },
+    "odds-ratio": {
+        "mean": [17.51802432, 20.78353104, 22.69219945],
+        "both": (
+            [
+                22.36006678,
+                27.16687571,
+                30.02311424,
+                21.47075815,
+                26.2779342,
+                29.11422196,
+            ],
+            [
+                24.87974829,
+                29.65917421,
+                32.55467659,
+                25.76905692,
+                30.54811572,
+                33.46356887,
+            ],
+        ),
+        "upper": (
+            None,
+            [
+                24.31254886,
+                29.09083758,
+                31.97270478,
+                25.35042808,
+                30.12988038,
+                33.03608784,
+            ],
+        ),
+        "lower": (
+            [22.92726621, 27.73521234, 30.60508605, 21.889387, 26.69616955, 29.541703],
+            None,
+        ),
+        "confidence": (
+            [
+                17.25604292,
+                20.53815074,
+                22.36509149,
+                17.10503816,
+                20.39671477,
+                22.17654811,
+            ],
+            [
+                17.78000572,
+                21.02891134,
+                23.01930741,
+                17.93101048,
+                21.17034731,
+                23.20785079,
+            ],
+        ),
+    },
+}
+
+
+@pytest.fixture(scope="module", params=["fixed", "odds-ratio"])
+def regression_with_occurrence(request):
+    model = ADAM(model="NNN", occurrence=request.param).fit(OCC_Y, X=OCC_X)
+    return request.param, model
+
+
+@pytest.mark.parametrize("case", ["both", "upper", "lower", "confidence"])
+def test_pure_regression_with_occurrence_intervals_as_r(
+    regression_with_occurrence, case
+):
+    """The mean of the sizes times the probability; the prediction interval of
+    the sizes at the level (level-(1-p))/p, the confidence one times p, as R."""
+    occurrence, model = regression_with_occurrence
+    # R: coef(m)
+    np.testing.assert_allclose(model.coef, [6.364684804, 1.91724697], rtol=1e-8)
+    interval, side = (
+        ("confidence", "both") if case == "confidence" else ("prediction", case)
+    )
+    forecast = model.predict(
+        h=3, X=OCC_X_NEW, interval=interval, level=[0.8, 0.95], side=side
+    )
+    np.testing.assert_allclose(
+        forecast.mean.values, OCC_R[occurrence]["mean"], rtol=1e-8
+    )
+    for bound, expected in zip(
+        (forecast.lower, forecast.upper), OCC_R[occurrence][case]
+    ):
+        if expected is None:
+            # R gives -Inf / Inf for the bound a one-sided interval leaves out
+            assert bound is None
+        else:
+            np.testing.assert_allclose(
+                bound.values.ravel(order="F"), expected, rtol=1e-8
+            )
+
+
+def test_pure_regression_predict_needs_x(regression_with_occurrence):
+    _, model = regression_with_occurrence
+    with pytest.raises(ValueError, match="X for the forecast horizon is needed"):
+        model.predict(h=3)
+
+
+def test_pure_regression_with_occurrence_confidence_of_one_level_as_r():
+    model = ADAM(model="NNN", occurrence="fixed").fit(OCC_Y, X=OCC_X)
+    forecast = model.predict(h=3, X=OCC_X_NEW, interval="confidence", level=0.9)
+    # R: forecast(m, h=3, newdata=..., interval="confidence", level=0.9)
+    np.testing.assert_allclose(
+        forecast.lower.values.ravel(),
+        [16.98391287, 20.51584345, 22.51443991],
+        rtol=1e-8,
+    )
+    np.testing.assert_allclose(
+        forecast.upper.values.ravel(),
+        [17.65861818, 21.15659316, 23.37594003],
+        rtol=1e-8,
+    )
+
+
 def test_pure_regression_predict_with_selected_regressors():
     rng = np.random.default_rng(1)
     x = rng.normal(100, 10, (100, 3))
@@ -466,7 +713,8 @@ def test_etsx_adapt_lasso_lambda_one_does_not_adapt():
 
 @pytest.fixture
 def select_data():
-    """The ETSX data with a third, irrelevant column (R: d$x3 <- round(sin(1:120), 6))."""
+    """The ETSX data with a third, irrelevant column
+    (R: d$x3 <- round(sin(1:120), 6))."""
     df = pd.read_csv(DATA_PATH, float_precision="round_trip")
     df["x3"] = np.round(np.sin(np.arange(1, 121)), 6)
     return df

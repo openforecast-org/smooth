@@ -678,23 +678,17 @@ def parameters_checker(
     # Default behavior: 2 for backcasting/complete, 1 for optimal/two-stage
     # Track whether user explicitly provided n_iterations
     n_iterations_provided = n_iterations is not None
-
-    if n_iterations is None:
-        if init_info["initial_type"] in ["backcasting", "complete", "gradient"]:
-            n_iterations = 2
-        else:
-            n_iterations = 1
-    else:
-        # Validate user-provided n_iterations
-        if not isinstance(n_iterations, int) or n_iterations < 1:
-            _warn(
-                "n_iterations must be a positive integer. Using default value.", silent
-            )
-            n_iterations_provided = False
-            if init_info["initial_type"] in ["backcasting", "complete"]:
-                n_iterations = 2
-            else:
-                n_iterations = 1
+    if n_iterations_provided and (
+        not isinstance(n_iterations, int) or n_iterations < 1
+    ):
+        _warn("n_iterations must be a positive integer. Using default value.", silent)
+        n_iterations_provided = False
+    if not n_iterations_provided:
+        n_iterations = (
+            2
+            if init_info["initial_type"] in ["backcasting", "complete", "gradient"]
+            else 1
+        )
 
     # Add to init_info
     init_info["n_iterations"] = n_iterations

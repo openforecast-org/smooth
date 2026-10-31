@@ -42,27 +42,18 @@ def _format_distribution(distribution: str, other: Optional[Dict] = None) -> str
         "dgamma": "Gamma",
     }
 
-    if distribution == "dgnorm":
-        shape = other.get("shape", "?")
-        return (
-            f"Generalised Normal with shape={shape:.4f}"
-            if isinstance(shape, float)
-            else f"Generalised Normal with shape={shape}"
-        )
-    elif distribution == "dt":
-        nu = other.get("nu", "?")
-        return (
-            f"Student t with df={nu:.4f}"
-            if isinstance(nu, float)
-            else f"Student t with df={nu}"
-        )
-    elif distribution == "dlgnorm":
-        shape = other.get("shape", "?")
-        return (
-            f"Log-Generalised Normal with shape={shape:.4f}"
-            if isinstance(shape, float)
-            else f"Log-Generalised Normal with shape={shape}"
-        )
+    # The distributions with a parameter, printed as R's round(value, 4)
+    with_parameter = {
+        "dgnorm": ("Generalised Normal with shape=", "shape"),
+        "dt": ("Student t with df=", "nu"),
+        "dlgnorm": ("Log-Generalised Normal with shape=", "shape"),
+    }
+    if distribution in with_parameter:
+        label, key = with_parameter[distribution]
+        value = other.get(key, "?")
+        if isinstance(value, float):
+            value = f"{round(value, 4):.15g}"
+        return f"{label}{value}"
 
     return dist_names.get(distribution, distribution)
 

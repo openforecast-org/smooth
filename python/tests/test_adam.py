@@ -9,6 +9,7 @@ Tests cover:
 """
 
 import re
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -342,6 +343,64 @@ class TestADAMBounds:
         assert alpha > 1, (
             f"Expected alpha > 1 for linear series with admissible bounds, got {alpha}"
         )
+
+    @pytest.fixture(scope="class")
+    def etsx_arima(self):
+        """ETS(ANA)+ARMA(1,1) with two adaptive regressors and admissible bounds."""
+        rng = np.random.default_rng(3)
+        x = rng.normal(size=(40, 2))
+        y = 50 + np.tile([3, -2, 4, -5], 10) + 2 * x[:, 0] - x[:, 1]
+        y = y + rng.normal(size=40)
+        orders = {"ar": [1], "i": [0], "ma": [1]}
+        return ADAM(
+            model="ANA",
+            lags=[4],
+            orders=orders,
+            regressors="adapt",
+            bounds="admissible",
+        ).fit(y, x)
+
+    def test_persistence_index_points_at_vec_g(self, etsx_arima):
+        """The deltas sit after the ETS and the ARIMA components in vec_g."""
+        vec_g = np.asarray(etsx_arima._adam_created["vec_g"]).ravel()
+        coef = dict(zip(etsx_arima.coef_names, etsx_arima.coef))
+        index = etsx_arima._persistence_index
+        assert [index(n) for n in ("alpha", "gamma", "gamma1", "delta1", "delta2")] == [
+            0,
+            1,
+            1,
+            3,
+            4,
+        ]
+        assert index("delta") == 3
+        for name in ("alpha", "gamma", "delta1", "delta2"):
+            assert vec_g[index(name)] == coef[name]
+        with pytest.raises(ValueError, match="Unknown persistence parameter: phi"):
+            index("phi")
+
+    def test_persistence_index_of_beta(self):
+        """beta follows alpha in vec_g."""
+        y = 10 + 0.5 * np.arange(20) + np.sin(np.arange(20))
+        model = ADAM(model="AAN", bounds="admissible").fit(y)
+        vec_g = np.asarray(model._adam_created["vec_g"]).ravel()
+        coef = dict(zip(model.coef_names, model.coef))
+        assert model._persistence_index("beta") == 1
+        assert vec_g[1] == coef["beta"]
+
+    def test_confint_keeps_the_deltas_admissible(self, etsx_arima):
+        from smooth.adam_general.core.utils.bounds import eigen_bounds
+
+        vec_g = np.asarray(etsx_arima._adam_created["vec_g"]).ravel()
+        static_args = etsx_arima._eigen_static_args()
+        ci = etsx_arima.confint()
+        for name in ("delta1", "delta2"):
+            low, high = eigen_bounds(
+                vec_g, etsx_arima._persistence_index(name), **static_args
+            )
+            lower, upper = ci.loc[name].iloc[1], ci.loc[name].iloc[2]
+            # The t-interval reaches below the region: clamped to its bound
+            assert lower == pytest.approx(low, abs=1e-15)
+            assert lower < upper <= high
 
 
 class TestADAMConstant:
@@ -1698,7 +1757,8 @@ def test_an_unknown_occurrence_raises(cls):
         cls(occurrence="foo").fit(y)
 
 
-# The samples too small to estimate, and the occurrence of data without zeros, as R's adam()
+# The samples too small to estimate, and the occurrence of data without zeros, as
+# R's adam()
 # (R values: adam(x, occurrence="a", h=2))
 @pytest.mark.parametrize(
     "y, forecast, loglik",
@@ -1715,6 +1775,98 @@ def test_adam_tiny_samples_as_r(y, forecast, loglik):
     assert np.allclose(np.asarray(model.predict(h=2).mean), forecast)
     if loglik is not None:
         assert model.loglik == pytest.approx(loglik, abs=1e-6)
+
+
+_AIR_10 = np.array([112, 118, 132, 129, 121, 135, 148, 148, 136, 119], dtype=float)
+
+
+# ARIMA on too few observations, as R/utils-adam.R:1638-1680. R:
+# adam(AirPassengers[1:obs], model, orders=orders, initial="optimal"): its warning,
+# m$model, m$initialType, nparam(m), logLik(m) and orders(m)
+@pytest.mark.parametrize(
+    "obs, model, orders, message, name, initial_type, nparam, loglik, orders_r",
+    [
+        (
+            10,
+            "AAN",
+            (2, 1, 2),
+            "I don't have enough observations to fit ETS with ARIMA terms. "
+            "I will construct the simple ETS.",
+            "ETS(AAN)",
+            "optimal",
+            5,
+            -37.37900953,
+            (0, 0, 0),
+        ),
+        (
+            7,
+            "NNN",
+            (2, 1, 2),
+            "The number of parameter to estimate is 8, while the number of "
+            "observations is 7. Switching initial to 'backcasting' to save some "
+            "degrees of freedom.",
+            "ARIMA(2,1,2)",
+            "complete",
+            8,
+            -17.13347997,
+            (2, 1, 2),
+        ),
+        (
+            5,
+            "NNN",
+            (3, 2, 3),
+            "The number of parameter to estimate is 12, while the number of "
+            "observations is 5. Switching to ARIMA(0,1,1) model.",
+            "ARIMA(0,1,1)",
+            "optimal",
+            3,
+            -16.03769798,
+            (0, 1, 1),
+        ),
+    ],
+)
+def test_arima_on_a_small_sample_as_r(
+    capsys, obs, model, orders, message, name, initial_type, nparam, loglik, orders_r
+):
+    arima = {"ar": [orders[0]], "i": [orders[1]], "ma": [orders[2]]}
+    fit = ADAM(model=model, orders=arima, initial="optimal").fit(_AIR_10[:obs])
+    assert f"Warning: {message}" in capsys.readouterr().out.splitlines()
+    assert fit.model_name == name
+    assert fit.initial_type == initial_type
+    assert fit.nparam == nparam
+    assert fit.loglik == pytest.approx(loglik, rel=1e-8)
+    assert tuple(fit.orders[key][0] for key in ("ar", "i", "ma")) == orders_r
+    # The backcasting takes two iterations, as R sets them after this check
+    assert fit._initials["n_iterations"] == (2 if initial_type == "complete" else 1)
+
+
+@pytest.mark.parametrize(
+    "initial, expected",
+    [
+        ("backcasting", 2),
+        ("complete", 2),
+        ("optimal", 1),
+        ("gradient", 2),
+    ],
+)
+@pytest.mark.parametrize("n_iterations", [0, 2.5])
+def test_an_invalid_n_iterations_takes_the_default(
+    capsys, initial, expected, n_iterations
+):
+    # The warning is shown with verbose, as the other warnings of the checker
+    fit = ADAM(model="ANN", initial=initial, n_iterations=n_iterations, verbose=1).fit(
+        _AIR_10
+    )
+    assert (
+        "Warning: n_iterations must be a positive integer. Using default value."
+        in capsys.readouterr().out.splitlines()
+    )
+    assert fit._initials["n_iterations"] == expected
+    assert (
+        fit._initials["n_iterations"]
+        == (ADAM(model="ANN", initial=initial).fit(_AIR_10)._initials["n_iterations"])
+    )
+    assert fit._initials["n_iterations_provided"] is False
 
 
 def test_adam_fits_a_list_as_the_array():
@@ -1956,3 +2108,144 @@ class TestADAMPrint:
     def test_repr(self, damped):
         assert repr(ADAM(model="ANN")) == "ADAM(model=ANN, fitted=False)"
         assert repr(damped) == "ADAM(ETS(AAdN), fitted=True)"
+
+
+class TestPrintingHelpers:
+    """The pieces of print(model), as R's print.adam(); the stand-ins carry only
+    what each helper reads."""
+
+    @pytest.mark.parametrize(
+        "distribution, expected",
+        [
+            ("dnorm", "Normal"),
+            ("dlaplace", "Laplace"),
+            ("ds", "S"),
+            ("dlogis", "Logistic"),
+            ("dlnorm", "Log-Normal"),
+            ("dllaplace", "Log-Laplace"),
+            ("dls", "Log-S"),
+            ("dinvgauss", "Inverse Gaussian"),
+            ("dgamma", "Gamma"),
+            # R: round(shape, 4) / round(nu, 4)
+            ("dgnorm", "Generalised Normal with shape=1.2346"),
+            ("dt", "Student t with df=5.1235"),
+            ("dlgnorm", "Log-Generalised Normal with shape=1.2346"),
+        ],
+    )
+    def test_format_distribution(self, distribution, expected):
+        from smooth.adam_general.core.utils.printing import _format_distribution
+
+        other = {"shape": 1.23456789, "nu": 5.123456}
+        assert _format_distribution(distribution, other) == expected
+
+    def test_format_distribution_without_a_float_parameter(self):
+        from smooth.adam_general.core.utils.printing import _format_distribution
+
+        assert _format_distribution("dgnorm", {"shape": 2}) == (
+            "Generalised Normal with shape=2"
+        )
+        assert _format_distribution("dgnorm") == "Generalised Normal with shape=?"
+        assert _format_distribution("dt") == "Student t with df=?"
+        assert _format_distribution("dlgnorm", {}) == (
+            "Log-Generalised Normal with shape=?"
+        )
+        assert _format_distribution("dunknown") == "dunknown"
+
+    def test_format_distribution_drops_the_trailing_zeros_as_r(self):
+        from smooth.adam_general.core.utils.printing import _format_distribution
+
+        # R: print(adam(y, "ANN", distribution="dgnorm", shape=1.5, ...))
+        assert _format_distribution("dgnorm", {"shape": 1.5}) == (
+            "Generalised Normal with shape=1.5"
+        )
+
+    def test_get_initialization_type(self):
+        from smooth.adam_general.core.utils.printing import _get_initialization_type
+
+        assert (
+            _get_initialization_type(
+                SimpleNamespace(_initials={"initial_type": "backcasting"})
+            )
+            == "backcasting"
+        )
+        assert (
+            _get_initialization_type(SimpleNamespace(_initials={"x": 1})) == "unknown"
+        )
+        assert (
+            _get_initialization_type(
+                SimpleNamespace(_initials={}, _config={"initial": "optimal"})
+            )
+            == "optimal"
+        )
+        assert (
+            _get_initialization_type(
+                SimpleNamespace(_config={"initial": {"level": 1.0}})
+            )
+            == "provided"
+        )
+        assert _get_initialization_type(SimpleNamespace()) == "unknown"
+
+    def test_get_distribution(self):
+        from smooth.adam_general.core.utils.printing import _get_distribution
+
+        general = {"distribution": "default", "distribution_new": "dgamma"}
+        assert _get_distribution(SimpleNamespace(_general=general)) == "dgamma"
+        assert (
+            _get_distribution(SimpleNamespace(_general={"distribution": "ds"})) == "ds"
+        )
+        assert _get_distribution(SimpleNamespace(_general={"loss": "MSE"})) == "dnorm"
+        assert (
+            _get_distribution(
+                SimpleNamespace(_general={}, _config={"distribution": "dlaplace"})
+            )
+            == "dlaplace"
+        )
+        assert (
+            _get_distribution(SimpleNamespace(_config={"distribution": None}))
+            == "dnorm"
+        )
+        assert _get_distribution(SimpleNamespace()) == "dnorm"
+
+    def test_get_n_params(self):
+        from smooth.adam_general.core.utils.printing import _get_n_params
+
+        n_param = SimpleNamespace(n_param_estimated=4)
+        assert _get_n_params(SimpleNamespace(_general={"n_param": n_param})) == 4
+        # The legacy table: its first row and column
+        assert (
+            _get_n_params(
+                SimpleNamespace(_general={"parameters_number": [[3, 1], [0, 0]]})
+            )
+            == 3
+        )
+        assert _get_n_params(SimpleNamespace(_general={"parameters_number": [5]})) == 5
+        assert _get_n_params(SimpleNamespace(_general={"loss": "MSE"})) == 0
+        assert (
+            _get_n_params(
+                SimpleNamespace(
+                    _general={"parameters_number": []}, _n_param_estimated=2
+                )
+            )
+            == 2
+        )
+        assert _get_n_params(SimpleNamespace(_general={}, _n_param_estimated=6)) == 6
+        assert _get_n_params(SimpleNamespace()) == 0
+
+    def test_the_printed_model_takes_them(self):
+        """print() of a dgnorm model with provided parameters, as R's print() of
+        adam(AirPassengers[1:12], "ANN", distribution="dgnorm", persistence=0.3,
+        initial=115, shape=1.23456789)."""
+        y = np.array([112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118.0])
+        model = ADAM(
+            model="ANN",
+            distribution="dgnorm",
+            persistence={"level": 0.3},
+            initial={"level": 115.0},
+            gnorm_shape=1.23456789,
+        ).fit(y)
+        lines = str(model).splitlines()
+        assert "With provided initialisation" in lines
+        assert (
+            "Distribution assumed in the model: Generalised Normal with shape=1.2346"
+            in lines
+        )

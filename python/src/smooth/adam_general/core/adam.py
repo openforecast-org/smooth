@@ -2607,56 +2607,47 @@ class ADAM:
         # Each error as the one-step one, after the periods without an observed size
         errors = self._gap_residuals()
         dist = self.distribution_
+        # The observed sizes, as R's residsToGo (and rstandard()); the others keep
+        # their residuals
+        residuals = np.asarray(self.residuals, dtype=float)
+        used = np.isfinite(residuals)
+        if hasattr(self, "_observations"):
+            used &= np.asarray(self._observations["ot_logical"], dtype=bool)
+        elif hasattr(self, "_ot"):
+            used &= np.asarray(self._ot, dtype=bool)
 
-        if dist == "dnorm":
-            errors -= np.nanmean(errors)
-            total_sq = np.nansum(errors**2)
-            denom = np.sqrt((total_sq - errors**2) / df)
-            return errors / denom
-
-        elif dist == "dlaplace":
+        if dist == "dlaplace":
             errors -= np.nanmean(errors)
             total_abs = np.nansum(np.abs(errors))
-            denom = (total_abs - np.abs(errors)) / df
-            return errors / denom
-
+            values = errors / ((total_abs - np.abs(errors)) / df)
         elif dist == "ds":
             errors -= np.nanmean(errors)
             total_sqrt_abs = np.nansum(np.sqrt(np.abs(errors)))
             denom = ((total_sqrt_abs - np.sqrt(np.abs(errors))) / (2 * df)) ** 2
-            return errors / denom
-
+            values = errors / denom
         elif dist == "dgnorm":
             beta = self._gnorm_shape() or 2.0
             errors -= np.nanmean(errors)
             total_pow = np.nansum(np.abs(errors) ** beta)
             denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
-            return errors / denom
-
+            values = errors / denom
         elif dist in ("dinvgauss", "dgamma"):
-            # The observed values, non-zero with an occurrence model, as R's
-            # residsToGo: each leaves itself out of their mean
-            used = observed_mask(self._observations)
-            if getattr(self, "_om_model", None) is not None:
-                used = used & np.asarray(self._observations["ot_logical"], dtype=bool)
+            # Each leaves itself out of the mean of the used ones
             total = np.sum(errors[used])
             mean_loo = (total - np.where(used, errors, 0.0)) / (
                 np.sum(used) - used.astype(float)
             )
-            return np.where(used, errors / mean_loo, errors)
-
+            values = errors / mean_loo
         elif dist == "dlnorm":
             scale = self.extract_scale()
             log_e = np.log(errors) - np.nanmean(np.log(errors)) - scale / 2
             total_sq = np.nansum(log_e**2)
-            denom = np.sqrt((total_sq - log_e**2) / df)
-            return np.exp(log_e / denom)
-
-        else:  # default: treat like normal
+            values = np.exp(log_e / np.sqrt((total_sq - log_e**2) / df))
+        else:  # dnorm, and the default of R
             errors -= np.nanmean(errors)
             total_sq = np.nansum(errors**2)
-            denom = np.sqrt((total_sq - errors**2) / df)
-            return errors / denom
+            values = errors / np.sqrt((total_sq - errors**2) / df)
+        return np.where(used, values, residuals)
 
     def outlierdummy(
         self,
@@ -4319,8 +4310,8 @@ class ADAM:
             p = np.asarray(om_model.predict(h=h, X=X).mean, dtype=float)
             result.mean = np.ravel(result.mean) * p
             if interval == "confidence":
-                result.lower = np.asarray(result.lower, dtype=float) * p[:, None]
-                result.upper = np.asarray(result.upper, dtype=float) * p[:, None]
+                result.lower = np.reshape(result.lower, (h, -1)) * p[:, None]
+                result.upper = np.reshape(result.upper, (h, -1)) * p[:, None]
             elif interval != "none":
                 # The bound of a one-sided interval that ALM leaves out stays NaN
                 mixture_lower = np.full((h, len(levels)), np.nan)

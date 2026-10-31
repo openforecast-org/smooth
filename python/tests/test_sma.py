@@ -142,3 +142,43 @@ class TestSMAHoldout:
         m = SMA(order=4, h=12, holdout=True).fit(y60)
         fc = m.predict(h=12, interval="prediction")
         assert len(fc.mean) == 12
+
+
+class TestSMAInferFrequency:
+    """The frequency of the data, R's frequency(y), evaluated next to the ternary
+    search of the order."""
+
+    def test_no_frequency_without_a_dated_index(self):
+        import pandas as pd
+
+        from smooth.adam_general.core.sma import _infer_frequency
+
+        assert _infer_frequency(np.arange(24.0)) is None
+        assert _infer_frequency(pd.Series(np.arange(24.0))) is None
+        irregular = pd.DatetimeIndex(["2020-01-01", "2020-01-03", "2020-01-10"])
+        assert irregular.freq is None
+        assert _infer_frequency(pd.Series([1.0, 2.0, 3.0], index=irregular)) is None
+
+    @pytest.mark.parametrize(
+        "freq, expected", [("MS", 12), ("QS", 4), ("W", 52), ("D", 7), ("h", 24)]
+    )
+    def test_the_frequency_of_a_dated_index(self, freq, expected):
+        import pandas as pd
+
+        from smooth.adam_general.core.sma import _infer_frequency
+
+        index = pd.date_range("2020-01-01", periods=30, freq=freq)
+        assert _infer_frequency(pd.Series(np.arange(30.0), index=index)) == expected
+
+    def test_the_order_of_the_frequency_is_evaluated_as_r(self):
+        import pandas as pd
+
+        from tests.test_outliers import AIRPASSENGERS
+
+        y = pd.Series(
+            AIRPASSENGERS, index=pd.date_range("1949-01-01", periods=144, freq="MS")
+        )
+        model = SMA().fit(y)
+        # R: which(!is.na(sma(AirPassengers)$ICs)) and sma(AirPassengers)$ICs[12]
+        assert sorted(model.ICs) == [1, 2, 3, 5, 9, 12, 18, 36, 71, 141]
+        assert model.ICs[12] == pytest.approx(1550.957584, rel=1e-8)

@@ -207,22 +207,21 @@ def test_auto_ces_drops_the_models_a_short_sample_cannot_take():
 @pytest.mark.parametrize(
     "seasonality, a, name, side, bound, tolerance",
     [
-        ("none", None, "alpha_0", "max", 2.00026793268, _BOUND_TOLERANCE),
-        ("none", None, "alpha_1", "min", 1.00013497312, _BOUND_TOLERANCE),
-        ("partial", None, "alpha_1", "max", 1.0, _BOUND_TOLERANCE),
+        ("none", None, "alpha_0", "max", 2.00027003727, _BOUND_TOLERANCE),
+        ("none", None, "alpha_1", "min", 1.00013392153, _BOUND_TOLERANCE),
+        ("partial", None, "alpha_1", "max", 1.00000000553, _BOUND_TOLERANCE),
         # The bound of the full CES follows its estimates, which the last bits of the
-        # matrix products of the BLAS move (1.837771 with the reference BLAS, 1.836848
-        # with OpenBLAS)
-        ("full", 1.35 + 1.01j, "beta_0", "max", 1.83777093985, 1e-3),
-        ("full", 1.35 + 1.01j, "beta_1", "min", 0.94, _BOUND_TOLERANCE),
+        # matrix products of the BLAS move (here with the reference BLAS)
+        ("full", 1.35 + 1.01j, "beta_0", "max", 1.83809071273, 1e-3),
+        ("full", 1.35 + 1.01j, "beta_1", "min", 0.935343781235, _BOUND_TOLERANCE),
     ],
 )
 def test_reapply_keeps_the_draws_of_ces_stable(
     seasonality, a, name, side, bound, tolerance
 ):
-    """The draws of the smoothing parameters are cut at the range where the model
-    stays stable, with the others at their estimates, as R's cesBounds(): they
-    pile up at R's bound. R: set.seed(1); m <- ces(ts(y, frequency=12),
+    """The draws of the smoothing parameters are cut at the interval around the
+    estimate where the model stays forecastable, with the others at their
+    estimates, as R's cesBounds(): they pile up at R's bound. R: set.seed(1); m <- ces(ts(y, frequency=12),
     seasonality=..., initial="optimal", a=...); range(reapply(m,
     nsim=2000)$randomParameters[, name])."""
     m = CES(seasonality=seasonality, lags=[12], initial="optimal", a=a).fit(_AIR)

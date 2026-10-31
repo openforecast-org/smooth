@@ -268,7 +268,7 @@ test_that("confint.omg returns a finite joint CI table", {
 
 test_that("confint.omg clamps each model to its admissible bounds, as confint.adam", {
     # omgConfintSide() clamped the usual bounds only: the lower limits were below the
-    # admissible ones (-0.022 and -0.025 for -0.01)
+    # admissible ones (-0.022 and -0.025 for 0)
     set.seed(41);
     y <- rpois(120, 0.6);
     m <- omg(y, modelA="MNN", modelB="MNN", bounds="admissible");

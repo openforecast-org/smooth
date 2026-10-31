@@ -4483,38 +4483,24 @@ eigenValues <- function(object, persistence=NULL){
                             modelLags(object), ncol(object$data)>1, nobs(object))>1-1E-10));
 }
 
-# The function that returns the bounds for persistence parameters, based on eigen values
+# The bounds of a persistence parameter with the others at their values: the interval
+# around its value on which the model stays forecastable (eigenValues()), found by the
+# search of the ARMA bounds (stabilityInterval() in src/headers/arimaBounds.h) within
+# [-5, 5]. No bounds, (-Inf, Inf), when the model is not forecastable at its value
 eigenBounds <- function(object, persistence, variableNumber=1){
-    # The lower bound
-    persistence[variableNumber,] <- -5;
-    eigenValuesTested <- eigenValues(object, persistence);
-    while(eigenValuesTested){
-        persistence[variableNumber,] <- persistence[variableNumber,] + 0.01;
-        eigenValuesTested[] <- eigenValues(object, persistence);
-        if(persistence[variableNumber,]>5){
-            persistence[variableNumber,] <- -5;
-            break;
-        }
+    bounds <- stabilityIntervalCpp(function(value){
+        persistence[variableNumber,] <- value;
+        return(!eigenValues(object, persistence));
+    }, persistence[variableNumber,], 0.01, 5);
+    if(anyNA(bounds)){
+        return(c(-Inf, Inf));
     }
-    lowerBound <- persistence[variableNumber,]-0.01;
-    # The upper bound
-    persistence[variableNumber,] <- 5;
-    eigenValuesTested <- eigenValues(object, persistence);
-    while(eigenValuesTested){
-        persistence[variableNumber,] <- persistence[variableNumber,] - 0.01;
-        eigenValuesTested[] <- eigenValues(object, persistence);
-        if(persistence[variableNumber,] < -5){
-            persistence[variableNumber,] <- 5;
-            break;
-        }
-    }
-    upperBound <- persistence[variableNumber,]+0.01;
-    return(c(lowerBound, upperBound));
+    return(as.vector(bounds));
 }
 
 # The bounds of a smoothing parameter of CES with the other parameters at their
-# values: the range of the values of a grid on [-5, 5] (and the value itself) at
-# which the model is stable. As eigenBounds(), but each parameter moves both the
+# values: the interval around its value on which the model stays forecastable, found
+# by the same search as eigenBounds(). As there, but each parameter moves both the
 # transition and the persistence, so both are rebuilt from the parameters: each
 # complex (alpha_0, alpha_1) and (beta_0, beta_1) gives a pair of states, after the
 # level and potential for beta, and the real beta of the partial seasonality one
@@ -4534,8 +4520,11 @@ cesBounds <- function(object, parameters, variableNumber){
         persistence[2+seq_along(partial),] <- parameters[partial];
         return(!eigenValues(object, persistence));
     }
-    grid <- -5+0.01*(0:1000);
-    return(range(parameters[variableNumber], grid[vapply(grid, stable, logical(1))]));
+    bounds <- stabilityIntervalCpp(stable, parameters[variableNumber], 0.01, 5);
+    if(anyNA(bounds)){
+        return(c(-Inf, Inf));
+    }
+    return(as.vector(bounds));
 }
 
 # The bounds of the ARMA parameters among parametersNames, each within its factor

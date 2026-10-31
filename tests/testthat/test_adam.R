@@ -1911,3 +1911,11 @@ test_that("the selection of the regressors expands the factors with or without a
     expect_equal(logLik(testModel),
                  logLik(adam(xregFactor, "ANN", regressors="select", formula=y~x1+x2+z)));
 })
+
+# The bounds of a smoothing parameter are the interval around its estimate where the model
+# is forecastable, bisected to the tolerance of the condition: 0 <= alpha < 2 for ETS(A,N,N)
+# (alpha=0 cancels the unit root of the level). The grid of 0.01 gave (-0.01, 2)
+test_that("eigenBounds() of ETS(A,N,N) is the forecastable region of alpha", {
+    testModel <- adam(AirPassengers, "ANN", bounds="admissible");
+    expect_equal(eigenBounds(testModel, as.matrix(testModel$persistence), 1), c(0, 2), tolerance=1e-8);
+})

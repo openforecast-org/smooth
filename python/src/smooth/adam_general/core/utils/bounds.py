@@ -8,6 +8,7 @@ clamp parameters to the region in which the model is stable
 
 import numpy as np
 
+from smooth.adam_general import _ols  # type: ignore[attr-defined]
 from smooth.adam_general._eigenCalc import smooth_eigens
 
 
@@ -46,41 +47,33 @@ def eigen_values(
 def eigen_bounds(vec_g, variable_index, **static_args):
     """Stability bounds for a single persistence parameter.
 
-    Translation of R's ``eigenBounds`` (``R/adam.R:4341``): grid-search the value
-    of ``vec_g[variable_index]`` from -5 upwards (step 0.01) for the lower bound
-    and from 5 downwards for the upper bound, keeping the discount matrix stable.
+    Translation of R's ``eigenBounds``: the interval around the value of
+    ``vec_g[variable_index]`` on which the model stays forecastable, found by the
+    search of the ARMA bounds (``stability_interval``, ``arimaBounds.h``) within
+    [-5, 5]; ``(-inf, inf)`` when it is not forecastable at its value.
     ``static_args`` are forwarded to :func:`eigen_values` (everything except
     ``vec_g``).
     """
     g = np.asarray(vec_g, dtype=float).copy()
 
-    # Lower bound
-    g[variable_index] = -5.0
-    while eigen_values(g, **static_args):
-        g[variable_index] += 0.01
-        if g[variable_index] > 5:
-            g[variable_index] = -5.0
-            break
-    lower_bound = g[variable_index] - 0.01
+    def stable(value):
+        g[variable_index] = value
+        return not eigen_values(g, **static_args)
 
-    # Upper bound
-    g[variable_index] = 5.0
-    while eigen_values(g, **static_args):
-        g[variable_index] -= 0.01
-        if g[variable_index] < -5:
-            g[variable_index] = 5.0
-            break
-    upper_bound = g[variable_index] + 0.01
-
-    return lower_bound, upper_bound
+    lower, upper = _ols.stability_interval(
+        stable, float(vec_g[variable_index]), 0.01, 5.0
+    )
+    if np.isnan(lower) or np.isnan(upper):
+        return -np.inf, np.inf
+    return float(lower), float(upper)
 
 
 def ces_bounds(params, names, variable_index, vec_g, **static_args):
     """Stability bounds for a single smoothing parameter of CES.
 
-    Translation of R's ``cesBounds``: the range of the values of a grid on
-    [-5, 5] (and the value itself) at which the model is stable, with the other
-    parameters at their values. As :func:`eigen_bounds`, but each parameter moves
+    Translation of R's ``cesBounds``: the interval around its value on which the
+    model stays forecastable, with the other parameters at their values, found by
+    the same search as :func:`eigen_bounds`. As there, but each parameter moves
     both the transition and the persistence, so both are rebuilt from ``params``:
     each complex (alpha_0, alpha_1) and (beta_0, beta_1) gives a pair of states,
     after the level and potential for beta, and the real beta of the partial
@@ -104,10 +97,12 @@ def ces_bounds(params, names, variable_index, vec_g, **static_args):
         g[2 : 2 + len(partial)] = params[partial]
         return not eigen_values(g, transition, **static_args)
 
-    value = params[variable_index]
-    grid = -5 + 0.01 * np.arange(1001)
-    values = [value] + [x for x in grid if stable(x)]
-    return min(values), max(values)
+    lower, upper = _ols.stability_interval(
+        stable, float(params[variable_index]), 0.01, 5.0
+    )
+    if np.isnan(lower) or np.isnan(upper):
+        return -np.inf, np.inf
+    return float(lower), float(upper)
 
 
 def arima_parameter_bounds(names, params, arima, lags):
@@ -121,8 +116,6 @@ def arima_parameter_bounds(names, params, arima, lags):
 
     Returns a dict of parameter name to (lower, upper).
     """
-    from smooth.adam_general import _ols
-
     estimated = dict(zip(names, params))
     fixed = iter(arima.get("arma_parameters") or [])
     factors: dict = {}

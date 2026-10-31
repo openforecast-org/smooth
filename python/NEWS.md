@@ -6,6 +6,7 @@ Release history of the Python implementation of the **smooth** forecasting packa
 ## v1.2.0 (unreleased)
 
 Changes:
+* The admissible bounds of the smoothing parameters in `confint()` and `reapply()` (`ADAM`, `CES`, `OM`, `OMG`) are the interval around each estimate where the model is forecastable, found by the search of the ARMA bounds (shared C++ code with R); they were the outermost points of a grid of 0.01, up to 0.01 outside the region, as in R.
 * `OMG.vcov()` takes `heuristics`, as R's `vcov.omg()`: it returns `diag(abs(coef) * heuristics)`.
 * Requires `greybox>=1.0.10`: MAPE and MPE are `Inf` on a zero actual, as in R.
 * `OM` and `OMG` no longer take `formula` / `formula_a` / `formula_b`, which were ignored; the regressors come from `X`, as in the other models.

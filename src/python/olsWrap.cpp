@@ -61,6 +61,20 @@ py::array_t<double> arima_parameter_bounds_wrapper(const arma::vec& values, arma
     return arr;
 }
 
+// The interval around current on which the Python callable stable() is true (arimaBounds.h)
+py::array_t<double> stability_interval_wrapper(py::function stable, double current, double step,
+                                               double limit) {
+    arma::vec b = stabilityInterval([&](double value) {
+        return stable(value).cast<bool>();
+    }, current, step, limit);
+    py::array_t<double> arr({static_cast<py::ssize_t>(b.n_elem)});
+    auto buf = arr.mutable_unchecked<1>();
+    for(size_t i = 0; i < b.n_elem; i++) {
+        buf(i) = b(i);
+    }
+    return arr;
+}
+
 // A vector as a NumPy array
 static py::array_t<double> householder_vector(const arma::vec& v) {
     py::array_t<double> arr({static_cast<py::ssize_t>(v.n_elem)});
@@ -157,4 +171,7 @@ PYBIND11_MODULE(_ols, m) {
         py::arg("j"),
         py::arg("sign")
     );
+    m.def("stability_interval", &stability_interval_wrapper,
+          "The interval around current on which stable(value) is true (see arimaBounds.h).",
+          py::arg("stable"), py::arg("current"), py::arg("step") = 0.01, py::arg("limit") = 5.0);
 }

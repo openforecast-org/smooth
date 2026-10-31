@@ -637,3 +637,27 @@ test_that("rstudent() of om() and omg() is rstandard() with one degree of freedo
                      label=class(testModel)[1]);
     }
 })
+
+test_that("omLinkFunction() maps the latent values to the probabilities of each occurrence type", {
+    oddsValues <- c(0.5, 1, 3);
+    # The odds for the multiplicative error and the other types, their logarithms for the additive one
+    for(Etype in c("M","N")){
+        expect_equal(omLinkFunction(oddsValues, Etype, "odds-ratio"), c(1/3, 0.5, 0.75), label=Etype);
+        expect_equal(omLinkFunction(oddsValues, Etype, "inverse-odds-ratio"), c(2/3, 0.5, 0.25), label=Etype);
+    }
+    expect_equal(omLinkFunction(log(oddsValues), "A", "odds-ratio"), c(1/3, 0.5, 0.75));
+    expect_equal(omLinkFunction(log(oddsValues), "A", "inverse-odds-ratio"), c(2/3, 0.5, 0.25));
+    # The probabilities of the direct and the fixed models are kept between zero and one
+    for(occurrence in c("fixed","direct")){
+        expect_equal(omLinkFunction(c(-0.2, 0.4, 1.3), "A", occurrence), c(0, 0.4, 1), label=occurrence);
+    }
+    expect_equal(omLinkFunction(oddsValues, "M", "general"), oddsValues);
+})
+
+test_that("the inverse odds ratio with the additive error is the odds ratio of the non-occurrence", {
+    testModel <- om(yIntermittent, model="ANN", occurrence="inverse-odds-ratio");
+    expect_equal(testModel$model, "oETS(ANN)[I]");
+    nonOccurrenceModel <- om((yIntermittent==0)*1, model="ANN", occurrence="odds-ratio");
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(nonOccurrenceModel)), tolerance=1e-6);
+    expect_equal(as.vector(fitted(testModel)), 1 - as.vector(fitted(nonOccurrenceModel)), tolerance=1e-6);
+})

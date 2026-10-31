@@ -1912,3 +1912,172 @@ test_that("the selection of the regressors expands the factors with or without a
                  logLik(adam(xregFactor, "ANN", regressors="select", formula=y~x1+x2+z)));
 })
 
+
+#### The damping parameter ####
+test_that("phi is used, estimated or one depending on the model", {
+    # Provided for a damped trend: used, and counted as provided
+    testModel <- adam(BJsales, "AAdN", phi=0.9);
+    expect_equal(testModel$phi, 0.9);
+    expect_false("phi" %in% names(coef(testModel)));
+    expect_equal(testModel$nParam["Provided","nParamInternal"], 1);
+    # Not provided: estimated for a damped trend, one otherwise and for ARIMA
+    testModel <- adam(BJsales, "AAdN");
+    expect_true("phi" %in% names(coef(testModel)));
+    expect_equal(testModel$phi, coef(testModel)[["phi"]]);
+    expect_equal(adam(BJsales, "AAN")$phi, 1);
+    expect_equal(adam(BJsales, "NNN", orders=list(ar=1,i=1), phi=0.9)$phi, 1);
+})
+
+test_that("phi that cannot be used is estimated with a warning", {
+    expect_warning(testModel <- adam(BJsales, "ZZN", phi=0.9),
+                   "Predefined phi can only be used with preselected ETS model");
+    expect_s3_class(testModel, "adam");
+    expect_warning(testModel <- adam(BJsales, "AAdN", phi="a"), "Provided value of phi is meaningless");
+    expect_true("phi" %in% names(coef(testModel)));
+    for(phi in c(-0.1, 3)){
+        expect_warning(testModel <- adam(BJsales, "AAdN", phi=phi), "Damping parameter should lie in \\(0, 2\\)");
+        expect_true("phi" %in% names(coef(testModel)), label=phi);
+        expect_true(testModel$phi>=0 && testModel$phi<=1, label=phi);
+    }
+})
+
+#### Methods of the smooth class ####
+test_that("modelLags() returns the lags of the states", {
+    testModel <- adam(BJsales, "AAN");
+    expect_equal(modelLags(testModel), testModel$lagsAll);
+    expect_equal(as.vector(modelLags(testModel)), c(1,1));
+    expect_equal(as.vector(modelLags(adam(AirPassengers, "MAM", lags=12))), c(1,1,12));
+    # The objects of the old msarima() kept them in modelLags
+    testModel <- structure(list(modelLags=matrix(c(1,1,12), ncol=1)), class=c("msarima","smooth"));
+    expect_equal(modelLags(testModel), matrix(c(1,1,12), ncol=1));
+})
+
+test_that("pointLik() of msdecompose() is the density of its residuals", {
+    testModel <- msdecompose(AirPassengers, lags=12, type="multiplicative");
+    yValues <- as.vector(actuals(testModel));
+    errors <- as.vector(residuals(testModel));
+    # The residuals of the multiplicative decomposition are in logs: the log-normal density
+    expect_s3_class(pointLik(testModel), "ts");
+    expect_equal(tsp(pointLik(testModel)), tsp(AirPassengers));
+    expect_equal(as.vector(pointLik(testModel)),
+                 dlnorm(yValues, log(as.vector(fitted(testModel))), sqrt(mean(errors^2)), log=TRUE));
+    testModel <- msdecompose(AirPassengers, lags=12, type="additive");
+    errors <- as.vector(residuals(testModel));
+    expect_equal(as.vector(pointLik(testModel)), dnorm(errors, 0, sqrt(mean(errors^2)), log=TRUE));
+    expect_equal(as.vector(pointLik(testModel, log=FALSE)), dnorm(errors, 0, sqrt(mean(errors^2))));
+    # The Laplace density for the MAE losses and the S one for HAM
+    testModel$loss <- "MAE";
+    expect_equal(as.vector(pointLik(testModel)), dlaplace(errors, 0, mean(abs(errors)), log=TRUE));
+    testModel$loss <- "HAM";
+    expect_equal(as.vector(pointLik(testModel)), ds(errors, 0, mean(sqrt(abs(errors)))/2, log=TRUE));
+})
+
+test_that("plot() of the forecast of msdecompose() draws it with and without the interval", {
+    testModel <- msdecompose(AirPassengers, lags=12, type="multiplicative");
+    plotLength <- c(parametric=0, none=0);
+    for(interval in names(plotLength)){
+        testForecast <- forecast(testModel, h=6, interval=interval);
+        expect_s3_class(testForecast, "smooth.forecast");
+        pdf(NULL);
+        dev.control("enable");
+        plot(testForecast);
+        plotLength[interval] <- length(recordPlot()[[1]]);
+        dev.off();
+    }
+    expect_gt(plotLength[["none"]], 0);
+    # The interval adds its bounds to the plot
+    expect_gt(plotLength[["parametric"]], plotLength[["none"]]);
+})
+
+test_that("accuracy() of adam() and of its forecasts", {
+    holdout <- BJsales[141:150];
+    testModel <- adam(BJsales, "AAN", h=10, holdout=TRUE);
+    expect_equal(accuracy(testModel), testModel$accuracy);
+    expect_equal(accuracy(testModel)[["ME"]], mean(holdout - testModel$forecast));
+    expect_equal(accuracy(forecast(testModel, h=10)), testModel$accuracy);
+    # Without the holdout: the in-sample measures, or those on the provided holdout
+    testModel <- adam(BJsales[1:140], "AAN");
+    expect_equal(accuracy(testModel), measures(actuals(testModel), fitted(testModel), actuals(testModel)));
+    expect_equal(accuracy(testModel)[["ME"]], mean(residuals(testModel)));
+    expect_equal(accuracy(testModel, holdout=holdout),
+                 measures(holdout, forecast(testModel, h=10)$mean, actuals(testModel)));
+    testForecast <- forecast(testModel, h=10);
+    expect_equal(accuracy(testForecast), accuracy(testModel));
+    expect_equal(accuracy(testForecast, holdout=holdout), accuracy(testModel, holdout=holdout));
+})
+
+test_that("plot() of predict() of adam() draws the fitted values and their interval", {
+    testModel <- adam(BJsales, "AAN");
+    testPredict <- predict(testModel);
+    expect_s3_class(testPredict, "adam.predict");
+    pdf(NULL);
+    dev.control("enable");
+    plot(testPredict);
+    plotLength <- length(recordPlot()[[1]]);
+    expect_gt(plotLength, 0);
+    # The interval spans the y-axis, unless the limits are provided
+    testPredict <- predict(testModel, interval="prediction");
+    plot(testPredict);
+    expect_gt(length(recordPlot()[[1]]), plotLength);
+    yRange <- range(c(actuals(testModel), testPredict$mean, testPredict$lower, testPredict$upper));
+    expect_equal(par("usr")[3:4], yRange + c(-1,1)*0.04*diff(yRange));
+    plot(testPredict, ylim=c(150,300));
+    expect_equal(par("usr")[3:4], c(150,300) + c(-1,1)*0.04*150);
+    dev.off();
+})
+
+test_that("The gap variances of a model without the filter come from its matrices", {
+    yGaps <- BJsales;
+    yGaps[c(20,21,50)] <- NA;
+    expect_warning(testModel <- adam(yGaps, "ANN", persistence=0.3), "Data contains NAs");
+    # As in the models fitted without the filter (cma()): the error after j-1 missing values
+    # sums j one-step errors, with the variance 1+(j-1)*alpha^2 and the mean multiplier 1+(j-1)*alpha
+    testModel$adamCpp <- NULL;
+    gapVariance <- gapMean <- rep(1, 150);
+    gapVariance[c(22,51)] <- 1 + c(2,1)*0.3^2;
+    gapMean[c(22,51)] <- 1 + c(2,1)*0.3;
+    expect_equal(adam_gapVarianceModel(testModel), gapVariance);
+    expect_equal(adam_gapVarianceModel(testModel, 1), gapMean);
+    expect_equal(as.vector(adam_gapResiduals(testModel)), as.vector(residuals(testModel))/sqrt(gapVariance));
+    expect_equal(as.vector(pointLik(testModel))[c(19,22,51)],
+                 dnorm(BJsales[c(19,22,51)], as.vector(fitted(testModel))[c(19,22,51)],
+                       sqrt(testModel$scale*gapVariance[c(19,22,51)]), log=TRUE));
+})
+
+test_that("extractSigma() of adam() is sigma() or the one implied by the scale model", {
+    testModel <- adam(BJsales, "ANN");
+    expect_equal(extractSigma(testModel), sigma(testModel));
+    # The scale of the normal distribution is the variance, the one of Laplace is sigma/sqrt(2)
+    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "non-positive values");
+    expect_length(extractSigma(scaleModel), nobs(testModel));
+    expect_equal(extractSigma(scaleModel), sqrt(extractScale(scaleModel)));
+    testModel <- adam(BJsales, "ANN", distribution="dlaplace");
+    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "non-positive values");
+    expect_equal(extractSigma(scaleModel), sqrt(2)*extractScale(scaleModel));
+})
+
+#### The start-up message ####
+test_that(".onAttach() shows the version of smooth and, at times, a hint", {
+    # The seed that makes the random number of the message satisfy the condition
+    findSeed <- function(condition){
+        seed <- 1;
+        set.seed(seed);
+        while(!condition(sample(c(1:100), 1))){
+            seed <- seed + 1;
+            set.seed(seed);
+        }
+        return(seed);
+    }
+    startUpMessage <- paste0("This is package \"smooth\", v", packageVersion("smooth"), "\n");
+    hints <- c("have you already tried adam() function", "you can visit my website",
+               "you can read the online monograph", "File an issue on github");
+    for(i in 1:4){
+        set.seed(findSeed(function(value){return(value==i)}));
+        printed <- tryCatch(smooth:::.onAttach("", "smooth"), message=function(m){return(conditionMessage(m))});
+        expect_true(startsWith(printed, startUpMessage), label=i);
+        expect_match(printed, hints[i], fixed=TRUE);
+    }
+    set.seed(findSeed(function(value){return(value>4)}));
+    expect_equal(tryCatch(smooth:::.onAttach("", "smooth"), message=function(m){return(conditionMessage(m))}),
+                 paste0(startUpMessage, "\n"));
+})

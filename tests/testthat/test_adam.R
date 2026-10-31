@@ -748,11 +748,11 @@ test_that("confint keeps the ARMA parameters within their stationary / invertibl
     testModel <- msarima(BJsales, orders=list(ar=2, i=1, ma=2))
     phi2 <- coef(testModel)[["phi2[1]"]]
     expect_equal(unname(confint(testModel)["phi1[1]", 2:3]), c(phi2-1, 1-phi2), tolerance=1e-6)
-    # The upper bound of the admissible alpha of ANN, [0, 2), was stuck at 5.01. The bound is the
-    # first inadmissible value of the grid from above: alpha=2 puts the root of the MA polynomial
-    # 1 + B on the unit circle, so it is not admissible (the per-lag check took it, giving 2.01)
+    # The admissible alpha of ANN is [0, 2): alpha=2 puts the root of the MA polynomial 1 + B on
+    # the unit circle, and alpha=0 cancels the unit root of the level. The bounds are bisected to
+    # the tolerance of the condition (a grid of 0.01 gave (-0.01, 2); the upper one was once 5.01)
     testModel <- adam(BJsales, "ANN", bounds="admissible")
-    expect_equal(unname(eigenBounds(testModel, as.matrix(testModel$persistence), 1)), c(-0.01, 2))
+    expect_equal(eigenBounds(testModel, as.matrix(testModel$persistence), 1), c(0, 2), tolerance=1e-8)
 })
 
 test_that("The ARIMA bounds reject exactly the non-invertible MA and non-stationary AR", {
@@ -1912,10 +1912,3 @@ test_that("the selection of the regressors expands the factors with or without a
                  logLik(adam(xregFactor, "ANN", regressors="select", formula=y~x1+x2+z)));
 })
 
-# The bounds of a smoothing parameter are the interval around its estimate where the model
-# is forecastable, bisected to the tolerance of the condition: 0 <= alpha < 2 for ETS(A,N,N)
-# (alpha=0 cancels the unit root of the level). The grid of 0.01 gave (-0.01, 2)
-test_that("eigenBounds() of ETS(A,N,N) is the forecastable region of alpha", {
-    testModel <- adam(AirPassengers, "ANN", bounds="admissible");
-    expect_equal(eigenBounds(testModel, as.matrix(testModel$persistence), 1), c(0, 2), tolerance=1e-8);
-})

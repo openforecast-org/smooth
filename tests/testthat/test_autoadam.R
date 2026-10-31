@@ -152,6 +152,12 @@ test_that("auto.msarima() names the regressors of xreg", {
     testModel <- auto.msarima(y, orders=orders, lags=1, xreg=data.frame(a=xregValues[,1], b=xregValues[,2]))
     expect_equal(colnames(testModel$data), c("y","a","b"))
     expect_equal(names(testModel$initial$xreg), c("a","b"))
+    # The names of the columns of a matrix too, in msarima() and ssarima() as well
+    colnames(xregValues) <- c("a","b")
+    for(modelFunction in list(auto.msarima, msarima, ssarima)){
+        testModel <- modelFunction(y, orders=orders, lags=1, xreg=xregValues)
+        expect_equal(colnames(testModel$data), c("y","a","b"))
+    }
 })
 
 #### Parallel calculations ####

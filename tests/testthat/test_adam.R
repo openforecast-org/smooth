@@ -1871,6 +1871,15 @@ test_that("a regression with an occurrence model fits the sizes to the non-zero 
                               level=(0.95-(1-mean(nonZero)))/mean(nonZero));
     expect_equal(as.vector(testForecast$mean), as.vector(sizesForecast$mean)*mean(nonZero));
     expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper));
+    # The confidence interval of the sizes times the probability, for one and several levels
+    sizesForecast <- forecast(sizes, h=3, newdata=xregIntermittent[1:3,], interval="confidence",
+                              level=c(0.8,0.95));
+    testForecast <- forecast(testModel, h=3, newdata=xregIntermittent[1:3,], interval="confidence",
+                             level=c(0.8,0.95));
+    expect_equal(as.vector(testForecast$lower), as.vector(sizesForecast$lower)*mean(nonZero));
+    expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper)*mean(nonZero));
+    testForecast <- forecast(testModel, h=3, newdata=xregIntermittent[1:3,], interval="confidence");
+    expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper[,2])*mean(nonZero));
     # The same with the selection of the regressors and with a fitted om()
     expect_equal(logLik(adam(xregIntermittent, "NNN", occurrence="fixed", regressors="select")),
                  logLik(testModel));
@@ -1961,6 +1970,8 @@ test_that("pointLik() of msdecompose() is the density of its residuals", {
     expect_equal(tsp(pointLik(testModel)), tsp(AirPassengers));
     expect_equal(as.vector(pointLik(testModel)),
                  dlnorm(yValues, log(as.vector(fitted(testModel))), sqrt(mean(errors^2)), log=TRUE));
+    expect_equal(as.vector(pointLik(testModel, log=FALSE)),
+                 dlnorm(yValues, log(as.vector(fitted(testModel))), sqrt(mean(errors^2))));
     testModel <- msdecompose(AirPassengers, lags=12, type="additive");
     errors <- as.vector(residuals(testModel));
     expect_equal(as.vector(pointLik(testModel)), dnorm(errors, 0, sqrt(mean(errors^2)), log=TRUE));

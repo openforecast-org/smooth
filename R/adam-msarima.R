@@ -271,7 +271,7 @@ msarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1),
         data <- ts(data, start=start(y), frequency=frequency(y));
         colnames(data)[1] <- "y";
         # Give name to the explanatory variables if they do not have them
-        if(is.null(names(xreg))){
+        if(is.null(colnames(xreg))){
             if(!is.null(ncol(xreg))){
                 colnames(data)[-1] <- paste0("x",c(1:ncol(xreg)));
             }

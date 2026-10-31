@@ -5815,8 +5815,9 @@ adam_forecastRegression <- function(object, h, newdata, occurrence, interval, le
     if(occurrenceModel){
         almForecast$mean <- almForecast$mean * pForecast;
         if(interval=="confidence"){
-            almForecast$lower <- almForecast$lower * pForecast;
-            almForecast$upper <- almForecast$upper * pForecast;
+            # As matrices: the time series of several levels do not take a vector
+            almForecast$lower[] <- as.matrix(almForecast$lower) * as.vector(pForecast);
+            almForecast$upper[] <- as.matrix(almForecast$upper) * as.vector(pForecast);
         }
         else if(interval!="none"){
             # The bounds named by alm(), with the values of the sizes at their levels

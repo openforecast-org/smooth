@@ -278,14 +278,16 @@ test_that("print() of a GUM simulation shows its matrices and likelihood", {
 })
 
 test_that("modelLags() of the simulations has a lag per state", {
-    expectedLags <- list(c(1,1,4), c(1,1,4), c(1,1,4,4), c(1,1,4), rep(1,4), c(1,1));
+    expectedLags <- list(c(1,1,4), c(1,1,4), c(1,1,4,4), c(1,1,4), rep(1,4), c(1,1), c(1,1));
     testData <- list(sim.es("AAA", obs=30, frequency=4),
                      sim.ces(seasonality="partial", frequency=4, obs=30),
                      sim.ces(seasonality="full", frequency=4, obs=30),
                      sim.gum(orders=c(2,1), lags=c(1,4), obs=30),
                      sim.sma(order=4, obs=30),
                      # The state of the AR(1) and the one of the constant
-                     sim.ssarima(orders=list(ar=1), constant=TRUE, obs=30));
+                     sim.ssarima(orders=list(ar=1), constant=TRUE, obs=30),
+                     # Without the constant, its zeros are no state
+                     sim.ssarima(orders=list(ar=1, i=1), obs=30));
     for(i in seq_along(testData)){
         expect_equal(modelLags(testData[[i]]), matrix(expectedLags[[i]], ncol=1), label=testData[[i]]$model);
     }

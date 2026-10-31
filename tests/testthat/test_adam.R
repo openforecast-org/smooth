@@ -1946,6 +1946,17 @@ test_that("phi is used, estimated or one depending on the model", {
     expect_equal(adam(BJsales, "NNN", orders=list(ar=1,i=1), phi=0.9)$phi, 1);
 })
 
+test_that("phi of a model without the damped trend is ignored", {
+    for(phi in list(0.9, "a")){
+        expect_warning(testModel <- adam(BJsales, "AAN", phi=phi), "phi is used only with a damped trend");
+        expect_equal(testModel$phi, 1);
+        expect_equal(logLik(testModel), logLik(adam(BJsales, "AAN")));
+    }
+    # The phi of an undamped model, as when it is reused, is ignored silently
+    expect_no_warning(adam(BJsales, "AAN", phi=1));
+    expect_no_warning(adam(BJsales, model=adam(BJsales, "AAN")));
+})
+
 test_that("phi that cannot be used is estimated with a warning", {
     expect_warning(testModel <- adam(BJsales, "ZZN", phi=0.9),
                    "Predefined phi can only be used with preselected ETS model");

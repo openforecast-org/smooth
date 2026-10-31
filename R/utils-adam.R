@@ -300,14 +300,23 @@ adam_checkPhi <- function(phi, etsModel, modelDo, damped, parametersNumber){
                 phi <- 0.95;
                 phiEstimate <- TRUE;
             }
+            # phi of the model without the damped trend ("d" in its name) is ignored, with a
+            # warning unless it is the 1 of an undamped model being reused
+            else if(!damped){
+                if(!isTRUE(all.equal(phi, 1, check.attributes=FALSE))){
+                    warning("phi is used only with a damped trend. Ignoring it.", call.=FALSE);
+                }
+                phi <- 1;
+                phiEstimate <- FALSE;
+            }
             else{
-                if(!is.numeric(phi) & (damped)){
+                if(!is.numeric(phi)){
                     warning(paste0("Provided value of phi is meaningless. phi will be estimated."),
                             call.=FALSE);
                     phi <- 0.95;
                     phiEstimate <- TRUE;
                 }
-                else if(is.numeric(phi) & (phi<0 | phi>2)){
+                else if(phi<0 | phi>2){
                     warning(paste0("Damping parameter should lie in (0, 2) region. ",
                                    "Changing to the estimation of phi."),call.=FALSE);
                     phi[] <- 0.95;
@@ -315,9 +324,7 @@ adam_checkPhi <- function(phi, etsModel, modelDo, damped, parametersNumber){
                 }
                 else{
                     phiEstimate <- FALSE;
-                    if(damped){
-                        parametersNumber[2,1] <- parametersNumber[2,1] + 1;
-                    }
+                    parametersNumber[2,1] <- parametersNumber[2,1] + 1;
                 }
             }
         }
@@ -1760,7 +1767,7 @@ adam_checkSampleSize <- function(Etype, Stype, Ttype, allowMultiplicative, arEst
                     if(any(Ttype==c("Z","X","A")) && any(Stype==c("Z","X","A"))){
                         modelsPool <- c(modelsPool,"AAA");
                     }
-                    if(allowMultiplicative && any(Ttype==c("Z","X","A")) && any(Stype==c("Z","Y","A"))){
+                    if(allowMultiplicative && any(Ttype==c("Z","X","A")) && any(Stype==c("Z","X","A"))){
                         modelsPool <- c(modelsPool,"MAA");
                     }
                     if(allowMultiplicative && any(Ttype==c("Z","X","A")) && any(Stype==c("Z","Y","M"))){

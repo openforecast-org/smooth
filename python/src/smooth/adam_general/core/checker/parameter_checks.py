@@ -125,7 +125,7 @@ def _check_outliers(outliers_mode, silent=False):
     return outliers_mode
 
 
-def _check_phi(phi, damped, silent=False):
+def _check_phi(phi, damped, silent=False, model_do="estimate"):
     """
     Check damping parameter phi.
 
@@ -137,6 +137,9 @@ def _check_phi(phi, damped, silent=False):
         Whether trend is damped
     silent : bool, optional
         Whether to suppress warnings
+    model_do : str, optional
+        The action on the model: a provided phi of a fixed model ("estimate" or
+        "use") without the damped trend is ignored with a warning, as in R
 
     Returns
     -------
@@ -163,6 +166,8 @@ def _check_phi(phi, damped, silent=False):
         phi_estimate = True
     # If not damped, phi is fixed at 1
     elif not damped:
+        if phi is not None and phi != 1 and model_do in ("estimate", "use"):
+            _warn("phi is used only with a damped trend. Ignoring it.", silent)
         phi = 1.0
         phi_estimate = False
     # Default fallback

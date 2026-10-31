@@ -141,7 +141,7 @@ def _restrict_models_pool_for_sample_size(
             if trend_type in ["Z", "X", "A"] and season_type in ["Z", "X", "A"]:
                 new_pool.append("AAA")
             if allow_multiplicative:
-                if trend_type in ["Z", "X", "A"] and season_type in ["Z", "Y", "A"]:
+                if trend_type in ["Z", "X", "A"] and season_type in ["Z", "X", "A"]:
                     new_pool.append("MAA")
                 if trend_type in ["Z", "X", "A"] and season_type in ["Z", "Y", "M"]:
                     new_pool.extend(["AAM", "MAM"])

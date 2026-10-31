@@ -324,6 +324,15 @@ class TestADAMAttributes:
 
         assert hasattr(model, "phi_")
 
+    def test_phi_of_a_model_without_damping_is_ignored(self, simple_series, capsys):
+        """phi of a model without "d" is ignored with a warning, as in R."""
+        reference = ADAM(model="AAN").fit(simple_series)
+        model = ADAM(model="AAN", phi=0.9, verbose=1).fit(simple_series)
+        assert "phi is used only with a damped trend" in capsys.readouterr().out
+        assert model.loglik == pytest.approx(reference.loglik, rel=1e-10)
+        ADAM(model="AAN", phi=1, verbose=1).fit(simple_series)
+        assert "phi is used only" not in capsys.readouterr().out
+
 
 class TestADAMBounds:
     """Tests for parameter bounds."""
@@ -1755,6 +1764,25 @@ def test_an_unknown_occurrence_raises(cls):
     y = np.abs(np.random.default_rng(1).normal(10, 2, 60))
     with pytest.raises(ValueError, match="occurrence should be one of"):
         cls(occurrence="foo").fit(y)
+
+
+# The pool of a small sample keeps the seasonality that the model allows: "Y" the
+# multiplicative one, "X" the additive one (MAA has an additive seasonality)
+@pytest.mark.parametrize(
+    "season_type, allowed",
+    [("Y", {"N", "M"}), ("X", {"N", "A"}), ("Z", {"N", "A", "M"})],
+)
+def test_the_small_sample_pool_keeps_the_allowed_seasonality(season_type, allowed):
+    from smooth.adam_general.core.checker.sample_size import (
+        _restrict_models_pool_for_sample_size,
+    )
+
+    result = _restrict_models_pool_for_sample_size(
+        obs_nonzero=30, lags_model_max=12, model_do="select", error_type="Z",
+        trend_type="Z", season_type=season_type, models_pool=None, silent=True,
+    )
+    assert {model[-1] for model in result["models_pool"]} == allowed
+    assert ("MAA" in result["models_pool"]) == (season_type != "Y")
 
 
 # The samples too small to estimate, and the occurrence of data without zeros, as

@@ -1024,12 +1024,14 @@ omg <- function(data,
         sideHoldout <- if(holdout) yHoldout else NULL
         if(checker$xregModel) {
             names(initialCollected$initialValue$xreg) <- checker$xregNames
-            dataColumns <- c(checker$responseName, setdiff(colnames(data), checker$responseName))
+            # The column of the response, under the name of the user
+            responseColumn <- adam_responseColumn(data, checker$responseName)
+            dataColumns <- c(responseColumn, setdiff(colnames(data), responseColumn))
             sideData <- data[1:obsInSample, dataColumns, drop=FALSE]
-            sideData[,checker$responseName] <- replace(as.numeric(yInSample), !otObserved, NA)
+            sideData[,responseColumn] <- replace(as.numeric(yInSample), !otObserved, NA)
             if(holdout) {
                 sideHoldout <- data[obsInSample+c(1:h), dataColumns, drop=FALSE]
-                sideHoldout[,checker$responseName] <- as.numeric(yHoldout)
+                sideHoldout[,responseColumn] <- as.numeric(yHoldout)
             }
         }
 

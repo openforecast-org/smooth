@@ -1288,10 +1288,11 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         # Fix the ts class, which is destroyed during subsetting
         if(all(yClasses!="zoo")){
             if(is.data.frame(data)){
-                modelReturned$data[,responseName] <- ts(modelReturned$data[,responseName],
+                responseColumn <- adam_responseColumn(modelReturned$data, responseName);
+                modelReturned$data[,responseColumn] <- ts(modelReturned$data[,responseColumn],
                                                         start=yStart, frequency=yFrequency);
                 if(holdout){
-                    modelReturned$holdout[,responseName] <- ts(modelReturned$holdout[,responseName],
+                    modelReturned$holdout[,responseColumn] <- ts(modelReturned$holdout[,responseColumn],
                                                                start=yForecastStart, frequency=yFrequency);
                 }
             }

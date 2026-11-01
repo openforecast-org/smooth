@@ -49,8 +49,8 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         other <- NULL;
     }
 
-    # Extract the name of response variable
-    responseName <- as.character(formula(object)[[2]]);
+    # The column of the response variable, under the name of the user
+    responseName <- adam_responseColumn(object$data, all.vars(formula(object))[1]);
 
     # Actuals, fitted, residuals, scale from the original model
     yInSampleSM <- actuals(object);

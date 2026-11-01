@@ -239,7 +239,8 @@ om <- function(data,
         orders <- list(ar=0, i=0, ma=0);
         constant <- FALSE;
         if(!is.null(ncol(data)) && ncol(data)>1){
-            data <- data[, if(is.null(formula)) 1 else all.vars(formula)[1], drop=FALSE];
+            data <- data[, if(is.null(formula)) 1 else adam_responseColumn(data, all.vars(formula)[1]),
+                         drop=FALSE];
         }
         formula <- NULL;
     }
@@ -491,11 +492,13 @@ om <- function(data,
     # from adam()
     omHoldout <- yHoldout;
     if(xregModel){
-        dataColumns <- c(responseName, setdiff(colnames(data), responseName));
+        # The column of the response, under the name of the user
+        responseColumn <- adam_responseColumn(data, responseName);
+        dataColumns <- c(responseColumn, setdiff(colnames(data), responseColumn));
         omData <- data[1:obsInSample,dataColumns,drop=FALSE];
         if(holdout){
             omHoldout <- data[obsInSample+c(1:h),dataColumns,drop=FALSE];
-            omHoldout[,responseName] <- as.numeric(yHoldout);
+            omHoldout[,responseColumn] <- as.numeric(yHoldout);
         }
     }
 
@@ -1132,7 +1135,7 @@ om <- function(data,
         # The missing observations stay missing
         omDataFinal <- replace(yInSample, !otObserved, NA);
         if(xregModel){
-            omData[,responseName] <- omDataFinal;
+            omData[,responseColumn] <- omDataFinal;
             omDataFinal <- omData;
         }
         subModel <- list(

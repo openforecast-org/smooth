@@ -4138,6 +4138,7 @@ class ADAM:
             X=X,
             regressors=self.regressors,
             arma=self.arma,
+            gnorm_shape=getattr(self, "gnorm_shape", None),
         )
         if not isinstance(result, tuple):
             self._alm_model = result

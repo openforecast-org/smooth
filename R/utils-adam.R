@@ -2,6 +2,17 @@
 # These are extracted from parametersChecker() to allow reuse by om() and
 # other future functions without duplicating logic.
 
+#### The column of the response ####
+# The column of the data whose syntactic name is responseName: the model takes the syntactic
+# names of the variables, while the data keeps those of the user
+adam_responseColumn <- function(data, responseName){
+    responseColumn <- colnames(data)[make.names(colnames(data))==responseName];
+    if(length(responseColumn)==0){
+        responseColumn <- responseName;
+    }
+    return(responseColumn[1]);
+}
+
 #### Data preparation ####
 adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse) {
     responseName <- yName
@@ -54,7 +65,7 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
         }
         if(!is.null(formulaToUse)){
             responseName <- all.vars(formulaToUse)[1]
-            y <- data[,responseName]
+            y <- data[,adam_responseColumn(data, responseName)]
         }
         else{
             responseName <- colnames(xregData)[1]
@@ -139,7 +150,7 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
         yFilled[1:obsInSample] <- naFillCpp(as.numeric(y[1:obsInSample]), lagMax);
         y[yNAValues] <- yFilled[yNAValues]
         if(!is.null(xregData)){
-            xregData[yNAValues,responseName] <- y[yNAValues]
+            xregData[yNAValues,adam_responseColumn(xregData, responseName)] <- y[yNAValues]
         }
     }
 
@@ -1813,7 +1824,7 @@ adam_xregPrepare <- function(data, formulaToUse, initialType, initialXreg, initi
     # The missing values of the regressors (not of the response): the first observed
     # value of each, for all the ways of getting their initials below
     xregNAs <- which(is.na(xregData),arr.ind=TRUE);
-    xregNAs <- xregNAs[colnames(xregData)[xregNAs[,2]]!=responseName,,drop=FALSE];
+    xregNAs <- xregNAs[colnames(xregData)[xregNAs[,2]]!=adam_responseColumn(xregData, responseName),,drop=FALSE];
     if(nrow(xregNAs)>0){
         warning("Some variables contained NAs. This might cause issues in the estimation. ",
                 "I will substitute those values with the first non-NA values",
@@ -1839,6 +1850,26 @@ adam_xregPrepare <- function(data, formulaToUse, initialType, initialXreg, initi
             data[[name]] <- factor(data[[name]]);
         }
     }
+    # The regressors and the variables of the formula take their syntactic names, as the model
+    colnames(xregData) <- make.names(colnames(xregData));
+    if(!is.null(formulaToUse)){
+        formulaToUse <- as.formula(formulaToUse);
+        # If there are spaces in names, give a warning
+        if(any(grepl("[^A-Za-z0-9,;._-]", all.vars(formulaToUse))) ||
+           # If the names only contain numbers
+           any(suppressWarnings(!is.na(as.numeric(all.vars(formulaToUse)))))){
+            warning("The names of your variables contain special characters ",
+                    "(such as numbers, spaces, comas, brackets etc). adam() might not work properly. ",
+                    "It is recommended to use `make.names()` function to fix the names of variables.",
+                    call.=FALSE);
+            formulaToUse <- as.formula(do.call(substitute,
+                                               list(formulaToUse,
+                                                    setNames(lapply(make.names(all.vars(formulaToUse)), as.name),
+                                                             all.vars(formulaToUse)))),
+                                       env=environment(formulaToUse));
+        }
+    }
+
     # The initials provided for some of the regressors only (the columns of their model
     # matrix): the others are estimated, and the provided ones are set after that
     if(!is.null(initialXreg) && regressors!="select"){
@@ -1872,7 +1903,7 @@ adam_xregPrepare <- function(data, formulaToUse, initialType, initialXreg, initi
             persistenceXreg <- NULL;
         }
     }
-    return(list(data=data, xregData=xregData, initialXreg=initialXreg,
+    return(list(data=data, formulaToUse=formulaToUse, xregData=xregData, initialXreg=initialXreg,
                 initialXregEstimate=initialXregEstimate, persistenceXreg=persistenceXreg));
 }
 
@@ -1887,30 +1918,11 @@ adam_xregAlm <- function(Etype, arimaModel, distribution, etsModel, FI, formulaT
     # Extract names of variables, fix the formula
     formulaProvided <- !is.null(formulaToUse);
     if(formulaProvided){
-        formulaToUse <- as.formula(formulaToUse);
         responseName <- all.vars(formulaToUse)[1];
-        # If there are spaces in names, give a warning
-        if(any(grepl("[^A-Za-z0-9,;._-]", all.vars(formulaToUse))) ||
-           # If the names only contain numbers
-           any(suppressWarnings(!is.na(as.numeric(all.vars(formulaToUse)))))){
-            warning("The names of your variables contain special characters ",
-                    "(such as numbers, spaces, comas, brackets etc). adam() might not work properly. ",
-                    "It is recommended to use `make.names()` function to fix the names of variables.",
-                    call.=FALSE);
-            formulaToUse <- as.formula(paste0(gsub(paste0("`",all.vars(formulaToUse)[1],"`"),
-                                                   make.names(all.vars(formulaToUse)[1]),
-                                                   all.vars(formulaToUse)[1]),"~",
-                                              paste0(mapply(gsub, paste0("`",all.vars(formulaToUse)[-1],"`"),
-                                                            make.names(all.vars(formulaToUse)[-1]),
-                                                            labels(terms(formulaToUse))),
-                                                     collapse="+")));
-        }
     }
     else{
-        formulaToUse <- reformulate(make.names(colnames(xregData)[-1]), response=responseName);
+        formulaToUse <- reformulate(colnames(xregData)[-1], response=responseName);
     }
-    # Robustify the names of variables
-    colnames(xregData) <- make.names(colnames(xregData));
 
     # A pure regression is the model of alm()
     if((!etsModel && !arimaModel) && regressors!="adapt"){
@@ -2239,10 +2251,18 @@ adam_xregProvided <- function(Etype, arimaModel, distribution, ellipsis, etsMode
                             mean(xregFrame[,1]));
             B <- c("(Intercept)"=yMean - sum(colMeans(xregMatrix[,-1,drop=FALSE]) * B), B);
         }
-        almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
-                                        distribution=distribution, loss=loss, subset=which(subset),
-                                        occurrence=occurrence,FI=FI,
-                                        parameters=B,fast=TRUE));
+        # The extra parameter of dgnorm and dalaplace: provided, or all of them are estimated
+        extra <- switch(distribution, "dgnorm"=list(shape=ellipsis$shape),
+                        "dalaplace"=list(alpha=ellipsis$alpha), list());
+        if(length(extra)==1 && is.null(extra[[1]])){
+            warning("The coefficients need the ", names(extra), " of ", distribution,
+                    " too. Estimating all of them.", call.=FALSE);
+            B <- NULL;
+        }
+        almModel <- do.call("alm", c(list(formula=formulaToUse, data=xregData,
+                                          distribution=distribution, loss=loss, subset=which(subset),
+                                          occurrence=occurrence,FI=FI,
+                                          parameters=B,fast=TRUE), extra));
         almModel$call$data <- as.name(yName);
         return(almModel);
     }

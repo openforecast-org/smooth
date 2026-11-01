@@ -2163,6 +2163,21 @@ def test_admissible_bounds_check_the_whole_model(
     assert (penalty == 0) == admissible
 
 
+def test_regression_with_provided_coefficients():
+    """A regression with the coefficients of all its regressors provided takes the
+    intercept of the means, E(y) - b E(x), as R; dgnorm needs its shape too."""
+    rng = np.random.default_rng(41)
+    X = pd.DataFrame({"x1": rng.normal(10, 2, 60), "x2": rng.normal(5, 1, 60)})
+    y = 50 + 2 * X["x1"] - 3 * X["x2"] + rng.normal(0, 2, 60)
+    model = ADAM("NNN", initial={"xreg": {"x1": 2, "x2": -3}}).fit(y, X)
+    intercept = np.mean(y) - 2 * np.mean(X["x1"]) + 3 * np.mean(X["x2"])
+    assert np.allclose(model._alm_model.B_, [intercept, 2, -3])
+    model = ADAM(
+        "NNN", distribution="dgnorm", gnorm_shape=1.5, initial={"xreg": [2, -3]}
+    ).fit(y, X)
+    assert np.allclose(model._alm_model.B_, [intercept, 2, -3])
+
+
 def test_repr_names_the_fitted_model():
     """repr() takes the name of the model, as for ETS, also for ARIMA."""
     import pathlib

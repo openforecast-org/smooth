@@ -71,6 +71,7 @@ def parameters_checker(
     X=None,
     regressors="use",
     arma=None,
+    gnorm_shape=None,
 ):
     """
     Validate and process all ADAM model parameters before estimation.
@@ -1174,6 +1175,7 @@ def parameters_checker(
         model_type_dict=model_type_dict,
         persistence_dict=persistence_dict,
         initials_dict=initials_dict,
+        gnorm_shape=gnorm_shape,
     )
     if not isinstance(xreg_dict, dict):
         return xreg_dict
@@ -1361,6 +1363,7 @@ def _check_xreg(
     model_type_dict,
     persistence_dict,
     initials_dict,
+    gnorm_shape=None,
 ):
     """The regressors, as R's adam_checkXreg(): their data, the initials of their
     coefficients and their smoothing parameters, updating the model, persistence and
@@ -1395,7 +1398,36 @@ def _check_xreg(
             from greybox import stepwise
 
             return stepwise(X_df, ic=ic, distribution=dist, silent=True)
-        alm = ALM(distribution=dist)
+        # The provided coefficients of all the regressors, by name or in their order,
+        # with the intercept of the means, E(y) - b E(x), in the space of the location
+        # of the distribution, as R. dgnorm needs its shape too
+        names = xreg_names_from_input or [f"x{i + 1}" for i in range(xreg_number)]
+        initial_xreg = initials_dict.get("initial_xreg")
+        provided = np.full(xreg_number, np.nan)
+        if isinstance(initial_xreg, dict):
+            provided[:] = [initial_xreg.get(name, np.nan) for name in names]
+        elif initial_xreg is not None:
+            values = np.ravel(initial_xreg)[:xreg_number]
+            provided[: len(values)] = values
+        alm_kwargs: dict = {"distribution": dist}
+        if initial_xreg is not None and not np.any(np.isnan(provided)):
+            if dist == "dgnorm" and gnorm_shape is None:
+                _warn(
+                    "The coefficients need the shape of dgnorm too. Estimating all "
+                    "of them."
+                )
+            else:
+                if dist == "dlnorm":
+                    location = np.mean(np.log(y_is))
+                elif dist in ("dgamma", "dinvgauss"):
+                    location = np.log(np.mean(y_is))
+                else:
+                    location = np.mean(y_is)
+                intercept = location - np.mean(X_is, axis=0) @ provided
+                alm_kwargs["parameters"] = np.concatenate([[intercept], provided])
+                if dist == "dgnorm":
+                    alm_kwargs["shape"] = gnorm_shape
+        alm = ALM(**alm_kwargs)
         alm.fit(np.column_stack([np.ones(len(y_is)), X_is]), y_is)
         return alm
 

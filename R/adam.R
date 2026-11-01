@@ -556,7 +556,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             modelReturned$holdout <- NULL;
         }
         responseName <- all.vars(formula)[1];
-        y <- data[,responseName];
+        # The column of the response, under the name of the user
+        responseColumn <- adam_responseColumn(data, responseName);
+        y <- data[,responseColumn];
         # Extract indeces from the data
         yIndex <- try(time(y),silent=TRUE);
         # If we cannot extract time, do something
@@ -626,8 +628,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             # A data frame keeps its factors, with the response as ts
             modelReturned$data <- data[1:obsInSample,,drop=FALSE];
             if(is.data.frame(data)){
-                modelReturned$data[,responseName] <- ts(modelReturned$data[,responseName],
-                                                        start=yIndex[1], frequency=yFrequency);
+                modelReturned$data[,responseColumn] <- ts(modelReturned$data[,responseColumn],
+                                                          start=yIndex[1], frequency=yFrequency);
             }
             else{
                 modelReturned$data <- ts(modelReturned$data, start=yIndex[1], frequency=yFrequency);
@@ -703,8 +705,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$alm <- checkerReturn;
         if(holdout){
             # This won't work if transformations of the response variable are done...
-            modelReturned$accuracy <- adam_accuracy(modelReturned$holdout[,responseName],modelReturned$forecast,
-                                                    modelReturned$data[,responseName]);
+            modelReturned$accuracy <- adam_accuracy(modelReturned$holdout[,responseColumn],modelReturned$forecast,
+                                                    modelReturned$data[,responseColumn]);
         }
         else{
             modelReturned$accuracy <- NULL;
@@ -719,6 +721,8 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
     #### Unpack the validated parameters into the local environment ####
     list2env(checkerReturn, envir=environment());
+    # The column of the response, under the name of the user
+    responseColumn <- adam_responseColumn(data, responseName);
 
     #### If select was provided in the model, do auto.adam selection ####
     if(select){
@@ -1333,7 +1337,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             }
             # Get rid of explanatory variables if they are not needed
             if(!xregModel && (!is.null(ncol(data)) && ncol(data)>1)){
-                clNew$data <- data[,responseName];
+                clNew$data <- data[,adam_responseColumn(data, responseName)];
             }
             # Call for ADAM with backcasting
             adamBack <- suppressWarnings(eval(clNew, envir=env));
@@ -3001,10 +3005,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             # Fix the ts class, which is destroyed during subsetting
             if(all(yClasses!="zoo")){
                 if(is.data.frame(data)){
-                    modelReturned$data[,responseName] <- ts(modelReturned$data[,responseName],
+                    modelReturned$data[,responseColumn] <- ts(modelReturned$data[,responseColumn],
                                                             start=yStart, frequency=yFrequency);
                     if(holdout){
-                        modelReturned$holdout[,responseName] <- ts(modelReturned$holdout[,responseName],
+                        modelReturned$holdout[,responseColumn] <- ts(modelReturned$holdout[,responseColumn],
                                                                    start=yForecastStart, frequency=yFrequency);
                     }
                 }
@@ -3021,9 +3025,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             modelReturned$holdout <- yHoldout;
         }
         if(any(yNAValues)){
-            modelReturned$data[yNAValues[1:obsInSample],responseName] <- NA;
+            modelReturned$data[yNAValues[1:obsInSample],responseColumn] <- NA;
             if(holdout && length(yNAValues)==obsAll){
-                modelReturned$holdout[yNAValues[-c(1:obsInSample)],responseName] <- NA;
+                modelReturned$holdout[yNAValues[-c(1:obsInSample)],responseColumn] <- NA;
             }
             modelReturned$residuals[yNAValues[1:obsInSample]] <- NA;
         }
@@ -3086,10 +3090,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 # Fix the ts class, which is destroyed during subsetting
                 if(all(yClasses!="zoo")){
                     if(is.data.frame(data)){
-                        modelReturned$models[[i]]$data[,responseName] <- ts(modelReturned$models[[i]]$data[,responseName],
+                        modelReturned$models[[i]]$data[,responseColumn] <- ts(modelReturned$models[[i]]$data[,responseColumn],
                                                                             start=yStart, frequency=yFrequency);
                         if(holdout){
-                            modelReturned$models[[i]]$holdout[,responseName] <- ts(modelReturned$models[[i]]$holdout[,responseName],
+                            modelReturned$models[[i]]$holdout[,responseColumn] <- ts(modelReturned$models[[i]]$holdout[,responseColumn],
                                                                                    start=yForecastStart, frequency=yFrequency);
                         }
                     }
@@ -3106,9 +3110,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                 modelReturned$models[[i]]$holdout <- yHoldout;
             }
             if(any(yNAValues)){
-                modelReturned$models[[i]]$data[yNAValues[1:obsInSample],responseName] <- NA;
+                modelReturned$models[[i]]$data[yNAValues[1:obsInSample],responseColumn] <- NA;
                 if(holdout && length(yNAValues)==obsAll){
-                    modelReturned$models[[i]]$holdout[yNAValues[-c(1:obsInSample)],responseName] <- NA;
+                    modelReturned$models[[i]]$holdout[yNAValues[-c(1:obsInSample)],responseColumn] <- NA;
                 }
                 modelReturned$models[[i]]$residuals[yNAValues[1:obsInSample]] <- NA;
             }
@@ -3144,10 +3148,10 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             # Fix the ts class, which is destroyed during subsetting
             if(all(yClasses!="zoo")){
                 if(is.data.frame(data)){
-                    modelReturned$data[,responseName] <- ts(modelReturned$data[,responseName],
+                    modelReturned$data[,responseColumn] <- ts(modelReturned$data[,responseColumn],
                                                             start=yStart, frequency=yFrequency);
                     if(holdout){
-                        modelReturned$holdout[,responseName] <- ts(modelReturned$holdout[,responseName],
+                        modelReturned$holdout[,responseColumn] <- ts(modelReturned$holdout[,responseColumn],
                                                                    start=yForecastStart, frequency=yFrequency);
                     }
                 }
@@ -3166,9 +3170,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$fitted <- ts(yFittedCombined,start=yStart, frequency=yFrequency);
         modelReturned$residuals <- yInSample - yFittedCombined;
         if(any(yNAValues)){
-            modelReturned$data[yNAValues[1:obsInSample],responseName] <- NA;
+            modelReturned$data[yNAValues[1:obsInSample],responseColumn] <- NA;
             if(holdout && length(yNAValues)==obsAll){
-                modelReturned$holdout[yNAValues[-c(1:obsInSample)],responseName] <- NA;
+                modelReturned$holdout[yNAValues[-c(1:obsInSample)],responseColumn] <- NA;
             }
             modelReturned$residuals[yNAValues[1:obsInSample]] <- NA;
         }
@@ -3817,7 +3821,7 @@ plot.adam <- function(x, which=c(1,2,4,6), level=0.95, legend=FALSE,
         ellipsis$actuals <- actuals(x);
         if(!is.null(x$holdout)){
             responseName <- all.vars(formula(x))[1];
-            yHoldout <- x$holdout[,responseName]
+            yHoldout <- x$holdout[,adam_responseColumn(x$holdout, responseName)]
             if(inherits(yHoldout,"tbl_df") || inherits(yHoldout,"tbl")){
                 yHoldout <- yHoldout[[1]];
             }
@@ -5008,10 +5012,11 @@ coefbootstrap.adam <- function(object, nsim=1000, size=floor(0.75*nobs(object)),
     #### Bootstrap the data
     if(method=="dsr"){
         #### Data Shape Replication bootstrap
-        responseName <- all.vars(formula(object))[1];
+        # The column of the response, under the name of the user
+        responseName <- adam_responseColumn(object$data, all.vars(formula(object))[1]);
         # Create a new dataset
         newData <- replicate(nsim, object$data, simplify=FALSE);
-        newCall$formula <- as.formula(paste0(responseName,"~."));
+        newCall$formula <- as.formula(paste0("`",responseName,"`~."));
         type <- "multiplicative";
         # The observed values are bootstrapped, the missing ones stay missing
         observed <- !is.na(yInSample);
@@ -5229,7 +5234,7 @@ vcov.adam <- function(object, type=c("opg","hessian","bootstrap"),
 #' @importFrom greybox actuals
 #' @export
 actuals.adam <- function(object, all=TRUE, ...){
-    responseName <- all.vars(formula(object))[1];
+    responseName <- adam_responseColumn(object$data, all.vars(formula(object))[1]);
     if(all){
         response <- object$data[,responseName];
     }
@@ -7129,7 +7134,7 @@ plot.adam.forecast <- function(x, ...){
 
     if(!is.null(x$model$holdout)){
         responseName <- all.vars(formula(x$model))[1];
-        yHoldout <- x$model$holdout[,responseName];
+        yHoldout <- x$model$holdout[,adam_responseColumn(x$model$holdout, responseName)];
         if(any(yClasses=="ts")){
             ellipsis$actuals <- ts(c(actuals(x$model),yHoldout),
                                    start=start(actuals(x$model)),

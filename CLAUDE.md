@@ -330,12 +330,6 @@ C++ dependencies:
 - Armadillo library (via RcppArmadillo)
 - C++11 or later
 
-**Pending version bump (greybox).** R's greybox 2.0.10 computes the log-densities of
-`dlaplace`, `ds` and `dgnorm` analytically, identically to Python's greybox (already
-required at `>=1.0.10`), which smooth's R/Python parity relies on (`tbats()` with
-`distribution="auto"` selects with `dgnorm`). Raise `greybox (>= 2.0.10)` in
-`DESCRIPTION` with the next smooth release after 2.0.10 is on CRAN, then remove this note.
-
 ## Mac OS Specific Notes
 
 Mac users may need gfortran libraries for Rcpp/RcppArmadillo compilation. See: http://www.thecoatlessprofessor.com/programming/rcpp-rcpparmadillo-and-os-x-mavericks-lgfortran-and-lquadmath-error/

@@ -1683,6 +1683,20 @@ def test_provided_occurrence_of_the_horizon():
     np.testing.assert_allclose(np.ravel(model.predict(h=4).mean), before)
 
 
+def test_provided_occurrence_zeros_the_fitted_values_at_the_fit():
+    """The fitted values at the zeros of a provided occurrence are zero after the fit,
+    as in R, and predict() does not change them."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    )
+    y[::5] = 0
+    model = ADAM(model="MNN", occurrence=(y != 0).astype(float)).fit(y)
+    fitted = np.asarray(model.fitted, dtype=float).copy()
+    assert np.all(fitted[::5] == 0) and np.all(fitted[1::5] > 0)
+    model.predict(h=4, occurrence=np.ones(4))
+    np.testing.assert_array_equal(np.asarray(model.fitted, dtype=float), fitted)
+
+
 @pytest.mark.r_parity
 @pytest.mark.parametrize("model,distribution", [("MAdM", "dinvgauss"), ("MAM", "dgamma")])
 def test_adam_ets_multiplicative_starts_as_r(model, distribution):
@@ -1783,6 +1797,93 @@ def test_the_small_sample_pool_keeps_the_allowed_seasonality(season_type, allowe
     )
     assert {model[-1] for model in result["models_pool"]} == allowed
     assert ("MAA" in result["models_pool"]) == (season_type != "Y")
+
+
+def test_the_small_sample_pool_follows_the_sample_size():
+    from smooth.adam_general.core.checker.sample_size import _build_small_sample_pool
+
+    # Six observations: a trend, but no damping and no seasonality
+    assert _build_small_sample_pool(6, 12, "Z", "Z", True, 0) == [
+        "ANN", "MNN", "AAN", "MAN", "AMN", "MMN",
+    ]  # fmt: skip
+    assert _build_small_sample_pool(30, 12, "Z", "Z", False, 0) == [
+        "ANN", "AAN", "AAdN", "ANA", "AAA",
+    ]  # fmt: skip
+
+
+def test_a_small_sample_drops_from_the_pool_what_it_cannot_fit():
+    from smooth.adam_general.core.checker.sample_size import _filter_small_sample_pool
+
+    # Eight observations with lag 4: the trend with the seasonality needs ten, the
+    # damped one eleven
+    pool = ["ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA", "ANN"]
+    assert _filter_small_sample_pool(pool, 8, 4, 0) == ["ANN", "AAN", "AAdN", "ANA"]
+
+
+def test_a_small_sample_simplifies_the_model(capsys):
+    from smooth.adam_general.core.checker.sample_size import (
+        _simplify_small_sample_model,
+    )
+
+    # The damping, then the trend, until the sample of eight fits the model
+    assert _simplify_small_sample_model("AAdA", 8, 4, 0, False) == "ANA"
+    assert capsys.readouterr().out.count("Fitting what I can") == 2
+    assert _simplify_small_sample_model("MAdN", 6, 1, 0, True) == "MAN"
+    assert _simplify_small_sample_model("MAA", 3, 4, 0, True) == "MNN"
+
+
+@pytest.mark.parametrize(
+    "obs, error_type, expected",
+    [
+        (4, "A", {"model_do": "estimate", "models_pool": None}),
+        (4, "Z", {"model_do": "select", "models_pool": ["ANN"], "error_type": "Z"}),
+        (3, "M", {"model_do": "estimate", "persistence_level": 0}),
+        (3, "Z", {"model_do": "select", "persistence_estimate": False}),
+        (2, "Z", {"model_do": "use", "error_type": "A", "initial_type": "provided"}),
+        (1, "A", {"model_do": "use", "persistence_level": 0}),
+        (0, "M", {"model_do": "use", "error_type": "A", "initial_estimate": False}),
+    ],
+)
+def test_the_tiny_samples_fit_a_level_model(obs, error_type, expected):
+    from smooth.adam_general.core.checker.sample_size import (
+        _restrict_models_pool_for_sample_size,
+    )
+
+    result = _restrict_models_pool_for_sample_size(
+        obs_nonzero=obs, lags_model_max=1, model_do="estimate", error_type=error_type,
+        trend_type="A", season_type="N", models_pool=None, allow_multiplicative=False,
+        n_param_exo=1, silent=True, damped=True,
+    )  # fmt: skip
+    assert {key: result[key] for key in expected} == expected
+    assert result["trend_type"] == "N" and not result["damped"]
+    assert not result["phi_estimate"]
+
+
+def test_the_small_sample_restriction_of_the_model_and_the_pool(capsys):
+    from smooth.adam_general.core.checker.sample_size import (
+        _restrict_models_pool_for_sample_size,
+    )
+
+    arguments = dict(
+        obs_nonzero=8, lags_model_max=4, model_do="estimate", error_type="A",
+        trend_type="A", season_type="A", models_pool=None, damped=True,
+    )  # fmt: skip
+    # Enough for all the parameters: nothing changes
+    assert _restrict_models_pool_for_sample_size(**arguments, n_param_max=7)[
+        "damped"
+    ]
+    result = _restrict_models_pool_for_sample_size(**arguments, n_param_max=10)
+    assert "Updating pool of models" in capsys.readouterr().out
+    assert (result["trend_type"], result["season_type"]) == ("N", "A")
+    assert not result["damped"] and not result["phi_estimate"]
+    # A pool given for the combination keeps it, and what the sample fits of it
+    arguments.update(model_do="combine", models_pool=["ANN", "AAdA"], silent=True)
+    result = _restrict_models_pool_for_sample_size(**arguments)
+    assert (result["model_do"], result["models_pool"]) == ("combine", ["ANN"])
+    # Five observations with two parameters of the regressors are too few
+    arguments.update(obs_nonzero=6, n_param_exo=3)
+    with pytest.raises(ValueError, match="Even for fitting"):
+        _restrict_models_pool_for_sample_size(**arguments)
 
 
 # The samples too small to estimate, and the occurrence of data without zeros, as

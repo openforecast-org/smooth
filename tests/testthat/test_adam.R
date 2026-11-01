@@ -1793,6 +1793,33 @@ test_that("a small sample restricts the pool to the models it can fit", {
     expect_setequal(names(testModel$ICs), c("ANN","AAN"));
 })
 
+test_that("the helpers of the small samples build, filter and simplify as the sample allows", {
+    # Six observations: a trend, but no damping and no seasonality
+    expect_equal(adam_samplePoolBuild(6, 12, "Z", "Z", TRUE, 0), c("ANN","MNN","AAN","MAN","AMN","MMN"));
+    expect_equal(adam_samplePoolBuild(30, 12, "Z", "Z", FALSE, 0), c("ANN","AAN","AAdN","ANA","AAA"));
+    # MAA has an additive seasonality: in the pool for "X", not for "Y"
+    expect_true("MAA" %in% adam_samplePoolBuild(30, 12, "Z", "X", TRUE, 0));
+    expect_false("MAA" %in% adam_samplePoolBuild(30, 12, "Z", "Y", TRUE, 0));
+    # Eight observations with lag 4: the trend with the seasonality needs ten, the damped one eleven
+    expect_equal(adam_samplePoolFilter(c("ANN","AAN","AAdN","ANA","AAA","AAdA","ANN"), 8, 4, 0),
+                 c("ANN","AAN","AAdN","ANA"));
+    caught <- capture_warnings(model <- adam_sampleModelSimplify("AAdA", 8, 4, 0));
+    expect_equal(model, "ANA");
+    expect_length(caught, 2);
+    expect_equal(suppressWarnings(adam_sampleModelSimplify("MAA", 3, 4, 0)), "MNN");
+    # The tiny samples: a level model, estimated, selected, or used with the initial preset
+    expect_warning(adam_sampleTiny(3, 3, "Z", FALSE, c(1,2,3), rep(TRUE,3), matrix(0,2,1)),
+                   "persistence value was set to zero");
+    tiny <- suppressWarnings(adam_sampleTiny(2, 3, "M", TRUE, c(4,0,6), c(TRUE,FALSE,TRUE), matrix(0,2,1)));
+    expect_equal(tiny[c("model","modelDo","initialLevel","initialType")],
+                 list(model="ANN", modelDo="use", initialLevel=5, initialType="provided"));
+    expect_equal(tiny$parametersNumber[,1], c(0,2));
+    tiny <- suppressWarnings(adam_sampleTiny(0, 3, "A", TRUE, c(0,0,0), rep(FALSE,3), matrix(0,2,1)));
+    expect_equal(tiny[c("initialLevel","occurrence")], list(initialLevel=0, occurrence="none"));
+    expect_equal(adam_sampleTiny(4, 4, "A", TRUE, 1:4, rep(TRUE,4), matrix(0,2,1))$model, "ANN");
+    expect_error(adam_sampleTiny(5, 5, "A", TRUE, 1:5, rep(TRUE,5), matrix(0,2,1)), "Even for fitting");
+})
+
 test_that("an estimated model loses its damping and then its trend as the sample shrinks", {
     # Only the steps that apply to the model warn
     caught <- capture_warnings(testModel <- adam(AirPassengers[1:6], "AAdN", initial="optimal"));

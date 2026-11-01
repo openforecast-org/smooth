@@ -1716,283 +1716,40 @@ adam_checkSampleSize <- function(Etype, Stype, Ttype, allowMultiplicative, arEst
                                "Updating pool of models."));
             }
 
-            # If the number of observations is still enough for the model selection and the pool is not specified
-            if(obsNonzero > (3 + nParamExo) && is.null(modelsPool) && any(modelDo==c("select","combine"))){
-                # We have enough observations for local level model
-                modelsPool <- c("ANN");
-                if(allowMultiplicative){
-                    modelsPool <- c(modelsPool,"MNN");
+            # A pool: built for the selection, or what the sample can fit of the one given
+            if(obsNonzero > (3 + nParamExo) && (!is.null(modelsPool) || any(modelDo==c("select","combine")))){
+                if(is.null(modelsPool)){
+                    modelsPool <- adam_samplePoolBuild(obsNonzero, lagsModelMax, Ttype, Stype,
+                                                       allowMultiplicative, nParamExo);
                 }
-                # We have enough observations for trend model
-                if(obsNonzero > (5 + nParamExo)){
-                    if(any(Ttype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AAN");
-                        # MAN has an additive trend, so it belongs to this branch,
-                        # but its error is multiplicative and must be allowed.
-                        if(allowMultiplicative){
-                            modelsPool <- c(modelsPool,"MAN");
-                        }
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AMN","MMN");
-                    }
+                else{
+                    modelsPool <- adam_samplePoolFilter(modelsPool, obsNonzero, lagsModelMax, nParamExo);
                 }
-                # We have enough observations for damped trend model
-                if(obsNonzero > (6 + nParamExo)){
-                    if(any(Ttype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AAdN");
-                        if(allowMultiplicative){
-                            modelsPool <- c(modelsPool,"MAdN");
-                        }
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AMdN","MMdN");
-                    }
-                }
-                # We have enough observations for seasonal model
-                if((obsNonzero > (lagsModelMax)) && lagsModelMax!=1){
-                    if(any(Stype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"ANA");
-                        if(allowMultiplicative){
-                            modelsPool <- c(modelsPool,"MNA");
-                        }
-                    }
-                    if(allowMultiplicative && any(Stype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"ANM","MNM");
-                    }
-                }
-                # We have enough observations for seasonal model with trend
-                if((obsNonzero > (6 + lagsModelMax + nParamExo)) &&
-                   (obsNonzero > 2*lagsModelMax) && lagsModelMax!=1){
-                    if(any(Ttype==c("Z","X","A")) && any(Stype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AAA");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","X","A")) && any(Stype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"MAA");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","X","A")) && any(Stype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AAM","MAM");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M")) && any(Stype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AMA","MMA");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M")) && any(Stype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AMM","MMM");
-                    }
-                }
-
                 warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
                         call.=FALSE);
                 if(modelDo=="combine"){
-                    model <- "CNN";
-                    if(length(modelsPool)>2){
-                        model <- "CCN";
-                    }
-                    if(length(modelsPool)>10){
-                        model <- "CCC";
-                    }
+                    model <- c("CNN","CCN","CCC")[1 + (length(modelsPool)>2) + (length(modelsPool)>10)];
                 }
                 else{
-                    modelDo <- "select"
+                    modelDo <- "select";
                     model <- "ZZZ";
                 }
             }
-            # If the pool is provided (so, select / combine), amend it
-            else if(obsNonzero > (3 + nParamExo) && !is.null(modelsPool)){
-                # We don't have enough observations for seasonal models with damped trend
-                if((obsNonzero <= (6 + lagsModelMax + 1 + nParamExo))){
-                    modelsPool <- modelsPool[!(nchar(modelsPool)==4 &
-                                                   substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="A")];
-                    modelsPool <- modelsPool[!(nchar(modelsPool)==4 &
-                                                   substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="M")];
-                }
-                # We don't have enough observations for seasonal models with trend
-                if((obsNonzero <= (5 + lagsModelMax + 1 + nParamExo))){
-                    modelsPool <- modelsPool[!(substr(modelsPool,2,2)!="N" &
-                                                   substr(modelsPool,nchar(modelsPool),nchar(modelsPool))!="N")];
-                }
-                # We don't have enough observations for seasonal models
-                if(obsNonzero <= lagsModelMax){
-                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N"];
-                }
-                # We don't have enough observations for damped trend
-                if(obsNonzero <= (6 + nParamExo)){
-                    modelsPool <- modelsPool[nchar(modelsPool)!=4];
-                }
-                # We don't have enough observations for any trend
-                if(obsNonzero <= (5 + nParamExo)){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2)=="N"];
-                }
-
-                modelsPool <- unique(modelsPool);
-                warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                        call.=FALSE);
-                if(modelDo=="combine"){
-                    model <- "CNN";
-                    if(length(modelsPool)>2){
-                        model <- "CCN";
-                    }
-                    if(length(modelsPool)>10){
-                        model <- "CCC";
-                    }
-                }
-                else{
-                    modelDo <- "select"
-                    model <- "ZZZ";
-                }
-            }
-            # If the model needs to be estimated / used, not selected
-            else if(obsNonzero > (3 + nParamExo) && any(modelDo==c("estimate","use"))){
-                modelIsSeasonal <- substr(model,nchar(model),nchar(model))!="N";
-                # We don't have enough observations for seasonal models with damped trend
-                if(nchar(model)==4 && modelIsSeasonal && (obsNonzero <= (6 + lagsModelMax + 1 + nParamExo))){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,2),substr(model,4,4));
-                }
-                # We don't have enough observations for seasonal models with trend
-                if(substr(model,2,2)!="N" && modelIsSeasonal && (obsNonzero <= (5 + lagsModelMax + 1 + nParamExo))){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model)));
-                }
-                # We don't have enough observations for seasonal models
-                if(modelIsSeasonal && obsNonzero <= lagsModelMax){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,nchar(model)-1),"N");
-                }
-                # We don't have enough observations for damped trend
-                if(nchar(model)==4 && obsNonzero <= (6 + nParamExo)){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,2),substr(model,4,4));
-                }
-                # We don't have enough observations for any trend
-                if(substr(model,2,2)!="N" && obsNonzero <= (5 + nParamExo)){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model)));
-                }
-                # Change E,T,S elements based on the trimmed thingy
+            # The model simplified to what the sample can fit
+            else if(obsNonzero > (3 + nParamExo)){
+                model <- adam_sampleModelSimplify(model, obsNonzero, lagsModelMax, nParamExo);
                 Etype <- substr(model,1,1);
                 Ttype <- substr(model,2,2);
                 Stype <- substr(model,nchar(model),nchar(model));
-
                 modelIsTrendy <- Ttype!="N";
                 modelIsSeasonal <- Stype!="N";
-
-                damped <- modelIsTrendy && (nchar(model)==4);
+                damped <- nchar(model)==4;
                 phiEstimate <- damped;
             }
-            # Extreme cases of small samples
-            else if(obsNonzero==4){
-                if(any(Etype==c("A","M"))){
-                    modelDo <- "estimate";
-                    Ttype <- "N";
-                    Stype <- "N";
-                    model <- paste0(Etype,"NN");
-                }
-                else{
-                    modelsPool <- c("ANN");
-                    if(allowMultiplicative){
-                        modelsPool <- c(modelsPool,"MNN");
-                    }
-                    modelDo <- "select";
-                    model <- "ZZZ";
-                    Etype <- "Z";
-                    Ttype <- "N";
-                    Stype <- "N";
-                    warning("You have a very small sample. The only available model is level model.",
-                            call.=FALSE);
-                }
-                phiEstimate <- FALSE;
-            }
-            # Even smaller sample
-            else if(obsNonzero==3){
-                if(any(Etype==c("A","M"))){
-                    modelDo <- "estimate";
-                    Ttype <- "N";
-                    Stype <- "N";
-                    model <- paste0(Etype,"NN");
-                }
-                else{
-                    modelsPool <- c("ANN");
-                    if(allowMultiplicative){
-                        modelsPool <- c(modelsPool,"MNN");
-                    }
-                    modelDo <- "select";
-                    model <- "ZNN";
-                    Etype <- "Z";
-                    Ttype <- "N";
-                    Stype <- "N";
-                }
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                warning("I did not have enough of non-zero observations, so persistence value was set to zero.",
-                        call.=FALSE);
-                phiEstimate <- FALSE;
-            }
-            # Can it be even smaller?
-            else if(obsNonzero==2){
-                modelsPool <- NULL;
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- mean(yInSample[otLogical]);
-                initialType <- "provided";
-                initialEstimate <- initialLevelEstimate <- FALSE;
-                warning("I did not have enough of non-zero observations, so persistence value was set to zero and initial was preset.",
-                        call.=FALSE);
-                modelDo <- "use";
-                model <- "ANN";
-                Etype <- "A";
-                Ttype <- "N";
-                Stype <- "N";
-                phiEstimate <- FALSE;
-                parametersNumber[1,1] <- 0;
-                parametersNumber[2,1] <- 2;
-            }
-            # And how about now?!
-            else if(obsNonzero==1){
-                modelsPool <- NULL;
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- yInSample[otLogical];
-                initialType <- "provided";
-                initialEstimate <- initialLevelEstimate <- FALSE;
-                warning("I did not have enough of non-zero observations, so I used Naive.",call.=FALSE);
-                modelDo <- "use"
-                model <- "ANN";
-                Etype <- "A";
-                Ttype <- "N";
-                Stype <- "N";
-                phiEstimate <- FALSE;
-                parametersNumber[1,1] <- 0;
-                parametersNumber[2,1] <- 2;
-            }
-            # Only zeroes in the data...
-            else if(obsNonzero==0 && obsInSample>1){
-                modelsPool <- NULL;
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- 0;
-                initialType <- "provided";
-                initialEstimate <- initialLevelEstimate <- FALSE;
-                occurrenceModelProvided <- occurrenceModel <- FALSE;
-                occurrence <- "none";
-                warning("You have a sample with zeroes only. Your forecast will be zero.",call.=FALSE);
-                modelDo <- "use"
-                model <- "ANN";
-                Etype <- "A";
-                Ttype <- "N";
-                Stype <- "N";
-                phiEstimate <- FALSE;
-                parametersNumber[1,1] <- 0;
-                parametersNumber[2,1] <- 2;
-            }
-            # If you don't have observations, then fuck off!
+            # The extreme cases of small samples
             else{
-                stop("Not enough observations... Even for fitting of ETS('ANN')!",call.=FALSE);
+                list2env(adam_sampleTiny(obsNonzero, obsInSample, Etype, allowMultiplicative, yInSample,
+                                         otLogical, parametersNumber), environment());
             }
         }
     }
@@ -2009,6 +1766,122 @@ adam_checkSampleSize <- function(Etype, Stype, Ttype, allowMultiplicative, arEst
                          "occurrenceModelProvided", "orders", "parametersNumber",
                          "persistenceEstimate", "persistenceLevel", "persistenceLevelEstimate",
                          "phiEstimate"), ls())));
+}
+
+
+# The pool of the selection on a small sample: the candidates the sample can fit, with the
+# components the model letters allow
+adam_samplePoolBuild <- function(obsNonzero, lagsModelMax, Ttype, Stype, allowMultiplicative, nParamExo){
+    # The candidates in this order, with what they need: a trend (T), a damped one (D) or none
+    # (N), and a seasonality (S) or none (N)
+    candidates <- c("ANN"="NN", "MNN"="NN",
+                    "AAN"="TN", "MAN"="TN", "AMN"="TN", "MMN"="TN",
+                    "AAdN"="DN", "MAdN"="DN", "AMdN"="DN", "MMdN"="DN",
+                    "ANA"="NS", "MNA"="NS", "ANM"="NS", "MNM"="NS",
+                    "AAA"="TS", "MAA"="TS", "AAM"="TS", "MAM"="TS",
+                    "AMA"="TS", "MMA"="TS", "AMM"="TS", "MMM"="TS");
+    seasonal <- lagsModelMax!=1;
+    enough <- c("NN"=TRUE, "TN"=obsNonzero > 5+nParamExo, "DN"=obsNonzero > 6+nParamExo,
+                "NS"=seasonal && obsNonzero > lagsModelMax,
+                "TS"=seasonal && obsNonzero > max(6+lagsModelMax+nParamExo, 2*lagsModelMax));
+    trendAllowed <- c("N"=TRUE, "A"=any(Ttype==c("Z","X","A")), "M"=any(Ttype==c("Z","Y","M")));
+    seasonAllowed <- c("N"=TRUE, "A"=any(Stype==c("Z","X","A")), "M"=any(Stype==c("Z","Y","M")));
+    models <- names(candidates);
+    keep <- enough[candidates] & trendAllowed[substr(models,2,2)] &
+        seasonAllowed[substr(models,nchar(models),nchar(models))] &
+        (allowMultiplicative | !grepl("M", models));
+    return(models[keep]);
+}
+
+# The models of a pool that a small sample can fit: those it does not simplify
+adam_samplePoolFilter <- function(modelsPool, obsNonzero, lagsModelMax, nParamExo){
+    simplified <- suppressWarnings(vapply(modelsPool, adam_sampleModelSimplify, character(1),
+                                          obsNonzero, lagsModelMax, nParamExo, USE.NAMES=FALSE));
+    return(unique(modelsPool[simplified==modelsPool]));
+}
+
+# The model without the damping, the trend and the seasonality, in this order, while the sample
+# cannot fit it
+adam_sampleModelSimplify <- function(model, obsNonzero, lagsModelMax, nParamExo){
+    # The observations needed by a trend (T), a damped one (D) or none (N), with a seasonality
+    # (S) or without (N)
+    needed <- c("NN"=0, "TN"=5+nParamExo, "DN"=6+nParamExo, "NS"=lagsModelMax,
+                "TS"=6+lagsModelMax+nParamExo, "DS"=7+lagsModelMax+nParamExo);
+    repeat{
+        trend <- c("N","T","D")[1 + (substr(model,2,2)!="N") + (nchar(model)==4)];
+        components <- paste0(trend, c("N","S")[1 + (substr(model,nchar(model),nchar(model))!="N")]);
+        if(obsNonzero > needed[components]){
+            break;
+        }
+        warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
+                call.=FALSE);
+        model <- switch(trend,
+                        "D"=paste0(substr(model,1,2),substr(model,4,4)),
+                        "T"=paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model))),
+                        paste0(substr(model,1,nchar(model)-1),"N"));
+    }
+    return(model);
+}
+
+# The model of the samples of zero to four non-zero observations
+adam_sampleTiny <- function(obsNonzero, obsInSample, Etype, allowMultiplicative, yInSample, otLogical,
+                            parametersNumber){
+    if(obsNonzero>4 || (obsNonzero==0 && obsInSample<=1)){
+        stop("Not enough observations... Even for fitting of ETS('ANN')!",call.=FALSE);
+    }
+    Ttype <- Stype <- "N";
+    phiEstimate <- FALSE;
+    # A level model: estimated, or selected without the error type
+    if(obsNonzero>=3){
+        if(any(Etype==c("A","M"))){
+            modelDo <- "estimate";
+            model <- paste0(Etype,"NN");
+        }
+        else{
+            modelsPool <- c("ANN","MNN")[1:(1+allowMultiplicative)];
+            modelDo <- "select";
+            model <- c("ZNN","ZZZ")[obsNonzero-2];
+            Etype <- "Z";
+            if(obsNonzero==4){
+                warning("You have a very small sample. The only available model is level model.",
+                        call.=FALSE);
+            }
+        }
+        if(obsNonzero==3){
+            persistenceLevel <- 0;
+            persistenceEstimate <- persistenceLevelEstimate <- FALSE;
+            warning("I did not have enough of non-zero observations, so persistence value was set to zero.",
+                    call.=FALSE);
+        }
+    }
+    # The level model with zero persistence and the initial preset
+    else{
+        modelsPool <- NULL;
+        persistenceLevel <- 0;
+        persistenceEstimate <- persistenceLevelEstimate <- FALSE;
+        initialLevel <- switch(obsNonzero+1, 0, yInSample[otLogical], mean(yInSample[otLogical]));
+        initialType <- "provided";
+        initialEstimate <- initialLevelEstimate <- FALSE;
+        if(obsNonzero==0){
+            occurrenceModelProvided <- occurrenceModel <- FALSE;
+            occurrence <- "none";
+        }
+        warning(switch(obsNonzero+1,
+                       "You have a sample with zeroes only. Your forecast will be zero.",
+                       "I did not have enough of non-zero observations, so I used Naive.",
+                       "I did not have enough of non-zero observations, so persistence value was set to zero and initial was preset."),
+                call.=FALSE);
+        modelDo <- "use";
+        model <- "ANN";
+        Etype <- "A";
+        parametersNumber[1,1] <- 0;
+        parametersNumber[2,1] <- 2;
+    }
+    return(mget(intersect(c("Etype", "Stype", "Ttype", "initialEstimate", "initialLevel",
+                            "initialLevelEstimate", "initialType", "model", "modelDo", "modelsPool",
+                            "occurrence", "occurrenceModel", "occurrenceModelProvided",
+                            "parametersNumber", "persistenceEstimate", "persistenceLevel",
+                            "persistenceLevelEstimate", "phiEstimate"), ls())));
 }
 
 

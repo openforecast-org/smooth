@@ -721,8 +721,6 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
 
     #### Unpack the validated parameters into the local environment ####
     list2env(checkerReturn, envir=environment());
-    # The column of the response, under the name of the user
-    responseColumn <- adam_responseColumn(data, responseName);
 
     #### If select was provided in the model, do auto.adam selection ####
     if(select){
@@ -737,6 +735,9 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                        # The data is substituted (for its name), so it is found where adam() was called
                        envir=parent.frame()));
     }
+
+    # The column of the response, under the name of the user
+    responseColumn <- adam_responseColumn(data, responseName);
 
     headLengthUser <- ellipsis$headLength;
 

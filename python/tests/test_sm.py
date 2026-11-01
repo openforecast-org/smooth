@@ -122,14 +122,14 @@ def test_the_scale_model_takes_the_holdout_of_the_location_model():
 def test_the_errors_equal_to_zero_are_gaps_of_the_scale_model(
     distribution, lags, model_name, loglik, scale_at_zeros
 ):
-    """The random walk of ANN on AirPassengers gives five errors equal to zero: the
+    """The random walk of ANN on AirPassengers gives five observations with zero errors: the
     scale model skips them, stays multiplicative and keeps them in its likelihood,
     as R's."""
     y = pd.read_csv(DATA / "ces_airpassengers.csv")["y"].to_numpy(float)
     location = ADAM(model="ANN", distribution=distribution).fit(y)
     zeros = np.flatnonzero(np.asarray(location.residuals) == 0)
     assert len(zeros) == 5
-    with pytest.warns(UserWarning, match="errors equal to zero"):
+    with pytest.warns(UserWarning, match="observations with zero errors"):
         scale_model = sm(location, lags=lags)
     assert scale_model.model_name == model_name
     assert scale_model.loglik == pytest.approx(loglik, abs=1e-5)

@@ -361,10 +361,8 @@ def sm(
     zero_errors = info["ot_logical"] & (np.nan_to_num(response, nan=1.0) == 0)
     if np.any(zero_errors):
         warnings.warn(
-            f"The location model has {int(np.sum(zero_errors))} errors equal to zero, "
-            "which its distribution does not produce (an exact fit, or discrete data). "
-            "The scale model treats them as missing values: it does not update its "
-            "states on them.",
+            f"There were {int(np.sum(zero_errors))} observations with zero errors. "
+            "sm() will treat them as missing values.",
             stacklevel=2,
         )
 

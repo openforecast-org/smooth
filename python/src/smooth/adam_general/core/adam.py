@@ -20,6 +20,7 @@ from smooth.adam_general.core.estimator import (
     selector,
 )
 from smooth.adam_general.core.forecaster import forecaster, preparator
+from smooth.adam_general.core.forecaster.forecaster import _check_fitted_values
 from smooth.adam_general.core.forecaster.intervals import ensure_level_format
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
@@ -1278,16 +1279,10 @@ class ADAM:
         # Prepare final results and format output data
         self._prepare_results()
 
-        # Scale the demand-sizes fitted values by the occurrence probability
-        # so the resulting ``fitted`` series is on the original (mixed) scale.
+        # The fitted values times the probability of occurrence, and zero at the zeros
+        # of a provided occurrence, as R's (and as predict() does)
+        _check_fitted_values(self._prepared, self._occurrence, self._observations)
         if self._occurrence.get("occurrence_model"):
-            p = self._occurrence["p_fitted"]
-            yf = self._prepared["y_fitted"]
-            if isinstance(yf, pd.Series):
-                yf = yf * p
-            else:
-                yf = np.asarray(yf) * np.asarray(p)
-            self._prepared["y_fitted"] = yf
             # The residuals stay as the fitter produced them. R does the same
             # (R/adam.R:2005-2015): it scales `yFitted` by the probability and
             # leaves `errors` alone, because those are the *demand-size*

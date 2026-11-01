@@ -133,10 +133,8 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     # of the location model keeps them, with the scale predicted there
     zeroErrors <- otLogical & et %in% 0;
     if(any(zeroErrors)){
-        warning(paste0("The location model has ", sum(zeroErrors), " errors equal to zero, which ",
-                       "its distribution does not produce (an exact fit, or discrete data). ",
-                       "The scale model treats them as missing values: it does not update its ",
-                       "states on them."), call.=FALSE);
+        warning(paste0("There were ", sum(zeroErrors), " observations with zero errors. ",
+                       "sm() will treat them as missing values."), call.=FALSE);
     }
     fittedLoss <- NULL;
     lossBest <- Inf;

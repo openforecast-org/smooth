@@ -84,6 +84,8 @@ Changes:
 * In `ADAM`, the values filled in for the missing ones only seed the initial states, fitted to the in-sample values only, as R: the losses, the scale, the multistep losses (complete windows), the regressors, the accuracy (the holdout keeps its NaN), `sigma`, `aicc`, `bicc`, `rstandard()`, `rstudent()`, `outlierdummy()`, `multicov()`, the empirical and semiparametric intervals and `reapply()` (which propagated NaN) take the observed values. The fitted values at the gaps are the predictions of the model.
 
 Bugfixes:
+* `model` with `"F"` or `"P"` takes the other letters, as R: it ignored them and failed with seasonal lags. `"S"` with Z in the other letters gave an empty pool.
+* A damped model keeps its damping when the data or the lags fix all its letters (`"MAdZ"` with lag 1 is ETS(MAdN)).
 * With a provided occurrence of zeros and ones, `fitted` is zero at its zeros after the fit, as in R; it was set at the first `predict()`.
 * `sm()` treats the zero errors of the location model as missing values of the scale model, with a warning, as in R.
 * With a provided occurrence (zeros and ones), only negative values rule the multiplicative models out, as in R: the zeros did, so `model="YYY"` selected additive models.

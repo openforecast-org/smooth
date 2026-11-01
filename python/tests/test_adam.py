@@ -1799,6 +1799,52 @@ def test_the_small_sample_pool_keeps_the_allowed_seasonality(season_type, allowe
     assert ("MAA" in result["models_pool"]) == (season_type != "Y")
 
 
+@pytest.mark.parametrize(
+    "model, pool",
+    [
+        # R: names(adam(AirPassengers, model)$ICs)
+        ("FNN", ["ANN", "MNN"]),
+        ("PAN", ["AAN", "AAdN"]),
+        ("FXN", ["ANN", "AAN", "AAdN", "MNN", "MAN", "MAdN"]),
+        ("PYN", ["ANN", "MNN", "MMN", "MMdN"]),
+        ("SZN", ["ANN", "AAN", "AAdN", "MNN", "MAN", "MAdN", "MMN", "MMdN"]),
+    ],
+)
+def test_the_full_pure_and_safe_pools_take_the_other_letters(model, pool):
+    from smooth.adam_general.core.checker.model_checks import _check_model_composition
+
+    result = _check_model_composition(model, True, True, 12)
+    assert result["models_pool"] == pool and result["model_do"] == "select"
+
+
+def test_the_model_composition_on_non_positive_data_and_unity_lags(capsys):
+    from smooth.adam_general.core.checker.model_checks import _check_model_composition
+
+    # The additive pool, the additive selection, the warning for a specific model
+    assert _check_model_composition("SNN", False, False, 1)["models_pool"] == ["ANN"]
+    assert "Amending the pool" in capsys.readouterr().out
+    result = _check_model_composition("ZZZ", False, False, 12)
+    assert (result["error_type"], result["trend_type"], result["models_pool"]) == (
+        "A", "X", None,
+    )  # fmt: skip
+    _check_model_composition("MNN", False, False, 1)
+    assert "might break down" in capsys.readouterr().out
+    # The damped model whose seasonality the lags drop keeps its damping, as R's
+    result = _check_model_composition("MAdZ", True, True, 1)
+    assert result["models_pool"] == ["MAdN"]
+    _check_model_composition("AAA", True, False, 1)
+    assert "unity lags" in capsys.readouterr().out
+    assert _check_model_composition("SNZ", True, True, 1)["models_pool"] == [
+        "ANN", "MNN",
+    ]  # fmt: skip
+    # The invalid letters are selected, and "C" combines
+    result = _check_model_composition("QAdNC", True, False, 12)
+    assert result["model"] == "ZZZ" and "string length" in capsys.readouterr().out
+    result = _check_model_composition("AQxC", True, False, 12)
+    assert (result["trend_type"], result["model_do"]) == ("Z", "combine")
+    assert _check_model_composition(5, True, True, 12)["model"] == "ZZZ"
+
+
 def test_the_small_sample_pool_follows_the_sample_size():
     from smooth.adam_general.core.checker.sample_size import _build_small_sample_pool
 

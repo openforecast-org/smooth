@@ -661,35 +661,11 @@ adam_checkOccurrence <- function(Etype, Stype, Ttype, etsModel, h, lagsModelMax,
     allowMultiplicative <- !((any(yObserved<=0) && !occurrenceModel) || (occurrenceModel && any(yObserved<0)));
 
     if(etsModel){
-        # Clean the pool of models if only additive are allowed
-        if(!allowMultiplicative && !is.null(modelsPool)){
-            modelsPoolMultiplicative <- ((substr(modelsPool,1,1)=="M") |
-                                             substr(modelsPool,2,2)=="M" |
-                                             substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="M");
-            if(any(modelsPoolMultiplicative)){
-                modelsPool <- modelsPool[!modelsPoolMultiplicative];
-
-                # This is needed, because PPP and FFF use pool, not Branch and bound
-                if(!any(c(any(unlist(strsplit(model,""))=="P"),any(unlist(strsplit(model,""))=="F")))){
-                    warning("Only additive models are allowed for your data. Amending the pool.",
-                            call.=FALSE);
-                }
-            }
+        # Only the additive models for the non-positive data
+        if(!allowMultiplicative){
+            list2env(adam_modelsAdditive(model, Etype, Ttype, Stype, modelsPool), environment());
         }
-        if((any(model==c("PPP","FFF","YYY")) || any(unlist(strsplit(model,""))=="Z")) && !allowMultiplicative){
-            model <- "XXX";
-            Etype[] <- "A";
-            Ttype[] <- switch(Ttype,"Y"=,"Z"=,"P"=,"F"="X",Ttype);
-            Stype[] <- switch(Stype,"Y"=,"Z"=,"P"=,"F"="X",Stype);
-            modelsPool <- NULL;
-            warning("Only additive models are allowed for your data. Changing the selection mechanism.",
-                    call.=FALSE);
-        }
-        else if(!allowMultiplicative && any(c(Etype,Ttype,Stype)=="M")){
-            warning("Your data contains non-positive values, so the ETS(",model,") might break down.",
-                    call.=FALSE);
-        }
-        else if(any(model==c("PPP","FFF")) && allowMultiplicative){
+        else if(any(model==c("PPP","FFF"))){
             model <- "ZZZ";
         }
     }
@@ -938,98 +914,12 @@ adam_checkModel <- function(fast, model, modelDo){
 
     # Predefine models pool for a model selection
     modelsPool <- NULL;
-    if(!fast){
-        # Deal with the list of models. Check what has been provided. Stop if there is a mistake.
-        if(length(model)>1){
-            if(any(nchar(model)>4) || any(nchar(model)<3)){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[nchar(model)>4 | nchar(model)<3],collapse=",")),call.=FALSE);
-            }
-            else if(any(substr(model,1,1)!="A" & substr(model,1,1)!="M" & substr(model,1,1)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[substr(model,1,1)!="A" & substr(model,1,1)!="M"],collapse=",")),
-                     call.=FALSE);
-            }
-            else if(any(substr(model,2,2)!="N" & substr(model,2,2)!="A" &
-                        substr(model,2,2)!="M" & substr(model,2,2)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[substr(model,2,2)!="N" & substr(model,2,2)!="A" &
-                                             substr(model,2,2)!="M"],collapse=",")),call.=FALSE);
-            }
-            else if(any(substr(model,3,3)!="N" & substr(model,3,3)!="A" &
-                        substr(model,3,3)!="M" & substr(model,3,3)!="d" & substr(model,3,3)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[substr(model,3,3)!="N" & substr(model,3,3)!="A" &
-                                             substr(model,3,3)!="M" & substr(model,3,3)!="d"],collapse=",")),
-                     call.=FALSE);
-            }
-            else if(any(nchar(model)==4 & substr(model,4,4)!="N" & substr(model,4,4)!="A" &
-                        substr(model,4,4)!="M" & substr(model,4,4)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[nchar(model)==4 & substr(model,4,4)!="N" &
-                                             substr(model,4,4)!="A" & substr(model,4,4)!="M"],collapse=",")),
-                     call.=FALSE);
-            }
-            else{
-                modelsPoolCombiner <- (substr(model,1,1)=="C" | substr(model,2,2)=="C" |
-                                           substr(model,3,3)=="C" | substr(model,4,4)=="C");
-                modelsPool <- model[!modelsPoolCombiner];
-                modelsPool <- unique(modelsPool);
-                if(any(modelsPoolCombiner)){
-                    if(any(substr(model,nchar(model),nchar(model))!="N")){
-                        model <- "CCC";
-                    }
-                    else{
-                        model <- "CCN";
-                    }
-                }
-                else{
-                    model <- c("Z","Z","Z");
-                    if(all(substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N")){
-                        model[3] <- "N";
-                    }
-                    if(all(substr(modelsPool,2,2)=="N")){
-                        model[2] <- "N";
-                    }
-                    model <- paste0(model,collapse="");
-                }
-            }
-        }
+    if(!fast && length(model)>1){
+        list2env(adam_modelsPoolCheck(model), environment());
     }
 
     # If chosen model is "AAdN" or anything like that, we are taking the appropriate values
-    if(nchar(model)==4){
-        Etype <- substr(model,1,1);
-        Ttype <- substr(model,2,2);
-        Stype <- substr(model,4,4);
-        damped <- TRUE;
-        if(substr(model,3,3)!="d"){
-            message(paste0("You have defined a strange model: ", model,
-                           ". Switching to ", paste0(Etype,Ttype,"d",Stype)));
-            model <- paste0(Etype,Ttype,"d",Stype);
-        }
-    }
-    else if(nchar(model)==3){
-        Etype <- substr(model,1,1);
-        Ttype <- substr(model,2,2);
-        Stype <- substr(model,3,3);
-        if(any(Ttype==c("Z","X","Y"))){
-            damped <- TRUE;
-        }
-        else{
-            damped <- FALSE;
-        }
-    }
-    else{
-        message(paste0("You have defined a strange model: ",model));
-        message("Switching to 'ZZZ'");
-        model <- "ZZZ";
-
-        Etype <- "Z";
-        Ttype <- "Z";
-        Stype <- "Z";
-        damped <- TRUE;
-    }
+    list2env(adam_modelComponents(model), environment());
 
     # Define if we want to select or combine models... or do none of the above.
     if(is.null(modelsPool)){
@@ -1053,99 +943,14 @@ adam_checkModel <- function(fast, model, modelDo){
                 any(unlist(strsplit(model,""))=="S")){
             modelDo <- "select";
 
-            # The full test, sidestepping branch and bound
-            if(any(unlist(strsplit(model,""))=="F")){
-                modelsPool <- c("ANN","AAN","AAdN","AMN","AMdN",
-                                "ANA","AAA","AAdA","AMA","AMdA",
-                                "ANM","AAM","AAdM","AMM","AMdM",
-                                "MNN","MAN","MAdN","MMN","MMdN",
-                                "MNA","MAA","MAdA","MMA","MMdA",
-                                "MNM","MAM","MAdM","MMM","MMdM");
-                # Remove models from pool if specific elements are provided
-                if(Etype!="F"){
-                    modelsPool <- modelsPool[substr(modelsPool,1,1)==Etype];
-                }
-                else{
-                    Etype[] <- "Z"
-                }
-                if(Ttype!="F"){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2)==Ttype];
-                }
-                else{
-                    Ttype[] <- "Z"
-                }
-                if(Stype!="F"){
-                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))==Stype];
-                }
-                else{
-                    Stype[] <- "Z"
-                }
-                model <- "FFF";
-            }
-
-            # The test for pure models only
-            if(any(unlist(strsplit(model,""))=="P")){
-                modelsPool <- c("ANN","AAN","AAdN","ANA","AAA","AAdA",
-                                "MNN","MMN","MMdN","MNM","MMM","MMdM");
-                # Remove models from pool if specific elements are provided
-                if(Etype!="P"){
-                    modelsPool <- modelsPool[substr(modelsPool,1,1)==Etype];
-                }
-                else{
-                    Etype[] <- "Z"
-                }
-                if(Ttype!="P"){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2)==Ttype];
-                }
-                else{
-                    Ttype[] <- "Z"
-                }
-                if(Stype!="P"){
-                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))==Stype];
-                }
-                else{
-                    Stype[] <- "Z"
-                }
-                model <- "PPP";
-            }
-
-            # The pool of sensible/standard models, those that have finite variance
-            if(any(unlist(strsplit(model,""))=="S")){
-                modelsPool <- c("ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA",
-                                "MNN", "MAN", "MAdN", "MNA", "MAA", "MAdA",
-                                "MNM", "MAM", "MAdM", "MMN", "MMdN", "MMM", "MMdM");
-                # Remove models from pool if specific elements are provided
-                if(Etype!="S"){
-                    # Switch is needed here if people want to restrict the basic pool further
-                    modelsPool <- modelsPool[substr(modelsPool,1,1)==switch(Etype,
-                                                                            "X"="A",
-                                                                            "Y"="M",
-                                                                            Etype)];
-                }
-                else{
-                    Etype[] <- "Z"
-                }
-                if(Ttype!="S"){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2) %in% switch(Ttype,
-                                                                                "X"=c("A","N"),
-                                                                                "Y"=c("M","N"),
-                                                                                Ttype)];
-                }
-                else{
-                    Ttype[] <- "Z"
-                }
-                if(Stype!="S"){
-                    modelsPool <- modelsPool[substr(modelsPool,
-                                                    nchar(modelsPool),
-                                                    nchar(modelsPool))==switch(Stype,
-                                                                               "X"=c("A","N"),
-                                                                               "Y"=c("M","N"),
-                                                                               Stype)];
-                }
-                else{
-                    Stype[] <- "Z"
-                }
-                model <- "SSS";
+            # The full, the pure or the safe pool, narrowed by the other letters
+            named <- intersect(c("F","P","S"), c(Etype, Ttype, Stype))[1];
+            if(!is.na(named)){
+                modelsPool <- adam_modelsPoolNamed(named, Etype, Ttype, Stype);
+                Etype[Etype %in% c("F","P","S")] <- "Z";
+                Ttype[Ttype %in% c("F","P","S")] <- "Z";
+                Stype[Stype %in% c("F","P","S")] <- "Z";
+                model <- strrep(named, 3);
             }
         }
         else{
@@ -1882,6 +1687,106 @@ adam_sampleTiny <- function(obsNonzero, obsInSample, Etype, allowMultiplicative,
                             "occurrence", "occurrenceModel", "occurrenceModelProvided",
                             "parametersNumber", "persistenceEstimate", "persistenceLevel",
                             "persistenceLevelEstimate", "phiEstimate"), ls())));
+}
+
+
+# The pool of models given as a vector: the strange ones stop, "C" in them combines the rest
+adam_modelsPoolCheck <- function(model){
+    # The letters each position allows: the error, the trend, the damping or the seasonality,
+    # and the seasonality of a damped model
+    allowed <- list(c("A","M","C"), c("N","A","M","C"), c("N","A","M","d","C"), c("N","A","M","C"));
+    strange <- nchar(model)>4 | nchar(model)<3;
+    for(i in 1:4){
+        strange[] <- strange | (nchar(model)>=i & !(substr(model,i,i) %in% allowed[[i]]));
+    }
+    if(any(strange)){
+        stop(paste0("You have defined strange model(s) in the pool: ", paste0(model[strange],collapse=",")),
+             call.=FALSE);
+    }
+    modelsPoolCombiner <- (substr(model,1,1)=="C" | substr(model,2,2)=="C" |
+                               substr(model,3,3)=="C" | substr(model,4,4)=="C");
+    modelsPool <- unique(model[!modelsPoolCombiner]);
+    seasonal <- any(substr(model,nchar(model),nchar(model))!="N");
+    if(any(modelsPoolCombiner)){
+        model <- c("CCN","CCC")[1 + seasonal];
+    }
+    else{
+        model <- paste0("Z", c("Z","N")[1 + all(substr(modelsPool,2,2)=="N")],
+                        c("Z","N")[1 + all(substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N")]);
+    }
+    return(list(model=model, modelsPool=modelsPool));
+}
+
+# The components of the model, and its damping
+adam_modelComponents <- function(model){
+    if(all(nchar(model)!=c(3,4))){
+        message(paste0("You have defined a strange model: ",model));
+        message("Switching to 'ZZZ'");
+        model <- "ZZZ";
+    }
+    Etype <- substr(model,1,1);
+    Ttype <- substr(model,2,2);
+    Stype <- substr(model,nchar(model),nchar(model));
+    damped <- nchar(model)==4 || any(Ttype==c("Z","X","Y"));
+    if(nchar(model)==4 && substr(model,3,3)!="d"){
+        message(paste0("You have defined a strange model: ", model,
+                       ". Switching to ", paste0(Etype,Ttype,"d",Stype)));
+        model <- paste0(Etype,Ttype,"d",Stype);
+    }
+    return(list(model=model, Etype=Etype, Ttype=Ttype, Stype=Stype, damped=damped));
+}
+
+# The full, the pure or the safe pool ("F", "P" or "S"), narrowed by the other letters: X the
+# additive or no component, Y the multiplicative or none
+adam_modelsPoolNamed <- function(letter, Etype, Ttype, Stype){
+    modelsPool <- switch(letter,
+                         "F"=c("ANN","AAN","AAdN","AMN","AMdN","ANA","AAA","AAdA","AMA","AMdA",
+                               "ANM","AAM","AAdM","AMM","AMdM","MNN","MAN","MAdN","MMN","MMdN",
+                               "MNA","MAA","MAdA","MMA","MMdA","MNM","MAM","MAdM","MMM","MMdM"),
+                         "P"=c("ANN","AAN","AAdN","ANA","AAA","AAdA",
+                               "MNN","MMN","MMdN","MNM","MMM","MMdM"),
+                         "S"=c("ANN","AAN","AAdN","ANA","AAA","AAdA","MNN","MAN","MAdN","MNA",
+                               "MAA","MAdA","MNM","MAM","MAdM","MMN","MMdN","MMM","MMdM"));
+    allows <- list("X"=c("A","N"), "Y"=c("M","N"), "N"="N", "A"="A", "M"="M");
+    parts <- list(substr(modelsPool,1,1), substr(modelsPool,2,2),
+                  substr(modelsPool,nchar(modelsPool),nchar(modelsPool)));
+    types <- c(Etype, Ttype, Stype);
+    keep <- rep(TRUE, length(modelsPool));
+    for(i in 1:3){
+        if(!is.null(allows[[types[i]]])){
+            keep[] <- keep & parts[[i]] %in% allows[[types[i]]];
+        }
+    }
+    return(modelsPool[keep]);
+}
+
+
+# The models on non-positive data: the pool without the multiplicative ones, a selection among
+# the additive ones, a warning for a multiplicative model
+adam_modelsAdditive <- function(model, Etype, Ttype, Stype, modelsPool){
+    multiplicative <- (substr(modelsPool,1,1)=="M" | substr(modelsPool,2,2)=="M" |
+                           substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="M");
+    if(any(multiplicative)){
+        modelsPool <- modelsPool[!multiplicative];
+        # This is needed, because PPP and FFF use pool, not Branch and bound
+        if(!any(unlist(strsplit(model,"")) %in% c("P","F"))){
+            warning("Only additive models are allowed for your data. Amending the pool.", call.=FALSE);
+        }
+    }
+    if(any(model==c("PPP","FFF","YYY")) || any(unlist(strsplit(model,""))=="Z")){
+        model <- "XXX";
+        Etype[] <- "A";
+        Ttype[] <- switch(Ttype,"Y"=,"Z"=,"P"=,"F"="X",Ttype);
+        Stype[] <- switch(Stype,"Y"=,"Z"=,"P"=,"F"="X",Stype);
+        modelsPool <- NULL;
+        warning("Only additive models are allowed for your data. Changing the selection mechanism.",
+                call.=FALSE);
+    }
+    else if(any(c(Etype,Ttype,Stype)=="M")){
+        warning("Your data contains non-positive values, so the ETS(",model,") might break down.",
+                call.=FALSE);
+    }
+    return(list(model=model, Etype=Etype, Ttype=Ttype, Stype=Stype, modelsPool=modelsPool));
 }
 
 

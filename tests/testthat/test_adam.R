@@ -1793,6 +1793,27 @@ test_that("a small sample restricts the pool to the models it can fit", {
     expect_setequal(names(testModel$ICs), c("ANN","AAN"));
 })
 
+test_that("the full, the pure and the safe pools take the other letters of the model", {
+    expect_equal(adam_modelsPoolNamed("F", "F", "N", "N"), c("ANN","MNN"));
+    expect_equal(adam_modelsPoolNamed("P", "P", "A", "N"), c("AAN","AAdN"));
+    expect_equal(adam_modelsPoolNamed("F", "F", "X", "N"), c("ANN","AAN","AAdN","MNN","MAN","MAdN"));
+    expect_equal(adam_modelsPoolNamed("S", "S", "Z", "N"), c("ANN","AAN","AAdN","MNN","MAN","MAdN","MMN","MMdN"));
+    expect_equal(adam_checkModel(FALSE, "PYN", "estimate")$modelsPool, c("ANN","MNN","MMN","MMdN"));
+    # The pool given as a vector, its strange models, and the combination of the rest
+    expect_error(adam_modelsPoolCheck(c("ANN","AQN")), "strange model");
+    expect_equal(adam_modelsPoolCheck(c("ANN","AAN","CCC")), list(model="CCN", modelsPool=c("ANN","AAN")));
+    expect_equal(adam_modelsPoolCheck(c("ANN","MNN"))$model, "ZNN");
+    expect_message(expect_equal(adam_modelComponents("AAxN")$model, "AAdN"), "strange model");
+    expect_equal(suppressMessages(adam_modelComponents("AN"))[c("model","damped")],
+                 list(model="ZZZ", damped=TRUE));
+    # The non-positive data: the additive pool, the additive selection, or a warning
+    expect_warning(expect_equal(adam_modelsAdditive("SSS", "Z", "Z", "N", c("ANN","MNN"))$modelsPool, "ANN"),
+                   "Amending the pool");
+    expect_warning(expect_null(adam_modelsAdditive("ZZZ", "Z", "Z", "Z", NULL)$modelsPool),
+                   "Changing the selection mechanism");
+    expect_warning(adam_modelsAdditive("MNN", "M", "N", "N", NULL), "might break down");
+})
+
 test_that("the helpers of the small samples build, filter and simplify as the sample allows", {
     # Six observations: a trend, but no damping and no seasonality
     expect_equal(adam_samplePoolBuild(6, 12, "Z", "Z", TRUE, 0), c("ANN","MNN","AAN","MAN","AMN","MMN"));

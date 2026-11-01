@@ -167,7 +167,15 @@ Update only if you do C++ code changes not python code changes.
 
 # Or use the Makefile
 make test
+
+# Only the tests whose Python code changed since the last testmon run
+.venv/bin/python -m pytest tests/ -q --testmon-forceselect
 ```
+
+pytest-testmon (in the `dev` extra) keeps its database in `python/.testmondata`. Plain
+`--testmon` selects nothing, as the default `-m` switches its selection off. It does not see
+changes to C++, R or the fixtures: run the affected tests by name then. When to run what is
+in the root `CLAUDE.md` (Testing).
 
 **Test location**: `python/tests/` — a pytest suite of 969 tests (a further 547 are
 deselected by default; see below).

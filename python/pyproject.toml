@@ -74,6 +74,7 @@ exclude = ["tests*", "tests.*", "*.tests", "*.tests.*"]
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-testmon",
     "ruff",
     "mypy",
     "pre-commit",

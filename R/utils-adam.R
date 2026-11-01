@@ -1609,13 +1609,13 @@ adam_samplePoolFilter <- function(modelsPool, obsNonzero, lagsModelMax, nParamEx
 # cannot fit it
 adam_sampleModelSimplify <- function(model, obsNonzero, lagsModelMax, nParamExo){
     # The observations needed by a trend (T), a damped one (D) or none (N), with a seasonality
-    # (S) or without (N)
-    needed <- c("NN"=0, "TN"=5+nParamExo, "DN"=6+nParamExo, "NS"=lagsModelMax,
+    # (S) or without (N); the level alone needs none
+    needed <- c("TN"=5+nParamExo, "DN"=6+nParamExo, "NS"=lagsModelMax,
                 "TS"=6+lagsModelMax+nParamExo, "DS"=7+lagsModelMax+nParamExo);
     repeat{
         trend <- c("N","T","D")[1 + (substr(model,2,2)!="N") + (nchar(model)==4)];
         components <- paste0(trend, c("N","S")[1 + (substr(model,nchar(model),nchar(model))!="N")]);
-        if(obsNonzero > needed[components]){
+        if(components=="NN" || obsNonzero > needed[components]){
             break;
         }
         warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",

@@ -1876,6 +1876,7 @@ def test_a_small_sample_simplifies_the_model(capsys):
     assert capsys.readouterr().out.count("Fitting what I can") == 2
     assert _simplify_small_sample_model("MAdN", 6, 1, 0, True) == "MAN"
     assert _simplify_small_sample_model("MAA", 3, 4, 0, True) == "MNN"
+    assert _simplify_small_sample_model("AAdA", 0, 12, 0, True) == "ANN"
 
 
 @pytest.mark.parametrize(

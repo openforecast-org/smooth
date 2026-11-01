@@ -1801,7 +1801,8 @@ test_that("the full, the pure and the safe pools take the other letters of the m
     expect_equal(adam_checkModel(FALSE, "PYN", "estimate")$modelsPool, c("ANN","MNN","MMN","MMdN"));
     # The pool given as a vector, its strange models, and the combination of the rest
     expect_error(adam_modelsPoolCheck(c("ANN","AQN")), "strange model");
-    expect_equal(adam_modelsPoolCheck(c("ANN","AAN","CCC")), list(model="CCN", modelsPool=c("ANN","AAN")));
+    expect_equal(adam_modelsPoolCheck(c("ANN","AAN","CCN")), list(model="CCN", modelsPool=c("ANN","AAN")));
+    expect_equal(adam_modelsPoolCheck(c("ANN","AAN","CCC"))$model, "CCC");
     expect_equal(adam_modelsPoolCheck(c("ANN","MNN"))$model, "ZNN");
     expect_message(expect_equal(adam_modelComponents("AAxN")$model, "AAdN"), "strange model");
     expect_equal(suppressMessages(adam_modelComponents("AN"))[c("model","damped")],
@@ -1828,6 +1829,7 @@ test_that("the helpers of the small samples build, filter and simplify as the sa
     expect_equal(model, "ANA");
     expect_length(caught, 2);
     expect_equal(suppressWarnings(adam_sampleModelSimplify("MAA", 3, 4, 0)), "MNN");
+    expect_equal(suppressWarnings(adam_sampleModelSimplify("AAdA", 0, 12, 0)), "ANN");
     # The tiny samples: a level model, estimated, selected, or used with the initial preset
     expect_warning(adam_sampleTiny(3, 3, "Z", FALSE, c(1,2,3), rep(TRUE,3), matrix(0,2,1)),
                    "persistence value was set to zero");

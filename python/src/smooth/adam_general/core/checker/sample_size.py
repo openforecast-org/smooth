@@ -190,9 +190,8 @@ def _simplify_small_sample_model(
     """The model without the damping, the trend and the seasonality, in this order,
     while the sample cannot fit it (R lines 2778-2832)."""
     # The observations needed by a trend (T), a damped one (D) or none (N), with a
-    # seasonality (S) or without (N)
+    # seasonality (S) or without (N); the level alone needs none
     needed = {
-        "NN": 0,
         "TN": 5 + n_param_exo,
         "DN": 6 + n_param_exo,
         "NS": lags_model_max,
@@ -202,7 +201,7 @@ def _simplify_small_sample_model(
     while True:
         trend = "D" if len(model) == 4 else ("N" if model[1] == "N" else "T")
         components = trend + ("N" if model[-1] == "N" else "S")
-        if obs_nonzero > needed[components]:
+        if components == "NN" or obs_nonzero > needed[components]:
             return model
         _warn(_FITTING_WHAT_I_CAN.format(model), silent)
         if trend == "D":

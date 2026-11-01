@@ -1026,153 +1026,7 @@ adam_checkModel <- function(fast, model, modelDo){
 adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS, distribution,
                              etsModel, fast, lags, model, modelDo, modelIsTrendy, modelsPool,
                              orders, parametersNumber){
-    # This should be available for pure models only
-    if(is.list(orders)){
-        arOrders <- orders$ar;
-        iOrders <- orders$i;
-        maOrders <- orders$ma;
-        select <- orders$select;
-        if(is.null(select)){
-            select <- FALSE;
-        }
-    }
-    else if(is.vector(orders)){
-        arOrders <- orders[1];
-        iOrders <- orders[2];
-        maOrders <- orders[3];
-        select <- FALSE;
-    }
-    else{
-        select <- FALSE;
-    }
-
-    # If there is arima, prepare orders
-    if(sum(c(arOrders,iOrders,maOrders))>0){
-        arimaModel <- TRUE;
-
-        # See if AR is needed
-        arRequired <- FALSE;
-        if(sum(arOrders)>0){
-            arRequired[] <- TRUE;
-        }
-
-        # See if I is needed
-        iRequired <- FALSE;
-        if(sum(iOrders)>0){
-            iRequired[] <- TRUE;
-        }
-
-        # See if I is needed
-        maRequired <- FALSE;
-        if(sum(maOrders)>0){
-            maRequired[] <- TRUE;
-        }
-
-        # Define maxOrder and make all the values look similar (for the polynomials)
-        maxOrder <- max(length(arOrders),length(iOrders),length(maOrders),length(lags));
-        if(length(arOrders)!=maxOrder){
-            arOrders <- c(arOrders,rep(0,maxOrder-length(arOrders)));
-        }
-        if(length(iOrders)!=maxOrder){
-            iOrders <- c(iOrders,rep(0,maxOrder-length(iOrders)));
-        }
-        if(length(maOrders)!=maxOrder){
-            maOrders <- c(maOrders,rep(0,maxOrder-length(maOrders)));
-        }
-        if(length(lags)!=maxOrder){
-            lagsNew <- c(lags,rep(0,maxOrder-length(lags)));
-            arOrders <- arOrders[lagsNew!=0];
-            iOrders <- iOrders[lagsNew!=0];
-            maOrders <- maOrders[lagsNew!=0];
-        }
-
-        # Define the non-zero values. This is done via the calculation of orders of polynomials
-        ariValues <- list(NA);
-        maValues <- list(NA);
-        for(i in 1:length(lags)){
-            ariValues[[i]] <- c(0,min(1,arOrders[i]):arOrders[i])
-            if(iOrders[i]!=0){
-                ariValues[[i]] <- c(ariValues[[i]],1:iOrders[i]+arOrders[i]);
-            }
-            ariValues[[i]] <- unique(ariValues[[i]] * lags[i]);
-            maValues[[i]] <- unique(c(0,min(1,maOrders[i]):maOrders[i]) * lags[i]);
-        }
-
-        # Produce ARI polynomials
-        ariLengths <- unlist(lapply(ariValues,length));
-        ariPolynomial <- array(0,ariLengths);
-        for(i in 1:length(ariValues)){
-            if(i==1){
-                ariPolynomial <- ariPolynomial + array(ariValues[[i]], ariLengths);
-            }
-            else{
-                ariPolynomial <- ariPolynomial + array(rep(ariValues[[i]],each=prod(ariLengths[1:(i-1)])),
-                                                       ariLengths);
-            }
-        }
-
-        # Produce MA polynomials
-        maLengths <- unlist(lapply(maValues,length));
-        maPolynomial <- array(0,maLengths);
-        for(i in 1:length(maValues)){
-            if(i==1){
-                maPolynomial <- maPolynomial + array(maValues[[i]], maLengths);
-            }
-            else{
-                maPolynomial <- maPolynomial + array(rep(maValues[[i]],each=prod(maLengths[1:(i-1)])),
-                                                     maLengths);
-            }
-        }
-
-        # What are the non-zero ARI and MA polynomials?
-        ### What are their positions in transition matrix?
-        nonZeroARI <- unique(matrix(c(ariPolynomial)[-1],ncol=1));
-        nonZeroMA <- unique(matrix(c(maPolynomial)[-1],ncol=1));
-        # Lags for the ARIMA components
-        lagsModelARIMA <- matrix(sort(unique(c(nonZeroARI,nonZeroMA))),ncol=1);
-        nonZeroARI <- cbind(nonZeroARI+1,which(lagsModelARIMA %in% nonZeroARI));
-        nonZeroMA <- cbind(nonZeroMA+1,which(lagsModelARIMA %in% nonZeroMA));
-
-        # Number of components
-        componentsNumberARIMA <- length(lagsModelARIMA);
-        # Their names
-        componentsNamesARIMA <- paste0("ARIMAState",c(1:componentsNumberARIMA));
-
-        # If all orders are zero, drop ARIMA part
-        if(all(c(arOrders,iOrders,maOrders)==0)){
-            arOrders <- NULL;
-            iOrders <- NULL;
-            maOrders <- NULL;
-            arimaModel <- FALSE;
-            arRequired <- arEstimate <- FALSE;
-            iRequired <- FALSE;
-            maRequired <- maEstimate <- FALSE;
-            lagsModelARIMA <- initialArimaNumber <- 0;
-            componentsNumberARIMA <- 0;
-            componentsNamesARIMA <- NULL;
-            nonZeroARI <- NULL;
-            nonZeroMA <- NULL;
-        }
-        else{
-            # Number of initials needed. This is based on the longest one (see adam_arimaInitials)
-            initialArimaNumber <- max(lagsModelARIMA);
-        }
-    }
-    else{
-        arOrders <- NULL;
-        iOrders <- NULL;
-        maOrders <- NULL;
-        arimaModel <- FALSE;
-        arRequired <- arEstimate <- FALSE;
-        iRequired <- FALSE;
-        maRequired <- maEstimate <- FALSE;
-        lagsModelARIMA <- initialArimaNumber <- 0;
-        componentsNumberARIMA <- 0;
-        componentsNamesARIMA <- NULL;
-        nonZeroARI <- NULL;
-        nonZeroMA <- NULL;
-        select <- FALSE;
-    }
+    list2env(adam_arimaOrders(orders, lags), environment());
 
     if(etsModel){
         modelIsSeasonal <- Stype!="N";
@@ -1289,108 +1143,8 @@ adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS
 
     # Check ARIMA parameters, if they are provided
     if(arimaModel){
-        # Check the provided parameters for AR and MA
-        if(!is.null(arma)){
-            arEstimate <- arRequired;
-            maEstimate <- maRequired;
-            # If this is a proper list, extract parameters separately
-            if(is.list(arma)){
-                armaParameters <- vector("numeric",sum(sapply(arma,length)));
-                j <- arIndex <- maIndex <- 0;
-                # The named list (proper thing)
-                if(!is.null(names(arma))){
-                    # Check if the length of the provided parameters is correct
-                    if(arRequired && !is.null(arma$ar) && length(arma$ar)!=sum(arOrders)){
-                        warning(paste0("The number of provided AR parameters is ",length(arma$ar),
-                                       "while I need ",sum(arOrders),". ",
-                                       "Switching to estimation."),call.=FALSE);
-                        arEstimate[] <- TRUE;
-                    }
-                    if(maRequired && !is.null(arma$ma) && length(arma$ma)!=sum(maOrders)){
-                        warning(paste0("The number of provided MA parameters is ",length(arma$ma),
-                                       "while I need ",sum(maOrders),". ",
-                                       "Switching to estimation."),call.=FALSE);
-                        maEstimate[] <- TRUE;
-                    }
-                    for(i in 1:length(lags)){
-                        if(arRequired && !is.null(arma$ar) && arOrders[i]>0){
-                            armaParameters[j+c(1:arOrders[i])] <- arma$ar[arIndex+c(1:arOrders[i])];
-                            names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                            j[] <- j+arOrders[i];
-                            arIndex[] <- arIndex+arOrders[i];
-                            arEstimate[] <- FALSE;
-                        }
-                        if(maRequired && !is.null(arma$ma) && maOrders[i]>0){
-                            armaParameters[j+c(1:maOrders[i])] <- arma$ma[maIndex+c(1:maOrders[i])];
-                            names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                            j[] <- j+maOrders[i];
-                            maIndex[] <- maIndex+maOrders[i];
-                            maEstimate[] <- FALSE;
-                        }
-                    }
-                }
-                # Just a list. Assume that the first element is ar, and the second is ma
-                else{
-                    for(i in 1:length(lags)){
-                        k <- 1;
-                        if(arRequired && !is.null(arma[[1]]) && arOrders[i]>0){
-                            armaParameters[j+c(1:arOrders[i])] <- arma[[1]][arIndex+c(1:arOrders[i])];
-                            names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                            j[] <- j+arOrders[i];
-                            arIndex[] <- arIndex+arOrders[i];
-                            arEstimate[] <- FALSE;
-                            k[] <- 2;
-                        }
-                        if(maRequired && !is.null(arma[[k]]) && maOrders[i]>0){
-                            armaParameters[j+c(1:maOrders[i])] <- arma[[k]][maIndex+c(1:maOrders[i])];
-                            names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                            j[] <- j+maOrders[i];
-                            maIndex[] <- maIndex+maOrders[i];
-                            maEstimate[] <- FALSE;
-                        }
-                    }
-                    # Check if the length of the provided parameters is correct
-                    if(length(armaParameters)!=sum(arOrders)+sum(maOrders)){
-                        warning(paste0("The number of provided ARMA parameters is ",length(armaParameters),
-                                       "while I need ",sum(arOrders)+sum(maOrders),". ",
-                                       "Switching to estimation."),call.=FALSE);
-                        maEstimate <- arEstimate[] <- TRUE;
-                        armaParameters <- NULL;
-                    }
-                }
-            }
-            else if(is.vector(arma)){
-                # Check the length of the vector
-                if(length(arma)!=sum(arOrders)+sum(maOrders)){
-                    warning(paste0("The number of provided ARMA parameters is ",length(arma),
-                                   "while I need ",sum(arOrders)+sum(maOrders),". ",
-                                   "Switching to estimation."),call.=FALSE);
-                    maEstimate <- arEstimate[] <- TRUE;
-                    armaParameters <- NULL;
-                }
-                else{
-                    armaParameters <- arma;
-                    j <- 0;
-                    for(i in 1:length(lags)){
-                        if(arOrders[i]>0){
-                            names(armaParameters)[j+1:arOrders[i]] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                            j <- j + arOrders[i];
-                        }
-                        if(maOrders[i]>0){
-                            names(armaParameters)[j+1:maOrders[i]] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                            j <- j + maOrders[i];
-                        }
-                    }
-                    maEstimate <- arEstimate[] <- FALSE;
-                }
-            }
-            parametersNumber[2,1] <- parametersNumber[2,1] + length(armaParameters);
-        }
-        else{
-            arEstimate <- arRequired;
-            maEstimate <- maRequired;
-            armaParameters <- NULL;
-        }
+        list2env(adam_armaParameters(arma, arOrders, maOrders, lags, arRequired, maRequired), environment());
+        parametersNumber[2,1] <- parametersNumber[2,1] + length(armaParameters);
     }
     else{
         armaParameters <- NULL;
@@ -1410,6 +1164,114 @@ adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS
                          "maOrders", "maRequired", "model", "modelDo", "modelIsSeasonal",
                          "modelsPool", "nonZeroARI", "nonZeroMA", "parametersNumber",
                          "select"), ls())));
+}
+
+# The ARIMA orders aligned with the lags, and the states of the ARIMA polynomials
+adam_arimaOrders <- function(orders, lags){
+    # The orders as a list, or as a vector of the AR, I and MA orders
+    if(!is.list(orders)){
+        orders <- list(ar=orders[1], i=orders[2], ma=orders[3]);
+    }
+    arOrders <- orders$ar;
+    iOrders <- orders$i;
+    maOrders <- orders$ma;
+    select <- !is.null(orders$select) && orders$select;
+    noARIMA <- list(arOrders=NULL, iOrders=NULL, maOrders=NULL, arimaModel=FALSE, arRequired=FALSE,
+                    arEstimate=FALSE, iRequired=FALSE, maRequired=FALSE, maEstimate=FALSE,
+                    lagsModelARIMA=0, initialArimaNumber=0, componentsNumberARIMA=0,
+                    componentsNamesARIMA=NULL, nonZeroARI=NULL, nonZeroMA=NULL);
+    if(sum(c(arOrders,iOrders,maOrders))==0){
+        return(c(noARIMA, select=FALSE));
+    }
+    arRequired <- sum(arOrders)>0;
+    iRequired <- sum(iOrders)>0;
+    maRequired <- sum(maOrders)>0;
+
+    # The orders of the same length as the lags, padded with zeroes, or cut to the lags
+    maxOrder <- max(length(arOrders),length(iOrders),length(maOrders),length(lags));
+    arOrders <- c(arOrders,rep(0,maxOrder-length(arOrders)))[1:length(lags)];
+    iOrders <- c(iOrders,rep(0,maxOrder-length(iOrders)))[1:length(lags)];
+    maOrders <- c(maOrders,rep(0,maxOrder-length(maOrders)))[1:length(lags)];
+    if(all(c(arOrders,iOrders,maOrders)==0)){
+        return(c(noARIMA, select=select));
+    }
+
+    # The non-zero powers of the ARI and MA polynomials: every sum of a power of each lag
+    ariValues <- maValues <- vector("list", length(lags));
+    for(i in 1:length(lags)){
+        ariValues[[i]] <- c(0,min(1,arOrders[i]):arOrders[i]);
+        if(iOrders[i]!=0){
+            ariValues[[i]] <- c(ariValues[[i]],1:iOrders[i]+arOrders[i]);
+        }
+        ariValues[[i]] <- unique(ariValues[[i]] * lags[i]);
+        maValues[[i]] <- unique(c(0,min(1,maOrders[i]):maOrders[i]) * lags[i]);
+    }
+    ariPolynomial <- Reduce(function(x, y){return(c(outer(x, y, "+")))}, ariValues);
+    maPolynomial <- Reduce(function(x, y){return(c(outer(x, y, "+")))}, maValues);
+
+    # Their positions in the transition matrix, and the lags of the ARIMA states
+    nonZeroARI <- unique(matrix(ariPolynomial[-1],ncol=1));
+    nonZeroMA <- unique(matrix(maPolynomial[-1],ncol=1));
+    lagsModelARIMA <- matrix(sort(unique(c(nonZeroARI,nonZeroMA))),ncol=1);
+    nonZeroARI <- cbind(nonZeroARI+1,which(lagsModelARIMA %in% nonZeroARI));
+    nonZeroMA <- cbind(nonZeroMA+1,which(lagsModelARIMA %in% nonZeroMA));
+    componentsNumberARIMA <- length(lagsModelARIMA);
+    componentsNamesARIMA <- paste0("ARIMAState",c(1:componentsNumberARIMA));
+    # Number of initials needed. This is based on the longest one (see adam_arimaInitials)
+    initialArimaNumber <- max(lagsModelARIMA);
+    return(list(arOrders=arOrders, iOrders=iOrders, maOrders=maOrders, arimaModel=TRUE,
+                arRequired=arRequired, iRequired=iRequired, maRequired=maRequired,
+                lagsModelARIMA=lagsModelARIMA, initialArimaNumber=initialArimaNumber,
+                componentsNumberARIMA=componentsNumberARIMA, componentsNamesARIMA=componentsNamesARIMA,
+                nonZeroARI=nonZeroARI, nonZeroMA=nonZeroMA, select=select));
+}
+
+# The provided ARMA parameters, lag by lag: the AR of the lag, then its MA, and whether the AR
+# and the MA are estimated. A wrong number of them switches to estimation
+adam_armaParameters <- function(arma, arOrders, maOrders, lags, arRequired, maRequired){
+    ordersLagwise <- c(rbind(arOrders, maOrders));
+    kinds <- rep(rep(c("ar","ma"), length(lags)), ordersLagwise);
+    armaNames <- sprintf("%s%d[%s]", c(ar="phi", ma="theta")[kinds], sequence(ordersLagwise),
+                         rep(rep(lags, each=2), ordersLagwise));
+
+    # A vector goes lag by lag, and a list without names holds the AR, then the MA
+    if(is.null(arma)){
+        arma <- list();
+    }
+    else if(!is.list(arma) && length(arma)!=length(kinds)){
+        warning(paste0("The number of provided ARMA parameters is ",length(arma),
+                       " while I need ",length(kinds),". Switching to estimation."),call.=FALSE);
+        arma <- list();
+    }
+    else if(!is.list(arma)){
+        arma <- split(unname(arma), kinds);
+    }
+    else if(is.null(names(arma))){
+        names(arma) <- c("ar","ma")[seq_along(arma) + !arRequired];
+    }
+
+    fixed <- c(ar=FALSE, ma=FALSE);
+    for(kind in c("ar","ma")[c(arRequired, maRequired)]){
+        if(is.null(arma[[kind]])){
+            next;
+        }
+        if(length(arma[[kind]])!=sum(kinds==kind)){
+            warning(paste0("The number of provided ",toupper(kind)," parameters is ",length(arma[[kind]]),
+                           " while I need ",sum(kinds==kind),". Switching to estimation."),call.=FALSE);
+            next;
+        }
+        fixed[kind] <- TRUE;
+    }
+    armaParameters <- setNames(numeric(length(kinds)), armaNames);
+    for(kind in names(fixed)[fixed]){
+        armaParameters[kinds==kind] <- arma[[kind]];
+    }
+    armaParameters <- armaParameters[fixed[kinds]];
+    if(length(armaParameters)==0){
+        armaParameters <- NULL;
+    }
+    return(list(armaParameters=armaParameters, arEstimate=arRequired && !fixed[["ar"]],
+                maEstimate=maRequired && !fixed[["ma"]]));
 }
 
 

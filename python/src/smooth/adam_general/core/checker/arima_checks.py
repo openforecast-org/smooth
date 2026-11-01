@@ -326,117 +326,20 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
     arima_result["ma_orders"] = ma_orders
 
     poly_result = _get_polynomial_indices(ar_orders, i_orders, ma_orders, lags)
-
-    if poly_result is not None:
-        (
-            non_zero_ari,
-            non_zero_ma,
-            lags_model_arima,
-            components_number_arima,
-            initial_arima_number,
-        ) = poly_result
-        # Component names - R lines 629-630
-        if components_number_arima > 1:
-            components_names_arima = [
-                f"ARIMAState{i + 1}" for i in range(components_number_arima)
-            ]
-        else:
-            components_names_arima = (
-                ["ARIMAState1"] if components_number_arima > 0 else []
-            )
-    else:
-        # Fall back to the Python algorithm when there is no ARIMA part
-        # Define the non-zero values via polynomial computation - R lines 580-616
-        ari_values = []
-        ma_values = []
-
-        def _unique_preserve_order(values):
-            seen = set()
-            out = []
-            for value in values:
-                if value not in seen:
-                    seen.add(value)
-                    out.append(value)
-            return out
-
-        for i in range(len(lags)):
-            ari_for_lag = [0]
-            if ar_orders[i] > 0:
-                ari_for_lag.extend(range(1, ar_orders[i] + 1))
-            if i_orders[i] > 0:
-                ari_for_lag.extend(
-                    range(ar_orders[i] + 1, ar_orders[i] + i_orders[i] + 1)
-                )
-            ari_for_lag = _unique_preserve_order([v * lags[i] for v in ari_for_lag])
-            ari_values.append(ari_for_lag)
-
-            ma_for_lag = [0]
-            if ma_orders[i] > 0:
-                ma_for_lag.extend(range(1, ma_orders[i] + 1))
-            ma_for_lag = _unique_preserve_order([v * lags[i] for v in ma_for_lag])
-            ma_values.append(ma_for_lag)
-
-        def expand_polynomial(values_list):
-            if len(values_list) == 0:
-                return [0]
-            dims = [len(values) for values in values_list]
-            result = np.zeros(dims, dtype=int)
-            for axis, values in enumerate(values_list):
-                shape = [1] * len(values_list)
-                shape[axis] = len(values)
-                result = result + np.asarray(values, dtype=int).reshape(shape)
-            return result.flatten(order="F").tolist()
-
-        ari_polynomial = expand_polynomial(ari_values)
-        ma_polynomial = expand_polynomial(ma_values)
-
-        def _unique_positive_in_order(values):
-            seen = set()
-            out = []
-            for value in values:
-                if value > 0 and value not in seen:
-                    seen.add(value)
-                    out.append(value)
-            return out
-
-        non_zero_ari_lags = _unique_positive_in_order(ari_polynomial)
-        non_zero_ma_lags = _unique_positive_in_order(ma_polynomial)
-
-        lags_model_arima = sorted(set(non_zero_ari_lags + non_zero_ma_lags))
-
-        if len(lags_model_arima) == 0:
-            arima_result["arima_model"] = False
-            return arima_result
-
-        ari_state_map = {lag: idx for idx, lag in enumerate(lags_model_arima)}
-        ma_state_map = ari_state_map
-
-        non_zero_ari = [[lag, ari_state_map[lag]] for lag in non_zero_ari_lags]
-        non_zero_ma = [[lag, ma_state_map[lag]] for lag in non_zero_ma_lags]
-
-        non_zero_ari = (
-            np.array(non_zero_ari, dtype=int)
-            if non_zero_ari
-            else np.zeros((0, 2), dtype=int)
-        )
-        non_zero_ma = (
-            np.array(non_zero_ma, dtype=int)
-            if non_zero_ma
-            else np.zeros((0, 2), dtype=int)
-        )
-
-        components_number_arima = len(lags_model_arima)
-        # The initials are based on the longest lag (see arima_initials)
-        initial_arima_number = max(lags_model_arima) if lags_model_arima else 0
-        # Component names
-        if components_number_arima > 1:
-            components_names_arima = [
-                f"ARIMAState{i + 1}" for i in range(components_number_arima)
-            ]
-        else:
-            components_names_arima = (
-                ["ARIMAState1"] if components_number_arima > 0 else []
-            )
+    if poly_result is None:
+        arima_result["arima_model"] = False
+        return arima_result
+    (
+        non_zero_ari,
+        non_zero_ma,
+        lags_model_arima,
+        components_number_arima,
+        initial_arima_number,
+    ) = poly_result
+    # Component names - R lines 629-630
+    components_names_arima = [
+        f"ARIMAState{i + 1}" for i in range(components_number_arima)
+    ]
 
     # Update result
     arima_result["non_zero_ari"] = non_zero_ari
@@ -446,39 +349,42 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
     arima_result["components_names_arima"] = components_names_arima
     arima_result["initial_arima_number"] = initial_arima_number
 
-    # Set estimation flags - always estimate parameters if they are required
-    arima_result["ar_estimate"] = ar_required
-    arima_result["ma_estimate"] = ma_required
-
-    # The provided ARMA parameters, as R's parametersChecker: lag by lag, the AR of
-    # the lag, then its MA, of those provided only, which is the order in which the
-    # polynomialiser reads them. A wrong number of them switches to estimation
-    arma_parameters: list = []
-    if arma is not None and isinstance(arma, dict):
-        fixed = {}
-        for kind, orders, required in (
-            ("ar", ar_orders, ar_required),
-            ("ma", ma_orders, ma_required),
-        ):
-            values = arma.get(kind)
-            if values is None or not required:
-                continue
-            values = [values] if isinstance(values, (int, float)) else list(values)
-            if len(values) != sum(orders):
-                warnings.warn(
-                    f"The number of provided {kind.upper()} parameters is "
-                    f"{len(values)} while I need {sum(orders)}. "
-                    "Switching to estimation.",
-                    stacklevel=2,
-                )
-                continue
-            fixed[kind] = iter(values)
-            arima_result[f"{kind}_estimate"] = False
-        for ar_order, ma_order in zip(ar_orders, ma_orders):
-            if "ar" in fixed:
-                arma_parameters += [next(fixed["ar"]) for _ in range(ar_order)]
-            if "ma" in fixed:
-                arma_parameters += [next(fixed["ma"]) for _ in range(ma_order)]
-    arima_result["arma_parameters"] = arma_parameters if arma_parameters else None
+    (
+        arima_result["arma_parameters"],
+        arima_result["ar_estimate"],
+        arima_result["ma_estimate"],
+    ) = _arma_parameters(arma, ar_orders, ma_orders, ar_required, ma_required)
 
     return arima_result
+
+
+def _arma_parameters(arma, ar_orders, ma_orders, ar_required, ma_required):
+    """The provided ARMA parameters and whether the AR and the MA are estimated, as
+    R's adam_armaParameters: lag by lag, the AR of the lag, then its MA, of those
+    provided only, which is the order in which the polynomialiser reads them. A
+    wrong number of them switches to estimation."""
+    estimate = {"ar": ar_required, "ma": ma_required}
+    orders = {"ar": ar_orders, "ma": ma_orders}
+    fixed = {}
+    arma = arma if isinstance(arma, dict) else {}
+    for kind in estimate:
+        values = arma.get(kind)
+        if values is None or not estimate[kind]:
+            continue
+        values = [values] if isinstance(values, (int, float)) else list(values)
+        if len(values) != sum(orders[kind]):
+            warnings.warn(
+                f"The number of provided {kind.upper()} parameters is "
+                f"{len(values)} while I need {sum(orders[kind])}. "
+                "Switching to estimation.",
+                stacklevel=3,
+            )
+            continue
+        fixed[kind] = iter(values)
+        estimate[kind] = False
+    arma_parameters = []
+    for ar_order, ma_order in zip(ar_orders, ma_orders):
+        for kind, order in (("ar", ar_order), ("ma", ma_order)):
+            if kind in fixed:
+                arma_parameters += [next(fixed[kind]) for _ in range(order)]
+    return arma_parameters or None, estimate["ar"], estimate["ma"]

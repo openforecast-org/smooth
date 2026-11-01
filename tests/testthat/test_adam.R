@@ -1843,6 +1843,21 @@ test_that("the helpers of the small samples build, filter and simplify as the sa
     expect_error(adam_sampleTiny(5, 5, "A", TRUE, 1:5, rep(TRUE,5), matrix(0,2,1)), "Even for fitting");
 })
 
+# The provided ARMA parameters: a named list, a list without names and a vector
+test_that("The provided ARMA parameters are read lag by lag", {
+    # A named list of a wrong length switches that part to estimation
+    expect_warning(arma <- adam_armaParameters(list(ar=0.5, ma=0.2), c(1,1), c(0,1), c(1,4), TRUE, TRUE),
+                   "AR parameters is 1 while I need 2");
+    expect_equal(arma, list(armaParameters=c("theta1[4]"=0.2), arEstimate=TRUE, maEstimate=FALSE));
+    # A list without names holds the AR, then the MA, in every lag
+    expect_equal(adam_armaParameters(list(0.5, 0.2), c(1,0), c(0,1), c(1,4), TRUE, TRUE)$armaParameters,
+                 c("phi1[1]"=0.5, "theta1[4]"=0.2));
+    # A vector goes lag by lag, and nothing is returned without the AR and the MA
+    expect_equal(adam_armaParameters(c(0.1,0.2,0.3), c(1,1), c(1,0), c(1,4), TRUE, TRUE)$armaParameters,
+                 c("phi1[1]"=0.1, "theta1[1]"=0.2, "phi1[4]"=0.3));
+    expect_null(adam_armaParameters(NULL, 0, 0, 1, FALSE, FALSE)$armaParameters);
+})
+
 test_that("an estimated model loses its damping and then its trend as the sample shrinks", {
     # Only the steps that apply to the model warn
     caught <- capture_warnings(testModel <- adam(AirPassengers[1:6], "AAdN", initial="optimal"));

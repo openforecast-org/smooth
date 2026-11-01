@@ -623,7 +623,15 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         }
         else{
             yFrequency <- frequency(y);
-            modelReturned$data <- ts(data[1:obsInSample,,drop=FALSE], start=yIndex[1], frequency=yFrequency);
+            # A data frame keeps its factors, with the response as ts
+            modelReturned$data <- data[1:obsInSample,,drop=FALSE];
+            if(is.data.frame(data)){
+                modelReturned$data[,responseName] <- ts(modelReturned$data[,responseName],
+                                                        start=yIndex[1], frequency=yFrequency);
+            }
+            else{
+                modelReturned$data <- ts(modelReturned$data, start=yIndex[1], frequency=yFrequency);
+            }
             modelReturned$fitted <- ts(fittedValues, start=yIndex[1], frequency=yFrequency);
             modelReturned$residuals <- ts(residualValues, start=yIndex[1], frequency=yFrequency);
             if(h>0){
@@ -647,8 +655,12 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         names(modelReturned$persistence) <- paste0("delta",c(1:nParam));
         modelReturned$phi <- 1;
         modelReturned$transition <- diag(nParam);
+        # The regressors, after the ones of the intercept when the model has it
         modelReturned$measurement <- checkerReturn$data;
         modelReturned$measurement[,1] <- 1;
+        if(all(names(coef(checkerReturn))!="(Intercept)")){
+            modelReturned$measurement <- modelReturned$measurement[,-1,drop=FALSE];
+        }
         colnames(modelReturned$measurement) <- colnames(modelReturned$states);
         modelReturned$initial <- list(xreg=coef(checkerReturn));
         modelReturned$initialType <- "optimal";

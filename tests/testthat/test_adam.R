@@ -191,6 +191,20 @@ test_that("ADAM ETSX(MMN) on AirPassengers", {
     expect_false(ncol(testModel$data)==1)
 })
 
+# The regression keeps the factors of a data frame, takes the intercept of the means with the
+# provided coefficients, and works without an intercept
+test_that("ADAM regression with factors, provided coefficients and no intercept", {
+    set.seed(41);
+    regressionData <- data.frame(y=rnorm(60, 50), x1=rnorm(60, 10), x2=rnorm(60, 5),
+                                 colour=factor(sample(c("red","green","blue"), 60, TRUE)));
+    expect_true(is.factor(suppressWarnings(adam(regressionData, "NNN"))$data$colour));
+    testModel <- adam(regressionData[,1:3], "NNN", initial=list(xreg=c(x1=2, x2=-3)));
+    expect_equal(coef(testModel),
+                 c("(Intercept)"=with(regressionData, mean(y)-2*mean(x1)+3*mean(x2)), x1=2, x2=-3));
+    testModel <- suppressWarnings(adam(regressionData, "NNN", formula=y~x1+x2-1));
+    expect_equal(dim(testModel$measurement), c(60, 2));
+})
+
 # ETSX selection on AirPassengers
 test_that("ADAM ETSX(ZZZ) + xreg selection on AirPassengers", {
     skip_on_cran()

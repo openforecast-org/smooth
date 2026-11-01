@@ -2227,6 +2227,18 @@ adam_xregProvided <- function(Etype, arimaModel, distribution, ellipsis, etsMode
             formulaToUse <- as.formula(paste0("`",responseName,"`~."));
         }
         B <- if(is.null(ellipsis$B)) initialXreg else ellipsis$B;
+        # Without the intercept, it is the one of the means, E(y) - b E(x), in the space of the
+        # location of the distribution
+        if(all(names(B)!="(Intercept)") &&
+           attr(terms(formulaToUse, data=as.data.frame(xregData)), "intercept")==1){
+            xregFrame <- model.frame(formulaToUse, data=as.data.frame(xregData)[which(subset),,drop=FALSE]);
+            xregMatrix <- model.matrix(formulaToUse, xregFrame);
+            yMean <- switch(distribution,
+                            "dlnorm"=,"dllaplace"=,"dls"=,"dlgnorm"=mean(log(xregFrame[,1])),
+                            "dinvgauss"=,"dgamma"=,"dexp"=,"dpois"=,"dnbinom"=log(mean(xregFrame[,1])),
+                            mean(xregFrame[,1]));
+            B <- c("(Intercept)"=yMean - sum(colMeans(xregMatrix[,-1,drop=FALSE]) * B), B);
+        }
         almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
                                         distribution=distribution, loss=loss, subset=which(subset),
                                         occurrence=occurrence,FI=FI,

@@ -1895,6 +1895,28 @@ def test_a_lag_above_the_sample_size_is_dropped(model, n, expected):
     assert fitted.model == expected
 
 
+# The starting values of the smoothing parameters drop the provided ones in every
+# branch, as R, which fits these: the multiplicative ones with a trend failed
+@pytest.mark.parametrize(
+    "model, bounds, loglik",
+    [
+        ("MAN", "usual", -678.620363749),
+        ("MMN", "usual", -679.507068677),
+        ("MAN", "admissible", -674.841768458),
+        ("MMN", "admissible", -675.902873589),
+    ],
+)
+def test_a_provided_beta_of_the_multiplicative_trend(model, bounds, loglik):
+    import pathlib
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    fitted = ADAM(
+        model=model, persistence={"beta": 0.01}, initial="optimal", bounds=bounds
+    ).fit(y)
+    assert fitted.loglik == pytest.approx(loglik, rel=1e-9)
+
+
 def test_a_small_sample_simplifies_the_model(capsys):
     from smooth.adam_general.core.checker.sample_size import (
         _simplify_small_sample_model,

@@ -3415,330 +3415,207 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     persistenceEstimateVector <- c(persistenceLevelEstimate,
                                    modelIsTrendy&persistenceTrendEstimate,
                                    modelIsSeasonal&persistenceSeasonalEstimate)
+    backcast <- any(initialType==c("complete","backcasting","gradient"));
 
-    # The order:
-    # Persistence of states and for xreg, phi, AR and MA parameters,
-    # initials, initialsARIMA, initials for xreg
-    B <- Bl <- Bu <- vector("numeric",
-                            # Values of the persistence vector + phi
-                            etsModel*(persistenceLevelEstimate +
-                                          modelIsTrendy*persistenceTrendEstimate +
-                                          modelIsSeasonal*sum(persistenceSeasonalEstimate) +
-                                          phiEstimate) +
-                                xregModel*persistenceXregEstimate*max(xregParametersPersistence) +
-                                # AR and MA values
-                                arimaModel*(arEstimate*sum(arOrders)+maEstimate*sum(maOrders)) +
-                                # initials of ETS
-                                etsModel*all(initialType!=c("complete","backcasting","gradient"))*
-                                (initialLevelEstimate +
-                                     (modelIsTrendy*initialTrendEstimate) +
-                                     (modelIsSeasonal*
-                                          sum(initialSeasonalEstimate*(lagsModelSeasonal-1)))) +
-                                # initials of ARIMA
-                                all(initialType!=c("complete","backcasting","gradient"))*
-                                arimaModel*initialArimaNumber*initialArimaEstimate +
-                                # initials of xreg (in B unless backcast under "complete")
-                                (initialType!="complete")*xregModel*initialXregEstimate*
-                                sum(xregParametersEstimated) +
-                                constantEstimate + otherParameterEstimate)
-
-    j <- 0
-    if(etsModel){
-        # Fill in persistence
-        if(persistenceEstimate && any(persistenceEstimateVector)){
-            if(ets=="conventional" && any(c(Etype,Ttype,Stype)=="M")){
-                # A special type of model which is not safe: AAM, MAA, MAM
-                if((Etype=="A" && Ttype=="A" && Stype=="M") ||
-                   (Etype=="A" && Ttype=="M" && Stype=="A") ||
-                   (any(initialType==c("complete","backcasting","gradient")) &&
-                    ((Etype=="M" && Ttype=="A" && Stype=="A") ||
-                     (Etype=="M" && Ttype=="A" && Stype=="M")))){
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.01,0.005,rep(0.001,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-                # MMA is the worst. Set everything to zero and see if anything can be done...
-                else if((Etype=="M" && Ttype=="M" && Stype=="A")){
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.01,0.005,rep(0.01,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-                else if(Etype=="M" && Ttype=="A"){
-                    if(any(initialType==c("complete","backcasting","gradient"))){
-                        B[1:sum(persistenceEstimateVector)] <-
-                            c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))[
-                                which(persistenceEstimateVector)]
-                    }
-                    else{
-                        B[1:sum(persistenceEstimateVector)] <-
-                            c(0.2,0.01,rep(0.3,componentsNumberETSSeasonal))[
-                                which(persistenceEstimateVector)]
-                    }
-                }
-                else if(Etype=="M" && Ttype=="M"){
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-                else{
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-            }
-            else{
-                B[1:sum(persistenceEstimateVector)] <-
-                    c(0.1, 0.05, rep(0.3, componentsNumberETSSeasonal))[
-                        which(persistenceEstimateVector)]
-            }
-            if(bounds=="usual"){
-                Bl[1:sum(persistenceEstimateVector)] <- rep(0, sum(persistenceEstimateVector))
-                Bu[1:sum(persistenceEstimateVector)] <- rep(1, sum(persistenceEstimateVector))
-            }
-            else{
-                Bl[1:sum(persistenceEstimateVector)] <- rep(-5, sum(persistenceEstimateVector))
-                Bu[1:sum(persistenceEstimateVector)] <- rep(5, sum(persistenceEstimateVector))
-            }
-            # Names for B
-            if(persistenceLevelEstimate){
-                j[] <- j+1
-                names(B)[j] <- "alpha"
-            }
-            if(modelIsTrendy && persistenceTrendEstimate){
-                j[] <- j+1
-                names(B)[j] <- "beta"
-            }
-            if(modelIsSeasonal && any(persistenceSeasonalEstimate)){
-                if(componentsNumberETSSeasonal>1){
-                    names(B)[j+c(1:sum(persistenceSeasonalEstimate))] <-
-                        paste0("gamma",c(1:componentsNumberETSSeasonal))
-                }
-                else{
-                    names(B)[j+1] <- "gamma"
-                }
-                j[] <- j+sum(persistenceSeasonalEstimate)
-            }
-        }
+    # The parts of B in this order: the persistence of states and of xreg, phi, AR and MA
+    # parameters, the initials of ETS, ARIMA and xreg, the constant and the other parameter
+    pieces <- list();
+    if(etsModel && persistenceEstimate && any(persistenceEstimateVector)){
+        pieces$persistence <- adam_initialiserPersistence(Etype, Ttype, Stype, ets, backcast,
+                                                          persistenceEstimateVector,
+                                                          componentsNumberETSSeasonal, bounds);
     }
 
     # Persistence if xreg is provided
     if(xregModel && persistenceXregEstimate){
-        xregPersistenceNumber <- max(xregParametersPersistence)
-        B[j+1:xregPersistenceNumber] <- rep(switch(Etype,"A"=0.01,"M"=0),xregPersistenceNumber)
-        Bl[j+1:xregPersistenceNumber] <- rep(-5, xregPersistenceNumber)
-        Bu[j+1:xregPersistenceNumber] <- rep(5, xregPersistenceNumber)
-        names(B)[j+1:xregPersistenceNumber] <- paste0("delta",c(1:xregPersistenceNumber))
-        j[] <- j+xregPersistenceNumber
+        xregPersistenceNumber <- max(xregParametersPersistence);
+        pieces$delta <- list(B=setNames(rep(switch(Etype,"A"=0.01,"M"=0), xregPersistenceNumber),
+                                        paste0("delta",1:xregPersistenceNumber)),
+                             Bl=rep(-5, xregPersistenceNumber), Bu=rep(5, xregPersistenceNumber));
     }
 
     # Damping parameter
     if(etsModel && phiEstimate){
-        j[] <- j+1
-        B[j] <- 0.95
-        names(B)[j] <- "phi"
-        Bl[j] <- 0
-        Bu[j] <- 1
+        pieces$phi <- list(B=c(phi=0.95), Bl=0, Bu=1);
     }
 
-    # ARIMA parameters (AR / MA)
+    # ARIMA parameters (AR / MA), filled in lags-wise, and the polynomials at them
     if(arimaModel){
-        # This index is needed to get the correct polynomials
-        k <- j
-        # These are filled in lags-wise
-        if(any(c(arEstimate,maEstimate))){
-            armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
-                                                modelIsSeasonal, lags, arOrders, iOrders, maOrders,
-                                                arEstimate, maEstimate, armaParameters,
-                                                bounds!="none", smoother,
-                                                if(xregModel){matWt[seq_along(yInSample),
-                                                                    componentsNumberETS+componentsNumberARIMA+
-                                                                        1:xregNumber, drop=FALSE]})
-            for(i in 1:length(lags)){
-                if(arRequired && arEstimate && arOrders[i]>0){
-                    B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])]
-                    Bl[j+c(1:arOrders[i])] <- -5
-                    Bu[j+c(1:arOrders[i])] <- 5
-                    names(B)[j+1:arOrders[i]] <- paste0("phi",1:arOrders[i],"[",lags[i],"]")
-                    j[] <- j + arOrders[i]
-                }
-                if(maRequired && maEstimate && maOrders[i]>0){
-                    B[j+c(1:maOrders[i])] <- armaValues[j-k+c(1:maOrders[i])]
-                    Bl[j+c(1:maOrders[i])] <- -5
-                    Bu[j+c(1:maOrders[i])] <- 5
-                    names(B)[j+1:maOrders[i]] <- paste0("theta",1:maOrders[i],"[",lags[i],"]")
-                    j[] <- j + maOrders[i]
-                }
-            }
-        }
-
-        arimaPolynomials <- lapply(
-            adamCpp$polynomialise(B[k+1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
-                                  arOrders, iOrders, maOrders,
-                                  arEstimate, maEstimate, armaParameters, lags),
-            as.vector)
+        pieces$arma <- adam_initialiserArma(yInSample, otLogical, etsModel, Etype, Stype,
+                                            modelIsSeasonal, lags, arOrders, iOrders, maOrders,
+                                            arRequired, maRequired, arEstimate, maEstimate,
+                                            armaParameters, bounds, smoother,
+                                            if(xregModel){matWt[seq_along(yInSample),
+                                                                componentsNumberETS+componentsNumberARIMA+
+                                                                    1:xregNumber, drop=FALSE]},
+                                            adamCpp);
+        arimaPolynomials <- pieces$arma$arimaPolynomials;
     }
 
     # Initials
-    if(etsModel && all(initialType!=c("complete","backcasting","gradient")) && initialEstimate){
-        if(initialLevelEstimate){
-            j[] <- j+1
-            B[j] <- matVt[1,1]
-            names(B)[j] <- "level"
-            if(Etype=="A"){
-                Bl[j] <- -Inf
-                Bu[j] <- Inf
-            }
-            else{
-                Bl[j] <- 0
-                Bu[j] <- Inf
-            }
-        }
-        if(modelIsTrendy && initialTrendEstimate){
-            j[] <- j+1
-            B[j] <- matVt[2,1]
-            names(B)[j] <- "trend"
-            if(Ttype=="A"){
-                Bl[j] <- -Inf
-                Bu[j] <- Inf
-            }
-            else{
-                Bl[j] <- 0
-                Bu[j] <- 2
-            }
-        }
-        if(modelIsSeasonal && any(initialSeasonalEstimate)){
-            if(componentsNumberETSSeasonal>1){
-                for(k in 1:componentsNumberETSSeasonal){
-                    if(initialSeasonalEstimate[k]){
-                        B[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <-
-                            matVt[componentsNumberETSNonSeasonal+k,
-                                  2:lagsModel[componentsNumberETSNonSeasonal+k]-1]
-                        names(B)[j+2:(lagsModel[componentsNumberETSNonSeasonal+k])-1] <-
-                            paste0("seasonal",k,"_",
-                                   2:lagsModel[componentsNumberETSNonSeasonal+k]-1)
-                        if(Stype=="A"){
-                            Bl[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- -Inf
-                            Bu[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- Inf
-                        }
-                        else{
-                            Bl[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- 0
-                            Bu[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- Inf
-                        }
-                        j[] <- j+(lagsModelSeasonal[k]-1)
-                    }
-                }
-            }
-            else{
-                B[j+2:(lagsModel[componentsNumberETS])-1] <-
-                    matVt[componentsNumberETS,2:lagsModel[componentsNumberETS]-1]
-                names(B)[j+2:(lagsModel[componentsNumberETS])-1] <-
-                    paste0("seasonal_",2:lagsModel[componentsNumberETS]-1)
-                if(Stype=="A"){
-                    Bl[j+2:(lagsModel[componentsNumberETS])-1] <- -Inf
-                    Bu[j+2:(lagsModel[componentsNumberETS])-1] <- Inf
-                }
-                else{
-                    Bl[j+2:(lagsModel[componentsNumberETS])-1] <- 0
-                    Bu[j+2:(lagsModel[componentsNumberETS])-1] <- Inf
-                }
-                j[] <- j+(lagsModel[componentsNumberETS]-1)
-            }
-        }
+    if(etsModel && !backcast && initialEstimate){
+        pieces$states <- adam_initialiserStates(matVt, Etype, Ttype, Stype, modelIsTrendy,
+                                                modelIsSeasonal, initialLevelEstimate,
+                                                initialTrendEstimate, initialSeasonalEstimate,
+                                                componentsNumberETSNonSeasonal,
+                                                componentsNumberETSSeasonal, lagsModel);
     }
 
-    # ARIMA initials
-    if(arimaModel && all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
-        # The creator holds the pre-sample values in the last ARIMA state (see
-        # adam_arimaInitials), taken through the ARI polynomial of the starting values
-        B[j+1:initialArimaNumber] <-
-            adam_arimaInitials(arimaPolynomials$ariPolynomial,
-                               matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber], Etype)
-        names(B)[j+1:initialArimaNumber] <- paste0("ARIMAState",1:initialArimaNumber)
-
-        if(Etype=="A"){
-            Bl[j+1:initialArimaNumber] <- -Inf
-            Bu[j+1:initialArimaNumber] <- Inf
+    # ARIMA initials: the creator holds the pre-sample values in the last ARIMA state (see
+    # adam_arimaInitials), taken through the ARI polynomial of the starting values. The
+    # multiplicative ones are positive to avoid errors
+    if(arimaModel && !backcast && initialArimaEstimate){
+        initialsARIMA <- adam_arimaInitials(arimaPolynomials$ariPolynomial,
+                                            matVt[componentsNumberETS+componentsNumberARIMA,
+                                                  1:initialArimaNumber], Etype);
+        if(Etype=="M"){
+            initialsARIMA[] <- abs(initialsARIMA);
         }
-        else{
-            # Make sure that ARIMA states are positive to avoid errors
-            B[j+1:initialArimaNumber] <- abs(B[j+1:initialArimaNumber])
-            Bl[j+1:initialArimaNumber] <- 0
-            Bu[j+1:initialArimaNumber] <- Inf
-        }
-        j[] <- j+initialArimaNumber
+        pieces$initialsARIMA <- list(B=setNames(initialsARIMA, paste0("ARIMAState",1:initialArimaNumber)),
+                                     Bl=rep(switch(Etype,"A"=-Inf,"M"=0), initialArimaNumber),
+                                     Bu=rep(Inf, initialArimaNumber));
     }
 
     # Initials of the xreg (excluded from B only under "complete")
     if((initialType!="complete") && initialXregEstimate){
-        xregNumberToEstimate <- sum(xregParametersEstimated)
-        B[j+1:xregNumberToEstimate] <-
-            matVt[componentsNumberETS+componentsNumberARIMA+
-                      which(xregParametersEstimated==1),1]
-        names(B)[j+1:xregNumberToEstimate] <-
-            rownames(matVt)[componentsNumberETS+componentsNumberARIMA+
-                                which(xregParametersEstimated==1)]
-        if(Etype=="A"){
-            Bl[j+1:xregNumberToEstimate] <- -Inf
-            Bu[j+1:xregNumberToEstimate] <- Inf
-        }
-        else{
-            Bl[j+1:xregNumberToEstimate] <- -Inf
-            Bu[j+1:xregNumberToEstimate] <- Inf
-        }
-        j[] <- j+xregNumberToEstimate
+        xregRows <- componentsNumberETS+componentsNumberARIMA+which(xregParametersEstimated==1);
+        pieces$initialsXreg <- list(B=setNames(matVt[xregRows,1], rownames(matVt)[xregRows]),
+                                    Bl=rep(-Inf, length(xregRows)), Bu=rep(Inf, length(xregRows)));
     }
 
     if(constantEstimate){
-        j[] <- j+1
-        B[j] <- matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
-        # The constant is the intercept of ARIMA, so it needs to agree with the AR starting values
-        if(arimaModel && !etsModel){
-            B[j] <- switch(Etype,
-                           "M"=B[j]^sum(arimaPolynomials$arPolynomial),
-                           B[j]*sum(arimaPolynomials$arPolynomial))
-        }
-        names(B)[j] <- constantName
-        if(etsModel || sum(iOrders)!=0){
-            driftSeries <- adam_driftSeries(yInSample[otLogical], Etype, etsModel, lags, iOrders)
-            if(Etype=="A"){
-                Bu[j] <- quantile(driftSeries,0.6)
-                Bl[j] <- -Bu[j]
-            }
-            else{
-                Bu[j] <- exp(quantile(driftSeries,0.6))
-                Bl[j] <- exp(quantile(driftSeries,0.4))
-            }
-
-            # Failsafe for weird cases, when upper bound is the same or lower than the lower one
-            if(Bu[j]<=Bl[j]){
-                Bu[j] <- Inf
-                Bl[j] <- switch(Etype,"A"=-Inf,"M"=0)
-            }
-
-            # Failsafe for cases, when the B is outside of bounds
-            if(B[j]<=Bl[j]){
-                Bl[j] <- switch(Etype,"A"=-Inf,"M"=0)
-            }
-            if(B[j]>=Bu[j]){
-                Bu[j] <- Inf
-            }
-        }
-        else{
-            Bu[j] <- max(abs(yInSample[otLogical]),abs(B[j])*1.01)
-            Bl[j] <- -Bu[j]
-        }
+        pieces$constant <- adam_initialiserConstant(matVt[componentsNumberETS+componentsNumberARIMA+
+                                                              xregNumber+1,1],
+                                                    constantName, arimaModel, etsModel, Etype,
+                                                    if(arimaModel){arimaPolynomials$arPolynomial},
+                                                    iOrders, yInSample, otLogical, lags);
     }
 
     # Add lambda if it is needed
     if(otherParameterEstimate){
-        j[] <- j+1
-        B[j] <- other
-        names(B)[j] <- "other"
-        Bl[j] <- 1e-10
-        Bu[j] <- Inf
+        pieces$other <- list(B=c(other=unname(other)), Bl=1e-10, Bu=Inf);
     }
 
-    return(list(B=B,Bl=Bl,Bu=Bu))
+    pieces <- unname(pieces);
+    return(list(B=c(numeric(0), unlist(lapply(pieces, "[[", "B"))),
+                Bl=c(numeric(0), unname(unlist(lapply(pieces, "[[", "Bl")))),
+                Bu=c(numeric(0), unname(unlist(lapply(pieces, "[[", "Bu"))))));
+}
+
+# The starting values of the smoothing parameters, with their bounds and names: the small ones
+# of the multiplicative models that are not safe for the conventional ETS (Python's
+# _initialiser_persistence)
+adam_initialiserPersistence <- function(Etype, Ttype, Stype, ets, backcast, persistenceEstimateVector,
+                                        componentsNumberETSSeasonal, bounds){
+    model <- paste0(Etype,Ttype,Stype);
+    values <- c(0.1, 0.05, 0.3);
+    if(ets=="conventional" && any(c(Etype,Ttype,Stype)=="M")){
+        # AAM, AMA, and with backcasting MAA and MAM
+        if(any(model==c("AAM","AMA")) || (backcast && any(model==c("MAA","MAM")))){
+            values[] <- c(0.01, 0.005, 0.001);
+        }
+        # MMA is the worst. Set everything to zero and see if anything can be done...
+        else if(model=="MMA"){
+            values[] <- c(0.01, 0.005, 0.01);
+        }
+        else if(Etype=="M" && Ttype=="A" && !backcast){
+            values[] <- c(0.2, 0.01, 0.3);
+        }
+    }
+    estimated <- which(persistenceEstimateVector);
+    gammas <- if(componentsNumberETSSeasonal>1){paste0("gamma",1:componentsNumberETSSeasonal)}else{"gamma"};
+    B <- setNames(c(values[1:2], rep(values[3], componentsNumberETSSeasonal)),
+                  c("alpha", "beta", gammas)[1:(2+componentsNumberETSSeasonal)])[estimated];
+    return(list(B=B, Bl=rep(switch(bounds,"usual"=0,-5), length(B)),
+                Bu=rep(switch(bounds,"usual"=1,5), length(B))));
+}
+
+# The starting values of the AR and MA parameters, filled in lags-wise, with their bounds and
+# names, and the polynomials at them (Python's _initialiser_arma)
+adam_initialiserArma <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal, lags,
+                                 arOrders, iOrders, maOrders, arRequired, maRequired, arEstimate,
+                                 maEstimate, armaParameters, bounds, smoother, xreg, adamCpp){
+    B <- numeric(0);
+    if(any(c(arEstimate,maEstimate))){
+        armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
+                                            modelIsSeasonal, lags, arOrders, iOrders, maOrders,
+                                            arEstimate, maEstimate, armaParameters,
+                                            bounds!="none", smoother, xreg);
+        for(i in 1:length(lags)){
+            if(arRequired && arEstimate && arOrders[i]>0){
+                B <- c(B, setNames(armaValues[length(B)+1:arOrders[i]],
+                                   paste0("phi",1:arOrders[i],"[",lags[i],"]")));
+            }
+            if(maRequired && maEstimate && maOrders[i]>0){
+                B <- c(B, setNames(armaValues[length(B)+1:maOrders[i]],
+                                   paste0("theta",1:maOrders[i],"[",lags[i],"]")));
+            }
+        }
+    }
+    arimaPolynomials <- lapply(adamCpp$polynomialise(B, arOrders, iOrders, maOrders, arEstimate,
+                                                     maEstimate, armaParameters, lags),
+                               as.vector);
+    return(list(B=B, Bl=rep(-5, length(B)), Bu=rep(5, length(B)), arimaPolynomials=arimaPolynomials));
+}
+
+# The initial level, trend and seasonal states from the first column of matVt, with their bounds
+# and names (Python's _initialiser_states)
+adam_initialiserStates <- function(matVt, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
+                                   initialLevelEstimate, initialTrendEstimate, initialSeasonalEstimate,
+                                   componentsNumberETSNonSeasonal, componentsNumberETSSeasonal,
+                                   lagsModel){
+    B <- Bl <- Bu <- numeric(0);
+    if(initialLevelEstimate){
+        B <- c(level=unname(matVt[1,1]));
+        Bl <- switch(Etype,"A"=-Inf,"M"=0);
+        Bu <- Inf;
+    }
+    if(modelIsTrendy && initialTrendEstimate){
+        B <- c(B, trend=unname(matVt[2,1]));
+        Bl <- c(Bl, switch(Ttype,"A"=-Inf,0));
+        Bu <- c(Bu, switch(Ttype,"A"=Inf,2));
+    }
+    if(modelIsSeasonal){
+        # The seasonal states are numbered by the component with several of them
+        for(k in which(initialSeasonalEstimate[1:componentsNumberETSSeasonal])){
+            row <- componentsNumberETSNonSeasonal+k;
+            positions <- 1:(lagsModel[row]-1);
+            B <- c(B, setNames(matVt[row, positions],
+                               paste0("seasonal", if(componentsNumberETSSeasonal>1){k}, "_", positions)));
+            Bl <- c(Bl, rep(switch(Stype,"A"=-Inf,0), length(positions)));
+            Bu <- c(Bu, rep(Inf, length(positions)));
+        }
+    }
+    return(list(B=B, Bl=Bl, Bu=Bu));
+}
+
+# The starting value of the constant, which agrees with the AR starting values in ARIMA, with its
+# bounds from the drift of the series (Python's _initialiser_constant)
+adam_initialiserConstant <- function(constant, constantName, arimaModel, etsModel, Etype, arPolynomial,
+                                     iOrders, yInSample, otLogical, lags){
+    if(arimaModel && !etsModel){
+        constant <- switch(Etype, "M"=constant^sum(arPolynomial), constant*sum(arPolynomial));
+    }
+    if(!etsModel && sum(iOrders)==0){
+        Bu <- max(abs(yInSample[otLogical]),abs(constant)*1.01);
+        return(list(B=setNames(constant, constantName), Bl=-Bu, Bu=Bu));
+    }
+    driftSeries <- adam_driftSeries(yInSample[otLogical], Etype, etsModel, lags, iOrders);
+    Bu <- switch(Etype, "A"=quantile(driftSeries,0.6), "M"=exp(quantile(driftSeries,0.6)));
+    Bl <- switch(Etype, "A"=-Bu, "M"=exp(quantile(driftSeries,0.4)));
+    # Failsafe for weird cases, when upper bound is the same or lower than the lower one
+    if(Bu<=Bl){
+        Bu[] <- Inf;
+        Bl[] <- switch(Etype,"A"=-Inf,"M"=0);
+    }
+    # Failsafe for cases, when the B is outside of bounds
+    if(constant<=Bl){
+        Bl[] <- switch(Etype,"A"=-Inf,"M"=0);
+    }
+    if(constant>=Bu){
+        Bu[] <- Inf;
+    }
+    return(list(B=setNames(constant, constantName), Bl=unname(Bl), Bu=unname(Bu)));
 }
 
 adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other,

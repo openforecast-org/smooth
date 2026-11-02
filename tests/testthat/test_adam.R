@@ -2240,3 +2240,10 @@ test_that("Non-positive multiplicative components are replaced", {
     expect_equal(corrected$matVt, expected);
     expect_equal(corrected$profilesRecentTable, matrix(c(1,2, 1e-6,2, 1,1e-6, 1e-6,1), 4, 2, byrow=TRUE));
 })
+
+# A pool of seasonal models only, on a sample shorter than the lag: the lag is dropped, and the
+# selection is over the non-seasonal models
+test_that("A pool without non-seasonal models on a short sample", {
+    testModel <- suppressWarnings(adam(as.numeric(AirPassengers)[1:8], c("MAM","ANA"), lags=12));
+    expect_equal(testModel$model, "ETS(ANN)");
+})

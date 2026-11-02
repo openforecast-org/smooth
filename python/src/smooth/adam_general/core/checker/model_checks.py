@@ -256,7 +256,10 @@ def _check_ets_model(
         model_info = _check_model_composition(
             base_model, allow_multiplicative, silent, max_lag
         )
-        # Override models_pool with the user-provided list
+        # Override models_pool with the user-provided list, without the seasonal
+        # models when there is no seasonal lag, as R
+        if model_info["season_type"] == "N":
+            regular_pool = [m for m in regular_pool if m[-1] == "N"]
         model_info["models_pool"] = regular_pool if regular_pool else None
         model_info["ets_model"] = True
         model_info["allow_multiplicative"] = allow_multiplicative

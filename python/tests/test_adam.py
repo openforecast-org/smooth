@@ -9,6 +9,7 @@ Tests cover:
 """
 
 import re
+import warnings
 from types import SimpleNamespace
 
 import numpy as np
@@ -1864,6 +1865,34 @@ def test_a_small_sample_drops_from_the_pool_what_it_cannot_fit():
     # damped one eleven
     pool = ["ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA", "ANN"]
     assert _filter_small_sample_pool(pool, 8, 4, 0) == ["ANN", "AAN", "AAdN", "ANA"]
+
+
+# A lag above the sample size is dropped, as R, which fits these models (the ARIMA
+# keeps the orders of lag 1); they failed on the seasonal decomposition or the
+# lags of ARIMA
+@pytest.mark.parametrize(
+    "model, n, expected",
+    [
+        ("MAM", 5, "ETS(MAN)"),
+        ("CCC", 5, "ETS(CCN)"),
+        ("ZZZ", 5, "ETS(MAN)"),
+        ("XXX", 5, "ETS(AAN)"),
+        ("MAM", 8, "ETS(MAN)"),
+        ("ZZZ", 8, "ETS(ANN)"),
+        (["ANN", "AAN", "MAM", "ANA"], 8, "ETS(ANN)"),
+        (["MAM", "ANA"], 8, "ETS(ANN)"),
+        ("SARIMA", 3, "ARIMA(0,1,1)"),
+        ("SARIMA", 5, "ARIMA(1,1,1)"),
+    ],
+)
+def test_a_lag_above_the_sample_size_is_dropped(model, n, expected):
+    y = np.array([112, 118, 132, 129, 121, 135, 148, 148], dtype=float)[:n]
+    arima = dict(ar_order=[1, 1], i_order=[1, 0], ma_order=[1, 1], lags=[1, 12])
+    kwargs = dict(model="NNN", **arima) if model == "SARIMA" else dict(model=model)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fitted = ADAM(**{"lags": [12], **kwargs}).fit(y)
+    assert fitted.model == expected
 
 
 def test_a_small_sample_simplifies_the_model(capsys):

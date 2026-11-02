@@ -1099,6 +1099,10 @@ adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS
         # Check the pool of models to combine if it was decided that the data is not seasonal
         if(!modelIsSeasonal && !is.null(modelsPool)){
             modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N"];
+            # Without a non-seasonal model in the pool, the selection is over all of them
+            if(length(modelsPool)==0){
+                modelsPool <- NULL;
+            }
         }
 
         # Check the type of seasonal

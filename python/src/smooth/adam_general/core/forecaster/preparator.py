@@ -162,100 +162,28 @@ def _prepare_fitter_inputs(
 
 
 def _correct_multiplicative_components(
-    matrices_dict, profiles_dict, model_type_dict, components_dict
+    states, profiles_recent_table, model_type_dict, components_dict
 ):
-    """
-    Correct negative or NaN values in multiplicative components.
-
-    Parameters
-    ----------
-    matrices_dict : dict
-        Dictionary with model matrices
-    profiles_dict : dict
-        Dictionary with profile information
-    model_type_dict : dict
-        Dictionary with model type information
-    components_dict : dict
-        Dictionary with model components information
-
-    Returns
-    -------
-    dict
-        Updated matrices dictionary
-    dict
-        Updated profiles dictionary
-    """
-
-    # Kind of complex here. Sorry people.
-    # Thanks for the nice heuristics Ivan!
-
+    """No negative values in the multiplicative components of the fitted states and
+    of the recent profile, which might appear with bounds="a" (R's
+    adam_correctMultiplicativeComponents). Returns both."""
     if model_type_dict["trend_type"] == "M" and (
-        np.any(np.isnan(matrices_dict["mat_vt"][1, :]))
-        or np.any(matrices_dict["mat_vt"][1, :] <= 0)
+        np.any(np.isnan(states[1])) or np.any(states[1] <= 0)
     ):
-        i = np.where(matrices_dict["mat_vt"][1, :] <= 0)[0]
-        matrices_dict["mat_vt"][1, i] = 1e-6
-        profiles_dict["profiles_recent_table"][1, i] = 1e-6
+        states[1, states[1] <= 0] = 1e-6
+        profiles_recent_table[1, profiles_recent_table[1] <= 0] = 1e-6
+
+    first = components_dict["components_number_ets_non_seasonal"]
+    seasonal = slice(first, first + components_dict["components_number_ets_seasonal"])
     if (
         model_type_dict["season_type"] == "M"
-        and np.all(
-            ~np.isnan(
-                matrices_dict["mat_vt"][
-                    components_dict[
-                        "components_number_ets_non_seasonal"
-                    ] : components_dict["components_number_ets_non_seasonal"]
-                    + components_dict["components_number_ets_seasonal"],
-                    :,
-                ]
-            )
-        )
-        and np.any(
-            matrices_dict["mat_vt"][
-                components_dict["components_number_ets_non_seasonal"] : components_dict[
-                    "components_number_ets_non_seasonal"
-                ]
-                + components_dict["components_number_ets_seasonal"],
-                :,
-            ]
-            <= 0
-        )
+        and not np.any(np.isnan(states[seasonal]))
+        and np.any(states[seasonal] <= 0)
     ):
-        i = np.where(
-            matrices_dict["mat_vt"][
-                components_dict["components_number_ets_non_seasonal"] : components_dict[
-                    "components_number_ets_non_seasonal"
-                ]
-                + components_dict["components_number_ets_seasonal"],
-                :,
-            ]
-            <= 0
-        )[0]
-        matrices_dict["mat_vt"][
-            components_dict["components_number_ets_non_seasonal"] : components_dict[
-                "components_number_ets_non_seasonal"
-            ]
-            + components_dict["components_number_ets_seasonal"],
-            i,
-        ] = 1e-6
-        i = np.where(
-            profiles_dict["profiles_recent_table"][
-                components_dict["components_number_ets_non_seasonal"] : components_dict[
-                    "components_number_ets_non_seasonal"
-                ]
-                + components_dict["components_number_ets_seasonal"],
-                :,
-            ]
-            <= 0
-        )[0]
-        profiles_dict["profiles_recent_table"][
-            components_dict["components_number_ets_non_seasonal"] : components_dict[
-                "components_number_ets_non_seasonal"
-            ]
-            + components_dict["components_number_ets_seasonal"],
-            i,
-        ] = 1e-6
-
-    return matrices_dict, profiles_dict
+        states[seasonal][states[seasonal] <= 0] = 1e-6
+        profile = profiles_recent_table[seasonal]
+        profile[profile <= 0] = 1e-6
+    return states, profiles_recent_table
 
 
 def _initialize_fitted_series(observations_dict):
@@ -1217,9 +1145,18 @@ def preparator(
         adam_cpp,
         other,
     )
-    # 5. Correct negative or NaN values in multiplicative components
-    matrices_dict, profiles_dict = _correct_multiplicative_components(
-        matrices_dict, profiles_dict, model_type_dict, components_dict
+    # 5. The states after the head: if the backcasting head is longer than one lag
+    # cycle, only the last lags_model_max head states are kept, as in R/adam.R. No
+    # negative values in their multiplicative components
+    states = np.array(adam_fitted.states, dtype=np.float64)
+    head_offset = observations_dict.get("head_length", lags_dict["lags_model_max"])
+    if head_offset > lags_dict["lags_model_max"]:
+        states = states[:, head_offset - lags_dict["lags_model_max"] :]
+    states, profiles_recent_table = _correct_multiplicative_components(
+        states,
+        np.array(adam_fitted.profile, dtype=np.float64),
+        model_type_dict,
+        components_dict,
     )
     # 6. Initialize fitted values and errors series
     y_fitted, errors = _initialize_fitted_series(observations_dict)
@@ -1230,13 +1167,7 @@ def preparator(
     general_dict = _update_distribution(general_dict, model_type_dict)
 
     # 9. Process initial values for all components, from the head of the fitted
-    # states, as R's adam_initial_collector() (backcasting writes it there). If
-    # the backcasting head is longer than one lag cycle, only the last
-    # lags_model_max head states are kept, as in R/adam.R
-    states = adam_fitted.states
-    head_offset = observations_dict.get("head_length", lags_dict["lags_model_max"])
-    if head_offset > lags_dict["lags_model_max"]:
-        states = states[:, head_offset - lags_dict["lags_model_max"] :]
+    # states, as R's adam_initial_collector() (backcasting writes it there)
     initial_value, initial_value_names, initial_estimated = _process_initial_values(
         model_type_dict,
         lags_dict,
@@ -1304,7 +1235,7 @@ def preparator(
         "y_fitted": y_fitted,
         "residuals": errors,
         "states": states,
-        "profiles_recent_table": adam_fitted.profile,
+        "profiles_recent_table": profiles_recent_table,
         "profile_observed": np.asarray(adam_fitted.profileObserved),
         "persistence": matrices_dict["vec_g"],
         "transition": matrices_dict["mat_f"],

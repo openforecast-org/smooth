@@ -2229,3 +2229,14 @@ test_that(".onAttach() shows the version of smooth and, at times, a hint", {
     expect_equal(tryCatch(smooth:::.onAttach("", "smooth"), message=function(m){return(conditionMessage(m))}),
                  paste0(startUpMessage, "\n"));
 })
+
+# Every non-positive multiplicative trend and seasonal value of the states and of the profile
+test_that("Non-positive multiplicative components are replaced", {
+    matVt <- matrix(c(1,2,3,4,5, 1,-1,2,0,-3, 1,-1,1,1,2, 2,1,0,1,-1), 4, 5, byrow=TRUE);
+    profile <- matrix(c(1,2, -1,2, 1,-2, 0,1), 4, 2, byrow=TRUE);
+    corrected <- smooth:::adam_correctMultiplicativeComponents(matVt, profile, "M", "M", 2, 2);
+    expected <- matVt;
+    expected[-1,][expected[-1,]<=0] <- 1e-6;
+    expect_equal(corrected$matVt, expected);
+    expect_equal(corrected$profilesRecentTable, matrix(c(1,2, 1e-6,2, 1,1e-6, 1e-6,1), 4, 2, byrow=TRUE));
+})

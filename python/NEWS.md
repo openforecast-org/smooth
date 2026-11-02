@@ -14,6 +14,7 @@ Changes:
 * `AutoOM` takes `n_iterations` and `smoother`, and `OMG` takes `n_iterations`, as `OM`: they reach every candidate of `AutoOM` and both sub-models of `OMG`, as R's `auto.om()` and `omg()` pass their ellipsis on. `OM(occurrence="auto" | "general")` passes them through instead of raising a `TypeError`.
 
 Bugfixes:
+* The non-positive values of a multiplicative trend and of the multiplicative seasonal states are replaced by 1e-6 after the fit in `states` and in the profile of the forecasts, as in R: they were replaced in the matrices of the creator, which neither uses.
 * A regression (`ADAM("NNN")` with `X`) with the coefficients of all its regressors in `initial["xreg"]` estimated them: they are now used, with the intercept of the means, E(y) - b E(x), as in R (`dgnorm` needs `gnorm_shape` too).
 * `model` with `"F"` or `"P"` takes the other letters, as R: it ignored them and failed with seasonal lags. `"S"` with Z in the other letters gave an empty pool.
 * A damped model keeps its damping when the data or the lags fix all its letters (`"MAdZ"` with lag 1 is ETS(MAdN)).

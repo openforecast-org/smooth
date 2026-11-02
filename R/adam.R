@@ -6699,17 +6699,14 @@ adam_correctMultiplicativeComponents <- function(matVt, profilesRecentTable, Tty
                                                  componentsNumberETSNonSeasonal,
                                                  componentsNumberETSSeasonal){
     if(Ttype=="M" && (any(is.na(matVt[2,])) || any(matVt[2,]<=0))){
-        i <- which(any(matVt[2,]<=0));
-        matVt[2,i] <- 1e-6;
-        profilesRecentTable[2,i] <- 1e-6;
+        matVt[2,which(matVt[2,]<=0)] <- 1e-6;
+        profilesRecentTable[2,which(profilesRecentTable[2,]<=0)] <- 1e-6;
     }
 
     seasonal <- componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal;
     if(Stype=="M" && all(!is.na(matVt[seasonal,])) && any(matVt[seasonal,]<=0)){
-        i <- which(matVt[seasonal,]<=0);
-        matVt[seasonal,i] <- 1e-6;
-        i <- which(profilesRecentTable[seasonal,]<=0);
-        profilesRecentTable[seasonal,i] <- 1e-6;
+        matVt[seasonal,][which(matVt[seasonal,]<=0)] <- 1e-6;
+        profilesRecentTable[seasonal,][which(profilesRecentTable[seasonal,]<=0)] <- 1e-6;
     }
     return(list(matVt=matVt, profilesRecentTable=profilesRecentTable));
 }

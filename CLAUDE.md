@@ -105,7 +105,9 @@ every change:
 - **At the end of a batch, and before a commit that changes the behaviour of shared code**
   (`R/adam.R`, `R/autoadam.R`, `R/adamGeneral.R`, `R/utils-adam.R`, `src/headers/`,
   Python's `adam.py`, `checker/`, `creator/`, `estimator/`, `forecaster/`, `utils/`): the
-  default suites, R (~8 min) and Python (~5 min).
+  default suites, R (~35 min, of which `test_adam.R` 18, `test_autoadam.R` 7 and
+  `test_tbats.R` 6) and Python (~4 min). Run the R suite in the background with a time
+  limit above 35 min.
 - **At milestones** (the end of a feature, before a merge into `master` or a release): the
   full R-parity suite as well (`pytest tests/ -m r_parity`, ~30 min).
 

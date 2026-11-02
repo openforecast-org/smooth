@@ -5541,94 +5541,11 @@ predict.adam <- function(object, newdata=NULL, interval=c("none", "confidence", 
     }
 
     #### Produce the prediction intervals ####
-    if(object$distribution=="dnorm"){
-        if(Etype=="A"){
-            yLower[] <- qnorm(levelLow, 0, sqrt(s2));
-            yUpper[] <- qnorm(levelUp, 0, sqrt(s2));
-        }
-        else{
-            yLower[] <- qnorm(levelLow, 1, sqrt(s2));
-            yUpper[] <- qnorm(levelUp, 1, sqrt(s2));
-        }
-    }
-    else if(object$distribution=="dlaplace"){
-        if(Etype=="A"){
-            yLower[] <- qlaplace(levelLow, 0, sqrt(s2/2));
-            yUpper[] <- qlaplace(levelUp, 0, sqrt(s2/2));
-        }
-        else{
-            yLower[] <- qlaplace(levelLow, 1, sqrt(s2/2));
-            yUpper[] <- qlaplace(levelUp, 1, sqrt(s2/2));
-        }
-    }
-    else if(object$distribution=="ds"){
-        if(Etype=="A"){
-            yLower[] <- qs(levelLow, 0, (s2/120)^0.25);
-            yUpper[] <- qs(levelUp, 0, (s2/120)^0.25);
-        }
-        else{
-            yLower[] <- qs(levelLow, 1, (s2/120)^0.25);
-            yUpper[] <- qs(levelUp, 1, (s2/120)^0.25);
-        }
-    }
-    else if(object$distribution=="dgnorm"){
-        scale <- sqrt(s2*(gamma(1/object$other$shape)/gamma(3/object$other$shape)));
-        if(Etype=="A"){
-            yLower[] <- suppressWarnings(qgnorm(levelLow, 0, scale, object$other$shape));
-            yUpper[] <- suppressWarnings(qgnorm(levelUp, 0, scale, object$other$shape));
-        }
-        else{
-            yLower[] <- suppressWarnings(qgnorm(levelLow, 1, scale, object$other$shape));
-            yUpper[] <- suppressWarnings(qgnorm(levelUp, 1, scale, object$other$shape));
-        }
-    }
-    else if(object$distribution=="dlogis"){
-        if(Etype=="A"){
-            yLower[] <- qlogis(levelLow, 0, sqrt(s2*3)/pi);
-            yUpper[] <- qlogis(levelUp, 0, sqrt(s2*3)/pi);
-        }
-        else{
-            yLower[] <- qlogis(levelLow, 1, sqrt(s2*3)/pi);
-            yUpper[] <- qlogis(levelUp, 1, sqrt(s2*3)/pi);
-        }
-    }
-    else if(object$distribution=="dt"){
-        df <- nobs(object) - nparam(object);
-        if(Etype=="A"){
-            yLower[] <- sqrt(s2)*qt(levelLow, df);
-            yUpper[] <- sqrt(s2)*qt(levelUp, df);
-        }
-        else{
-            yLower[] <- (1 + sqrt(s2)*qt(levelLow, df));
-            yUpper[] <- (1 + sqrt(s2)*qt(levelUp, df));
-        }
-    }
-    else if(object$distribution=="dlnorm"){
-        # 1+e with the mean of one, s2 being the variance of log(1+e)
-        yLower[] <- qlnorm(levelLow, -s2Mean/2, sqrt(s2));
-        yUpper[] <- qlnorm(levelUp, -s2Mean/2, sqrt(s2));
-    }
-    else if(object$distribution=="dllaplace"){
-        yLower[] <- exp(qlaplace(levelLow, 0, sqrt(s2/2)));
-        yUpper[] <- exp(qlaplace(levelUp, 0, sqrt(s2/2)));
-    }
-    else if(object$distribution=="dls"){
-        yLower[] <- exp(qs(levelLow, 0, (s2/120)^0.25));
-        yUpper[] <- exp(qs(levelUp, 0, (s2/120)^0.25));
-    }
-    else if(object$distribution=="dlgnorm"){
-        scale <- sqrt(s2*(gamma(1/object$other$shape)/gamma(3/object$other$shape)));
-        yLower[] <- suppressWarnings(exp(qgnorm(levelLow, 0, scale, object$other$shape)));
-        yUpper[] <- suppressWarnings(exp(qgnorm(levelUp, 0, scale, object$other$shape)));
-    }
-    else if(object$distribution=="dinvgauss"){
-        yLower[] <- qinvgauss(levelLow, 1, dispersion=s2);
-        yUpper[] <- qinvgauss(levelUp, 1, dispersion=s2);
-    }
-    else if(object$distribution=="dgamma"){
-        yLower[] <- qgamma(levelLow, shape=1/s2, scale=s2);
-        yUpper[] <- qgamma(levelUp, shape=1/s2, scale=s2);
-    }
+    # The intervals of an occurrence model are of the sizes, around their fitted values
+    yCentre <- yForecast / pForecast;
+    yCentre[pForecast==0] <- 0;
+    yLower[] <- adam_intervalQuantiles(levelLow, object, Etype, s2, yCentre, s2Mean);
+    yUpper[] <- adam_intervalQuantiles(levelUp, object, Etype, s2, yCentre, s2Mean);
 
     #### Clean up the produced values for the interval ####
     # Make sensible values out of those weird quantiles
@@ -5650,9 +5567,6 @@ predict.adam <- function(object, newdata=NULL, interval=c("none", "confidence", 
         yUpper[is.na(yUpper)] <- 0;
     }
 
-    # The intervals of an occurrence model are of the sizes, around their fitted values
-    yCentre <- yForecast / pForecast;
-    yCentre[pForecast==0] <- 0;
     if(Etype=="A"){
         yLower[] <- yCentre + yLower;
         yUpper[] <- yCentre + yUpper;
@@ -6117,84 +6031,12 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
     Ttype <- trendType(object);
     damped <- substr(model,3,3)=="d";
     Stype <- seasonType(object);
-
     etsModel <- etsChecker(object);
-    # arimaModel <- arimaChecker(object);
-    # cesModel <- cesChecker(object);
-    # ssarimaModel <- ssarimaChecker(object);
-
-    # Technical parameters
-    lagsModelAll <- modelLags(object);
-    lagsModelMax <- max(lagsModelAll);
-    # This is needed in order to see, whether h>m or not in seasonal models
-    lagsModelMin <- lagsModelAll[lagsModelAll!=1];
-    if(length(lagsModelMin)==0){
-        lagsModelMin <- Inf;
-    }
-    else{
-        lagsModelMin <- min(lagsModelMin);
-    }
-    profilesRecentTable <- object$profile;
-
-    # Get componentsNumberETS and componentsNumberARIMA
-    componentsDefined <- componentsDefiner(object);
-    componentsNumberETS <- componentsDefined$componentsNumberETS;
-    componentsNumberETSSeasonal <- componentsDefined$componentsNumberETSSeasonal;
-    componentsNumberETSNonSeasonal <- componentsDefined$componentsNumberETSNonSeasonal;
-    componentsNumberARIMA <- componentsDefined$componentsNumberARIMA;
-    constantRequired <- componentsDefined$constantRequired;
-
-    obsStates <- nrow(object$states);
-    obsInSample <- nobs(object);
-
-    yIndex <- time(actuals(object));
-    yClasses <- class(actuals(object));
-    # Create indices for the future
-    if(any(yClasses=="ts")){
-        # ts structure
-        yForecastStart <- time(actuals(object))[obsInSample]+deltat(actuals(object));
-        yFrequency <- frequency(actuals(object));
-        yForecastIndex <- yIndex[obsInSample]+deltat(yIndex)*c(1:h);
-    }
-    else{
-        # zoo
-        yIndex <- time(actuals(object));
-        yForecastIndex <- yIndex[obsInSample]+diff(tail(yIndex,2))*c(1:h);
-    }
-
-    # Get the lookup table
-    indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
-                                           lags(object), c(yIndex,yForecastIndex),
-                                           yClasses)$lookup[,-c(1:(obsInSample+lagsModelMax)),drop=FALSE];
-
-    # All the important matrices
-    matVt <- t(object$states[obsStates-(lagsModelMax:1)+1,,drop=FALSE]);
-    matWt <- tail(object$measurement,h);
-    # If the forecast horizon is higher than the in-sample, duplicate the last value in matWt
-    if(nrow(matWt)<h){
-        matWt <- matrix(tail(matWt,1), nrow=h, ncol=ncol(matWt), dimnames=list(NULL,colnames(matWt)), byrow=TRUE);
-    }
-    vecG <- matrix(object$persistence, ncol=1);
 
     # The occurrence and the scale models take the newdata as given: their regressors
     # can differ from the selected ones of the demand
     newdataProvided <- newdata;
-    # Deal with explanatory variables
-    if(ncol(object$data)>1){
-        newdata <- adam_xregNewdata(object, h, newdata);
-        xregNumber <- ncol(newdata);
-        # From 1 to nrow to address potential missing values
-        matWt[1:nrow(newdata),componentsNumberETS+componentsNumberARIMA+c(1:xregNumber)] <- newdata;
-    }
-    else{
-        xregNumber <- 0;
-        # If the user asked for trend, but it's not in the data, add it
-        if(any(all.vars(formula(object))=="trend") && all(colnames(object$data)!="trend")){
-            xreg <- matrix(nobs(object)+c(1:h),h,1);
-            xregNumber <- 1;
-        }
-    }
-    matF <- object$transition;
+    list2env(adam_prepareMatricesForForecast(object, h, newdata), environment());
 
     # If this is "prediction", do simulations for multiplicative components
     if(interval=="prediction"){
@@ -6212,65 +6054,16 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         }
     }
 
-    # With the k last periods of the sample without an observed size, the forecast of the pure
-    # multiplicative ETS with the drift of the states over them (adam_gapVarianceModel()), and the
-    # simulated and the cumulative ones of any model (and all with a scale model), start from the
-    # last observed size, as h+k steps ahead: the uncertainty of the states over those periods is
-    # then that of the k first steps
-    yActuals <- as.vector(actuals(object));
-    otLogical <- !is.na(yActuals);
-    if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
-        otLogical[] <- otLogical & yActuals!=0;
-    }
-    trailing <- obsInSample - max(c(0, which(otLogical)));
-    if(trailing>0 && trailing<obsInSample-lagsModelMax && !is.null(object$profileObserved) &&
-       (cumulative || interval=="simulated" || is.scale(object$scale) ||
-        !is.null(attr(adam_gapVarianceModel(object), "drift")))){
-        originStates <- obsStates - trailing;
-        matVt <- t(object$states[originStates-(lagsModelMax:1)+1,,drop=FALSE]);
-        # The profile at the origin, with the corrections of the filter that the states do not record
-        profilesRecentTable[] <- object$profileObserved;
-        indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
-                                               lags(object), c(yIndex,yForecastIndex),
-                                               yClasses)$lookup[,-c(1:(obsInSample-trailing+lagsModelMax)),drop=FALSE];
-        matWt <- rbind(object$measurement[obsInSample-trailing+(1:trailing),,drop=FALSE], matWt);
-    }
-    else{
-        trailing <- 0;
-    }
+    list2env(adam_forecastTrailing(object, h, cumulative, interval, obsInSample, obsStates,
+                                   lagsModelAll, lagsModelMax, profilesRecentTable, indexLookupTable,
+                                   matVt, matWt, yIndex, yForecastIndex, yClasses),
+             environment());
     hModel <- h + trailing;
 
-    # Create C++ adam class, which will then use fit, forecast etc methods
-    adamCpp <- object$adamCpp;
-    # adamCpp <- new(adamCore,
-    #                lagsModelAll, Etype, Ttype, Stype,
-    #                componentsNumberETSNonSeasonal,
-    #                componentsNumberETSSeasonal,
-    #                componentsNumberETS, componentsNumberARIMA,
-    #                xregNumber, length(lagsModelAll),
-    #                constantRequired, adamETS);
-
     ##### Produce point forecasts, not mean forecasts from the model! #####
-    # Produce point forecasts for non-multiplicative trend / seasonality
-    # Do this for cases, when h<=m as well and prediction /confidence / simulated interval
-    # if(Ttype!="M" && (Stype!="M" | (Stype=="M" & h<=lagsModelMin)) ||
-    #    any(interval==c("nonparametric","semiparametric","empirical","approximate"))){
-        adamForecast <- tail(adamCpp$forecast(matWt, matF,
-                                              indexLookupTable, profilesRecentTable,
-                                              hModel)$forecast, h);
-    # }
-    # else{
-    #     # If we do simulations, leave it for later
-    #     if(interval=="simulated"){
-    #         adamForecast <- rep(0, h);
-    #     }
-    #     # If we don't, do simulations to get mean
-    #     else{
-    #         adamForecast <- forecast(object, h=h, newdata=newdata, occurrence=occurrence,
-    #                                  interval="simulated",
-    #                                  level=level, side="both", cumulative=cumulative, nsim=nsim, ...)$mean;
-    #     }
-    # }
+    adamForecast <- tail(object$adamCpp$forecast(matWt, matF,
+                                                 indexLookupTable, profilesRecentTable,
+                                                 hModel)$forecast, h);
 
     #### Make safety checks
     # If there are NaN values
@@ -6370,514 +6163,40 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
         levelUp[levelUp<0] <- 0;
     }
 
-    #### Simulated interval ####
+    # The interval relative to the forecast: the differences from it for the additive error, the
+    # ratios to it for the multiplicative one
+    componentsNumber <- componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired;
     if(interval=="simulated"){
-        arrVt <- array(NA, c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired, hModel+lagsModelMax, nsim));
-        arrVt[,1:lagsModelMax,] <- rep(matVt,nsim);
-
-        # The scale, or the scale model's forecasts (after its fitted values over the k last
-        # periods), de-biased for the simulations
-        if(is.scale(object$scale)){
-            # as.vector is needed to declass the mean.
-            scaleValue <- c(tail(as.vector(fitted(object$scale)), trailing),
-                            as.vector(forecast(object$scale,h=h,newdata=newdataProvided,interval="none")$mean));
-        }
-        else{
-            scaleValue <- object$scale;
-        }
-        scaleValue <- adam_scaleSimulation(object, scaleValue);
-        matErrors <- matrix(adam_errorsSimulate(hModel*nsim, object$distribution, scaleValue, object$other,
-                                                obsInSample-nparam(object)),
-                            hModel,nsim);
-        # Normalise errors in order not to get ridiculous things on small nsim
-        if(nsim<=500){
-            if(Etype=="A"){
-                matErrors[] <- matErrors - array(apply(matErrors,1,mean),c(hModel,nsim));
-            }
-            else{
-                matErrors[] <- (1+matErrors) / array(apply(1+matErrors,1,mean),c(hModel,nsim))-1;
-            }
-        }
-        # This stuff is needed in order to produce adequate values for weird models
-        EtypeModified <- Etype;
-        if(Etype=="A" && any(object$distribution==c("dlnorm","dinvgauss","dgamma","dls","dllaplace"))){
-            EtypeModified[] <- "M";
-        }
-
-        # States, Errors, Ot, Transition, Measurement, Persistence
-        ySimulated <- adamCpp$simulate(matErrors, rbind(matrix(1, trailing, nsim),
-                                                        matrix(rbinom(h*nsim, 1, pForecast), h, nsim)),
-                                       arrVt, matWt,
-                                       array(matF,c(dim(matF),nsim)),
-                                       matrix(vecG, componentsNumberETS+componentsNumberARIMA+
-                                                  xregNumber+constantRequired, nsim),
-                                       indexLookupTable,
-                                       array(profilesRecentTable,
-                                             c(componentsNumberETS+componentsNumberARIMA+xregNumber+constantRequired,
-                                               lagsModelMax,
-                                               nsim)),
-                                       EtypeModified, FALSE)$data[trailing+(1:h),,drop=FALSE];
-
-        #### Note that the cumulative doesn't work with oes at the moment!
-        if(cumulative){
-            # The totals of the paths, in the space of the data
-            ySums <- colSums(if(logModel){exp(ySimulated)}else{ySimulated}, na.rm=TRUE);
-            yForecast[] <- mean(ySums);
-            yLower[] <- quantile(ySums,levelLow,type=7);
-            yUpper[] <- quantile(ySums,levelUp,type=7);
-        }
-        else{
-            for(i in 1:h){
-                ##### We now do point forecasts, not mean #####
-                # if(Ttype=="M" || (Stype=="M" & h>lagsModelMin)){
-                #     # Trim 1% of values just to resolve some issues with outliers
-                #     yForecast[i] <- mean(ySimulated[i,],na.rm=TRUE,trim=0.01);
-                # }
-                yLower[i,] <- quantile(ySimulated[i,],levelLow[i,],na.rm=TRUE,type=7);
-                yUpper[i,] <- quantile(ySimulated[i,],levelUp[i,],na.rm=TRUE,type=7);
-            }
-        }
-        # This step is needed in order to make intervals similar between the different methods
-        if(Etype=="A"){
-            yLower[] <- yLower - yCentre;
-            yUpper[] <- yUpper - yCentre;
-        }
-        else{
-            yLower[] <- yLower / yCentre;
-            yUpper[] <- yUpper / yCentre;
-            # Substitute NaNs with zeroes - it means that both values were originally zeroes
-            yLower[as.vector(is.nan(yLower))] <- 0;
-            yUpper[as.vector(is.nan(yUpper))] <- 0;
-        }
+        list2env(adam_generateSimulationInterval(object, h, trailing, nsim, Etype, cumulative, logModel,
+                                                 componentsNumber, lagsModelMax, matVt, matWt, matF,
+                                                 vecG, indexLookupTable, profilesRecentTable,
+                                                 pForecast, newdataProvided, levelLow, levelUp,
+                                                 yForecast, yLower, yUpper, yCentre),
+                 environment());
+    }
+    else if(interval=="approximate"){
+        list2env(adam_generatePredictionInterval(object, h, trailing, Etype, Ttype, Stype, etsModel,
+                                                 cumulative, lagsModelAll, matWt, matF, vecG,
+                                                 newdataProvided, levelLow, levelUp, yForecast,
+                                                 yLower, yUpper),
+                 environment());
+    }
+    else if(any(interval==c("semiparametric","nonparametric","empirical"))){
+        list2env(adam_generateMultistepInterval(object, h, trailing, Etype, interval, cumulative,
+                                                newdataProvided, levelLow, levelUp, levelNew, nLevels,
+                                                yForecast, yLower, yUpper),
+                 environment());
     }
     else{
-        #### Approximate and confidence interval ####
-        # Produce covariance matrix and use it. vcovMean is the mean of log(1+e) times -2 for
-        # the log-normal, when it differs from the variance
-        vcovMean <- vcovDrift <- NULL;
-        if(any(interval=="approximate")){
-            # The variance of the model implied by the scale, de-biased; with a scale
-            # model it is replaced by its forecasts below
-            s2 <- mean(adam_varianceDebiased(object));
-            # If scale model is included, produce forecasts
-            if(is.scale(object$scale)){
-                s2Forecast <- adam_scaleModelVariance(object, h, newdataProvided);
-            }
-            # A pure multiplicative ADAM ETS with the log-normal is additive in logs: log(1+e) at
-            # the horizon j has the mean -s2*a_j/2 and the variance s2*k_j, as over the gaps
-            if(object$distribution=="dlnorm" && etsModel && adamETSChecker(object) &&
-               !arimaChecker(object) && Etype=="M" && Ttype!="A" && Stype!="A"){
-                covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, 1);
-                s2Horizon <- if(is.scale(object$scale)){s2Forecast}else{s2};
-                vcovMulti <- s2Horizon*diag(covarMat);
-                vcovMean <- s2Horizon*cumsum(covarMat[1,]);
-                # After the periods without an observed size, those of the filter, with the
-                # uncertainty of the states at the end of the sample
-                filterVariances <- adam_gapVarianceModel(object, 2, h);
-                if(!is.null(filterVariances)){
-                    vcovMulti <- s2Horizon*filterVariances;
-                    vcovMean <- s2Horizon*adam_gapVarianceModel(object, 1, h);
-                }
-                if(cumulative){
-                    vcovMulti <- sum(vcovMulti);
-                }
-            }
-            # A pure multiplicative ADAM ETS with the Gamma or the Inverse Gaussian: z/mu at the horizon
-            # j is D(1+e), log(D) ~ N(mu (a_j - 1), v (k_j - 1)) with the moments mu and v of log(1+e)
-            # and the multipliers a_j and k_j of the log-normal above, the quantiles of their mixture
-            else if(any(object$distribution==c("dgamma","dinvgauss")) && etsModel && adamETSChecker(object) &&
-                    !arimaChecker(object) && Etype=="M" && Ttype!="A" && Stype!="A" &&
-                    !is.scale(object$scale) && !cumulative){
-                multiplierMean <- adam_gapVarianceModel(object, 1, h);
-                multiplierVariance <- adam_gapVarianceModel(object, 2, h);
-                if(is.null(multiplierVariance)){
-                    covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, 1);
-                    multiplierMean <- cumsum(covarMat[1,]);
-                    multiplierVariance <- diag(covarMat);
-                }
-                noise <- adam_gapDrift(vecG, TRUE, object$distribution, TRUE, s2)$noise;
-                vcovMulti <- s2;
-                vcovDrift <- list(mean=noise$mean[1]*(multiplierMean-1),
-                                  variance=noise$covariance[1,1]*(multiplierVariance-1));
-            }
-            # IG and Lnorm can use approximations from the multiplications
-            else if(etsModel && any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) && Etype=="M"){
-                # The log-normal takes the variance of 1+e, s2 being the one of log(1+e)
-                if(object$distribution=="dlnorm"){
-                    s2[] <- exp(s2)-1;
-                    if(is.scale(object$scale)){
-                        s2Forecast[] <- exp(s2Forecast)-1;
-                    }
-                }
-                vcovMulti <- tail(adamVarAnal(lagsModelAll, hModel, matWt[1,,drop=FALSE], matF, vecG, s2), h);
-                if(is.scale(object$scale)){
-                    # Fix the variances with the time varying ones
-                    vcovMulti[] <- vcovMulti / s2 * s2Forecast;
-                }
-                if(any(object$distribution==c("dlnorm","dls","dllaplace","dlgnorm"))){
-                    vcovMulti[] <- log(1+vcovMulti);
-                }
-
-                # We don't do correct cumulatives in this case...
-                if(cumulative){
-                    vcovMulti <- sum(vcovMulti);
-                }
-            }
-            else{
-                vcovMulti <- covarAnal(lagsModelAll, hModel, matWt[1,,drop=FALSE], matF, vecG,
-                                       s2)[trailing+(1:h),trailing+(1:h),drop=FALSE];
-                if(is.scale(object$scale)){
-                    # Fix the matrix with the time varying variance
-                    vcovMulti[] <- vcovMulti / s2 * (sqrt(s2Forecast) %*% t(sqrt(s2Forecast)));
-                }
-
-                # Do either the variance of sum, or a diagonal: after the periods without an
-                # observed value, that of the filter, with the uncertainty of the states at the
-                # end of the sample
-                filterVariances <- if(cumulative){NULL}else{adam_gapVarianceModel(object, 2, h)};
-                if(cumulative){
-                    vcovMulti <- sum(vcovMulti);
-                }
-                else if(!is.null(filterVariances)){
-                    vcovMulti <- (if(is.scale(object$scale)){s2Forecast}else{s2}) * filterVariances;
-                }
-                else{
-                    vcovMulti <- diag(vcovMulti);
-                }
-            }
-
-        }
-        #### Semiparametric, nonparametric and empirical interval ####
-        # Extract multistep errors and calculate the covariance matrix
-        else if(any(interval==c("semiparametric","nonparametric","empirical"))){
-            if(hModel>1){
-                adamErrors <- as.matrix(rmultistep(object, h=hModel));
-
-                if(any(object$distribution==c("dinvgauss","dgamma","dlnorm","dls","dllaplace","dlgnorm")) && (Etype=="A")){
-                    yFittedMatrix <- adamErrors;
-                    for(i in 1:hModel){
-                        yFittedMatrix[,i] <- fitted(object)[1:nrow(adamErrors)+i-1];
-                    }
-                    adamErrors[] <- adamErrors/yFittedMatrix;
-                }
-                # The windows with all their targets observed, at the steps after the origin
-                adamErrors <- adamErrors[complete.cases(adamErrors),trailing+(1:h),drop=FALSE];
-                nWindows <- nrow(adamErrors);
-
-                if(interval=="semiparametric"){
-                    # Do either the variance of sum, or a diagonal
-                    if(cumulative){
-                        vcovMulti <- sum(t(adamErrors) %*% adamErrors / nWindows);
-                    }
-                    else{
-                        vcovMulti <- diag(t(adamErrors) %*% adamErrors / nWindows);
-                    }
-                    # The log-normal takes the variance of log(1+e), as at h=1
-                    if(object$distribution=="dlnorm"){
-                        vcovMulti[] <- log(1+vcovMulti);
-                    }
-                }
-                # For nonparametric and cumulative...
-                else{
-                    if(cumulative){
-                        adamErrors <- matrix(apply(adamErrors, 2, sum),nWindows,1);
-                    }
-                }
-            }
-            else{
-                # If scale model is included, produce forecasts
-                if(is.scale(object$scale)){
-                    vcovMulti <- adam_scaleModelVariance(object, h, newdataProvided);
-                }
-                else{
-                    vcovMulti <- adam_varianceDebiased(object);
-                }
-                # The errors of the observed values, as the multistep ones for h>1:
-                # residuals() gives the ratios 1+e for the ratio distributions
-                adamErrors <- as.matrix(as.vector(object$residuals));
-                if(any(object$distribution==c("dinvgauss","dgamma","dlnorm","dls","dllaplace","dlgnorm")) &&
-                   (Etype=="A")){
-                    adamErrors[] <- adamErrors/as.vector(fitted(object));
-                }
-                adamErrors <- adamErrors[!is.na(adamErrors[,1]),,drop=FALSE];
-            }
-        }
-
-        # Calculate interval for approximate and semiparametric
-        if(any(interval==c("approximate","semiparametric"))){
-            if(!is.null(vcovDrift)){
-                yLower[] <- adam_gapQuantile(levelLow, object$distribution, vcovMulti,
-                                             vcovDrift$mean, vcovDrift$variance);
-                yUpper[] <- adam_gapQuantile(levelUp, object$distribution, vcovMulti,
-                                             vcovDrift$mean, vcovDrift$variance);
-            }
-            else if(object$distribution=="dnorm"){
-                if(Etype=="A"){
-                    yLower[] <- qnorm(levelLow, 0, sqrt(vcovMulti));
-                    yUpper[] <- qnorm(levelUp, 0, sqrt(vcovMulti));
-                }
-                else{
-                    yLower[] <- qnorm(levelLow, 1, sqrt(vcovMulti));
-                    yUpper[] <- qnorm(levelUp, 1, sqrt(vcovMulti));
-                }
-            }
-            else if(object$distribution=="dlaplace"){
-                if(Etype=="A"){
-                    yLower[] <- qlaplace(levelLow, 0, sqrt(vcovMulti/2));
-                    yUpper[] <- qlaplace(levelUp, 0, sqrt(vcovMulti/2));
-                }
-                else{
-                    yLower[] <- qlaplace(levelLow, 1, sqrt(vcovMulti/2));
-                    yUpper[] <- qlaplace(levelUp, 1, sqrt(vcovMulti/2));
-                }
-            }
-            else if(object$distribution=="ds"){
-                if(Etype=="A"){
-                    yLower[] <- qs(levelLow, 0, (vcovMulti/120)^0.25);
-                    yUpper[] <- qs(levelUp, 0, (vcovMulti/120)^0.25);
-                }
-                else{
-                    yLower[] <- qs(levelLow, 1, (vcovMulti/120)^0.25);
-                    yUpper[] <- qs(levelUp, 1, (vcovMulti/120)^0.25);
-                }
-            }
-            else if(object$distribution=="dgnorm"){
-                scale <- sqrt(vcovMulti*(gamma(1/object$other$shape)/gamma(3/object$other$shape)));
-                if(Etype=="A"){
-                    yLower[] <- suppressWarnings(qgnorm(levelLow, 0, scale, object$other$shape));
-                    yUpper[] <- suppressWarnings(qgnorm(levelUp, 0, scale, object$other$shape));
-                }
-                else{
-                    yLower[] <- suppressWarnings(qgnorm(levelLow, 1, scale, object$other$shape));
-                    yUpper[] <- suppressWarnings(qgnorm(levelUp, 1, scale, object$other$shape));
-                }
-            }
-            else if(object$distribution=="dlogis"){
-                if(Etype=="A"){
-                    yLower[] <- qlogis(levelLow, 0, sqrt(vcovMulti*3)/pi);
-                    yUpper[] <- qlogis(levelUp, 0, sqrt(vcovMulti*3)/pi);
-                }
-                else{
-                    yLower[] <- qlogis(levelLow, 1, sqrt(vcovMulti*3)/pi);
-                    yUpper[] <- qlogis(levelUp, 1, sqrt(vcovMulti*3)/pi);
-                }
-            }
-            else if(object$distribution=="dt"){
-                df <- nobs(object) - nparam(object);
-                if(Etype=="A"){
-                    yLower[] <- sqrt(vcovMulti)*qt(levelLow, df);
-                    yUpper[] <- sqrt(vcovMulti)*qt(levelUp, df);
-                }
-                else{
-                    yLower[] <- (1 + sqrt(vcovMulti)*qt(levelLow, df));
-                    yUpper[] <- (1 + sqrt(vcovMulti)*qt(levelUp, df));
-                }
-            }
-            else if(object$distribution=="dlnorm"){
-                # 1+e with the mean of one: vcovMulti is the variance of log(1+e)
-                if(is.null(vcovMean)){
-                    vcovMean <- vcovMulti;
-                }
-                yLower[] <- qlnorm(levelLow, -vcovMean/2, sqrt(vcovMulti));
-                yUpper[] <- qlnorm(levelUp, -vcovMean/2, sqrt(vcovMulti));
-                if(Etype=="A"){
-                    yLower[] <- (yLower-1)*yForecast;
-                    yUpper[] <-(yUpper-1)*yForecast;
-                }
-            }
-            else if(object$distribution=="dllaplace"){
-                yLower[] <- exp(qlaplace(levelLow, 0, sqrt(vcovMulti/2)));
-                yUpper[] <- exp(qlaplace(levelUp, 0, sqrt(vcovMulti/2)));
-                if(Etype=="A"){
-                    yLower[] <- (yLower-1)*yForecast;
-                    yUpper[] <-(yUpper-1)*yForecast;
-                }
-            }
-            else if(object$distribution=="dls"){
-                yLower[] <- exp(qs(levelLow, 0, (vcovMulti/120)^0.25));
-                yUpper[] <- exp(qs(levelUp, 0, (vcovMulti/120)^0.25));
-                if(Etype=="A"){
-                    yLower[] <- (yLower-1)*yForecast;
-                    yUpper[] <-(yUpper-1)*yForecast;
-                }
-            }
-            else if(object$distribution=="dlgnorm"){
-                scale <- sqrt(vcovMulti*(gamma(1/object$other$shape)/gamma(3/object$other$shape)));
-                yLower[] <- suppressWarnings(exp(qgnorm(levelLow, 0, scale, object$other$shape)));
-                yUpper[] <- suppressWarnings(exp(qgnorm(levelUp, 0, scale, object$other$shape)));
-                if(Etype=="A"){
-                    yLower[] <- (yLower-1)*yForecast;
-                    yUpper[] <-(yUpper-1)*yForecast;
-                }
-            }
-            else if(object$distribution=="dinvgauss"){
-                yLower[] <- qinvgauss(levelLow, 1, dispersion=vcovMulti);
-                yUpper[] <- qinvgauss(levelUp, 1, dispersion=vcovMulti);
-                if(Etype=="A"){
-                    yLower[] <- (yLower-1)*yForecast;
-                    yUpper[] <-(yUpper-1)*yForecast;
-                }
-            }
-            else if(object$distribution=="dgamma"){
-                yLower[] <- qgamma(levelLow, shape=1/vcovMulti, scale=vcovMulti);
-                yUpper[] <- qgamma(levelUp, shape=1/vcovMulti, scale=vcovMulti);
-                if(Etype=="A"){
-                    yLower[] <- (yLower-1)*yForecast;
-                    yUpper[] <-(yUpper-1)*yForecast;
-                }
-            }
-
-        }
-
-        # Empirical, based on specific quantiles
-        else if(interval=="empirical"){
-            for(i in 1:h){
-                yLower[i,] <- quantile(adamErrors[,i],levelLow[i,],na.rm=TRUE,type=7);
-                yUpper[i,] <- quantile(adamErrors[,i],levelUp[i,],na.rm=TRUE,type=7);
-            }
-
-            if(Etype=="M"){
-                yLower[] <- 1+yLower;
-                yUpper[] <- 1+yUpper;
-            }
-            else if(Etype=="A" & any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm"))){
-                yLower[] <- yLower*yForecast;
-                yUpper[] <- yUpper*yForecast;
-            }
-        }
-        # Use Taylor & Bunn approach for the nonparametric ones
-        #### Nonparametric intervals, regression ####
-        else if(interval=="nonparametric"){
-            if(h>1){
-                # This is needed in order to see if quant regression can be used
-                if(all(levelLow==levelLow[1,])){
-                    levelLow <- levelLow[1,,drop=FALSE];
-                }
-                if(all(levelUp==levelUp[1,])){
-                    levelUp <- levelUp[1,,drop=FALSE];
-                }
-
-                # Do quantile regression for h>1 and scalars for the level (no change across h)
-                # transpose is needed in order to compare correctly
-                if(all(t(levelNew)==levelNew[1,])){
-                    for(i in 1:nLevels){
-                        yLower[,i] <- adam_quantilePower(adamErrors, levelLow[1,i]);
-                        yUpper[,i] <- adam_quantilePower(adamErrors, levelUp[1,i]);
-                    }
-                }
-                # Otherwise just return quantiles of errors
-                else{
-                    if(cumulative){
-                        yLower[] <- quantile(adamErrors,levelLow,type=7);
-                        yUpper[] <- quantile(adamErrors,levelUp,type=7);
-                    }
-                    else{
-                        for(i in 1:h){
-                            yLower[i] <- quantile(adamErrors[,i],levelLow[i],na.rm=TRUE,type=7);
-                            yUpper[i] <- quantile(adamErrors[,i],levelUp[i],na.rm=TRUE,type=7);
-                        }
-                    }
-                }
-            }
-            else{
-                yLower[] <- quantile(adamErrors,levelLow,type=7);
-                yUpper[] <- quantile(adamErrors,levelUp,type=7);
-            }
-
-            if(Etype=="M"){
-                yLower[] <- 1+yLower;
-                yUpper[] <- 1+yUpper;
-            }
-            else if(Etype=="A" & any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm"))){
-                yLower[] <- yLower*yForecast;
-                yUpper[] <- yUpper*yForecast;
-            }
-        }
-        else{
-            yUpper[] <- yLower[] <- NA;
-        }
+        yUpper[] <- yLower[] <- NA;
     }
 
-
-
-    # Fix of prediction intervals depending on what has happened
+    # The bounds around the forecasts
     if(interval!="none"){
-        # Make sensible values out of those weird quantiles
-        if(!cumulative){
-            if(any(levelLow==0)){
-                # zoo does not like, when you work with matrices of indices... silly thing
-                yBoundBuffer <- levelLow;
-                yBoundBuffer[] <- yLower
-                if(Etype=="A"){
-                    yBoundBuffer[levelLow==0] <- -Inf;
-                    yLower[] <- yBoundBuffer;
-                }
-                else{
-                    yBoundBuffer[levelLow==0] <- 0;
-                    yLower[] <- yBoundBuffer;
-                }
-            }
-            if(any(levelUp==1)){
-                # zoo does not like, when you work with matrices of indices... silly thing
-                yBoundBuffer <- levelUp;
-                yBoundBuffer[] <- yUpper
-                yBoundBuffer[levelUp==1] <- Inf;
-                yUpper[] <- yBoundBuffer;
-            }
-        }
-        else{
-            # The bounds are relative to the centre here: zero for the totals of a model in logs
-            if(any(levelLow==0)){
-                yLower[] <- switch(Etype, "A"=if(logModel){-yCentre}else{-Inf}, "M"=0);
-            }
-            if(any(levelUp==1)){
-                yUpper[] <- Inf;
-            }
-        }
-
-        # Substitute NAs and NaNs with zeroes
-        if(any(is.nan(yLower)) || any(is.na(yLower))){
-            yLower[is.nan(yLower)] <- switch(Etype,"A"=0,"M"=1);
-            yLower[is.na(yLower)] <- switch(Etype,"A"=0,"M"=1);
-        }
-        if(any(is.nan(yUpper)) || any(is.na(yUpper))){
-            yUpper[is.nan(yUpper)] <- switch(Etype,"A"=0,"M"=1);
-            yUpper[is.na(yUpper)] <- switch(Etype,"A"=0,"M"=1);
-        }
-
-        # Do intervals around the forecasts...
-        if(Etype=="A"){
-            yLower[] <- yCentre + yLower;
-            yUpper[] <- yCentre + yUpper;
-        }
-        else{
-            yLower[] <- yCentre*yLower;
-            yUpper[] <- yCentre*yUpper;
-        }
-
-        # Check what we have from the occurrence model
-        if(occurrenceModel){
-            # If there are NAs, then there's no variability and no intervals.
-            if(any(is.na(yUpper))){
-                yUpper[is.na(yUpper)] <- (yForecast/pForecast)[is.na(yUpper)];
-            }
-            if(any(is.na(yLower))){
-                yLower[is.na(yLower)] <- 0;
-            }
-        }
-
-        colnames(yLower) <- switch(side,
-                                   "both"=paste0("Lower bound (",(1-level)/2*100,"%)"),
-                                   "lower"=paste0("Lower bound (",(1-level)*100,"%)"),
-                                   "upper"=rep("Lower 0%",nLevels));
-
-        colnames(yUpper) <- switch(side,
-                                   "both"=paste0("Upper bound (",(1+level)/2*100,"%)"),
-                                   "lower"=rep("Upper 100%",nLevels),
-                                   "upper"=paste0("Upper bound (",level*100,"%)"));
+        list2env(adam_intervalBounds(Etype, cumulative, logModel, occurrenceModel, side, level, nLevels,
+                                     levelLow, levelUp, yForecast, yCentre, pForecast, yLower, yUpper),
+                 environment());
     }
-
-
 
     # If this was a model in logarithms (e.g. ARIMA for sm or the multiplicative GUM), then take
     # exponent. The cumulative values are already in the space of the data
@@ -6921,6 +6240,523 @@ forecast.adam <- function(object, h=10, newdata=NULL, occurrence=NULL,
                           level=level, interval=interval, side=side, cumulative=cumulative, h=h,
                           scenarios=ySimulated, point=point),
                      class=c("adam.forecast","smooth.forecast","forecast")));
+}
+
+# The matrices of the model at the end of the sample and over the horizon: the states, the
+# measurement with the regressors of newdata, the transition, the persistence, the profiles and
+# their lookup table, with the indices of the horizon (Python's _prepare_matrices_for_forecast)
+adam_prepareMatricesForForecast <- function(object, h, newdata){
+    # Technical parameters
+    lagsModelAll <- modelLags(object);
+    lagsModelMax <- max(lagsModelAll);
+    # This is needed in order to see, whether h>m or not in seasonal models
+    lagsModelMin <- lagsModelAll[lagsModelAll!=1];
+    if(length(lagsModelMin)==0){
+        lagsModelMin <- Inf;
+    }
+    else{
+        lagsModelMin <- min(lagsModelMin);
+    }
+    profilesRecentTable <- object$profile;
+
+    # Get componentsNumberETS and componentsNumberARIMA
+    componentsDefined <- componentsDefiner(object);
+    componentsNumberETS <- componentsDefined$componentsNumberETS;
+    componentsNumberARIMA <- componentsDefined$componentsNumberARIMA;
+    constantRequired <- componentsDefined$constantRequired;
+
+    obsStates <- nrow(object$states);
+    obsInSample <- nobs(object);
+
+    yIndex <- time(actuals(object));
+    yClasses <- class(actuals(object));
+    # Create indices for the future
+    if(any(yClasses=="ts")){
+        # ts structure
+        yForecastStart <- time(actuals(object))[obsInSample]+deltat(actuals(object));
+        yFrequency <- frequency(actuals(object));
+        yForecastIndex <- yIndex[obsInSample]+deltat(yIndex)*c(1:h);
+    }
+    else{
+        # zoo
+        yForecastIndex <- yIndex[obsInSample]+diff(tail(yIndex,2))*c(1:h);
+    }
+
+    # Get the lookup table
+    indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
+                                           lags(object), c(yIndex,yForecastIndex),
+                                           yClasses)$lookup[,-c(1:(obsInSample+lagsModelMax)),drop=FALSE];
+
+    # All the important matrices
+    matVt <- t(object$states[obsStates-(lagsModelMax:1)+1,,drop=FALSE]);
+    matWt <- tail(object$measurement,h);
+    # If the forecast horizon is higher than the in-sample, duplicate the last value in matWt
+    if(nrow(matWt)<h){
+        matWt <- matrix(tail(matWt,1), nrow=h, ncol=ncol(matWt), dimnames=list(NULL,colnames(matWt)), byrow=TRUE);
+    }
+    vecG <- matrix(object$persistence, ncol=1);
+
+    # Deal with explanatory variables
+    xregNumber <- 0;
+    if(ncol(object$data)>1){
+        newdata <- adam_xregNewdata(object, h, newdata);
+        xregNumber <- ncol(newdata);
+        # From 1 to nrow to address potential missing values
+        matWt[1:nrow(newdata),componentsNumberETS+componentsNumberARIMA+c(1:xregNumber)] <- newdata;
+    }
+    # If the user asked for trend, but it's not in the data, add it
+    else if(any(all.vars(formula(object))=="trend") && all(colnames(object$data)!="trend")){
+        xregNumber <- 1;
+    }
+    matF <- object$transition;
+    return(mget(intersect(c("componentsNumberARIMA", "componentsNumberETS", "constantRequired",
+                            "indexLookupTable", "lagsModelAll", "lagsModelMax", "lagsModelMin",
+                            "matF", "matVt", "matWt", "newdata", "obsInSample", "obsStates",
+                            "profilesRecentTable", "vecG", "xregNumber", "yClasses",
+                            "yForecastIndex", "yForecastStart", "yFrequency", "yIndex"), ls())));
+}
+
+# With the k last periods of the sample without an observed size, the forecast of the pure
+# multiplicative ETS with the drift of the states over them (adam_gapVarianceModel()), and the
+# simulated and the cumulative ones of any model (and all with a scale model), start from the
+# last observed size, as h+k steps ahead: the uncertainty of the states over those periods is
+# then that of the k first steps (Python's _forecast_trailing)
+adam_forecastTrailing <- function(object, h, cumulative, interval, obsInSample, obsStates,
+                                  lagsModelAll, lagsModelMax, profilesRecentTable, indexLookupTable,
+                                  matVt, matWt, yIndex, yForecastIndex, yClasses){
+    yActuals <- as.vector(actuals(object));
+    otLogical <- !is.na(yActuals);
+    if(is.list(object$occurrence) && any(as.vector(tbats_pFitted(object))[otLogical]!=1)){
+        otLogical[] <- otLogical & yActuals!=0;
+    }
+    trailing <- obsInSample - max(c(0, which(otLogical)));
+    if(trailing>0 && trailing<obsInSample-lagsModelMax && !is.null(object$profileObserved) &&
+       (cumulative || interval=="simulated" || is.scale(object$scale) ||
+        !is.null(attr(adam_gapVarianceModel(object), "drift")))){
+        originStates <- obsStates - trailing;
+        matVt <- t(object$states[originStates-(lagsModelMax:1)+1,,drop=FALSE]);
+        # The profile at the origin, with the corrections of the filter that the states do not record
+        profilesRecentTable[] <- object$profileObserved;
+        indexLookupTable <- adamProfileCreator(lagsModelAll, lagsModelMax, obsInSample+h,
+                                               lags(object), c(yIndex,yForecastIndex),
+                                               yClasses)$lookup[,-c(1:(obsInSample-trailing+lagsModelMax)),drop=FALSE];
+        matWt <- rbind(object$measurement[obsInSample-trailing+(1:trailing),,drop=FALSE], matWt);
+    }
+    else{
+        trailing <- 0;
+    }
+    return(list(otLogical=otLogical, trailing=trailing, matVt=matVt, matWt=matWt,
+                profilesRecentTable=profilesRecentTable, indexLookupTable=indexLookupTable));
+}
+
+# The simulated interval: the quantiles of the paths of the model, relative to the forecast, and
+# the mean of their totals for the cumulative forecast (Python's generate_simulation_interval)
+adam_generateSimulationInterval <- function(object, h, trailing, nsim, Etype, cumulative, logModel,
+                                            componentsNumber, lagsModelMax, matVt, matWt, matF, vecG,
+                                            indexLookupTable, profilesRecentTable, pForecast,
+                                            newdataProvided, levelLow, levelUp, yForecast, yLower,
+                                            yUpper, yCentre){
+    hModel <- h + trailing;
+    arrVt <- array(NA, c(componentsNumber, hModel+lagsModelMax, nsim));
+    arrVt[,1:lagsModelMax,] <- rep(matVt,nsim);
+
+    # The scale, or the scale model's forecasts (after its fitted values over the k last
+    # periods), de-biased for the simulations
+    if(is.scale(object$scale)){
+        # as.vector is needed to declass the mean.
+        scaleValue <- c(tail(as.vector(fitted(object$scale)), trailing),
+                        as.vector(forecast(object$scale,h=h,newdata=newdataProvided,interval="none")$mean));
+    }
+    else{
+        scaleValue <- object$scale;
+    }
+    scaleValue <- adam_scaleSimulation(object, scaleValue);
+    matErrors <- matrix(adam_errorsSimulate(hModel*nsim, object$distribution, scaleValue, object$other,
+                                            nobs(object)-nparam(object)),
+                        hModel,nsim);
+    # Normalise errors in order not to get ridiculous things on small nsim
+    if(nsim<=500){
+        if(Etype=="A"){
+            matErrors[] <- matErrors - array(apply(matErrors,1,mean),c(hModel,nsim));
+        }
+        else{
+            matErrors[] <- (1+matErrors) / array(apply(1+matErrors,1,mean),c(hModel,nsim))-1;
+        }
+    }
+    # This stuff is needed in order to produce adequate values for weird models
+    EtypeModified <- Etype;
+    if(Etype=="A" && any(object$distribution==c("dlnorm","dinvgauss","dgamma","dls","dllaplace"))){
+        EtypeModified[] <- "M";
+    }
+
+    # States, Errors, Ot, Transition, Measurement, Persistence
+    ySimulated <- object$adamCpp$simulate(matErrors, rbind(matrix(1, trailing, nsim),
+                                                           matrix(rbinom(h*nsim, 1, pForecast), h, nsim)),
+                                          arrVt, matWt,
+                                          array(matF,c(dim(matF),nsim)),
+                                          matrix(vecG, componentsNumber, nsim),
+                                          indexLookupTable,
+                                          array(profilesRecentTable, c(componentsNumber, lagsModelMax, nsim)),
+                                          EtypeModified, FALSE)$data[trailing+(1:h),,drop=FALSE];
+
+    #### Note that the cumulative doesn't work with oes at the moment!
+    if(cumulative){
+        # The totals of the paths, in the space of the data
+        ySums <- colSums(if(logModel){exp(ySimulated)}else{ySimulated}, na.rm=TRUE);
+        yForecast[] <- mean(ySums);
+        yLower[] <- quantile(ySums,levelLow,type=7);
+        yUpper[] <- quantile(ySums,levelUp,type=7);
+    }
+    else{
+        for(i in 1:h){
+            yLower[i,] <- quantile(ySimulated[i,],levelLow[i,],na.rm=TRUE,type=7);
+            yUpper[i,] <- quantile(ySimulated[i,],levelUp[i,],na.rm=TRUE,type=7);
+        }
+    }
+    # This step is needed in order to make intervals similar between the different methods
+    if(Etype=="A"){
+        yLower[] <- yLower - yCentre;
+        yUpper[] <- yUpper - yCentre;
+    }
+    else{
+        yLower[] <- yLower / yCentre;
+        yUpper[] <- yUpper / yCentre;
+        # Substitute NaNs with zeroes - it means that both values were originally zeroes
+        yLower[as.vector(is.nan(yLower))] <- 0;
+        yUpper[as.vector(is.nan(yUpper))] <- 0;
+    }
+    return(list(yForecast=yForecast, yLower=yLower, yUpper=yUpper, ySimulated=ySimulated));
+}
+
+# The approximate interval: the variances of the horizons implied by the model, and the quantiles
+# of its distribution with them, relative to the forecast (Python's generate_prediction_interval)
+adam_generatePredictionInterval <- function(object, h, trailing, Etype, Ttype, Stype, etsModel, cumulative,
+                                            lagsModelAll, matWt, matF, vecG, newdataProvided, levelLow,
+                                            levelUp, yForecast, yLower, yUpper){
+    hModel <- h + trailing;
+    # vcovMean is the mean of log(1+e) times -2 for the log-normal, when it differs from the variance
+    vcovMean <- vcovDrift <- NULL;
+    # The variance of the model implied by the scale, de-biased; with a scale
+    # model it is replaced by its forecasts below
+    s2 <- mean(adam_varianceDebiased(object));
+    # If scale model is included, produce forecasts
+    if(is.scale(object$scale)){
+        s2Forecast <- adam_scaleModelVariance(object, h, newdataProvided);
+    }
+    # A pure multiplicative ADAM ETS with the log-normal is additive in logs: log(1+e) at
+    # the horizon j has the mean -s2*a_j/2 and the variance s2*k_j, as over the gaps
+    if(object$distribution=="dlnorm" && etsModel && adamETSChecker(object) &&
+       !arimaChecker(object) && Etype=="M" && Ttype!="A" && Stype!="A"){
+        covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, 1);
+        s2Horizon <- if(is.scale(object$scale)){s2Forecast}else{s2};
+        vcovMulti <- s2Horizon*diag(covarMat);
+        vcovMean <- s2Horizon*cumsum(covarMat[1,]);
+        # After the periods without an observed size, those of the filter, with the
+        # uncertainty of the states at the end of the sample
+        filterVariances <- adam_gapVarianceModel(object, 2, h);
+        if(!is.null(filterVariances)){
+            vcovMulti <- s2Horizon*filterVariances;
+            vcovMean <- s2Horizon*adam_gapVarianceModel(object, 1, h);
+        }
+        if(cumulative){
+            vcovMulti <- sum(vcovMulti);
+        }
+    }
+    # A pure multiplicative ADAM ETS with the Gamma or the Inverse Gaussian: z/mu at the horizon
+    # j is D(1+e), log(D) ~ N(mu (a_j - 1), v (k_j - 1)) with the moments mu and v of log(1+e)
+    # and the multipliers a_j and k_j of the log-normal above, the quantiles of their mixture
+    else if(any(object$distribution==c("dgamma","dinvgauss")) && etsModel && adamETSChecker(object) &&
+            !arimaChecker(object) && Etype=="M" && Ttype!="A" && Stype!="A" &&
+            !is.scale(object$scale) && !cumulative){
+        multiplierMean <- adam_gapVarianceModel(object, 1, h);
+        multiplierVariance <- adam_gapVarianceModel(object, 2, h);
+        if(is.null(multiplierVariance)){
+            covarMat <- covarAnal(lagsModelAll, h, matWt[1,,drop=FALSE], matF, vecG, 1);
+            multiplierMean <- cumsum(covarMat[1,]);
+            multiplierVariance <- diag(covarMat);
+        }
+        noise <- adam_gapDrift(vecG, TRUE, object$distribution, TRUE, s2)$noise;
+        vcovMulti <- s2;
+        vcovDrift <- list(mean=noise$mean[1]*(multiplierMean-1),
+                          variance=noise$covariance[1,1]*(multiplierVariance-1));
+    }
+    # IG and Lnorm can use approximations from the multiplications
+    else if(etsModel && any(object$distribution==c("dinvgauss","dgamma","dlnorm","dllaplace","dls","dlgnorm")) && Etype=="M"){
+        # The log-normal takes the variance of 1+e, s2 being the one of log(1+e)
+        if(object$distribution=="dlnorm"){
+            s2[] <- exp(s2)-1;
+            if(is.scale(object$scale)){
+                s2Forecast[] <- exp(s2Forecast)-1;
+            }
+        }
+        vcovMulti <- tail(adamVarAnal(lagsModelAll, hModel, matWt[1,,drop=FALSE], matF, vecG, s2), h);
+        if(is.scale(object$scale)){
+            # Fix the variances with the time varying ones
+            vcovMulti[] <- vcovMulti / s2 * s2Forecast;
+        }
+        if(any(object$distribution==c("dlnorm","dls","dllaplace","dlgnorm"))){
+            vcovMulti[] <- log(1+vcovMulti);
+        }
+
+        # We don't do correct cumulatives in this case...
+        if(cumulative){
+            vcovMulti <- sum(vcovMulti);
+        }
+    }
+    else{
+        vcovMulti <- covarAnal(lagsModelAll, hModel, matWt[1,,drop=FALSE], matF, vecG,
+                               s2)[trailing+(1:h),trailing+(1:h),drop=FALSE];
+        if(is.scale(object$scale)){
+            # Fix the matrix with the time varying variance
+            vcovMulti[] <- vcovMulti / s2 * (sqrt(s2Forecast) %*% t(sqrt(s2Forecast)));
+        }
+
+        # Do either the variance of sum, or a diagonal: after the periods without an
+        # observed value, that of the filter, with the uncertainty of the states at the
+        # end of the sample
+        filterVariances <- if(cumulative){NULL}else{adam_gapVarianceModel(object, 2, h)};
+        if(cumulative){
+            vcovMulti <- sum(vcovMulti);
+        }
+        else if(!is.null(filterVariances)){
+            vcovMulti <- (if(is.scale(object$scale)){s2Forecast}else{s2}) * filterVariances;
+        }
+        else{
+            vcovMulti <- diag(vcovMulti);
+        }
+    }
+    yLower[] <- adam_intervalQuantiles(levelLow, object, Etype, vcovMulti, yForecast, vcovMean, vcovDrift);
+    yUpper[] <- adam_intervalQuantiles(levelUp, object, Etype, vcovMulti, yForecast, vcovMean, vcovDrift);
+    return(list(yLower=yLower, yUpper=yUpper));
+}
+
+# The semiparametric, nonparametric and empirical intervals, from the multistep errors of the
+# model: the quantiles of the distribution with their variances, the quantile regression of
+# Taylor & Bunn on them, or their quantiles, relative to the forecast (Python's
+# generate_multistep_interval)
+adam_generateMultistepInterval <- function(object, h, trailing, Etype, interval, cumulative,
+                                           newdataProvided, levelLow, levelUp, levelNew, nLevels,
+                                           yForecast, yLower, yUpper){
+    hModel <- h + trailing;
+    # The distributions of 1+e take the errors relative to the fitted values for an additive error
+    ratioErrors <- any(object$distribution==c("dinvgauss","dgamma","dlnorm","dls","dllaplace","dlgnorm")) &&
+        (Etype=="A");
+    # Extract multistep errors and calculate the covariance matrix
+    if(hModel>1){
+        adamErrors <- as.matrix(rmultistep(object, h=hModel));
+
+        if(ratioErrors){
+            yFittedMatrix <- adamErrors;
+            for(i in 1:hModel){
+                yFittedMatrix[,i] <- fitted(object)[1:nrow(adamErrors)+i-1];
+            }
+            adamErrors[] <- adamErrors/yFittedMatrix;
+        }
+        # The windows with all their targets observed, at the steps after the origin
+        adamErrors <- adamErrors[complete.cases(adamErrors),trailing+(1:h),drop=FALSE];
+        nWindows <- nrow(adamErrors);
+
+        if(interval=="semiparametric"){
+            # Do either the variance of sum, or a diagonal
+            if(cumulative){
+                vcovMulti <- sum(t(adamErrors) %*% adamErrors / nWindows);
+            }
+            else{
+                vcovMulti <- diag(t(adamErrors) %*% adamErrors / nWindows);
+            }
+            # The log-normal takes the variance of log(1+e), as at h=1
+            if(object$distribution=="dlnorm"){
+                vcovMulti[] <- log(1+vcovMulti);
+            }
+        }
+        # For nonparametric and cumulative...
+        else if(cumulative){
+            adamErrors <- matrix(apply(adamErrors, 2, sum),nWindows,1);
+        }
+    }
+    else{
+        # If scale model is included, produce forecasts
+        if(is.scale(object$scale)){
+            vcovMulti <- adam_scaleModelVariance(object, h, newdataProvided);
+        }
+        else{
+            vcovMulti <- adam_varianceDebiased(object);
+        }
+        # The errors of the observed values, as the multistep ones for h>1:
+        # residuals() gives the ratios 1+e for the ratio distributions
+        adamErrors <- as.matrix(as.vector(object$residuals));
+        if(ratioErrors){
+            adamErrors[] <- adamErrors/as.vector(fitted(object));
+        }
+        adamErrors <- adamErrors[!is.na(adamErrors[,1]),,drop=FALSE];
+    }
+
+    if(interval=="semiparametric"){
+        yLower[] <- adam_intervalQuantiles(levelLow, object, Etype, vcovMulti, yForecast);
+        yUpper[] <- adam_intervalQuantiles(levelUp, object, Etype, vcovMulti, yForecast);
+        return(list(yLower=yLower, yUpper=yUpper, levelLow=levelLow, levelUp=levelUp));
+    }
+    # Empirical, based on specific quantiles
+    if(interval=="empirical"){
+        for(i in 1:h){
+            yLower[i,] <- quantile(adamErrors[,i],levelLow[i,],na.rm=TRUE,type=7);
+            yUpper[i,] <- quantile(adamErrors[,i],levelUp[i,],na.rm=TRUE,type=7);
+        }
+    }
+    # Use Taylor & Bunn approach for the nonparametric ones
+    else if(h>1){
+        # This is needed in order to see if quant regression can be used
+        if(all(levelLow==levelLow[1,])){
+            levelLow <- levelLow[1,,drop=FALSE];
+        }
+        if(all(levelUp==levelUp[1,])){
+            levelUp <- levelUp[1,,drop=FALSE];
+        }
+
+        # Do quantile regression for h>1 and scalars for the level (no change across h)
+        # transpose is needed in order to compare correctly
+        if(all(t(levelNew)==levelNew[1,])){
+            for(i in 1:nLevels){
+                yLower[,i] <- adam_quantilePower(adamErrors, levelLow[1,i]);
+                yUpper[,i] <- adam_quantilePower(adamErrors, levelUp[1,i]);
+            }
+        }
+        # Otherwise just return quantiles of errors
+        else if(cumulative){
+            yLower[] <- quantile(adamErrors,levelLow,type=7);
+            yUpper[] <- quantile(adamErrors,levelUp,type=7);
+        }
+        else{
+            for(i in 1:h){
+                yLower[i] <- quantile(adamErrors[,i],levelLow[i],na.rm=TRUE,type=7);
+                yUpper[i] <- quantile(adamErrors[,i],levelUp[i],na.rm=TRUE,type=7);
+            }
+        }
+    }
+    else{
+        yLower[] <- quantile(adamErrors,levelLow,type=7);
+        yUpper[] <- quantile(adamErrors,levelUp,type=7);
+    }
+
+    # The errors relative to the forecast: those of a multiplicative error, and of the ratio
+    # distributions with an additive one
+    if(Etype=="M"){
+        yLower[] <- 1+yLower;
+        yUpper[] <- 1+yUpper;
+    }
+    else if(ratioErrors){
+        yLower[] <- yLower*yForecast;
+        yUpper[] <- yUpper*yForecast;
+    }
+    return(list(yLower=yLower, yUpper=yUpper, levelLow=levelLow, levelUp=levelUp));
+}
+
+# The quantiles of the error term at the levels, of the distribution with the variances vcovMulti
+# (vcovMean is the mean of log(1+e) times -2 for the log-normal, vcovDrift the drift of the states
+# after the periods without an observed size): around zero for the additive error and one for the
+# multiplicative one; the distributions of 1+e of an additive error are relative to the centre
+# (Python's _interval_quantiles)
+adam_intervalQuantiles <- function(levels, object, Etype, vcovMulti, centre, vcovMean=NULL, vcovDrift=NULL){
+    if(!is.null(vcovDrift)){
+        return(adam_gapQuantile(levels, object$distribution, vcovMulti, vcovDrift$mean, vcovDrift$variance));
+    }
+    location <- switch(Etype, "A"=0, "M"=1);
+    shape <- object$other$shape;
+    if(is.null(vcovMean)){
+        vcovMean <- vcovMulti;
+    }
+    quantiles <- switch(object$distribution,
+                        "dnorm"=qnorm(levels, location, sqrt(vcovMulti)),
+                        "dlaplace"=qlaplace(levels, location, sqrt(vcovMulti/2)),
+                        "ds"=qs(levels, location, (vcovMulti/120)^0.25),
+                        "dgnorm"=suppressWarnings(qgnorm(levels, location,
+                                                         sqrt(vcovMulti*(gamma(1/shape)/gamma(3/shape))),
+                                                         shape)),
+                        "dlogis"=qlogis(levels, location, sqrt(vcovMulti*3)/pi),
+                        "dt"=location + sqrt(vcovMulti)*qt(levels, nobs(object) - nparam(object)),
+                        # 1+e with the mean of one
+                        "dlnorm"=qlnorm(levels, -vcovMean/2, sqrt(vcovMulti)),
+                        "dllaplace"=exp(qlaplace(levels, 0, sqrt(vcovMulti/2))),
+                        "dls"=exp(qs(levels, 0, (vcovMulti/120)^0.25)),
+                        "dlgnorm"=suppressWarnings(exp(qgnorm(levels, 0,
+                                                              sqrt(vcovMulti*(gamma(1/shape)/gamma(3/shape))),
+                                                              shape))),
+                        "dinvgauss"=qinvgauss(levels, 1, dispersion=vcovMulti),
+                        "dgamma"=qgamma(levels, shape=1/vcovMulti, scale=vcovMulti),
+                        0*levels);
+    if(Etype=="A" && any(object$distribution==c("dlnorm","dllaplace","dls","dlgnorm","dinvgauss","dgamma"))){
+        quantiles <- (quantiles-1)*as.vector(centre);
+    }
+    return(quantiles);
+}
+
+# The bounds of the interval around the forecasts: the levels of zero and one at the ends of the
+# support, no value as zero, the occurrence model without variability at its forecast (Python's
+# _interval_bounds)
+adam_intervalBounds <- function(Etype, cumulative, logModel, occurrenceModel, side, level, nLevels,
+                                levelLow, levelUp, yForecast, yCentre, pForecast, yLower, yUpper){
+    # Make sensible values out of those weird quantiles
+    if(!cumulative){
+        if(any(levelLow==0)){
+            # zoo does not like, when you work with matrices of indices... silly thing
+            yBoundBuffer <- levelLow;
+            yBoundBuffer[] <- yLower
+            yBoundBuffer[levelLow==0] <- switch(Etype, "A"=-Inf, "M"=0);
+            yLower[] <- yBoundBuffer;
+        }
+        if(any(levelUp==1)){
+            yBoundBuffer <- levelUp;
+            yBoundBuffer[] <- yUpper
+            yBoundBuffer[levelUp==1] <- Inf;
+            yUpper[] <- yBoundBuffer;
+        }
+    }
+    else{
+        # The bounds are relative to the centre here: zero for the totals of a model in logs
+        if(any(levelLow==0)){
+            yLower[] <- switch(Etype, "A"=if(logModel){-yCentre}else{-Inf}, "M"=0);
+        }
+        if(any(levelUp==1)){
+            yUpper[] <- Inf;
+        }
+    }
+
+    # Substitute NAs and NaNs with zeroes
+    noValue <- switch(Etype,"A"=0,"M"=1);
+    yLower[is.nan(yLower) | is.na(yLower)] <- noValue;
+    yUpper[is.nan(yUpper) | is.na(yUpper)] <- noValue;
+
+    # Do intervals around the forecasts...
+    if(Etype=="A"){
+        yLower[] <- yCentre + yLower;
+        yUpper[] <- yCentre + yUpper;
+    }
+    else{
+        yLower[] <- yCentre*yLower;
+        yUpper[] <- yCentre*yUpper;
+    }
+
+    # Check what we have from the occurrence model
+    if(occurrenceModel){
+        # If there are NAs, then there's no variability and no intervals.
+        if(any(is.na(yUpper))){
+            yUpper[is.na(yUpper)] <- (yForecast/pForecast)[is.na(yUpper)];
+        }
+        if(any(is.na(yLower))){
+            yLower[is.na(yLower)] <- 0;
+        }
+    }
+
+    colnames(yLower) <- switch(side,
+                               "both"=paste0("Lower bound (",(1-level)/2*100,"%)"),
+                               "lower"=paste0("Lower bound (",(1-level)*100,"%)"),
+                               "upper"=rep("Lower 0%",nLevels));
+
+    colnames(yUpper) <- switch(side,
+                               "both"=paste0("Upper bound (",(1+level)/2*100,"%)"),
+                               "lower"=rep("Upper 100%",nLevels),
+                               "upper"=paste0("Upper bound (",level*100,"%)"));
+    return(list(yLower=yLower, yUpper=yUpper));
 }
 
 # Whether a model works in logarithms, with its forecasts exponentiated in forecast.adam()

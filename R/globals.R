@@ -8,7 +8,7 @@ utils::globalVariables(c(
   "B", "FI",
   "denominator",
   "initialXregProvided",
-  "lagsLength",
+  "lagsLength", "lagsModelMin",
   "occurrenceMissingOnly", "occurrenceProbability", "omModel",
   "lb", "ub",
   "otherReturned",
@@ -16,6 +16,7 @@ utils::globalVariables(c(
   "print_level",
   "profilesRecentInitial",
   "select",
+  "trailing",
 
   # adam.R - Main ADAM function and related infrastructure
   "adamCpp", "adamETS", "adamFitted",

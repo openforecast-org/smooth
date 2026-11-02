@@ -205,6 +205,13 @@ test_that("ADAM regression with factors, provided coefficients and no intercept"
     expect_equal(dim(testModel$measurement), c(60, 2));
 })
 
+# The prediction interval of an additive error with a distribution of 1+e is around the fitted
+test_that("predict() of ETS(A,A,N) with dgamma brackets the fitted values", {
+    testModel <- adam(BJsales, "AAN", distribution="dgamma");
+    testPredict <- predict(testModel, interval="prediction");
+    expect_true(all(testPredict$lower < testPredict$mean & testPredict$mean < testPredict$upper));
+})
+
 # The names with special characters stay in the data of the model, the model takes the
 # syntactic ones, and the forecasts take the newdata with the names of the user
 test_that("ADAM with special characters in the names of the variables", {

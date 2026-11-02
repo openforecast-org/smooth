@@ -8,6 +8,7 @@ utils::globalVariables(c(
   "B", "FI",
   "denominator",
   "initialXregProvided",
+  "filterLogs", "gapDrifting", "headOffset",
   "lagsLength", "lagsModelMin",
   "occurrenceMissingOnly", "occurrenceProbability", "omModel",
   "lb", "ub",

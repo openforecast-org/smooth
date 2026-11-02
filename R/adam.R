@@ -1994,111 +1994,28 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             other <- abs(tail(B,1));
         }
 
-        # If the distribution is default, change it according to the error term
-        if(distribution=="default"){
-            distribution[] <- switch(loss,
-                                     "likelihood"= switch(Etype, "A"= "dnorm", "M"= "dgamma"),
-                                     "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"= "dlaplace",
-                                     "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"= "ds",
-                                     "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
-        }
+        distribution <- adam_updateDistribution(distribution, loss, Etype);
 
         # Fit the model to the data, with the filter as in the estimation
-        gapDrifting <- (any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
-            etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
-            Etype=="M" && Ttype!="A" && Stype!="A";
-        filterLogs <- NULL;
-        if(any(distribution==c("dnorm","dlaplace","ds","dgnorm")) && Etype=="A" && Ttype!="M" && Stype!="M"){
-            filterLogs <- FALSE;
-        }
-        else if(gapDrifting || distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
-                Etype=="M" && Ttype!="A" && Stype!="A"){
-            filterLogs <- TRUE;
-        }
-        fitArguments <- list(matVt, matWt, matF, vecG,
-                             indexLookupTable, profilesRecentTable,
-                             yInSample, ot, initialType, nIterations, adamCpp,
-                             etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
-                             componentsNumberETS, componentsNumberETSSeasonal,
-                             componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
-                             loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
-                             filterLogs);
-        adamFitted <- do.call(adam_fitOrGradient, fitArguments);
-        # The drift of the states of the other pure multiplicative ETS, as in the estimation: the
-        # scale is found here, so that the filter of the conventional ETS, which runs with the
-        # moments of the errors at the scale, gives the states, the fitted values and the errors
-        gapDrift <- NULL;
-        if(gapDrifting){
-            gapDrift <- function(scale){
-                drift <- adam_gapDrift(vecG, otLogical, distribution, adamETS, scale, if(adamETS) adamFitted);
-                if(!adamETS && any(!otLogical)){
-                    adamFitted <<- do.call(adam_fitOrGradient, c(fitArguments, list(filterNoise=drift$noise)));
-                    drift <- adam_gapDrift(vecG, otLogical, distribution, FALSE, scale, adamFitted, drift$noise);
-                    drift$errors <- adamFitted$errors[otLogical];
-                }
-                return(drift);
-            }
-            scale <- scaler(distribution, Etype, adamFitted$errors[otLogical], adamFitted$fitted[otLogical],
-                            sum(otLogical), other, 1, 1, gapDrift);
-            gapDrift(scale);
-        }
+        list2env(adam_fitPreparedModel(matVt, matWt, matF, vecG, indexLookupTable, profilesRecentTable,
+                                       yInSample, ot, otLogical, initialType, nIterations, adamCpp,
+                                       etsModel, arimaModel, xregModel, regressors, adamETS,
+                                       Etype, Ttype, Stype, componentsNumberETS,
+                                       componentsNumberETSSeasonal, componentsNumberETSNonSeasonal,
+                                       componentsNumberARIMA, lagsModel, lagsModelMax, lagsModelAll,
+                                       obsInSample, xregNumber, loss, distribution, other, horizon,
+                                       multisteps, headLength),
+                 environment());
 
-        matVt[] <- adamFitted$states;
+        list2env(adam_correctMultiplicativeComponents(matVt, profilesRecentTable, Ttype, Stype,
+                                                      componentsNumberETSNonSeasonal,
+                                                      componentsNumberETSSeasonal),
+                 environment());
 
-        # If headLength > lagsModelMax, keep only the last lagsModelMax head states
-        # so returned states and extracted initials keep exactly today's dimensions and meaning.
-        headOffset <- if(!is.null(headLength)) headLength else lagsModelMax;
-        if(headOffset > lagsModelMax){
-            matVt <- matVt[, c((headOffset - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
-        }
-
-        # Write down the recent profile for future use
-        profilesRecentTable <- adamFitted$profile;
-
-        # Make sure that there are no negative values in multiplicative components
-        # This might appear in case of bounds="a"
-        if(Ttype=="M" && (any(is.na(matVt[2,])) || any(matVt[2,]<=0))){
-            i <- which(any(matVt[2,]<=0));
-            matVt[2,i] <- 1e-6;
-            profilesRecentTable[2,i] <- 1e-6;
-        }
-
-        if(Stype=="M" && all(!is.na(matVt[componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal,])) &&
-           any(matVt[componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal,]<=0)){
-            i <- which(matVt[componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal,]<=0);
-            matVt[componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal,i] <- 1e-6;
-            i <- which(profilesRecentTable[componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal,]<=0);
-            profilesRecentTable[componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal,i] <- 1e-6;
-        }
-
-        # Prepare fitted and error with ts / zoo
-        if(any(yClasses=="ts")){
-            yFitted <- ts(rep(NA,obsInSample), start=yStart, frequency=yFrequency);
-            errors <- ts(rep(NA,obsInSample), start=yStart, frequency=yFrequency);
-        }
-        else{
-            yFitted <- zoo(rep(NA,obsInSample), order.by=yInSampleIndex);
-            errors <- zoo(rep(NA,obsInSample), order.by=yInSampleIndex);
-        }
-
-        errors[] <- adamFitted$errors;
-        yFitted[] <- adamFitted$fitted;
-        # Check what was returned in the end
-        if(any(is.nan(yFitted)) || any(is.na(yFitted))){
-            warning("Something went wrong in the estimation of the model and NaNs were produced. ",
-                    "If this is a mixed model, consider using the pure ones instead.",
-                    call.=FALSE, immediate.=TRUE);
-        }
-        if(occurrenceModel){
-            yFitted[] <- yFitted * as.numeric(pFitted);
-        }
-
-        # Fix the cases, when we have zeroes in the provided occurrence. At the missing
-        # values the fitted is the prediction of the model
-        if(occurrence=="provided" && !occurrenceModel){
-            zeroObserved <- !otLogical & !yNAValues[1:obsInSample];
-            yFitted[zeroObserved] <- yFitted[zeroObserved] * pFitted[zeroObserved];
-        }
+        list2env(adam_initializeFittedSeries(adamFitted, yClasses, obsInSample, yStart, yFrequency,
+                                             yInSampleIndex, occurrenceModel, occurrence, pFitted,
+                                             otLogical, yNAValues),
+                 environment());
 
         # Produce forecasts if the horizon is non-zero
         if(horizon>0){
@@ -2163,82 +2080,20 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
             regressors <- NULL;
         }
 
-        if(arimaModel){
-            armaParametersList <- vector("list",arRequired+maRequired);
-            j <- 1;
-            if(arRequired && arEstimate){
-                # Avoid damping parameter phi
-                armaParametersList[[j]] <- B[nchar(names(B))>3 & substr(names(B),1,3)=="phi"];
-                names(armaParametersList)[j] <- "ar";
-                j[] <- j+1;
-            }
-            # If this was provided
-            else if(arRequired && !arEstimate){
-                # Avoid damping parameter phi
-                armaParametersList[[j]] <- armaParameters[substr(names(armaParameters),1,3)=="phi"];
-                names(armaParametersList)[j] <- "ar";
-                j[] <- j+1;
-            }
-            if(maRequired && maEstimate){
-                armaParametersList[[j]] <- B[substr(names(B),1,5)=="theta"];
-                names(armaParametersList)[j] <- "ma";
-            }
-            else if(maRequired && !maEstimate){
-                armaParametersList[[j]] <- armaParameters[substr(names(armaParameters),1,5)=="theta"];
-                names(armaParametersList)[j] <- "ma";
-            }
-        }
-        else{
-            armaParametersList <- NULL;
-        }
+        armaParametersList <- adam_processArmaParameters(arimaModel, arRequired, maRequired, arEstimate,
+                                                         maEstimate, B, armaParameters);
 
-        if(any(distribution==c("dgnorm","dlgnorm","dt")) && otherParameterEstimate){
-            other <- abs(tail(B,1));
-        }
-        # which() is needed in order to overcome weird behaviour of zoo
-        # The sizes, not multiplied by the probabilities, with the variance and the mean after
-        # the periods without an observed size, as in the estimation
-        gapVariance <- gapMean <- rep(1, obsInSample);
-        if(isFALSE(filterLogs) || distribution=="dlnorm" && adamETS && isTRUE(filterLogs)){
-            gapVariance[] <- adamFitted$variances;
-            gapMean[] <- 2*adamFitted$innovationsScale;
-        }
+        # The scale, unless found with the drift of the states
         if(!gapDrifting){
-            scale <- scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
-                            sum(otLogical), other, gapMean[which(otLogical)], gapVariance[which(otLogical)], gapDrift);
+            scale <- adam_calculateScaleParameter(distribution, Etype, errors, adamFitted, otLogical,
+                                                  other, filterLogs, adamETS);
         }
 
-        # Record constant if it was estimated
-        if(constantEstimate){
-            constantValue <- B[constantName];
-        }
-
-        # Prepare the list of distribution parameters to return
-        otherReturned <- vector("list",1);
-        # Write down parameters for distribution. It is always positive, so take abs
-        if(otherParameterEstimate){
-            otherReturned[[1]] <- abs(tail(B,1));
-        }
-        else{
-            otherReturned[[1]] <- other;
-        }
-        # Give names to the other values
-        if(any(distribution==c("dgnorm","dlgnorm"))){
-            names(otherReturned) <- "shape";
-        }
-        else if(any(distribution==c("dt"))){
-            names(otherReturned) <- "nu";
-        }
-        # LASSO / RIDGE lambda
-        if(any(loss==c("LASSO","RIDGE"))){
-            otherReturned$lambda <- lambda;
-        }
-        # Return ARIMA polynomials and indices for persistence and transition
-        if(arimaModel){
-            otherReturned$polynomial <- arimaPolynomials;
-            otherReturned$ARIMAIndices <- list(nonZeroARI=nonZeroARI,nonZeroMA=nonZeroMA);
-            otherReturned$armaParameters <- armaParameters;
-        }
+        list2env(adam_processOtherParameters(B, constantEstimate, constantName, constantValue,
+                                             otherParameterEstimate, other, distribution, loss, lambda,
+                                             arimaModel, arimaPolynomials, nonZeroARI, nonZeroMA,
+                                             armaParameters),
+                 environment());
 
         # Amend the class of state matrix
         if(any(yClasses=="ts")){
@@ -6757,6 +6612,223 @@ adam_intervalBounds <- function(Etype, cumulative, logModel, occurrenceModel, si
                                "lower"=rep("Upper 100%",nLevels),
                                "upper"=paste0("Upper bound (",level*100,"%)"));
     return(list(yLower=yLower, yUpper=yUpper));
+}
+
+# The distribution of the default one: from the loss, and the error type for the likelihood
+# (Python's _update_distribution)
+adam_updateDistribution <- function(distribution, loss, Etype){
+    if(distribution=="default"){
+        distribution[] <- switch(loss,
+                                 "likelihood"= switch(Etype, "A"= "dnorm", "M"= "dgamma"),
+                                 "MAEh"=, "TMAE"=, "GTMAE"=, "MACE"=, "MAE"= "dlaplace",
+                                 "HAMh"=, "THAM"=, "GTHAM"=, "CHAM"=, "HAM"= "ds",
+                                 "MSEh"=, "MSCE"=, "MSE"=, "GPL"=, "dnorm");
+    }
+    return(distribution);
+}
+
+# The fit of the model with the estimated parameters, with the filter over the periods without an
+# observed value and the drift of the states of the pure multiplicative ETS, as in the estimation:
+# the states after the head, the recent profile, and the scale found with the drift (Python's
+# _fit_prepared_model)
+adam_fitPreparedModel <- function(matVt, matWt, matF, vecG, indexLookupTable, profilesRecentTable,
+                                  yInSample, ot, otLogical, initialType, nIterations, adamCpp,
+                                  etsModel, arimaModel, xregModel, regressors, adamETS,
+                                  Etype, Ttype, Stype, componentsNumberETS,
+                                  componentsNumberETSSeasonal, componentsNumberETSNonSeasonal,
+                                  componentsNumberARIMA, lagsModel, lagsModelMax, lagsModelAll,
+                                  obsInSample, xregNumber, loss, distribution, other, horizon,
+                                  multisteps, headLength){
+    gapDrifting <- (any(distribution==c("dgamma","dinvgauss")) || distribution=="dlnorm" && !adamETS) &&
+        etsModel && !arimaModel && !(xregModel && regressors=="adapt") &&
+        Etype=="M" && Ttype!="A" && Stype!="A";
+    filterLogs <- NULL;
+    if(any(distribution==c("dnorm","dlaplace","ds","dgnorm")) && Etype=="A" && Ttype!="M" && Stype!="M"){
+        filterLogs <- FALSE;
+    }
+    else if(gapDrifting || distribution=="dlnorm" && adamETS && etsModel && !arimaModel &&
+            Etype=="M" && Ttype!="A" && Stype!="A"){
+        filterLogs <- TRUE;
+    }
+    fitArguments <- list(matVt, matWt, matF, vecG,
+                         indexLookupTable, profilesRecentTable,
+                         yInSample, ot, initialType, nIterations, adamCpp,
+                         etsModel, arimaModel, xregModel, Etype, Ttype, Stype,
+                         componentsNumberETS, componentsNumberETSSeasonal,
+                         componentsNumberETSNonSeasonal, lagsModel, lagsModelMax, obsInSample,
+                         loss, distribution, other, horizon, multisteps, "n", componentsNumberARIMA, lagsModelAll, xregNumber,
+                         filterLogs);
+    adamFitted <- do.call(adam_fitOrGradient, fitArguments);
+    # The drift of the states of the other pure multiplicative ETS, as in the estimation: the
+    # scale is found here, so that the filter of the conventional ETS, which runs with the
+    # moments of the errors at the scale, gives the states, the fitted values and the errors
+    scale <- NULL;
+    if(gapDrifting){
+        gapDrift <- function(scale){
+            drift <- adam_gapDrift(vecG, otLogical, distribution, adamETS, scale, if(adamETS) adamFitted);
+            if(!adamETS && any(!otLogical)){
+                adamFitted <<- do.call(adam_fitOrGradient, c(fitArguments, list(filterNoise=drift$noise)));
+                drift <- adam_gapDrift(vecG, otLogical, distribution, FALSE, scale, adamFitted, drift$noise);
+                drift$errors <- adamFitted$errors[otLogical];
+            }
+            return(drift);
+        }
+        scale <- adam_scaler(distribution, Etype, adamFitted$errors[otLogical], adamFitted$fitted[otLogical],
+                        sum(otLogical), other, 1, 1, gapDrift);
+        gapDrift(scale);
+    }
+
+    matVt[] <- adamFitted$states;
+
+    # If headLength > lagsModelMax, keep only the last lagsModelMax head states
+    # so returned states and extracted initials keep exactly today's dimensions and meaning.
+    headOffset <- if(!is.null(headLength)) headLength else lagsModelMax;
+    if(headOffset > lagsModelMax){
+        matVt <- matVt[, c((headOffset - lagsModelMax + 1):ncol(matVt)), drop=FALSE];
+    }
+
+    # Write down the recent profile for future use
+    profilesRecentTable <- adamFitted$profile;
+    return(list(adamFitted=adamFitted, gapDrifting=gapDrifting, filterLogs=filterLogs, scale=scale,
+                matVt=matVt, headOffset=headOffset, profilesRecentTable=profilesRecentTable));
+}
+
+# No negative values in the multiplicative components, which might appear with bounds="a"
+# (Python's _correct_multiplicative_components)
+adam_correctMultiplicativeComponents <- function(matVt, profilesRecentTable, Ttype, Stype,
+                                                 componentsNumberETSNonSeasonal,
+                                                 componentsNumberETSSeasonal){
+    if(Ttype=="M" && (any(is.na(matVt[2,])) || any(matVt[2,]<=0))){
+        i <- which(any(matVt[2,]<=0));
+        matVt[2,i] <- 1e-6;
+        profilesRecentTable[2,i] <- 1e-6;
+    }
+
+    seasonal <- componentsNumberETSNonSeasonal+1:componentsNumberETSSeasonal;
+    if(Stype=="M" && all(!is.na(matVt[seasonal,])) && any(matVt[seasonal,]<=0)){
+        i <- which(matVt[seasonal,]<=0);
+        matVt[seasonal,i] <- 1e-6;
+        i <- which(profilesRecentTable[seasonal,]<=0);
+        profilesRecentTable[seasonal,i] <- 1e-6;
+    }
+    return(list(matVt=matVt, profilesRecentTable=profilesRecentTable));
+}
+
+# The fitted values and the errors with the index of the data: the fitted values of an occurrence
+# model times the probabilities, and those of the zeros of a provided occurrence (Python's
+# _initialize_fitted_series)
+adam_initializeFittedSeries <- function(adamFitted, yClasses, obsInSample, yStart, yFrequency,
+                                        yInSampleIndex, occurrenceModel, occurrence, pFitted,
+                                        otLogical, yNAValues){
+    # Prepare fitted and error with ts / zoo
+    if(any(yClasses=="ts")){
+        yFitted <- ts(rep(NA,obsInSample), start=yStart, frequency=yFrequency);
+        errors <- ts(rep(NA,obsInSample), start=yStart, frequency=yFrequency);
+    }
+    else{
+        yFitted <- zoo(rep(NA,obsInSample), order.by=yInSampleIndex);
+        errors <- zoo(rep(NA,obsInSample), order.by=yInSampleIndex);
+    }
+
+    errors[] <- adamFitted$errors;
+    yFitted[] <- adamFitted$fitted;
+    # Check what was returned in the end
+    if(any(is.nan(yFitted)) || any(is.na(yFitted))){
+        warning("Something went wrong in the estimation of the model and NaNs were produced. ",
+                "If this is a mixed model, consider using the pure ones instead.",
+                call.=FALSE, immediate.=TRUE);
+    }
+    if(occurrenceModel){
+        yFitted[] <- yFitted * as.numeric(pFitted);
+    }
+
+    # Fix the cases, when we have zeroes in the provided occurrence. At the missing
+    # values the fitted is the prediction of the model
+    if(occurrence=="provided" && !occurrenceModel){
+        zeroObserved <- !otLogical & !yNAValues[1:obsInSample];
+        yFitted[zeroObserved] <- yFitted[zeroObserved] * pFitted[zeroObserved];
+    }
+    return(list(yFitted=yFitted, errors=errors));
+}
+
+# The AR and MA parameters to return: estimated or provided (Python's _process_arma_parameters)
+adam_processArmaParameters <- function(arimaModel, arRequired, maRequired, arEstimate, maEstimate,
+                                       B, armaParameters){
+    if(!arimaModel){
+        return(NULL);
+    }
+    armaParametersList <- vector("list",arRequired+maRequired);
+    j <- 1;
+    if(arRequired){
+        # Avoid damping parameter phi
+        armaParametersList[[j]] <- if(arEstimate){
+            B[nchar(names(B))>3 & substr(names(B),1,3)=="phi"];
+        }
+        else{
+            armaParameters[substr(names(armaParameters),1,3)=="phi"];
+        }
+        names(armaParametersList)[j] <- "ar";
+        j[] <- j+1;
+    }
+    if(maRequired){
+        armaParametersList[[j]] <- if(maEstimate){
+            B[substr(names(B),1,5)=="theta"];
+        }
+        else{
+            armaParameters[substr(names(armaParameters),1,5)=="theta"];
+        }
+        names(armaParametersList)[j] <- "ma";
+    }
+    return(armaParametersList);
+}
+
+# The scale of the observed sizes, not multiplied by the probabilities, with the variance and the
+# mean after the periods without an observed size, as in the estimation (Python's
+# _calculate_scale_parameter)
+adam_calculateScaleParameter <- function(distribution, Etype, errors, adamFitted, otLogical, other,
+                                         filterLogs, adamETS){
+    # which() is needed in order to overcome weird behaviour of zoo
+    gapVariance <- gapMean <- rep(1, length(otLogical));
+    if(isFALSE(filterLogs) || distribution=="dlnorm" && adamETS && isTRUE(filterLogs)){
+        gapVariance[] <- adamFitted$variances;
+        gapMean[] <- 2*adamFitted$innovationsScale;
+    }
+    return(adam_scaler(distribution, Etype, errors[which(otLogical)], adamFitted$fitted[which(otLogical)],
+                  sum(otLogical), other, gapMean[which(otLogical)], gapVariance[which(otLogical)], NULL));
+}
+
+# The constant, the parameter of the distribution, the lambda of LASSO / RIDGE and the ARIMA
+# polynomials with their indices (Python's _process_other_parameters)
+adam_processOtherParameters <- function(B, constantEstimate, constantName, constantValue,
+                                        otherParameterEstimate, other, distribution, loss, lambda,
+                                        arimaModel, arimaPolynomials, nonZeroARI, nonZeroMA,
+                                        armaParameters){
+    # Record constant if it was estimated
+    if(constantEstimate){
+        constantValue <- B[constantName];
+    }
+
+    # Write down parameters for distribution. It is always positive, so take abs
+    otherReturned <- vector("list",1);
+    otherReturned[[1]] <- if(otherParameterEstimate) abs(tail(B,1)) else other;
+    # Give names to the other values
+    if(any(distribution==c("dgnorm","dlgnorm"))){
+        names(otherReturned) <- "shape";
+    }
+    else if(any(distribution==c("dt"))){
+        names(otherReturned) <- "nu";
+    }
+    # LASSO / RIDGE lambda
+    if(any(loss==c("LASSO","RIDGE"))){
+        otherReturned$lambda <- lambda;
+    }
+    # Return ARIMA polynomials and indices for persistence and transition
+    if(arimaModel){
+        otherReturned$polynomial <- arimaPolynomials;
+        otherReturned$ARIMAIndices <- list(nonZeroARI=nonZeroARI,nonZeroMA=nonZeroMA);
+        otherReturned$armaParameters <- armaParameters;
+    }
+    return(list(constantValue=constantValue, otherReturned=otherReturned));
 }
 
 # Whether a model works in logarithms, with its forecasts exponentiated in forecast.adam()

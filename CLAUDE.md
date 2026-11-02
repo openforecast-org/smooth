@@ -109,7 +109,7 @@ every change:
   `test_tbats.R` 6) and Python (~4 min). Run the R suite in the background with a time
   limit above 35 min.
 - **At milestones** (the end of a feature, before a merge into `master` or a release): the
-  full R-parity suite as well (`pytest tests/ -m r_parity`, ~30 min).
+  full R-parity suite as well (`pytest tests/ -m r_parity`, ~50 min).
 
 The rule against dismissing failures holds at every level: a failure in a targeted run is
 investigated as one in a full run.

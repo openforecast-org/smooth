@@ -1,4 +1,8 @@
+import numpy as np
+
 from ._utils import _warn
+from .arima_checks import _check_arima
+from .organizers import _calculate_n_param_max
 
 
 def _restrict_models_pool_for_sample_size(
@@ -262,4 +266,220 @@ def _restrict_tiny_sample(
             0: "You have a sample with zeroes only. Your forecast will be zero.",
         }[obs_nonzero],
         silent,
+    )
+
+
+def _check_sample_size(
+    ets_info,
+    arima_info,
+    persist_info,
+    init_info,
+    phi_estimate,
+    model_do,
+    obs_nonzero,
+    obs_in_sample,
+    y_na_values,
+    data,
+    occ_info,
+    distribution,
+    validated_lags,
+    lags_model_seasonal,
+    max_lag,
+    has_xreg,
+    xreg_number,
+    regressors,
+    silent,
+):
+    """The model, the pool and the parameters that the sample can fit (R's
+    adam_checkSampleSize): ARIMA is dropped next to ETS, backcast or replaced by
+    ARIMA(0,1,1) alone, the pool of ETS is restricted, and the level of the samples
+    too small to estimate anything is set. Returns the updated checks of ETS, ARIMA,
+    the persistence and the initials, phi_estimate, model_do and obs_nonzero."""
+    ets_model = ets_info["ets_model"]
+    arima_model = arima_info["arima_model"]
+    ar_orders = arima_info["ar_orders"]
+    ma_orders = arima_info["ma_orders"]
+    # Whether multiplicative models are allowed (resolved in _check_ets_model)
+    allow_multiplicative = ets_info["allow_multiplicative"]
+
+    #  Calculate n_param_max to determine if pool restriction is needed (R lines
+    # 2641-2651)
+    model_is_trendy = ets_info["trend_type"] not in ["N", None]
+    model_is_seasonal = (
+        ets_info["season_type"] not in ["N", None] and len(lags_model_seasonal) > 0
+    )
+
+    # The occurrence model is fitted to all the observed values, not to the non-zero
+    # ones, as R
+    if distribution == "plogis":
+        obs_nonzero = obs_in_sample - int(np.sum(y_na_values[:obs_in_sample]))
+
+    n_param_arguments = dict(
+        ets_model=ets_model,
+        persistence_level_estimate=persist_info.get("persistence_level_estimate", True),
+        model_is_trendy=model_is_trendy,
+        persistence_trend_estimate=persist_info.get("persistence_trend_estimate", True),
+        model_is_seasonal=model_is_seasonal,
+        persistence_seasonal_estimate=persist_info.get(
+            "persistence_seasonal_estimate", [True] * len(lags_model_seasonal)
+        ),
+        phi_estimate=phi_estimate,
+        initial_type=init_info.get("initial_type", "optimal"),
+        initial_level_estimate=init_info.get("initial_level_estimate", True),
+        initial_trend_estimate=init_info.get("initial_trend_estimate", True),
+        initial_seasonal_estimate=init_info["initial_seasonal_estimate"],
+        lags_model_seasonal=lags_model_seasonal,
+        arima_model=arima_model,
+        initial_arima_number=arima_info.get("initial_arima_number", 0),
+        ar_required=any(ar_orders) if ar_orders else False,
+        ar_estimate=arima_info.get("ar_estimate", True),
+        ar_orders=ar_orders,
+        ma_required=any(ma_orders) if ma_orders else False,
+        ma_estimate=arima_info.get("ma_estimate", True),
+        ma_orders=ma_orders,
+        xreg_model=has_xreg,
+        xreg_number=xreg_number,
+        initial_xreg_estimate=has_xreg,
+        persistence_xreg_estimate=(has_xreg and regressors == "adapt"),
+    )
+
+    # ARIMA on a small sample, as R: dropped next to ETS; alone, backcast if that
+    # saves enough, else ARIMA(0,1,1)
+    n_param_max = _calculate_n_param_max(**n_param_arguments)
+    initial_optimal = init_info.get("initial_type") in ["optimal", "two-stage"]
+    initial_arima_number = arima_info.get("initial_arima_number", 0)
+    if obs_nonzero <= n_param_max and arima_model and not arima_info["select"]:
+        if ets_model:
+            _warn(
+                "I don't have enough observations to fit ETS with ARIMA terms. "
+                "I will construct the simple ETS."
+            )
+            arima_info = _check_arima(None, validated_lags, silent)
+        elif initial_optimal and (obs_nonzero > n_param_max - initial_arima_number):
+            _warn(
+                f"The number of parameter to estimate is {n_param_max}, while the "
+                f"number of observations is {obs_nonzero}. Switching initial to "
+                "'backcasting' to save some degrees of freedom."
+            )
+            init_info["initial_type"] = "complete"
+            # R sets the iterations from the initial after this check
+            if not init_info["n_iterations_provided"]:
+                init_info["n_iterations"] = 2
+        else:
+            _warn(
+                f"The number of parameter to estimate is {n_param_max}, while the "
+                f"number of observations is {obs_nonzero}. Switching to "
+                "ARIMA(0,1,1) model."
+            )
+            arima_info = _check_arima({"ar": 0, "i": 1, "ma": 1}, [1], silent)
+        arima_model = arima_info["arima_model"]
+        ar_orders = arima_info["ar_orders"]
+        ma_orders = arima_info["ma_orders"]
+        init_info["initial_arima_number"] = arima_info["initial_arima_number"]
+        n_param_arguments.update(
+            arima_model=arima_model,
+            initial_arima_number=arima_info["initial_arima_number"],
+            ar_required=arima_info["ar_required"],
+            ar_estimate=arima_info["ar_estimate"],
+            ar_orders=ar_orders,
+            ma_required=arima_info["ma_required"],
+            ma_estimate=arima_info["ma_estimate"],
+            ma_orders=ma_orders,
+            initial_type=init_info["initial_type"],
+        )
+    if (
+        arima_model
+        and obs_nonzero
+        < (init_info.get("initial_type") in ["optimal", "two-stage"])
+        * arima_info.get("initial_arima_number", 0)
+        and not arima_info["select"]
+    ):
+        raise ValueError("Not enough observations for such a complicated model.")
+    n_param_max = _calculate_n_param_max(**n_param_arguments)
+
+    # Restrict models pool based on sample size (R's "Checks for the potential
+    # number of degrees of freedom"), for ETS only
+    pool_restriction = _restrict_models_pool_for_sample_size(
+        obs_nonzero=obs_nonzero,
+        lags_model_max=max_lag,
+        model_do=model_do,
+        error_type=ets_info["error_type"],
+        trend_type=ets_info["trend_type"],
+        season_type=ets_info["season_type"],
+        models_pool=ets_info.get("models_pool"),
+        allow_multiplicative=allow_multiplicative,
+        n_param_exo=xreg_number
+        * (int(has_xreg) + int(has_xreg and regressors == "adapt")),
+        silent=silent,
+        # R checks the ETS part for an ETS model only
+        n_param_max=n_param_max if ets_model else -1,
+        damped=ets_info.get("damped", False),
+    )
+
+    # Update ets_info with restricted values
+    model_changed = False
+    if pool_restriction["error_type"] != ets_info["error_type"]:
+        ets_info["error_type"] = pool_restriction["error_type"]
+        model_changed = True
+    if pool_restriction["trend_type"] != ets_info["trend_type"]:
+        ets_info["trend_type"] = pool_restriction["trend_type"]
+        model_changed = True
+    if pool_restriction["season_type"] != ets_info["season_type"]:
+        ets_info["season_type"] = pool_restriction["season_type"]
+        model_changed = True
+    if pool_restriction["models_pool"] is not None:
+        ets_info["models_pool"] = pool_restriction["models_pool"]
+    if pool_restriction["model_do"] != model_do:
+        model_do = pool_restriction["model_do"]
+        ets_info["model_do"] = model_do
+    # Update damped flag if it was changed
+    if pool_restriction["damped"] != ets_info.get("damped", False):
+        ets_info["damped"] = pool_restriction["damped"]
+        model_changed = True
+
+    # Rebuild model string if any component changed
+    if model_changed:
+        new_model = ets_info["error_type"] + ets_info["trend_type"]
+        if ets_info["damped"] and ets_info["trend_type"] != "N":
+            new_model += "d"
+        new_model += ets_info["season_type"]
+        ets_info["model"] = new_model
+
+    # Update persistence if restricted: alpha is set, as R's persistenceLevel
+    if pool_restriction["persistence_level"] is not None:
+        persist_info["persistence_level"] = pool_restriction["persistence_level"]
+    if not pool_restriction["persistence_estimate"]:
+        persist_info["persistence_estimate"] = False
+        persist_info["persistence_level_estimate"] = False
+
+    # Update phi_estimate if restricted
+    if not pool_restriction["phi_estimate"]:
+        phi_estimate = False
+
+    # Update initial if restricted
+    if pool_restriction["initial_type"] is not None:
+        init_info["initial_type"] = pool_restriction["initial_type"]
+    if not pool_restriction["initial_estimate"]:
+        init_info["initial_estimate"] = False
+        init_info["initial_level_estimate"] = False
+    # The level of the samples too small to estimate anything, as R: the mean of the
+    # values the occurrence marks (all of them without one), zero without any
+    if pool_restriction["model_do"] == "use" and obs_nonzero <= 2:
+        y_is = np.asarray(data, dtype=float).ravel()[:obs_in_sample]
+        no_occurrence = (
+            isinstance(occ_info["occurrence"], str) and occ_info["occurrence"] == "none"
+        )
+        marked = ~np.isnan(y_is) & ((y_is != 0) | no_occurrence)
+        init_info["initial_level"] = (
+            float(np.mean(y_is[marked])) if obs_nonzero > 0 else 0.0
+        )
+
+    return (
+        ets_info,
+        arima_info,
+        persist_info,
+        init_info,
+        phi_estimate,
+        model_do,
+        obs_nonzero,
     )

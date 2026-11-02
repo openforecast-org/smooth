@@ -222,7 +222,9 @@ def _get_polynomial_indices(ar_orders, i_orders, ma_orders, lags):
     )
 
 
-def _check_arima(orders, validated_lags, silent=False, arma=None):
+def _check_arima(
+    orders, validated_lags, silent=False, arma=None, season_type="N", lags_model=None
+):
     """
     Check and validate ARIMA model specification.
 
@@ -238,11 +240,19 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
         List of validated lags (must include 1 as first element for non-seasonal)
     silent : bool, optional
         Whether to suppress warnings
+    arma : dict, list or None, optional
+        The provided AR and MA parameters
+    season_type : str, optional
+        The seasonal type of the ETS model ("N" without ETS)
+    lags_model : list, optional
+        The lags of the model (validated_lags by default)
 
     Returns
     -------
     dict
         Dictionary with ARIMA model information including:
+        - lags, lags_model, lags_model_seasonal: the lags, without the seasonal ones
+        of a non-seasonal model with no seasonal ARIMA orders, as R's adam_checkArima
         - non_zero_ari: Nx2 matrix [polynomial_index, state_index] (0-indexed for
         Python)
         - non_zero_ma: Nx2 matrix [polynomial_index, state_index] (0-indexed for Python)
@@ -250,8 +260,30 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
         - components_number_arima: number of ARIMA state components
     """
 
+    # A non-seasonal model with no seasonal ARIMA orders does not need the seasonal
+    # lags, as R's adam_checkArima: without the trim an unused seasonal lag still
+    # reaches the ARIMA initial-state seed, so lags=[1, 12] and lags=[1] gave
+    # different fits for the very same model
+    lags_model = list(validated_lags if lags_model is None else lags_model)
+    expanded = _expand_orders(orders)
+    seasonal_orders = any(
+        vec[i]
+        for vec in expanded
+        for i, lag in enumerate(validated_lags)
+        if lag > 1 and i < len(vec)
+    )
+    seasonal_model = season_type not in ("N", None) and any(
+        lag > 1 for lag in lags_model
+    )
+    if not seasonal_model and not seasonal_orders:
+        validated_lags = [lag for lag in validated_lags if lag == 1]
+        lags_model = [lag for lag in lags_model if lag == 1]
+
     # Initialize with default values - R lines 652-666
     arima_result = {
+        "lags": list(validated_lags),
+        "lags_model": lags_model,
+        "lags_model_seasonal": [lag for lag in lags_model if lag > 1],
         "arima_model": False,
         "ar_orders": None,
         "i_orders": None,
@@ -275,8 +307,7 @@ def _check_arima(orders, validated_lags, silent=False, arma=None):
     if orders is None:
         return arima_result
 
-    # Parse orders into components - R lines 521-538
-    ar_orders, i_orders, ma_orders = _expand_orders(orders)
+    ar_orders, i_orders, ma_orders = expanded
 
     # Check for valid ARIMA component - R lines 541-542
     if (sum(ar_orders) + sum(i_orders) + sum(ma_orders)) == 0:

@@ -82,15 +82,16 @@ test_that("orders() and lags() of a simulated SARIMA are those of the simulation
     expect_equal(lags(testData), c(1,4));
 })
 
-# A custom loss is a function, as in adam(): the mean of the squared errors is MSE
+# A custom loss is a function, as in adam(): the squared errors summed as MSE sums them give MSE
+# (mean() rounds differently from sum()/n without the long double, as on ARM macOS)
 test_that("ssarima() takes a custom loss", {
     testLoss <- function(actual, fitted, B){
-        return(mean((actual-fitted)^2));
+        return(sum((actual-fitted)^2)/length(actual));
     }
     testModel <- ssarima(AirPassengers, orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)), lags=c(1,12), loss=testLoss);
     expect_equal(testModel$loss, "custom");
     testLoss <- "MSE";
     testMSE <- ssarima(AirPassengers, orders=list(ar=c(1,1),i=c(1,1),ma=c(1,1)), lags=c(1,12), loss=testLoss);
-    expect_equal(testModel$B, testMSE$B, tolerance=1e-10);
-    expect_equal(logLik(testModel), logLik(testMSE));
+    expect_identical(testModel$B, testMSE$B);
+    expect_identical(as.numeric(logLik(testModel)), as.numeric(logLik(testMSE)));
 })

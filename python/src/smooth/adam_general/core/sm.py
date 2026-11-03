@@ -188,6 +188,7 @@ def make_scale_loss(
     other: Optional[float],
     log_model: bool,
     best: Optional[Dict[str, Any]] = None,
+    zero_errors: Optional[NDArray] = None,
 ) -> Callable[..., float]:
     """Build the custom loss ``sm()`` hands to ``ADAM``.
 
@@ -196,6 +197,7 @@ def make_scale_loss(
     the location model's negative log-likelihood, evaluated at the scale the
     scale model currently proposes. ``best`` keeps the fitted vector of the lowest
     loss, which the estimates give (the scale at the errors equal to zero).
+    A regression is fitted to the values outside ``zero_errors`` only.
     """
     # The zeros of an occurrence model are missing values of the response, as the
     # missing ones: ADAM hands the custom loss the observed values only, so its
@@ -204,13 +206,24 @@ def make_scale_loss(
     y = np.asarray(y_in_sample, dtype=np.float64).ravel()[ot]
     mu = np.asarray(y_fitted, dtype=np.float64).ravel()[ot]
 
-    def loss(actual: Any = None, fitted: Any = None, B: Any = None, **_: Any) -> float:
+    def loss(
+        actual: Any = None,
+        fitted: Any = None,
+        B: Any = None,
+        xreg: Any = None,
+        **_: Any,
+    ) -> float:
         scale = np.asarray(fitted, dtype=np.float64).ravel()
         if log_model:
             scale = np.exp(scale)
+        rows = (
+            slice(None)
+            if scale.size == y.size or zero_errors is None
+            else ~np.asarray(zero_errors, dtype=bool).ravel()[ot]
+        )
 
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            ll = _log_density(distribution, error_type, y, mu, scale, other)
+            ll = _log_density(distribution, error_type, y[rows], mu[rows], scale, other)
         value = -float(_sum_r(ll))
         if best is not None and np.isfinite(value) and value < best["loss"]:
             best.update(loss=value, fitted=np.asarray(fitted, dtype=np.float64).copy())
@@ -406,6 +419,7 @@ def sm(
         other,
         log_model,
         best,
+        zero_errors,
     )
 
     args: Dict[str, Any] = {
@@ -424,7 +438,17 @@ def sm(
     if distribution in ("dgnorm", "dlgnorm") and other is not None:
         args["gnorm_shape"] = other
     args.update(kwargs)
-    if np.any(zero_errors):
+    # A regression is fitted to the non-zero errors only, and predicts the scale at the
+    # zeros itself: they are its missing values, as R
+    regression = (
+        args["model"] == "NNN"
+        and X is not None
+        and args["regressors"] != "adapt"
+        and not any(args.get(k) for k in ("orders", "ar_order", "i_order", "ma_order"))
+    )
+    if np.any(zero_errors) and regression:
+        response[: zero_errors.size][zero_errors] = np.nan
+    elif np.any(zero_errors):
         args["occurrence"] = np.concatenate([(~zero_errors).astype(float), np.ones(h)])
 
     # The scale at the zeros of the errors comes from the call of the loss at the
@@ -442,7 +466,7 @@ def sm(
         best.update(loss=np.inf, fitted=None)
     # Without the occurrence that made them gaps, as R's: the scale predicted at the
     # zeros of the errors, and the observations counted
-    if np.any(zero_errors):
+    if np.any(zero_errors) and not regression:
         scale_model._prepared["y_fitted"][zero_errors] = best["fitted"][
             zero_errors[info["ot_logical"]]
         ]
@@ -489,6 +513,9 @@ def _finalise(
         scale_model.loglik_sm_ += float(
             _sum_r(np.log(p_fitted[demand])) + _sum_r(np.log(1 - p_fitted[zero]))
         )
+    # The likelihood of the scale model, as R's logLik(): a regression with the loss of
+    # sm() has none of its own
+    scale_model._adam_estimated["log_lik_adam_value"]["value"] = scale_model.loglik_sm_
     # -1 removes the scale from the location model's parameter count.
     scale_model.df_sm_ = int(scale_model.nparam) + int(location.nparam) - 1
 

@@ -4223,22 +4223,33 @@ class ADAM:
             "bounds": self.bounds,
         }
         residuals = y_in_sample - fitted
-        loglik = float(alm.loglik)
+        # Without a likelihood (a custom loss), NA, as R's logLik(alm)
+        loglik = np.nan if alm.loglik is None else float(alm.loglik)
         n_param = int(alm.nparam)
         # The occurrence model of the sizes, fitted as R's adam() does: the fitted
         # values are the sizes times the probability, the residuals at the zeros are
         # zero, and the likelihood and the parameters include the occurrence's
         self._om_model = None
         if not np.all(fitted_rows == observed):
-            self._occurrence = {"occurrence": self.occurrence}
+            # A provided occurrence is known: the probabilities, without a model
+            provided = np.ndim(self.occurrence) > 0
+            self._occurrence = {
+                "occurrence": "provided" if provided else self.occurrence
+            }
             self._lags_model = {"lags": [1]}
             self._initials = {"initial_type": "optimal"}
-            self._om_model = (
-                self.occurrence
-                if not isinstance(self.occurrence, str)
-                else self._fit_occurrence_model(y, X)
-            )
-            p_fitted = np.ravel(np.asarray(self._om_model.fitted, dtype=float))
+            if provided:
+                p_provided = np.ravel(np.asarray(self.occurrence, dtype=float))
+                p_fitted = p_provided[:n]
+                self._occurrence.update(p_fitted=p_fitted, p_forecast=p_provided[n:])
+            else:
+                self._om_model = (
+                    self.occurrence
+                    if not isinstance(self.occurrence, str)
+                    else self._fit_occurrence_model(y, X)
+                )
+                p_fitted = np.ravel(np.asarray(self._om_model.fitted, dtype=float))
+                n_param += int(self._om_model.nparam)
             residuals[observed & ~fitted_rows] = 0.0
             fitted = fitted * p_fitted
             nonzero = y_in_sample[observed] != 0
@@ -4246,7 +4257,6 @@ class ADAM:
             loglik += float(
                 np.sum(np.log(np.where(nonzero, p_observed, 1 - p_observed)))
             )
-            n_param += int(self._om_model.nparam)
         self._prepared = {
             "y_fitted": fitted,
             "residuals": residuals,
@@ -4255,6 +4265,8 @@ class ADAM:
         }
         self._adam_estimated = {
             "B": np.asarray(alm.coefficients),
+            # The value of the loss, as R's lossValue of the regression
+            "CF_value": float(alm.loss_value),
             "n_param_estimated": n_param,
             "log_lik_adam_value": {
                 "value": loglik,

@@ -35,8 +35,10 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     }
 
     cl <- match.call();
-    # Start a new call for the adam function
-    newCall <- as.list(cl);
+    # The arguments of adam(): the values of the provided ones, not their expressions, which do
+    # not evaluate inside adam() and are not the strings that the checks below read
+    provided <- setdiff(intersect(names(cl), names(formals())), c("object", "..."));
+    newCall <- c(mget(provided, envir=environment()), list(...));
 
     # Extract the "other" value
     if(length(object$other)>0){
@@ -97,7 +99,10 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         if(logModelSM){
             fitted[] <- exp(fitted);
         }
-        lossValue <- -sum(sm_logDensities(ySM, fSM, fitted, distribution, EtypeSM, other, otSM));
+        # A regression is fitted to the non-zero errors only (see regressionSM)
+        rows <- if(length(fitted)==length(ySM)){TRUE}else{!zeroErrors[otLogical]};
+        lossValue <- -sum(sm_logDensities(ySM[rows], fSM[rows], fitted, distribution, EtypeSM, other,
+                                          otSM[rows]));
         # The scale at the zeros of the errors, which adam() does not return (see below): that
         # of the lowest loss, which the estimates give
         if(is.finite(lossValue) && lossValue < lossBest){
@@ -106,10 +111,6 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         }
         return(lossValue);
     }
-
-    # Remove sm.adam and "object"
-    newCall[[1]] <- NULL;
-    newCall$object <- NULL;
 
     # Transform residuals for the model fit
     # These should align with how the scale is calculated
@@ -227,7 +228,14 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     newCall$holdout <- holdout;
     newCall$loss <- lossFunction;
     newCall$occurrence <- "none";
-    if(any(zeroErrors)){
+    # A regression is fitted by alm() to the non-zero errors only, and predicts the scale at the
+    # zeros itself: they are its missing values
+    regressionSM <- newCall$model=="NNN" && !is.null(formula) && newCall$regressors!="adapt" &&
+        sum(unlist(orders[c("ar","i","ma")]))==0;
+    if(any(zeroErrors) && regressionSM){
+        newCall$data[which(zeroErrors),responseName] <- NA;
+    }
+    else if(any(zeroErrors)){
         newCall$occurrence <- c(as.numeric(!zeroErrors), rep(1, h));
         # A placeholder for the logarithms of the zeros, which the fit does not read
         if(logModelSM){
@@ -263,7 +271,10 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     # the scale predicted there is the one the loss saw. The occurrence was only the means of
     # the gaps
     if(any(zeroErrors)){
-        adamModel$fitted[zeroErrors] <- fittedLoss[zeroErrors[otLogical]];
+        # A regression predicts the scale there itself (see regressionSM)
+        if(!regressionSM){
+            adamModel$fitted[zeroErrors] <- fittedLoss[zeroErrors[otLogical]];
+        }
         adamModel$occurrence <- NULL;
         adamModel$model <- sub("^i", "", adamModel$model);
     }

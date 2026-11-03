@@ -14,6 +14,10 @@ Changes:
 * `AutoOM` takes `n_iterations` and `smoother`, and `OMG` takes `n_iterations`, as `OM`: they reach every candidate of `AutoOM` and both sub-models of `OMG`, as R's `auto.om()` and `omg()` pass their ellipsis on. `OM(occurrence="auto" | "general")` passes them through instead of raising a `TypeError`.
 
 Bugfixes:
+* `ADAM("NNN")` with `X` and a provided occurrence fits the regression to the non-zero values, with the prediction times the occurrence as its fitted values, as in R: the zeros were fitted as data.
+* The regression of `ADAM("NNN")` with `X` is estimated with the loss of the model, a custom one included, as in R: it was always the likelihood. Without a likelihood of its own (a custom loss), `loglik` is NaN, as R's.
+* `sm()` with a regression (`model="NNN"` and `X`) failed: it is estimated with the loss of `sm()` and predicts the scale at the errors equal to zero, as in R.
+* The log-likelihood of `sm()` of an intermittent location model includes that of its occurrence model, as in R: `loglik` and the information criteria left it out.
 * The selection of a model with a damped trend (`"ZAdZ"`, `"XAdX"`, ...) failed: `phi` is taken from the estimated parameters by its name, as in R.
 * A provided `beta` of `MAN` (with `initial="optimal"`) and of `MMN` failed: the starting values of the smoothing parameters drop the provided ones, as in R.
 * A lag above the in-sample size is dropped with a warning, as in R: the seasonal models on fewer observations than the lag (`MAM`, `ZZZ`, `CCC`, ..., and the pools) and the seasonal ARIMA on them failed. Without a seasonal lag, the seasonal models leave a provided pool.

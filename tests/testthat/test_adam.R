@@ -1109,6 +1109,44 @@ test_that("sm() takes the observations with zero errors as its missing values", 
     expect_equal(as.vector(fitted(scaleModel)), as.vector(fitted(gapModel)));
 })
 
+# The arguments of sm() reach adam() as values: through the variables of a function, they were
+# not found, and a model through a variable was taken for an additive one and fitted in logs
+test_that("sm() takes the values of its arguments", {
+    testModel <- adam(AirPassengers, "ANN");
+    scaleLiteral <- suppressWarnings(sm(testModel, model="MNN", lags=12));
+    scaleFunction <- function(object, modelSM, lagsSM){
+        return(suppressWarnings(sm(object, model=modelSM, lags=lagsSM)));
+    }
+    scaleVariable <- scaleFunction(testModel, "MNN", 12);
+    expect_equal(scaleVariable$model, scaleLiteral$model);
+    expect_equal(logLik(scaleVariable), logLik(scaleLiteral));
+})
+
+# A regression of the scale predicts it at the zero errors, its missing values: it failed there
+test_that("sm() with a regression and zero errors", {
+    set.seed(1);
+    testData <- data.frame(y=as.numeric(AirPassengers), x=rnorm(144));
+    testModel <- adam(testData, "ANN", formula=y~x);
+    expect_true(any(residuals(testModel)==0));
+    scaleModel <- suppressWarnings(sm(testModel, model="NNN", formula=y~x));
+    expect_equal(scaleModel$model, "Regression in logs");
+    expect_equal(as.vector(fitted(scaleModel)), as.vector(exp(scaleModel$B[1]+scaleModel$B[2]*testData$x)));
+})
+
+# A regression with a provided occurrence has its fitted values at their rows, the prediction
+# times the occurrence: they were recycled over all the observations
+test_that("A regression with a provided occurrence", {
+    set.seed(1);
+    testData <- data.frame(y=as.numeric(AirPassengers), x=rnorm(144));
+    zeros <- c(1,50);
+    testData$y[zeros] <- 0;
+    testOccurrence <- replace(rep(1,144), zeros, 0);
+    expect_no_warning(testModel <- adam(testData, "NNN", formula=y~x, occurrence=testOccurrence));
+    expect_equal(as.vector(fitted(testModel)),
+                 as.vector(testModel$B[1]+testModel$B[2]*testData$x)*testOccurrence);
+    expect_equal(as.vector(residuals(testModel))[zeros], c(0,0));
+})
+
 test_that("The point likelihoods of sm() sum to its log-likelihood", {
     set.seed(41);
     yIntermittent <- rbinom(200, 1, 0.6) * exp(rnorm(200, 2, 0.3));

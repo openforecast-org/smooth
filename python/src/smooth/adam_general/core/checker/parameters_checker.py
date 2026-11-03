@@ -976,6 +976,7 @@ def parameters_checker(
         persistence_dict=persistence_dict,
         initials_dict=initials_dict,
         gnorm_shape=gnorm_shape,
+        loss=loss if loss_function is None else loss_function,
     )
     if not isinstance(xreg_dict, dict):
         return xreg_dict
@@ -1164,6 +1165,7 @@ def _check_xreg(
     persistence_dict,
     initials_dict,
     gnorm_shape=None,
+    loss="likelihood",
 ):
     """The regressors, as R's adam_checkXreg(): their data, the initials of their
     coefficients and their smoothing parameters, updating the model, persistence and
@@ -1183,9 +1185,10 @@ def _check_xreg(
         n = observations_dict["obs_in_sample"]
         # The observed values only: the filled ones are for the initialisation of
         # the states, which a regression does not have. With an occurrence model (not
-        # the occurrence of OM), the sizes: the non-zero values, as R
+        # the occurrence of OM) or a provided occurrence, the sizes: the non-zero
+        # values, as R
         observed = observed_mask(observations_dict)
-        if occurrence_model and distribution != "plogis":
+        if (occurrence_model or np.ndim(occurrence) > 0) and distribution != "plogis":
             ot_logical = np.asarray(observations_dict["ot_logical"], dtype=bool)
             observed = observed & ot_logical
         y_is = np.asarray(observations_dict["y_in_sample"], dtype=float)[observed]
@@ -1210,6 +1213,9 @@ def _check_xreg(
             values = np.ravel(initial_xreg)[:xreg_number]
             provided[: len(values)] = values
         alm_kwargs: dict = {"distribution": dist}
+        # The loss of the model, a function included (that of sm()), as R
+        if callable(loss) or loss in ALM.LOSS_FUNCTIONS:
+            alm_kwargs["loss"] = loss
         if initial_xreg is not None and not np.any(np.isnan(provided)):
             if dist == "dgnorm" and gnorm_shape is None:
                 _warn(

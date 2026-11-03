@@ -582,8 +582,11 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         # The occurrence model of the sizes, attached by the checker: forecast.alm() does not take it
         omModel <- checkerReturn$occurrence;
         checkerReturn$occurrence <- NULL;
+        # A provided occurrence (zeros and ones) is attached as a list, not an occurrence model
+        occurrenceSizes <- is.occurrence(omModel) ||
+            (is.list(omModel) && identical(omModel$occurrence, "provided"));
         fittedRows <- observed;
-        if(is.occurrence(omModel)){
+        if(occurrenceSizes){
             fittedRows[observed] <- y[1:obsInSample][observed]!=0;
         }
         fittedValues <- residualValues <- rep(NA, obsInSample);
@@ -594,7 +597,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
                                                   newdata=data[which(!fittedRows),,drop=FALSE],
                                                   interval="none")$mean;
         }
-        if(is.occurrence(omModel)){
+        if(occurrenceSizes){
             residualValues[observed & !fittedRows] <- 0;
             pFitted <- as.vector(fitted(omModel));
             fittedValues[] <- fittedValues * pFitted;
@@ -689,7 +692,7 @@ adam <- function(data, model="ZXZ", lags=c(frequency(data)), orders=list(ar=c(0)
         modelReturned$lossFunction <- checkerReturn$lossFunction;
         modelReturned$logLik <- as.numeric(logLik(checkerReturn));
         # The likelihood of the occurrence, over the observed values
-        if(is.occurrence(omModel)){
+        if(occurrenceSizes){
             modelReturned$logLik[] <- modelReturned$logLik +
                 sum(log(ifelse(y[1:obsInSample][observed]!=0, pFitted[observed], 1-pFitted[observed])));
         }

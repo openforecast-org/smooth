@@ -1932,6 +1932,26 @@ def test_the_selection_of_a_damped_trend(model, expected, loglik):
     assert fitted.loglik == pytest.approx(loglik, rel=1e-9)
 
 
+def test_a_regression_with_a_provided_occurrence():
+    """The regression of the sizes is fitted to the non-zero values, its fitted values
+    are the prediction times the occurrence, as R: the zeros were fitted as data."""
+    import pathlib
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(float)
+    x = np.sin(np.arange(1, 145))
+    y[[0, 49]] = 0
+    occurrence = np.ones(144)
+    occurrence[[0, 49]] = 0
+    fitted = ADAM(model="NNN", occurrence=occurrence).fit(y, pd.DataFrame({"x": x}))
+    # R: adam(data, "NNN", formula=y~x, occurrence=occurrence)
+    B = fitted._adam_estimated["B"]
+    np.testing.assert_allclose(B, [282.09642463233439, 3.80980840102647])
+    assert fitted.loglik == pytest.approx(-880.486313585518, rel=1e-10)
+    np.testing.assert_allclose(fitted.fitted, (B[0] + B[1] * x) * occurrence)
+    assert np.all(np.asarray(fitted.residuals)[[0, 49]] == 0)
+
+
 def test_a_small_sample_simplifies_the_model(capsys):
     from smooth.adam_general.core.checker.sample_size import (
         _simplify_small_sample_model,

@@ -140,6 +140,38 @@ def test_the_errors_equal_to_zero_are_gaps_of_the_scale_model(
         )
 
 
+def test_a_regression_of_the_scale_with_a_zero_error():
+    """The regression of the scale is estimated with the loss of sm(), as R's alm()
+    gets it, on the non-zero errors, and predicts the scale at the zero one: it failed
+    there."""
+    y = pd.read_csv(DATA / "ces_airpassengers.csv")["y"].to_numpy(float)
+    X = pd.DataFrame({"x": np.sin(np.arange(1, 145))})
+    location = ADAM(model="ANN").fit(y, X)
+    assert np.flatnonzero(np.asarray(location.residuals) == 0).tolist() == [0]
+    with pytest.warns(UserWarning, match="observations with zero errors"):
+        scale_model = sm(location, model="NNN", X=X)
+    # R: sm(adam(data.frame(y=AirPassengers, x=sin(1:144)), "ANN", formula=y~x),
+    #       model="NNN", formula=y~x)
+    np.testing.assert_allclose(
+        scale_model._adam_estimated["B"], [7.0405961957110419, -0.0598290012200179]
+    )
+    assert scale_model.loglik == pytest.approx(-704.666288092188, rel=1e-10)
+    assert np.asarray(scale_model.fitted)[0] == pytest.approx(1085.99492474342)
+
+
+def test_the_likelihood_of_the_scale_model_has_the_occurrence():
+    """The likelihood of the scale model of an intermittent location model includes
+    that of its occurrence model, as R's logLik(sm())."""
+    rng = np.random.default_rng(2)
+    y = rng.poisson(0.7, 100) * rng.lognormal(2, 0.3, 100)
+    location = ADAM(model="MNN", occurrence="fixed").fit(y)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        scale_model = sm(location, model="MNN")
+    assert scale_model.loglik == pytest.approx(-218.078361586, rel=1e-10)
+    assert scale_model.aic == pytest.approx(442.156723173, rel=1e-10)
+
+
 def test_rejects_non_likelihood_loss():
     y = _series("positive")
     model = ADAM(model="ANN", lags=[1], loss="MSE")

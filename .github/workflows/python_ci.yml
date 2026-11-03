@@ -211,17 +211,25 @@ jobs:
         with:
           python-version: "3.12"
 
+      # A wheel, repaired as in the wheel builds: on Windows, Python does not look
+      # for the DLLs of an extension (MSYS2's libblas.dll) on PATH, so delvewheel
+      # bundles them
       - name: Build smooth for Python
         shell: bash
         run: |
+          python -m pip install pytest
           if [ "$RUNNER_OS" = "Windows" ]; then
             export CMAKE_ARGS="-DBLAS_LIBRARIES=D:/msys64/mingw64/lib/libblas.dll.a -DLAPACK_LIBRARIES=D:/msys64/mingw64/lib/liblapack.dll.a"
-            # The MinGW DLLs of the reference BLAS, found at import
-            echo "D:\\msys64\\mingw64\\bin" >> "$GITHUB_PATH"
-          elif [ "$RUNNER_OS" = "Linux" ]; then
-            export CMAKE_ARGS="-DBLA_VENDOR=Generic"
+            python -m pip install delvewheel
+            python -m pip wheel ./python --no-deps -w dist
+            delvewheel repair -w wheelhouse dist/*.whl --add-path D:/msys64/mingw64/bin
+            python -m pip install wheelhouse/*.whl
+          else
+            if [ "$RUNNER_OS" = "Linux" ]; then
+              export CMAKE_ARGS="-DBLA_VENDOR=Generic"
+            fi
+            python -m pip install ./python
           fi
-          python -m pip install ./python pytest
 
       - name: R parity tests
         working-directory: python

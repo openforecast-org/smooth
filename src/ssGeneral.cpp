@@ -1,3 +1,4 @@
+#include "headers/fpContract.h"
 #include <RcppArmadillo.h>
 #include <iostream>
 #include <cmath>

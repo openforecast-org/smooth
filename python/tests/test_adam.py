@@ -1917,6 +1917,21 @@ def test_a_provided_beta_of_the_multiplicative_trend(model, bounds, loglik):
     assert fitted.loglik == pytest.approx(loglik, rel=1e-9)
 
 
+# A selection that starts from a damped trend takes phi from B by its name, as R:
+# it failed on B, which is an array
+@pytest.mark.parametrize(
+    "model, expected, loglik",
+    [("ZAdZ", "ETS(MAdM)", -530.2552820504), ("XAdX", "ETS(AAdA)", -565.080294298)],
+)
+def test_the_selection_of_a_damped_trend(model, expected, loglik):
+    import pathlib
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    fitted = ADAM(model=model, lags=[12]).fit(pd.read_csv(path)["y"].to_numpy(float))
+    assert fitted.model == expected
+    assert fitted.loglik == pytest.approx(loglik, rel=1e-9)
+
+
 def test_a_small_sample_simplifies_the_model(capsys):
     from smooth.adam_general.core.checker.sample_size import (
         _simplify_small_sample_model,

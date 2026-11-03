@@ -340,7 +340,11 @@ def _run_branch_and_bound(
         result["Stype"] = model_str[-1]
         result["model"] = model_str
         if phi_dict_temp["phi_estimate"]:
-            result["phi_dict"]["phi"] = result["adam_estimated"]["B"].get("phi", 0.95)
+            # By its name in B, as R's B[names(B)=="phi"]
+            estimated = result["adam_estimated"]
+            result["phi_dict"]["phi"] = estimated["B"][
+                estimated["B_names"].index("phi")
+            ]
         else:
             result["phi_dict"]["phi"] = 1
         cache[model_str] = result

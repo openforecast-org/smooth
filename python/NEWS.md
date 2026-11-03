@@ -14,6 +14,7 @@ Changes:
 * `AutoOM` takes `n_iterations` and `smoother`, and `OMG` takes `n_iterations`, as `OM`: they reach every candidate of `AutoOM` and both sub-models of `OMG`, as R's `auto.om()` and `omg()` pass their ellipsis on. `OM(occurrence="auto" | "general")` passes them through instead of raising a `TypeError`.
 
 Bugfixes:
+* The selection of a model with a damped trend (`"ZAdZ"`, `"XAdX"`, ...) failed: `phi` is taken from the estimated parameters by its name, as in R.
 * A provided `beta` of `MAN` (with `initial="optimal"`) and of `MMN` failed: the starting values of the smoothing parameters drop the provided ones, as in R.
 * A lag above the in-sample size is dropped with a warning, as in R: the seasonal models on fewer observations than the lag (`MAM`, `ZZZ`, `CCC`, ..., and the pools) and the seasonal ARIMA on them failed. Without a seasonal lag, the seasonal models leave a provided pool.
 * The non-positive values of a multiplicative trend and of the multiplicative seasonal states are replaced by 1e-6 after the fit in `states` and in the profile of the forecasts, as in R: they were replaced in the matrices of the creator, which neither uses.

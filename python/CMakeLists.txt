@@ -69,18 +69,18 @@ ADD_SUBDIRECTORY(../src/libs/carma carma)
 # R links its reference BLAS / LAPACK by default, and the order in which a BLAS
 # sums a matrix product sets the last bits of every fit: with OpenBLAS, Python
 # gives other estimates than R (the same as R linked to OpenBLAS), and they move
-# with the CPU kernels it picks. The wheels therefore link the reference (netlib)
-# libraries, as R.
+# with the CPU kernels it picks. The Linux and Windows wheels therefore link the
+# reference (netlib) libraries, as R.
 #
 # Detection strategy:
 #   1. ``BLAS_LIBRARIES`` / ``LAPACK_LIBRARIES`` given to CMake (``CMAKE_ARGS``):
 #      used as they are. The wheels pass them: on Linux netlib's 3.12.1, the
 #      version R bundles, built in the manylinux container (its own 3.8 sums
-#      differently); on macOS Homebrew's ``lapack`` (netlib's); on Windows
-#      MSYS2's ``mingw-w64-x86_64-lapack``, whose MinGW import libs MSVC's
-#      linker accepts.
+#      differently); on Windows MSYS2's ``mingw-w64-x86_64-lapack``, whose
+#      MinGW import libs MSVC's linker accepts.
 #   2. MODULE-mode ``find_package(BLAS)`` / ``find_package(LAPACK)`` otherwise,
-#      with ``BLA_VENDOR=Generic`` for the reference libraries.
+#      with ``BLA_VENDOR=Generic`` for the reference libraries. The macOS wheels
+#      find Homebrew's OpenBLAS here for now.
 #   3. Final fallback only when the dependency is genuinely absent.
 if(BLAS_LIBRARIES AND LAPACK_LIBRARIES)
   set(BLAS_FOUND TRUE)

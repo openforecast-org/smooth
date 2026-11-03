@@ -5,6 +5,7 @@ whole; these check the Python API's own guards, and its results against values
 taken from R (the R call is in each test).
 """
 
+import sys
 import warnings
 from pathlib import Path
 
@@ -234,19 +235,26 @@ def test_reapply_keeps_the_draws_of_ces_stable(
     assert np.sum(draws == edge) > 100
 
 
+# R itself gives other last bits on a platform without a long double (macOS arm64):
+# the log-likelihood is R's on the same machine
+@pytest.mark.r_parity
 @pytest.mark.parametrize(
-    "seasonality, lags, n, loglik",
-    [
-        ("full", None, 144, -710.2583887752485),
-        ("simple", [1], 144, -710.2583887752485),
-        ("full", [12], 8, -28.77751039224519),
-    ],
+    "seasonality, lags, n",
+    [("full", None, 144), ("simple", [1], 144), ("full", [12], 8)],
 )
-def test_a_seasonal_ces_without_a_seasonal_lag_is_none(seasonality, lags, n, loglik):
+def test_a_seasonal_ces_without_a_seasonal_lag_is_none(seasonality, lags, n):
     """Without a seasonal lag, or with the only one above the sample size, a seasonal
     CES is CES(none) with a warning, as R's: it failed in the creator. R: ces(y[1:n],
     seasonality, lags) on the numeric AirPassengers."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    from _r_bridge import r_eval, r_to_literal
+
     y = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")["y"]
+    loglik = r_eval(
+        f"as.numeric(logLik(suppressWarnings(ces(y[1:{n}], seasonality='{seasonality}'"
+        f", lags={r_to_literal(lags)}))))",
+        {"y": y.to_numpy(float)},
+    )[0]
     with pytest.warns(UserWarning, match="needs a seasonal lag"):
         model = CES(seasonality=seasonality, lags=lags).fit(y.to_numpy(float)[:n])
     assert model.model_name == "CES(none)"

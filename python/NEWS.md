@@ -15,6 +15,7 @@ Changes:
 * `AutoOM` takes `n_iterations` and `smoother`, and `OMG` takes `n_iterations`, as `OM`: they reach every candidate of `AutoOM` and both sub-models of `OMG`, as R's `auto.om()` and `omg()` pass their ellipsis on. `OM(occurrence="auto" | "general")` passes them through instead of raising a `TypeError`.
 
 Bugfixes:
+* The wheels link the reference (netlib) BLAS and LAPACK, as R does by default, instead of OpenBLAS: the order in which OpenBLAS sums the matrix products, which depends on its version and on the CPU, moved the last bits of the fits, so Python did not match R (CES on AirPassengers stopped at another point than R on Linux and Windows, as R does when linked to OpenBLAS).
 * A seasonal `CES` without a seasonal lag (no `lags`, `lags=[1]`, or a lag above the sample size, which is dropped with a warning as in R) is CES(none), with a warning, as in R: it failed in the creator.
 * `ADAM("NNN")` with `X` and a provided occurrence fits the regression to the non-zero values, with the prediction times the occurrence as its fitted values, as in R: the zeros were fitted as data.
 * The regression of `ADAM("NNN")` with `X` is estimated with the loss of the model, a custom one included, as in R: it was always the likelihood. Without a likelihood of its own (a custom loss), `loglik` is NaN, as R's.

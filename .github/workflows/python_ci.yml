@@ -73,13 +73,9 @@ jobs:
           - os: macos-latest
             python-version: "3.11"
             cibw-build: "cp311-macosx*"
-          # Windows — pin to windows-2025 (newer Server 2025 host, but
-          # still a stable VS17 toolchain on GitHub's image) rather than
-          # ``windows-latest``. ``windows-latest`` now rolls to a VS18 /
-          # MSVC 14.51.36231 preview toolchain that openblas 0.3.33 (the
-          # vcpkg port we pull in CIBW_BEFORE_ALL_WINDOWS) doesn't
-          # compile under, killing the ``vcpkg install
-          # openblas:x64-windows-release`` step.
+          # Windows — pin to windows-2025 (a stable VS17 toolchain on
+          # GitHub's image) rather than ``windows-latest``, which rolls to
+          # preview toolchains.
           - os: windows-2025
             python-version: "3.11"
             cibw-build: "cp311-win_amd64"
@@ -89,26 +85,28 @@ jobs:
         with:
           submodules: recursive
 
-      # Cache the OpenMathLib OpenBLAS install tree on Windows. The
-      # download + extract in CIBW_BEFORE_ALL_WINDOWS takes ~30-60s
-      # per run; with a cache hit it's a no-op. Keyed on the OpenBLAS
-      # release version so a bump invalidates the cache automatically.
-      - name: Cache OpenBLAS (Windows)
+      # The reference (netlib) BLAS / LAPACK, as R's default: the order in which
+      # a BLAS sums matrix products sets the last bits of the fits, so with
+      # OpenBLAS Python did not match R (see python/CMakeLists.txt). On Windows,
+      # MSYS2's build, whose MinGW import libs MSVC links.
+      - name: Install the reference BLAS / LAPACK (Windows)
         if: runner.os == 'Windows'
-        uses: actions/cache@v6
+        uses: msys2/setup-msys2@v2
         with:
-          path: C:\openblas
-          key: openblas-windows-0.3.33
+          msystem: MINGW64
+          location: D:\
+          update: false
+          install: mingw-w64-x86_64-lapack
 
       # Cache Homebrew's bottle download tree on macOS. ``brew install
-      # openblas`` still runs (so symlinks / dependency-resolution stay
-      # correct) but skips the ~100 MB bottle download on cache hit.
+      # lapack`` still runs (so symlinks / dependency-resolution stay
+      # correct) but skips the bottle download on cache hit.
       - name: Cache Homebrew downloads (macOS)
         if: runner.os == 'macOS'
         uses: actions/cache@v6
         with:
           path: ~/Library/Caches/Homebrew/downloads
-          key: brew-openblas-${{ runner.os }}-${{ runner.arch }}
+          key: brew-lapack-${{ runner.os }}-${{ runner.arch }}
 
       - name: Build and test with cibuildwheel
         uses: pypa/cibuildwheel@v4.3.1
@@ -121,44 +119,110 @@ jobs:
           CIBW_ARCHS_MACOS: x86_64 arm64
           CIBW_ARCHS_WINDOWS: AMD64
           CIBW_BEFORE_ALL_LINUX: |
-            yum install -y openblas-devel lapack-devel pkgconfig || \
-            (apt-get update && apt-get install -y libopenblas-dev liblapack-dev pkg-config)
-          CIBW_ENVIRONMENT_LINUX: PKG_CONFIG_PATH="/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
-          CIBW_BEFORE_ALL_MACOS: brew install openblas
-          # Stop using vcpkg for BLAS/LAPACK on Windows. The vcpkg
-          # ``openblas`` port does not bundle LAPACK kernels, so we
-          # used to pair it with ``lapack-reference``, which in turn
-          # needs a Fortran compiler. vcpkg's bundled Fortran
-          # (``vcpkg-gfortran``) silently switched to LLVMFlang
-          # somewhere in early 2025, and LLVMFlang 22.x doesn't build
-          # ``lapack-reference 3.12.1`` — every recent CI run dies
-          # there.
-          #
-          # OpenBLAS publishes pre-built Windows binaries on GitHub
-          # that already include LAPACK in ``libopenblas.dll`` (no
-          # Fortran compiler needed at build time). Download the
-          # release zip, extract it, and let CMakeLists.txt pick it
-          # up via ``OPENBLAS_HOME``. ``delvewheel`` then bundles the
-          # OpenBLAS DLL and its MinGW runtime DLLs
-          # (``libgfortran-5.dll``, ``libgcc_s_seh-1.dll``,
-          # ``libwinpthread-1.dll``) into the wheel.
-          # ``actions/cache@v6`` (Windows step above) restores
-          # ``C:\openblas`` if a prior run wrote it. Skip the download
-          # in that case — re-running ``mkdir C:\openblas`` would fail
-          # and re-extracting would be wasted work. cmd.exe's
-          # ``if exist ... (Y) else (Z)`` resolves on a single line, so
-          # the YAML folded scalar ``>`` joins everything with spaces.
-          CIBW_BEFORE_ALL_WINDOWS: >
-            if exist C:\openblas\lib\libopenblas.dll.a
-            (echo OpenBLAS cache hit) else
-            (curl -L -o C:/openblas.zip
-            https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.33/OpenBLAS-0.3.33-x64.zip
-            && mkdir C:\openblas
-            && tar -xf C:/openblas.zip -C C:/openblas)
+            yum install -y blas-devel lapack-devel pkgconfig || \
+            (apt-get update && apt-get install -y libblas-dev liblapack-dev pkg-config)
+          CIBW_ENVIRONMENT_LINUX: >
+            PKG_CONFIG_PATH="/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
+            CMAKE_ARGS="-DBLA_VENDOR=Generic"
+          # Homebrew's ``lapack`` is netlib's (keg-only), with the reference BLAS
+          CIBW_BEFORE_ALL_MACOS: brew install lapack
+          CIBW_ENVIRONMENT_MACOS: >
+            CMAKE_ARGS="-DBLAS_LIBRARIES=$(brew --prefix lapack)/lib/libblas.dylib
+            -DLAPACK_LIBRARIES=$(brew --prefix lapack)/lib/liblapack.dylib"
+          # ``delvewheel`` bundles MSYS2's ``libblas.dll``, ``liblapack.dll`` and
+          # their MinGW runtime DLLs (``libgfortran-5.dll``, ``libgcc_s_seh-1.dll``,
+          # ``libquadmath-0.dll``, ``libwinpthread-1.dll``) into the wheel.
           CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
           CIBW_ENVIRONMENT_WINDOWS: >
-            CMAKE_ARGS="-DOPENBLAS_HOME=C:/openblas"
-            OPENBLAS_HOME=C:/openblas
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair -w {dest_dir} {wheel} --add-path C:/openblas/bin
+            CMAKE_ARGS="-DBLAS_LIBRARIES=D:/msys64/mingw64/lib/libblas.dll.a
+            -DLAPACK_LIBRARIES=D:/msys64/mingw64/lib/liblapack.dll.a"
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair -w {dest_dir} {wheel} --add-path D:/msys64/mingw64/bin
           CIBW_TEST_REQUIRES: pytest numpy
           CIBW_TEST_COMMAND: pytest {project}/python/tests -v --tb=short
+
+  # Python against R on the same machine. R's own results differ between
+  # platforms (macOS arm64 has no long double, so sum() and mean() accumulate in
+  # double there), so the fixed references of the default suite, made by R on
+  # Linux, cannot check the other platforms: these tests ask the local R source
+  # (tests/_r_bridge.py, pkgload::load_all) for its values instead. Both sides
+  # use the reference BLAS / LAPACK.
+  r-parity:
+    name: R parity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04, macos-latest, windows-2025]
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: '"hard"'
+          cache: true
+          extra-packages: |
+            any::pkgload
+            any::jsonlite
+
+      - name: Install the reference BLAS / LAPACK (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libblas-dev liblapack-dev
+          # R and Python both on the reference libraries, not on an OpenBLAS
+          # alternative of the image
+          sudo update-alternatives --set libblas.so.3-x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/blas/libblas.so.3
+          sudo update-alternatives --set liblapack.so.3-x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3
+
+      - name: Install the reference BLAS / LAPACK (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install lapack
+          echo "CMAKE_ARGS=-DBLAS_LIBRARIES=$(brew --prefix lapack)/lib/libblas.dylib -DLAPACK_LIBRARIES=$(brew --prefix lapack)/lib/liblapack.dylib" >> "$GITHUB_ENV"
+
+      - name: Install the reference BLAS / LAPACK (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          location: D:\
+          update: false
+          install: mingw-w64-x86_64-lapack
+
+      - name: The BLAS of R
+        shell: Rscript {0}
+        run: |
+          si <- sessionInfo()
+          cat("BLAS:", si$BLAS, "\nLAPACK:", si$LAPACK, "\n")
+          cat("long double:", capabilities("long.double"), .Machine$sizeof.longdouble, "\n")
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build smooth for Python
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export CMAKE_ARGS="-DBLAS_LIBRARIES=D:/msys64/mingw64/lib/libblas.dll.a -DLAPACK_LIBRARIES=D:/msys64/mingw64/lib/liblapack.dll.a"
+            # The MinGW DLLs of the reference BLAS, found at import
+            echo "D:\\msys64\\mingw64\\bin" >> "$GITHUB_PATH"
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            export CMAKE_ARGS="-DBLA_VENDOR=Generic"
+          fi
+          python -m pip install ./python pytest
+
+      - name: R parity tests
+        working-directory: python
+        run: python -m pytest tests -m "r_parity or r_comparison" --tb=short -q

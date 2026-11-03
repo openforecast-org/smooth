@@ -66,56 +66,26 @@ ADD_SUBDIRECTORY(../src/libs/carma carma)
 # ``LNK2001: unresolved external symbol sposv_``-style errors, or at
 # runtime with ``eig_gen(): use of LAPACK must be enabled``.
 #
+# R links its reference BLAS / LAPACK by default, and the order in which a BLAS
+# sums a matrix product sets the last bits of every fit: with OpenBLAS, Python
+# gives other estimates than R (the same as R linked to OpenBLAS), and they move
+# with the CPU kernels it picks. The wheels therefore link the reference (netlib)
+# libraries, as R.
+#
 # Detection strategy:
-#   1. On Windows, consume the OpenBLAS pre-built release from
-#      OpenMathLib (``libopenblas.dll`` ships both BLAS *and* LAPACK
-#      in a single library, with no Fortran compiler needed at our
-#      build time).  The CI step downloads / extracts the zip and
-#      sets ``-DOPENBLAS_HOME=C:/openblas``; we then point
-#      ``BLAS_LIBRARIES`` / ``LAPACK_LIBRARIES`` at the MinGW import
-#      lib ``libopenblas.dll.a`` (MSVC's linker accepts COFF import
-#      libs).  Avoids the whole vcpkg openblas + lapack-reference +
-#      vcpkg-gfortran chain that fell apart when
-#      ``vcpkg-gfortran@3#3`` switched to LLVMFlang.
-#   2. MODULE-mode ``find_package(BLAS)`` / ``find_package(LAPACK)``
-#      handles Linux / macOS, where the system packages
-#      (openblas-devel + lapack-devel on Linux, brew's openblas on
-#      macOS) are found by the canonical search.
+#   1. ``BLAS_LIBRARIES`` / ``LAPACK_LIBRARIES`` given to CMake (``CMAKE_ARGS``):
+#      used as they are. The wheels pass them on macOS (Homebrew's ``lapack``,
+#      which is netlib's) and on Windows (MSYS2's ``mingw-w64-x86_64-lapack``,
+#      whose MinGW import libs MSVC's linker accepts).
+#   2. MODULE-mode ``find_package(BLAS)`` / ``find_package(LAPACK)`` otherwise,
+#      with ``BLA_VENDOR=Generic`` for the reference libraries (Linux wheels).
 #   3. Final fallback only when the dependency is genuinely absent.
-if(WIN32)
-  if(NOT DEFINED OPENBLAS_HOME AND DEFINED ENV{OPENBLAS_HOME})
-    set(OPENBLAS_HOME $ENV{OPENBLAS_HOME})
-  endif()
-  if(OPENBLAS_HOME)
-    # OpenMathLib's pre-built zip lays out as:
-    #   <OPENBLAS_HOME>/bin/libopenblas.dll
-    #   <OPENBLAS_HOME>/lib/libopenblas.dll.a   (MinGW import lib)
-    #   <OPENBLAS_HOME>/include/cblas.h, openblas_config.h, ...
-    find_library(OPENBLAS_IMPLIB
-                 NAMES libopenblas.dll.a libopenblas.lib openblas
-                 PATHS "${OPENBLAS_HOME}/lib"
-                 NO_DEFAULT_PATH)
-    find_path(OPENBLAS_INCLUDE_DIR
-              NAMES openblas_config.h cblas.h
-              PATHS "${OPENBLAS_HOME}/include"
-                    "${OPENBLAS_HOME}/include/openblas"
-              NO_DEFAULT_PATH)
-    if(OPENBLAS_IMPLIB AND OPENBLAS_INCLUDE_DIR)
-      set(BLAS_FOUND TRUE)
-      set(LAPACK_FOUND TRUE)
-      set(BLAS_LIBRARIES   ${OPENBLAS_IMPLIB})
-      set(LAPACK_LIBRARIES ${OPENBLAS_IMPLIB})
-      include_directories(${OPENBLAS_INCLUDE_DIR})
-      set(lapackblas_libraries ${OPENBLAS_IMPLIB})
-      message(STATUS "Found OpenMathLib OpenBLAS pre-built (BLAS + LAPACK):")
-      message(STATUS "  import lib : ${OPENBLAS_IMPLIB}")
-      message(STATUS "  headers    : ${OPENBLAS_INCLUDE_DIR}")
-    else()
-      message(WARNING
-        "OPENBLAS_HOME=${OPENBLAS_HOME} set but the import lib / headers "
-        "were not found under it.  Falling back to find_package.")
-    endif()
-  endif()
+if(BLAS_LIBRARIES AND LAPACK_LIBRARIES)
+  set(BLAS_FOUND TRUE)
+  set(LAPACK_FOUND TRUE)
+  set(lapackblas_libraries ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+  message(STATUS "BLAS libraries (provided): ${BLAS_LIBRARIES}")
+  message(STATUS "LAPACK libraries (provided): ${LAPACK_LIBRARIES}")
 endif()
 
 if(NOT BLAS_FOUND)
@@ -143,10 +113,9 @@ endif()
 # build failure that surfaces the misconfiguration immediately.
 if(WIN32 AND NOT LAPACK_FOUND)
   message(FATAL_ERROR
-    "LAPACK not found on Windows. The wheel build expects the OpenMathLib "
-    "pre-built OpenBLAS zip extracted to a directory pointed at by the "
-    "``OPENBLAS_HOME`` cache variable (or environment variable) — see "
-    "``CIBW_BEFORE_ALL_WINDOWS`` in .github/workflows/python_ci.yml.")
+    "LAPACK not found on Windows. The wheel build passes the reference BLAS and "
+    "LAPACK import libraries of MSYS2 as -DBLAS_LIBRARIES and -DLAPACK_LIBRARIES "
+    "-- see CIBW_ENVIRONMENT_WINDOWS in .github/workflows/python_ci.yml.")
 endif()
 
 # ==============================================================================

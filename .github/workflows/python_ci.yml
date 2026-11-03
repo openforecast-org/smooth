@@ -148,12 +148,14 @@ jobs:
 
   # Python against R on the same machine, on Linux: with the same BLAS / LAPACK
   # (the reference 3.12.1) and the same Armadillo (RcppArmadillo's 15.6.2), the two
-  # give the same results. The other platforms are not compared: there R and the
+  # give the same results. Ubuntu 24.04 (gcc 13, glibc 2.39) is where that is
+  # established; on 26.04 (gcc 15) 38 CES cases still differ in their last bits,
+  # with the same libraries. The other platforms are not compared: there R and the
   # wheels use other compilers and libraries (see the R-Python-differences page of
   # the wiki).
   r-parity:
-    name: R parity (ubuntu-26.04)
-    runs-on: ubuntu-26.04
+    name: R parity (ubuntu-24.04)
+    runs-on: ubuntu-24.04
     needs: lint
     timeout-minutes: 120
     env:

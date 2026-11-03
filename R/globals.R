@@ -94,6 +94,7 @@ utils::globalVariables(c(
   # (ces, gum, ssarima - all share similar xreg and distribution variables)
   "distribution",
   "initialXregEstimate",
+  "modelname",
   "otLogical",
   "persistenceXreg", "persistenceXregEstimate",
   "xregData", "xregModel", "xregNames", "xregNumber",

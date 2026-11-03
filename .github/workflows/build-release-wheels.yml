@@ -80,14 +80,14 @@ jobs:
           install: mingw-w64-x86_64-lapack
 
       # Cache Homebrew's bottle download tree on macOS. ``brew install
-      # openblas`` still runs (so symlinks / dependency-resolution stay
+      # lapack`` still runs (so symlinks / dependency-resolution stay
       # correct) but skips the bottle download on cache hit.
       - name: Cache Homebrew downloads (macOS)
         if: runner.os == 'macOS'
         uses: actions/cache@v6
         with:
           path: ~/Library/Caches/Homebrew/downloads
-          key: brew-openblas-${{ runner.os }}-${{ runner.arch }}
+          key: brew-lapack-${{ runner.os }}-${{ runner.arch }}
 
       # Cache cibuildwheel's per-OS interpreter / pip download cache.
       # Saves ~1-2 minutes per matrix row by reusing CPython binaries
@@ -132,10 +132,12 @@ jobs:
             PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
             CMAKE_ARGS="-DBLAS_LIBRARIES=/usr/local/lib/libblas.so -DLAPACK_LIBRARIES=/usr/local/lib/liblapack.so"
 
-          # macOS stays on Homebrew's OpenBLAS for now: its netlib ``lapack``
-          # and ``libgfortran`` are built for the runner's macOS, too new for
-          # the wheel.
-          CIBW_BEFORE_ALL_MACOS: brew install openblas
+          # macOS: Homebrew's ``lapack`` is netlib's (keg-only), with the
+          # reference BLAS.
+          CIBW_BEFORE_ALL_MACOS: brew install lapack
+          CIBW_ENVIRONMENT_MACOS: >
+            CMAKE_ARGS="-DBLAS_LIBRARIES=$(brew --prefix lapack)/lib/libblas.dylib
+            -DLAPACK_LIBRARIES=$(brew --prefix lapack)/lib/liblapack.dylib"
 
           # Windows: MSYS2's reference BLAS + LAPACK (step above);
           # ``delvewheel`` bundles ``libblas.dll``, ``liblapack.dll`` and their

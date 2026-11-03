@@ -128,22 +128,12 @@ def _make_fig(mpl_figure, **kwargs):
 
 
 def _state_labels(model):
-    """Derive human-readable labels for each row of model.states: the names of the
-    components where the model has them (TBATS), as R's column names."""
+    """The labels of the rows of model.states: the names of the components (TBATS's
+    own, else those of the states), as R's column names."""
     names = getattr(model, "_component_names", None)
-    if names is not None:
-        return list(names)
-    comp = model._components
-    is_trendy = comp.get("model_is_trendy", False)
-    n_seasonal = comp.get("components_number_ets_seasonal", 0)
-    n_arima = comp.get("components_number_arima", 0)
-
-    labels = ["Level"]
-    if is_trendy:
-        labels.append("Trend")
-    labels += [f"Seasonal {i + 1}" for i in range(n_seasonal)]
-    labels += [f"ARIMA {i + 1}" for i in range(n_arima)]
-    return labels
+    if names is None:
+        names = model._component_names_for_states()
+    return list(names)
 
 
 # ---------------------------------------------------------------------------

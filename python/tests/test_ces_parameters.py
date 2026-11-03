@@ -232,3 +232,22 @@ def test_reapply_keeps_the_draws_of_ces_stable(
     edge = draws.max() if side == "max" else draws.min()
     assert edge == pytest.approx(bound, rel=tolerance)
     assert np.sum(draws == edge) > 100
+
+
+@pytest.mark.parametrize(
+    "seasonality, lags, n, loglik",
+    [
+        ("full", None, 144, -710.2583887752485),
+        ("simple", [1], 144, -710.2583887752485),
+        ("full", [12], 8, -28.77751039224519),
+    ],
+)
+def test_a_seasonal_ces_without_a_seasonal_lag_is_none(seasonality, lags, n, loglik):
+    """Without a seasonal lag, or with the only one above the sample size, a seasonal
+    CES is CES(none) with a warning, as R's: it failed in the creator. R: ces(y[1:n],
+    seasonality, lags) on the numeric AirPassengers."""
+    y = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")["y"]
+    with pytest.warns(UserWarning, match="needs a seasonal lag"):
+        model = CES(seasonality=seasonality, lags=lags).fit(y.to_numpy(float)[:n])
+    assert model.model_name == "CES(none)"
+    assert model.loglik == pytest.approx(loglik, rel=1e-12)

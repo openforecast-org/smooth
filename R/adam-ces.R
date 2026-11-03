@@ -158,6 +158,17 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
         initialOriginal <- initial;
     }
 
+    # The checker drops a lag above the sample size, as in adam(): without a seasonal lag, a
+    # seasonal CES is CES(none)
+    lagsSeasonal <- unique(lags[lags>1]);
+    if(length(lagsSeasonal)>0 && max(lagsSeasonal) > NROW(y)-h*holdout){
+        lagsSeasonal <- lagsSeasonal[-which.max(lagsSeasonal)];
+    }
+    if(seasonality!="none" && length(lagsSeasonal)==0){
+        warning("CES(", seasonality, ") needs a seasonal lag. Switching to CES(none).", call.=FALSE);
+        seasonality <- "none";
+    }
+
     # Validate the provided b against the seasonality it belongs to. "partial"
     # carries one real coefficient, "full" a complex pair, and "none"/"simple"
     # have no b at all -- silently taking Re(b), or letting a wrong-shaped b

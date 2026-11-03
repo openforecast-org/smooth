@@ -341,6 +341,24 @@ class CES:
             lags = [1]
         else:
             lags = list(self.lags)
+        # A lag above the sample size cannot be fitted: the highest is dropped, as R's
+        # checker does; without a seasonal lag, a seasonal CES is CES(none), as R's
+        if max(lags) > obs_in_sample:
+            warnings.warn(
+                f"The maximum lags value is {max(lags)}, while the sample size is "
+                f"{obs_in_sample}. I cannot fit the seasonal model in this case. "
+                "Dropping the highest lag.",
+                stacklevel=2,
+            )
+            lags = [lag for lag in lags if lag != max(lags)] or [1]
+        if self.seasonality != "none" and not any(lag > 1 for lag in lags):
+            warnings.warn(
+                f"CES({self.seasonality}) needs a seasonal lag. "
+                "Switching to CES(none).",
+                stacklevel=2,
+            )
+            self.seasonality = "none"
+            self._b_provided = _validate_b(self._b_provided, "none")
         y_frequency = max(lags)
 
         # The missing values are gaps: filled for the initialisation only, skipped by

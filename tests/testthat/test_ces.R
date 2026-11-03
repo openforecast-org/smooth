@@ -133,3 +133,14 @@ test_that("ces() takes a custom loss", {
     expect_equal(testModel$B, testMSE$B, tolerance=1e-10);
     expect_equal(logLik(testModel), logLik(testMSE));
 })
+
+# Without a seasonal lag, or with the only one above the sample size, a seasonal CES is CES(none),
+# with a warning: it failed with "data is too long" or "missing value where TRUE/FALSE needed"
+test_that("A seasonal ces() without a seasonal lag is CES(none)", {
+    y <- as.numeric(AirPassengers);
+    expect_warning(testModel <- ces(y, "full"), "needs a seasonal lag");
+    expect_equal(testModel$model, "CES(none)");
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(ces(y, "none"))));
+    testModel <- suppressWarnings(ces(y[1:8], "simple", lags=12));
+    expect_equal(testModel$model, "CES(none)");
+})

@@ -135,3 +135,16 @@ test_that("orders() and lags() of a simulated GUM are those of the simulation", 
     expect_equal(orders(testData), c(1,1));
     expect_equal(lags(testData), c(1,4));
 })
+
+# A custom loss is a function, as in adam(): the mean of the squared errors is MSE
+test_that("gum() takes a custom loss", {
+    testLoss <- function(actual, fitted, B){
+        return(mean((actual-fitted)^2));
+    }
+    testModel <- gum(AirPassengers, orders=c(2,1), lags=c(1,12), loss=testLoss);
+    expect_equal(testModel$loss, "custom");
+    testLoss <- "MSE";
+    testMSE <- gum(AirPassengers, orders=c(2,1), lags=c(1,12), loss=testLoss);
+    expect_equal(testModel$B, testMSE$B, tolerance=1e-10);
+    expect_equal(logLik(testModel), logLik(testMSE));
+})

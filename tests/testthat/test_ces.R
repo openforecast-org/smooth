@@ -120,3 +120,16 @@ test_that("ces() fits with the coefficients of the regressors it reports", {
     expect_equal(as.vector(testModel$states[1, c("x1","x2")]), unname(tail(testModel$B, 2)));
     expect_equal(unname(tail(testModel$B, 2)), c(2, -1.5), tolerance=0.05);
 })
+
+# A custom loss is a function, as in adam(): the mean of the squared errors is MSE
+test_that("ces() takes a custom loss", {
+    testLoss <- function(actual, fitted, B){
+        return(mean((actual-fitted)^2));
+    }
+    testModel <- ces(AirPassengers, "full", lags=12, loss=testLoss);
+    expect_equal(testModel$loss, "custom");
+    testLoss <- "MSE";
+    testMSE <- ces(AirPassengers, "full", lags=12, loss=testLoss);
+    expect_equal(testModel$B, testMSE$B, tolerance=1e-10);
+    expect_equal(logLik(testModel), logLik(testMSE));
+})

@@ -128,7 +128,10 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     ellipsis <- list(...);
 
     # Check seasonality and loss
-    loss <- match.arg(loss);
+    # A function is a custom loss, which the checker takes as in adam()
+    if(!is.function(loss)){
+        loss <- match.arg(loss);
+    }
 
     # paste0() is needed in order to get rid of potential issues with names
     yName <- paste0(deparse(substitute(y)),collapse="");

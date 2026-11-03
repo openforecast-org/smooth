@@ -10,7 +10,7 @@ import inspect
 import re
 import time
 import warnings
-from typing import Any, Dict, List, Literal, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Literal, Optional, Union, cast
 
 import nlopt
 import numpy as np
@@ -79,12 +79,13 @@ _NLOPT_DEFAULTS: Dict[str, Any] = {
 def _check_loss(loss):
     """Reject a loss ces() would not accept.
 
-    R's ces() runs match.arg() over exactly this set, so a callable or one of
-    ADAM's absolute / half-moment multistep losses is an error there. Without
-    this check the cost function falls through to its MSE branch and returns a
-    fit under a loss that was never requested.
+    R's ces() runs match.arg() over exactly this set, or takes a function of
+    ``actual``, ``fitted`` and ``B`` as a custom loss, so one of ADAM's absolute /
+    half-moment multistep losses is an error there. Without this check the cost
+    function falls through to its MSE branch and returns a fit under a loss that
+    was never requested.
     """
-    if loss not in _VALID_LOSSES:
+    if not callable(loss) and loss not in _VALID_LOSSES:
         raise ValueError(
             f"Unknown loss function: {loss!r}. CES accepts one of "
             f"{', '.join(repr(v) for v in _VALID_LOSSES)}."
@@ -215,7 +216,7 @@ class CES:
         initial: str = "backcasting",
         a: Optional[complex] = None,
         b: Optional[Union[complex, float]] = None,
-        loss: LOSS_OPTIONS = "likelihood",
+        loss: Union[LOSS_OPTIONS, Callable[..., float]] = "likelihood",
         h: Optional[int] = None,
         holdout: bool = False,
         bounds: Literal["admissible", "none"] = "admissible",
@@ -295,6 +296,8 @@ class CES:
         self
         """
         _check_loss(self.loss)
+        # A custom loss is a function of actual, fitted and B, as in ADAM and R
+        loss = "custom" if callable(self.loss) else self.loss
         # The regressors are selected on the errors of the model without them, as R
         if X is not None and self.regressors == "select":
             fitted = _xreg_select_refit(self, y, X, self.ic)
@@ -495,7 +498,7 @@ class CES:
         index_lookup_table = created["index_lookup_table"]
 
         # Multistep detection
-        multisteps = self.loss in (
+        multisteps = loss in (
             "MSEh",
             "TMSE",
             "GTMSE",
@@ -593,7 +596,8 @@ class CES:
             obs_in_sample=obs_in_sample,
             n_iterations=n_iterations,
             bounds=self.bounds,
-            loss=self.loss,
+            loss=loss,
+            loss_function=self.loss if loss == "custom" else None,
             h=h,
             multisteps=multisteps,
             adam_cpp=adam_cpp,
@@ -674,7 +678,7 @@ class CES:
             },
             obs_in_sample=obs_in_sample,
             o_type="n",
-            loss=self.loss,
+            loss=loss,
             distribution="dnorm",
             filter_logs=False,
         )
@@ -719,7 +723,7 @@ class CES:
         # distribution argument to follow. A multistep loss instead reports the
         # predictive likelihood of the GPL paper. Mirrors R/adam-ces.R.
         if multisteps:
-            log_lik_value = multistep_log_lik(cf_value, self.loss, h, observed)
+            log_lik_value = multistep_log_lik(cf_value, loss, h, observed)
         else:
             log_lik_value = -float(ces_cf(B=B, **_pristine(ll_kwargs)))
 
@@ -802,7 +806,7 @@ class CES:
         # The internals of ADAM that its methods read, as R's methods of adam() read
         # the elements of the ces() models
         seasonal_lags = [lag for lag in lags_model_all if lag != 1]
-        n_scale = int(self.loss == "likelihood")
+        n_scale = int(loss == "likelihood")
         self._prepared = {
             # States without the extra backcasting head, as R stores them
             "states": self.states,
@@ -834,7 +838,7 @@ class CES:
             "holdout": self.holdout,
             "distribution": "dnorm",
             "distribution_new": "dnorm",
-            "loss": self.loss,
+            "loss": loss,
             "ic": self.ic,
             "bounds": self.bounds,
             "other": {},
@@ -1085,8 +1089,8 @@ class CES:
 
     @property
     def loss_(self) -> str:
-        """The loss used (R's ``$loss``)."""
-        return self.loss
+        """The loss used (R's ``$loss``): "custom" for a function."""
+        return "custom" if callable(self.loss) else self.loss
 
     @property
     def distribution_(self) -> str:
@@ -1187,7 +1191,7 @@ class AutoCES:
         lags: Optional[List[int]] = None,
         initial: str = "backcasting",
         ic: Literal["AIC", "AICc", "BIC", "BICc"] = "AICc",
-        loss: LOSS_OPTIONS = "likelihood",
+        loss: Union[LOSS_OPTIONS, Callable[..., float]] = "likelihood",
         h: Optional[int] = None,
         holdout: bool = False,
         bounds: Literal["admissible", "none"] = "admissible",

@@ -112,7 +112,10 @@ ces <- function(y, seasonality=c("none","simple","partial","full"), lags=c(frequ
 
     # Check seasonality and loss
     seasonality <- match.arg(seasonality);
-    loss <- match.arg(loss);
+    # A function is a custom loss, which the checker takes as in adam()
+    if(!is.function(loss)){
+        loss <- match.arg(loss);
+    }
 
     # paste0() is needed in order to get rid of potential issues with names
     yName <- paste0(deparse(substitute(y)),collapse="");

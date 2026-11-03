@@ -116,7 +116,10 @@ gum <- function(y, orders=c(1,1), lags=c(1,frequency(y)), type=c("additive","mul
 
     # Check seasonality and loss
     type <- match.arg(type);
-    loss <- match.arg(loss);
+    # A function is a custom loss, which the checker takes as in adam()
+    if(!is.function(loss)){
+        loss <- match.arg(loss);
+    }
     boundsOriginal <- match.arg(bounds);
 
     # paste0() is needed in order to get rid of potential issues with names

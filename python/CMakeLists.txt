@@ -134,6 +134,16 @@ else()
   message(STATUS "Armadillo not found - using carma's bundled Armadillo headers")
 endif()
 
+# No contraction of a*b+c into one fused multiply-add, as R's build (src/Makevars): a
+# compiler that targets FMA fuses where its optimiser sees the pattern, so two builds
+# of the same C++ at other optimisation levels round differently. MSVC does not fuse
+# under /fp:precise.
+if(MSVC)
+  add_compile_options(/fp:precise)
+else()
+  add_compile_options(-ffp-contract=off)
+endif()
+
 # Adam Core - Updated to use new core implementation
 pybind11_add_module(_adamCore ../src/python/adamPython.cpp)
 

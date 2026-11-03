@@ -1,4 +1,9 @@
 #PKG_CXXFLAGS=$(shell $(R_HOME)/bin${R_ARCH_BIN}/Rscript.exe -e "Rcpp:::CxxFlags()")
 #PKG_LIBS = $(shell $(R_HOME)/bin${R_ARCH_BIN}/Rscript.exe -e "Rcpp:::LdFlags()") $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
+# No contraction of a*b+c into one fused multiply-add: the compilers that target FMA
+# (gcc on x86-64-v3, clang on arm64) fuse where their optimiser happens to see the
+# pattern, so the R and the Python builds of the same C++ rounded differently. The
+# Python build (python/CMakeLists.txt) takes the same flag.
+PKG_CXXFLAGS=-ffp-contract=off
 PKG_LIBS=$(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
 #CXX_STD = CXX11

@@ -117,15 +117,20 @@ jobs:
           CIBW_ARCHS_MACOS: x86_64 arm64
           CIBW_ARCHS_WINDOWS: AMD64
 
-          # Linux: the reference BLAS + LAPACK so CMakeLists' module-mode
-          # ``find_package`` (BLA_VENDOR=Generic) finds them inside the
-          # manylinux container.
+          # The manylinux image has netlib 3.8, whose BLAS sums differently from
+          # the 3.12.1 that R bundles (BLAS 3.10 rewrote dnrm2, drotg, ...): CES
+          # on AirPassengers stopped elsewhere than R. So netlib's 3.12.1 is
+          # built here, with R's -O2.
           CIBW_BEFORE_ALL_LINUX: |
-            yum install -y blas-devel lapack-devel pkgconfig || \
-            (apt-get update && apt-get install -y libblas-dev liblapack-dev pkg-config)
+            yum install -y pkgconfig gcc-toolset-14-gcc-gfortran
+            curl -sSL https://github.com/Reference-LAPACK/lapack/archive/refs/tags/v3.12.1.tar.gz | tar xz -C /tmp
+            cmake -S /tmp/lapack-3.12.1 -B /tmp/lapack-build -DBUILD_SHARED_LIBS=ON \
+              -DCMAKE_BUILD_TYPE=None -DCMAKE_Fortran_FLAGS=-O2 -DCMAKE_Fortran_COMPILER=gfortran \
+              -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=lib
+            cmake --build /tmp/lapack-build -j4 --target install
           CIBW_ENVIRONMENT_LINUX: >
-            PKG_CONFIG_PATH="/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
-            CMAKE_ARGS="-DBLA_VENDOR=Generic"
+            PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
+            CMAKE_ARGS="-DBLAS_LIBRARIES=/usr/local/lib/libblas.so -DLAPACK_LIBRARIES=/usr/local/lib/liblapack.so"
 
           # macOS: Homebrew's ``lapack`` is netlib's (keg-only), with the
           # reference BLAS.

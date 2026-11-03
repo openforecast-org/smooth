@@ -20,8 +20,10 @@ from numpy.typing import NDArray
 from smooth.adam_general import _adamCore
 from smooth.adam_general._numDeriv import hessian as _hessian_cpp
 from smooth.adam_general.core.adam import ADAM
+from smooth.adam_general.core.ces.collector import ces_collector
 from smooth.adam_general.core.ces.cost_function import ces_cf
 from smooth.adam_general.core.ces.creator import ces_creator
+from smooth.adam_general.core.ces.estimator import ces_estimator
 from smooth.adam_general.core.ces.filler import ces_filler
 from smooth.adam_general.core.ces.initialiser import ces_initialiser
 from smooth.adam_general.core.checker.data_checks import _fill_missing
@@ -565,16 +567,6 @@ class CES:
         if B is None:
             B = B_initial
 
-        # Maxeval — R lines 800-807
-        maxeval_used = nlopt_settings["maxeval"]
-        if maxeval_used is None:
-            maxeval_used = len(B) * 40
-            if xreg_model:
-                maxeval_used = max(1000, len(B) * 100)
-        maxeval0_used = nlopt_settings["maxeval0"]
-        if maxeval0_used is None:
-            maxeval0_used = maxeval_used
-
         # CF arguments shared by both optimizer stages
         cf_kwargs = dict(
             mat_vt=mat_vt,
@@ -611,68 +603,8 @@ class CES:
         # (and the final fit) write through the shared matrices.
         ll_kwargs = {**_pristine(cf_kwargs), "loss": "likelihood", "bounds": "none"}
 
-        def objective(x, grad):
-            return ces_cf(B=x, **cf_kwargs)
-
-        # Stage 1: BOBYQA — R lines 853-857
-        algo_map = {
-            "NLOPT_LN_BOBYQA": nlopt.LN_BOBYQA,
-            "NLOPT_LN_NELDERMEAD": nlopt.LN_NELDERMEAD,
-            "NLOPT_LN_SBPLX": nlopt.LN_SBPLX,
-            "NLOPT_LN_COBYLA": nlopt.LN_COBYLA,
-        }
-
-        lower = np.full(len(B), -np.inf)
-        upper = np.full(len(B), np.inf)
-        if nlopt_settings["lb"] is not None:
-            lower = np.asarray(nlopt_settings["lb"], dtype=float)
-        if nlopt_settings["ub"] is not None:
-            upper = np.asarray(nlopt_settings["ub"], dtype=float)
-        if len(B) == 0:
-            # Nothing left to estimate: `a` (and `b`) supplied together with
-            # backcast/complete initials and no xreg leaves an empty parameter
-            # vector. R switches ``modelDo`` to "use" there and evaluates the
-            # cost once instead of optimising (R/adam-ces.R:633-636). nlopt
-            # cannot be constructed with zero dimensions -- it raises
-            # ``invalid_argument`` -- so the optimiser is skipped entirely.
-            cf_value = float(ces_cf(B=B, **cf_kwargs))
-        else:
-            opt1 = nlopt.opt(
-                algo_map.get(nlopt_settings["algorithm0"], nlopt.LN_BOBYQA), len(B)
-            )
-            opt1.set_min_objective(objective)
-            opt1.set_lower_bounds(lower)
-            opt1.set_upper_bounds(upper)
-            opt1.set_maxeval(maxeval0_used)
-            opt1.set_xtol_rel(nlopt_settings["xtol_rel0"])
-            opt1.set_xtol_abs(nlopt_settings["xtol_abs0"])
-            opt1.set_ftol_rel(nlopt_settings["ftol_rel0"])
-            opt1.set_ftol_abs(nlopt_settings["ftol_abs0"])
-            opt1.set_maxtime(nlopt_settings["maxtime0"])
-            try:
-                B = opt1.optimize(B)
-            except nlopt.RoundoffLimited:
-                B = B.copy()
-
-            # Stage 2: Nelder-Mead — R lines 866-870
-            opt2 = nlopt.opt(
-                algo_map.get(nlopt_settings["algorithm"], nlopt.LN_NELDERMEAD), len(B)
-            )
-            opt2.set_min_objective(objective)
-            opt2.set_lower_bounds(lower)
-            opt2.set_upper_bounds(upper)
-            opt2.set_maxeval(maxeval_used)
-            opt2.set_xtol_rel(nlopt_settings["xtol_rel"])
-            opt2.set_xtol_abs(nlopt_settings["xtol_abs"])
-            opt2.set_ftol_rel(nlopt_settings["ftol_rel"])
-            opt2.set_ftol_abs(nlopt_settings["ftol_abs"])
-            opt2.set_maxtime(nlopt_settings["maxtime"])
-            try:
-                B = opt2.optimize(B)
-            except nlopt.RoundoffLimited:
-                B = B.copy()
-
-            cf_value = opt2.last_optimum_value()
+        # The estimates from the starting B: BOBYQA, then the main optimiser
+        B, cf_value = ces_estimator(B, cf_kwargs, nlopt_settings, xreg_model)
 
         # --- Final fit with optimized B --- R lines 931-996
 
@@ -761,63 +693,21 @@ class CES:
         # No errors at the missing values, where the fitted values are the predictions
         errors[~observed] = np.nan
 
-        # Reconstruct complex a and b from B — R lines 1048-1093
-        n_coefficients = 0
-        if a["estimate"]:
-            if self.seasonality != "simple":
-                a["value"] = complex(B[0], B[1])
-                n_coefficients = 2
-            else:
-                a_vals = []
-                for i in range(n_seasonal):
-                    a_vals.append(
-                        complex(
-                            B[n_coefficients + 2 * i], B[n_coefficients + 2 * i + 1]
-                        )
-                    )
-                a["value"] = a_vals if n_seasonal > 1 else a_vals[0]
-                n_coefficients += 2 * n_seasonal
-
-        if b["estimate"]:
-            if self.seasonality == "partial":
-                b_vals = B[n_coefficients : n_coefficients + n_seasonal]
-                b["value"] = b_vals.tolist() if n_seasonal > 1 else float(b_vals[0])
-                n_coefficients += n_seasonal
-            elif self.seasonality == "full":
-                b_vals = []
-                for i in range(n_seasonal):
-                    b_vals.append(
-                        complex(
-                            B[n_coefficients + 2 * i],
-                            B[n_coefficients + 2 * i + 1],
-                        )
-                    )
-                b["value"] = b_vals if n_seasonal > 1 else b_vals[0]
-                n_coefficients += 2 * n_seasonal
-
-        # Initial values — R lines 1021-1044
-        # mat_vt is (time, components) after transpose
-        initial_states = {}
-        if self.seasonality == "none":
-            initial_states["nonseasonal"] = mat_vt[0, 0:2]
-        elif self.seasonality == "simple":
-            initial_states["seasonal"] = mat_vt[:lags_model_max, : n_seasonal * 2]
-        else:
-            initial_states["nonseasonal"] = mat_vt[0, 0:2]
-            seasonal_mask = np.array(lags_model_all[:components_number]) != 1
-            initial_states["seasonal"] = mat_vt[:lags_model_max, :components_number][
-                :, seasonal_mask
-            ]
-        if xreg_model:
-            initial_states["xreg"] = mat_vt[
-                0, components_number : components_number + xreg_number
-            ]
-
-        # Model name — R lines 1096-1104
-        model_name = "CES"
-        if xreg_model:
-            model_name += "X"
-        model_name += f"({self.seasonality})"
+        # The complex smoothing parameters, the initial states and the name of the
+        # model, from B
+        a, b, initial_states, model_name = ces_collector(
+            B,
+            a,
+            b,
+            mat_vt,
+            self.seasonality,
+            n_seasonal,
+            lags_model_max,
+            lags_model_all,
+            components_number,
+            xreg_model,
+            xreg_number,
+        )
 
         # Log-likelihood. The reported value is a concentrated likelihood, never
         # -loss. For a fit-only loss it is the *Normal* likelihood re-evaluated

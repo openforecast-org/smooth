@@ -215,6 +215,18 @@ jobs:
           cat("BLAS:", si$BLAS, "\nLAPACK:", si$LAPACK, "\n")
           cat("long double:", capabilities("long.double"), .Machine$sizeof.longdouble, "\n")
 
+      # What the two builds of the shared C++ are made with: the compiler, its default
+      # target (FMA contracts a*b+c into one rounding), R's flags, the Armadillo
+      # versions and the CPU
+      - name: The compilers and the CPU
+        shell: bash
+        run: |
+          c++ --version | head -1 || true
+          echo | c++ -dM -E -x c++ - | grep -E "__FMA__|__AVX2__|__AVX512F__|__x86_64__|__aarch64__" || true
+          R CMD config CXX17; R CMD config CXX17FLAGS
+          Rscript -e 'cat("RcppArmadillo", as.character(packageVersion("RcppArmadillo")), "\n")'
+          (lscpu 2>/dev/null | grep -E "Model name|Flags" | cut -c1-200) || sysctl -n machdep.cpu.brand_string || true
+
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -236,8 +248,10 @@ jobs:
             if [ "$RUNNER_OS" = "Linux" ]; then
               export CMAKE_ARGS="-DBLA_VENDOR=Generic"
             fi
-            python -m pip install ./python
+            python -m pip install -v ./python > build.log 2>&1 || { tail -80 build.log; exit 1; }
+            grep -E "CMAKE_CXX_COMPILER|eigenCalc.cpp.o -c|Armadillo" build.log | cut -c1-400 || true
           fi
+          grep -h "define ARMA_VERSION_M" src/libs/carma/extern/armadillo-code/include/armadillo_bits/arma_version.hpp || true
 
       - name: R parity tests
         working-directory: python

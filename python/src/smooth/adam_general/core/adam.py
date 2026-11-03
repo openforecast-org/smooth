@@ -4039,6 +4039,7 @@ class ADAM:
                     self._observations.get("y_na_values"),
                 )
 
+        predictions._model = self
         return predictions
 
     def predict_intervals(

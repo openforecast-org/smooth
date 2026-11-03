@@ -9,12 +9,14 @@ Changes:
 * `CES` and `AutoCES` take a custom loss, a function of `actual`, `fitted` and `B`, as `ADAM` and R's `ces()`; `loss_` is then `"custom"`.
 * The admissible bounds of the smoothing parameters in `confint()` and `reapply()` (`ADAM`, `CES`, `OM`, `OMG`) are the interval around each estimate where the model is forecastable, found by the search of the ARMA bounds (shared C++ code with R); they were the outermost points of a grid of 0.01, up to 0.01 outside the region, as in R.
 * `OMG.vcov()` takes `heuristics`, as R's `vcov.omg()`: it returns `diag(abs(coef) * heuristics)`.
+* The forecasts of `predict()` have `plot()`, as R's `plot()` of a forecast: the actuals, the fitted values, the forecast and its bounds.
 * Requires `greybox>=1.0.11`: MAPE and MPE are `Inf` on a zero actual, as in R, and `ALM(parameters=)` evaluates a regression at provided coefficients.
 * `OM` and `OMG` no longer take `formula` / `formula_a` / `formula_b`, which were ignored; the regressors come from `X`, as in the other models.
 * `AutoADAM` selects the ARIMA orders by default, as R's `auto.adam()`: without `orders` (and `ar_order` / `i_order` / `ma_order`) they are R's `{"ar": [3, 3], "i": [2, 1], "ma": [3, 3], "select": True}`; it fitted no ARIMA (on UKgas it selected ETS(MNM), log-likelihood -495.41, against R's ETS(MNM) with drift, -490.89). Pass `orders={"ar": 0, "i": 0, "ma": 0}` for no ARIMA.
 * `AutoOM` takes `n_iterations` and `smoother`, and `OMG` takes `n_iterations`, as `OM`: they reach every candidate of `AutoOM` and both sub-models of `OMG`, as R's `auto.om()` and `omg()` pass their ellipsis on. `OM(occurrence="auto" | "general")` passes them through instead of raising a `TypeError`.
 
 Bugfixes:
+* The plots over time (`which=7`, 8, 9 and 12) take the index of the data, its dates when it has them, instead of the observation numbers.
 * `plot(which=12)` labels the panels with the names of the states, as R: the trend was never labelled, so every panel after the level took the label of the next one (the trend "Seasonal 1", the seasonal "Residuals").
 * The Linux and Windows wheels link the reference (netlib) BLAS and LAPACK, as R does by default, instead of OpenBLAS, and on Linux the 3.12.1 that R bundles rather than the 3.8 of the manylinux image: the order in which a BLAS sums the matrix products moves the last bits of the fits, so Python did not match R (CES on AirPassengers stopped at another point than R, as R does when linked to OpenBLAS or to BLAS 3.9).
 * A seasonal `CES` without a seasonal lag (no `lags`, `lags=[1]`, or a lag above the sample size, which is dropped with a warning as in R) is CES(none), with a warning, as in R: it failed in the creator.

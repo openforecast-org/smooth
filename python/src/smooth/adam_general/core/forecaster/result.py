@@ -29,7 +29,7 @@ class ForecastResult:
     ``result.columns``, ``result.shape``) for backward compatibility.
     """
 
-    __slots__ = ("mean", "lower", "upper", "level", "side", "interval")
+    __slots__ = ("mean", "lower", "upper", "level", "side", "interval", "_model")
 
     def __init__(self, mean, lower, upper, level, side, interval):
         self.mean = mean
@@ -38,6 +38,34 @@ class ForecastResult:
         self.level = level
         self.side = side
         self.interval = interval
+        # The model that produced the forecast, set by its predict(), as R's
+        # forecast object carries its model
+        self._model = None
+
+    def plot(self, legend=True, **kwargs):
+        """Plot the actuals, the fitted values, this forecast and its bounds, as R's
+        ``plot()`` of a forecast.
+
+        Parameters
+        ----------
+        legend : bool, default=True
+            Show the legend.
+        **kwargs
+            ``figsize``, ``dpi``, ``main``, ``xlab`` and ``ylab``, as in the
+            model's ``plot()``.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+        """
+        from smooth.adam_general.core.plotting import _lazy_mpl, _make_fig, _plot5
+
+        if self._model is None:
+            raise ValueError("The forecast does not know its model: use predict().")
+        fig, kw = _make_fig(_lazy_mpl(), **kwargs)
+        _plot5(self._model, fig.add_subplot(111), legend, forecast=self, **kw)
+        fig.tight_layout()
+        return fig
 
     # ------------------------------------------------------------------
     # Display

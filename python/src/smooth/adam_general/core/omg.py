@@ -340,7 +340,9 @@ class OMG:
                 "Intervals on the probability scale are not implemented for OMG; "
                 "returning point forecasts only."
             )
-        return self._forecast_combined(h, X_future=X)
+        result = self._forecast_combined(h, X_future=X)
+        result._model = self
+        return result
 
     # ---------------------------------------------------------------------
     # Properties

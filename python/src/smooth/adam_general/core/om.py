@@ -1589,7 +1589,9 @@ class OM(ADAM):
         if getattr(self, "_alm_model", None) is not None:
             self._general["h"] = h
             return self._predict_regression(X, "none", level, side)
-        return self._om_forecast(h, X_future=X)
+        result = self._om_forecast(h, X_future=X)
+        result._model = self
+        return result
 
     # ------------------------------------------------------------------
     # Property overrides (return OM-specific values)

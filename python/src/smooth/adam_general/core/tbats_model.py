@@ -1601,7 +1601,11 @@ class TBATS:
         # The sums of the transformed values do not transform back: the cumulative
         # forecasts come from the paths of the data
         if cumulative and h > 0 and (self.lambda_ != 1 or intermittent):
-            return self._cumulative(run, interval, level, side, point, p_forecast, seed)
+            result = self._cumulative(
+                run, interval, level, side, point, p_forecast, seed
+            )
+            result._model = self
+            return result
         # The median of the transformed data is its skeleton, and transforms back into
         # the median of the data
         result, _ = run(interval, level, side)
@@ -1614,6 +1618,7 @@ class TBATS:
             result.upper = _inverse_like(result.upper, self.lambda_)
         if intermittent and h > 0:
             self._mixture(result, run, p_forecast, interval, level, side, point)
+        result._model = self
         return result
 
     def _forecaster_run(

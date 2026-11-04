@@ -2,6 +2,17 @@
 # These are extracted from parametersChecker() to allow reuse by om() and
 # other future functions without duplicating logic.
 
+#### The column of the response ####
+# The column of the data whose syntactic name is responseName: the model takes the syntactic
+# names of the variables, while the data keeps those of the user
+adam_responseColumn <- function(data, responseName){
+    responseColumn <- colnames(data)[make.names(colnames(data))==responseName];
+    if(length(responseColumn)==0){
+        responseColumn <- responseName;
+    }
+    return(responseColumn[1]);
+}
+
 #### Data preparation ####
 adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse) {
     responseName <- yName
@@ -54,7 +65,7 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
         }
         if(!is.null(formulaToUse)){
             responseName <- all.vars(formulaToUse)[1]
-            y <- data[,responseName]
+            y <- data[,adam_responseColumn(data, responseName)]
         }
         else{
             responseName <- colnames(xregData)[1]
@@ -139,7 +150,7 @@ adam_checkData <- function(data, lags, h, holdout, yName, modelDo, formulaToUse)
         yFilled[1:obsInSample] <- naFillCpp(as.numeric(y[1:obsInSample]), lagMax);
         y[yNAValues] <- yFilled[yNAValues]
         if(!is.null(xregData)){
-            xregData[yNAValues,responseName] <- y[yNAValues]
+            xregData[yNAValues,adam_responseColumn(xregData, responseName)] <- y[yNAValues]
         }
     }
 
@@ -300,14 +311,23 @@ adam_checkPhi <- function(phi, etsModel, modelDo, damped, parametersNumber){
                 phi <- 0.95;
                 phiEstimate <- TRUE;
             }
+            # phi of the model without the damped trend ("d" in its name) is ignored, with a
+            # warning unless it is the 1 of an undamped model being reused
+            else if(!damped){
+                if(!isTRUE(all.equal(phi, 1, check.attributes=FALSE))){
+                    warning("phi is used only with a damped trend. Ignoring it.", call.=FALSE);
+                }
+                phi <- 1;
+                phiEstimate <- FALSE;
+            }
             else{
-                if(!is.numeric(phi) & (damped)){
+                if(!is.numeric(phi)){
                     warning(paste0("Provided value of phi is meaningless. phi will be estimated."),
                             call.=FALSE);
                     phi <- 0.95;
                     phiEstimate <- TRUE;
                 }
-                else if(is.numeric(phi) & (phi<0 | phi>2)){
+                else if(phi<0 | phi>2){
                     warning(paste0("Damping parameter should lie in (0, 2) region. ",
                                    "Changing to the estimation of phi."),call.=FALSE);
                     phi[] <- 0.95;
@@ -315,9 +335,7 @@ adam_checkPhi <- function(phi, etsModel, modelDo, damped, parametersNumber){
                 }
                 else{
                     phiEstimate <- FALSE;
-                    if(damped){
-                        parametersNumber[2,1] <- parametersNumber[2,1] + 1;
-                    }
+                    parametersNumber[2,1] <- parametersNumber[2,1] + 1;
                 }
             }
         }
@@ -654,35 +672,11 @@ adam_checkOccurrence <- function(Etype, Stype, Ttype, etsModel, h, lagsModelMax,
     allowMultiplicative <- !((any(yObserved<=0) && !occurrenceModel) || (occurrenceModel && any(yObserved<0)));
 
     if(etsModel){
-        # Clean the pool of models if only additive are allowed
-        if(!allowMultiplicative && !is.null(modelsPool)){
-            modelsPoolMultiplicative <- ((substr(modelsPool,1,1)=="M") |
-                                             substr(modelsPool,2,2)=="M" |
-                                             substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="M");
-            if(any(modelsPoolMultiplicative)){
-                modelsPool <- modelsPool[!modelsPoolMultiplicative];
-
-                # This is needed, because PPP and FFF use pool, not Branch and bound
-                if(!any(c(any(unlist(strsplit(model,""))=="P"),any(unlist(strsplit(model,""))=="F")))){
-                    warning("Only additive models are allowed for your data. Amending the pool.",
-                            call.=FALSE);
-                }
-            }
+        # Only the additive models for the non-positive data
+        if(!allowMultiplicative){
+            list2env(adam_modelsAdditive(model, Etype, Ttype, Stype, modelsPool), environment());
         }
-        if((any(model==c("PPP","FFF","YYY")) || any(unlist(strsplit(model,""))=="Z")) && !allowMultiplicative){
-            model <- "XXX";
-            Etype[] <- "A";
-            Ttype[] <- switch(Ttype,"Y"=,"Z"=,"P"=,"F"="X",Ttype);
-            Stype[] <- switch(Stype,"Y"=,"Z"=,"P"=,"F"="X",Stype);
-            modelsPool <- NULL;
-            warning("Only additive models are allowed for your data. Changing the selection mechanism.",
-                    call.=FALSE);
-        }
-        else if(!allowMultiplicative && any(c(Etype,Ttype,Stype)=="M")){
-            warning("Your data contains non-positive values, so the ETS(",model,") might break down.",
-                    call.=FALSE);
-        }
-        else if(any(model==c("PPP","FFF")) && allowMultiplicative){
+        else if(any(model==c("PPP","FFF"))){
             model <- "ZZZ";
         }
     }
@@ -931,98 +925,12 @@ adam_checkModel <- function(fast, model, modelDo){
 
     # Predefine models pool for a model selection
     modelsPool <- NULL;
-    if(!fast){
-        # Deal with the list of models. Check what has been provided. Stop if there is a mistake.
-        if(length(model)>1){
-            if(any(nchar(model)>4) || any(nchar(model)<3)){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[nchar(model)>4 | nchar(model)<3],collapse=",")),call.=FALSE);
-            }
-            else if(any(substr(model,1,1)!="A" & substr(model,1,1)!="M" & substr(model,1,1)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[substr(model,1,1)!="A" & substr(model,1,1)!="M"],collapse=",")),
-                     call.=FALSE);
-            }
-            else if(any(substr(model,2,2)!="N" & substr(model,2,2)!="A" &
-                        substr(model,2,2)!="M" & substr(model,2,2)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[substr(model,2,2)!="N" & substr(model,2,2)!="A" &
-                                             substr(model,2,2)!="M"],collapse=",")),call.=FALSE);
-            }
-            else if(any(substr(model,3,3)!="N" & substr(model,3,3)!="A" &
-                        substr(model,3,3)!="M" & substr(model,3,3)!="d" & substr(model,3,3)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[substr(model,3,3)!="N" & substr(model,3,3)!="A" &
-                                             substr(model,3,3)!="M" & substr(model,3,3)!="d"],collapse=",")),
-                     call.=FALSE);
-            }
-            else if(any(nchar(model)==4 & substr(model,4,4)!="N" & substr(model,4,4)!="A" &
-                        substr(model,4,4)!="M" & substr(model,4,4)!="C")){
-                stop(paste0("You have defined strange model(s) in the pool: ",
-                            paste0(model[nchar(model)==4 & substr(model,4,4)!="N" &
-                                             substr(model,4,4)!="A" & substr(model,4,4)!="M"],collapse=",")),
-                     call.=FALSE);
-            }
-            else{
-                modelsPoolCombiner <- (substr(model,1,1)=="C" | substr(model,2,2)=="C" |
-                                           substr(model,3,3)=="C" | substr(model,4,4)=="C");
-                modelsPool <- model[!modelsPoolCombiner];
-                modelsPool <- unique(modelsPool);
-                if(any(modelsPoolCombiner)){
-                    if(any(substr(model,nchar(model),nchar(model))!="N")){
-                        model <- "CCC";
-                    }
-                    else{
-                        model <- "CCN";
-                    }
-                }
-                else{
-                    model <- c("Z","Z","Z");
-                    if(all(substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N")){
-                        model[3] <- "N";
-                    }
-                    if(all(substr(modelsPool,2,2)=="N")){
-                        model[2] <- "N";
-                    }
-                    model <- paste0(model,collapse="");
-                }
-            }
-        }
+    if(!fast && length(model)>1){
+        list2env(adam_modelsPoolCheck(model), environment());
     }
 
     # If chosen model is "AAdN" or anything like that, we are taking the appropriate values
-    if(nchar(model)==4){
-        Etype <- substr(model,1,1);
-        Ttype <- substr(model,2,2);
-        Stype <- substr(model,4,4);
-        damped <- TRUE;
-        if(substr(model,3,3)!="d"){
-            message(paste0("You have defined a strange model: ", model,
-                           ". Switching to ", paste0(Etype,Ttype,"d",Stype)));
-            model <- paste0(Etype,Ttype,"d",Stype);
-        }
-    }
-    else if(nchar(model)==3){
-        Etype <- substr(model,1,1);
-        Ttype <- substr(model,2,2);
-        Stype <- substr(model,3,3);
-        if(any(Ttype==c("Z","X","Y"))){
-            damped <- TRUE;
-        }
-        else{
-            damped <- FALSE;
-        }
-    }
-    else{
-        message(paste0("You have defined a strange model: ",model));
-        message("Switching to 'ZZZ'");
-        model <- "ZZZ";
-
-        Etype <- "Z";
-        Ttype <- "Z";
-        Stype <- "Z";
-        damped <- TRUE;
-    }
+    list2env(adam_modelComponents(model), environment());
 
     # Define if we want to select or combine models... or do none of the above.
     if(is.null(modelsPool)){
@@ -1046,99 +954,14 @@ adam_checkModel <- function(fast, model, modelDo){
                 any(unlist(strsplit(model,""))=="S")){
             modelDo <- "select";
 
-            # The full test, sidestepping branch and bound
-            if(any(unlist(strsplit(model,""))=="F")){
-                modelsPool <- c("ANN","AAN","AAdN","AMN","AMdN",
-                                "ANA","AAA","AAdA","AMA","AMdA",
-                                "ANM","AAM","AAdM","AMM","AMdM",
-                                "MNN","MAN","MAdN","MMN","MMdN",
-                                "MNA","MAA","MAdA","MMA","MMdA",
-                                "MNM","MAM","MAdM","MMM","MMdM");
-                # Remove models from pool if specific elements are provided
-                if(Etype!="F"){
-                    modelsPool <- modelsPool[substr(modelsPool,1,1)==Etype];
-                }
-                else{
-                    Etype[] <- "Z"
-                }
-                if(Ttype!="F"){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2)==Ttype];
-                }
-                else{
-                    Ttype[] <- "Z"
-                }
-                if(Stype!="F"){
-                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))==Stype];
-                }
-                else{
-                    Stype[] <- "Z"
-                }
-                model <- "FFF";
-            }
-
-            # The test for pure models only
-            if(any(unlist(strsplit(model,""))=="P")){
-                modelsPool <- c("ANN","AAN","AAdN","ANA","AAA","AAdA",
-                                "MNN","MMN","MMdN","MNM","MMM","MMdM");
-                # Remove models from pool if specific elements are provided
-                if(Etype!="P"){
-                    modelsPool <- modelsPool[substr(modelsPool,1,1)==Etype];
-                }
-                else{
-                    Etype[] <- "Z"
-                }
-                if(Ttype!="P"){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2)==Ttype];
-                }
-                else{
-                    Ttype[] <- "Z"
-                }
-                if(Stype!="P"){
-                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))==Stype];
-                }
-                else{
-                    Stype[] <- "Z"
-                }
-                model <- "PPP";
-            }
-
-            # The pool of sensible/standard models, those that have finite variance
-            if(any(unlist(strsplit(model,""))=="S")){
-                modelsPool <- c("ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA",
-                                "MNN", "MAN", "MAdN", "MNA", "MAA", "MAdA",
-                                "MNM", "MAM", "MAdM", "MMN", "MMdN", "MMM", "MMdM");
-                # Remove models from pool if specific elements are provided
-                if(Etype!="S"){
-                    # Switch is needed here if people want to restrict the basic pool further
-                    modelsPool <- modelsPool[substr(modelsPool,1,1)==switch(Etype,
-                                                                            "X"="A",
-                                                                            "Y"="M",
-                                                                            Etype)];
-                }
-                else{
-                    Etype[] <- "Z"
-                }
-                if(Ttype!="S"){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2) %in% switch(Ttype,
-                                                                                "X"=c("A","N"),
-                                                                                "Y"=c("M","N"),
-                                                                                Ttype)];
-                }
-                else{
-                    Ttype[] <- "Z"
-                }
-                if(Stype!="S"){
-                    modelsPool <- modelsPool[substr(modelsPool,
-                                                    nchar(modelsPool),
-                                                    nchar(modelsPool))==switch(Stype,
-                                                                               "X"=c("A","N"),
-                                                                               "Y"=c("M","N"),
-                                                                               Stype)];
-                }
-                else{
-                    Stype[] <- "Z"
-                }
-                model <- "SSS";
+            # The full, the pure or the safe pool, narrowed by the other letters
+            named <- intersect(c("F","P","S"), c(Etype, Ttype, Stype))[1];
+            if(!is.na(named)){
+                modelsPool <- adam_modelsPoolNamed(named, Etype, Ttype, Stype);
+                Etype[Etype %in% c("F","P","S")] <- "Z";
+                Ttype[Ttype %in% c("F","P","S")] <- "Z";
+                Stype[Stype %in% c("F","P","S")] <- "Z";
+                model <- strrep(named, 3);
             }
         }
         else{
@@ -1214,153 +1037,7 @@ adam_checkModel <- function(fast, model, modelDo){
 adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS, distribution,
                              etsModel, fast, lags, model, modelDo, modelIsTrendy, modelsPool,
                              orders, parametersNumber){
-    # This should be available for pure models only
-    if(is.list(orders)){
-        arOrders <- orders$ar;
-        iOrders <- orders$i;
-        maOrders <- orders$ma;
-        select <- orders$select;
-        if(is.null(select)){
-            select <- FALSE;
-        }
-    }
-    else if(is.vector(orders)){
-        arOrders <- orders[1];
-        iOrders <- orders[2];
-        maOrders <- orders[3];
-        select <- FALSE;
-    }
-    else{
-        select <- FALSE;
-    }
-
-    # If there is arima, prepare orders
-    if(sum(c(arOrders,iOrders,maOrders))>0){
-        arimaModel <- TRUE;
-
-        # See if AR is needed
-        arRequired <- FALSE;
-        if(sum(arOrders)>0){
-            arRequired[] <- TRUE;
-        }
-
-        # See if I is needed
-        iRequired <- FALSE;
-        if(sum(iOrders)>0){
-            iRequired[] <- TRUE;
-        }
-
-        # See if I is needed
-        maRequired <- FALSE;
-        if(sum(maOrders)>0){
-            maRequired[] <- TRUE;
-        }
-
-        # Define maxOrder and make all the values look similar (for the polynomials)
-        maxOrder <- max(length(arOrders),length(iOrders),length(maOrders),length(lags));
-        if(length(arOrders)!=maxOrder){
-            arOrders <- c(arOrders,rep(0,maxOrder-length(arOrders)));
-        }
-        if(length(iOrders)!=maxOrder){
-            iOrders <- c(iOrders,rep(0,maxOrder-length(iOrders)));
-        }
-        if(length(maOrders)!=maxOrder){
-            maOrders <- c(maOrders,rep(0,maxOrder-length(maOrders)));
-        }
-        if(length(lags)!=maxOrder){
-            lagsNew <- c(lags,rep(0,maxOrder-length(lags)));
-            arOrders <- arOrders[lagsNew!=0];
-            iOrders <- iOrders[lagsNew!=0];
-            maOrders <- maOrders[lagsNew!=0];
-        }
-
-        # Define the non-zero values. This is done via the calculation of orders of polynomials
-        ariValues <- list(NA);
-        maValues <- list(NA);
-        for(i in 1:length(lags)){
-            ariValues[[i]] <- c(0,min(1,arOrders[i]):arOrders[i])
-            if(iOrders[i]!=0){
-                ariValues[[i]] <- c(ariValues[[i]],1:iOrders[i]+arOrders[i]);
-            }
-            ariValues[[i]] <- unique(ariValues[[i]] * lags[i]);
-            maValues[[i]] <- unique(c(0,min(1,maOrders[i]):maOrders[i]) * lags[i]);
-        }
-
-        # Produce ARI polynomials
-        ariLengths <- unlist(lapply(ariValues,length));
-        ariPolynomial <- array(0,ariLengths);
-        for(i in 1:length(ariValues)){
-            if(i==1){
-                ariPolynomial <- ariPolynomial + array(ariValues[[i]], ariLengths);
-            }
-            else{
-                ariPolynomial <- ariPolynomial + array(rep(ariValues[[i]],each=prod(ariLengths[1:(i-1)])),
-                                                       ariLengths);
-            }
-        }
-
-        # Produce MA polynomials
-        maLengths <- unlist(lapply(maValues,length));
-        maPolynomial <- array(0,maLengths);
-        for(i in 1:length(maValues)){
-            if(i==1){
-                maPolynomial <- maPolynomial + array(maValues[[i]], maLengths);
-            }
-            else{
-                maPolynomial <- maPolynomial + array(rep(maValues[[i]],each=prod(maLengths[1:(i-1)])),
-                                                     maLengths);
-            }
-        }
-
-        # What are the non-zero ARI and MA polynomials?
-        ### What are their positions in transition matrix?
-        nonZeroARI <- unique(matrix(c(ariPolynomial)[-1],ncol=1));
-        nonZeroMA <- unique(matrix(c(maPolynomial)[-1],ncol=1));
-        # Lags for the ARIMA components
-        lagsModelARIMA <- matrix(sort(unique(c(nonZeroARI,nonZeroMA))),ncol=1);
-        nonZeroARI <- cbind(nonZeroARI+1,which(lagsModelARIMA %in% nonZeroARI));
-        nonZeroMA <- cbind(nonZeroMA+1,which(lagsModelARIMA %in% nonZeroMA));
-
-        # Number of components
-        componentsNumberARIMA <- length(lagsModelARIMA);
-        # Their names
-        componentsNamesARIMA <- paste0("ARIMAState",c(1:componentsNumberARIMA));
-
-        # If all orders are zero, drop ARIMA part
-        if(all(c(arOrders,iOrders,maOrders)==0)){
-            arOrders <- NULL;
-            iOrders <- NULL;
-            maOrders <- NULL;
-            arimaModel <- FALSE;
-            arRequired <- arEstimate <- FALSE;
-            iRequired <- FALSE;
-            maRequired <- maEstimate <- FALSE;
-            lagsModelARIMA <- initialArimaNumber <- 0;
-            componentsNumberARIMA <- 0;
-            componentsNamesARIMA <- NULL;
-            nonZeroARI <- NULL;
-            nonZeroMA <- NULL;
-        }
-        else{
-            # Number of initials needed. This is based on the longest one (see adam_arimaInitials)
-            initialArimaNumber <- max(lagsModelARIMA);
-        }
-    }
-    else{
-        arOrders <- NULL;
-        iOrders <- NULL;
-        maOrders <- NULL;
-        arimaModel <- FALSE;
-        arRequired <- arEstimate <- FALSE;
-        iRequired <- FALSE;
-        maRequired <- maEstimate <- FALSE;
-        lagsModelARIMA <- initialArimaNumber <- 0;
-        componentsNumberARIMA <- 0;
-        componentsNamesARIMA <- NULL;
-        nonZeroARI <- NULL;
-        nonZeroMA <- NULL;
-        select <- FALSE;
-    }
+    list2env(adam_arimaOrders(orders, lags), environment());
 
     if(etsModel){
         modelIsSeasonal <- Stype!="N";
@@ -1422,6 +1099,10 @@ adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS
         # Check the pool of models to combine if it was decided that the data is not seasonal
         if(!modelIsSeasonal && !is.null(modelsPool)){
             modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N"];
+            # Without a non-seasonal model in the pool, the selection is over all of them
+            if(length(modelsPool)==0){
+                modelsPool <- NULL;
+            }
         }
 
         # Check the type of seasonal
@@ -1477,108 +1158,8 @@ adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS
 
     # Check ARIMA parameters, if they are provided
     if(arimaModel){
-        # Check the provided parameters for AR and MA
-        if(!is.null(arma)){
-            arEstimate <- arRequired;
-            maEstimate <- maRequired;
-            # If this is a proper list, extract parameters separately
-            if(is.list(arma)){
-                armaParameters <- vector("numeric",sum(sapply(arma,length)));
-                j <- arIndex <- maIndex <- 0;
-                # The named list (proper thing)
-                if(!is.null(names(arma))){
-                    # Check if the length of the provided parameters is correct
-                    if(arRequired && !is.null(arma$ar) && length(arma$ar)!=sum(arOrders)){
-                        warning(paste0("The number of provided AR parameters is ",length(arma$ar),
-                                       "while I need ",sum(arOrders),". ",
-                                       "Switching to estimation."),call.=FALSE);
-                        arEstimate[] <- TRUE;
-                    }
-                    if(maRequired && !is.null(arma$ma) && length(arma$ma)!=sum(maOrders)){
-                        warning(paste0("The number of provided MA parameters is ",length(arma$ma),
-                                       "while I need ",sum(maOrders),". ",
-                                       "Switching to estimation."),call.=FALSE);
-                        maEstimate[] <- TRUE;
-                    }
-                    for(i in 1:length(lags)){
-                        if(arRequired && !is.null(arma$ar) && arOrders[i]>0){
-                            armaParameters[j+c(1:arOrders[i])] <- arma$ar[arIndex+c(1:arOrders[i])];
-                            names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                            j[] <- j+arOrders[i];
-                            arIndex[] <- arIndex+arOrders[i];
-                            arEstimate[] <- FALSE;
-                        }
-                        if(maRequired && !is.null(arma$ma) && maOrders[i]>0){
-                            armaParameters[j+c(1:maOrders[i])] <- arma$ma[maIndex+c(1:maOrders[i])];
-                            names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                            j[] <- j+maOrders[i];
-                            maIndex[] <- maIndex+maOrders[i];
-                            maEstimate[] <- FALSE;
-                        }
-                    }
-                }
-                # Just a list. Assume that the first element is ar, and the second is ma
-                else{
-                    for(i in 1:length(lags)){
-                        k <- 1;
-                        if(arRequired && !is.null(arma[[1]]) && arOrders[i]>0){
-                            armaParameters[j+c(1:arOrders[i])] <- arma[[1]][arIndex+c(1:arOrders[i])];
-                            names(armaParameters)[j+c(1:arOrders[i])] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                            j[] <- j+arOrders[i];
-                            arIndex[] <- arIndex+arOrders[i];
-                            arEstimate[] <- FALSE;
-                            k[] <- 2;
-                        }
-                        if(maRequired && !is.null(arma[[k]]) && maOrders[i]>0){
-                            armaParameters[j+c(1:maOrders[i])] <- arma[[k]][maIndex+c(1:maOrders[i])];
-                            names(armaParameters)[j+c(1:maOrders[i])] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                            j[] <- j+maOrders[i];
-                            maIndex[] <- maIndex+maOrders[i];
-                            maEstimate[] <- FALSE;
-                        }
-                    }
-                    # Check if the length of the provided parameters is correct
-                    if(length(armaParameters)!=sum(arOrders)+sum(maOrders)){
-                        warning(paste0("The number of provided ARMA parameters is ",length(armaParameters),
-                                       "while I need ",sum(arOrders)+sum(maOrders),". ",
-                                       "Switching to estimation."),call.=FALSE);
-                        maEstimate <- arEstimate[] <- TRUE;
-                        armaParameters <- NULL;
-                    }
-                }
-            }
-            else if(is.vector(arma)){
-                # Check the length of the vector
-                if(length(arma)!=sum(arOrders)+sum(maOrders)){
-                    warning(paste0("The number of provided ARMA parameters is ",length(arma),
-                                   "while I need ",sum(arOrders)+sum(maOrders),". ",
-                                   "Switching to estimation."),call.=FALSE);
-                    maEstimate <- arEstimate[] <- TRUE;
-                    armaParameters <- NULL;
-                }
-                else{
-                    armaParameters <- arma;
-                    j <- 0;
-                    for(i in 1:length(lags)){
-                        if(arOrders[i]>0){
-                            names(armaParameters)[j+1:arOrders[i]] <- paste0("phi",1:arOrders[i],"[",lags[i],"]");
-                            j <- j + arOrders[i];
-                        }
-                        if(maOrders[i]>0){
-                            names(armaParameters)[j+1:maOrders[i]] <- paste0("theta",1:maOrders[i],"[",lags[i],"]");
-                            j <- j + maOrders[i];
-                        }
-                    }
-                    maEstimate <- arEstimate[] <- FALSE;
-                }
-            }
-            parametersNumber[2,1] <- parametersNumber[2,1] + length(armaParameters);
-        }
-        else{
-            arEstimate <- arRequired;
-            maEstimate <- maRequired;
-            armaParameters <- NULL;
-        }
+        list2env(adam_armaParameters(arma, arOrders, maOrders, lags, arRequired, maRequired), environment());
+        parametersNumber[2,1] <- parametersNumber[2,1] + length(armaParameters);
     }
     else{
         armaParameters <- NULL;
@@ -1598,6 +1179,114 @@ adam_checkArima <- function(Stype, arma, componentsNamesETS, componentsNumberETS
                          "maOrders", "maRequired", "model", "modelDo", "modelIsSeasonal",
                          "modelsPool", "nonZeroARI", "nonZeroMA", "parametersNumber",
                          "select"), ls())));
+}
+
+# The ARIMA orders aligned with the lags, and the states of the ARIMA polynomials
+adam_arimaOrders <- function(orders, lags){
+    # The orders as a list, or as a vector of the AR, I and MA orders
+    if(!is.list(orders)){
+        orders <- list(ar=orders[1], i=orders[2], ma=orders[3]);
+    }
+    arOrders <- orders$ar;
+    iOrders <- orders$i;
+    maOrders <- orders$ma;
+    select <- !is.null(orders$select) && orders$select;
+    noARIMA <- list(arOrders=NULL, iOrders=NULL, maOrders=NULL, arimaModel=FALSE, arRequired=FALSE,
+                    arEstimate=FALSE, iRequired=FALSE, maRequired=FALSE, maEstimate=FALSE,
+                    lagsModelARIMA=0, initialArimaNumber=0, componentsNumberARIMA=0,
+                    componentsNamesARIMA=NULL, nonZeroARI=NULL, nonZeroMA=NULL);
+    if(sum(c(arOrders,iOrders,maOrders))==0){
+        return(c(noARIMA, select=FALSE));
+    }
+    arRequired <- sum(arOrders)>0;
+    iRequired <- sum(iOrders)>0;
+    maRequired <- sum(maOrders)>0;
+
+    # The orders of the same length as the lags, padded with zeroes, or cut to the lags
+    maxOrder <- max(length(arOrders),length(iOrders),length(maOrders),length(lags));
+    arOrders <- c(arOrders,rep(0,maxOrder-length(arOrders)))[1:length(lags)];
+    iOrders <- c(iOrders,rep(0,maxOrder-length(iOrders)))[1:length(lags)];
+    maOrders <- c(maOrders,rep(0,maxOrder-length(maOrders)))[1:length(lags)];
+    if(all(c(arOrders,iOrders,maOrders)==0)){
+        return(c(noARIMA, select=select));
+    }
+
+    # The non-zero powers of the ARI and MA polynomials: every sum of a power of each lag
+    ariValues <- maValues <- vector("list", length(lags));
+    for(i in 1:length(lags)){
+        ariValues[[i]] <- c(0,min(1,arOrders[i]):arOrders[i]);
+        if(iOrders[i]!=0){
+            ariValues[[i]] <- c(ariValues[[i]],1:iOrders[i]+arOrders[i]);
+        }
+        ariValues[[i]] <- unique(ariValues[[i]] * lags[i]);
+        maValues[[i]] <- unique(c(0,min(1,maOrders[i]):maOrders[i]) * lags[i]);
+    }
+    ariPolynomial <- Reduce(function(x, y){return(c(outer(x, y, "+")))}, ariValues);
+    maPolynomial <- Reduce(function(x, y){return(c(outer(x, y, "+")))}, maValues);
+
+    # Their positions in the transition matrix, and the lags of the ARIMA states
+    nonZeroARI <- unique(matrix(ariPolynomial[-1],ncol=1));
+    nonZeroMA <- unique(matrix(maPolynomial[-1],ncol=1));
+    lagsModelARIMA <- matrix(sort(unique(c(nonZeroARI,nonZeroMA))),ncol=1);
+    nonZeroARI <- cbind(nonZeroARI+1,which(lagsModelARIMA %in% nonZeroARI));
+    nonZeroMA <- cbind(nonZeroMA+1,which(lagsModelARIMA %in% nonZeroMA));
+    componentsNumberARIMA <- length(lagsModelARIMA);
+    componentsNamesARIMA <- paste0("ARIMAState",c(1:componentsNumberARIMA));
+    # Number of initials needed. This is based on the longest one (see adam_arimaInitials)
+    initialArimaNumber <- max(lagsModelARIMA);
+    return(list(arOrders=arOrders, iOrders=iOrders, maOrders=maOrders, arimaModel=TRUE,
+                arRequired=arRequired, iRequired=iRequired, maRequired=maRequired,
+                lagsModelARIMA=lagsModelARIMA, initialArimaNumber=initialArimaNumber,
+                componentsNumberARIMA=componentsNumberARIMA, componentsNamesARIMA=componentsNamesARIMA,
+                nonZeroARI=nonZeroARI, nonZeroMA=nonZeroMA, select=select));
+}
+
+# The provided ARMA parameters, lag by lag: the AR of the lag, then its MA, and whether the AR
+# and the MA are estimated. A wrong number of them switches to estimation
+adam_armaParameters <- function(arma, arOrders, maOrders, lags, arRequired, maRequired){
+    ordersLagwise <- c(rbind(arOrders, maOrders));
+    kinds <- rep(rep(c("ar","ma"), length(lags)), ordersLagwise);
+    armaNames <- sprintf("%s%d[%s]", c(ar="phi", ma="theta")[kinds], sequence(ordersLagwise),
+                         rep(rep(lags, each=2), ordersLagwise));
+
+    # A vector goes lag by lag, and a list without names holds the AR, then the MA
+    if(is.null(arma)){
+        arma <- list();
+    }
+    else if(!is.list(arma) && length(arma)!=length(kinds)){
+        warning(paste0("The number of provided ARMA parameters is ",length(arma),
+                       " while I need ",length(kinds),". Switching to estimation."),call.=FALSE);
+        arma <- list();
+    }
+    else if(!is.list(arma)){
+        arma <- split(unname(arma), kinds);
+    }
+    else if(is.null(names(arma))){
+        names(arma) <- c("ar","ma")[seq_along(arma) + !arRequired];
+    }
+
+    fixed <- c(ar=FALSE, ma=FALSE);
+    for(kind in c("ar","ma")[c(arRequired, maRequired)]){
+        if(is.null(arma[[kind]])){
+            next;
+        }
+        if(length(arma[[kind]])!=sum(kinds==kind)){
+            warning(paste0("The number of provided ",toupper(kind)," parameters is ",length(arma[[kind]]),
+                           " while I need ",sum(kinds==kind),". Switching to estimation."),call.=FALSE);
+            next;
+        }
+        fixed[kind] <- TRUE;
+    }
+    armaParameters <- setNames(numeric(length(kinds)), armaNames);
+    for(kind in names(fixed)[fixed]){
+        armaParameters[kinds==kind] <- arma[[kind]];
+    }
+    armaParameters <- armaParameters[fixed[kinds]];
+    if(length(armaParameters)==0){
+        armaParameters <- NULL;
+    }
+    return(list(armaParameters=armaParameters, arEstimate=arRequired && !fixed[["ar"]],
+                maEstimate=maRequired && !fixed[["ma"]]));
 }
 
 
@@ -1709,283 +1398,40 @@ adam_checkSampleSize <- function(Etype, Stype, Ttype, allowMultiplicative, arEst
                                "Updating pool of models."));
             }
 
-            # If the number of observations is still enough for the model selection and the pool is not specified
-            if(obsNonzero > (3 + nParamExo) && is.null(modelsPool) && any(modelDo==c("select","combine"))){
-                # We have enough observations for local level model
-                modelsPool <- c("ANN");
-                if(allowMultiplicative){
-                    modelsPool <- c(modelsPool,"MNN");
+            # A pool: built for the selection, or what the sample can fit of the one given
+            if(obsNonzero > (3 + nParamExo) && (!is.null(modelsPool) || any(modelDo==c("select","combine")))){
+                if(is.null(modelsPool)){
+                    modelsPool <- adam_samplePoolBuild(obsNonzero, lagsModelMax, Ttype, Stype,
+                                                       allowMultiplicative, nParamExo);
                 }
-                # We have enough observations for trend model
-                if(obsNonzero > (5 + nParamExo)){
-                    if(any(Ttype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AAN");
-                        # MAN has an additive trend, so it belongs to this branch,
-                        # but its error is multiplicative and must be allowed.
-                        if(allowMultiplicative){
-                            modelsPool <- c(modelsPool,"MAN");
-                        }
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AMN","MMN");
-                    }
+                else{
+                    modelsPool <- adam_samplePoolFilter(modelsPool, obsNonzero, lagsModelMax, nParamExo);
                 }
-                # We have enough observations for damped trend model
-                if(obsNonzero > (6 + nParamExo)){
-                    if(any(Ttype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AAdN");
-                        if(allowMultiplicative){
-                            modelsPool <- c(modelsPool,"MAdN");
-                        }
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AMdN","MMdN");
-                    }
-                }
-                # We have enough observations for seasonal model
-                if((obsNonzero > (lagsModelMax)) && lagsModelMax!=1){
-                    if(any(Stype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"ANA");
-                        if(allowMultiplicative){
-                            modelsPool <- c(modelsPool,"MNA");
-                        }
-                    }
-                    if(allowMultiplicative && any(Stype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"ANM","MNM");
-                    }
-                }
-                # We have enough observations for seasonal model with trend
-                if((obsNonzero > (6 + lagsModelMax + nParamExo)) &&
-                   (obsNonzero > 2*lagsModelMax) && lagsModelMax!=1){
-                    if(any(Ttype==c("Z","X","A")) && any(Stype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AAA");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","X","A")) && any(Stype==c("Z","Y","A"))){
-                        modelsPool <- c(modelsPool,"MAA");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","X","A")) && any(Stype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AAM","MAM");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M")) && any(Stype==c("Z","X","A"))){
-                        modelsPool <- c(modelsPool,"AMA","MMA");
-                    }
-                    if(allowMultiplicative && any(Ttype==c("Z","Y","M")) && any(Stype==c("Z","Y","M"))){
-                        modelsPool <- c(modelsPool,"AMM","MMM");
-                    }
-                }
-
                 warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
                         call.=FALSE);
                 if(modelDo=="combine"){
-                    model <- "CNN";
-                    if(length(modelsPool)>2){
-                        model <- "CCN";
-                    }
-                    if(length(modelsPool)>10){
-                        model <- "CCC";
-                    }
+                    model <- c("CNN","CCN","CCC")[1 + (length(modelsPool)>2) + (length(modelsPool)>10)];
                 }
                 else{
-                    modelDo <- "select"
+                    modelDo <- "select";
                     model <- "ZZZ";
                 }
             }
-            # If the pool is provided (so, select / combine), amend it
-            else if(obsNonzero > (3 + nParamExo) && !is.null(modelsPool)){
-                # We don't have enough observations for seasonal models with damped trend
-                if((obsNonzero <= (6 + lagsModelMax + 1 + nParamExo))){
-                    modelsPool <- modelsPool[!(nchar(modelsPool)==4 &
-                                                   substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="A")];
-                    modelsPool <- modelsPool[!(nchar(modelsPool)==4 &
-                                                   substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="M")];
-                }
-                # We don't have enough observations for seasonal models with trend
-                if((obsNonzero <= (5 + lagsModelMax + 1 + nParamExo))){
-                    modelsPool <- modelsPool[!(substr(modelsPool,2,2)!="N" &
-                                                   substr(modelsPool,nchar(modelsPool),nchar(modelsPool))!="N")];
-                }
-                # We don't have enough observations for seasonal models
-                if(obsNonzero <= lagsModelMax){
-                    modelsPool <- modelsPool[substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N"];
-                }
-                # We don't have enough observations for damped trend
-                if(obsNonzero <= (6 + nParamExo)){
-                    modelsPool <- modelsPool[nchar(modelsPool)!=4];
-                }
-                # We don't have enough observations for any trend
-                if(obsNonzero <= (5 + nParamExo)){
-                    modelsPool <- modelsPool[substr(modelsPool,2,2)=="N"];
-                }
-
-                modelsPool <- unique(modelsPool);
-                warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                        call.=FALSE);
-                if(modelDo=="combine"){
-                    model <- "CNN";
-                    if(length(modelsPool)>2){
-                        model <- "CCN";
-                    }
-                    if(length(modelsPool)>10){
-                        model <- "CCC";
-                    }
-                }
-                else{
-                    modelDo <- "select"
-                    model <- "ZZZ";
-                }
-            }
-            # If the model needs to be estimated / used, not selected
-            else if(obsNonzero > (3 + nParamExo) && any(modelDo==c("estimate","use"))){
-                modelIsSeasonal <- substr(model,nchar(model),nchar(model))!="N";
-                # We don't have enough observations for seasonal models with damped trend
-                if(nchar(model)==4 && modelIsSeasonal && (obsNonzero <= (6 + lagsModelMax + 1 + nParamExo))){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,2),substr(model,4,4));
-                }
-                # We don't have enough observations for seasonal models with trend
-                if(substr(model,2,2)!="N" && modelIsSeasonal && (obsNonzero <= (5 + lagsModelMax + 1 + nParamExo))){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model)));
-                }
-                # We don't have enough observations for seasonal models
-                if(modelIsSeasonal && obsNonzero <= lagsModelMax){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,nchar(model)-1),"N");
-                }
-                # We don't have enough observations for damped trend
-                if(nchar(model)==4 && obsNonzero <= (6 + nParamExo)){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,2),substr(model,4,4));
-                }
-                # We don't have enough observations for any trend
-                if(substr(model,2,2)!="N" && obsNonzero <= (5 + nParamExo)){
-                    warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
-                            call.=FALSE);
-                    model <- paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model)));
-                }
-                # Change E,T,S elements based on the trimmed thingy
+            # The model simplified to what the sample can fit
+            else if(obsNonzero > (3 + nParamExo)){
+                model <- adam_sampleModelSimplify(model, obsNonzero, lagsModelMax, nParamExo);
                 Etype <- substr(model,1,1);
                 Ttype <- substr(model,2,2);
                 Stype <- substr(model,nchar(model),nchar(model));
-
                 modelIsTrendy <- Ttype!="N";
                 modelIsSeasonal <- Stype!="N";
-
-                damped <- modelIsTrendy && (nchar(model)==4);
+                damped <- nchar(model)==4;
                 phiEstimate <- damped;
             }
-            # Extreme cases of small samples
-            else if(obsNonzero==4){
-                if(any(Etype==c("A","M"))){
-                    modelDo <- "estimate";
-                    Ttype <- "N";
-                    Stype <- "N";
-                    model <- paste0(Etype,"NN");
-                }
-                else{
-                    modelsPool <- c("ANN");
-                    if(allowMultiplicative){
-                        modelsPool <- c(modelsPool,"MNN");
-                    }
-                    modelDo <- "select";
-                    model <- "ZZZ";
-                    Etype <- "Z";
-                    Ttype <- "N";
-                    Stype <- "N";
-                    warning("You have a very small sample. The only available model is level model.",
-                            call.=FALSE);
-                }
-                phiEstimate <- FALSE;
-            }
-            # Even smaller sample
-            else if(obsNonzero==3){
-                if(any(Etype==c("A","M"))){
-                    modelDo <- "estimate";
-                    Ttype <- "N";
-                    Stype <- "N";
-                    model <- paste0(Etype,"NN");
-                }
-                else{
-                    modelsPool <- c("ANN");
-                    if(allowMultiplicative){
-                        modelsPool <- c(modelsPool,"MNN");
-                    }
-                    modelDo <- "select";
-                    model <- "ZNN";
-                    Etype <- "Z";
-                    Ttype <- "N";
-                    Stype <- "N";
-                }
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                warning("I did not have enough of non-zero observations, so persistence value was set to zero.",
-                        call.=FALSE);
-                phiEstimate <- FALSE;
-            }
-            # Can it be even smaller?
-            else if(obsNonzero==2){
-                modelsPool <- NULL;
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- mean(yInSample[otLogical]);
-                initialType <- "provided";
-                initialEstimate <- initialLevelEstimate <- FALSE;
-                warning("I did not have enough of non-zero observations, so persistence value was set to zero and initial was preset.",
-                        call.=FALSE);
-                modelDo <- "use";
-                model <- "ANN";
-                Etype <- "A";
-                Ttype <- "N";
-                Stype <- "N";
-                phiEstimate <- FALSE;
-                parametersNumber[1,1] <- 0;
-                parametersNumber[2,1] <- 2;
-            }
-            # And how about now?!
-            else if(obsNonzero==1){
-                modelsPool <- NULL;
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- yInSample[otLogical];
-                initialType <- "provided";
-                initialEstimate <- initialLevelEstimate <- FALSE;
-                warning("I did not have enough of non-zero observations, so I used Naive.",call.=FALSE);
-                modelDo <- "use"
-                model <- "ANN";
-                Etype <- "A";
-                Ttype <- "N";
-                Stype <- "N";
-                phiEstimate <- FALSE;
-                parametersNumber[1,1] <- 0;
-                parametersNumber[2,1] <- 2;
-            }
-            # Only zeroes in the data...
-            else if(obsNonzero==0 && obsInSample>1){
-                modelsPool <- NULL;
-                persistenceLevel <- 0;
-                persistenceEstimate <- persistenceLevelEstimate <- FALSE;
-                initialLevel <- 0;
-                initialType <- "provided";
-                initialEstimate <- initialLevelEstimate <- FALSE;
-                occurrenceModelProvided <- occurrenceModel <- FALSE;
-                occurrence <- "none";
-                warning("You have a sample with zeroes only. Your forecast will be zero.",call.=FALSE);
-                modelDo <- "use"
-                model <- "ANN";
-                Etype <- "A";
-                Ttype <- "N";
-                Stype <- "N";
-                phiEstimate <- FALSE;
-                parametersNumber[1,1] <- 0;
-                parametersNumber[2,1] <- 2;
-            }
-            # If you don't have observations, then fuck off!
+            # The extreme cases of small samples
             else{
-                stop("Not enough observations... Even for fitting of ETS('ANN')!",call.=FALSE);
+                list2env(adam_sampleTiny(obsNonzero, obsInSample, Etype, allowMultiplicative, yInSample,
+                                         otLogical, parametersNumber), environment());
             }
         }
     }
@@ -2005,6 +1451,222 @@ adam_checkSampleSize <- function(Etype, Stype, Ttype, allowMultiplicative, arEst
 }
 
 
+# The pool of the selection on a small sample: the candidates the sample can fit, with the
+# components the model letters allow
+adam_samplePoolBuild <- function(obsNonzero, lagsModelMax, Ttype, Stype, allowMultiplicative, nParamExo){
+    # The candidates in this order, with what they need: a trend (T), a damped one (D) or none
+    # (N), and a seasonality (S) or none (N)
+    candidates <- c("ANN"="NN", "MNN"="NN",
+                    "AAN"="TN", "MAN"="TN", "AMN"="TN", "MMN"="TN",
+                    "AAdN"="DN", "MAdN"="DN", "AMdN"="DN", "MMdN"="DN",
+                    "ANA"="NS", "MNA"="NS", "ANM"="NS", "MNM"="NS",
+                    "AAA"="TS", "MAA"="TS", "AAM"="TS", "MAM"="TS",
+                    "AMA"="TS", "MMA"="TS", "AMM"="TS", "MMM"="TS");
+    seasonal <- lagsModelMax!=1;
+    enough <- c("NN"=TRUE, "TN"=obsNonzero > 5+nParamExo, "DN"=obsNonzero > 6+nParamExo,
+                "NS"=seasonal && obsNonzero > lagsModelMax,
+                "TS"=seasonal && obsNonzero > max(6+lagsModelMax+nParamExo, 2*lagsModelMax));
+    trendAllowed <- c("N"=TRUE, "A"=any(Ttype==c("Z","X","A")), "M"=any(Ttype==c("Z","Y","M")));
+    seasonAllowed <- c("N"=TRUE, "A"=any(Stype==c("Z","X","A")), "M"=any(Stype==c("Z","Y","M")));
+    models <- names(candidates);
+    keep <- enough[candidates] & trendAllowed[substr(models,2,2)] &
+        seasonAllowed[substr(models,nchar(models),nchar(models))] &
+        (allowMultiplicative | !grepl("M", models));
+    return(models[keep]);
+}
+
+# The models of a pool that a small sample can fit: those it does not simplify
+adam_samplePoolFilter <- function(modelsPool, obsNonzero, lagsModelMax, nParamExo){
+    simplified <- suppressWarnings(vapply(modelsPool, adam_sampleModelSimplify, character(1),
+                                          obsNonzero, lagsModelMax, nParamExo, USE.NAMES=FALSE));
+    return(unique(modelsPool[simplified==modelsPool]));
+}
+
+# The model without the damping, the trend and the seasonality, in this order, while the sample
+# cannot fit it
+adam_sampleModelSimplify <- function(model, obsNonzero, lagsModelMax, nParamExo){
+    # The observations needed by a trend (T), a damped one (D) or none (N), with a seasonality
+    # (S) or without (N); the level alone needs none
+    needed <- c("TN"=5+nParamExo, "DN"=6+nParamExo, "NS"=lagsModelMax,
+                "TS"=6+lagsModelMax+nParamExo, "DS"=7+lagsModelMax+nParamExo);
+    repeat{
+        trend <- c("N","T","D")[1 + (substr(model,2,2)!="N") + (nchar(model)==4)];
+        components <- paste0(trend, c("N","S")[1 + (substr(model,nchar(model),nchar(model))!="N")]);
+        if(components=="NN" || obsNonzero > needed[components]){
+            break;
+        }
+        warning("Not enough of non-zero observations for the fit of ETS(",model,")! Fitting what I can...",
+                call.=FALSE);
+        model <- switch(trend,
+                        "D"=paste0(substr(model,1,2),substr(model,4,4)),
+                        "T"=paste0(substr(model,1,1),"N",substr(model,nchar(model),nchar(model))),
+                        paste0(substr(model,1,nchar(model)-1),"N"));
+    }
+    return(model);
+}
+
+# The model of the samples of zero to four non-zero observations
+adam_sampleTiny <- function(obsNonzero, obsInSample, Etype, allowMultiplicative, yInSample, otLogical,
+                            parametersNumber){
+    if(obsNonzero>4 || (obsNonzero==0 && obsInSample<=1)){
+        stop("Not enough observations... Even for fitting of ETS('ANN')!",call.=FALSE);
+    }
+    Ttype <- Stype <- "N";
+    phiEstimate <- FALSE;
+    # A level model: estimated, or selected without the error type
+    if(obsNonzero>=3){
+        if(any(Etype==c("A","M"))){
+            modelDo <- "estimate";
+            model <- paste0(Etype,"NN");
+        }
+        else{
+            modelsPool <- c("ANN","MNN")[1:(1+allowMultiplicative)];
+            modelDo <- "select";
+            model <- c("ZNN","ZZZ")[obsNonzero-2];
+            Etype <- "Z";
+            if(obsNonzero==4){
+                warning("You have a very small sample. The only available model is level model.",
+                        call.=FALSE);
+            }
+        }
+        if(obsNonzero==3){
+            persistenceLevel <- 0;
+            persistenceEstimate <- persistenceLevelEstimate <- FALSE;
+            warning("I did not have enough of non-zero observations, so persistence value was set to zero.",
+                    call.=FALSE);
+        }
+    }
+    # The level model with zero persistence and the initial preset
+    else{
+        modelsPool <- NULL;
+        persistenceLevel <- 0;
+        persistenceEstimate <- persistenceLevelEstimate <- FALSE;
+        initialLevel <- switch(obsNonzero+1, 0, yInSample[otLogical], mean(yInSample[otLogical]));
+        initialType <- "provided";
+        initialEstimate <- initialLevelEstimate <- FALSE;
+        if(obsNonzero==0){
+            occurrenceModelProvided <- occurrenceModel <- FALSE;
+            occurrence <- "none";
+        }
+        warning(switch(obsNonzero+1,
+                       "You have a sample with zeroes only. Your forecast will be zero.",
+                       "I did not have enough of non-zero observations, so I used Naive.",
+                       "I did not have enough of non-zero observations, so persistence value was set to zero and initial was preset."),
+                call.=FALSE);
+        modelDo <- "use";
+        model <- "ANN";
+        Etype <- "A";
+        parametersNumber[1,1] <- 0;
+        parametersNumber[2,1] <- 2;
+    }
+    return(mget(intersect(c("Etype", "Stype", "Ttype", "initialEstimate", "initialLevel",
+                            "initialLevelEstimate", "initialType", "model", "modelDo", "modelsPool",
+                            "occurrence", "occurrenceModel", "occurrenceModelProvided",
+                            "parametersNumber", "persistenceEstimate", "persistenceLevel",
+                            "persistenceLevelEstimate", "phiEstimate"), ls())));
+}
+
+
+# The pool of models given as a vector: the strange ones stop, "C" in them combines the rest
+adam_modelsPoolCheck <- function(model){
+    # The letters each position allows: the error, the trend, the damping or the seasonality,
+    # and the seasonality of a damped model
+    allowed <- list(c("A","M","C"), c("N","A","M","C"), c("N","A","M","d","C"), c("N","A","M","C"));
+    strange <- nchar(model)>4 | nchar(model)<3;
+    for(i in 1:4){
+        strange[] <- strange | (nchar(model)>=i & !(substr(model,i,i) %in% allowed[[i]]));
+    }
+    if(any(strange)){
+        stop(paste0("You have defined strange model(s) in the pool: ", paste0(model[strange],collapse=",")),
+             call.=FALSE);
+    }
+    modelsPoolCombiner <- (substr(model,1,1)=="C" | substr(model,2,2)=="C" |
+                               substr(model,3,3)=="C" | substr(model,4,4)=="C");
+    modelsPool <- unique(model[!modelsPoolCombiner]);
+    seasonal <- any(substr(model,nchar(model),nchar(model))!="N");
+    if(any(modelsPoolCombiner)){
+        model <- c("CCN","CCC")[1 + seasonal];
+    }
+    else{
+        model <- paste0("Z", c("Z","N")[1 + all(substr(modelsPool,2,2)=="N")],
+                        c("Z","N")[1 + all(substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="N")]);
+    }
+    return(list(model=model, modelsPool=modelsPool));
+}
+
+# The components of the model, and its damping
+adam_modelComponents <- function(model){
+    if(all(nchar(model)!=c(3,4))){
+        message(paste0("You have defined a strange model: ",model));
+        message("Switching to 'ZZZ'");
+        model <- "ZZZ";
+    }
+    Etype <- substr(model,1,1);
+    Ttype <- substr(model,2,2);
+    Stype <- substr(model,nchar(model),nchar(model));
+    damped <- nchar(model)==4 || any(Ttype==c("Z","X","Y"));
+    if(nchar(model)==4 && substr(model,3,3)!="d"){
+        message(paste0("You have defined a strange model: ", model,
+                       ". Switching to ", paste0(Etype,Ttype,"d",Stype)));
+        model <- paste0(Etype,Ttype,"d",Stype);
+    }
+    return(list(model=model, Etype=Etype, Ttype=Ttype, Stype=Stype, damped=damped));
+}
+
+# The full, the pure or the safe pool ("F", "P" or "S"), narrowed by the other letters: X the
+# additive or no component, Y the multiplicative or none
+adam_modelsPoolNamed <- function(letter, Etype, Ttype, Stype){
+    modelsPool <- switch(letter,
+                         "F"=c("ANN","AAN","AAdN","AMN","AMdN","ANA","AAA","AAdA","AMA","AMdA",
+                               "ANM","AAM","AAdM","AMM","AMdM","MNN","MAN","MAdN","MMN","MMdN",
+                               "MNA","MAA","MAdA","MMA","MMdA","MNM","MAM","MAdM","MMM","MMdM"),
+                         "P"=c("ANN","AAN","AAdN","ANA","AAA","AAdA",
+                               "MNN","MMN","MMdN","MNM","MMM","MMdM"),
+                         "S"=c("ANN","AAN","AAdN","ANA","AAA","AAdA","MNN","MAN","MAdN","MNA",
+                               "MAA","MAdA","MNM","MAM","MAdM","MMN","MMdN","MMM","MMdM"));
+    allows <- list("X"=c("A","N"), "Y"=c("M","N"), "N"="N", "A"="A", "M"="M");
+    parts <- list(substr(modelsPool,1,1), substr(modelsPool,2,2),
+                  substr(modelsPool,nchar(modelsPool),nchar(modelsPool)));
+    types <- c(Etype, Ttype, Stype);
+    keep <- rep(TRUE, length(modelsPool));
+    for(i in 1:3){
+        if(!is.null(allows[[types[i]]])){
+            keep[] <- keep & parts[[i]] %in% allows[[types[i]]];
+        }
+    }
+    return(modelsPool[keep]);
+}
+
+
+# The models on non-positive data: the pool without the multiplicative ones, a selection among
+# the additive ones, a warning for a multiplicative model
+adam_modelsAdditive <- function(model, Etype, Ttype, Stype, modelsPool){
+    multiplicative <- (substr(modelsPool,1,1)=="M" | substr(modelsPool,2,2)=="M" |
+                           substr(modelsPool,nchar(modelsPool),nchar(modelsPool))=="M");
+    if(any(multiplicative)){
+        modelsPool <- modelsPool[!multiplicative];
+        # This is needed, because PPP and FFF use pool, not Branch and bound
+        if(!any(unlist(strsplit(model,"")) %in% c("P","F"))){
+            warning("Only additive models are allowed for your data. Amending the pool.", call.=FALSE);
+        }
+    }
+    if(any(model==c("PPP","FFF","YYY")) || any(unlist(strsplit(model,""))=="Z")){
+        model <- "XXX";
+        Etype[] <- "A";
+        Ttype[] <- switch(Ttype,"Y"=,"Z"=,"P"=,"F"="X",Ttype);
+        Stype[] <- switch(Stype,"Y"=,"Z"=,"P"=,"F"="X",Stype);
+        modelsPool <- NULL;
+        warning("Only additive models are allowed for your data. Changing the selection mechanism.",
+                call.=FALSE);
+    }
+    else if(any(c(Etype,Ttype,Stype)=="M")){
+        warning("Your data contains non-positive values, so the ETS(",model,") might break down.",
+                call.=FALSE);
+    }
+    return(list(model=model, Etype=Etype, Ttype=Ttype, Stype=Stype, modelsPool=modelsPool));
+}
+
+
 #### Regressors: their data, the initials of their coefficients and their smoothing parameters ####
 adam_checkXreg <- function(Etype, arimaModel, bounds, data, distribution, ellipsis, etsModel,
                             formula, formulaToUse, h, holdout, ic, initialType, initialXreg,
@@ -2021,75 +1683,11 @@ adam_checkXreg <- function(Etype, arimaModel, bounds, data, distribution, ellips
         formulaToUse <- NULL;
     }
     else{
-        # The missing values of the regressors (not of the response): the first observed
-        # value of each, for all the ways of getting their initials below
-        xregNAs <- which(is.na(xregData),arr.ind=TRUE);
-        xregNAs <- xregNAs[colnames(xregData)[xregNAs[,2]]!=responseName,,drop=FALSE];
-        if(nrow(xregNAs)>0){
-            warning("Some variables contained NAs. This might cause issues in the estimation. ",
-                    "I will substitute those values with the first non-NA values",
-                    call.=FALSE);
-            xregNonNAs <- which(!is.na(xregData),arr.ind=TRUE);
-            # Go through variables and substitute values
-            for(i in unique(xregNAs[,2])){
-                # This split on [row, column] is needed, because data.table is funny with cbind(row,column)
-                xregData[xregNAs[xregNAs[,2]==i,,drop=FALSE]] <- xregData[xregNonNAs[which(xregNonNAs[,2]==i)[1],1],
-                                                       xregNonNAs[which(xregNonNAs[,2]==i)[1],2]];
-            }
-            # The same values in the data, from which the selected regressors are refitted
-            data[xregNAs] <- xregData[xregNAs];
-        }
-        # The character variables are factors, with all their levels as the other factors,
-        # in the data too
-        if(is.data.frame(xregData) && any(sapply(xregData, is.character))){
-            warning("You have character variables in your data. ",
-                    "I will treat them as factors, but it is advised to convert them to factors manually",
-                    call.=FALSE);
-            for(name in names(which(sapply(xregData, is.character)))){
-                xregData[[name]] <- factor(xregData[[name]]);
-                data[[name]] <- factor(data[[name]]);
-            }
-        }
-        # The initials provided for some of the regressors only (the columns of their model
-        # matrix): the others are estimated, and the provided ones are set after that
-        if(!is.null(initialXreg) && regressors!="select"){
-            xregNamesAll <- make.names(setdiff(colnames(model.matrix(
-                if(is.null(formulaToUse)) reformulate(setdiff(colnames(xregData), responseName),
-                                                      response=responseName) else formulaToUse,
-                data=as.data.frame(xregData))), "(Intercept)"));
-            # The unnamed values are in the order of the variables
-            if(is.null(names(initialXreg))){
-                names(initialXreg) <- xregNamesAll[seq_along(initialXreg)];
-            }
-            if(!all(xregNamesAll %in% names(initialXreg))){
-                initialXregEstimate <- TRUE;
-            }
-            else{
-                initialXreg <- initialXreg[xregNamesAll];
-            }
-        }
-        if(regressors=="select"){
-            # If this has not happened by chance, then switch to optimisation
-            if(!is.null(initialXreg) && any(initialType==c("backcasting","optimal","two-stage"))){
-                warning("Variables selection does not work with the provided initials for explantory variables. I will drop them.",
-                        call.=FALSE);
-                initialXreg <- NULL;
-                initialXregEstimate <- TRUE;
-            }
-            if(!is.null(persistenceXreg) && any(persistenceXreg!=0)){
-                warning(paste0("I cannot do variables selection with the provided smoothing parameters ",
-                               "for explantory variables. I will estimate them instead."),
-                        call.=FALSE);
-                persistenceXreg <- NULL;
-            }
-        }
+        list2env(adam_xregPrepare(data, formulaToUse, initialType, initialXreg, initialXregEstimate,
+                                  persistenceXreg, regressors, responseName, xregData), environment());
     }
 
-    # Use alm() in order to fit the preliminary model for xreg
     if(xregModel){
-        # List of initials. The first element is additive error, the second is the multiplicative one
-        xregModelInitials <- vector("list",2);
-
         # A regression of the sizes of an occurrence model (not the occurrence of om()) is
         # fitted to the non-zero values, with the occurrence model fitted as adam() does
         occurrenceSizes <- (!etsModel && !arimaModel) && regressors!="adapt" && occurrenceModel &&
@@ -2100,914 +1698,62 @@ adam_checkXreg <- function(Etype, arimaModel, bounds, data, distribution, ellips
                                            bounds=bounds, regressors=regressors, silent=TRUE));
         }
 
-        if(regressors!="select"){
-            #### Initial xreg are not provided ####
-            # If the initials are not provided, estimate them using ALM.
-            if(initialXregEstimate){
-                initialXregProvided <- FALSE;
-                # The function returns an ALM model
-                xregInitialiser <- function(Etype,distribution,formulaToUse,subset,responseName){
-                    # The regressors of the probability of occurrence (om(), omg()) are estimated
-                    # on all the observations, with the occurrence indicator as the response
-                    occurrenceIndicator <- occurrenceModel && distribution=="plogis";
-                    if(occurrenceIndicator){
-                        xregData[1:obsInSample,1] <- otLogical*1;
-                        subset <- subsetOccurrence;
-                    }
-                    # Fix the default distribution for ALM
-                    if(distribution=="default"){
-                        distribution <- switch(Etype,
-                                               "A"="dnorm",
-                                               "M"="dlnorm");
-                    }
-                    else if(distribution=="dllaplace"){
-                        distribution <- "dlaplace";
-                        Etype <- "M";
-                    }
-                    else if(distribution=="dls"){
-                        distribution <- "ds";
-                        Etype <- "M";
-                    }
-                    else if(distribution=="dlgnorm"){
-                        distribution <- "dgnorm";
-                        Etype <- "M";
-                    }
-                    # This is needed to see if trend was asked explicitly. If not, we add it to get rid of bias
-                    trendIncluded <- any(colnames(xregData)[-1]=="trend");
-                    # Unless a regressor is a trend itself: alm() drops the first of two variables
-                    # correlated above 0.999, which would be the regressor rather than the trend
-                    xregNumeric <- Filter(is.numeric, as.data.frame(xregData)[which(subset),-1,drop=FALSE]);
-                    trendCollinear <- ncol(xregNumeric)>0 &&
-                        any(abs(suppressWarnings(cor(xregNumeric, seq_len(nrow(xregNumeric)))))>=0.999, na.rm=TRUE);
-                    trendIncluded <- trendIncluded || trendCollinear;
-                    formulaIsAbsent <- is.null(formulaToUse);
-                    formulaOriginal <- formulaToUse;
-                    # If the formula is not provided, construct one
-                    if(formulaIsAbsent){
-                        if(Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt"))){
-                            if(trendIncluded){
-                                formulaOriginal <- formulaToUse <- as.formula(paste0("log(`",responseName,"`)~."));
-                            }
-                            else{
-                                formulaOriginal <- as.formula(paste0("log(`",responseName,"`)~."));
-                                formulaToUse <- as.formula(paste0("log(`",responseName,"`)~.+trend"));
-                            }
-                        }
-                        else{
-                            if(trendIncluded){
-                                formulaOriginal <- formulaToUse <- as.formula(paste0("`",responseName,"`~."));
-                            }
-                            else{
-                                formulaOriginal <- as.formula(paste0("`",responseName,"`~."));
-                                formulaToUse <- as.formula(paste0("`",responseName,"`~.+trend"));
-                            }
-                        }
-                    }
-                    else{
-                        # If formula only contains ".", then just change it
-                        if(length(all.vars(formulaToUse))==2 && all.vars(formulaToUse)[2]=="."){
-                            # Take logs if the model requires that
-                            if((Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt")))){
-                                if(trendIncluded){
-                                    formulaToUse <- as.formula(paste0("log(`",responseName,"`)~."));
-                                }
-                                else{
-                                    formulaToUse <- as.formula(paste0("log(`",responseName,"`)~.+trend"));
-                                }
-                            }
-                            else{
-                                if(trendIncluded){
-                                    formulaToUse <- as.formula(paste0(responseName,"~."));
-                                }
-                                else{
-                                    formulaToUse <- as.formula(paste0(responseName,"~.+trend"));
-                                }
-                            }
-                        }
-                        else{
-                            trendIncluded <- any(all.vars(formulaToUse)[-1]=="trend") || trendCollinear;
-                            # If formula contains only one element, or several, but no logs, then change response formula
-                            if((length(formulaToUse[[2]])==1 ||
-                                (length(formulaToUse[[2]])>1 & !any(as.character(formulaToUse[[2]])=="log"))) &&
-                               (Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt")))){
-                                if(trendIncluded){
-                                    formulaToUse <- update(formulaToUse,log(.)~.);
-                                }
-                                else{
-                                    formulaToUse <- update(formulaToUse,log(.)~.+trend);
-                                }
-                            }
-                            else{
-                                if(!trendIncluded){
-                                    formulaToUse <- update(formulaToUse,.~.+trend);
-                                }
-                            }
-                        }
-                    }
-                    almModel <- do.call(alm,list(formula=formulaToUse,data=xregData,distribution=distribution,subset=which(subset)));
-                    # Remove trend
-                    if(!trendIncluded){
-                        almModel$coefficients <- almModel$coefficients[names(almModel$coefficients)!="trend"];
-                        almModel$data <- almModel$data[,colnames(almModel$data)!="trend",drop=FALSE];
-                        if(formulaIsAbsent){
-                            almModel$call$formula <- as.formula(paste0("`",responseName,"`~."));
-                        }
-                        else{
-                            almModel$call$formula <- formulaOriginal;
-                        }
-                        # Reset terms, they are not needed for what comes, but confuse the formula() method
-                        almModel$terms <- NULL;
-                    }
-                    # The inverse odds ratio falls with the probability
-                    if(occurrenceIndicator && occurrence=="inverse-odds-ratio"){
-                        almModel$coefficients[] <- -almModel$coefficients;
-                    }
-                    return(almModel);
-                }
+        # The observed in-sample values, and those without the zeros of an occurrence model
+        subsetOccurrence <- c(!yNAValues[1:obsInSample], rep(FALSE, obsAll-obsInSample));
+        subset <- subsetOccurrence;
+        if(occurrenceModel){
+            subset[1:obsInSample][!otLogical] <- FALSE;
+        }
 
-                # Extract names of variables, fix the formula
-                if(!is.null(formulaToUse)){
-                    formulaToUse <- as.formula(formulaToUse);
-                    responseName <- all.vars(formulaToUse)[1];
-                    # If there are spaces in names, give a warning
-                    if(any(grepl("[^A-Za-z0-9,;._-]", all.vars(formulaToUse))) ||
-                       # If the names only contain numbers
-                       any(suppressWarnings(!is.na(as.numeric(all.vars(formulaToUse)))))){
-                        warning("The names of your variables contain special characters ",
-                                "(such as numbers, spaces, comas, brackets etc). adam() might not work properly. ",
-                                "It is recommended to use `make.names()` function to fix the names of variables.",
-                                call.=FALSE);
-                        formulaToUse <- as.formula(paste0(gsub(paste0("`",all.vars(formulaToUse)[1],"`"),
-                                                          make.names(all.vars(formulaToUse)[1]),
-                                                          all.vars(formulaToUse)[1]),"~",
-                                                     paste0(mapply(gsub, paste0("`",all.vars(formulaToUse)[-1],"`"),
-                                                                   make.names(all.vars(formulaToUse)[-1]),
-                                                                   labels(terms(formulaToUse))),
-                                                            collapse="+")));
-                    }
-                    formulaProvided <- TRUE;
-                }
-                else{
-                    formulaToUse <- reformulate(make.names(colnames(xregData)[-1]), response=responseName);
-                    # Quotes are needed here for the insecure names of variables, such as "1", "2", "3" etc
-                    # formulaToUse <- reformulate(setdiff(paste0("`",colnames(xregData),"`"),
-                    #                                     paste0("`",responseName,"`")),
-                    #                             response=responseName);
-                    formulaProvided <- FALSE;
-                }
-
-                # Robustify the names of variables
-                colnames(xregData) <- make.names(colnames(xregData));
-                # This allows to save the original data
-                xreg <- xregData;
-                obsXreg <- nrow(xregData);
-
-                # Form subset in order to use in-sample only
-                subset <- rep(FALSE, obsAll);
-                subset[1:obsInSample] <- !yNAValues[1:obsInSample]; # the observed values only
-                # Exclude zeroes if this is an occurrence model (demand-size models need
-                # only non-zero demand; for the occurrence-probability ALM we keep all obs)
-                if(occurrenceModel){
-                    subsetOccurrence <- subset;
-                    subset[1:obsInSample][!otLogical] <- FALSE;
-                }
-
-                #### Pure regression ####
-                #### If this is just a regression ALM
-                if((!etsModel && !arimaModel) && regressors!="adapt"){
-                    # Return the estimated model based on the provided xreg
-                    if(is.null(formulaToUse)){
-                        formulaToUse <- reformulate(setdiff(colnames(xregData), responseName), response=responseName);
-                        # formulaToUse <- as.formula(paste0("`",responseName,"`~."));
-                        formulaProvided <- FALSE;
-                    }
-                    else{
-                        formulaProvided <- TRUE;
-                    }
-                    if(distribution=="default"){
-                        distribution[] <- "dnorm";
-                    }
-
-                    # Redefine loss for ALM
-                    loss <- switch(loss,
-                                   "MSEh"=,"TMSE"=,"GTMSE"=,"MSCE"="MSE",
-                                   "MAEh"=,"TMAE"=,"GTMAE"=,"MACE"="MAE",
-                                   "HAMh"=,"THAM"=,"GTHAM"=,"CHAM"="HAM",
-                                   loss);
-                    lossOriginal <- loss;
-                    if(loss=="custom"){
-                        loss <- lossFunction;
-                    }
-
-                    # Either use or select the model via greybox functions
-                    # Fisher Information
-                    if(is.null(ellipsis$FI)){
-                        FI <- FALSE;
-                    }
-                    else{
-                        FI <- ellipsis$FI;
-                    }
-                    almSubset <- if(occurrenceModel && !occurrenceSizes) which(subsetOccurrence) else which(subset);
-                    almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
-                                                    distribution=distribution, loss=loss,
-                                                    subset=almSubset,
-                                                    # The missing values alone are out of the subset
-                                                    occurrence=if(occurrenceMissingOnly || occurrenceSizes) "none" else omModel,
-                                                    FI=FI));
-                    almModel$call$data <- as.name(yName);
-                    if(occurrenceSizes){
-                        almModel$occurrence <- omModel;
-                    }
-                    return(almModel);
-                }
-
-                #### ETSX / ARIMAX ####
-                almModel <- NULL;
-                if(Etype!="Z"){
-                    almModel <- xregInitialiser(Etype,distribution,formulaToUse,subset,responseName);
-                    # If Intercept was not included, substitute with zero
-                    if(!any(names(almModel$coefficients)=="(Intercept)")){
-                        almIntercept <- 0;
-                    }
-                    else{
-                        almIntercept <- almModel$coefficients["(Intercept)"];
-                    }
-                    if(Etype=="A"){
-                        # If this is just a regression, include intercept
-                        if(!etsModel && !arimaModel){
-                            xregModelInitials[[1]]$initialXreg <- almModel$coefficients;
-                        }
-                        else{
-                            xregModelInitials[[1]]$initialXreg <- almModel$coefficients[-1];
-                        }
-                        if(is.null(formulaToUse)){
-                            xregModelInitials[[1]]$formula <- formulaToUse <- formula(almModel);
-                        }
-                        xregModelInitials[[1]]$other <- almModel$other;
-                        names(xregModelInitials[[1]]$initialXreg) <-
-                            make.names(names(xregModelInitials[[1]]$initialXreg));
-                    }
-                    else{
-                        # If this is just a regression, include intercept
-                        if(!etsModel && !arimaModel){
-                            xregModelInitials[[2]]$initialXreg <- almModel$coefficients;
-                        }
-                        else{
-                            xregModelInitials[[2]]$initialXreg <- almModel$coefficients[-1];
-                        }
-                        if(is.null(formulaToUse)){
-                            xregModelInitials[[2]]$formula <- formulaToUse <- formula(almModel);
-                        }
-                        xregModelInitials[[2]]$other <- almModel$other;
-                        names(xregModelInitials[[2]]$initialXreg) <-
-                            make.names(names(xregModelInitials[[2]]$initialXreg));
-                    }
-                }
-                # If we are selecting the appropriate error, produce two models: for "M" and for "A"
-                else{
-                    # Additive model
-                    almModel <- xregInitialiser("A",distribution,formulaToUse,subset,responseName);
-                    # If Intercept was not included, substitute with zero
-                    if(!any(names(almModel$coefficients)=="(Intercept)")){
-                        almIntercept <- 0;
-                    }
-                    else{
-                        almIntercept <- almModel$coefficients["(Intercept)"];
-                    }
-                    # If this is just a regression, include intercept
-                    if(!etsModel && !arimaModel){
-                        xregModelInitials[[1]]$initialXreg <- almModel$coefficients;
-                    }
-                    else{
-                        xregModelInitials[[1]]$initialXreg <- almModel$coefficients[-1];
-                    }
-                    if(is.null(formulaToUse)){
-                        xregModelInitials[[1]]$formula <- formula(almModel);
-                    }
-                    xregModelInitials[[1]]$other <- almModel$other;
-                    # Multiplicative model
-                    almModel[] <- xregInitialiser("M",distribution,formulaToUse,subset,responseName);
-                    # If Intercept was not included, substitute with zero
-                    if(!any(names(almModel$coefficients)=="(Intercept)")){
-                        almIntercept <- 0;
-                    }
-                    else{
-                        almIntercept <- almModel$coefficients["(Intercept)"];
-                    }
-                    # If this is just a regression, include intercept
-                    if(!etsModel && !arimaModel){
-                        xregModelInitials[[2]]$initialXreg <- almModel$coefficients;
-                    }
-                    else{
-                        xregModelInitials[[2]]$initialXreg <- almModel$coefficients[-1];
-                    }
-                    if(is.null(formulaToUse)){
-                        xregModelInitials[[2]]$formula <- formula(almModel);
-                    }
-                    xregModelInitials[[2]]$other <- almModel$other;
-                }
-
-                # If this is just a regression, include intercept
-                if(!etsModel && !arimaModel){
-                    xregNumber <- ncol(almModel$data);
-                    xregNames <- names(coef(almModel));
-                }
-                else{
-                    # Write down the number and names of parameters
-                    xregNumber <- ncol(almModel$data)-1;
-                    xregNames <- names(coef(almModel))[-1];
-                }
-                # The original number of obs in xreg
-                obsXreg <- nrow(xreg);
-
-                #### Data manipulations for further use ####
-                # This formula is needed in order to expand the data
-                if(is.null(formulaToUse)){
-                    formulaToUse <- as.formula(paste0("`",responseName,"`~",
-                                                      paste0(colnames(xreg)[colnames(xreg)!=responseName],
-                                                             collapse="+")));
-                }
-
-                # Remove variables without variability and amend the formula
-                noVariability <- setNames(vector("logical",ncol(xreg)),colnames(xreg));
-                noVariability[] <- apply((as.matrix(xreg[1:obsInSample,])==matrix(xreg[1,],obsInSample,ncol(xreg),byrow=TRUE)),2,all);
-                noVariabilityNames <- names(noVariability)[noVariability];
-                # If there are variables with no variability, their nams are in the formula, and the formula is not "y~.",
-                # update the formula
-                if(any(noVariability) && any(all.vars(formulaToUse) %in% names(noVariability)) &&
-                   all.vars(formulaToUse)[2]!="."){
-                    formulaToUse <- update.formula(formulaToUse,
-                                                   paste0(".~.-",paste0(noVariabilityNames,collapse="-")));
-                }
-
-                # Robustify the names of variables
-                colnames(xreg) <- make.names(colnames(xreg),unique=TRUE);
-                # The names of the original variables
-                xregNamesOriginal <- colnames(xregData)[-1];
-                # If xreg is data frame or formula is provided, do model.frame
-                additionalManipulations <- (is.data.frame(xreg) || formulaProvided);
-                if(additionalManipulations){
-                    # Expand the variables. We cannot use alm, because it is based on obsInSample
-                    xregData <- model.frame(formulaToUse,data=as.data.frame(xreg));
-                }
-                else{
-                    # If there was no formula, use the alm variable names
-                    if(!formulaProvided){
-                        formulaToUse <- as.formula(paste0("`",responseName,"`~",
-                                                      paste0(xregNames, collapse="+")));
-                    }
-                    # Use the matrix with the xregNames - all the others are dropped by alm().
-                    xregData <- as.matrix(xreg)[,xregNames,drop=FALSE];
-                    xregNumber <- ncol(xregData);
-                    xregNames <- colnames(xregData);
-                }
-
-                # Get the response variable, just in case it was transformed
-                if(additionalManipulations && length(formulaToUse[[2]])>1){
-                    y <- xregData[,1];
-                    yInSample <- matrix(y[1:obsInSample],ncol=1);
-                    if(holdout){
-                        yHoldout <- matrix(y[-c(1:obsInSample)],ncol=1);
-                    }
-                }
-
-                #### Drop the variables with no variability and perfectly correlated
-                # This part takes care of explanatory variables potentially dropped by ALM
-                # This is needed to get the correct xregData
-                if(additionalManipulations){
-                    # If we have a data.frame and there is a factor, we need to compare variables
-                    # differently
-                    xregFactors <- FALSE
-                    if(is.data.frame(xreg) && any(sapply(xreg, is.factor))){
-                        xregFactors[] <- TRUE;
-                    }
-                    xregExpanded <- colnames(model.matrix(xregData,data=xregData));
-                    # Remove intercept
-                    if(any(xregExpanded=="(Intercept)")){
-                        xregExpanded <- xregExpanded[-1];
-                    }
-                    # Fix formula in case some variables were dropped by alm()
-                    if(any(!(xregExpanded %in% xregNames))){
-                        xregNamesRetained <- rep(TRUE,length(xregNamesOriginal));
-                        for(i in 1:length(xregNamesOriginal)){
-                            if(xregFactors){
-                                xregNamesRetained[i] <- any(grepl(xregNamesOriginal[i], xregNames));
-                            }
-                            else{
-                                xregNamesRetained[i] <- any(xregNamesOriginal[i] %in% xregNames);
-                            }
-                        }
-
-                        # If the dropped variables are in the formula, update the formula
-                        if(length(all.vars(formulaToUse))>2 &&
-                           any(all.vars(formulaToUse) %in% xregNamesOriginal[!xregNamesRetained])){
-                            formulaToUse <- update.formula(formulaToUse,
-                                                           paste0(".~.-",
-                                                                  paste(xregNamesOriginal[!xregNamesRetained],
-                                                                        collapse="-")));
-                        }
-                        xregNamesOriginal <- c(responseName,xregNamesOriginal[xregNamesRetained]);
-                        xregData <- model.frame(formulaToUse,data=as.data.frame(xreg[,xregNamesOriginal,drop=FALSE]));
-                        # Remove response variable
-                        xregNamesOriginal <- xregNamesOriginal[-1]
-                    }
-
-                    # Binary, flagging factors in the data
-                    xregFactors <- (attr(terms(xregData),"dataClasses")=="factor")[-1];
-
-                    # Expanded stuff with all levels for factors
-                    if(any(xregFactors)){
-                        # Levels for the factors
-                        xregFactorsLevels <- lapply(xreg,levels);
-                        xregFactorsLevels[[responseName]] <- NULL;
-                        xregModelMatrix <- model.matrix(xregData,xregData,
-                                                        contrasts.arg=lapply(xregData[attr(terms(xregData),"dataClasses")=="factor"],
-                                                                             contrasts, contrasts=FALSE));
-                        xregNamesModified <- colnames(xregModelMatrix)[-1];
-                    }
-                    else{
-                        # Drop variables that were removed by alm()
-                        xregModelMatrix <- model.matrix(xregData,data=xregData);
-                        xregNamesModified <- xregNames;
-                    }
-                    # Drop the unused variables
-                    xregData <- as.matrix(xregModelMatrix);
-
-                    # Remove intercept
-                    interceptIsPresent <- FALSE;
-                    if(any(colnames(xregData)=="(Intercept)")){
-                        interceptIsPresent[] <- TRUE;
-                        xregData <- xregData[,-1,drop=FALSE];
-                    }
-                    xregNumber <- ncol(xregData);
-
-                    # If there are more obs in xreg than the obsAll cut the thing
-                    if(obsXreg>=obsAll){
-                        xregData <- xregData[1:obsAll,,drop=FALSE]
-                    }
-                    # If there are less xreg observations than obsAll, use Naive
-                    else{
-                        newnRows <- obsAll-obsXreg;
-                        xregData <- rbind(xregData,matrix(rep(tail(xregData,1),each=newnRows),newnRows,xregNumber));
-                    }
-
-                    #### Fix parameters for factors ####
-                    {
-                        # This part of code is terrible! In the nutshell, what it does it keeps
-                        # all levels of categorical variables to make sure that the same
-                        # categorical variable is treated equally inside ETS. This is mainly needed
-                        # for regressors="adapt", so that "colour" changes over time in the same way,
-                        # and not that "blue" reacts to error more than "red"... Why did I do that?!!
-                        #### Potentially, this part can be removed to save some brain cells from destruction
-
-                        # The indices of the original parameters
-                        xregParametersMissing <- setNames(vector("numeric",xregNumber),xregNamesModified);
-                        # # The indices of the original parameters
-                        xregParametersIncluded <- setNames(vector("numeric",xregNumber),xregNamesModified);
-                        # The vector, marking the same values of smoothing parameters
-                        if(interceptIsPresent){
-                            xregParametersPersistence <- setNames(attr(xregModelMatrix,"assign")[-1],xregNamesModified);
-                        }
-                        else{
-                            xregParametersPersistence <- setNames(attr(xregModelMatrix,"assign"),xregNamesModified);
-                        }
-                        if(length(xregParametersPersistence)==0){
-                            xregParametersPersistence <- 0;
-                        }
-
-                        # If there are factors not in the alm data, create additional initials
-                        if(any(xregFactors) && any(!(xregNamesModified %in% xregNames))){
-                            xregAbsent <- !(xregNamesModified %in% xregNames);
-                            xregParametersNew <- setNames(rep(NA,xregNumber),xregNamesModified);
-                            # If there is stuff for additive error model, fix parameters
-                            if(!is.null(xregModelInitials[[1]])){
-                                xregParametersNew[!xregAbsent] <- xregModelInitials[[1]]$initialXreg;
-                                # Go through new names and find, where they came from. Then get the missing parameters
-                                for(i in which(xregAbsent)){
-                                    # Find the name of the original variable
-                                    # Use only the last value... hoping that the names like x and x1 are not used.
-                                    xregNameFoundID <- sapply(xregNamesOriginal,grepl,xregNamesModified[i]);
-                                    xregNameFound <- tail(names(xregNameFoundID)[xregNameFoundID],1);
-                                    # Get the indices of all k-1 levels
-                                    xregParametersIncluded[xregNames[xregNames %in% paste0(xregNameFound,
-                                                                                           xregFactorsLevels[[xregNameFound]])]] <- i;
-                                    # Get the index of the absent one
-                                    xregParametersMissing[i] <- i;
-                                    # Fill in the absent one, add intercept
-                                    xregParametersNew[i] <- almIntercept;
-                                    xregParametersNew[xregNamesModified[xregParametersIncluded==i]] <- almIntercept +
-                                        xregParametersNew[xregNamesModified[xregParametersIncluded==i]];
-                                    # normalise all of them
-                                    xregParametersNew[xregNamesModified[c(which(xregParametersIncluded==i),i)]] <-
-                                        xregParametersNew[xregNamesModified[c(which(xregParametersIncluded==i),i)]] -
-                                        mean(xregParametersNew[xregNamesModified[c(which(xregParametersIncluded==i),i)]]);
-
-                                }
-                                # Write down the new parameters
-                                xregModelInitials[[1]]$initialXreg <- xregParametersNew;
-                            }
-                            # If there is stuff for multiplicative error model, fix parameters
-                            if(!is.null(xregModelInitials[[2]])){
-                                xregParametersNew[!xregAbsent] <- xregModelInitials[[2]]$initialXreg;
-                                # Go through new names and find, where they came from. Then get the missing parameters
-                                for(i in which(xregAbsent)){
-                                    # Find the name of the original variable
-                                    # Use only the last value... hoping that the names like x and x1 are not used.
-                                    xregNameFoundID <- sapply(xregNamesOriginal,grepl,xregNamesModified[i]);
-                                    xregNameFound <- tail(names(xregNameFoundID)[xregNameFoundID],1);
-                                    # Get the indices of all k-1 levels
-                                    xregParametersIncluded[xregNames[xregNames %in% paste0(xregNameFound,
-                                                                                           xregFactorsLevels[[xregNameFound]])]] <- i;
-
-                                    # Get the index of the absent one
-                                    xregParametersMissing[i] <- i;
-                                    # Fill in the absent one, add intercept
-                                    xregParametersNew[i] <- almIntercept;
-                                    xregParametersNew[xregNamesModified[xregParametersIncluded==i]] <- almIntercept +
-                                        xregParametersNew[xregNamesModified[xregParametersIncluded==i]];
-                                    # normalise all of them
-                                    xregParametersNew[xregNamesModified[c(which(xregParametersIncluded==i),i)]] <-
-                                        xregParametersNew[xregNamesModified[c(which(xregParametersIncluded==i),i)]] -
-                                        mean(xregParametersNew[xregNamesModified[c(which(xregParametersIncluded==i),i)]]);
-                                }
-                                # Write down the new parameters
-                                xregModelInitials[[2]]$initialXreg <- xregParametersNew;
-                            }
-                            xregNames <- xregNamesModified;
-                        }
-                        # The vector of parameters that should be estimated (numeric + original levels of factors)
-                        xregParametersEstimated <- xregParametersIncluded
-                        xregParametersEstimated[xregParametersEstimated!=0] <- 1;
-                        xregParametersEstimated[xregParametersMissing==0 & xregParametersIncluded==0] <- 1;
-                    }
-                }
-                else{
-                    # If there are more obs in xreg than the obsAll cut the thing
-                    if(obsXreg>=obsAll){
-                        xregData <- xregData[1:obsAll,,drop=FALSE]
-                    }
-                    # If there are less xreg observations than obsAll, use Naive
-                    else{
-                        newnRows <- obsAll-obsXreg;
-                        xregData <- rbind(xregData,matrix(rep(tail(xregData,1),each=newnRows),newnRows,xregNumber));
-                    }
-                    xregFactors <- FALSE;
-                    xregParametersPersistence <- setNames(c(1:xregNumber),xregNames);
-                    xregParametersEstimated <- setNames(rep(1,xregNumber),xregNames);
-                    xregParametersMissing <- setNames(c(1:xregNumber),xregNames);
-                    xregParametersIncluded <- setNames(c(1:xregNumber),xregNames);
-                }
-
-                # The initials provided for some of the regressors: their values, not estimated
-                if(!is.null(initialXreg)){
-                    for(k in which(!sapply(xregModelInitials, is.null))){
-                        xregModelInitials[[k]]$initialXreg[names(initialXreg)] <- initialXreg;
-                    }
-                    xregParametersEstimated[names(initialXreg)] <- 0;
-                    parametersNumber[2,2] <- parametersNumber[2,2] + length(initialXreg);
-                    # The level of a factor left out of the regression keeps the levels summing to zero
-                    for(i in which(xregParametersIncluded==0 & xregParametersMissing!=0)){
-                        for(k in which(!sapply(xregModelInitials, is.null))){
-                            xregModelInitials[[k]]$initialXreg[i] <-
-                                -sum(xregModelInitials[[k]]$initialXreg[xregParametersIncluded==i]);
-                        }
-                    }
-                }
-
-                # Remove xreg, just to preserve some memory
-                rm(xreg);
-                # Clean memory if have a big object
-                if(obsInSample>10000){
-                    gc(verbose=FALSE);
-                }
+        # A pure regression is the model of alm(): its distribution and loss
+        if((!etsModel && !arimaModel) && regressors!="adapt"){
+            if(distribution=="default"){
+                distribution[] <- "dnorm";
             }
-            #### Initial xreg are provided ####
-            else{
-                #### Pure regression ####
-                #### If this is just a regression, then this must be a reuse of alm.
-                if((!etsModel && !arimaModel) && regressors!="adapt"){
-                    # Return the estimated model based on the provided xreg
-                    if(is.null(formulaToUse)){
-                        formulaToUse <- as.formula(paste0("`",responseName,"`~."));
-                    }
-                    if(distribution=="default"){
-                        distribution[] <- "dnorm";
-                    }
-                    # Redefine loss for ALM
-                    loss <- switch(loss,
-                                   "MSEh"=,"TMSE"=,"GTMSE"=,"MSCE"="MSE",
-                                   "MAEh"=,"TMAE"=,"GTMAE"=,"MACE"="MAE",
-                                   "HAMh"=,"THAM"=,"GTHAM"=,"CHAM"="HAM",
-                                   loss);
-                    lossOriginal <- loss;
-                    if(loss=="custom"){
-                        loss <- lossFunction;
-                    }
-
-                    # Form subset in order to use in-sample only
-                    subset <- rep(FALSE, obsAll);
-                    subset[1:obsInSample] <- !yNAValues[1:obsInSample]; # the observed values only
-                    # Exclude zeroes if this is an occurrence model
-                    if(occurrenceModel){
-                        subset[1:obsInSample][!otLogical] <- FALSE;
-                    }
-                    # Fisher Information
-                    if(is.null(ellipsis$FI)){
-                        FI <- FALSE;
-                    }
-                    else{
-                        FI <- ellipsis$FI;
-                    }
-                    if(is.null(ellipsis$B)){
-                        B <- initialXreg;
-                    }
-                    else{
-                        B <- ellipsis$B;
-                    }
-                    almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
-                                                    distribution=distribution, loss=loss, subset=which(subset),
-                                                    occurrence=occurrence,FI=FI,
-                                                    parameters=B,fast=TRUE));
-                    almModel$call$data <- as.name(yName);
-                    return(almModel);
-                }
-                #### InitialXreg is provided ####
-                else{
-                    # Save the original data
-                    xreg <- xregData;
-                    initialXregProvided <- TRUE;
-                    # Robustify the names of variables
-                    colnames(xreg) <- make.names(colnames(xreg),unique=TRUE);
-
-                    # This formula is needed only to expand xreg
-                    if(is.null(formulaToUse)){
-                        responseName <- colnames(xreg)[1]
-                        formulaToUse <- as.formula(paste0("`",responseName,"`~",
-                                                          paste0(colnames(xreg)[colnames(xreg)!=responseName],
-                                                                 collapse="+")));
-                    }
-                    # Extract names and form a proper matrix for the regression
-                    else{
-                        responseName <- all.vars(formulaToUse)[1];
-                    }
-
-                    # Get the names of initials
-                    xregNames <- names(initialXreg);
-
-                    # The names of the original variables
-                    xregNamesOriginal <- colnames(xregData)[-1];
-                    # Expand the variables. We cannot use alm, because it is based on obsInSample
-                    xregData <- model.frame(formulaToUse,data=as.data.frame(xreg));
-                    # Get the response variable, just in case it was transformed
-                    if(length(formulaToUse[[2]])>1){
-                        y <- xregData[,1];
-                        yInSample <- matrix(y[1:obsInSample],ncol=1);
-                        if(holdout){
-                            yHoldout <- matrix(y[-c(1:obsInSample)],ncol=1);
-                        }
-                    }
-
-                    # Binary, flagging factors in the data
-                    xregFactors <- (attr(terms(xregData),"dataClasses")=="factor")[-1];
-                    # Expanded stuff with all levels for factors
-                    if(any(xregFactors)){
-                        # Levels for the factors
-                        xregFactorsLevels <- lapply(xreg[,-1,drop=FALSE],levels);
-                        xregModelMatrix <- model.matrix(xregData,xregData,
-                                                        contrasts.arg=lapply(xregData[attr(terms(xregData),"dataClasses")=="factor"],
-                                                                             contrasts, contrasts=FALSE));
-                        xregNamesModified <- colnames(xregModelMatrix)[-1];
-                    }
-                    else{
-                        xregModelMatrix <- model.matrix(xregData,data=xregData);
-                        xregNamesModified <- xregNames <- setdiff(colnames(xregModelMatrix), "(Intercept)");
-                    }
-                    xregData <- as.matrix(xregModelMatrix);
-
-                    # Remove intercept
-                    interceptIsPresent <- FALSE;
-                    if(any(colnames(xregData)=="(Intercept)")){
-                        interceptIsPresent[] <- TRUE;
-                        xregData <- xregData[,-1,drop=FALSE];
-                    }
-                    xregNumber <- ncol(xregData);
-                    obsXreg <- nrow(xregData);
-
-                    # If there are more obs in xreg than the obsAll cut the thing
-                    if(obsXreg>=obsAll){
-                        xregData <- xregData[1:obsAll,,drop=FALSE]
-                    }
-                    # If there are less xreg observations than obsAll, use Naive
-                    else{
-                        newnRows <- obsAll-obsXreg;
-                        xregData <- rbind(xregData,matrix(rep(tail(xregData,1),each=newnRows),newnRows,xregNumber));
-                    }
-
-                    # This variable is needed in order to do model.matrix only, when required.
-                    xregDataIsDataFrame <- is.data.frame(xregData);
-                    if(xregDataIsDataFrame){
-                        # Expand xregData if it is a data frame
-                        xregData <- model.frame(formulaToUse,data=xregData);
-                    }
-                    xregNumber[] <- ncol(xregData);
-
-                    #### Fix parameters for factors ####
-                    # The indices of the original parameters
-                    xregParametersMissing <- setNames(vector("numeric",xregNumber),xregNamesModified);
-                    # # The indices of the original parameters
-                    xregParametersIncluded <- setNames(vector("numeric",xregNumber),xregNamesModified);
-                    # The vector, marking the same values of smoothing parameters
-                    if(interceptIsPresent){
-                        xregParametersPersistence <- setNames(attr(xregModelMatrix,"assign")[-1],xregNamesModified);
-                    }
-                    else{
-                        xregParametersPersistence <- setNames(attr(xregModelMatrix,"assign"),xregNamesModified);
-                    }
-                    if(length(xregParametersPersistence)==0){
-                        xregParametersPersistence <- 0;
-                    }
-
-                    # If there are factors and the number of initials is not the same as the number of parameters needed
-                    # This stuff assumes that the provided xreg parameters are named.
-                    if(any(xregFactors)){
-                        # Expand the data again in order to find the missing elements
-                        xregNames <- colnames(as.matrix(model.matrix(formulaToUse,
-                                                                     model.frame(formulaToUse,data=as.data.frame(xreg)))));
-                        if(any(xregNames=="(Intercept)")){
-                            xregNames <- xregNames[xregNames!="(Intercept)"];
-                        }
-                        if(length(xregNames)!=length(xregNamesModified)){
-                            xregAbsent <- !(xregNamesModified %in% xregNames);
-                            # Create the new vector of parameters
-                            xregParametersNew <- setNames(rep(NA,xregNumber),xregNamesModified);
-                            if(!is.null(names(initialXreg))){
-                                xregParametersNew[xregNames] <- initialXreg[xregNames];
-                            }
-                            else{
-                                # Insert values one by one
-                                j <- 1;
-                                for(i in 1:length(xregNamesModified)){
-                                    if(!xregAbsent[i]){
-                                        xregParametersNew[i] <- initialXreg[j];
-                                        j <- j+1;
-                                    }
-                                }
-                            }
-                            # Go through new names and find, where they came from. Then get the missing parameters
-                            for(i in which(xregAbsent)){
-                                # Find the name of the original variable
-                                # Use only the last value... hoping that the names like x and x1 are not used.
-                                xregNameFound <- tail(names(unlist(sapply(xregNamesOriginal,grep,xregNamesModified[i]))),1);
-                                # Get the indices of all k-1 levels
-                                xregParametersIncluded[xregNames[xregNames %in% paste0(xregNameFound,
-                                                                                       xregFactorsLevels[[xregNameFound]])]] <- i;
-                                # Get the index of the absent one
-                                xregParametersMissing[i] <- i;
-                                # Fill in the absent one
-                                xregParametersNew[i] <- -sum(xregParametersNew[xregParametersIncluded==i],
-                                                             na.rm=TRUE);
-                            }
-                            # Write down the new parameters
-                            xregModelInitials[[1]]$initialXreg <- xregParametersNew;
-
-                            # Write down the new parameters to the second part
-                            if(any(Etype==c("M","Z"))){
-                                xregModelInitials[[2]]$initialXreg <- xregParametersNew;
-                            }
-                            xregNames <- xregNamesModified;
-                        }
-                    }
-                    else{
-                        # The unnamed values are in the order of the variables
-                        if(is.null(names(initialXreg))){
-                            names(initialXreg) <- xregNames[seq_along(initialXreg)];
-                        }
-                        initialXreg <- initialXreg[xregNames];
-                        xregModelInitials[[1]]$initialXreg <- initialXreg;
-                        if(any(Etype==c("M","Z"))){
-                            xregModelInitials[[2]]$initialXreg <- initialXreg;
-                        }
-                    }
-                    # The vector of parameters that should be estimated (numeric + original levels of factors)
-                    xregParametersEstimated <- xregParametersIncluded
-                    xregParametersEstimated[xregParametersEstimated!=0] <- 1;
-                    xregParametersEstimated[xregParametersMissing==0 & xregParametersIncluded==0] <- 1;
-
-                    parametersNumber[2,2] <- parametersNumber[2,2] + xregNumber;
-                }
-
-                # Remove xreg, just to preserve some memory
-                rm(xreg);
-                # Clean memory if have a big object
-                if(obsInSample>10000){
-                    gc(verbose=FALSE);
-                }
+            loss <- switch(loss,
+                           "MSEh"=,"TMSE"=,"GTMSE"=,"MSCE"="MSE",
+                           "MAEh"=,"TMAE"=,"GTMAE"=,"MACE"="MAE",
+                           "HAMh"=,"THAM"=,"GTHAM"=,"CHAM"="HAM",
+                           loss);
+            if(loss=="custom"){
+                loss <- lossFunction;
             }
+        }
+        # The Fisher Information of alm()
+        FI <- if(is.null(ellipsis$FI)) FALSE else ellipsis$FI;
+
+        # The regressors selected, with the initials estimated, or with the initials provided
+        if(regressors=="select"){
+            xregChecked <- adam_xregSelect(arimaModel, distribution, etsModel, formulaToUse,
+                                           occurrenceMissingOnly, occurrenceSizes, omModel, regressors,
+                                           responseName, subset, xregData, yName);
+        }
+        else if(initialXregEstimate){
+            xregChecked <- adam_xregAlm(Etype, arimaModel, distribution, etsModel, FI, formulaToUse,
+                                        holdout, initialXreg, loss, obsAll, obsInSample, occurrence,
+                                        occurrenceMissingOnly, occurrenceModel, occurrenceSizes, omModel,
+                                        otLogical, parametersNumber, regressors, responseName, subset,
+                                        subsetOccurrence, xregData, y, yHoldout, yInSample, yName);
         }
         else{
-            #### Pure regression ####
-            #### If this is just a regression, use stepwise
-            if((!etsModel && !arimaModel) && regressors!="adapt"){
-                # Return the estimated model based on the provided xreg
-                if(is.null(formulaToUse)){
-                    formulaToUse <- reformulate(setdiff(colnames(xregData), responseName), response=responseName);
-                    # formulaToUse <- as.formula(paste0("`",responseName,"`~."));
-                    formulaProvided <- FALSE;
-                }
-                else{
-                    formulaProvided <- TRUE;
-                }
-                if(distribution=="default"){
-                    distribution[] <- "dnorm";
-                }
-
-                # Form subset in order to use in-sample only
-                subset <- rep(FALSE, obsAll);
-                subset[1:obsInSample] <- !yNAValues[1:obsInSample]; # the observed values only
-                # Exclude zeroes if this is an occurrence model
-                if(occurrenceModel){
-                    subset[1:obsInSample][!otLogical] <- FALSE;
-                }
-
-                almModel <- do.call("stepwise", list(data=xregData, formula=formulaToUse, subset=subset,
-                                                     distribution=distribution,
-                                                     occurrence=if(occurrenceMissingOnly || occurrenceSizes) "none" else omModel));
-                almModel$call$data <- as.name(yName);
-                if(occurrenceSizes){
-                    almModel$occurrence <- omModel;
-                }
-                return(almModel);
-            }
-
-            # Include only variables from the formula, all of them without one
-            if(is.null(formulaToUse)){
-                formulaToUse <- as.formula(paste0("`",responseName,"`~."));
-            }
-            # Do model.frame manipulations
-            # We do it this way to avoid factors expansion into dummies at this stage
-            mf <- as.call(list(quote(stats::model.frame), formula=formulaToUse,
-                               data=xregData, drop.unused.levels=FALSE));
-
-            if(!is.data.frame(xregData)){
-                mf$data <- as.data.frame(xregData);
-            }
-            # Evaluate data frame to do transformations of variables
-            xregData <- eval(mf, parent.frame());
-
-            # Expand the interactions and the factors: the selection runs over the columns
-            dataTerms <- terms(xregData);
-            xregData <- model.matrix(dataTerms, xregData);
-            xregAssign <- attr(xregData, "assign");
-            xregData <- xregData[, xregAssign>0, drop=FALSE];
-            xregTerms <- setNames(labels(dataTerms)[xregAssign[xregAssign>0]],
-                                  make.names(colnames(xregData), unique=TRUE));
-            xregNumber <- ncol(xregData);
-            xregNames <- colnames(xregData);
-            initialXregProvided <- FALSE;
-            xregFactors <- FALSE;
-            xregParametersPersistence <- setNames(c(1:xregNumber),xregNames);
-            xregParametersEstimated <- setNames(rep(1,xregNumber),xregNames);
-            xregParametersMissing <- setNames(c(1:xregNumber),xregNames);
-            xregParametersIncluded <- setNames(c(1:xregNumber),xregNames);
+            xregChecked <- adam_xregProvided(Etype, arimaModel, distribution, ellipsis, etsModel, FI,
+                                             formulaToUse, holdout, initialXreg, loss, obsAll,
+                                             obsInSample, occurrence, parametersNumber, regressors,
+                                             responseName, subset, xregData, y, yHoldout, yInSample,
+                                             yName);
+        }
+        # A pure regression is the alm() model, returned as it is
+        if(is.alm(xregChecked)){
+            return(xregChecked);
+        }
+        list2env(xregChecked, environment());
+        # Clean memory if have a big object
+        if(obsInSample>10000){
+            gc(verbose=FALSE);
         }
 
-        #### persistence for xreg ####
-        # Process the persistence for xreg
-        if(!is.null(persistenceXreg)){
-            if(length(persistenceXreg)!=xregNumber && length(persistenceXreg)!=1){
-                warning("The length of the provided persistence for the xreg variables is wrong. Reverting to the estimation.",
-                        call.=FALSE);
-                persistenceXreg <- rep(0.5,xregNumber);
-                persistenceXregProvided <- FALSE;
-                persistenceXregEstimate <- TRUE;
-            }
-            else if(length(persistenceXreg)==1){
-                persistenceXreg <- rep(persistenceXreg,xregNumber);
-                persistenceXregProvided <- TRUE;
-                persistenceXregEstimate <- FALSE;
-            }
-            else{
-                persistenceXregProvided <- TRUE;
-                persistenceXregEstimate <- FALSE;
-            }
-        }
-        else{
-            # The persistenceXregEstimate is provided
-            if(regressors=="adapt" && !persistenceXregEstimate){
-                persistenceXregProvided <- TRUE;
-                persistenceXregEstimate <- FALSE;
-            }
-            else if(regressors=="adapt" && persistenceXregEstimate){
-                persistenceXreg <- rep(0.05,xregNumber);
-                persistenceXregProvided <- FALSE;
-                persistenceXregEstimate <- TRUE;
-            }
-            else{
-                persistenceXreg <- rep(0,xregNumber);
-                persistenceXregProvided <- FALSE;
-                persistenceXregEstimate <- FALSE;
-            }
-        }
+        list2env(adam_xregPersistence(persistenceXreg, persistenceXregEstimate, regressors, xregNumber),
+                 environment());
 
         # If this is just a regression, include intercept
         if(!etsModel && !arimaModel){
@@ -3064,7 +1810,7 @@ adam_checkXreg <- function(Etype, arimaModel, bounds, data, distribution, ellips
     persistenceEstimate[] <- any(c(persistenceLevelEstimate,persistenceTrendEstimate,
                                    persistenceSeasonalEstimate,persistenceXregEstimate));
     # What the section set, on the branches that ran
-    return(mget(intersect(c("B", "Etype", "FI", "data", "distribution", "formulaToUse",
+    return(mget(intersect(c("Etype", "data", "distribution", "formulaToUse",
                          "initialXreg", "initialXregEstimate", "initialXregProvided",
                          "lagsModelAll", "loss", "occurrenceModel", "omModel", "parametersNumber",
                          "persistenceEstimate", "persistenceXreg", "persistenceXregEstimate",
@@ -3073,6 +1819,605 @@ adam_checkXreg <- function(Etype, arimaModel, bounds, data, distribution, ellips
                          "xregParametersEstimated", "xregParametersIncluded",
                          "xregParametersMissing", "xregParametersPersistence", "xregTerms", "y",
                          "yHoldout", "yInSample"), ls())));
+}
+
+# The regressors before their initials: their missing values filled, the character variables as
+# factors, the initials provided for some of them only, and the selection without provided values
+adam_xregPrepare <- function(data, formulaToUse, initialType, initialXreg, initialXregEstimate,
+                             persistenceXreg, regressors, responseName, xregData){
+    # The missing values of the regressors (not of the response): the first observed
+    # value of each, for all the ways of getting their initials below
+    xregNAs <- which(is.na(xregData),arr.ind=TRUE);
+    xregNAs <- xregNAs[colnames(xregData)[xregNAs[,2]]!=adam_responseColumn(xregData, responseName),,drop=FALSE];
+    if(nrow(xregNAs)>0){
+        warning("Some variables contained NAs. This might cause issues in the estimation. ",
+                "I will substitute those values with the first non-NA values",
+                call.=FALSE);
+        xregNonNAs <- which(!is.na(xregData),arr.ind=TRUE);
+        # Go through variables and substitute values
+        for(i in unique(xregNAs[,2])){
+            # This split on [row, column] is needed, because data.table is funny with cbind(row,column)
+            xregData[xregNAs[xregNAs[,2]==i,,drop=FALSE]] <- xregData[xregNonNAs[which(xregNonNAs[,2]==i)[1],1],
+                                                                      xregNonNAs[which(xregNonNAs[,2]==i)[1],2]];
+        }
+        # The same values in the data, from which the selected regressors are refitted
+        data[xregNAs] <- xregData[xregNAs];
+    }
+    # The character variables are factors, with all their levels as the other factors,
+    # in the data too
+    if(is.data.frame(xregData) && any(sapply(xregData, is.character))){
+        warning("You have character variables in your data. ",
+                "I will treat them as factors, but it is advised to convert them to factors manually",
+                call.=FALSE);
+        for(name in names(which(sapply(xregData, is.character)))){
+            xregData[[name]] <- factor(xregData[[name]]);
+            data[[name]] <- factor(data[[name]]);
+        }
+    }
+    # The regressors and the variables of the formula take their syntactic names, as the model
+    colnames(xregData) <- make.names(colnames(xregData));
+    if(!is.null(formulaToUse)){
+        formulaToUse <- as.formula(formulaToUse);
+        # If there are spaces in names, give a warning
+        if(any(grepl("[^A-Za-z0-9,;._-]", all.vars(formulaToUse))) ||
+           # If the names only contain numbers
+           any(suppressWarnings(!is.na(as.numeric(all.vars(formulaToUse)))))){
+            warning("The names of your variables contain special characters ",
+                    "(such as numbers, spaces, comas, brackets etc). adam() might not work properly. ",
+                    "It is recommended to use `make.names()` function to fix the names of variables.",
+                    call.=FALSE);
+            formulaToUse <- as.formula(do.call(substitute,
+                                               list(formulaToUse,
+                                                    setNames(lapply(make.names(all.vars(formulaToUse)), as.name),
+                                                             all.vars(formulaToUse)))),
+                                       env=environment(formulaToUse));
+        }
+    }
+
+    # The initials provided for some of the regressors only (the columns of their model
+    # matrix): the others are estimated, and the provided ones are set after that
+    if(!is.null(initialXreg) && regressors!="select"){
+        xregNamesAll <- make.names(setdiff(colnames(model.matrix(
+            if(is.null(formulaToUse)) reformulate(setdiff(colnames(xregData), responseName),
+                                                  response=responseName) else formulaToUse,
+            data=as.data.frame(xregData))), "(Intercept)"));
+        # The unnamed values are in the order of the variables
+        if(is.null(names(initialXreg))){
+            names(initialXreg) <- xregNamesAll[seq_along(initialXreg)];
+        }
+        if(!all(xregNamesAll %in% names(initialXreg))){
+            initialXregEstimate <- TRUE;
+        }
+        else{
+            initialXreg <- initialXreg[xregNamesAll];
+        }
+    }
+    if(regressors=="select"){
+        # If this has not happened by chance, then switch to optimisation
+        if(!is.null(initialXreg) && any(initialType==c("backcasting","optimal","two-stage"))){
+            warning("Variables selection does not work with the provided initials for explantory variables. I will drop them.",
+                    call.=FALSE);
+            initialXreg <- NULL;
+            initialXregEstimate <- TRUE;
+        }
+        if(!is.null(persistenceXreg) && any(persistenceXreg!=0)){
+            warning(paste0("I cannot do variables selection with the provided smoothing parameters ",
+                           "for explantory variables. I will estimate them instead."),
+                    call.=FALSE);
+            persistenceXreg <- NULL;
+        }
+    }
+    return(list(data=data, formulaToUse=formulaToUse, xregData=xregData, initialXreg=initialXreg,
+                initialXregEstimate=initialXregEstimate, persistenceXreg=persistenceXreg));
+}
+
+# The initials of the regressors estimated by alm(): the model itself for a pure regression,
+# else the regressions for the additive and the multiplicative errors, with all the levels of the
+# factors, and the provided initials of some of the regressors set
+adam_xregAlm <- function(Etype, arimaModel, distribution, etsModel, FI, formulaToUse, holdout,
+                         initialXreg, loss, obsAll, obsInSample, occurrence, occurrenceMissingOnly,
+                         occurrenceModel, occurrenceSizes, omModel, otLogical, parametersNumber,
+                         regressors, responseName, subset, subsetOccurrence, xregData, y, yHoldout,
+                         yInSample, yName){
+    # Extract names of variables, fix the formula
+    formulaProvided <- !is.null(formulaToUse);
+    if(formulaProvided){
+        responseName <- all.vars(formulaToUse)[1];
+    }
+    else{
+        formulaToUse <- reformulate(colnames(xregData)[-1], response=responseName);
+    }
+
+    # A pure regression is the model of alm()
+    if((!etsModel && !arimaModel) && regressors!="adapt"){
+        almSubset <- if(occurrenceModel && !occurrenceSizes) which(subsetOccurrence) else which(subset);
+        almModel <- do.call("alm", list(formula=formulaToUse, data=xregData,
+                                        distribution=distribution, loss=loss,
+                                        subset=almSubset,
+                                        # The missing values alone are out of the subset
+                                        occurrence=if(occurrenceMissingOnly || occurrenceSizes) "none" else omModel,
+                                        FI=FI));
+        almModel$call$data <- as.name(yName);
+        if(occurrenceSizes){
+            almModel$occurrence <- omModel;
+        }
+        return(almModel);
+    }
+
+    # The function returns an ALM model
+    xregInitialiser <- function(Etype,distribution,formulaToUse,subset,responseName){
+        # The regressors of the probability of occurrence (om(), omg()) are estimated
+        # on all the observations, with the occurrence indicator as the response
+        occurrenceIndicator <- occurrenceModel && distribution=="plogis";
+        if(occurrenceIndicator){
+            xregData[1:obsInSample,1] <- otLogical*1;
+            subset <- subsetOccurrence;
+        }
+        # The default distribution for ALM, and the logarithmic ones as the multiplicative error
+        if(distribution=="default"){
+            distribution <- switch(Etype,
+                                   "A"="dnorm",
+                                   "M"="dlnorm");
+        }
+        else if(any(distribution==c("dllaplace","dls","dlgnorm"))){
+            distribution <- c(dllaplace="dlaplace", dls="ds", dlgnorm="dgnorm")[[distribution]];
+            Etype <- "M";
+        }
+        # The trend is added to get rid of bias, unless it was asked for, or a regressor is a
+        # trend itself: alm() drops the first of two variables correlated above 0.999, which would
+        # be the regressor rather than the trend
+        xregNumeric <- Filter(is.numeric, as.data.frame(xregData)[which(subset),-1,drop=FALSE]);
+        trendCollinear <- ncol(xregNumeric)>0 &&
+            any(abs(suppressWarnings(cor(xregNumeric, seq_len(nrow(xregNumeric)))))>=0.999, na.rm=TRUE);
+        # The logarithm of the response for the multiplicative error with a distribution of logs
+        responseLog <- Etype=="M" && any(distribution==c("dnorm","dlaplace","ds","dgnorm","dlogis","dt"));
+        formulaIsAbsent <- is.null(formulaToUse);
+        formulaOriginal <- formulaToUse;
+        # Without a formula, or with "y~.", the formula is built
+        if(formulaIsAbsent || (length(all.vars(formulaToUse))==2 && all.vars(formulaToUse)[2]==".")){
+            trendIncluded <- any(colnames(xregData)[-1]=="trend") || trendCollinear;
+            formulaToUse <- as.formula(paste0(if(responseLog) "log(`" else "`", responseName,
+                                              if(responseLog) "`)" else "`", "~.",
+                                              if(!trendIncluded) "+trend"));
+        }
+        else{
+            trendIncluded <- any(all.vars(formulaToUse)[-1]=="trend") || trendCollinear;
+            # A response without logs takes them
+            if(responseLog && (length(formulaToUse[[2]])==1 || !any(as.character(formulaToUse[[2]])=="log"))){
+                formulaToUse <- update(formulaToUse, if(trendIncluded) log(.)~. else log(.)~.+trend);
+            }
+            else if(!trendIncluded){
+                formulaToUse <- update(formulaToUse,.~.+trend);
+            }
+        }
+        almModel <- do.call(alm,list(formula=formulaToUse,data=xregData,distribution=distribution,subset=which(subset)));
+        # Remove trend
+        if(!trendIncluded){
+            almModel$coefficients <- almModel$coefficients[names(almModel$coefficients)!="trend"];
+            almModel$data <- almModel$data[,colnames(almModel$data)!="trend",drop=FALSE];
+            if(formulaIsAbsent){
+                almModel$call$formula <- as.formula(paste0("`",responseName,"`~."));
+            }
+            else{
+                almModel$call$formula <- formulaOriginal;
+            }
+            # Reset terms, they are not needed for what comes, but confuse the formula() method
+            almModel$terms <- NULL;
+        }
+        # The inverse odds ratio falls with the probability
+        if(occurrenceIndicator && occurrence=="inverse-odds-ratio"){
+            almModel$coefficients[] <- -almModel$coefficients;
+        }
+        return(almModel);
+    }
+
+    #### ETSX / ARIMAX ####
+    # The initials of the additive error model first, of the multiplicative one second: both,
+    # when the error type is selected
+    xregModelInitials <- vector("list",2);
+    for(errorType in if(Etype=="Z") c("A","M") else Etype){
+        almModel <- xregInitialiser(errorType,distribution,formulaToUse,subset,responseName);
+        k <- 1 + (errorType=="M");
+        # If this is just a regression, include intercept
+        if(!etsModel && !arimaModel){
+            xregModelInitials[[k]]$initialXreg <- almModel$coefficients;
+        }
+        else{
+            xregModelInitials[[k]]$initialXreg <- almModel$coefficients[-1];
+        }
+        xregModelInitials[[k]]$other <- almModel$other;
+        if(Etype!="Z"){
+            names(xregModelInitials[[k]]$initialXreg) <- make.names(names(xregModelInitials[[k]]$initialXreg));
+        }
+    }
+    # If Intercept was not included, substitute with zero
+    almIntercept <- 0;
+    if(any(names(almModel$coefficients)=="(Intercept)")){
+        almIntercept <- almModel$coefficients["(Intercept)"];
+    }
+    # The names of the parameters, with the intercept for a regression
+    xregNames <- names(coef(almModel));
+    if(etsModel || arimaModel){
+        xregNames <- xregNames[-1];
+    }
+
+    # Remove variables without variability and amend the formula
+    noVariability <- setNames(vector("logical",ncol(xregData)),colnames(xregData));
+    noVariability[] <- apply((as.matrix(xregData[1:obsInSample,])==
+                                  matrix(xregData[1,],obsInSample,ncol(xregData),byrow=TRUE)),2,all);
+    noVariabilityNames <- names(noVariability)[noVariability];
+    # If there are variables with no variability, their nams are in the formula, and the formula is not "y~.",
+    # update the formula
+    if(any(noVariability) && any(all.vars(formulaToUse) %in% names(noVariability)) &&
+       all.vars(formulaToUse)[2]!="."){
+        formulaToUse <- update.formula(formulaToUse,
+                                       paste0(".~.-",paste0(noVariabilityNames,collapse="-")));
+    }
+
+    list2env(adam_xregExpand(xregData, formulaToUse, is.data.frame(xregData) || formulaProvided, xregNames,
+                             responseName, obsAll, obsInSample, holdout, y, yInSample, yHoldout),
+             environment());
+
+    #### Fix parameters for factors ####
+    # This part of code is terrible! In the nutshell, what it does it keeps
+    # all levels of categorical variables to make sure that the same
+    # categorical variable is treated equally inside ETS. This is mainly needed
+    # for regressors="adapt", so that "colour" changes over time in the same way,
+    # and not that "blue" reacts to error more than "red"... Why did I do that?!!
+    #### Potentially, this part can be removed to save some brain cells from destruction
+    # If there are factors not in the alm data, create additional initials
+    if(any(xregFactors) && any(!(xregNamesModified %in% xregNames))){
+        xregAbsent <- !(xregNamesModified %in% xregNames);
+        for(k in which(!sapply(xregModelInitials, is.null))){
+            xregParametersNew <- setNames(rep(NA,xregNumber),xregNamesModified);
+            xregParametersNew[!xregAbsent] <- xregModelInitials[[k]]$initialXreg;
+            # Go through new names and find, where they came from. Then get the missing parameters
+            for(i in which(xregAbsent)){
+                # Find the name of the original variable
+                # Use only the last value... hoping that the names like x and x1 are not used.
+                xregNameFoundID <- sapply(xregNamesOriginal,grepl,xregNamesModified[i]);
+                xregNameFound <- tail(names(xregNameFoundID)[xregNameFoundID],1);
+                # Get the indices of all k-1 levels
+                xregParametersIncluded[xregNames[xregNames %in% paste0(xregNameFound,
+                                                                       xregFactorsLevels[[xregNameFound]])]] <- i;
+                # Get the index of the absent one
+                xregParametersMissing[i] <- i;
+                # Fill in the absent one, add intercept, and normalise all of them
+                levelsAll <- xregNamesModified[c(which(xregParametersIncluded==i),i)];
+                xregParametersNew[i] <- almIntercept;
+                xregParametersNew[xregNamesModified[xregParametersIncluded==i]] <- almIntercept +
+                    xregParametersNew[xregNamesModified[xregParametersIncluded==i]];
+                xregParametersNew[levelsAll] <- xregParametersNew[levelsAll] - mean(xregParametersNew[levelsAll]);
+            }
+            # Write down the new parameters
+            xregModelInitials[[k]]$initialXreg <- xregParametersNew;
+        }
+        xregNames <- xregNamesModified;
+    }
+    # The vector of parameters that should be estimated (numeric + original levels of factors)
+    xregParametersEstimated <- xregParametersIncluded
+    xregParametersEstimated[xregParametersEstimated!=0] <- 1;
+    xregParametersEstimated[xregParametersMissing==0 & xregParametersIncluded==0] <- 1;
+
+    # The initials provided for some of the regressors: their values, not estimated
+    if(!is.null(initialXreg)){
+        for(k in which(!sapply(xregModelInitials, is.null))){
+            xregModelInitials[[k]]$initialXreg[names(initialXreg)] <- initialXreg;
+        }
+        xregParametersEstimated[names(initialXreg)] <- 0;
+        parametersNumber[2,2] <- parametersNumber[2,2] + length(initialXreg);
+        # The level of a factor left out of the regression keeps the levels summing to zero
+        for(i in which(xregParametersIncluded==0 & xregParametersMissing!=0)){
+            for(k in which(!sapply(xregModelInitials, is.null))){
+                xregModelInitials[[k]]$initialXreg[i] <-
+                    -sum(xregModelInitials[[k]]$initialXreg[xregParametersIncluded==i]);
+            }
+        }
+    }
+    return(list(formulaToUse=formulaToUse, initialXregProvided=FALSE, parametersNumber=parametersNumber,
+                responseName=responseName, xregData=xregData, xregModelInitials=xregModelInitials,
+                xregNames=xregNames, xregNumber=xregNumber, xregParametersEstimated=xregParametersEstimated,
+                xregParametersIncluded=xregParametersIncluded, xregParametersMissing=xregParametersMissing,
+                xregParametersPersistence=xregParametersPersistence, y=y, yHoldout=yHoldout,
+                yInSample=yInSample));
+}
+
+# The regressors expanded for the model: the formula applied to them (without the variables that
+# alm() dropped, given in xregNames), the factors with all their levels, the rows cut or extended
+# by the last values to obsAll, and the groups of their smoothing parameters
+adam_xregExpand <- function(xreg, formulaToUse, modelFrame, xregNames, responseName, obsAll,
+                            obsInSample, holdout, y, yInSample, yHoldout){
+    obsXreg <- nrow(xreg);
+    # The names of the original variables
+    xregNamesOriginal <- colnames(xreg)[-1];
+    # Robustify the names of variables
+    colnames(xreg) <- make.names(colnames(xreg),unique=TRUE);
+
+    # A matrix without a formula: the variables that alm() kept
+    if(!modelFrame){
+        formulaToUse <- as.formula(paste0("`",responseName,"`~", paste0(xregNames, collapse="+")));
+        xregData <- as.matrix(xreg)[,xregNames,drop=FALSE];
+        xregNumber <- ncol(xregData);
+        xregNames <- colnames(xregData);
+        xregFactors <- FALSE;
+        xregParametersPersistence <- setNames(c(1:xregNumber),xregNames);
+        xregParametersMissing <- setNames(c(1:xregNumber),xregNames);
+        xregParametersIncluded <- setNames(c(1:xregNumber),xregNames);
+    }
+    else{
+        # Expand the variables. We cannot use alm, because it is based on obsInSample
+        xregData <- model.frame(formulaToUse,data=as.data.frame(xreg));
+        # Get the response variable, just in case it was transformed
+        if(length(formulaToUse[[2]])>1){
+            y <- xregData[,1];
+            yInSample <- matrix(y[1:obsInSample],ncol=1);
+            if(holdout){
+                yHoldout <- matrix(y[-c(1:obsInSample)],ncol=1);
+            }
+        }
+
+        # The variables dropped by alm() are dropped from the formula and the data
+        if(!is.null(xregNames) &&
+           any(!(setdiff(colnames(model.matrix(xregData,data=xregData)), "(Intercept)") %in% xregNames))){
+            # The levels of a factor are compared with its name
+            if(is.data.frame(xreg) && any(sapply(xreg, is.factor))){
+                xregNamesRetained <- vapply(xregNamesOriginal, function(name){return(any(grepl(name, xregNames)))},
+                                            logical(1));
+            }
+            else{
+                xregNamesRetained <- xregNamesOriginal %in% xregNames;
+            }
+            # If the dropped variables are in the formula, update the formula
+            if(length(all.vars(formulaToUse))>2 &&
+               any(all.vars(formulaToUse) %in% xregNamesOriginal[!xregNamesRetained])){
+                formulaToUse <- update.formula(formulaToUse,
+                                               paste0(".~.-",
+                                                      paste(xregNamesOriginal[!xregNamesRetained],
+                                                            collapse="-")));
+            }
+            xregNamesOriginal <- xregNamesOriginal[xregNamesRetained];
+            xregData <- model.frame(formulaToUse,data=as.data.frame(xreg[,c(responseName,xregNamesOriginal),drop=FALSE]));
+        }
+
+        # Binary, flagging factors in the data
+        xregFactors <- (attr(terms(xregData),"dataClasses")=="factor")[-1];
+        # Expanded stuff with all levels for factors
+        if(any(xregFactors)){
+            # Levels for the factors
+            xregFactorsLevels <- lapply(xreg,levels);
+            xregModelMatrix <- model.matrix(xregData,xregData,
+                                            contrasts.arg=lapply(xregData[attr(terms(xregData),"dataClasses")=="factor"],
+                                                                 contrasts, contrasts=FALSE));
+            xregNamesModified <- colnames(xregModelMatrix)[-1];
+        }
+        else{
+            xregModelMatrix <- model.matrix(xregData,data=xregData);
+            xregNamesModified <- if(is.null(xregNames)) setdiff(colnames(xregModelMatrix), "(Intercept)") else xregNames;
+        }
+        xregData <- as.matrix(xregModelMatrix);
+
+        # Remove intercept
+        interceptIsPresent <- any(colnames(xregData)=="(Intercept)");
+        if(interceptIsPresent){
+            xregData <- xregData[,-1,drop=FALSE];
+        }
+        xregNumber <- ncol(xregData);
+
+        # The indices of the original parameters, and the vector marking the same values of the
+        # smoothing parameters
+        xregParametersMissing <- setNames(vector("numeric",xregNumber),xregNamesModified);
+        xregParametersIncluded <- setNames(vector("numeric",xregNumber),xregNamesModified);
+        xregParametersPersistence <- attr(xregModelMatrix,"assign");
+        if(interceptIsPresent){
+            xregParametersPersistence <- xregParametersPersistence[-1];
+        }
+        xregParametersPersistence <- setNames(xregParametersPersistence,xregNamesModified);
+        if(length(xregParametersPersistence)==0){
+            xregParametersPersistence <- 0;
+        }
+    }
+
+    # If there are more obs in xreg than the obsAll cut the thing, if less, use Naive
+    if(obsXreg>=obsAll){
+        xregData <- xregData[1:obsAll,,drop=FALSE];
+    }
+    else{
+        newnRows <- obsAll-obsXreg;
+        xregData <- rbind(xregData,matrix(rep(tail(xregData,1),each=newnRows),newnRows,xregNumber));
+    }
+    return(mget(intersect(c("formulaToUse", "xregData", "xregFactors", "xregFactorsLevels",
+                            "xregNames", "xregNamesModified", "xregNamesOriginal", "xregNumber",
+                            "xregParametersIncluded", "xregParametersMissing",
+                            "xregParametersPersistence", "y", "yHoldout", "yInSample"), ls())));
+}
+
+# The provided initials of the regressors: alm() with them for a pure regression, else the initials
+# of the additive and the multiplicative errors, with those of the levels of the factors left out
+adam_xregProvided <- function(Etype, arimaModel, distribution, ellipsis, etsModel, FI, formulaToUse,
+                              holdout, initialXreg, loss, obsAll, obsInSample, occurrence,
+                              parametersNumber, regressors, responseName, subset, xregData, y,
+                              yHoldout, yInSample, yName){
+    #### If this is just a regression, then this must be a reuse of alm.
+    if((!etsModel && !arimaModel) && regressors!="adapt"){
+        if(is.null(formulaToUse)){
+            formulaToUse <- as.formula(paste0("`",responseName,"`~."));
+        }
+        B <- if(is.null(ellipsis$B)) initialXreg else ellipsis$B;
+        # Without the intercept, it is the one of the means, E(y) - b E(x), in the space of the
+        # location of the distribution
+        if(all(names(B)!="(Intercept)") &&
+           attr(terms(formulaToUse, data=as.data.frame(xregData)), "intercept")==1){
+            xregFrame <- model.frame(formulaToUse, data=as.data.frame(xregData)[which(subset),,drop=FALSE]);
+            xregMatrix <- model.matrix(formulaToUse, xregFrame);
+            yMean <- switch(distribution,
+                            "dlnorm"=,"dllaplace"=,"dls"=,"dlgnorm"=mean(log(xregFrame[,1])),
+                            "dinvgauss"=,"dgamma"=,"dexp"=,"dpois"=,"dnbinom"=log(mean(xregFrame[,1])),
+                            mean(xregFrame[,1]));
+            B <- c("(Intercept)"=yMean - sum(colMeans(xregMatrix[,-1,drop=FALSE]) * B), B);
+        }
+        # The extra parameter of dgnorm and dalaplace: provided, or all of them are estimated
+        extra <- switch(distribution, "dgnorm"=list(shape=ellipsis$shape),
+                        "dalaplace"=list(alpha=ellipsis$alpha), list());
+        if(length(extra)==1 && is.null(extra[[1]])){
+            warning("The coefficients need the ", names(extra), " of ", distribution,
+                    " too. Estimating all of them.", call.=FALSE);
+            B <- NULL;
+        }
+        almModel <- do.call("alm", c(list(formula=formulaToUse, data=xregData,
+                                          distribution=distribution, loss=loss, subset=which(subset),
+                                          occurrence=occurrence,FI=FI,
+                                          parameters=B,fast=TRUE), extra));
+        almModel$call$data <- as.name(yName);
+        return(almModel);
+    }
+
+    # This formula is needed only to expand xreg
+    xreg <- xregData;
+    colnames(xreg) <- make.names(colnames(xreg),unique=TRUE);
+    if(is.null(formulaToUse)){
+        responseName <- colnames(xreg)[1];
+        formulaToUse <- as.formula(paste0("`",responseName,"`~",
+                                          paste0(colnames(xreg)[colnames(xreg)!=responseName],
+                                                 collapse="+")));
+    }
+    else{
+        responseName <- all.vars(formulaToUse)[1];
+    }
+    list2env(adam_xregExpand(xregData, formulaToUse, TRUE, NULL, responseName, obsAll, obsInSample,
+                             holdout, y, yInSample, yHoldout),
+             environment());
+
+    xregModelInitials <- vector("list",2);
+    # The initials of the levels of the factors left out: minus the sum of the others.
+    # This stuff assumes that the provided xreg parameters are named.
+    if(any(xregFactors)){
+        # Expand the data again in order to find the missing elements
+        xregNames <- setdiff(colnames(as.matrix(model.matrix(formulaToUse,
+                                                             model.frame(formulaToUse,data=as.data.frame(xreg))))),
+                             "(Intercept)");
+        if(length(xregNames)!=length(xregNamesModified)){
+            xregAbsent <- !(xregNamesModified %in% xregNames);
+            # Create the new vector of parameters
+            xregParametersNew <- setNames(rep(NA,xregNumber),xregNamesModified);
+            if(!is.null(names(initialXreg))){
+                xregParametersNew[xregNames] <- initialXreg[xregNames];
+            }
+            else{
+                # The unnamed values are in the order of the variables
+                xregParametersNew[!xregAbsent] <- initialXreg[seq_len(sum(!xregAbsent))];
+            }
+            # Go through new names and find, where they came from. Then get the missing parameters
+            for(i in which(xregAbsent)){
+                # Find the name of the original variable
+                # Use only the last value... hoping that the names like x and x1 are not used.
+                xregNameFound <- tail(names(unlist(sapply(xregNamesOriginal,grep,xregNamesModified[i]))),1);
+                # Get the indices of all k-1 levels
+                xregParametersIncluded[xregNames[xregNames %in% paste0(xregNameFound,
+                                                                       xregFactorsLevels[[xregNameFound]])]] <- i;
+                # Get the index of the absent one
+                xregParametersMissing[i] <- i;
+                # Fill in the absent one
+                xregParametersNew[i] <- -sum(xregParametersNew[xregParametersIncluded==i], na.rm=TRUE);
+            }
+            # The same initials for the additive and the multiplicative errors
+            xregModelInitials[[1]]$initialXreg <- xregParametersNew;
+            if(any(Etype==c("M","Z"))){
+                xregModelInitials[[2]]$initialXreg <- xregParametersNew;
+            }
+            xregNames <- xregNamesModified;
+        }
+    }
+    else{
+        xregNames <- xregNamesModified;
+        # The unnamed values are in the order of the variables
+        if(is.null(names(initialXreg))){
+            names(initialXreg) <- xregNames[seq_along(initialXreg)];
+        }
+        initialXreg <- initialXreg[xregNames];
+        xregModelInitials[[1]]$initialXreg <- initialXreg;
+        if(any(Etype==c("M","Z"))){
+            xregModelInitials[[2]]$initialXreg <- initialXreg;
+        }
+    }
+    # The vector of parameters that should be estimated (numeric + original levels of factors)
+    xregParametersEstimated <- xregParametersIncluded
+    xregParametersEstimated[xregParametersEstimated!=0] <- 1;
+    xregParametersEstimated[xregParametersMissing==0 & xregParametersIncluded==0] <- 1;
+    parametersNumber[2,2] <- parametersNumber[2,2] + xregNumber;
+    return(list(formulaToUse=formulaToUse, initialXreg=initialXreg, initialXregProvided=TRUE,
+                parametersNumber=parametersNumber, responseName=responseName, xregData=xregData,
+                xregModelInitials=xregModelInitials, xregNames=xregNames, xregNumber=xregNumber,
+                xregParametersEstimated=xregParametersEstimated,
+                xregParametersIncluded=xregParametersIncluded, xregParametersMissing=xregParametersMissing,
+                xregParametersPersistence=xregParametersPersistence, y=y, yHoldout=yHoldout,
+                yInSample=yInSample));
+}
+
+# The selection of the regressors: stepwise() for a pure regression, else their data expanded for
+# the selection in adam(), with the interactions and the factors as columns
+adam_xregSelect <- function(arimaModel, distribution, etsModel, formulaToUse, occurrenceMissingOnly,
+                            occurrenceSizes, omModel, regressors, responseName, subset, xregData, yName){
+    #### If this is just a regression, use stepwise
+    if((!etsModel && !arimaModel) && regressors!="adapt"){
+        if(is.null(formulaToUse)){
+            formulaToUse <- reformulate(setdiff(colnames(xregData), responseName), response=responseName);
+        }
+        almModel <- do.call("stepwise", list(data=xregData, formula=formulaToUse, subset=subset,
+                                             distribution=distribution,
+                                             occurrence=if(occurrenceMissingOnly || occurrenceSizes) "none" else omModel));
+        almModel$call$data <- as.name(yName);
+        if(occurrenceSizes){
+            almModel$occurrence <- omModel;
+        }
+        return(almModel);
+    }
+
+    # Include only variables from the formula, all of them without one
+    if(is.null(formulaToUse)){
+        formulaToUse <- as.formula(paste0("`",responseName,"`~."));
+    }
+    # Evaluate the data frame to do the transformations of variables, without expanding the
+    # factors into dummies at this stage
+    xregData <- stats::model.frame(formulaToUse, data=as.data.frame(xregData), drop.unused.levels=FALSE);
+
+    # Expand the interactions and the factors: the selection runs over the columns
+    dataTerms <- terms(xregData);
+    xregData <- model.matrix(dataTerms, xregData);
+    xregAssign <- attr(xregData, "assign");
+    xregData <- xregData[, xregAssign>0, drop=FALSE];
+    xregTerms <- setNames(labels(dataTerms)[xregAssign[xregAssign>0]],
+                          make.names(colnames(xregData), unique=TRUE));
+    xregNumber <- ncol(xregData);
+    xregNames <- colnames(xregData);
+    return(list(formulaToUse=formulaToUse, initialXregProvided=FALSE, xregData=xregData,
+                xregModelInitials=vector("list",2), xregNames=xregNames, xregNumber=xregNumber, xregTerms=xregTerms,
+                xregParametersPersistence=setNames(c(1:xregNumber),xregNames),
+                xregParametersEstimated=setNames(rep(1,xregNumber),xregNames),
+                xregParametersMissing=setNames(c(1:xregNumber),xregNames),
+                xregParametersIncluded=setNames(c(1:xregNumber),xregNames)));
+}
+
+# The smoothing parameters of the regressors: provided (one for all, or one for each), estimated
+# from 0.05 when they adapt, zero otherwise
+adam_xregPersistence <- function(persistenceXreg, persistenceXregEstimate, regressors, xregNumber){
+    if(!is.null(persistenceXreg) && length(persistenceXreg)!=xregNumber && length(persistenceXreg)!=1){
+        warning("The length of the provided persistence for the xreg variables is wrong. Reverting to the estimation.",
+                call.=FALSE);
+        return(list(persistenceXreg=rep(0.5,xregNumber), persistenceXregProvided=FALSE,
+                    persistenceXregEstimate=TRUE));
+    }
+    if(!is.null(persistenceXreg)){
+        if(length(persistenceXreg)==1){
+            persistenceXreg <- rep(persistenceXreg,xregNumber);
+        }
+        return(list(persistenceXreg=persistenceXreg, persistenceXregProvided=TRUE,
+                    persistenceXregEstimate=FALSE));
+    }
+    # The persistenceXregEstimate is provided
+    adapt <- regressors=="adapt";
+    return(list(persistenceXreg=if(adapt && !persistenceXregEstimate) NULL else rep(0.05*adapt,xregNumber),
+                persistenceXregProvided=adapt && !persistenceXregEstimate,
+                persistenceXregEstimate=adapt && persistenceXregEstimate));
 }
 
 
@@ -4070,330 +3415,207 @@ adam_initialiser <- function(etsModel, Etype, Ttype, Stype, modelIsTrendy, model
     persistenceEstimateVector <- c(persistenceLevelEstimate,
                                    modelIsTrendy&persistenceTrendEstimate,
                                    modelIsSeasonal&persistenceSeasonalEstimate)
+    backcast <- any(initialType==c("complete","backcasting","gradient"));
 
-    # The order:
-    # Persistence of states and for xreg, phi, AR and MA parameters,
-    # initials, initialsARIMA, initials for xreg
-    B <- Bl <- Bu <- vector("numeric",
-                            # Values of the persistence vector + phi
-                            etsModel*(persistenceLevelEstimate +
-                                          modelIsTrendy*persistenceTrendEstimate +
-                                          modelIsSeasonal*sum(persistenceSeasonalEstimate) +
-                                          phiEstimate) +
-                                xregModel*persistenceXregEstimate*max(xregParametersPersistence) +
-                                # AR and MA values
-                                arimaModel*(arEstimate*sum(arOrders)+maEstimate*sum(maOrders)) +
-                                # initials of ETS
-                                etsModel*all(initialType!=c("complete","backcasting","gradient"))*
-                                (initialLevelEstimate +
-                                     (modelIsTrendy*initialTrendEstimate) +
-                                     (modelIsSeasonal*
-                                          sum(initialSeasonalEstimate*(lagsModelSeasonal-1)))) +
-                                # initials of ARIMA
-                                all(initialType!=c("complete","backcasting","gradient"))*
-                                arimaModel*initialArimaNumber*initialArimaEstimate +
-                                # initials of xreg (in B unless backcast under "complete")
-                                (initialType!="complete")*xregModel*initialXregEstimate*
-                                sum(xregParametersEstimated) +
-                                constantEstimate + otherParameterEstimate)
-
-    j <- 0
-    if(etsModel){
-        # Fill in persistence
-        if(persistenceEstimate && any(persistenceEstimateVector)){
-            if(ets=="conventional" && any(c(Etype,Ttype,Stype)=="M")){
-                # A special type of model which is not safe: AAM, MAA, MAM
-                if((Etype=="A" && Ttype=="A" && Stype=="M") ||
-                   (Etype=="A" && Ttype=="M" && Stype=="A") ||
-                   (any(initialType==c("complete","backcasting","gradient")) &&
-                    ((Etype=="M" && Ttype=="A" && Stype=="A") ||
-                     (Etype=="M" && Ttype=="A" && Stype=="M")))){
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.01,0.005,rep(0.001,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-                # MMA is the worst. Set everything to zero and see if anything can be done...
-                else if((Etype=="M" && Ttype=="M" && Stype=="A")){
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.01,0.005,rep(0.01,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-                else if(Etype=="M" && Ttype=="A"){
-                    if(any(initialType==c("complete","backcasting","gradient"))){
-                        B[1:sum(persistenceEstimateVector)] <-
-                            c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))[
-                                which(persistenceEstimateVector)]
-                    }
-                    else{
-                        B[1:sum(persistenceEstimateVector)] <-
-                            c(0.2,0.01,rep(0.3,componentsNumberETSSeasonal))[
-                                which(persistenceEstimateVector)]
-                    }
-                }
-                else if(Etype=="M" && Ttype=="M"){
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-                else{
-                    B[1:sum(persistenceEstimateVector)] <-
-                        c(0.1,0.05,rep(0.3,componentsNumberETSSeasonal))[
-                            which(persistenceEstimateVector)]
-                }
-            }
-            else{
-                B[1:sum(persistenceEstimateVector)] <-
-                    c(0.1, 0.05, rep(0.3, componentsNumberETSSeasonal))[
-                        which(persistenceEstimateVector)]
-            }
-            if(bounds=="usual"){
-                Bl[1:sum(persistenceEstimateVector)] <- rep(0, sum(persistenceEstimateVector))
-                Bu[1:sum(persistenceEstimateVector)] <- rep(1, sum(persistenceEstimateVector))
-            }
-            else{
-                Bl[1:sum(persistenceEstimateVector)] <- rep(-5, sum(persistenceEstimateVector))
-                Bu[1:sum(persistenceEstimateVector)] <- rep(5, sum(persistenceEstimateVector))
-            }
-            # Names for B
-            if(persistenceLevelEstimate){
-                j[] <- j+1
-                names(B)[j] <- "alpha"
-            }
-            if(modelIsTrendy && persistenceTrendEstimate){
-                j[] <- j+1
-                names(B)[j] <- "beta"
-            }
-            if(modelIsSeasonal && any(persistenceSeasonalEstimate)){
-                if(componentsNumberETSSeasonal>1){
-                    names(B)[j+c(1:sum(persistenceSeasonalEstimate))] <-
-                        paste0("gamma",c(1:componentsNumberETSSeasonal))
-                }
-                else{
-                    names(B)[j+1] <- "gamma"
-                }
-                j[] <- j+sum(persistenceSeasonalEstimate)
-            }
-        }
+    # The parts of B in this order: the persistence of states and of xreg, phi, AR and MA
+    # parameters, the initials of ETS, ARIMA and xreg, the constant and the other parameter
+    pieces <- list();
+    if(etsModel && persistenceEstimate && any(persistenceEstimateVector)){
+        pieces$persistence <- adam_initialiserPersistence(Etype, Ttype, Stype, ets, backcast,
+                                                          persistenceEstimateVector,
+                                                          componentsNumberETSSeasonal, bounds);
     }
 
     # Persistence if xreg is provided
     if(xregModel && persistenceXregEstimate){
-        xregPersistenceNumber <- max(xregParametersPersistence)
-        B[j+1:xregPersistenceNumber] <- rep(switch(Etype,"A"=0.01,"M"=0),xregPersistenceNumber)
-        Bl[j+1:xregPersistenceNumber] <- rep(-5, xregPersistenceNumber)
-        Bu[j+1:xregPersistenceNumber] <- rep(5, xregPersistenceNumber)
-        names(B)[j+1:xregPersistenceNumber] <- paste0("delta",c(1:xregPersistenceNumber))
-        j[] <- j+xregPersistenceNumber
+        xregPersistenceNumber <- max(xregParametersPersistence);
+        pieces$delta <- list(B=setNames(rep(switch(Etype,"A"=0.01,"M"=0), xregPersistenceNumber),
+                                        paste0("delta",1:xregPersistenceNumber)),
+                             Bl=rep(-5, xregPersistenceNumber), Bu=rep(5, xregPersistenceNumber));
     }
 
     # Damping parameter
     if(etsModel && phiEstimate){
-        j[] <- j+1
-        B[j] <- 0.95
-        names(B)[j] <- "phi"
-        Bl[j] <- 0
-        Bu[j] <- 1
+        pieces$phi <- list(B=c(phi=0.95), Bl=0, Bu=1);
     }
 
-    # ARIMA parameters (AR / MA)
+    # ARIMA parameters (AR / MA), filled in lags-wise, and the polynomials at them
     if(arimaModel){
-        # This index is needed to get the correct polynomials
-        k <- j
-        # These are filled in lags-wise
-        if(any(c(arEstimate,maEstimate))){
-            armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
-                                                modelIsSeasonal, lags, arOrders, iOrders, maOrders,
-                                                arEstimate, maEstimate, armaParameters,
-                                                bounds!="none", smoother,
-                                                if(xregModel){matWt[seq_along(yInSample),
-                                                                    componentsNumberETS+componentsNumberARIMA+
-                                                                        1:xregNumber, drop=FALSE]})
-            for(i in 1:length(lags)){
-                if(arRequired && arEstimate && arOrders[i]>0){
-                    B[j+c(1:arOrders[i])] <- armaValues[j-k+c(1:arOrders[i])]
-                    Bl[j+c(1:arOrders[i])] <- -5
-                    Bu[j+c(1:arOrders[i])] <- 5
-                    names(B)[j+1:arOrders[i]] <- paste0("phi",1:arOrders[i],"[",lags[i],"]")
-                    j[] <- j + arOrders[i]
-                }
-                if(maRequired && maEstimate && maOrders[i]>0){
-                    B[j+c(1:maOrders[i])] <- armaValues[j-k+c(1:maOrders[i])]
-                    Bl[j+c(1:maOrders[i])] <- -5
-                    Bu[j+c(1:maOrders[i])] <- 5
-                    names(B)[j+1:maOrders[i]] <- paste0("theta",1:maOrders[i],"[",lags[i],"]")
-                    j[] <- j + maOrders[i]
-                }
-            }
-        }
-
-        arimaPolynomials <- lapply(
-            adamCpp$polynomialise(B[k+1:sum(c(arOrders*arEstimate,maOrders*maEstimate))],
-                                  arOrders, iOrders, maOrders,
-                                  arEstimate, maEstimate, armaParameters, lags),
-            as.vector)
+        pieces$arma <- adam_initialiserArma(yInSample, otLogical, etsModel, Etype, Stype,
+                                            modelIsSeasonal, lags, arOrders, iOrders, maOrders,
+                                            arRequired, maRequired, arEstimate, maEstimate,
+                                            armaParameters, bounds, smoother,
+                                            if(xregModel){matWt[seq_along(yInSample),
+                                                                componentsNumberETS+componentsNumberARIMA+
+                                                                    1:xregNumber, drop=FALSE]},
+                                            adamCpp);
+        arimaPolynomials <- pieces$arma$arimaPolynomials;
     }
 
     # Initials
-    if(etsModel && all(initialType!=c("complete","backcasting","gradient")) && initialEstimate){
-        if(initialLevelEstimate){
-            j[] <- j+1
-            B[j] <- matVt[1,1]
-            names(B)[j] <- "level"
-            if(Etype=="A"){
-                Bl[j] <- -Inf
-                Bu[j] <- Inf
-            }
-            else{
-                Bl[j] <- 0
-                Bu[j] <- Inf
-            }
-        }
-        if(modelIsTrendy && initialTrendEstimate){
-            j[] <- j+1
-            B[j] <- matVt[2,1]
-            names(B)[j] <- "trend"
-            if(Ttype=="A"){
-                Bl[j] <- -Inf
-                Bu[j] <- Inf
-            }
-            else{
-                Bl[j] <- 0
-                Bu[j] <- 2
-            }
-        }
-        if(modelIsSeasonal && any(initialSeasonalEstimate)){
-            if(componentsNumberETSSeasonal>1){
-                for(k in 1:componentsNumberETSSeasonal){
-                    if(initialSeasonalEstimate[k]){
-                        B[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <-
-                            matVt[componentsNumberETSNonSeasonal+k,
-                                  2:lagsModel[componentsNumberETSNonSeasonal+k]-1]
-                        names(B)[j+2:(lagsModel[componentsNumberETSNonSeasonal+k])-1] <-
-                            paste0("seasonal",k,"_",
-                                   2:lagsModel[componentsNumberETSNonSeasonal+k]-1)
-                        if(Stype=="A"){
-                            Bl[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- -Inf
-                            Bu[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- Inf
-                        }
-                        else{
-                            Bl[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- 0
-                            Bu[j+2:lagsModel[componentsNumberETSNonSeasonal+k]-1] <- Inf
-                        }
-                        j[] <- j+(lagsModelSeasonal[k]-1)
-                    }
-                }
-            }
-            else{
-                B[j+2:(lagsModel[componentsNumberETS])-1] <-
-                    matVt[componentsNumberETS,2:lagsModel[componentsNumberETS]-1]
-                names(B)[j+2:(lagsModel[componentsNumberETS])-1] <-
-                    paste0("seasonal_",2:lagsModel[componentsNumberETS]-1)
-                if(Stype=="A"){
-                    Bl[j+2:(lagsModel[componentsNumberETS])-1] <- -Inf
-                    Bu[j+2:(lagsModel[componentsNumberETS])-1] <- Inf
-                }
-                else{
-                    Bl[j+2:(lagsModel[componentsNumberETS])-1] <- 0
-                    Bu[j+2:(lagsModel[componentsNumberETS])-1] <- Inf
-                }
-                j[] <- j+(lagsModel[componentsNumberETS]-1)
-            }
-        }
+    if(etsModel && !backcast && initialEstimate){
+        pieces$states <- adam_initialiserStates(matVt, Etype, Ttype, Stype, modelIsTrendy,
+                                                modelIsSeasonal, initialLevelEstimate,
+                                                initialTrendEstimate, initialSeasonalEstimate,
+                                                componentsNumberETSNonSeasonal,
+                                                componentsNumberETSSeasonal, lagsModel);
     }
 
-    # ARIMA initials
-    if(arimaModel && all(initialType!=c("complete","backcasting","gradient")) && initialArimaEstimate){
-        # The creator holds the pre-sample values in the last ARIMA state (see
-        # adam_arimaInitials), taken through the ARI polynomial of the starting values
-        B[j+1:initialArimaNumber] <-
-            adam_arimaInitials(arimaPolynomials$ariPolynomial,
-                               matVt[componentsNumberETS+componentsNumberARIMA, 1:initialArimaNumber], Etype)
-        names(B)[j+1:initialArimaNumber] <- paste0("ARIMAState",1:initialArimaNumber)
-
-        if(Etype=="A"){
-            Bl[j+1:initialArimaNumber] <- -Inf
-            Bu[j+1:initialArimaNumber] <- Inf
+    # ARIMA initials: the creator holds the pre-sample values in the last ARIMA state (see
+    # adam_arimaInitials), taken through the ARI polynomial of the starting values. The
+    # multiplicative ones are positive to avoid errors
+    if(arimaModel && !backcast && initialArimaEstimate){
+        initialsARIMA <- adam_arimaInitials(arimaPolynomials$ariPolynomial,
+                                            matVt[componentsNumberETS+componentsNumberARIMA,
+                                                  1:initialArimaNumber], Etype);
+        if(Etype=="M"){
+            initialsARIMA[] <- abs(initialsARIMA);
         }
-        else{
-            # Make sure that ARIMA states are positive to avoid errors
-            B[j+1:initialArimaNumber] <- abs(B[j+1:initialArimaNumber])
-            Bl[j+1:initialArimaNumber] <- 0
-            Bu[j+1:initialArimaNumber] <- Inf
-        }
-        j[] <- j+initialArimaNumber
+        pieces$initialsARIMA <- list(B=setNames(initialsARIMA, paste0("ARIMAState",1:initialArimaNumber)),
+                                     Bl=rep(switch(Etype,"A"=-Inf,"M"=0), initialArimaNumber),
+                                     Bu=rep(Inf, initialArimaNumber));
     }
 
     # Initials of the xreg (excluded from B only under "complete")
     if((initialType!="complete") && initialXregEstimate){
-        xregNumberToEstimate <- sum(xregParametersEstimated)
-        B[j+1:xregNumberToEstimate] <-
-            matVt[componentsNumberETS+componentsNumberARIMA+
-                      which(xregParametersEstimated==1),1]
-        names(B)[j+1:xregNumberToEstimate] <-
-            rownames(matVt)[componentsNumberETS+componentsNumberARIMA+
-                                which(xregParametersEstimated==1)]
-        if(Etype=="A"){
-            Bl[j+1:xregNumberToEstimate] <- -Inf
-            Bu[j+1:xregNumberToEstimate] <- Inf
-        }
-        else{
-            Bl[j+1:xregNumberToEstimate] <- -Inf
-            Bu[j+1:xregNumberToEstimate] <- Inf
-        }
-        j[] <- j+xregNumberToEstimate
+        xregRows <- componentsNumberETS+componentsNumberARIMA+which(xregParametersEstimated==1);
+        pieces$initialsXreg <- list(B=setNames(matVt[xregRows,1], rownames(matVt)[xregRows]),
+                                    Bl=rep(-Inf, length(xregRows)), Bu=rep(Inf, length(xregRows)));
     }
 
     if(constantEstimate){
-        j[] <- j+1
-        B[j] <- matVt[componentsNumberETS+componentsNumberARIMA+xregNumber+1,1]
-        # The constant is the intercept of ARIMA, so it needs to agree with the AR starting values
-        if(arimaModel && !etsModel){
-            B[j] <- switch(Etype,
-                           "M"=B[j]^sum(arimaPolynomials$arPolynomial),
-                           B[j]*sum(arimaPolynomials$arPolynomial))
-        }
-        names(B)[j] <- constantName
-        if(etsModel || sum(iOrders)!=0){
-            driftSeries <- adam_driftSeries(yInSample[otLogical], Etype, etsModel, lags, iOrders)
-            if(Etype=="A"){
-                Bu[j] <- quantile(driftSeries,0.6)
-                Bl[j] <- -Bu[j]
-            }
-            else{
-                Bu[j] <- exp(quantile(driftSeries,0.6))
-                Bl[j] <- exp(quantile(driftSeries,0.4))
-            }
-
-            # Failsafe for weird cases, when upper bound is the same or lower than the lower one
-            if(Bu[j]<=Bl[j]){
-                Bu[j] <- Inf
-                Bl[j] <- switch(Etype,"A"=-Inf,"M"=0)
-            }
-
-            # Failsafe for cases, when the B is outside of bounds
-            if(B[j]<=Bl[j]){
-                Bl[j] <- switch(Etype,"A"=-Inf,"M"=0)
-            }
-            if(B[j]>=Bu[j]){
-                Bu[j] <- Inf
-            }
-        }
-        else{
-            Bu[j] <- max(abs(yInSample[otLogical]),abs(B[j])*1.01)
-            Bl[j] <- -Bu[j]
-        }
+        pieces$constant <- adam_initialiserConstant(matVt[componentsNumberETS+componentsNumberARIMA+
+                                                              xregNumber+1,1],
+                                                    constantName, arimaModel, etsModel, Etype,
+                                                    if(arimaModel){arimaPolynomials$arPolynomial},
+                                                    iOrders, yInSample, otLogical, lags);
     }
 
     # Add lambda if it is needed
     if(otherParameterEstimate){
-        j[] <- j+1
-        B[j] <- other
-        names(B)[j] <- "other"
-        Bl[j] <- 1e-10
-        Bu[j] <- Inf
+        pieces$other <- list(B=c(other=unname(other)), Bl=1e-10, Bu=Inf);
     }
 
-    return(list(B=B,Bl=Bl,Bu=Bu))
+    pieces <- unname(pieces);
+    return(list(B=c(numeric(0), unlist(lapply(pieces, "[[", "B"))),
+                Bl=c(numeric(0), unname(unlist(lapply(pieces, "[[", "Bl")))),
+                Bu=c(numeric(0), unname(unlist(lapply(pieces, "[[", "Bu"))))));
+}
+
+# The starting values of the smoothing parameters, with their bounds and names: the small ones
+# of the multiplicative models that are not safe for the conventional ETS (Python's
+# _initialiser_persistence)
+adam_initialiserPersistence <- function(Etype, Ttype, Stype, ets, backcast, persistenceEstimateVector,
+                                        componentsNumberETSSeasonal, bounds){
+    model <- paste0(Etype,Ttype,Stype);
+    values <- c(0.1, 0.05, 0.3);
+    if(ets=="conventional" && any(c(Etype,Ttype,Stype)=="M")){
+        # AAM, AMA, and with backcasting MAA and MAM
+        if(any(model==c("AAM","AMA")) || (backcast && any(model==c("MAA","MAM")))){
+            values[] <- c(0.01, 0.005, 0.001);
+        }
+        # MMA is the worst. Set everything to zero and see if anything can be done...
+        else if(model=="MMA"){
+            values[] <- c(0.01, 0.005, 0.01);
+        }
+        else if(Etype=="M" && Ttype=="A" && !backcast){
+            values[] <- c(0.2, 0.01, 0.3);
+        }
+    }
+    estimated <- which(persistenceEstimateVector);
+    gammas <- if(componentsNumberETSSeasonal>1){paste0("gamma",1:componentsNumberETSSeasonal)}else{"gamma"};
+    B <- setNames(c(values[1:2], rep(values[3], componentsNumberETSSeasonal)),
+                  c("alpha", "beta", gammas)[1:(2+componentsNumberETSSeasonal)])[estimated];
+    return(list(B=B, Bl=rep(switch(bounds,"usual"=0,-5), length(B)),
+                Bu=rep(switch(bounds,"usual"=1,5), length(B))));
+}
+
+# The starting values of the AR and MA parameters, filled in lags-wise, with their bounds and
+# names, and the polynomials at them (Python's _initialiser_arma)
+adam_initialiserArma <- function(yInSample, otLogical, etsModel, Etype, Stype, modelIsSeasonal, lags,
+                                 arOrders, iOrders, maOrders, arRequired, maRequired, arEstimate,
+                                 maEstimate, armaParameters, bounds, smoother, xreg, adamCpp){
+    B <- numeric(0);
+    if(any(c(arEstimate,maEstimate))){
+        armaValues <- adam_arimaInitialiser(yInSample, otLogical, etsModel, Etype, Stype,
+                                            modelIsSeasonal, lags, arOrders, iOrders, maOrders,
+                                            arEstimate, maEstimate, armaParameters,
+                                            bounds!="none", smoother, xreg);
+        for(i in 1:length(lags)){
+            if(arRequired && arEstimate && arOrders[i]>0){
+                B <- c(B, setNames(armaValues[length(B)+1:arOrders[i]],
+                                   paste0("phi",1:arOrders[i],"[",lags[i],"]")));
+            }
+            if(maRequired && maEstimate && maOrders[i]>0){
+                B <- c(B, setNames(armaValues[length(B)+1:maOrders[i]],
+                                   paste0("theta",1:maOrders[i],"[",lags[i],"]")));
+            }
+        }
+    }
+    arimaPolynomials <- lapply(adamCpp$polynomialise(B, arOrders, iOrders, maOrders, arEstimate,
+                                                     maEstimate, armaParameters, lags),
+                               as.vector);
+    return(list(B=B, Bl=rep(-5, length(B)), Bu=rep(5, length(B)), arimaPolynomials=arimaPolynomials));
+}
+
+# The initial level, trend and seasonal states from the first column of matVt, with their bounds
+# and names (Python's _initialiser_states)
+adam_initialiserStates <- function(matVt, Etype, Ttype, Stype, modelIsTrendy, modelIsSeasonal,
+                                   initialLevelEstimate, initialTrendEstimate, initialSeasonalEstimate,
+                                   componentsNumberETSNonSeasonal, componentsNumberETSSeasonal,
+                                   lagsModel){
+    B <- Bl <- Bu <- numeric(0);
+    if(initialLevelEstimate){
+        B <- c(level=unname(matVt[1,1]));
+        Bl <- switch(Etype,"A"=-Inf,"M"=0);
+        Bu <- Inf;
+    }
+    if(modelIsTrendy && initialTrendEstimate){
+        B <- c(B, trend=unname(matVt[2,1]));
+        Bl <- c(Bl, switch(Ttype,"A"=-Inf,0));
+        Bu <- c(Bu, switch(Ttype,"A"=Inf,2));
+    }
+    if(modelIsSeasonal){
+        # The seasonal states are numbered by the component with several of them
+        for(k in which(initialSeasonalEstimate[1:componentsNumberETSSeasonal])){
+            row <- componentsNumberETSNonSeasonal+k;
+            positions <- 1:(lagsModel[row]-1);
+            B <- c(B, setNames(matVt[row, positions],
+                               paste0("seasonal", if(componentsNumberETSSeasonal>1){k}, "_", positions)));
+            Bl <- c(Bl, rep(switch(Stype,"A"=-Inf,0), length(positions)));
+            Bu <- c(Bu, rep(Inf, length(positions)));
+        }
+    }
+    return(list(B=B, Bl=Bl, Bu=Bu));
+}
+
+# The starting value of the constant, which agrees with the AR starting values in ARIMA, with its
+# bounds from the drift of the series (Python's _initialiser_constant)
+adam_initialiserConstant <- function(constant, constantName, arimaModel, etsModel, Etype, arPolynomial,
+                                     iOrders, yInSample, otLogical, lags){
+    if(arimaModel && !etsModel){
+        constant <- switch(Etype, "M"=constant^sum(arPolynomial), constant*sum(arPolynomial));
+    }
+    if(!etsModel && sum(iOrders)==0){
+        Bu <- max(abs(yInSample[otLogical]),abs(constant)*1.01);
+        return(list(B=setNames(constant, constantName), Bl=-Bu, Bu=Bu));
+    }
+    driftSeries <- adam_driftSeries(yInSample[otLogical], Etype, etsModel, lags, iOrders);
+    Bu <- switch(Etype, "A"=quantile(driftSeries,0.6), "M"=exp(quantile(driftSeries,0.6)));
+    Bl <- switch(Etype, "A"=-Bu, "M"=exp(quantile(driftSeries,0.4)));
+    # Failsafe for weird cases, when upper bound is the same or lower than the lower one
+    if(Bu<=Bl){
+        Bu[] <- Inf;
+        Bl[] <- switch(Etype,"A"=-Inf,"M"=0);
+    }
+    # Failsafe for cases, when the B is outside of bounds
+    if(constant<=Bl){
+        Bl[] <- switch(Etype,"A"=-Inf,"M"=0);
+    }
+    if(constant>=Bu){
+        Bu[] <- Inf;
+    }
+    return(list(B=setNames(constant, constantName), Bl=unname(Bl), Bu=unname(Bu)));
 }
 
 adam_scaler <- function(distribution, Etype, errors, yFitted, obsInSample, other,

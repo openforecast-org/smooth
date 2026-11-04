@@ -663,3 +663,38 @@ def test_the_refitting_methods_run_on_ces():
     assert np.all(np.asarray(confidence.lower) <= np.asarray(confidence.upper))
     boot = m.coefbootstrap(nsim=5, seed=1)
     assert boot.vcov.shape == (len(m.coef), len(m.coef))
+
+
+@pytest.mark.parametrize(
+    "seasonality, initial", [("none", "backcasting"), ("full", "optimal")]
+)
+def test_a_custom_loss(seasonality, initial):
+    """A custom loss is a function of actual, fitted and B, as in R and ADAM: the
+    mean of the squared errors, summed as the MSE branch sums them, is MSE."""
+    from smooth.adam_general.core.utils.utils import _sum_r
+
+    y = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")["y"]
+    y = y.to_numpy(float)
+
+    def loss(actual, fitted, B):
+        return float(_sum_r((actual - fitted) ** 2) / len(actual))
+
+    kwargs = dict(seasonality=seasonality, lags=[12], initial=initial)
+    model = CES(loss=loss, **kwargs).fit(y)
+    reference = CES(loss="MSE", **kwargs).fit(y)
+    assert model.loss_ == "custom"
+    np.testing.assert_array_equal(model.coef, reference.coef)
+    assert model.loglik == reference.loglik
+
+
+def test_a_custom_loss_matches_r():
+    """R: ces(AirPassengers, "full", lags=12, loss=function(actual, fitted, B)
+    mean((actual-fitted)^2))."""
+    y = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")["y"]
+    model = CES(
+        seasonality="full",
+        lags=[12],
+        loss=lambda actual, fitted, B: float(np.mean((actual - fitted) ** 2)),
+    ).fit(y.to_numpy(float))
+    assert model.loglik == pytest.approx(-586.205483424, rel=1e-10)
+    assert model.loss_value == pytest.approx(201.112762643, rel=1e-10)

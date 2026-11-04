@@ -79,6 +79,7 @@ class ES(ADAM):
     initial_season : Optional[NDArray], default=None
         Initial values for seasonal components. If None, estimated.
         Length should be (seasonal_period - 1) for each seasonal component.
+        Ignored when ``initial`` is a dict, as in R.
 
     ic : Literal["AIC", "AICc", "BIC", "BICc"], default="AICc"
         Information criterion for model selection.
@@ -105,7 +106,8 @@ class ES(ADAM):
         How to handle external regressors.
 
     initial_X : Optional[NDArray], default=None
-        Initial values for regressor coefficients.
+        Initial values for regressor coefficients. Ignored when ``initial`` is
+        a dict, as in R.
 
     **kwargs
         Additional arguments passed to ADAM.
@@ -256,14 +258,10 @@ class ES(ADAM):
         Union[str, Dict[str, Any]]
             Processed initial specification.
         """
-        # If initial is already a dict, add seasonal and xreg if provided
+        # A dict initial is used as it is: R's es() ignores initialSeason and
+        # initialX when initial is a list
         if isinstance(initial, dict):
-            initial_value = initial.copy()
-            if initial_season is not None:
-                initial_value["seasonal"] = initial_season
-            if initial_X is not None:
-                initial_value["xreg"] = initial_X
-            return initial_value
+            return initial.copy()
 
         # If initial is a string method
         if isinstance(initial, str):

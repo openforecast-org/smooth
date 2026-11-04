@@ -92,16 +92,24 @@ Run all tests with: `R -e "devtools::test()"`
 **Run the tests in proportion to what the change can break**, not the full suites after
 every change:
 
-- **Every change:** the tests of the files touched and the parity tests of that feature
-  (e.g. `devtools::test(filter="tbats")`, `pytest tests/test_tbats.py -k outliers`), a few
-  minutes.
-- **Before a commit that touches shared code** (`R/adam.R`, `R/autoadam.R`,
-  `R/adamGeneral.R`, `R/utils-adam.R`, `src/headers/`, Python's `adam.py`, `checker/`,
-  `creator/`, `estimator/`, `forecaster/`, `utils/`): the default suites, R (~8 min) and
-  Python (~3 min). A change confined to one model (TBATS, CES, ...) or to tests does not
-  need them.
+- **Every change:** the tests that reach the changed code, a few minutes. In Python,
+  `pytest tests/ --testmon-forceselect` (from `python/`) runs only the tests whose code
+  changed since its last run (plain `--testmon` selects nothing, as the default `-m` of
+  `pyproject.toml` switches its selection off). It sees Python code only: after a change to
+  C++, R or the fixtures, run the affected tests by name (e.g. `pytest
+  tests/test_tbats.py -k outliers`, `-m r_parity -k arima`). In R, the test files that
+  call the changed functions (e.g. `devtools::test(filter="tbats")`).
+- **A refactor** (a split, a rewrite with the same results): the old and the new function
+  side by side over a grid of their inputs, every difference explained, plus the tests
+  above. The default suites are not needed after each refactor of a batch.
+- **At the end of a batch, and before a commit that changes the behaviour of shared code**
+  (`R/adam.R`, `R/autoadam.R`, `R/adamGeneral.R`, `R/utils-adam.R`, `src/headers/`,
+  Python's `adam.py`, `checker/`, `creator/`, `estimator/`, `forecaster/`, `utils/`): the
+  default suites, R (~35 min, of which `test_adam.R` 18, `test_autoadam.R` 7 and
+  `test_tbats.R` 6) and Python (~4 min). Run the R suite in the background with a time
+  limit above 35 min.
 - **At milestones** (the end of a feature, before a merge into `master` or a release): the
-  full R-parity suite as well (`pytest tests/ -m r_parity`, ~30 min).
+  full R-parity suite as well (`pytest tests/ -m r_parity`, ~50 min).
 
 The rule against dismissing failures holds at every level: a failure in a targeted run is
 investigated as one in a full run.
@@ -323,12 +331,6 @@ Key R packages:
 C++ dependencies:
 - Armadillo library (via RcppArmadillo)
 - C++11 or later
-
-**Pending version bump (greybox).** R's greybox 2.0.10 computes the log-densities of
-`dlaplace`, `ds` and `dgnorm` analytically, identically to Python's greybox (already
-required at `>=1.0.10`), which smooth's R/Python parity relies on (`tbats()` with
-`distribution="auto"` selects with `dgnorm`). Raise `greybox (>= 2.0.10)` in
-`DESCRIPTION` with the next smooth release after 2.0.10 is on CRAN, then remove this note.
 
 ## Mac OS Specific Notes
 

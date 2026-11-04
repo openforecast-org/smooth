@@ -172,11 +172,10 @@ class SMA(ADAM):
         n = len(y)
         h_eff = (self.h or 0) if self.holdout else 0
         obs_in_sample = n - h_eff
-        y_is = np.asarray(y[:obs_in_sample], dtype=float)
         ic = self.ic
 
         if self._sma_order is None:
-            order, ICs = self._select_order(y_is, ic)
+            order, ICs = self._select_order(y, obs_in_sample, ic)
             self._ICs_array = ICs
         else:
             order = self._sma_order
@@ -237,8 +236,11 @@ class SMA(ADAM):
         n = int(np.sum(~np.isnan(y_is)))
         return _ic_value(float(m.loglik), df=order + 1, n=n, ic=ic)
 
-    def _select_order(self, y_is: NDArray, ic: str) -> tuple[int, NDArray]:
+    def _select_order(
+        self, y: NDArray, obs_in_sample: int, ic: str
+    ) -> tuple[int, NDArray]:
         """Return (best_order, ICs_array) via ternary or sequential search."""
+        y_is = np.asarray(y[:obs_in_sample], dtype=float)
         # df = order + 1, so the order is capped to keep the denominator of AICc
         # positive, as R
         max_order = min(200, max(1, int(np.sum(~np.isnan(y_is))) - 3))
@@ -271,7 +273,7 @@ class SMA(ADAM):
                 if j == i or j == k or j == 0:
                     break
 
-            freq = _infer_frequency(y_is)
+            freq = _infer_frequency(y)
             if freq is not None and 1 <= freq <= max_order:
                 ev(freq)
         else:
@@ -303,7 +305,7 @@ def _infer_frequency(y: NDArray) -> Optional[int]:
                     "H": 24,
                 }
                 for k, v in freq_map.items():
-                    if str(freq).startswith(k):
+                    if freq.rule_code.startswith(k):
                         return v
     except ImportError:
         pass

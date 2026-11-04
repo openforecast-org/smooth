@@ -3,23 +3,24 @@ Pytest configuration and shared fixtures for smooth package tests.
 """
 
 import os
+import shutil
 
 import numpy as np
 import pytest
 
 
 def pytest_collection_modifyitems(config, items):
-    """Never run R-comparison tests on GitHub Actions.
+    """Skip the R-comparison tests on GitHub Actions where R is not installed.
 
-    These tests compare against committed R reference data and are meant for
-    local cross-language validation only. They are deselected by default via
-    ``addopts`` (``-m "not r_comparison and not r_parity"``); this hook is a
-    belt-and-suspenders guarantee that they are skipped on CI even if collected
-    explicitly (e.g. via ``-m r_comparison``).
+    They ask the local R source for its values (``tests/_r_bridge.py``), so
+    they need R. They are deselected by default via ``addopts``
+    (``-m "not r_comparison and not r_parity"``); the wheel builds have no R,
+    and this hook skips them there even if collected explicitly (e.g. via
+    ``-m r_comparison``). The R-parity job of the CI installs R and runs them.
     """
-    if os.environ.get("GITHUB_ACTIONS") != "true":
+    if os.environ.get("GITHUB_ACTIONS") != "true" or shutil.which("Rscript"):
         return
-    skip_ci = pytest.mark.skip(reason="R-comparison tests do not run on GitHub Actions")
+    skip_ci = pytest.mark.skip(reason="R-comparison tests need R")
     for item in items:
         if "r_comparison" in item.keywords or "r_parity" in item.keywords:
             item.add_marker(skip_ci)

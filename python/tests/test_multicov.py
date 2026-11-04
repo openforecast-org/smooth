@@ -234,3 +234,35 @@ def test_omg_submodel_multicov_works(y_intermittent):
     Ma = g.model_a.multicov(h=3)
     assert Ma.shape == (3, 3)
     assert list(Ma.columns) == ["h1", "h2", "h3"]
+
+
+# R: matrixPowerWrap(matrix(c(0.5,0.2,0.1,0.9),2,2), 3), column-major
+_R_POWER3 = np.array([[0.163, 0.153], [0.306, 0.775]])
+
+
+def test_matrix_power_wrap_as_r():
+    """The power of the matrices of the analytical variance, as R's
+    matrixPowerWrap(): the identity for 0, a non-integer power truncated."""
+    from smooth.adam_general.core.utils.var_covar import matrix_power_wrap
+
+    A = np.array([[0.5, 0.1], [0.2, 0.9]])
+    np.testing.assert_allclose(matrix_power_wrap(A, 3), _R_POWER3, rtol=1e-14)
+    np.testing.assert_array_equal(matrix_power_wrap(A, 0), np.eye(2))
+    # R: matrixPowerWrap(A, 2.7) is A %*% A
+    np.testing.assert_allclose(matrix_power_wrap(A, 2.7), A @ A, rtol=1e-14)
+
+
+@pytest.mark.parametrize(
+    "matrix, power, message",
+    [
+        (np.eye(2), -1, "negative power: -1"),
+        (np.ones((2, 3)), 2, r"must be square .* \(2, 3\)"),
+        (np.ones(3), 2, r"must be square .* \(3,\)"),
+        (np.array([[1.0, np.nan], [0.0, 1.0]]), 2, "non-finite"),
+    ],
+)
+def test_matrix_power_wrap_rejects(matrix, power, message):
+    from smooth.adam_general.core.utils.var_covar import matrix_power_wrap
+
+    with pytest.raises(ValueError, match=message):
+        matrix_power_wrap(matrix, power)

@@ -1,6 +1,7 @@
 """Tests for ADAM.predict() method options: intervals, levels, cumulative, scenarios."""
 
 import warnings
+from decimal import Decimal
 
 import numpy as np
 import pandas as pd
@@ -805,3 +806,60 @@ def test_the_forecast_continues_an_integer_index():
         forecast = fitted.predict(h=3)
     assert list(fitted.fitted.index[:2]) == [1970, 1971]
     assert list(forecast.mean.index) == [2018, 2019, 2020]
+
+
+@pytest.mark.parametrize(
+    "start, freq, expected",
+    [
+        (
+            pd.Period("2020-01", "M"),
+            "M",
+            pd.period_range("2020-01", periods=3, freq="M"),
+        ),
+        (5, 12, pd.RangeIndex(5, 8)),
+        (np.float64(5.0), "D", pd.RangeIndex(5, 8)),
+        # A numeric frequency: the integer of the start, or from zero
+        ("abc", 12, pd.RangeIndex(0, 3)),
+        (None, 1, pd.RangeIndex(0, 3)),
+        (Decimal("7"), 12, pd.RangeIndex(7, 10)),
+        (pd.Timestamp("2020-01-01"), 12, pd.RangeIndex(0, 3)),
+        (object(), 1.0, pd.RangeIndex(0, 3)),
+        # Dates with a pandas frequency, and a start that is no date
+        (
+            pd.Timestamp("2020-01-01"),
+            "MS",
+            pd.date_range("2020-01-01", periods=3, freq="MS"),
+        ),
+        ("not a date", "D", pd.RangeIndex(0, 3)),
+    ],
+)
+def test_safe_create_index(start, freq, expected):
+    """The index of a series without one: dates, periods or integers."""
+    from smooth.adam_general.core.forecaster._helpers import _safe_create_index
+
+    index = _safe_create_index(start, 3, freq)
+    assert type(index) is type(expected)
+    assert index.equals(expected)
+
+
+def test_correct_multiplicative_components():
+    """Every non-positive multiplicative trend and seasonal value of the fitted states
+    and of the recent profile is replaced, NaNs are left as they are."""
+    from smooth.adam_general.core.forecaster.preparator import (
+        _correct_multiplicative_components,
+    )
+
+    states = np.array(
+        [[1, 2, 3, 4, 5], [1, -1, 2, 0, -3], [1, -1, 1, 1, 2], [2, 1, 0, 1, -1.0]]
+    )
+    profile = np.array([[1, 2], [-1, 2], [1, -2], [0, 1.0]])
+    corrected, profile = _correct_multiplicative_components(
+        states.copy(),
+        profile,
+        {"trend_type": "M", "season_type": "M"},
+        {"components_number_ets_non_seasonal": 2, "components_number_ets_seasonal": 2},
+    )
+    expected = np.where(states <= 0, 1e-6, states)
+    expected[0] = states[0]
+    np.testing.assert_array_equal(corrected, expected)
+    np.testing.assert_array_equal(profile, [[1, 2], [1e-6, 2], [1, 1e-6], [1e-6, 1]])

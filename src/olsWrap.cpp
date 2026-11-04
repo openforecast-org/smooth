@@ -32,6 +32,14 @@ arma::vec arimaParameterBoundsCpp(const arma::vec& values, int j, double sign) {
     return arimaParameterBounds(values, j, sign);
 }
 
+// The interval around current on which the R function stable() is TRUE (arimaBounds.h)
+// [[Rcpp::export]]
+arma::vec stabilityIntervalCpp(Function stable, double current, double step = 0.01, double limit = 5) {
+    return stabilityInterval([&](double value) {
+        return as<bool>(stable(value));
+    }, current, step, limit);
+}
+
 // The Householder QR of a fixed design and its least squares (src/headers/olsCore.h)
 // [[Rcpp::export]]
 List householderQRCpp(const arma::mat& X) {

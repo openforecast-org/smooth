@@ -37,6 +37,10 @@ arimaParameterBoundsCpp <- function(values, j, sign) {
     .Call('_smooth_arimaParameterBoundsCpp', PACKAGE = 'smooth', values, j, sign)
 }
 
+stabilityIntervalCpp <- function(stable, current, step = 0.01, limit = 5) {
+    .Call('_smooth_stabilityIntervalCpp', PACKAGE = 'smooth', stable, current, step, limit)
+}
+
 householderQRCpp <- function(X) {
     .Call('_smooth_householderQRCpp', PACKAGE = 'smooth', X)
 }

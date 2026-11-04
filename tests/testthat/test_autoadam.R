@@ -135,3 +135,79 @@ test_that("auto.msarima() passes the smoother on", {
                          initial="optimal", smoother="lowess")$lossValue)
     expect_false(isTRUE(all.equal(lossValues[1], lossValues[2])))
 })
+
+# The regressors provided in xreg are named after their columns, or x1, x2, ...
+test_that("auto.msarima() names the regressors of xreg", {
+    set.seed(3)
+    xregValues <- cbind(rnorm(60, 10, 1), rnorm(60))
+    y <- 5 + 2*xregValues[,1] + cumsum(rnorm(60, 0, 0.5))
+    orders <- list(ar=1, i=1, ma=0)
+    testModel <- auto.msarima(y, orders=orders, lags=1, xreg=xregValues[,1])
+    expect_equal(colnames(testModel$data), c("y","x"))
+    expect_equal(as.vector(actuals(testModel)), y)
+    expect_equal(as.vector(testModel$data[,"x"]), xregValues[,1])
+    expect_match(testModel$model, "ARIMAX", fixed=TRUE)
+    testModel <- auto.msarima(y, orders=orders, lags=1, xreg=xregValues)
+    expect_equal(colnames(testModel$data), c("y","x1","x2"))
+    testModel <- auto.msarima(y, orders=orders, lags=1, xreg=data.frame(a=xregValues[,1], b=xregValues[,2]))
+    expect_equal(colnames(testModel$data), c("y","a","b"))
+    expect_equal(names(testModel$initial$xreg), c("a","b"))
+    # The names of the columns of a matrix too, in msarima() and ssarima() as well
+    colnames(xregValues) <- c("a","b")
+    for(modelFunction in list(auto.msarima, msarima, ssarima)){
+        testModel <- modelFunction(y, orders=orders, lags=1, xreg=xregValues)
+        expect_equal(colnames(testModel$data), c("y","a","b"))
+    }
+})
+
+#### Parallel calculations ####
+test_that("auto.adam() in parallel selects the model of the sequential selection", {
+    skip_on_cran()
+    skip_if_not_installed("foreach")
+    skip_if_not(requireNamespace("doMC", quietly=TRUE) || requireNamespace("doParallel", quietly=TRUE))
+    y <- BJsales[1:60]
+    testModel <- auto.adam(y, "ANN", distribution=c("dnorm","dlaplace"))
+    capture.output(parallelModel <- auto.adam(y, "ANN", distribution=c("dnorm","dlaplace"), parallel=2))
+    foreach::registerDoSEQ()
+    expect_equal(parallelModel$distribution, testModel$distribution)
+    expect_equal(coef(parallelModel), coef(testModel))
+    expect_equal(parallelModel$ICs, testModel$ICs)
+})
+
+test_that("adam_setupParallel() sets up the cores, or says which package is missing", {
+    expect_equal(adam_setupParallel(FALSE, 3),
+                 list(parallel=FALSE, cluster=NULL, nCores=min(parallel::detectCores()-1, 3)))
+    # The function with the installed packages and the system replaced
+    setupMocked <- function(installed, sysname="Linux"){
+        setupFunction <- adam_setupParallel
+        environment(setupFunction) <- list2env(list(requireNamespace=function(package, ...){
+                                                        return(any(package==installed))
+                                                    },
+                                                    Sys.info=function(){return(c(sysname=sysname))}),
+                                               parent=environment(adam_setupParallel))
+        return(setupFunction)
+    }
+    expect_error(setupMocked(c("parallel","doMC"))(2, 3), "'foreach' package must be installed")
+    expect_error(setupMocked(c("foreach","doMC"))(2, 3), "'parallel' package must be installed")
+    expect_error(setupMocked(c("foreach","parallel"))(2, 3),
+                 "either 'doMC' (prefered) or 'doParallel' package", fixed=TRUE)
+    expect_error(setupMocked(c("foreach","parallel","doMC"), "Windows")(2, 3),
+                 "you need 'doParallel' package", fixed=TRUE)
+    # doParallel sets up a cluster without doMC and on Windows
+    skip_if_not_installed("foreach")
+    skip_if_not_installed("doParallel")
+    for(sysname in c("Linux","Windows")){
+        expect_output(setupResult <- setupMocked(c("foreach","parallel","doParallel"), sysname)(1, 3),
+                      "Setting up 1 clusters using 'doParallel'", fixed=TRUE)
+        expect_s3_class(setupResult$cluster, "cluster")
+        expect_equal(foreach::getDoParName(), "doParallelSNOW", label=sysname)
+        adam_teardownParallel(setupResult$cluster)
+    }
+    foreach::registerDoSEQ()
+    # doMC registers the cores without a cluster
+    skip_if_not_installed("doMC")
+    expect_equal(setupMocked(c("foreach","parallel","doMC"))(2, 3), list(parallel=TRUE, cluster=NULL, nCores=2))
+    expect_equal(foreach::getDoParName(), "doMC")
+    expect_equal(foreach::getDoParWorkers(), 2)
+    foreach::registerDoSEQ()
+})

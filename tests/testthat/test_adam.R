@@ -191,6 +191,39 @@ test_that("ADAM ETSX(MMN) on AirPassengers", {
     expect_false(ncol(testModel$data)==1)
 })
 
+# The regression keeps the factors of a data frame, takes the intercept of the means with the
+# provided coefficients, and works without an intercept
+test_that("ADAM regression with factors, provided coefficients and no intercept", {
+    set.seed(41);
+    regressionData <- data.frame(y=rnorm(60, 50), x1=rnorm(60, 10), x2=rnorm(60, 5),
+                                 colour=factor(sample(c("red","green","blue"), 60, TRUE)));
+    expect_true(is.factor(suppressWarnings(adam(regressionData, "NNN"))$data$colour));
+    testModel <- adam(regressionData[,1:3], "NNN", initial=list(xreg=c(x1=2, x2=-3)));
+    expect_equal(coef(testModel),
+                 c("(Intercept)"=with(regressionData, mean(y)-2*mean(x1)+3*mean(x2)), x1=2, x2=-3));
+    testModel <- suppressWarnings(adam(regressionData, "NNN", formula=y~x1+x2-1));
+    expect_equal(dim(testModel$measurement), c(60, 2));
+})
+
+# The prediction interval of an additive error with a distribution of 1+e is around the fitted
+test_that("predict() of ETS(A,A,N) with dgamma brackets the fitted values", {
+    testModel <- adam(BJsales, "AAN", distribution="dgamma");
+    testPredict <- predict(testModel, interval="prediction");
+    expect_true(all(testPredict$lower < testPredict$mean & testPredict$mean < testPredict$upper));
+})
+
+# The names with special characters stay in the data of the model, the model takes the
+# syntactic ones, and the forecasts take the newdata with the names of the user
+test_that("ADAM with special characters in the names of the variables", {
+    set.seed(41);
+    specialData <- data.frame(`my y`=rnorm(60, 50), `x 1`=rnorm(60, 10), check.names=FALSE);
+    testModel <- suppressWarnings(adam(specialData, "ANN", h=3, holdout=TRUE));
+    expect_equal(colnames(testModel$data), c("my y", "x 1"));
+    expect_length(forecast(testModel, h=3, newdata=specialData[58:60,])$mean, 3);
+    expect_length(suppressWarnings(adam(specialData, "NNN", h=3))$forecast, 3);
+    expect_length(suppressWarnings(adam(specialData, "ANN", formula=`my y`~`x 1`, h=3))$forecast, 3);
+})
+
 # ETSX selection on AirPassengers
 test_that("ADAM ETSX(ZZZ) + xreg selection on AirPassengers", {
     skip_on_cran()
@@ -471,15 +504,17 @@ test_that("Detect outliers for ETS(ZZZ) on BJsales", {
 # Best ARIMA on the 2568
 test_that("Best auto.adam ARIMA on AirPassengers", {
     skip_on_cran()
-    testModel <- auto.adam(AirPassengers, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE))
+    expect_warning(testModel <- auto.adam(AirPassengers, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE)),
+                   "Not all distributions make sense for the pure ARIMA")
     expect_match(testModel$loss, "likelihood")
 })
 
 # Outliers detection for ARIMA on series BJsales of M1 in parallel
 test_that("Detect outliers for ARIMA on BJsales", {
     skip_on_cran()
-    testModel <- auto.adam(BJsales, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE),
-                           outliers="use")
+    expect_warning(testModel <- auto.adam(BJsales, "NNN", orders=list(ar=c(3,2),i=c(2,1),ma=c(3,2),select=TRUE),
+                                          outliers="use"),
+                   "Not all distributions make sense for the pure ARIMA")
     expect_match(modelType(testModel),"NNN")
 })
 
@@ -570,7 +605,8 @@ test_that("Hannan-Rissanen falls back to the defaults and respects the provided 
 test_that("ARIMA starting values with missing and intermittent data", {
     y <- AirPassengers
     y[c(10,50,90)] <- NA
-    expect_true(all(is.finite(msarima(y, orders=list(ar=1,i=1,ma=1), maxeval=1)$B)))
+    expect_warning(testModel <- msarima(y, orders=list(ar=1,i=1,ma=1), maxeval=1), "Data contains NAs")
+    expect_true(all(is.finite(testModel$B)))
     set.seed(44)
     y <- ts(rpois(120, 0.7) * (1 + rnorm(120)^2))
     expect_true(all(is.finite(adam(y, "MNN", orders=list(ar=1), occurrence="odds-ratio", maxeval=1)$B)))
@@ -748,11 +784,11 @@ test_that("confint keeps the ARMA parameters within their stationary / invertibl
     testModel <- msarima(BJsales, orders=list(ar=2, i=1, ma=2))
     phi2 <- coef(testModel)[["phi2[1]"]]
     expect_equal(unname(confint(testModel)["phi1[1]", 2:3]), c(phi2-1, 1-phi2), tolerance=1e-6)
-    # The upper bound of the admissible alpha of ANN, [0, 2), was stuck at 5.01. The bound is the
-    # first inadmissible value of the grid from above: alpha=2 puts the root of the MA polynomial
-    # 1 + B on the unit circle, so it is not admissible (the per-lag check took it, giving 2.01)
+    # The admissible alpha of ANN is [0, 2): alpha=2 puts the root of the MA polynomial 1 + B on
+    # the unit circle, and alpha=0 cancels the unit root of the level. The bounds are bisected to
+    # the tolerance of the condition (a grid of 0.01 gave (-0.01, 2); the upper one was once 5.01)
     testModel <- adam(BJsales, "ANN", bounds="admissible")
-    expect_equal(unname(eigenBounds(testModel, as.matrix(testModel$persistence), 1)), c(-0.01, 2))
+    expect_equal(eigenBounds(testModel, as.matrix(testModel$persistence), 1), c(0, 2), tolerance=1e-8)
 })
 
 test_that("The ARIMA bounds reject exactly the non-invertible MA and non-stationary AR", {
@@ -1054,12 +1090,75 @@ test_that("sm() and pls() take the missing values for gaps", {
                      sum(log(holdout[-c(3, 5)])));
 })
 
+test_that("sm() takes the observations with zero errors as its missing values", {
+    testModel <- adam(AirPassengers, "ANN", distribution="dlaplace");
+    zeros <- which(residuals(testModel)==0);
+    expect_length(zeros, 5);
+    # A seasonal scale model stays multiplicative, its states are not updated on the zeros, and
+    # its likelihood keeps them
+    expect_warning(scaleModel <- sm(testModel, lags=c(1,12)), "observations with zero errors");
+    expect_match(scaleModel$model, "^ETS\\(M");
+    expect_null(scaleModel$occurrence);
+    expect_true(all(is.finite(fitted(scaleModel)) & fitted(scaleModel)>0));
+    expect_equal(sum(pointLik(scaleModel)), as.numeric(logLik(scaleModel)));
+    # The same as the data of the scale model missing there, for the fixed model
+    expect_warning(scaleModel <- sm(testModel, model="MNN", persistence=0.3), "observations with zero errors");
+    gapModel <- suppressWarnings(adam(replace(abs(residuals(testModel)), zeros, NA), "MNN",
+                                      persistence=0.3, initial=scaleModel$initial$level,
+                                      distribution="dlaplace"));
+    expect_equal(as.vector(fitted(scaleModel)), as.vector(fitted(gapModel)));
+})
+
+# The arguments of sm() reach adam() as values: through the variables of a function, they were
+# not found, and a model through a variable was taken for an additive one and fitted in logs
+test_that("sm() takes the values of its arguments", {
+    testModel <- adam(AirPassengers, "ANN");
+    scaleLiteral <- suppressWarnings(sm(testModel, model="MNN", lags=12));
+    scaleFunction <- function(object, modelSM, lagsSM){
+        return(suppressWarnings(sm(object, model=modelSM, lags=lagsSM)));
+    }
+    scaleVariable <- scaleFunction(testModel, "MNN", 12);
+    expect_equal(scaleVariable$model, scaleLiteral$model);
+    expect_equal(logLik(scaleVariable), logLik(scaleLiteral));
+})
+
+# A regression of the scale predicts it at the zero errors, its missing values: it failed there
+test_that("sm() with a regression and zero errors", {
+    set.seed(1);
+    testData <- data.frame(y=as.numeric(AirPassengers), x=rnorm(144));
+    testModel <- adam(testData, "ANN", formula=y~x);
+    expect_true(any(residuals(testModel)==0));
+    scaleModel <- suppressWarnings(sm(testModel, model="NNN", formula=y~x));
+    expect_equal(scaleModel$model, "Regression in logs");
+    expect_equal(as.vector(fitted(scaleModel)), as.vector(exp(scaleModel$B[1]+scaleModel$B[2]*testData$x)));
+})
+
+# A regression with a provided occurrence has its fitted values at their rows, the prediction
+# times the occurrence: they were recycled over all the observations
+test_that("A regression with a provided occurrence", {
+    set.seed(1);
+    testData <- data.frame(y=as.numeric(AirPassengers), x=rnorm(144));
+    zeros <- c(1,50);
+    testData$y[zeros] <- 0;
+    testOccurrence <- replace(rep(1,144), zeros, 0);
+    expect_no_warning(testModel <- adam(testData, "NNN", formula=y~x, occurrence=testOccurrence));
+    expect_equal(as.vector(fitted(testModel)),
+                 as.vector(testModel$B[1]+testModel$B[2]*testData$x)*testOccurrence);
+    expect_equal(as.vector(residuals(testModel))[zeros], c(0,0));
+})
+
 test_that("The point likelihoods of sm() sum to its log-likelihood", {
     set.seed(41);
     yIntermittent <- rbinom(200, 1, 0.6) * exp(rnorm(200, 2, 0.3));
     for(testModel in list(adam(AirPassengers, "MAM"), adam(AirPassengers, "ANN", distribution="dlaplace"),
                           adam(yIntermittent, "MNN", occurrence="odds-ratio"))){
-        scaleModel <- sm(testModel);
+        # The random walk of ANN gives observations with zero errors, the gaps of the scale model
+        if(testModel$distribution=="dlaplace"){
+            expect_warning(scaleModel <- sm(testModel), "observations with zero errors");
+        }
+        else{
+            scaleModel <- sm(testModel);
+        }
         expect_equal(sum(pointLik(scaleModel)), as.numeric(logLik(scaleModel)));
     }
 })
@@ -1765,6 +1864,71 @@ test_that("a small sample restricts the pool to the models it can fit", {
     expect_setequal(names(testModel$ICs), c("ANN","AAN"));
 })
 
+test_that("the full, the pure and the safe pools take the other letters of the model", {
+    expect_equal(adam_modelsPoolNamed("F", "F", "N", "N"), c("ANN","MNN"));
+    expect_equal(adam_modelsPoolNamed("P", "P", "A", "N"), c("AAN","AAdN"));
+    expect_equal(adam_modelsPoolNamed("F", "F", "X", "N"), c("ANN","AAN","AAdN","MNN","MAN","MAdN"));
+    expect_equal(adam_modelsPoolNamed("S", "S", "Z", "N"), c("ANN","AAN","AAdN","MNN","MAN","MAdN","MMN","MMdN"));
+    expect_equal(adam_checkModel(FALSE, "PYN", "estimate")$modelsPool, c("ANN","MNN","MMN","MMdN"));
+    # The pool given as a vector, its strange models, and the combination of the rest
+    expect_error(adam_modelsPoolCheck(c("ANN","AQN")), "strange model");
+    expect_equal(adam_modelsPoolCheck(c("ANN","AAN","CCN")), list(model="CCN", modelsPool=c("ANN","AAN")));
+    expect_equal(adam_modelsPoolCheck(c("ANN","AAN","CCC"))$model, "CCC");
+    expect_equal(adam_modelsPoolCheck(c("ANN","MNN"))$model, "ZNN");
+    expect_message(expect_equal(adam_modelComponents("AAxN")$model, "AAdN"), "strange model");
+    expect_equal(suppressMessages(adam_modelComponents("AN"))[c("model","damped")],
+                 list(model="ZZZ", damped=TRUE));
+    # The non-positive data: the additive pool, the additive selection, or a warning
+    expect_warning(expect_equal(adam_modelsAdditive("SSS", "Z", "Z", "N", c("ANN","MNN"))$modelsPool, "ANN"),
+                   "Amending the pool");
+    expect_warning(expect_null(adam_modelsAdditive("ZZZ", "Z", "Z", "Z", NULL)$modelsPool),
+                   "Changing the selection mechanism");
+    expect_warning(adam_modelsAdditive("MNN", "M", "N", "N", NULL), "might break down");
+})
+
+test_that("the helpers of the small samples build, filter and simplify as the sample allows", {
+    # Six observations: a trend, but no damping and no seasonality
+    expect_equal(adam_samplePoolBuild(6, 12, "Z", "Z", TRUE, 0), c("ANN","MNN","AAN","MAN","AMN","MMN"));
+    expect_equal(adam_samplePoolBuild(30, 12, "Z", "Z", FALSE, 0), c("ANN","AAN","AAdN","ANA","AAA"));
+    # MAA has an additive seasonality: in the pool for "X", not for "Y"
+    expect_true("MAA" %in% adam_samplePoolBuild(30, 12, "Z", "X", TRUE, 0));
+    expect_false("MAA" %in% adam_samplePoolBuild(30, 12, "Z", "Y", TRUE, 0));
+    # Eight observations with lag 4: the trend with the seasonality needs ten, the damped one eleven
+    expect_equal(adam_samplePoolFilter(c("ANN","AAN","AAdN","ANA","AAA","AAdA","ANN"), 8, 4, 0),
+                 c("ANN","AAN","AAdN","ANA"));
+    caught <- capture_warnings(model <- adam_sampleModelSimplify("AAdA", 8, 4, 0));
+    expect_equal(model, "ANA");
+    expect_length(caught, 2);
+    expect_equal(suppressWarnings(adam_sampleModelSimplify("MAA", 3, 4, 0)), "MNN");
+    expect_equal(suppressWarnings(adam_sampleModelSimplify("AAdA", 0, 12, 0)), "ANN");
+    # The tiny samples: a level model, estimated, selected, or used with the initial preset
+    expect_warning(adam_sampleTiny(3, 3, "Z", FALSE, c(1,2,3), rep(TRUE,3), matrix(0,2,1)),
+                   "persistence value was set to zero");
+    tiny <- suppressWarnings(adam_sampleTiny(2, 3, "M", TRUE, c(4,0,6), c(TRUE,FALSE,TRUE), matrix(0,2,1)));
+    expect_equal(tiny[c("model","modelDo","initialLevel","initialType")],
+                 list(model="ANN", modelDo="use", initialLevel=5, initialType="provided"));
+    expect_equal(tiny$parametersNumber[,1], c(0,2));
+    tiny <- suppressWarnings(adam_sampleTiny(0, 3, "A", TRUE, c(0,0,0), rep(FALSE,3), matrix(0,2,1)));
+    expect_equal(tiny[c("initialLevel","occurrence")], list(initialLevel=0, occurrence="none"));
+    expect_equal(adam_sampleTiny(4, 4, "A", TRUE, 1:4, rep(TRUE,4), matrix(0,2,1))$model, "ANN");
+    expect_error(adam_sampleTiny(5, 5, "A", TRUE, 1:5, rep(TRUE,5), matrix(0,2,1)), "Even for fitting");
+})
+
+# The provided ARMA parameters: a named list, a list without names and a vector
+test_that("The provided ARMA parameters are read lag by lag", {
+    # A named list of a wrong length switches that part to estimation
+    expect_warning(arma <- adam_armaParameters(list(ar=0.5, ma=0.2), c(1,1), c(0,1), c(1,4), TRUE, TRUE),
+                   "AR parameters is 1 while I need 2");
+    expect_equal(arma, list(armaParameters=c("theta1[4]"=0.2), arEstimate=TRUE, maEstimate=FALSE));
+    # A list without names holds the AR, then the MA, in every lag
+    expect_equal(adam_armaParameters(list(0.5, 0.2), c(1,0), c(0,1), c(1,4), TRUE, TRUE)$armaParameters,
+                 c("phi1[1]"=0.5, "theta1[4]"=0.2));
+    # A vector goes lag by lag, and nothing is returned without the AR and the MA
+    expect_equal(adam_armaParameters(c(0.1,0.2,0.3), c(1,1), c(1,0), c(1,4), TRUE, TRUE)$armaParameters,
+                 c("phi1[1]"=0.1, "theta1[1]"=0.2, "phi1[4]"=0.3));
+    expect_null(adam_armaParameters(NULL, 0, 0, 1, FALSE, FALSE)$armaParameters);
+})
+
 test_that("an estimated model loses its damping and then its trend as the sample shrinks", {
     # Only the steps that apply to the model warn
     caught <- capture_warnings(testModel <- adam(AirPassengers[1:6], "AAdN", initial="optimal"));
@@ -1871,6 +2035,15 @@ test_that("a regression with an occurrence model fits the sizes to the non-zero 
                               level=(0.95-(1-mean(nonZero)))/mean(nonZero));
     expect_equal(as.vector(testForecast$mean), as.vector(sizesForecast$mean)*mean(nonZero));
     expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper));
+    # The confidence interval of the sizes times the probability, for one and several levels
+    sizesForecast <- forecast(sizes, h=3, newdata=xregIntermittent[1:3,], interval="confidence",
+                              level=c(0.8,0.95));
+    testForecast <- forecast(testModel, h=3, newdata=xregIntermittent[1:3,], interval="confidence",
+                             level=c(0.8,0.95));
+    expect_equal(as.vector(testForecast$lower), as.vector(sizesForecast$lower)*mean(nonZero));
+    expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper)*mean(nonZero));
+    testForecast <- forecast(testModel, h=3, newdata=xregIntermittent[1:3,], interval="confidence");
+    expect_equal(as.vector(testForecast$upper), as.vector(sizesForecast$upper[,2])*mean(nonZero));
     # The same with the selection of the regressors and with a fitted om()
     expect_equal(logLik(adam(xregIntermittent, "NNN", occurrence="fixed", regressors="select")),
                  logLik(testModel));
@@ -1910,4 +2083,205 @@ test_that("the selection of the regressors expands the factors with or without a
     expect_true(all(c("x1","za","zb","zc") %in% names(testModel$initial$xreg)));
     expect_equal(logLik(testModel),
                  logLik(adam(xregFactor, "ANN", regressors="select", formula=y~x1+x2+z)));
+})
+
+
+#### The damping parameter ####
+test_that("phi is used, estimated or one depending on the model", {
+    # Provided for a damped trend: used, and counted as provided
+    testModel <- adam(BJsales, "AAdN", phi=0.9);
+    expect_equal(testModel$phi, 0.9);
+    expect_false("phi" %in% names(coef(testModel)));
+    expect_equal(testModel$nParam["Provided","nParamInternal"], 1);
+    # Not provided: estimated for a damped trend, one otherwise and for ARIMA
+    testModel <- adam(BJsales, "AAdN");
+    expect_true("phi" %in% names(coef(testModel)));
+    expect_equal(testModel$phi, coef(testModel)[["phi"]]);
+    expect_equal(adam(BJsales, "AAN")$phi, 1);
+    expect_equal(adam(BJsales, "NNN", orders=list(ar=1,i=1), phi=0.9)$phi, 1);
+})
+
+test_that("phi of a model without the damped trend is ignored", {
+    for(phi in list(0.9, "a")){
+        expect_warning(testModel <- adam(BJsales, "AAN", phi=phi), "phi is used only with a damped trend");
+        expect_equal(testModel$phi, 1);
+        expect_equal(logLik(testModel), logLik(adam(BJsales, "AAN")));
+    }
+    # The phi of an undamped model, as when it is reused, is ignored silently
+    expect_no_warning(adam(BJsales, "AAN", phi=1));
+    expect_no_warning(adam(BJsales, model=adam(BJsales, "AAN")));
+})
+
+test_that("phi that cannot be used is estimated with a warning", {
+    expect_warning(testModel <- adam(BJsales, "ZZN", phi=0.9),
+                   "Predefined phi can only be used with preselected ETS model");
+    expect_s3_class(testModel, "adam");
+    expect_warning(testModel <- adam(BJsales, "AAdN", phi="a"), "Provided value of phi is meaningless");
+    expect_true("phi" %in% names(coef(testModel)));
+    for(phi in c(-0.1, 3)){
+        expect_warning(testModel <- adam(BJsales, "AAdN", phi=phi), "Damping parameter should lie in \\(0, 2\\)");
+        expect_true("phi" %in% names(coef(testModel)), label=phi);
+        expect_true(testModel$phi>=0 && testModel$phi<=1, label=phi);
+    }
+})
+
+#### Methods of the smooth class ####
+test_that("modelLags() returns the lags of the states", {
+    testModel <- adam(BJsales, "AAN");
+    expect_equal(modelLags(testModel), testModel$lagsAll);
+    expect_equal(as.vector(modelLags(testModel)), c(1,1));
+    expect_equal(as.vector(modelLags(adam(AirPassengers, "MAM", lags=12))), c(1,1,12));
+    # The objects of the old msarima() kept them in modelLags
+    testModel <- structure(list(modelLags=matrix(c(1,1,12), ncol=1)), class=c("msarima","smooth"));
+    expect_equal(modelLags(testModel), matrix(c(1,1,12), ncol=1));
+})
+
+test_that("pointLik() of msdecompose() is the density of its residuals", {
+    testModel <- msdecompose(AirPassengers, lags=12, type="multiplicative");
+    yValues <- as.vector(actuals(testModel));
+    errors <- as.vector(residuals(testModel));
+    # The residuals of the multiplicative decomposition are in logs: the log-normal density
+    expect_s3_class(pointLik(testModel), "ts");
+    expect_equal(tsp(pointLik(testModel)), tsp(AirPassengers));
+    expect_equal(as.vector(pointLik(testModel)),
+                 dlnorm(yValues, log(as.vector(fitted(testModel))), sqrt(mean(errors^2)), log=TRUE));
+    expect_equal(as.vector(pointLik(testModel, log=FALSE)),
+                 dlnorm(yValues, log(as.vector(fitted(testModel))), sqrt(mean(errors^2))));
+    testModel <- msdecompose(AirPassengers, lags=12, type="additive");
+    errors <- as.vector(residuals(testModel));
+    expect_equal(as.vector(pointLik(testModel)), dnorm(errors, 0, sqrt(mean(errors^2)), log=TRUE));
+    expect_equal(as.vector(pointLik(testModel, log=FALSE)), dnorm(errors, 0, sqrt(mean(errors^2))));
+    # The Laplace density for the MAE losses and the S one for HAM
+    testModel$loss <- "MAE";
+    expect_equal(as.vector(pointLik(testModel)), dlaplace(errors, 0, mean(abs(errors)), log=TRUE));
+    testModel$loss <- "HAM";
+    expect_equal(as.vector(pointLik(testModel)), ds(errors, 0, mean(sqrt(abs(errors)))/2, log=TRUE));
+})
+
+test_that("plot() of the forecast of msdecompose() draws it with and without the interval", {
+    testModel <- msdecompose(AirPassengers, lags=12, type="multiplicative");
+    plotLength <- c(parametric=0, none=0);
+    for(interval in names(plotLength)){
+        testForecast <- forecast(testModel, h=6, interval=interval);
+        expect_s3_class(testForecast, "smooth.forecast");
+        pdf(NULL);
+        dev.control("enable");
+        plot(testForecast);
+        plotLength[interval] <- length(recordPlot()[[1]]);
+        dev.off();
+    }
+    expect_gt(plotLength[["none"]], 0);
+    # The interval adds its bounds to the plot
+    expect_gt(plotLength[["parametric"]], plotLength[["none"]]);
+})
+
+test_that("accuracy() of adam() and of its forecasts", {
+    holdout <- BJsales[141:150];
+    testModel <- adam(BJsales, "AAN", h=10, holdout=TRUE);
+    expect_equal(accuracy(testModel), testModel$accuracy);
+    expect_equal(accuracy(testModel)[["ME"]], mean(holdout - testModel$forecast));
+    expect_equal(accuracy(forecast(testModel, h=10)), testModel$accuracy);
+    # Without the holdout: the in-sample measures, or those on the provided holdout
+    testModel <- adam(BJsales[1:140], "AAN");
+    expect_equal(accuracy(testModel), measures(actuals(testModel), fitted(testModel), actuals(testModel)));
+    expect_equal(accuracy(testModel)[["ME"]], mean(residuals(testModel)));
+    expect_equal(accuracy(testModel, holdout=holdout),
+                 measures(holdout, forecast(testModel, h=10)$mean, actuals(testModel)));
+    testForecast <- forecast(testModel, h=10);
+    expect_equal(accuracy(testForecast), accuracy(testModel));
+    expect_equal(accuracy(testForecast, holdout=holdout), accuracy(testModel, holdout=holdout));
+})
+
+test_that("plot() of predict() of adam() draws the fitted values and their interval", {
+    testModel <- adam(BJsales, "AAN");
+    testPredict <- predict(testModel);
+    expect_s3_class(testPredict, "adam.predict");
+    pdf(NULL);
+    dev.control("enable");
+    plot(testPredict);
+    plotLength <- length(recordPlot()[[1]]);
+    expect_gt(plotLength, 0);
+    # The interval spans the y-axis, unless the limits are provided
+    testPredict <- predict(testModel, interval="prediction");
+    plot(testPredict);
+    expect_gt(length(recordPlot()[[1]]), plotLength);
+    yRange <- range(c(actuals(testModel), testPredict$mean, testPredict$lower, testPredict$upper));
+    expect_equal(par("usr")[3:4], yRange + c(-1,1)*0.04*diff(yRange));
+    plot(testPredict, ylim=c(150,300));
+    expect_equal(par("usr")[3:4], c(150,300) + c(-1,1)*0.04*150);
+    dev.off();
+})
+
+test_that("The gap variances of a model without the filter come from its matrices", {
+    yGaps <- BJsales;
+    yGaps[c(20,21,50)] <- NA;
+    expect_warning(testModel <- adam(yGaps, "ANN", persistence=0.3), "Data contains NAs");
+    # As in the models fitted without the filter (cma()): the error after j-1 missing values
+    # sums j one-step errors, with the variance 1+(j-1)*alpha^2 and the mean multiplier 1+(j-1)*alpha
+    testModel$adamCpp <- NULL;
+    gapVariance <- gapMean <- rep(1, 150);
+    gapVariance[c(22,51)] <- 1 + c(2,1)*0.3^2;
+    gapMean[c(22,51)] <- 1 + c(2,1)*0.3;
+    expect_equal(adam_gapVarianceModel(testModel), gapVariance);
+    expect_equal(adam_gapVarianceModel(testModel, 1), gapMean);
+    expect_equal(as.vector(adam_gapResiduals(testModel)), as.vector(residuals(testModel))/sqrt(gapVariance));
+    expect_equal(as.vector(pointLik(testModel))[c(19,22,51)],
+                 dnorm(BJsales[c(19,22,51)], as.vector(fitted(testModel))[c(19,22,51)],
+                       sqrt(testModel$scale*gapVariance[c(19,22,51)]), log=TRUE));
+})
+
+test_that("extractSigma() of adam() is sigma() or the one implied by the scale model", {
+    testModel <- adam(BJsales, "ANN");
+    expect_equal(extractSigma(testModel), sigma(testModel));
+    # The scale of the normal distribution is the variance, the one of Laplace is sigma/sqrt(2)
+    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "observations with zero errors");
+    expect_length(extractSigma(scaleModel), nobs(testModel));
+    expect_equal(extractSigma(scaleModel), sqrt(extractScale(scaleModel)));
+    testModel <- adam(BJsales, "ANN", distribution="dlaplace");
+    expect_warning(scaleModel <- implant(testModel, sm(testModel)), "observations with zero errors");
+    expect_equal(extractSigma(scaleModel), sqrt(2)*extractScale(scaleModel));
+})
+
+#### The start-up message ####
+test_that(".onAttach() shows the version of smooth and, at times, a hint", {
+    # The seed that makes the random number of the message satisfy the condition
+    findSeed <- function(condition){
+        seed <- 1;
+        set.seed(seed);
+        while(!condition(sample(c(1:100), 1))){
+            seed <- seed + 1;
+            set.seed(seed);
+        }
+        return(seed);
+    }
+    startUpMessage <- paste0("This is package \"smooth\", v", packageVersion("smooth"), "\n");
+    hints <- c("have you already tried adam() function", "you can visit my website",
+               "you can read the online monograph", "File an issue on github");
+    for(i in 1:4){
+        set.seed(findSeed(function(value){return(value==i)}));
+        printed <- tryCatch(smooth:::.onAttach("", "smooth"), message=function(m){return(conditionMessage(m))});
+        expect_true(startsWith(printed, startUpMessage), label=i);
+        expect_match(printed, hints[i], fixed=TRUE);
+    }
+    set.seed(findSeed(function(value){return(value>4)}));
+    expect_equal(tryCatch(smooth:::.onAttach("", "smooth"), message=function(m){return(conditionMessage(m))}),
+                 paste0(startUpMessage, "\n"));
+})
+
+# Every non-positive multiplicative trend and seasonal value of the states and of the profile
+test_that("Non-positive multiplicative components are replaced", {
+    matVt <- matrix(c(1,2,3,4,5, 1,-1,2,0,-3, 1,-1,1,1,2, 2,1,0,1,-1), 4, 5, byrow=TRUE);
+    profile <- matrix(c(1,2, -1,2, 1,-2, 0,1), 4, 2, byrow=TRUE);
+    corrected <- smooth:::adam_correctMultiplicativeComponents(matVt, profile, "M", "M", 2, 2);
+    expected <- matVt;
+    expected[-1,][expected[-1,]<=0] <- 1e-6;
+    expect_equal(corrected$matVt, expected);
+    expect_equal(corrected$profilesRecentTable, matrix(c(1,2, 1e-6,2, 1,1e-6, 1e-6,1), 4, 2, byrow=TRUE));
+})
+
+# A pool of seasonal models only, on a sample shorter than the lag: the lag is dropped, and the
+# selection is over the non-seasonal models
+test_that("A pool without non-seasonal models on a short sample", {
+    testModel <- suppressWarnings(adam(as.numeric(AirPassengers)[1:8], c("MAM","ANA"), lags=12));
+    expect_equal(testModel$model, "ETS(ANN)");
 })

@@ -5,6 +5,7 @@ whole; these check the Python API's own guards, and its results against values
 taken from R (the R call is in each test).
 """
 
+import sys
 import warnings
 from pathlib import Path
 
@@ -204,32 +205,67 @@ def test_auto_ces_drops_the_models_a_short_sample_cannot_take():
     assert m.ICs["partial"] > m.ICs["none"]
 
 
+# The bounds follow the estimates, whose last bits move with the machine (the CES fits
+# stop on their budget): the bound is R's on the same machine
+@pytest.mark.r_parity
 @pytest.mark.parametrize(
-    "seasonality, a, name, side, bound, tolerance",
+    "seasonality, a, name, side",
     [
-        ("none", None, "alpha_0", "max", 2.00026793268, _BOUND_TOLERANCE),
-        ("none", None, "alpha_1", "min", 1.00013497312, _BOUND_TOLERANCE),
-        ("partial", None, "alpha_1", "max", 1.0, _BOUND_TOLERANCE),
-        # The bound of the full CES follows its estimates, which the last bits of the
-        # matrix products of the BLAS move (1.837771 with the reference BLAS, 1.836848
-        # with OpenBLAS)
-        ("full", 1.35 + 1.01j, "beta_0", "max", 1.83777093985, 1e-3),
-        ("full", 1.35 + 1.01j, "beta_1", "min", 0.94, _BOUND_TOLERANCE),
+        ("none", None, "alpha_0", "max"),
+        ("none", None, "alpha_1", "min"),
+        ("partial", None, "alpha_1", "max"),
+        ("full", 1.35 + 1.01j, "beta_0", "max"),
+        ("full", 1.35 + 1.01j, "beta_1", "min"),
     ],
 )
-def test_reapply_keeps_the_draws_of_ces_stable(
-    seasonality, a, name, side, bound, tolerance
-):
-    """The draws of the smoothing parameters are cut at the range where the model
-    stays stable, with the others at their estimates, as R's cesBounds(): they
-    pile up at R's bound. R: set.seed(1); m <- ces(ts(y, frequency=12),
+def test_reapply_keeps_the_draws_of_ces_stable(seasonality, a, name, side):
+    """The draws of the smoothing parameters are cut at the interval around the
+    estimate where the model stays forecastable, with the others at their
+    estimates, as R's cesBounds(): they pile up at R's bound. R: set.seed(1); m <- ces(ts(y, frequency=12),
     seasonality=..., initial="optimal", a=...); range(reapply(m,
     nsim=2000)$randomParameters[, name])."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    from _r_bridge import r_eval
+
+    a_r = "NULL" if a is None else f"{a.real}+{a.imag}i"
+    bound = r_eval(
+        f"{{ m <- ces(ts(y, frequency=12), seasonality='{seasonality}',"
+        f" initial='optimal', a={a_r}); set.seed(1);"
+        f" draws <- suppressWarnings(reapply(m, nsim=2000))$randomParameters;"
+        f" {side}(draws[, '{name}']) }}",
+        {"y": _AIR},
+    )[0]
     m = CES(seasonality=seasonality, lags=[12], initial="optimal", a=a).fit(_AIR)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         draws = np.asarray(m.reapply(nsim=2000, seed=1).random_parameters)
     draws = draws[:, m.coef_names.index(name)]
     edge = draws.max() if side == "max" else draws.min()
-    assert edge == pytest.approx(bound, rel=tolerance)
+    assert edge == pytest.approx(bound, rel=_BOUND_TOLERANCE)
     assert np.sum(draws == edge) > 100
+
+
+# R itself gives other last bits on a platform without a long double (macOS arm64):
+# the log-likelihood is R's on the same machine
+@pytest.mark.r_parity
+@pytest.mark.parametrize(
+    "seasonality, lags, n",
+    [("full", None, 144), ("simple", [1], 144), ("full", [12], 8)],
+)
+def test_a_seasonal_ces_without_a_seasonal_lag_is_none(seasonality, lags, n):
+    """Without a seasonal lag, or with the only one above the sample size, a seasonal
+    CES is CES(none) with a warning, as R's: it failed in the creator. R: ces(y[1:n],
+    seasonality, lags) on the numeric AirPassengers."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    from _r_bridge import r_eval, r_to_literal
+
+    y = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")["y"]
+    loglik = r_eval(
+        f"as.numeric(logLik(suppressWarnings(ces(y[1:{n}], seasonality='{seasonality}'"
+        f", lags={r_to_literal(lags)}))))",
+        {"y": y.to_numpy(float)},
+    )[0]
+    with pytest.warns(UserWarning, match="needs a seasonal lag"):
+        model = CES(seasonality=seasonality, lags=lags).fit(y.to_numpy(float)[:n])
+    assert model.model_name == "CES(none)"
+    assert model.loglik == pytest.approx(loglik, rel=1e-12)

@@ -113,6 +113,9 @@ def generate_prediction_interval(
     p_forecast=None,
     scale_2d_override=None,
 ):
+    """The approximate interval: the variances of the horizons implied by the model,
+    and the quantiles of its distribution with them, relative to the forecast, which
+    ``_interval_bounds`` puts around it (R's adam_generatePredictionInterval)."""
     mat_vt, mat_wt, vec_g, mat_f = _prepare_matrices_for_forecast(
         prepared_model, observations_dict, lags_dict, general
     )
@@ -259,15 +262,6 @@ def generate_prediction_interval(
     # Build prediction intervals per distribution.
     y_forecast = np.atleast_1d(predictions)
     v_voc_multi = np.atleast_1d(v_voc_multi)
-    n_levels = len(level_low)
-    h = len(y_forecast)
-    y_lower = np.zeros((h, n_levels))
-    y_upper = np.zeros((h, n_levels))
-
-    distribution = general["distribution"]
-    other_params = general.get(
-        "other", {}
-    )  # Handle cases where 'other' might be missing
 
     # Reshape for broadcasting: scale (h,1), levels (1,n_levels) or (h,n_levels)
     scale_2d = v_voc_multi.reshape(-1, 1) if v_voc_multi.ndim == 1 else v_voc_multi
@@ -299,139 +293,98 @@ def generate_prediction_interval(
             np.where(is_lower_side, 1.0, (1.0 + conf_levels_adj) / 2),
         )
 
-    # Quantiles of the *error* distribution, parameterised exactly as R does
-    # (R/adam.R:6600-6725), and taken from greybox so both languages call the
-    # same functions with the same arguments. `scale_2d` is R's `vcovMulti`.
-    shape = other_params.get("shape")
-    loc = 1.0 if e_type == "M" else 0.0
-    y_lower_mult = None
-    y_upper_mult = None
+    # Quantiles of the *error* distribution, relative to the forecast (R's
+    # adam_intervalQuantiles). `scale_2d` is R's `vcovMulti`.
+    variance = s2 if drift is not None else scale_2d
+    variance_mean = None if v_mean is None else v_mean.reshape(-1, 1)
+    y_lower = _interval_quantiles(
+        ll, general, e_type, variance, y_forecast, variance_mean, drift
+    )
+    y_upper = _interval_quantiles(
+        lu, general, e_type, variance, y_forecast, variance_mean, drift
+    )
+    return y_lower, y_upper
 
+
+def _interval_quantiles(
+    levels, general, e_type, variance, centre, variance_mean=None, drift=None
+):
+    """The quantiles of the error term at the levels, of the distribution with the
+    variances (variance_mean is the mean of log(1+e) times -2 for the log-normal,
+    drift the moments of the drift of the states after the periods without an
+    observed size): around zero for the additive error and one for the
+    multiplicative one; the distributions of 1+e of an additive error are relative to
+    the centre (R's adam_intervalQuantiles). From greybox, parameterised as R."""
+    distribution = general["distribution"]
+    rows = len(np.atleast_1d(centre))
+    columns = np.shape(levels)[-1]
     if drift is not None:
-        y_lower_mult = gap_quantile(
-            np.broadcast_to(ll, (h, n_levels)), distribution, s2, *drift
+        return gap_quantile(
+            np.broadcast_to(levels, (rows, columns)), distribution, variance, *drift
         )
-        y_upper_mult = gap_quantile(
-            np.broadcast_to(lu, (h, n_levels)), distribution, s2, *drift
-        )
+    other = general.get("other", {}) or {}
+    shape = other.get("shape")
+    loc = 1.0 if e_type == "M" else 0.0
+    gnorm_scale = (
+        np.sqrt(variance * (gamma(1 / shape) / gamma(3 / shape)))
+        if shape is not None
+        else None
+    )
+    quantiles = {
+        "dnorm": lambda: gb.qnorm(levels, loc, np.sqrt(variance)),
+        "dlaplace": lambda: gb.qlaplace(levels, loc, np.sqrt(variance / 2)),
+        "ds": lambda: gb.qs(levels, loc, (variance / 120) ** 0.25),
+        "dgnorm": lambda: gb.qgnorm(levels, loc, gnorm_scale, shape),
+        "dlogis": lambda: gb.qlogis(levels, loc, np.sqrt(variance * 3) / np.pi),
+        # R scales the standard t rather than passing a scale argument
+        "dt": lambda: (
+            loc
+            + np.sqrt(variance) * gb.qt(levels, general.get("df_t", other.get("nu")))
+        ),
+        # 1+e with the mean of one: variance is the one of log(1+e)
+        "dlnorm": lambda: gb.qlnorm(
+            levels,
+            -(variance if variance_mean is None else variance_mean) / 2,
+            np.sqrt(variance),
+        ),
+        "dllaplace": lambda: np.exp(gb.qlaplace(levels, 0.0, np.sqrt(variance / 2))),
+        "dls": lambda: np.exp(gb.qs(levels, 0.0, (variance / 120) ** 0.25)),
+        "dlgnorm": lambda: np.exp(gb.qgnorm(levels, 0.0, gnorm_scale, shape)),
+        # mean 1, dispersion vcovMulti: greybox's (loc, scale) are statmod's
+        # (mean, dispersion)
+        "dinvgauss": lambda: gb.qinvgauss(levels, 1.0, variance),
+        "dgamma": lambda: gb.qgamma(levels, shape=1 / variance, scale=variance),
+    }.get(distribution, lambda: 0 * levels)()
+    quantiles = np.array(np.broadcast_to(quantiles, (rows, columns)), dtype=float)
+    if e_type == "A" and distribution in _LOG_DISTS:
+        quantiles = (quantiles - 1) * np.reshape(centre, (-1, 1))
+    return quantiles
 
-    elif distribution == "dnorm":
-        sd = np.sqrt(scale_2d)
-        y_lower[:] = gb.qnorm(ll, loc, sd)
-        y_upper[:] = gb.qnorm(lu, loc, sd)
 
-    elif distribution == "dlaplace":
-        sd = np.sqrt(scale_2d / 2)
-        y_lower[:] = gb.qlaplace(ll, loc, sd)
-        y_upper[:] = gb.qlaplace(lu, loc, sd)
-
-    elif distribution == "ds":
-        sd = (scale_2d / 120) ** 0.25
-        y_lower[:] = gb.qs(ll, loc, sd)
-        y_upper[:] = gb.qs(lu, loc, sd)
-
-    elif distribution == "dgnorm":
-        sd = np.sqrt(scale_2d * gamma(1 / shape) / gamma(3 / shape))
-        y_lower[:] = gb.qgnorm(ll, loc, sd, shape)
-        y_upper[:] = gb.qgnorm(lu, loc, sd, shape)
-
-    elif distribution == "dlogis":
-        sd = np.sqrt(scale_2d * 3) / np.pi
-        y_lower[:] = gb.qlogis(ll, loc, sd)
-        y_upper[:] = gb.qlogis(lu, loc, sd)
-
-    elif distribution == "dt":
-        # R scales the standard t rather than passing a scale argument.
-        df = general.get("df_t", other_params.get("nu"))
-        y_lower[:] = loc + np.sqrt(scale_2d) * gb.qt(ll, df)
-        y_upper[:] = loc + np.sqrt(scale_2d) * gb.qt(lu, df)
-
-    elif distribution == "dlnorm":
-        # 1+e with the mean of one: scale_2d is the variance of log(1+e)
-        meanlog = -(scale_2d if v_mean is None else v_mean.reshape(-1, 1)) / 2
-        sdlog = np.sqrt(scale_2d)
-        y_lower_mult = gb.qlnorm(ll, meanlog, sdlog)
-        y_upper_mult = gb.qlnorm(lu, meanlog, sdlog)
-
-    elif distribution == "dllaplace":
-        sd = np.sqrt(scale_2d / 2)
-        y_lower_mult = np.exp(gb.qlaplace(ll, 0.0, sd))
-        y_upper_mult = np.exp(gb.qlaplace(lu, 0.0, sd))
-
-    elif distribution == "dls":
-        sd = (scale_2d / 120) ** 0.25
-        y_lower_mult = np.exp(gb.qs(ll, 0.0, sd))
-        y_upper_mult = np.exp(gb.qs(lu, 0.0, sd))
-
-    elif distribution == "dlgnorm":
-        sd = np.sqrt(scale_2d * gamma(1 / shape) / gamma(3 / shape))
-        y_lower_mult = np.exp(gb.qgnorm(ll, 0.0, sd, shape))
-        y_upper_mult = np.exp(gb.qgnorm(lu, 0.0, sd, shape))
-
-    elif distribution == "dinvgauss":
-        # mean 1, dispersion vcovMulti -- greybox's (loc, scale) are exactly
-        # statmod's (mean, dispersion).
-        y_lower_mult = gb.qinvgauss(ll, 1.0, scale_2d)
-        y_upper_mult = gb.qinvgauss(lu, 1.0, scale_2d)
-
-    elif distribution == "dgamma":
-        y_lower_mult = gb.qgamma(ll, shape=1 / scale_2d, scale=scale_2d)
-        y_upper_mult = gb.qgamma(lu, shape=1 / scale_2d, scale=scale_2d)
-
-    else:
-        print(
-            f"Warning: Distribution '{distribution}' not recognized "
-            f"for interval calculation."
-        )
-        y_lower[:], y_upper[:] = np.nan, np.nan
-
-    # Final adjustments based on Etype (as done in R lines 8632-8640)
-    needs_etype_A_adjustment = y_lower_mult is not None
-
-    yf = y_forecast.reshape(-1, 1)  # (h, 1) for broadcasting
-    if needs_etype_A_adjustment and e_type == "A":
-        y_lower[:] = (y_lower_mult - 1) * yf
-        y_upper[:] = (y_upper_mult - 1) * yf
-    elif needs_etype_A_adjustment and e_type == "M":
-        y_lower[:] = y_lower_mult
-        y_upper[:] = y_upper_mult
-
-    y_lower_final = y_lower.copy()
-    y_upper_final = y_upper.copy()
-
-    # 1. Handle extreme quantiles (0% → -inf/0, 100% → inf)
-    if not general["cumulative"]:
-        # level_low/level_up are (n_levels,) — broadcast across columns
-        zero_lower_mask = level_low == 0  # (n_levels,)
-        if np.any(zero_lower_mask):
-            val = -np.inf if e_type == "A" else 0.0
-            y_lower_final[:, zero_lower_mask] = val
-
-        one_upper_mask = level_up == 1
-        if np.any(one_upper_mask):
-            y_upper_final[:, one_upper_mask] = np.inf
-    else:
-        if e_type == "A" and np.any(level_low == 0):
-            y_lower_final[:] = -np.inf
-        elif e_type == "M" and np.any(level_low == 0):
-            y_lower_final[:] = 0.0
+def _interval_bounds(y_lower, y_upper, centre, level_low, level_up, e_type, cumulative):
+    """The bounds of the interval around the forecasts from the quantiles relative to
+    them: the levels of zero and one at the ends of the support, no value as zero
+    (R's adam_intervalBounds)."""
+    y_lower = np.array(y_lower, dtype=float)
+    y_upper = np.array(y_upper, dtype=float)
+    # Make sensible values out of those weird quantiles
+    if cumulative:
+        if np.any(level_low == 0):
+            y_lower[:] = -np.inf if e_type == "A" else 0.0
         if np.any(level_up == 1):
-            y_upper_final[:] = np.inf
-
-    # 2. Substitute NaNs
-    replace_val = 0.0 if e_type == "A" else 1.0
-    y_lower_final = np.where(np.isnan(y_lower_final), replace_val, y_lower_final)
-    y_upper_final = np.where(np.isnan(y_upper_final), replace_val, y_upper_final)
-
-    # 3. Combine intervals with forecasts
+            y_upper[:] = np.inf
+    else:
+        y_lower[:, level_low == 0] = -np.inf if e_type == "A" else 0.0
+        y_upper[:, level_up == 1] = np.inf
+    # Substitute NAs and NaNs with zeroes
+    no_value = 0.0 if e_type == "A" else 1.0
+    y_lower[np.isnan(y_lower)] = no_value
+    y_upper[np.isnan(y_upper)] = no_value
+    # Do intervals around the forecasts
+    centre = np.reshape(centre, (-1, 1))
     if e_type == "A":
-        y_lower_final = yf + y_lower_final
-        y_upper_final = yf + y_upper_final
-    else:  # e_type == "M"
-        y_lower_final = yf * y_lower_final
-        y_upper_final = yf * y_upper_final
-
-    return y_lower_final, y_upper_final
+        return centre + y_lower, centre + y_upper
+    return centre * y_lower, centre * y_upper
 
 
 def generate_simulation_interval(
@@ -495,8 +448,11 @@ def generate_simulation_interval(
     Returns
     -------
     tuple
-        (y_lower, y_upper, y_simulated) where y_simulated is the raw (h, nsim)
-        simulation matrix when ``general_dict["scenarios"]`` is True, else None.
+        (y_lower, y_upper, y_simulated, y_mean): the quantiles relative to the
+        forecast (differences for the additive error, ratios for the multiplicative
+        one), which ``_interval_bounds`` puts around it; y_simulated is the raw
+        (h, nsim) simulation matrix when ``general_dict["scenarios"]`` is True, else
+        None; y_mean the mean of the paths.
     """
     h = general_dict["h"]
     lags_model_max = lags_dict["lags_model_max"]
@@ -688,21 +644,12 @@ def generate_simulation_interval(
         y_lower = np.where(pred_col != 0, y_lower / pred_col, 0)
         y_upper = np.where(pred_col != 0, y_upper / pred_col, 0)
 
-    # 12. Final combination with forecasts (same as parametric)
-    replace_val = 0.0  # both A and M: R sets NaN to 0 (yLower[is.nan(yLower)] <- 0)
-    y_lower_final = np.where(np.isnan(y_lower), replace_val, y_lower)
-    y_upper_final = np.where(np.isnan(y_upper), replace_val, y_upper)
-
-    pred_col = predictions.reshape(-1, 1)
-    if e_type == "A":
-        y_lower_final = pred_col + y_lower_final
-        y_upper_final = pred_col + y_upper_final
-    else:
-        y_lower_final = pred_col * y_lower_final
-        y_upper_final = pred_col * y_upper_final
+    # No value as zero, for both the additive and the multiplicative error, as R
+    y_lower = np.where(np.isnan(y_lower), 0.0, y_lower)
+    y_upper = np.where(np.isnan(y_upper), 0.0, y_upper)
 
     scenarios_out = y_simulated if general_dict.get("scenarios", False) else None
-    return y_lower_final, y_upper_final, scenarios_out, y_forecast_sim
+    return y_lower, y_upper, scenarios_out, y_forecast_sim
 
 
 # Distributions where errors are normalised by fitted values for semiparametric/
@@ -785,7 +732,8 @@ def generate_multistep_interval(
     Returns
     -------
     tuple
-        (y_lower, y_upper) each of shape (h, n_levels).
+        (y_lower, y_upper) each of shape (h, n_levels), relative to the forecast,
+        which ``_interval_bounds`` puts around it.
     """
     h = general_dict["h"]
     obs = observations_dict["obs_in_sample"]
@@ -874,15 +822,11 @@ def generate_multistep_interval(
             [_fit_power_quantile(adam_errors, q) for q in level_up]
         )
 
-    pred_col = yf.reshape(-1, 1)
     # The errors relative to the forecast: those of a multiplicative error, and of
-    # the ratio distributions with an additive one (R: the forecast plus the
-    # quantile times the forecast)
-    if e_type == "M" or distribution in _LOG_DISTS:
-        y_lower = pred_col * (1.0 + y_lower)
-        y_upper = pred_col * (1.0 + y_upper)
-    else:
-        y_lower = pred_col + y_lower
-        y_upper = pred_col + y_upper
-
+    # the ratio distributions with an additive one (R: the quantile times the
+    # forecast, which the forecast is added to)
+    if e_type == "M":
+        return 1.0 + y_lower, 1.0 + y_upper
+    if distribution in _LOG_DISTS:
+        return y_lower * yf.reshape(-1, 1), y_upper * yf.reshape(-1, 1)
     return y_lower, y_upper

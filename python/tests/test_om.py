@@ -186,6 +186,13 @@ class TestProperties:
     def test_loss_is_likelihood(self, fitted_model):
         assert fitted_model.loss_ == "likelihood"
 
+    def test_rstudent_has_one_degree_of_freedom_fewer(self, fitted_model, intermittent_y):
+        """R: rstudent(om(y)) is the Pearson residual times sqrt(n / (n - k - 1))."""
+        p = np.asarray(fitted_model.fitted, dtype=float)
+        n, k = fitted_model.nobs, fitted_model.nparam
+        expected = ((intermittent_y != 0) - p) / np.sqrt(p * (1 - p)) * np.sqrt(n / (n - k - 1))
+        np.testing.assert_allclose(np.asarray(fitted_model.rstudent()), expected, rtol=1e-12)
+
     @pytest.mark.parametrize(
         "occ,letter",
         [

@@ -75,8 +75,11 @@ class TestRstandard:
     def test_approximately_standard_normal(self, ann_model):
         """For a dnorm model, rstandard() ≈ N(0, 1)."""
         std_res = ann_model.rstandard()
-        # Mean should be near zero (by construction — mean is subtracted)
-        assert abs(np.mean(std_res)) < 1e-10
+        # The errors at the location the model assumes (zero), divided by sigma:
+        # not centred by their mean
+        std_res, residuals = np.asarray(std_res), np.asarray(ann_model.residuals)
+        sigma = np.dot(std_res, residuals) / np.dot(std_res, std_res)
+        np.testing.assert_allclose(std_res * sigma, residuals, atol=1e-10)
         # Std should be close to 1 for a well-specified model
         assert 0.5 < np.std(std_res) < 2.0
 
@@ -135,6 +138,167 @@ class TestRstudent:
         stu_res = model.rstudent()
         # The absolute max of rstudent should be at least as large
         assert np.max(np.abs(stu_res)) >= np.max(np.abs(std_res)) * 0.9
+
+
+# R's rstudent() of adam(Y_SHORT, model, distribution=..., persistence=0.3,
+# initial=115) (with shape=1.5 for dgnorm): all parameters provided, so both
+# languages fit the same model
+Y_SHORT = AIRPASSENGERS[:12]
+R_RSTUDENT = {
+    ("ANN", "dlaplace"): [
+        -0.2254430076,
+        0.2950715645,
+        1.401861412,
+        0.6839649569,
+        -0.1417838419,
+        1.026587405,
+        1.914817144,
+        1.267557761,
+        -0.09531677356,
+        -1.51468356,
+        -2.536306111,
+        -0.402954129,
+    ],
+    ("ANN", "ds"): [
+        -0.9548428807,
+        1.258474534,
+        6.110779462,
+        2.973591201,
+        -0.5935920001,
+        4.482252746,
+        8.278049381,
+        5.531618985,
+        -0.3954421396,
+        -6.593765311,
+        -10.79694549,
+        -1.732206423,
+    ],
+    ("ANN", "dgnorm"): [
+        -0.159183735,
+        0.2075750777,
+        0.9637173336,
+        0.4741816513,
+        -0.1006222788,
+        0.7071148991,
+        1.322274261,
+        0.8715171567,
+        -0.06786017264,
+        -1.041611544,
+        -1.777953624,
+        -0.2820533693,
+    ],
+    ("MNN", "dlnorm"): [
+        0.8482186119,
+        1.38430057,
+        3.443623373,
+        1.878882139,
+        0.9264612572,
+        2.41981531,
+        4.44707016,
+        2.668895352,
+        0.9743272018,
+        0.3138096449,
+        0.1006795107,
+        0.7363101366,
+    ],
+    ("MNN", "dgamma"): [
+        0.9534246126,
+        1.017883776,
+        1.138394289,
+        1.059141584,
+        0.9647210806,
+        1.092952406,
+        1.169447373,
+        1.105817133,
+        0.971247406,
+        0.8431121409,
+        0.7616438623,
+        0.9357172008,
+    ],
+}
+R_RSTUDENT[("MNN", "dinvgauss")] = R_RSTUDENT[("MNN", "dgamma")]
+
+# R's rstudent() of adam(Y_INTERMITTENT, model, distribution=..., persistence=0.3,
+# initial=6, occurrence="fixed"): only the non-zero observations are studentised
+Y_INTERMITTENT = np.array([0, 5, 0, 0, 7, 6, 0, 4, 0, 0, 8, 5, 0, 6, 0, 7], float)
+R_RSTUDENT_OCCURRENCE = {
+    ("MNN", "dgamma"): [
+        1,
+        0.7942530193,
+        1,
+        1,
+        1.256463588,
+        0.9363955956,
+        1,
+        0.6058719097,
+        1,
+        1,
+        1.588224263,
+        0.7360949527,
+        1,
+        0.9929397713,
+        1,
+        1.177226032,
+    ],
+    ("ANN", "dnorm"): [
+        0,
+        -0.5655173879,
+        0,
+        0,
+        0.7411461062,
+        -0.1215516923,
+        0,
+        -1.34667079,
+        0,
+        0,
+        1.745475279,
+        -0.8736199014,
+        0,
+        0.02606258751,
+        0,
+        0.5679150353,
+    ],
+}
+
+
+class TestRstudentAsR:
+    """rstudent() of the other distributions, against R's rstudent.adam()."""
+
+    @pytest.mark.parametrize("model, distribution", list(R_RSTUDENT))
+    def test_the_values_are_those_of_r(self, model, distribution):
+        extra = {"gnorm_shape": 1.5} if distribution == "dgnorm" else {}
+        fit = ADAM(
+            model=model,
+            distribution=distribution,
+            persistence={"level": 0.3},
+            initial={"level": 115.0},
+            **extra,
+        ).fit(Y_SHORT)
+        np.testing.assert_allclose(
+            np.asarray(fit.rstudent()), R_RSTUDENT[(model, distribution)], rtol=1e-8
+        )
+
+    @pytest.mark.parametrize(
+        "model, distribution",
+        [
+            ("MNN", "dgamma"),
+            ("ANN", "dnorm"),
+        ],
+    )
+    def test_the_occurrence_values_are_those_of_r(self, model, distribution):
+        fit = ADAM(
+            model=model,
+            distribution=distribution,
+            persistence={"level": 0.3},
+            initial={"level": 6.0},
+            occurrence="fixed",
+        ).fit(Y_INTERMITTENT)
+        np.testing.assert_allclose(
+            np.asarray(fit.rstudent()),
+            R_RSTUDENT_OCCURRENCE[(model, distribution)],
+            rtol=1e-8,
+            atol=1e-12,
+        )
 
 
 class TestOutlierdummy:
@@ -413,15 +577,17 @@ class TestRComparisonWithR:
         expected = stats.norm.ppf(p)
         np.testing.assert_allclose(od.statistic, expected, rtol=1e-6)
 
-    def test_rstandard_mean_zero(self, ann_model):
+    def test_rstandard_is_not_centred(self, ann_model):
         """
-        rstandard() for dnorm mean-centers the errors.
+        rstandard() for dnorm takes the errors at the location the model assumes.
 
-        R's rstandard.adam() subtracts mean(errors) before scaling,
-        so the result always has mean = 0 (up to floating-point precision).
+        R's rstandard.adam() divides the errors by sigma without subtracting their
+        mean, so the mean of the result shows a bias of the model.
         """
-        std_res = ann_model.rstandard()
-        assert abs(np.mean(std_res)) < 1e-10
+        std_res = np.asarray(ann_model.rstandard())
+        residuals = np.asarray(ann_model.residuals)
+        sigma = np.dot(std_res, residuals) / np.dot(std_res, std_res)
+        np.testing.assert_allclose(np.mean(std_res) * sigma, np.mean(residuals))
 
     def test_rstandard_length_equals_nobs(self, ann_model):
         """Length of rstandard() equals nobs (144 for full AirPassengers)."""

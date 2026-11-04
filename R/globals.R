@@ -8,7 +8,8 @@ utils::globalVariables(c(
   "B", "FI",
   "denominator",
   "initialXregProvided",
-  "lagsLength",
+  "filterLogs", "gapDrifting", "headOffset",
+  "lagsLength", "lagsModelMin",
   "occurrenceMissingOnly", "occurrenceProbability", "omModel",
   "lb", "ub",
   "otherReturned",
@@ -16,6 +17,7 @@ utils::globalVariables(c(
   "print_level",
   "profilesRecentInitial",
   "select",
+  "trailing",
 
   # adam.R - Main ADAM function and related infrastructure
   "adamCpp", "adamETS", "adamFitted",
@@ -57,7 +59,8 @@ utils::globalVariables(c(
   "responseName",
   "smoother", "stepSize",
   "vecG",
-  "xregModelInitials",
+  "xregFactors", "xregFactorsLevels", "xregModelInitials",
+  "xregNamesModified", "xregNamesOriginal",
   "xregParametersEstimated", "xregParametersIncluded",
   "xregParametersMissing", "xregParametersPersistence",
   "xregTerms",
@@ -91,6 +94,7 @@ utils::globalVariables(c(
   # (ces, gum, ssarima - all share similar xreg and distribution variables)
   "distribution",
   "initialXregEstimate",
+  "modelname",
   "otLogical",
   "persistenceXreg", "persistenceXregEstimate",
   "xregData", "xregModel", "xregNames", "xregNumber",

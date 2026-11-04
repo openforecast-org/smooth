@@ -120,3 +120,28 @@ test_that("ces() fits with the coefficients of the regressors it reports", {
     expect_equal(as.vector(testModel$states[1, c("x1","x2")]), unname(tail(testModel$B, 2)));
     expect_equal(unname(tail(testModel$B, 2)), c(2, -1.5), tolerance=0.05);
 })
+
+# A custom loss is a function, as in adam(): the squared errors summed as MSE sums them give MSE
+# (mean() rounds differently from sum()/n without the long double, as on ARM macOS)
+test_that("ces() takes a custom loss", {
+    testLoss <- function(actual, fitted, B){
+        return(sum((actual-fitted)^2)/length(actual));
+    }
+    testModel <- ces(AirPassengers, "full", lags=12, loss=testLoss);
+    expect_equal(testModel$loss, "custom");
+    testLoss <- "MSE";
+    testMSE <- ces(AirPassengers, "full", lags=12, loss=testLoss);
+    expect_identical(testModel$B, testMSE$B);
+    expect_identical(as.numeric(logLik(testModel)), as.numeric(logLik(testMSE)));
+})
+
+# Without a seasonal lag, or with the only one above the sample size, a seasonal CES is CES(none),
+# with a warning: it failed with "data is too long" or "missing value where TRUE/FALSE needed"
+test_that("A seasonal ces() without a seasonal lag is CES(none)", {
+    y <- as.numeric(AirPassengers);
+    expect_warning(testModel <- ces(y, "full"), "needs a seasonal lag");
+    expect_equal(testModel$model, "CES(none)");
+    expect_equal(as.numeric(logLik(testModel)), as.numeric(logLik(ces(y, "none"))));
+    testModel <- suppressWarnings(ces(y[1:8], "simple", lags=12));
+    expect_equal(testModel$model, "CES(none)");
+})

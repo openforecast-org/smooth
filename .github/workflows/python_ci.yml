@@ -73,13 +73,9 @@ jobs:
           - os: macos-latest
             python-version: "3.11"
             cibw-build: "cp311-macosx*"
-          # Windows — pin to windows-2025 (newer Server 2025 host, but
-          # still a stable VS17 toolchain on GitHub's image) rather than
-          # ``windows-latest``. ``windows-latest`` now rolls to a VS18 /
-          # MSVC 14.51.36231 preview toolchain that openblas 0.3.33 (the
-          # vcpkg port we pull in CIBW_BEFORE_ALL_WINDOWS) doesn't
-          # compile under, killing the ``vcpkg install
-          # openblas:x64-windows-release`` step.
+          # Windows — pin to windows-2025 (a stable VS17 toolchain on
+          # GitHub's image) rather than ``windows-latest``, which rolls to
+          # preview toolchains.
           - os: windows-2025
             python-version: "3.11"
             cibw-build: "cp311-win_amd64"
@@ -89,20 +85,22 @@ jobs:
         with:
           submodules: recursive
 
-      # Cache the OpenMathLib OpenBLAS install tree on Windows. The
-      # download + extract in CIBW_BEFORE_ALL_WINDOWS takes ~30-60s
-      # per run; with a cache hit it's a no-op. Keyed on the OpenBLAS
-      # release version so a bump invalidates the cache automatically.
-      - name: Cache OpenBLAS (Windows)
+      # The reference (netlib) BLAS / LAPACK, as R's default: the order in which
+      # a BLAS sums matrix products sets the last bits of the fits, so with
+      # OpenBLAS Python did not match R (see python/CMakeLists.txt). On Windows,
+      # MSYS2's build, whose MinGW import libs MSVC links.
+      - name: Install the reference BLAS / LAPACK (Windows)
         if: runner.os == 'Windows'
-        uses: actions/cache@v6
+        uses: msys2/setup-msys2@v2
         with:
-          path: C:\openblas
-          key: openblas-windows-0.3.33
+          msystem: MINGW64
+          location: D:\
+          update: false
+          install: mingw-w64-x86_64-lapack
 
       # Cache Homebrew's bottle download tree on macOS. ``brew install
       # openblas`` still runs (so symlinks / dependency-resolution stay
-      # correct) but skips the ~100 MB bottle download on cache hit.
+      # correct) but skips the bottle download on cache hit.
       - name: Cache Homebrew downloads (macOS)
         if: runner.os == 'macOS'
         uses: actions/cache@v6
@@ -120,45 +118,31 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64
           CIBW_ARCHS_MACOS: x86_64 arm64
           CIBW_ARCHS_WINDOWS: AMD64
+          # The manylinux image has netlib 3.8, whose BLAS sums differently from
+          # the 3.12.1 that R bundles (BLAS 3.10 rewrote dnrm2, drotg, ...): CES
+          # on AirPassengers stopped elsewhere than R. So netlib's 3.12.1 is
+          # built here, with R's -O2.
           CIBW_BEFORE_ALL_LINUX: |
-            yum install -y openblas-devel lapack-devel pkgconfig || \
-            (apt-get update && apt-get install -y libopenblas-dev liblapack-dev pkg-config)
-          CIBW_ENVIRONMENT_LINUX: PKG_CONFIG_PATH="/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
+            yum install -y pkgconfig gcc-toolset-14-gcc-gfortran
+            curl -sSL https://github.com/Reference-LAPACK/lapack/archive/refs/tags/v3.12.1.tar.gz | tar xz -C /tmp
+            cmake -S /tmp/lapack-3.12.1 -B /tmp/lapack-build -DBUILD_SHARED_LIBS=ON \
+              -DCMAKE_BUILD_TYPE=None -DCMAKE_Fortran_FLAGS=-O2 -DCMAKE_Fortran_COMPILER=gfortran \
+              -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=lib
+            cmake --build /tmp/lapack-build -j4 --target install
+          CIBW_ENVIRONMENT_LINUX: >
+            PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/lib/pkgconfig"
+            CMAKE_ARGS="-DBLAS_LIBRARIES=/usr/local/lib/libblas.so -DLAPACK_LIBRARIES=/usr/local/lib/liblapack.so"
+          # macOS stays on Homebrew's OpenBLAS for now: its netlib ``lapack`` and
+          # ``libgfortran`` are built for the runner's macOS, too new for the wheel
           CIBW_BEFORE_ALL_MACOS: brew install openblas
-          # Stop using vcpkg for BLAS/LAPACK on Windows. The vcpkg
-          # ``openblas`` port does not bundle LAPACK kernels, so we
-          # used to pair it with ``lapack-reference``, which in turn
-          # needs a Fortran compiler. vcpkg's bundled Fortran
-          # (``vcpkg-gfortran``) silently switched to LLVMFlang
-          # somewhere in early 2025, and LLVMFlang 22.x doesn't build
-          # ``lapack-reference 3.12.1`` — every recent CI run dies
-          # there.
-          #
-          # OpenBLAS publishes pre-built Windows binaries on GitHub
-          # that already include LAPACK in ``libopenblas.dll`` (no
-          # Fortran compiler needed at build time). Download the
-          # release zip, extract it, and let CMakeLists.txt pick it
-          # up via ``OPENBLAS_HOME``. ``delvewheel`` then bundles the
-          # OpenBLAS DLL and its MinGW runtime DLLs
-          # (``libgfortran-5.dll``, ``libgcc_s_seh-1.dll``,
-          # ``libwinpthread-1.dll``) into the wheel.
-          # ``actions/cache@v6`` (Windows step above) restores
-          # ``C:\openblas`` if a prior run wrote it. Skip the download
-          # in that case — re-running ``mkdir C:\openblas`` would fail
-          # and re-extracting would be wasted work. cmd.exe's
-          # ``if exist ... (Y) else (Z)`` resolves on a single line, so
-          # the YAML folded scalar ``>`` joins everything with spaces.
-          CIBW_BEFORE_ALL_WINDOWS: >
-            if exist C:\openblas\lib\libopenblas.dll.a
-            (echo OpenBLAS cache hit) else
-            (curl -L -o C:/openblas.zip
-            https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.33/OpenBLAS-0.3.33-x64.zip
-            && mkdir C:\openblas
-            && tar -xf C:/openblas.zip -C C:/openblas)
+          # ``delvewheel`` bundles MSYS2's ``libblas.dll``, ``liblapack.dll`` and
+          # their MinGW runtime DLLs (``libgfortran-5.dll``, ``libgcc_s_seh-1.dll``,
+          # ``libquadmath-0.dll``, ``libwinpthread-1.dll``) into the wheel.
           CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
           CIBW_ENVIRONMENT_WINDOWS: >
-            CMAKE_ARGS="-DOPENBLAS_HOME=C:/openblas"
-            OPENBLAS_HOME=C:/openblas
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair -w {dest_dir} {wheel} --add-path C:/openblas/bin
+            CMAKE_ARGS="-DBLAS_LIBRARIES=D:/msys64/mingw64/lib/libblas.dll.a
+            -DLAPACK_LIBRARIES=D:/msys64/mingw64/lib/liblapack.dll.a"
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair -w {dest_dir} {wheel} --add-path D:/msys64/mingw64/bin
           CIBW_TEST_REQUIRES: pytest numpy
           CIBW_TEST_COMMAND: pytest {project}/python/tests -v --tb=short
+

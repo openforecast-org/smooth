@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from smooth import AutoADAM
+from smooth.adam_general.core.auto_adam import _max_params_count, _reduce_arima_orders
 from smooth.adam_general.core.estimator.arima_selector import (
     _check_ima_models,
     _normalize_lags_and_orders,
@@ -55,6 +56,94 @@ class TestNormalizeLagsAndOrders:
         assert len(ar) == 2
         assert len(i) == 2
         assert len(ma) == 2
+
+
+# ---------------------------------------------------------------------------
+# Trim the ARIMA search space to the sample
+# ---------------------------------------------------------------------------
+
+
+class TestReduceArimaOrders:
+    """The orders after the trimming of R/autoadam.R:264-336, R's values obtained by
+    running that block verbatim on the same inputs."""
+
+    @pytest.mark.parametrize(
+        "lags, orders, obs, model, initial, xreg_number, regressors, expected",
+        [
+            # One AR order off the seasonal lag is enough
+            (
+                [1, 12],
+                ([3, 2], [2, 1], [3, 2]),
+                40,
+                "ANN",
+                "backcasting",
+                0,
+                "use",
+                ([3, 1], [2, 1], [3, 2]),
+            ),
+            # The seasonal lag emptied entirely, with ETS initials and adapt
+            (
+                [1, 12],
+                ([3, 2], [2, 1], [3, 2]),
+                24,
+                "AAdN",
+                "optimal",
+                2,
+                "adapt",
+                ([3, 0], [2, 0], [3, 0]),
+            ),
+            # Pure ARIMA: AR, I and MA each lose one order on the seasonal lag
+            (
+                [1, 12],
+                ([3, 2], [2, 1], [3, 2]),
+                30,
+                "NNN",
+                "backcasting",
+                0,
+                "use",
+                ([3, 1], [2, 0], [3, 1]),
+            ),
+            # The tail moves to lag 1 once the seasonal orders are gone
+            (
+                [1, 4],
+                ([3, 0], [2, 1], [3, 1]),
+                12,
+                "NNN",
+                "optimal",
+                1,
+                "use",
+                ([2, 0], [2, 0], [3, 0]),
+            ),
+        ],
+    )
+    def test_the_orders_are_those_of_r(
+        self, lags, orders, obs, model, initial, xreg_number, regressors, expected
+    ):
+        reduced = _reduce_arima_orders(
+            *orders, lags, obs, model, initial, xreg_number, regressors
+        )
+        assert reduced == tuple(list(o) for o in expected)
+        count, _ = _max_params_count(
+            *reduced, lags, model, initial, xreg_number, regressors
+        )
+        assert count <= obs
+
+    def test_the_orders_stay_when_the_rest_exhausts_the_sample(self):
+        """ETS(AAA) with optimal initials on lags 1 and 12 needs 20 parameters
+        before any ARIMA: R leaves the orders be on 10 observations."""
+        orders = ([3, 2], [2, 1], [3, 2])
+        count, arima_initials = _max_params_count(
+            *orders, [1, 12], "AAA", "optimal", 0, "use"
+        )
+        assert count - (arima_initials + 5 + 5) == 20
+        reduced = _reduce_arima_orders(*orders, [1, 12], 10, "AAA", "optimal", 0, "use")
+        assert reduced == tuple(list(o) for o in orders)
+
+    def test_the_orders_stay_when_the_sample_is_enough(self):
+        reduced = _reduce_arima_orders(
+            [1], [1], [1], [1], 100, "ANN", "backcasting", 0, "use"
+        )
+        assert reduced == ([1], [1], [1])
 
 
 # ---------------------------------------------------------------------------

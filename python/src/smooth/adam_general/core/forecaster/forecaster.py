@@ -13,6 +13,7 @@ from ._helpers import (
     _safe_create_index,
 )
 from .intervals import (
+    _interval_bounds,
     ensure_level_format,
     generate_multistep_interval,
     generate_prediction_interval,
@@ -757,12 +758,241 @@ def forecaster(
         general_dict, model_type_dict, explanatory_checked, lags_dict
     )
 
-    # 6b. With the k last periods of the sample without an observed size, the
-    # forecast of the pure multiplicative ETS with the drift of the states over them
-    # (and of the models with a scale model), and the simulated and the cumulative
-    # ones of any model, start from the last observed size, as h+k steps ahead, as
-    # R's forecast.adam: the uncertainty of the states over those periods is then
-    # that of the k first steps
+    # 6b. The forecast from the last observed size, with the k last periods of the
+    # sample without one
+    result = _forecast_trailing(
+        model_prepared,
+        observations_dict,
+        general_dict,
+        occurrence_dict,
+        lags_dict,
+        model_type_dict,
+        explanatory_checked,
+        components_dict,
+        constants_checked,
+        params_info,
+        adam_cpp,
+        level,
+        side,
+    )
+    if result is not None:
+        return result
+
+    # 7. Generate point forecasts using adam_cpp.forecast()
+    y_forecast_values = _generate_point_forecasts(
+        observations_dict,
+        lags_dict,
+        model_prepared,
+        lookup,
+        model_type_dict,
+        components_dict,
+        explanatory_checked,
+        constants_checked,
+        general_dict,
+        adam_cpp,
+    )
+
+    # 8. Perform safety checks on forecasts
+    y_forecast_values = _handle_forecast_safety_checks(
+        y_forecast_values, model_type_dict, model_prepared, general_dict
+    )
+
+    # Point forecasts always come from adam_cpp.forecast(), not from the
+    # simulation mean — the deterministic forecast is more accurate and
+    # avoids Monte-Carlo noise.
+    resolved_interval = general_dict["interval"]
+
+    # 9. Process occurrence forecasts
+    p_forecast, occurrence_model = _process_occurrence_forecast(
+        occurrence_dict, general_dict
+    )
+
+    # 10. Apply occurrence probabilities and handle cumulative. The intervals of an
+    # occurrence model are of the sizes, around their forecasts
+    y_sizes = y_forecast_values
+    y_forecast_values = y_forecast_values * p_forecast
+    if general_dict.get("cumulative"):
+        # The h steps after the sample, with the origin k periods before its end; a
+        # model in logs sums its forecasts in the space of the data
+        if general_dict.get("_log_model"):
+            y_forecast_values = np.exp(y_sizes) * p_forecast
+        y_forecast_values = np.sum(
+            y_forecast_values[int(general_dict.get("_gap_shift", 0) or 0) :]
+        )
+        y_sizes = y_forecast_values
+    # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated
+    # (not for the occurrence of the missing values only, whose probability is one).
+    # So do the multiplicative models: the variance of the sum of their errors needs
+    # the covariances of the horizons, which their analytical variances do not have.
+    # A model in logs sums its paths in the space of the data
+    occurrence_model = occurrence_model and np.any(np.asarray(p_forecast) < 1)
+    multiplicative = "M" in (
+        model_type_dict["error_type"],
+        model_type_dict["trend_type"],
+        model_type_dict["season_type"],
+    ) or (general_dict.get("distribution_new") or general_dict["distribution"]) in (
+        "dlnorm",
+        "dinvgauss",
+        "dgamma",
+        "dls",
+        "dllaplace",
+        "dlgnorm",
+    )
+    if general_dict.get("cumulative", False) and (
+        occurrence_model
+        or (multiplicative and resolved_interval == "approximate")
+        or (general_dict.get("_log_model") and resolved_interval != "none")
+    ):
+        general_dict["interval"] = "simulated"
+        resolved_interval = "simulated"
+
+    # 12. Determine index: single row for cumulative, full horizon otherwise
+    is_cumulative = general_dict.get("cumulative", False)
+    forecast_index = (
+        observations_dict["y_forecast_index"][:1]
+        if is_cumulative
+        else observations_dict["y_forecast_index"]
+    )
+
+    if resolved_interval == "none":
+        return ForecastResult(
+            mean=pd.Series(y_forecast_values, index=forecast_index, name="mean"),
+            lower=None,
+            upper=None,
+            level=level,
+            side=side,
+            interval=resolved_interval,
+        )
+    else:
+        if level is None:
+            warnings.warn("No confidence level specified. Using default level of 0.95")
+            level = 0.95
+
+        level_low, level_up = ensure_level_format(level, side)
+
+        # The quantiles relative to the forecast: of the paths, around the forecast
+        # with the occurrence, and of the distribution, around the sizes
+        centre = y_forecast_values if resolved_interval == "simulated" else y_sizes
+        if resolved_interval == "simulated":
+            nsim = general_dict.get("nsim", 10000)
+            y_lower, y_upper, y_simulated, y_mean = generate_simulation_interval(
+                y_forecast_values,
+                model_prepared,
+                general_dict,
+                observations_dict,
+                model_type_dict,
+                lags_dict,
+                components_dict,
+                explanatory_checked,
+                constants_checked,
+                params_info,
+                adam_cpp,
+                level_low,
+                level_up,
+                nsim=nsim,
+                p_forecast=p_forecast if occurrence_model else None,
+            )
+            # The cumulative forecast is the mean of the simulated sums, as in R
+            if general_dict.get("cumulative", False):
+                y_forecast_values = y_mean
+            if general_dict.get("scenarios", False):
+                general_dict["_scenarios_matrix"] = y_simulated
+        elif resolved_interval == "approximate":
+            y_lower, y_upper = generate_prediction_interval(
+                y_sizes,
+                model_prepared,
+                general_dict,
+                observations_dict,
+                model_type_dict,
+                lags_dict,
+                params_info,
+                level_low,
+                level_up,
+                p_forecast=p_forecast if occurrence_model else None,
+            )
+            if general_dict.get("scenarios", False):
+                warnings.warn('scenarios=True requires interval="simulated". Ignored.')
+        elif resolved_interval in ("semiparametric", "empirical", "nonparametric"):
+            y_lower, y_upper = generate_multistep_interval(
+                y_sizes,
+                model_prepared,
+                general_dict,
+                observations_dict,
+                model_type_dict,
+                lags_dict,
+                params_info,
+                adam_cpp,
+                level_low,
+                level_up,
+                resolved_interval,
+            )
+            if general_dict.get("scenarios", False):
+                warnings.warn('scenarios=True requires interval="simulated". Ignored.')
+        else:
+            raise NotImplementedError(
+                f'interval="{resolved_interval}" is not yet implemented. '
+                '"confidence" and "complete" require reforecast() '
+                "which is not yet ported."
+            )
+
+        # The bounds around the forecasts (R's adam_intervalBounds)
+        y_lower, y_upper = _interval_bounds(
+            y_lower,
+            y_upper,
+            centre,
+            level_low,
+            level_up,
+            model_type_dict["error_type"],
+            general_dict.get("cumulative", False),
+        )
+        n_levels = len(level_low)
+        lower_df = None
+        upper_df = None
+        if side != "upper":
+            lower_df = pd.DataFrame(
+                {round(level_low[j], 5): y_lower[:, j] for j in range(n_levels)},
+                index=forecast_index,
+            )
+        if side != "lower":
+            upper_df = pd.DataFrame(
+                {round(level_up[j], 5): y_upper[:, j] for j in range(n_levels)},
+                index=forecast_index,
+            )
+
+    return ForecastResult(
+        mean=pd.Series(y_forecast_values, index=forecast_index, name="mean"),
+        lower=lower_df,
+        upper=upper_df,
+        level=level,
+        side=side,
+        interval=resolved_interval,
+    )
+
+
+SYMMETRIC_DISTRIBUTIONS = ("dnorm", "dlaplace", "ds", "dgnorm", "dlogis", "dt")
+
+
+def _forecast_trailing(
+    model_prepared,
+    observations_dict,
+    general_dict,
+    occurrence_dict,
+    lags_dict,
+    model_type_dict,
+    explanatory_checked,
+    components_dict,
+    constants_checked,
+    params_info,
+    adam_cpp,
+    level,
+    side,
+):
+    """With the k last periods of the sample without an observed size, the forecast
+    of the pure multiplicative ETS with the drift of the states over them (and of the
+    models with a scale model), and the simulated and the cumulative ones of any
+    model, start from the last observed size, as h+k steps ahead, as R's
+    forecast.adam: the uncertainty of the states over those periods is then that of
+    the k first steps (R's adam_forecastTrailing). None when it does not apply."""
     trailing = int(general_dict.get("_gap_trailing", 0) or 0)
     cumulative = general_dict.get("cumulative", False)
     if (
@@ -856,190 +1086,7 @@ def forecaster(
             side=result.side,
             interval=result.interval,
         )
-
-    # 7. Generate point forecasts using adam_cpp.forecast()
-    y_forecast_values = _generate_point_forecasts(
-        observations_dict,
-        lags_dict,
-        model_prepared,
-        lookup,
-        model_type_dict,
-        components_dict,
-        explanatory_checked,
-        constants_checked,
-        general_dict,
-        adam_cpp,
-    )
-
-    # 8. Perform safety checks on forecasts
-    y_forecast_values = _handle_forecast_safety_checks(
-        y_forecast_values, model_type_dict, model_prepared, general_dict
-    )
-
-    # Point forecasts always come from adam_cpp.forecast(), not from the
-    # simulation mean — the deterministic forecast is more accurate and
-    # avoids Monte-Carlo noise.
-    resolved_interval = general_dict["interval"]
-    _cached_sim = None
-
-    # 9. Process occurrence forecasts
-    p_forecast, occurrence_model = _process_occurrence_forecast(
-        occurrence_dict, general_dict
-    )
-
-    # 10. Apply occurrence probabilities and handle cumulative. The intervals of an
-    # occurrence model are of the sizes, around their forecasts
-    y_sizes = y_forecast_values
-    y_forecast_values = y_forecast_values * p_forecast
-    if general_dict.get("cumulative"):
-        # The h steps after the sample, with the origin k periods before its end; a
-        # model in logs sums its forecasts in the space of the data
-        if general_dict.get("_log_model"):
-            y_forecast_values = np.exp(y_sizes) * p_forecast
-        y_forecast_values = np.sum(
-            y_forecast_values[int(general_dict.get("_gap_shift", 0) or 0) :]
-        )
-        y_sizes = y_forecast_values
-    # For cumulative+occurrence the Bernoulli sum is non-trivial; force simulated
-    # (not for the occurrence of the missing values only, whose probability is one).
-    # So do the multiplicative models: the variance of the sum of their errors needs
-    # the covariances of the horizons, which their analytical variances do not have.
-    # A model in logs sums its paths in the space of the data
-    occurrence_model = occurrence_model and np.any(np.asarray(p_forecast) < 1)
-    multiplicative = "M" in (
-        model_type_dict["error_type"],
-        model_type_dict["trend_type"],
-        model_type_dict["season_type"],
-    ) or (general_dict.get("distribution_new") or general_dict["distribution"]) in (
-        "dlnorm",
-        "dinvgauss",
-        "dgamma",
-        "dls",
-        "dllaplace",
-        "dlgnorm",
-    )
-    if general_dict.get("cumulative", False) and (
-        occurrence_model
-        or (multiplicative and resolved_interval == "approximate")
-        or (general_dict.get("_log_model") and resolved_interval != "none")
-    ):
-        general_dict["interval"] = "simulated"
-        resolved_interval = "simulated"
-
-    # 12. Determine index: single row for cumulative, full horizon otherwise
-    is_cumulative = general_dict.get("cumulative", False)
-    forecast_index = (
-        observations_dict["y_forecast_index"][:1]
-        if is_cumulative
-        else observations_dict["y_forecast_index"]
-    )
-
-    if resolved_interval == "none":
-        return ForecastResult(
-            mean=pd.Series(y_forecast_values, index=forecast_index, name="mean"),
-            lower=None,
-            upper=None,
-            level=level,
-            side=side,
-            interval=resolved_interval,
-        )
-    else:
-        if level is None:
-            warnings.warn("No confidence level specified. Using default level of 0.95")
-            level = 0.95
-
-        level_low, level_up = ensure_level_format(level, side)
-
-        if resolved_interval == "simulated":
-            if _cached_sim is not None:
-                y_lower, y_upper, y_simulated = _cached_sim
-            else:
-                nsim = general_dict.get("nsim", 10000)
-                y_lower, y_upper, y_simulated, y_mean = generate_simulation_interval(
-                    y_forecast_values,
-                    model_prepared,
-                    general_dict,
-                    observations_dict,
-                    model_type_dict,
-                    lags_dict,
-                    components_dict,
-                    explanatory_checked,
-                    constants_checked,
-                    params_info,
-                    adam_cpp,
-                    level_low,
-                    level_up,
-                    nsim=nsim,
-                    p_forecast=p_forecast if occurrence_model else None,
-                )
-                # The cumulative forecast is the mean of the simulated sums, as in R
-                if general_dict.get("cumulative", False):
-                    y_forecast_values = y_mean
-            if general_dict.get("scenarios", False):
-                general_dict["_scenarios_matrix"] = y_simulated
-        elif resolved_interval == "approximate":
-            y_lower, y_upper = generate_prediction_interval(
-                y_sizes,
-                model_prepared,
-                general_dict,
-                observations_dict,
-                model_type_dict,
-                lags_dict,
-                params_info,
-                level_low,
-                level_up,
-                p_forecast=p_forecast if occurrence_model else None,
-            )
-            if general_dict.get("scenarios", False):
-                warnings.warn('scenarios=True requires interval="simulated". Ignored.')
-        elif resolved_interval in ("semiparametric", "empirical", "nonparametric"):
-            y_lower, y_upper = generate_multistep_interval(
-                y_sizes,
-                model_prepared,
-                general_dict,
-                observations_dict,
-                model_type_dict,
-                lags_dict,
-                params_info,
-                adam_cpp,
-                level_low,
-                level_up,
-                resolved_interval,
-            )
-            if general_dict.get("scenarios", False):
-                warnings.warn('scenarios=True requires interval="simulated". Ignored.')
-        else:
-            raise NotImplementedError(
-                f'interval="{resolved_interval}" is not yet implemented. '
-                '"confidence" and "complete" require reforecast() '
-                "which is not yet ported."
-            )
-
-        n_levels = len(level_low)
-        lower_df = None
-        upper_df = None
-        if side != "upper":
-            lower_df = pd.DataFrame(
-                {round(level_low[j], 5): y_lower[:, j] for j in range(n_levels)},
-                index=forecast_index,
-            )
-        if side != "lower":
-            upper_df = pd.DataFrame(
-                {round(level_up[j], 5): y_upper[:, j] for j in range(n_levels)},
-                index=forecast_index,
-            )
-
-    return ForecastResult(
-        mean=pd.Series(y_forecast_values, index=forecast_index, name="mean"),
-        lower=lower_df,
-        upper=upper_df,
-        level=level,
-        side=side,
-        interval=resolved_interval,
-    )
-
-
-SYMMETRIC_DISTRIBUTIONS = ("dnorm", "dlaplace", "ds", "dgnorm", "dlogis", "dt")
+    return None
 
 
 def _skeleton_steps(

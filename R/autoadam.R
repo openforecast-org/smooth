@@ -397,7 +397,13 @@ auto.adam <- function(data, model="ZXZ", lags=c(frequency(data)),
             }
         }
         else{
-            selectedModels <- foreach::`%dopar%`(foreach::foreach(i=1:length(distribution)),{
+            # The variables of auto.adam() itself and its internal functions are exported to the
+            # workers of a cluster (doParallel on Windows), which do not see this function's
+            # enclosing frame or the namespace of smooth
+            selectedModels <- foreach::`%dopar%`(foreach::foreach(i=1:length(distribution),
+                                                                  .export=c("etsModel", "xregModel", "formula",
+                                                                            "IC", "ets", "responseName",
+                                                                            "obsInSample", "adam_arimaSelector")),{
                 if(etsModel || xregModel){
                     testModel <- adam(data=data, model=model, lags=lags, orders=ordersToUse,
                                       distribution=distribution[i], formula=formula,
@@ -581,7 +587,9 @@ auto.adam <- function(data, model="ZXZ", lags=c(frequency(data)),
                 }
             }
             else{
-                selectedModels <- foreach::`%dopar%`(foreach::foreach(i=1:length(distribution)),{
+                # The internal function is exported to the workers of a cluster, as above
+                selectedModels <- foreach::`%dopar%`(foreach::foreach(i=1:length(distribution),
+                                                                      .export="adam_arimaSelector"),{
                     testModel <- adam_arimaSelector(
                         data=data, model=model,
                         lags=lags, arMax=arMax, iMax=iMax, maMax=maMax,

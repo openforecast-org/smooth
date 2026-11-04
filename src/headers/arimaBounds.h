@@ -36,29 +36,18 @@ inline double arimaReflection(arma::vec c) {
     return largest;
 }
 
-// The interval of the j-th (from 0) of the parameters of one factor, the others
-// fixed, on which the factor stays stationary / invertible, around their current
-// values; sign is -1 for AR (c = -phi) and 1 for MA (c = theta). The coefficient
-// of z^(j+1) of a factor with all roots outside the unit circle is below the
-// binomial coefficient C(q, j+1) in absolute value, so stepping out from the
-// current value by step finds the first crossing, which is then bisected. NaNs if
-// the factor is not stationary / invertible at the current values.
-inline arma::vec arimaParameterBounds(arma::vec values, arma::uword j, double sign,
-                                      double step = 0.01) {
+// The interval around current on which stable(value) holds: stepping out from current by
+// step until stable() fails or |value| passes limit, then bisecting that crossing 40 times
+// and keeping the stable side. NaNs if current is not stable. The bounds of the ARMA
+// parameters below, and those of the smoothing parameters of ETS and CES under the
+// forecastability condition (eigenBounds() and cesBounds() in R, eigen_bounds() and
+// ces_bounds() in Python)
+template <typename Stable>
+inline arma::vec stabilityInterval(Stable stable, double current, double step, double limit) {
     arma::vec bounds(2);
     bounds.fill(arma::datum::nan);
-    auto stable = [&](double value) {
-        values(j) = value;
-        return arimaReflection(sign * values) < 1;
-    };
-    double current = values(j);
     if(!stable(current)) {
         return bounds;
-    }
-    arma::uword q = values.n_elem;
-    double limit = 1;
-    for(arma::uword i = 0; i <= j; ++i) {
-        limit *= double(q - i) / double(i + 1);
     }
     for(int side = 0; side < 2; ++side) {
         double direction = side == 0 ? -1 : 1, inside = current, outside = current;
@@ -76,4 +65,23 @@ inline arma::vec arimaParameterBounds(arma::vec values, arma::uword j, double si
         bounds(side) = inside;
     }
     return bounds;
+}
+
+// The interval of the j-th (from 0) of the parameters of one factor, the others
+// fixed, on which the factor stays stationary / invertible, around their current
+// values; sign is -1 for AR (c = -phi) and 1 for MA (c = theta). The coefficient
+// of z^(j+1) of a factor with all roots outside the unit circle is below the
+// binomial coefficient C(q, j+1) in absolute value, which limits the search. NaNs
+// if the factor is not stationary / invertible at the current values.
+inline arma::vec arimaParameterBounds(arma::vec values, arma::uword j, double sign,
+                                      double step = 0.01) {
+    arma::uword q = values.n_elem;
+    double limit = 1;
+    for(arma::uword i = 0; i <= j; ++i) {
+        limit *= double(q - i) / double(i + 1);
+    }
+    return stabilityInterval([&](double value) {
+        values(j) = value;
+        return arimaReflection(sign * values) < 1;
+    }, values(j), step, limit);
 }

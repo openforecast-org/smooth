@@ -91,15 +91,29 @@ def _log_transform(y, dist):
     return y
 
 
-def _lowess_line(ax, x, y):
-    """Draw a red LOWESS smoothing line on ax."""
+def _lowess_line(ax, x, y, times=None):
+    """Draw a red LOWESS smoothing line on ax; at ``times[x]`` when the x are the
+    positions of the observations in time."""
     from greybox import lowess
 
     mask = ~(np.isnan(x) | np.isnan(y))
     if mask.sum() < 4:  # noqa: PLR2004
         return
     result = lowess(x[mask], y[mask])
-    ax.plot(result["x"], result["y"], color="red", lw=1.5)
+    x_line = result["x"] if times is None else times[result["x"].astype(int)]
+    ax.plot(x_line, result["y"], color="red", lw=1.5)
+
+
+def _time_index(model, h=0):
+    """The times of the in-sample observations and of the ``h`` after them: the
+    index of the data (its dates) when it has one, else the observation numbers."""
+    from smooth.adam_general.core.adam import _forecast_index
+
+    fitted = model.fitted
+    if hasattr(fitted, "index"):
+        return np.asarray(fitted.index), np.asarray(_forecast_index(fitted, h))
+    n = len(np.asarray(fitted).ravel())
+    return np.arange(n), np.arange(n, n + h)
 
 
 def _residual_bounds(ax, statistic, x_range):
@@ -128,22 +142,12 @@ def _make_fig(mpl_figure, **kwargs):
 
 
 def _state_labels(model):
-    """Derive human-readable labels for each row of model.states: the names of the
-    components where the model has them (TBATS), as R's column names."""
+    """The labels of the rows of model.states: the names of the components (TBATS's
+    own, else those of the states), as R's column names."""
     names = getattr(model, "_component_names", None)
-    if names is not None:
-        return list(names)
-    comp = model._components
-    is_trendy = comp.get("model_is_trendy", False)
-    n_seasonal = comp.get("components_number_ets_seasonal", 0)
-    n_arima = comp.get("components_number_arima", 0)
-
-    labels = ["Level"]
-    if is_trendy:
-        labels.append("Trend")
-    labels += [f"Seasonal {i + 1}" for i in range(n_seasonal)]
-    labels += [f"ARIMA {i + 1}" for i in range(n_arima)]
-    return labels
+    if names is None:
+        names = model._component_names_for_states()
+    return list(names)
 
 
 # ---------------------------------------------------------------------------
@@ -374,17 +378,28 @@ def _plot4(model, ax, **kw):
 # ---------------------------------------------------------------------------
 
 
-def _plot5(model, ax, legend, **kw):
+def _plot5(model, ax, legend, forecast=None, **kw):
     actuals = np.asarray(model.actuals, dtype=float)
     fitted = np.asarray(model.fitted, dtype=float)
-    n = len(actuals)
-    t_in = np.arange(n)
 
-    # Continuous actuals line: training + holdout joined
+    # Forecast mean: the given forecast, else the manual predict() result, else the
+    # auto-forecast
+    fc = (
+        forecast
+        or getattr(model, "_forecast_results", None)
+        or getattr(model, "_auto_forecast", None)
+    )
     holdout = model.holdout_data
     if holdout is not None:
         holdout = np.asarray(holdout, dtype=float).ravel()
-        t_h = np.arange(n, n + len(holdout))
+    fc_mean = None if fc is None else getattr(fc, "mean", None)
+    h_fc = 0 if fc_mean is None else len(np.asarray(fc_mean).ravel())
+    h_after = max(h_fc, 0 if holdout is None else len(holdout))
+    t_in, t_after = _time_index(model, h_after)
+
+    # Continuous actuals line: training + holdout joined
+    if holdout is not None:
+        t_h = t_after[: len(holdout)]
         full_t = np.concatenate([t_in, t_h])
         full_y = np.concatenate([actuals, holdout])
     else:
@@ -394,10 +409,6 @@ def _plot5(model, ax, legend, **kw):
     # Fitted values — dashed purple on top
     ax.plot(t_in, fitted, color="#A020F0", lw=1.5, linestyle="--", label="Fitted")
 
-    # Forecast mean: prefer manual predict() result, fall back to auto-forecast
-    fc = getattr(model, "_forecast_results", None) or getattr(
-        model, "_auto_forecast", None
-    )
     has_forecast = (
         fc is not None
         and getattr(fc, "mean", None) is not None
@@ -408,11 +419,11 @@ def _plot5(model, ax, legend, **kw):
     # only means something when there is a forecast. R suppresses it the same
     # way: greybox::graphmaker sets `vline <- FALSE` when the forecast is all NA.
     if has_forecast or holdout is not None:
-        ax.axvline(n - 1, color="#FF0000", lw=0.8)
+        ax.axvline(t_in[-1], color="#FF0000", lw=0.8)
 
     if has_forecast:
         fc_mean = np.asarray(fc.mean, dtype=float).ravel()
-        t_f = np.arange(n, n + len(fc_mean))
+        t_f = t_after[: len(fc_mean)]
         ax.plot(t_f, fc_mean, color="#0000FF", lw=1.5, label="Forecast")
 
         lower = getattr(fc, "lower", None)
@@ -460,7 +471,7 @@ def _plot6(model, ax, resid_type, level, lowess, legend, **kw):
     if dist in {"dinvgauss", "dgamma"}:
         statistic = np.log(statistic)
 
-    t = np.arange(len(resid))
+    t = _time_index(model)[0]
     y_pad = max(abs(resid[~np.isnan(resid)])) * 1.2 if np.any(~np.isnan(resid)) else 1
     ax.set_ylim(-y_pad, y_pad)
 
@@ -494,7 +505,7 @@ def _plot6(model, ax, resid_type, level, lowess, legend, **kw):
         y_fill = resid.copy()
         if np.any(np.isnan(y_fill)):
             y_fill[np.isnan(y_fill)] = np.nanmean(y_fill)
-        _lowess_line(ax, t.astype(float), y_fill)
+        _lowess_line(ax, np.arange(len(y_fill), dtype=float), y_fill, times=t)
 
     y_name = "Standardised" if resid_type == "rstandard" else "Studentised"
     log_prefix = "log(" if _is_log_dist(dist) else ""
@@ -598,6 +609,7 @@ def _plot8(model, mpl_figure, **kw):
         [actuals[np.newaxis, :], states_aligned, resid[np.newaxis, :]]
     )
 
+    times = _time_index(model)[0]
     state_labels = _state_labels(model)
     all_labels = ["Actuals"] + state_labels + ["Residuals"]
 
@@ -633,8 +645,7 @@ def _plot8(model, mpl_figure, **kw):
         fig.suptitle(title, fontsize=11)
 
         for i, (series, label) in enumerate(zip(batch, labels)):
-            t = np.arange(series.shape[0])
-            axes[i].plot(t, series, color="black", lw=1)
+            axes[i].plot(times, series, color="black", lw=1)
             axes[i].set_ylabel(label, fontsize=8)
             axes[i].tick_params(labelsize=7)
 

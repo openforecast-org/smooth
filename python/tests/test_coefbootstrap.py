@@ -221,6 +221,37 @@ def test_parallel_falls_back_when_joblib_missing(y_continuous, monkeypatch):
     assert boot.nsim_effective == 5
 
 
+@pytest.mark.parametrize(
+    "parallel, nsim, cpus, expected",
+    [
+        (False, 100, 8, 1),
+        # True: all the cores but one, as R's detectCores()-1
+        (True, 100, 8, 7),
+        (True, 100, 1, 1),
+        (True, 100, None, 1),
+        # Never more workers than replicates
+        (True, 3, 8, 3),
+        (4, 100, 8, 4),
+        (4, 2, 8, 2),
+        (4, 0, 8, 1),
+    ],
+)
+def test_resolve_n_jobs(parallel, nsim, cpus, expected, monkeypatch):
+    """``parallel`` as the number of workers of the bootstrap."""
+    from smooth.adam_general.core.utils import bootstrap
+
+    monkeypatch.setattr(bootstrap.os, "cpu_count", lambda: cpus)
+    assert bootstrap._resolve_n_jobs(parallel, nsim) == expected
+
+
+@pytest.mark.parametrize("parallel", [0, -2])
+def test_resolve_n_jobs_rejects_a_non_positive_int(parallel):
+    from smooth.adam_general.core.utils.bootstrap import _resolve_n_jobs
+
+    with pytest.raises(ValueError, match="parallel must be a positive int or bool"):
+        _resolve_n_jobs(parallel, 10)
+
+
 def test_invalid_method_raises(y_continuous):
     with _silence_inner_warnings():
         warnings.simplefilter("ignore")

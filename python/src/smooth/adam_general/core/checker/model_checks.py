@@ -2,173 +2,107 @@ import numpy as np
 
 from ._utils import _warn
 
+# The full, the pure and the safe pools ("F", "P" and "S" in the model), in R's order
+_NAMED_MODELS_POOLS = {
+    "F": (
+        "ANN", "AAN", "AAdN", "AMN", "AMdN", "ANA", "AAA", "AAdA", "AMA", "AMdA",
+        "ANM", "AAM", "AAdM", "AMM", "AMdM", "MNN", "MAN", "MAdN", "MMN", "MMdN",
+        "MNA", "MAA", "MAdA", "MMA", "MMdA", "MNM", "MAM", "MAdM", "MMM", "MMdM",
+    ),
+    "P": (
+        "ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA",
+        "MNN", "MMN", "MMdN", "MNM", "MMM", "MMdM",
+    ),
+    "S": (
+        "ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA", "MNN", "MAN", "MAdN", "MNA",
+        "MAA", "MAdA", "MNM", "MAM", "MAdM", "MMN", "MMdN", "MMM", "MMdM",
+    ),
+}  # fmt: skip
 
-def _build_models_pool_from_components(
-    error_type_char,
-    trend_type_char,
-    season_type_char,
-    damped_original_model,
-    allow_multiplicative,
-    max_lag=1,
+# The components a letter of the model allows: X the additive or none, Y the
+# multiplicative or none, the selection letters all
+_ALLOWED_COMPONENTS = {"X": "AN", "Y": "MN", "N": "N", "A": "A", "M": "M"}
+
+
+def _named_models_pool(letter, error_type, trend_type, season_type):
+    """The full, the pure or the safe pool (``letter`` "F", "P" or "S"), narrowed by
+    the other letters of the model, as R's."""
+    allowed = [
+        _ALLOWED_COMPONENTS.get(component, "NAM")
+        for component in (error_type, trend_type, season_type)
+    ]
+    return [
+        model
+        for model in _NAMED_MODELS_POOLS[letter]
+        if model[0] in allowed[0] and model[1] in allowed[1] and model[-1] in allowed[2]
+    ]
+
+
+def _parse_model_string(model_str, silent):
+    """The letters of the model, its damping and what to do with it: the invalid
+    letters are selected, "C" combines."""
+    model_do = "estimate"
+    if not isinstance(model_str, str):
+        _warn(
+            f"Invalid model type: {model_str}. Should be a string. Switching to 'ZZZ'.",
+            silent,
+        )
+        model_str = "ZZZ"
+    if len(model_str) not in (3, 4):
+        _warn(f"Invalid model string length: {model_str}. Switching to 'ZZZ'.", silent)
+        model_str = "ZZZ"
+    if len(model_str) == 4 and model_str[2] != "d":
+        _warn(f"Invalid damped trend specification in {model_str}. Using 'd'.", silent)
+    # The letters with "C" for the combination of the selected models
+    letters = model_str.replace("C", "Z")
+    components = [letters[0], letters[1], letters[-1]]
+    damped = len(model_str) == 4 or model_str[1] in ["Z", "X", "Y"]
+
+    for i, name in enumerate(("error", "trend", "seasonal")):
+        if components[i] not in "ZXYAMNFPS":
+            _warn(f"Invalid {name} type: {components[i]}. Switching to 'Z'.", silent)
+            components[i] = "Z"
+            model_do = "select"
+    if letters != model_str:
+        model_do = "combine"
+    return model_str, *components, damped, model_do
+
+
+def _restrict_to_additive(
+    model_str, error_type, trend_type, season_type, models_pool, silent
 ):
-    """
-    Build a models pool by fully enumerating expansions for E, T, S.
-
-    Parameters
-    ----------
-    error_type_char : str
-        Error component character (e.g., 'Z', 'A', 'F', 'P')
-        These are characters *after* initial processing in _check_model_composition
-        (e.g., C->Z, M->A if not allow_multiplicative for specific components).
-    trend_type_char : str
-        Trend component character, similarly processed.
-    season_type_char : str
-        Seasonal component character, similarly processed.
-    damped_original_model : bool
-        Damping flag from the original model string (largely ignored here for pool
-        generation,
-        as damping is part of trend strings like "Ad").
-    allow_multiplicative : bool
-        Whether multiplicative models are generally allowed for pool expansion (e.g. for
-        Z).
-    max_lag : int, default=1
-        Maximum lag value. If <= 1, seasonality is not allowed.
-
-    Returns
-    -------
-    tuple
-        (candidate_models, combined_mode_placeholder)
-    """
-    candidate_models = []
-
-    # If max_lag <= 1, no seasonality is possible - set to "N" silently
-    if max_lag <= 1:
-        season_type_char = "N"
-
-    # Handle full pool case ("F")
-    if "F" in [error_type_char, trend_type_char, season_type_char]:
-        candidate_models = [
-            "ANN",
-            "AAN",
-            "AAdN",
-            "AMN",
-            "AMdN",
-            "ANA",
-            "AAA",
-            "AAdA",
-            "AMA",
-            "AMdA",
-            "ANM",
-            "AAM",
-            "AAdM",
-            "AMM",
-            "AMdM",
-        ]
-        if allow_multiplicative:
-            candidate_models.extend(
-                [
-                    "MNN",
-                    "MAN",
-                    "MAdN",
-                    "MMN",
-                    "MMdN",
-                    "MNA",
-                    "MAA",
-                    "MAdA",
-                    "MMA",
-                    "MMdA",
-                    "MNM",
-                    "MAM",
-                    "MAdM",
-                    "MMM",
-                    "MMdM",
-                ]
-            )
-        # Filter out seasonal models if max_lag <= 1
-        if max_lag <= 1:
-            candidate_models = [m for m in candidate_models if m[-1] == "N"]
-    # Handle pure models case ("P")
-    elif "P" in [error_type_char, trend_type_char, season_type_char]:
-        candidate_models = ["ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA"]
-        if allow_multiplicative:
-            candidate_models.extend(["MNN", "MMN", "MMdN", "MNM", "MMM", "MMdM"])
-        # Filter out seasonal models if max_lag <= 1
-        if max_lag <= 1:
-            candidate_models = [m for m in candidate_models if m[-1] == "N"]
-    # Handle standard selection case
-    else:
-        # Check for multiplicative requests on non-positive data
-        if not allow_multiplicative:
-            if error_type_char in ["Y", "Z"]:
-                import warnings
-
-                warnings.warn(
-                    "Multiplicative error models cannot be used on non-positive data. "
-                    "Switching to additive error (A).",
-                    UserWarning,
+    """The model on non-positive data, as R's (R/adamGeneral.R, allowMultiplicative):
+    an explicit pool amended, a selection switched to the additive models, a warning
+    for a specific multiplicative model."""
+    if models_pool is not None:
+        pool_additive = [m for m in models_pool if "M" not in (m[0], m[1], m[-1])]
+        if len(pool_additive) != len(models_pool):
+            models_pool = pool_additive
+            # The full and the pure pools are amended silently
+            if not set("PF") & set(model_str):
+                _warn(
+                    "Only additive models are allowed for your data. "
+                    "Amending the pool.",
+                    silent,
                 )
-                error_type_char = "A"
-            if trend_type_char in ["Y", "Z"]:
-                import warnings
-
-                warnings.warn(
-                    "Multiplicative trend models cannot be used on non-positive data. "
-                    "Switching to additive trend selection (X).",
-                    UserWarning,
-                )
-                trend_type_char = "X"
-            if season_type_char in ["Y", "Z"]:
-                import warnings
-
-                warnings.warn(
-                    "Multiplicative seasonal models cannot be used on "
-                    "non-positive data. Switching to additive seasonal "
-                    "selection (X).",
-                    UserWarning,
-                )
-                season_type_char = "X"
-
-        # Determine Error Options
-        if error_type_char in ["A", "M"]:
-            actual_error_options = [error_type_char]
-        else:  # For 'Z', 'N', 'X', 'Y' etc.
-            actual_error_options = ["A", "M"] if allow_multiplicative else ["A"]
-
-        # Determine Trend Options
-        # Note: trend_type_char would already be 'A' or 'Ad' if originally 'M' or 'Md'
-        #  and allow_multiplicative was false, due to pre-processing in
-        # _check_model_composition.
-        if trend_type_char in ["N", "A", "M", "Ad", "Md"]:
-            actual_trend_options_with_damping = [trend_type_char]
-        elif trend_type_char == "Z":
-            actual_trend_options_with_damping = ["N", "A", "M", "Ad", "Md"]
-        elif trend_type_char == "Y":
-            actual_trend_options_with_damping = ["N", "M", "Md"]
-        else:  # 'X' or any other
-            actual_trend_options_with_damping = ["N", "A", "Ad"]
-
-        # Determine Season Options
-        # Note: season_type_char would already be 'A' if originally 'M'
-        # and allow_multiplicative was false.
-        if season_type_char in ["N", "A", "M"]:
-            actual_season_options = [season_type_char]
-        elif season_type_char == "Z":
-            actual_season_options = ["N", "A", "M"]
-        elif season_type_char == "Y":
-            actual_season_options = ["N", "M"]
-        else:  # 'X' or any other
-            actual_season_options = ["N", "A"]
-
-        for e_opt in actual_error_options:
-            for t_opt in actual_trend_options_with_damping:
-                # t_opt already includes 'd' if it's a damped trend (e.g., "Ad")
-                for s_opt in actual_season_options:
-                    candidate_models.append(f"{e_opt}{t_opt}{s_opt}")
-
-    candidate_models = sorted(list(set(candidate_models)))
-    # combined_mode is determined upstream in _check_model_composition and used there.
-    # This function just needs to return the pool.
-    return candidate_models, False
+    if model_str in ("PPP", "FFF", "YYY") or "Z" in model_str:
+        error_type, models_pool = "A", None
+        trend_type, season_type = (
+            "X" if component in ("Y", "Z", "P", "F") else component
+            for component in (trend_type, season_type)
+        )
+        _warn(
+            "Only additive models are allowed for your data. "
+            "Changing the selection mechanism.",
+            silent,
+        )
+    elif "M" in (error_type, trend_type, season_type):
+        _warn(
+            f"Your data contains non-positive values, so the "
+            f"ETS({model_str}) might break down.",
+            silent,
+        )
+    return model_str, error_type, trend_type, season_type, models_pool
 
 
 def _check_model_composition(
@@ -193,187 +127,37 @@ def _check_model_composition(
     dict
         Dictionary with model components and configuration
     """
-    # Initialize defaults
-    error_type = trend_type = season_type = "N"
-    damped = False
-    model_do = "estimate"
+    model_str, error_type, trend_type, season_type, damped, model_do = (
+        _parse_model_string(model_str, silent)
+    )
     models_pool = None
+    components = (error_type, trend_type, season_type)
 
-    # Validate model string
-    if not isinstance(model_str, str):
-        if not silent:
-            _warn(
-                f"Invalid model type: {model_str}. "
-                "Should be a string. Switching to 'ZZZ'."
-            )
-        model_str = "ZZZ"
-
-    # Handle 4-character models (with damping)
-    if len(model_str) == 4:
-        error_type = model_str[0]
-        trend_type = model_str[1]
-        season_type = model_str[3]
-        if model_str[2] != "d":
-            if not silent:
-                _warn(f"Invalid damped trend specification in {model_str}. Using 'd'.")
-        damped = True
-
-    # Handle 3-character models
-    elif len(model_str) == 3:
-        error_type = model_str[0]
-        trend_type = model_str[1]
-        season_type = model_str[2]
-        damped = trend_type in ["Z", "X", "Y"]
-
-    else:
-        if not silent:
-            _warn(f"Invalid model string length: {model_str}. Switching to 'ZZZ'.")
-        model_str = "ZZZ"
-        error_type = trend_type = season_type = "Z"
-        damped = True
-
-    # Validate components
-    valid_error = ["Z", "X", "Y", "A", "M", "C", "N", "F", "P", "S"]
-    valid_trend = ["Z", "X", "Y", "N", "A", "M", "C", "F", "P", "S"]
-    valid_season = ["Z", "X", "Y", "N", "A", "M", "C", "F", "P", "S"]
-
-    if error_type not in valid_error:
-        if not silent:
-            _warn(f"Invalid error type: {error_type}. Switching to 'Z'.")
-        error_type = "Z"
-        model_do = "select"
-
-    if trend_type not in valid_trend:
-        if not silent:
-            _warn(f"Invalid trend type: {trend_type}. Switching to 'Z'.")
-        trend_type = "Z"
-        model_do = "select"
-
-    if season_type not in valid_season:
-        if not silent:
-            _warn(f"Invalid seasonal type: {season_type}. Switching to 'Z'.")
-        season_type = "Z"
-        model_do = "select"
-
-    # Handle model selection/combination mode
-    # Track if combination was requested (to avoid overriding later)
-    is_combination = "C" in [error_type, trend_type, season_type]
-    if is_combination:
-        model_do = "combine"
-        # Replace C with Z for actual fitting
-        if error_type == "C":
-            error_type = "Z"
-        if trend_type == "C":
-            trend_type = "Z"
-        if season_type == "C":
-            season_type = "Z"
-
-    # Handle the sensible-pool case ("S"): a curated 19-model pool of
-    # ETS specifications with finite forecast variance.
-    if "S" in [error_type, trend_type, season_type]:
-        model_do = "select"
-        # Build sensible pool (19 models with finite variance)
-        sensible_pool = [
-            "ANN",
-            "AAN",
-            "AAdN",
-            "ANA",
-            "AAA",
-            "AAdA",
-            "MNN",
-            "MAN",
-            "MAdN",
-            "MNA",
-            "MAA",
-            "MAdA",
-            "MNM",
-            "MAM",
-            "MAdM",
-            "MMN",
-            "MMdN",
-            "MMM",
-            "MMdM",
-        ]
-
-        # Filter by error type if not S
-        if error_type != "S":
-            target = {"X": "A", "Y": "M"}.get(error_type, error_type)
-            sensible_pool = [m for m in sensible_pool if m[0] == target]
-        else:
-            error_type = "Z"
-
-        # Filter by trend type if not S
-        if trend_type != "S":
-            if trend_type == "X":
-                sensible_pool = [m for m in sensible_pool if m[1] in ["A", "N"]]
-            elif trend_type == "Y":
-                sensible_pool = [m for m in sensible_pool if m[1] in ["M", "N"]]
-            else:
-                sensible_pool = [m for m in sensible_pool if m[1] == trend_type]
-        else:
-            trend_type = "Z"
-
-        # Filter by season type if not S
-        if season_type != "S":
-            if season_type == "X":
-                sensible_pool = [m for m in sensible_pool if m[-1] in ["A", "N"]]
-            elif season_type == "Y":
-                sensible_pool = [m for m in sensible_pool if m[-1] in ["M", "N"]]
-            else:
-                sensible_pool = [m for m in sensible_pool if m[-1] == season_type]
-        else:
-            season_type = "Z"
-
-        # Filter for max_lag (no seasonality if <= 1)
-        if max_lag <= 1:
-            sensible_pool = [m for m in sensible_pool if m[-1] == "N"]
-
-        models_pool = sensible_pool
-
-    elif any(
-        c in ["Z", "X", "Y", "F", "P"] for c in [error_type, trend_type, season_type]
-    ):
-        # Don't override "combine" mode - only set to "select" if not already combining
-        if not is_combination:
+    # The full, the pure or the safe pool, unless the models are combined, as R's
+    named = next((letter for letter in "FPS" if letter in components), None)
+    if named is not None:
+        error_type, trend_type, season_type = (
+            "Z" if component in "FPS" else component for component in components
+        )
+        if model_do != "combine":
+            models_pool = _named_models_pool(named, *components)
             model_do = "select"
+    # The letters of the selection; the others are estimated
+    elif model_do != "combine" and any(c in ["Z", "X", "Y"] for c in components):
+        model_do = "select"
 
-    # Non-positive data: multiplicative components are not applicable.
-    # Mirrors R/adamGeneral.R (allowMultiplicative block): amend an explicit
-    # pool, switch a selection spec to pure additive, and merely warn when the
-    # user asked for one specific multiplicative model.
+    # Non-positive data: multiplicative components are not applicable
     if not allow_multiplicative:
-        if models_pool is not None:
-            pool_additive = [m for m in models_pool if "M" not in (m[0], m[1], m[-1])]
-            if len(pool_additive) != len(models_pool):
-                models_pool = pool_additive
-                if not any(c in ("P", "F") for c in model_str):
-                    _warn(
-                        "Only additive models are allowed for your data. "
-                        "Amending the pool.",
-                        silent,
-                    )
-
-        if model_str in ("PPP", "FFF", "YYY") or "Z" in model_str:
-            error_type = "A"
-            trend_type = "X" if trend_type in ("Y", "Z", "P", "F") else trend_type
-            season_type = "X" if season_type in ("Y", "Z", "P", "F") else season_type
-            models_pool = None
-            _warn(
-                "Only additive models are allowed for your data. "
-                "Changing the selection mechanism.",
-                silent,
+        model_str, error_type, trend_type, season_type, models_pool = (
+            _restrict_to_additive(
+                model_str, error_type, trend_type, season_type, models_pool, silent
             )
-        elif "M" in (error_type, trend_type, season_type):
-            _warn(
-                f"Your data contains non-positive values, so the "
-                f"ETS({model_str}) might break down.",
-                silent,
-            )
+        )
 
     # A seasonal model needs a seasonal lag. R warns and drops the seasonal
     # component when the maximum lag is 1 (R/adamGeneral.R, "unity lags").
-    if season_type not in ("N", None) and max_lag <= 1:
-        if season_type not in ("Z", "X", "Y"):
+    if season_type != "N" and max_lag <= 1:
+        if season_type not in "ZXY":
             _warn(
                 "Cannot build the seasonal model on data with the unity lags.\n"
                 f"Switching to non-seasonal model: ETS({model_str[:-1]}N)",
@@ -384,18 +168,11 @@ def _check_model_composition(
         if models_pool is not None:
             models_pool = [m for m in models_pool if m[-1] == "N"]
 
-    # Generate models pool if needed
-    # Only pre-generate pool when components are specific (not Z, X, Y)
-    # When Z, X, or Y is present, leave models_pool as None for branch-and-bound
-    use_branch_and_bound = any(
-        c in ["Z", "X", "Y"] for c in [error_type, trend_type, season_type]
-    )
-    if model_do in ["select", "combine"] and not use_branch_and_bound:
-        models_pool, _ = _build_models_pool_from_components(
-            error_type, trend_type, season_type, damped, allow_multiplicative, max_lag
-        )
+    # All the letters fixed by the data or the lags: that model, as R's
+    fixed = error_type + trend_type + season_type
+    if model_do != "estimate" and fixed[0] in "AM" and not set("ZXY") & set(fixed):
+        models_pool = [error_type + trend_type + "d" * damped + season_type]
 
-    # Return model components and info
     return {
         "model": model_str,
         "error_type": error_type,
@@ -479,7 +256,10 @@ def _check_ets_model(
         model_info = _check_model_composition(
             base_model, allow_multiplicative, silent, max_lag
         )
-        # Override models_pool with the user-provided list
+        # Override models_pool with the user-provided list, without the seasonal
+        # models when there is no seasonal lag, as R
+        if model_info["season_type"] == "N":
+            regular_pool = [m for m in regular_pool if m[-1] == "N"]
         model_info["models_pool"] = regular_pool if regular_pool else None
         model_info["ets_model"] = True
         model_info["allow_multiplicative"] = allow_multiplicative

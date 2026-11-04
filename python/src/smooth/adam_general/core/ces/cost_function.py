@@ -57,6 +57,7 @@ def ces_cf(
     adam_cpp,
     initial_value=None,
     return_fitted=False,
+    loss_function=None,
 ):
     """
     CES cost function evaluated during optimization.
@@ -227,6 +228,15 @@ def ces_cf(
             cf_value = _sum_r(np.abs(errors)) / obs_observed
         elif loss == "HAM":
             cf_value = _sum_r(np.sqrt(np.abs(errors))) / obs_observed
+        elif loss == "custom":
+            # A function of the observed values, their fitted values and B, as R's
+            cf_value = float(
+                loss_function(
+                    actual=np.asarray(y_in_sample, dtype=float).ravel()[ot_logical],
+                    fitted=fitted[ot_logical],
+                    B=B,
+                )
+            )
         else:
             cf_value = _sum_r(errors**2) / obs_observed
     else:

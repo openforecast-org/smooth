@@ -108,6 +108,70 @@ def test_the_scale_model_takes_the_holdout_of_the_location_model():
     )
 
 
+@pytest.mark.parametrize(
+    "distribution, lags, model_name, loglik, scale_at_zeros",
+    [
+        # R: sm(adam(AirPassengers, "ANN", distribution=...)), with lags=c(1,12)
+        ("dlaplace", None, "ETS(MMN)", -694.415719,
+         [10.69107, 11.43929, 13.00021, 14.79168, 17.7274]),
+        ("dnorm", None, "ETS(MMN)", -680.149280,
+         [162.15817, 184.17658, 235.63298, 305.07965, 434.65093]),
+        ("dlaplace", [1, 12], "ETS(MNM)", -667.764586, None),
+    ],
+)
+def test_the_errors_equal_to_zero_are_gaps_of_the_scale_model(
+    distribution, lags, model_name, loglik, scale_at_zeros
+):
+    """The random walk of ANN on AirPassengers gives five observations with zero errors: the
+    scale model skips them, stays multiplicative and keeps them in its likelihood,
+    as R's."""
+    y = pd.read_csv(DATA / "ces_airpassengers.csv")["y"].to_numpy(float)
+    location = ADAM(model="ANN", distribution=distribution).fit(y)
+    zeros = np.flatnonzero(np.asarray(location.residuals) == 0)
+    assert len(zeros) == 5
+    with pytest.warns(UserWarning, match="observations with zero errors"):
+        scale_model = sm(location, lags=lags)
+    assert scale_model.model_name == model_name
+    assert scale_model.loglik == pytest.approx(loglik, abs=1e-5)
+    assert np.sum(scale_model.point_lik()) == pytest.approx(scale_model.loglik)
+    if scale_at_zeros is not None:
+        np.testing.assert_allclose(
+            np.asarray(scale_model.fitted)[zeros], scale_at_zeros, rtol=1e-6
+        )
+
+
+def test_a_regression_of_the_scale_with_a_zero_error():
+    """The regression of the scale is estimated with the loss of sm(), as R's alm()
+    gets it, on the non-zero errors, and predicts the scale at the zero one: it failed
+    there."""
+    y = pd.read_csv(DATA / "ces_airpassengers.csv")["y"].to_numpy(float)
+    X = pd.DataFrame({"x": np.sin(np.arange(1, 145))})
+    location = ADAM(model="ANN").fit(y, X)
+    assert np.flatnonzero(np.asarray(location.residuals) == 0).tolist() == [0]
+    with pytest.warns(UserWarning, match="observations with zero errors"):
+        scale_model = sm(location, model="NNN", X=X)
+    # R: sm(adam(data.frame(y=AirPassengers, x=sin(1:144)), "ANN", formula=y~x),
+    #       model="NNN", formula=y~x)
+    np.testing.assert_allclose(
+        scale_model._adam_estimated["B"], [7.0405961957110419, -0.0598290012200179]
+    )
+    assert scale_model.loglik == pytest.approx(-704.666288092188, rel=1e-10)
+    assert np.asarray(scale_model.fitted)[0] == pytest.approx(1085.99492474342)
+
+
+def test_the_likelihood_of_the_scale_model_has_the_occurrence():
+    """The likelihood of the scale model of an intermittent location model includes
+    that of its occurrence model, as R's logLik(sm())."""
+    rng = np.random.default_rng(2)
+    y = rng.poisson(0.7, 100) * rng.lognormal(2, 0.3, 100)
+    location = ADAM(model="MNN", occurrence="fixed").fit(y)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        scale_model = sm(location, model="MNN")
+    assert scale_model.loglik == pytest.approx(-218.078361586, rel=1e-10)
+    assert scale_model.aic == pytest.approx(442.156723173, rel=1e-10)
+
+
 def test_rejects_non_likelihood_loss():
     y = _series("positive")
     model = ADAM(model="ANN", lags=[1], loss="MSE")

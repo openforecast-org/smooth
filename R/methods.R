@@ -612,18 +612,22 @@ pointLik.smooth <- function(object, log=TRUE, ...){
     likValues <- vector("numeric",obs);
     loss <- object$loss;
 
+    # The log-densities, of the data in case of the multiplicative error
     if(errorType(object)=="M"){
         likValues <- likValues - log(actuals(object));
     }
 
     if(any(loss==c("MAE","MAEh","TMAE","GTMAE","MACE"))){
-        likValues <- likValues + dlaplace(errors, 0, mean(abs(errors)), log=log);
+        likValues <- likValues + dlaplace(errors, 0, mean(abs(errors)), log=TRUE);
     }
     else if(any(loss==c("HAM","HAMh","THAM","GTHAM","CHAM"))){
-        likValues <- likValues + ds(errors, 0, mean(sqrt(abs(errors))/2), log=log);
+        likValues <- likValues + ds(errors, 0, mean(sqrt(abs(errors))/2), log=TRUE);
     }
     else{
-        likValues <- likValues + dnorm(errors, 0, sqrt(mean(abs(errors)^2)), log=log);
+        likValues <- likValues + dnorm(errors, 0, sqrt(mean(abs(errors)^2)), log=TRUE);
+    }
+    if(!log){
+        likValues <- exp(likValues);
     }
 
     likValues <- ts(as.vector(likValues), start=start(errors), frequency=frequency(errors));
@@ -901,7 +905,8 @@ modelLags <- function(object, ...){
             nComponents <- max(ordersARIMA$ar %*% lags(object) + ordersARIMA$i %*% lags(object),
                                ordersARIMA$ma %*% lags(object));
             modelLags <- matrix(rep(1,times=nComponents),ncol=1);
-            if(is.numeric(object$constant)){
+            # sim.ssarima() stores zeros without the constant
+            if(is.numeric(object$constant) && grepl("with (constant|drift)", object$model)){
                 modelLags <- rbind(modelLags,1);
             }
         }

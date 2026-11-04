@@ -9,6 +9,8 @@ Tests cover:
 """
 
 import re
+import warnings
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -323,6 +325,15 @@ class TestADAMAttributes:
 
         assert hasattr(model, "phi_")
 
+    def test_phi_of_a_model_without_damping_is_ignored(self, simple_series, capsys):
+        """phi of a model without "d" is ignored with a warning, as in R."""
+        reference = ADAM(model="AAN").fit(simple_series)
+        model = ADAM(model="AAN", phi=0.9, verbose=1).fit(simple_series)
+        assert "phi is used only with a damped trend" in capsys.readouterr().out
+        assert model.loglik == pytest.approx(reference.loglik, rel=1e-10)
+        ADAM(model="AAN", phi=1, verbose=1).fit(simple_series)
+        assert "phi is used only" not in capsys.readouterr().out
+
 
 class TestADAMBounds:
     """Tests for parameter bounds."""
@@ -342,6 +353,64 @@ class TestADAMBounds:
         assert alpha > 1, (
             f"Expected alpha > 1 for linear series with admissible bounds, got {alpha}"
         )
+
+    @pytest.fixture(scope="class")
+    def etsx_arima(self):
+        """ETS(ANA)+ARMA(1,1) with two adaptive regressors and admissible bounds."""
+        rng = np.random.default_rng(3)
+        x = rng.normal(size=(40, 2))
+        y = 50 + np.tile([3, -2, 4, -5], 10) + 2 * x[:, 0] - x[:, 1]
+        y = y + rng.normal(size=40)
+        orders = {"ar": [1], "i": [0], "ma": [1]}
+        return ADAM(
+            model="ANA",
+            lags=[4],
+            orders=orders,
+            regressors="adapt",
+            bounds="admissible",
+        ).fit(y, x)
+
+    def test_persistence_index_points_at_vec_g(self, etsx_arima):
+        """The deltas sit after the ETS and the ARIMA components in vec_g."""
+        vec_g = np.asarray(etsx_arima._adam_created["vec_g"]).ravel()
+        coef = dict(zip(etsx_arima.coef_names, etsx_arima.coef))
+        index = etsx_arima._persistence_index
+        assert [index(n) for n in ("alpha", "gamma", "gamma1", "delta1", "delta2")] == [
+            0,
+            1,
+            1,
+            3,
+            4,
+        ]
+        assert index("delta") == 3
+        for name in ("alpha", "gamma", "delta1", "delta2"):
+            assert vec_g[index(name)] == coef[name]
+        with pytest.raises(ValueError, match="Unknown persistence parameter: phi"):
+            index("phi")
+
+    def test_persistence_index_of_beta(self):
+        """beta follows alpha in vec_g."""
+        y = 10 + 0.5 * np.arange(20) + np.sin(np.arange(20))
+        model = ADAM(model="AAN", bounds="admissible").fit(y)
+        vec_g = np.asarray(model._adam_created["vec_g"]).ravel()
+        coef = dict(zip(model.coef_names, model.coef))
+        assert model._persistence_index("beta") == 1
+        assert vec_g[1] == coef["beta"]
+
+    def test_confint_keeps_the_deltas_admissible(self, etsx_arima):
+        from smooth.adam_general.core.utils.bounds import eigen_bounds
+
+        vec_g = np.asarray(etsx_arima._adam_created["vec_g"]).ravel()
+        static_args = etsx_arima._eigen_static_args()
+        ci = etsx_arima.confint()
+        for name in ("delta1", "delta2"):
+            low, high = eigen_bounds(
+                vec_g, etsx_arima._persistence_index(name), **static_args
+            )
+            lower, upper = ci.loc[name].iloc[1], ci.loc[name].iloc[2]
+            # The t-interval reaches below the region: clamped to its bound
+            assert lower == pytest.approx(low, abs=1e-15)
+            assert lower < upper <= high
 
 
 class TestADAMConstant:
@@ -1615,6 +1684,20 @@ def test_provided_occurrence_of_the_horizon():
     np.testing.assert_allclose(np.ravel(model.predict(h=4).mean), before)
 
 
+def test_provided_occurrence_zeros_the_fitted_values_at_the_fit():
+    """The fitted values at the zeros of a provided occurrence are zero after the fit,
+    as in R, and predict() does not change them."""
+    y = np.array(
+        [112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118] * 6, dtype=float
+    )
+    y[::5] = 0
+    model = ADAM(model="MNN", occurrence=(y != 0).astype(float)).fit(y)
+    fitted = np.asarray(model.fitted, dtype=float).copy()
+    assert np.all(fitted[::5] == 0) and np.all(fitted[1::5] > 0)
+    model.predict(h=4, occurrence=np.ones(4))
+    np.testing.assert_array_equal(np.asarray(model.fitted, dtype=float), fitted)
+
+
 @pytest.mark.r_parity
 @pytest.mark.parametrize("model,distribution", [("MAdM", "dinvgauss"), ("MAM", "dgamma")])
 def test_adam_ets_multiplicative_starts_as_r(model, distribution):
@@ -1698,7 +1781,246 @@ def test_an_unknown_occurrence_raises(cls):
         cls(occurrence="foo").fit(y)
 
 
-# The samples too small to estimate, and the occurrence of data without zeros, as R's adam()
+# The pool of a small sample keeps the seasonality that the model allows: "Y" the
+# multiplicative one, "X" the additive one (MAA has an additive seasonality)
+@pytest.mark.parametrize(
+    "season_type, allowed",
+    [("Y", {"N", "M"}), ("X", {"N", "A"}), ("Z", {"N", "A", "M"})],
+)
+def test_the_small_sample_pool_keeps_the_allowed_seasonality(season_type, allowed):
+    from smooth.adam_general.core.checker.sample_size import (
+        _restrict_models_pool_for_sample_size,
+    )
+
+    result = _restrict_models_pool_for_sample_size(
+        obs_nonzero=30, lags_model_max=12, model_do="select", error_type="Z",
+        trend_type="Z", season_type=season_type, models_pool=None, silent=True,
+    )
+    assert {model[-1] for model in result["models_pool"]} == allowed
+    assert ("MAA" in result["models_pool"]) == (season_type != "Y")
+
+
+@pytest.mark.parametrize(
+    "model, pool",
+    [
+        # R: names(adam(AirPassengers, model)$ICs)
+        ("FNN", ["ANN", "MNN"]),
+        ("PAN", ["AAN", "AAdN"]),
+        ("FXN", ["ANN", "AAN", "AAdN", "MNN", "MAN", "MAdN"]),
+        ("PYN", ["ANN", "MNN", "MMN", "MMdN"]),
+        ("SZN", ["ANN", "AAN", "AAdN", "MNN", "MAN", "MAdN", "MMN", "MMdN"]),
+    ],
+)
+def test_the_full_pure_and_safe_pools_take_the_other_letters(model, pool):
+    from smooth.adam_general.core.checker.model_checks import _check_model_composition
+
+    result = _check_model_composition(model, True, True, 12)
+    assert result["models_pool"] == pool and result["model_do"] == "select"
+
+
+def test_the_model_composition_on_non_positive_data_and_unity_lags(capsys):
+    from smooth.adam_general.core.checker.model_checks import _check_model_composition
+
+    # The additive pool, the additive selection, the warning for a specific model
+    assert _check_model_composition("SNN", False, False, 1)["models_pool"] == ["ANN"]
+    assert "Amending the pool" in capsys.readouterr().out
+    result = _check_model_composition("ZZZ", False, False, 12)
+    assert (result["error_type"], result["trend_type"], result["models_pool"]) == (
+        "A", "X", None,
+    )  # fmt: skip
+    _check_model_composition("MNN", False, False, 1)
+    assert "might break down" in capsys.readouterr().out
+    # The damped model whose seasonality the lags drop keeps its damping, as R's
+    result = _check_model_composition("MAdZ", True, True, 1)
+    assert result["models_pool"] == ["MAdN"]
+    _check_model_composition("AAA", True, False, 1)
+    assert "unity lags" in capsys.readouterr().out
+    assert _check_model_composition("SNZ", True, True, 1)["models_pool"] == [
+        "ANN", "MNN",
+    ]  # fmt: skip
+    # The invalid letters are selected, and "C" combines
+    result = _check_model_composition("QAdNC", True, False, 12)
+    assert result["model"] == "ZZZ" and "string length" in capsys.readouterr().out
+    result = _check_model_composition("AQxC", True, False, 12)
+    assert (result["trend_type"], result["model_do"]) == ("Z", "combine")
+    assert _check_model_composition(5, True, True, 12)["model"] == "ZZZ"
+
+
+def test_the_small_sample_pool_follows_the_sample_size():
+    from smooth.adam_general.core.checker.sample_size import _build_small_sample_pool
+
+    # Six observations: a trend, but no damping and no seasonality
+    assert _build_small_sample_pool(6, 12, "Z", "Z", True, 0) == [
+        "ANN", "MNN", "AAN", "MAN", "AMN", "MMN",
+    ]  # fmt: skip
+    assert _build_small_sample_pool(30, 12, "Z", "Z", False, 0) == [
+        "ANN", "AAN", "AAdN", "ANA", "AAA",
+    ]  # fmt: skip
+
+
+def test_a_small_sample_drops_from_the_pool_what_it_cannot_fit():
+    from smooth.adam_general.core.checker.sample_size import _filter_small_sample_pool
+
+    # Eight observations with lag 4: the trend with the seasonality needs ten, the
+    # damped one eleven
+    pool = ["ANN", "AAN", "AAdN", "ANA", "AAA", "AAdA", "ANN"]
+    assert _filter_small_sample_pool(pool, 8, 4, 0) == ["ANN", "AAN", "AAdN", "ANA"]
+
+
+# A lag above the sample size is dropped, as R, which fits these models (the ARIMA
+# keeps the orders of lag 1); they failed on the seasonal decomposition or the
+# lags of ARIMA
+@pytest.mark.parametrize(
+    "model, n, expected",
+    [
+        ("MAM", 5, "ETS(MAN)"),
+        ("CCC", 5, "ETS(CCN)"),
+        ("ZZZ", 5, "ETS(MAN)"),
+        ("XXX", 5, "ETS(AAN)"),
+        ("MAM", 8, "ETS(MAN)"),
+        ("ZZZ", 8, "ETS(ANN)"),
+        (["ANN", "AAN", "MAM", "ANA"], 8, "ETS(ANN)"),
+        (["MAM", "ANA"], 8, "ETS(ANN)"),
+        ("SARIMA", 3, "ARIMA(0,1,1)"),
+        ("SARIMA", 5, "ARIMA(1,1,1)"),
+    ],
+)
+def test_a_lag_above_the_sample_size_is_dropped(model, n, expected):
+    y = np.array([112, 118, 132, 129, 121, 135, 148, 148], dtype=float)[:n]
+    arima = dict(ar_order=[1, 1], i_order=[1, 0], ma_order=[1, 1], lags=[1, 12])
+    kwargs = dict(model="NNN", **arima) if model == "SARIMA" else dict(model=model)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fitted = ADAM(**{"lags": [12], **kwargs}).fit(y)
+    assert fitted.model == expected
+
+
+# The starting values of the smoothing parameters drop the provided ones in every
+# branch, as R, which fits these: the multiplicative ones with a trend failed
+@pytest.mark.parametrize(
+    "model, bounds, loglik",
+    [
+        ("MAN", "usual", -678.620363749),
+        ("MMN", "usual", -679.507068677),
+        ("MAN", "admissible", -674.841768458),
+        ("MMN", "admissible", -675.902873589),
+    ],
+)
+def test_a_provided_beta_of_the_multiplicative_trend(model, bounds, loglik):
+    import pathlib
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(dtype=float)
+    fitted = ADAM(
+        model=model, persistence={"beta": 0.01}, initial="optimal", bounds=bounds
+    ).fit(y)
+    assert fitted.loglik == pytest.approx(loglik, rel=1e-9)
+
+
+# A selection that starts from a damped trend takes phi from B by its name, as R:
+# it failed on B, which is an array
+@pytest.mark.parametrize(
+    "model, expected, loglik",
+    [("ZAdZ", "ETS(MAdM)", -530.2552820504), ("XAdX", "ETS(AAdA)", -565.080294298)],
+)
+def test_the_selection_of_a_damped_trend(model, expected, loglik):
+    import pathlib
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    fitted = ADAM(model=model, lags=[12]).fit(pd.read_csv(path)["y"].to_numpy(float))
+    assert fitted.model == expected
+    assert fitted.loglik == pytest.approx(loglik, rel=1e-9)
+
+
+def test_a_regression_with_a_provided_occurrence():
+    """The regression of the sizes is fitted to the non-zero values, its fitted values
+    are the prediction times the occurrence, as R: the zeros were fitted as data."""
+    import pathlib
+
+    path = pathlib.Path(__file__).parent / "data" / "ces_airpassengers.csv"
+    y = pd.read_csv(path)["y"].to_numpy(float)
+    x = np.sin(np.arange(1, 145))
+    y[[0, 49]] = 0
+    occurrence = np.ones(144)
+    occurrence[[0, 49]] = 0
+    fitted = ADAM(model="NNN", occurrence=occurrence).fit(y, pd.DataFrame({"x": x}))
+    # R: adam(data, "NNN", formula=y~x, occurrence=occurrence)
+    B = fitted._adam_estimated["B"]
+    np.testing.assert_allclose(B, [282.09642463233439, 3.80980840102647])
+    assert fitted.loglik == pytest.approx(-880.486313585518, rel=1e-10)
+    np.testing.assert_allclose(fitted.fitted, (B[0] + B[1] * x) * occurrence)
+    assert np.all(np.asarray(fitted.residuals)[[0, 49]] == 0)
+
+
+def test_a_small_sample_simplifies_the_model(capsys):
+    from smooth.adam_general.core.checker.sample_size import (
+        _simplify_small_sample_model,
+    )
+
+    # The damping, then the trend, until the sample of eight fits the model
+    assert _simplify_small_sample_model("AAdA", 8, 4, 0, False) == "ANA"
+    assert capsys.readouterr().out.count("Fitting what I can") == 2
+    assert _simplify_small_sample_model("MAdN", 6, 1, 0, True) == "MAN"
+    assert _simplify_small_sample_model("MAA", 3, 4, 0, True) == "MNN"
+    assert _simplify_small_sample_model("AAdA", 0, 12, 0, True) == "ANN"
+
+
+@pytest.mark.parametrize(
+    "obs, error_type, expected",
+    [
+        (4, "A", {"model_do": "estimate", "models_pool": None}),
+        (4, "Z", {"model_do": "select", "models_pool": ["ANN"], "error_type": "Z"}),
+        (3, "M", {"model_do": "estimate", "persistence_level": 0}),
+        (3, "Z", {"model_do": "select", "persistence_estimate": False}),
+        (2, "Z", {"model_do": "use", "error_type": "A", "initial_type": "provided"}),
+        (1, "A", {"model_do": "use", "persistence_level": 0}),
+        (0, "M", {"model_do": "use", "error_type": "A", "initial_estimate": False}),
+    ],
+)
+def test_the_tiny_samples_fit_a_level_model(obs, error_type, expected):
+    from smooth.adam_general.core.checker.sample_size import (
+        _restrict_models_pool_for_sample_size,
+    )
+
+    result = _restrict_models_pool_for_sample_size(
+        obs_nonzero=obs, lags_model_max=1, model_do="estimate", error_type=error_type,
+        trend_type="A", season_type="N", models_pool=None, allow_multiplicative=False,
+        n_param_exo=1, silent=True, damped=True,
+    )  # fmt: skip
+    assert {key: result[key] for key in expected} == expected
+    assert result["trend_type"] == "N" and not result["damped"]
+    assert not result["phi_estimate"]
+
+
+def test_the_small_sample_restriction_of_the_model_and_the_pool(capsys):
+    from smooth.adam_general.core.checker.sample_size import (
+        _restrict_models_pool_for_sample_size,
+    )
+
+    arguments = dict(
+        obs_nonzero=8, lags_model_max=4, model_do="estimate", error_type="A",
+        trend_type="A", season_type="A", models_pool=None, damped=True,
+    )  # fmt: skip
+    # Enough for all the parameters: nothing changes
+    assert _restrict_models_pool_for_sample_size(**arguments, n_param_max=7)[
+        "damped"
+    ]
+    result = _restrict_models_pool_for_sample_size(**arguments, n_param_max=10)
+    assert "Updating pool of models" in capsys.readouterr().out
+    assert (result["trend_type"], result["season_type"]) == ("N", "A")
+    assert not result["damped"] and not result["phi_estimate"]
+    # A pool given for the combination keeps it, and what the sample fits of it
+    arguments.update(model_do="combine", models_pool=["ANN", "AAdA"], silent=True)
+    result = _restrict_models_pool_for_sample_size(**arguments)
+    assert (result["model_do"], result["models_pool"]) == ("combine", ["ANN"])
+    # Five observations with two parameters of the regressors are too few
+    arguments.update(obs_nonzero=6, n_param_exo=3)
+    with pytest.raises(ValueError, match="Even for fitting"):
+        _restrict_models_pool_for_sample_size(**arguments)
+
+
+# The samples too small to estimate, and the occurrence of data without zeros, as
+# R's adam()
 # (R values: adam(x, occurrence="a", h=2))
 @pytest.mark.parametrize(
     "y, forecast, loglik",
@@ -1715,6 +2037,98 @@ def test_adam_tiny_samples_as_r(y, forecast, loglik):
     assert np.allclose(np.asarray(model.predict(h=2).mean), forecast)
     if loglik is not None:
         assert model.loglik == pytest.approx(loglik, abs=1e-6)
+
+
+_AIR_10 = np.array([112, 118, 132, 129, 121, 135, 148, 148, 136, 119], dtype=float)
+
+
+# ARIMA on too few observations, as R/utils-adam.R:1638-1680. R:
+# adam(AirPassengers[1:obs], model, orders=orders, initial="optimal"): its warning,
+# m$model, m$initialType, nparam(m), logLik(m) and orders(m)
+@pytest.mark.parametrize(
+    "obs, model, orders, message, name, initial_type, nparam, loglik, orders_r",
+    [
+        (
+            10,
+            "AAN",
+            (2, 1, 2),
+            "I don't have enough observations to fit ETS with ARIMA terms. "
+            "I will construct the simple ETS.",
+            "ETS(AAN)",
+            "optimal",
+            5,
+            -37.37900953,
+            (0, 0, 0),
+        ),
+        (
+            7,
+            "NNN",
+            (2, 1, 2),
+            "The number of parameter to estimate is 8, while the number of "
+            "observations is 7. Switching initial to 'backcasting' to save some "
+            "degrees of freedom.",
+            "ARIMA(2,1,2)",
+            "complete",
+            8,
+            -17.13347997,
+            (2, 1, 2),
+        ),
+        (
+            5,
+            "NNN",
+            (3, 2, 3),
+            "The number of parameter to estimate is 12, while the number of "
+            "observations is 5. Switching to ARIMA(0,1,1) model.",
+            "ARIMA(0,1,1)",
+            "optimal",
+            3,
+            -16.03769798,
+            (0, 1, 1),
+        ),
+    ],
+)
+def test_arima_on_a_small_sample_as_r(
+    capsys, obs, model, orders, message, name, initial_type, nparam, loglik, orders_r
+):
+    arima = {"ar": [orders[0]], "i": [orders[1]], "ma": [orders[2]]}
+    fit = ADAM(model=model, orders=arima, initial="optimal").fit(_AIR_10[:obs])
+    assert f"Warning: {message}" in capsys.readouterr().out.splitlines()
+    assert fit.model_name == name
+    assert fit.initial_type == initial_type
+    assert fit.nparam == nparam
+    assert fit.loglik == pytest.approx(loglik, rel=1e-8)
+    assert tuple(fit.orders[key][0] for key in ("ar", "i", "ma")) == orders_r
+    # The backcasting takes two iterations, as R sets them after this check
+    assert fit._initials["n_iterations"] == (2 if initial_type == "complete" else 1)
+
+
+@pytest.mark.parametrize(
+    "initial, expected",
+    [
+        ("backcasting", 2),
+        ("complete", 2),
+        ("optimal", 1),
+        ("gradient", 2),
+    ],
+)
+@pytest.mark.parametrize("n_iterations", [0, 2.5])
+def test_an_invalid_n_iterations_takes_the_default(
+    capsys, initial, expected, n_iterations
+):
+    # The warning is shown with verbose, as the other warnings of the checker
+    fit = ADAM(model="ANN", initial=initial, n_iterations=n_iterations, verbose=1).fit(
+        _AIR_10
+    )
+    assert (
+        "Warning: n_iterations must be a positive integer. Using default value."
+        in capsys.readouterr().out.splitlines()
+    )
+    assert fit._initials["n_iterations"] == expected
+    assert (
+        fit._initials["n_iterations"]
+        == (ADAM(model="ANN", initial=initial).fit(_AIR_10)._initials["n_iterations"])
+    )
+    assert fit._initials["n_iterations_provided"] is False
 
 
 def test_adam_fits_a_list_as_the_array():
@@ -1833,6 +2247,21 @@ def test_admissible_bounds_check_the_whole_model(
         len(y),
     )
     assert (penalty == 0) == admissible
+
+
+def test_regression_with_provided_coefficients():
+    """A regression with the coefficients of all its regressors provided takes the
+    intercept of the means, E(y) - b E(x), as R; dgnorm needs its shape too."""
+    rng = np.random.default_rng(41)
+    X = pd.DataFrame({"x1": rng.normal(10, 2, 60), "x2": rng.normal(5, 1, 60)})
+    y = 50 + 2 * X["x1"] - 3 * X["x2"] + rng.normal(0, 2, 60)
+    model = ADAM("NNN", initial={"xreg": {"x1": 2, "x2": -3}}).fit(y, X)
+    intercept = np.mean(y) - 2 * np.mean(X["x1"]) + 3 * np.mean(X["x2"])
+    assert np.allclose(model._alm_model.B_, [intercept, 2, -3])
+    model = ADAM(
+        "NNN", distribution="dgnorm", gnorm_shape=1.5, initial={"xreg": [2, -3]}
+    ).fit(y, X)
+    assert np.allclose(model._alm_model.B_, [intercept, 2, -3])
 
 
 def test_repr_names_the_fitted_model():
@@ -1956,3 +2385,144 @@ class TestADAMPrint:
     def test_repr(self, damped):
         assert repr(ADAM(model="ANN")) == "ADAM(model=ANN, fitted=False)"
         assert repr(damped) == "ADAM(ETS(AAdN), fitted=True)"
+
+
+class TestPrintingHelpers:
+    """The pieces of print(model), as R's print.adam(); the stand-ins carry only
+    what each helper reads."""
+
+    @pytest.mark.parametrize(
+        "distribution, expected",
+        [
+            ("dnorm", "Normal"),
+            ("dlaplace", "Laplace"),
+            ("ds", "S"),
+            ("dlogis", "Logistic"),
+            ("dlnorm", "Log-Normal"),
+            ("dllaplace", "Log-Laplace"),
+            ("dls", "Log-S"),
+            ("dinvgauss", "Inverse Gaussian"),
+            ("dgamma", "Gamma"),
+            # R: round(shape, 4) / round(nu, 4)
+            ("dgnorm", "Generalised Normal with shape=1.2346"),
+            ("dt", "Student t with df=5.1235"),
+            ("dlgnorm", "Log-Generalised Normal with shape=1.2346"),
+        ],
+    )
+    def test_format_distribution(self, distribution, expected):
+        from smooth.adam_general.core.utils.printing import _format_distribution
+
+        other = {"shape": 1.23456789, "nu": 5.123456}
+        assert _format_distribution(distribution, other) == expected
+
+    def test_format_distribution_without_a_float_parameter(self):
+        from smooth.adam_general.core.utils.printing import _format_distribution
+
+        assert _format_distribution("dgnorm", {"shape": 2}) == (
+            "Generalised Normal with shape=2"
+        )
+        assert _format_distribution("dgnorm") == "Generalised Normal with shape=?"
+        assert _format_distribution("dt") == "Student t with df=?"
+        assert _format_distribution("dlgnorm", {}) == (
+            "Log-Generalised Normal with shape=?"
+        )
+        assert _format_distribution("dunknown") == "dunknown"
+
+    def test_format_distribution_drops_the_trailing_zeros_as_r(self):
+        from smooth.adam_general.core.utils.printing import _format_distribution
+
+        # R: print(adam(y, "ANN", distribution="dgnorm", shape=1.5, ...))
+        assert _format_distribution("dgnorm", {"shape": 1.5}) == (
+            "Generalised Normal with shape=1.5"
+        )
+
+    def test_get_initialization_type(self):
+        from smooth.adam_general.core.utils.printing import _get_initialization_type
+
+        assert (
+            _get_initialization_type(
+                SimpleNamespace(_initials={"initial_type": "backcasting"})
+            )
+            == "backcasting"
+        )
+        assert (
+            _get_initialization_type(SimpleNamespace(_initials={"x": 1})) == "unknown"
+        )
+        assert (
+            _get_initialization_type(
+                SimpleNamespace(_initials={}, _config={"initial": "optimal"})
+            )
+            == "optimal"
+        )
+        assert (
+            _get_initialization_type(
+                SimpleNamespace(_config={"initial": {"level": 1.0}})
+            )
+            == "provided"
+        )
+        assert _get_initialization_type(SimpleNamespace()) == "unknown"
+
+    def test_get_distribution(self):
+        from smooth.adam_general.core.utils.printing import _get_distribution
+
+        general = {"distribution": "default", "distribution_new": "dgamma"}
+        assert _get_distribution(SimpleNamespace(_general=general)) == "dgamma"
+        assert (
+            _get_distribution(SimpleNamespace(_general={"distribution": "ds"})) == "ds"
+        )
+        assert _get_distribution(SimpleNamespace(_general={"loss": "MSE"})) == "dnorm"
+        assert (
+            _get_distribution(
+                SimpleNamespace(_general={}, _config={"distribution": "dlaplace"})
+            )
+            == "dlaplace"
+        )
+        assert (
+            _get_distribution(SimpleNamespace(_config={"distribution": None}))
+            == "dnorm"
+        )
+        assert _get_distribution(SimpleNamespace()) == "dnorm"
+
+    def test_get_n_params(self):
+        from smooth.adam_general.core.utils.printing import _get_n_params
+
+        n_param = SimpleNamespace(n_param_estimated=4)
+        assert _get_n_params(SimpleNamespace(_general={"n_param": n_param})) == 4
+        # The legacy table: its first row and column
+        assert (
+            _get_n_params(
+                SimpleNamespace(_general={"parameters_number": [[3, 1], [0, 0]]})
+            )
+            == 3
+        )
+        assert _get_n_params(SimpleNamespace(_general={"parameters_number": [5]})) == 5
+        assert _get_n_params(SimpleNamespace(_general={"loss": "MSE"})) == 0
+        assert (
+            _get_n_params(
+                SimpleNamespace(
+                    _general={"parameters_number": []}, _n_param_estimated=2
+                )
+            )
+            == 2
+        )
+        assert _get_n_params(SimpleNamespace(_general={}, _n_param_estimated=6)) == 6
+        assert _get_n_params(SimpleNamespace()) == 0
+
+    def test_the_printed_model_takes_them(self):
+        """print() of a dgnorm model with provided parameters, as R's print() of
+        adam(AirPassengers[1:12], "ANN", distribution="dgnorm", persistence=0.3,
+        initial=115, shape=1.23456789)."""
+        y = np.array([112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118.0])
+        model = ADAM(
+            model="ANN",
+            distribution="dgnorm",
+            persistence={"level": 0.3},
+            initial={"level": 115.0},
+            gnorm_shape=1.23456789,
+        ).fit(y)
+        lines = str(model).splitlines()
+        assert "With provided initialisation" in lines
+        assert (
+            "Distribution assumed in the model: Generalised Normal with shape=1.2346"
+            in lines
+        )

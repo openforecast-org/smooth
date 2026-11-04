@@ -128,7 +128,10 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
     ellipsis <- list(...);
 
     # Check seasonality and loss
-    loss <- match.arg(loss);
+    # A function is a custom loss, which the checker takes as in adam()
+    if(!is.function(loss)){
+        loss <- match.arg(loss);
+    }
 
     # paste0() is needed in order to get rid of potential issues with names
     yName <- paste0(deparse(substitute(y)),collapse="");
@@ -183,7 +186,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         data <- ts(data, start=start(y), frequency=frequency(y));
         colnames(data)[1] <- "y";
         # Give name to the explanatory variables if they do not have them
-        if(is.null(names(xreg))){
+        if(is.null(colnames(xreg))){
             if(!is.null(ncol(xreg))){
                 colnames(data)[-1] <- paste0("x",c(1:ncol(xreg)));
             }
@@ -860,7 +863,7 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
             }
             # Get rid of explanatory variables if they are not needed
             if(!xregModel && (!is.null(ncol(data)) && ncol(data)>1)){
-                clNew$data <- data[,responseName];
+                clNew$data <- data[,adam_responseColumn(data, responseName)];
             }
             # Call for ADAM with backcasting
             ssarimaBack <- suppressWarnings(eval(clNew, envir=env));
@@ -1299,10 +1302,11 @@ ssarima <- function(y, orders=list(ar=c(0),i=c(1),ma=c(1)), lags=c(1, frequency(
         # Fix the ts class, which is destroyed during subsetting
         if(all(yClasses!="zoo")){
             if(is.data.frame(data)){
-                modelReturned$data[,responseName] <- ts(modelReturned$data[,responseName],
+                responseColumn <- adam_responseColumn(modelReturned$data, responseName);
+                modelReturned$data[,responseColumn] <- ts(modelReturned$data[,responseColumn],
                                                         start=yStart, frequency=yFrequency);
                 if(holdout){
-                    modelReturned$holdout[,responseName] <- ts(modelReturned$holdout[,responseName],
+                    modelReturned$holdout[,responseColumn] <- ts(modelReturned$holdout[,responseColumn],
                                                                start=yForecastStart, frequency=yFrequency);
                 }
             }

@@ -14,3 +14,7 @@
 #' Finally, just for fun the absolute and half analogues of multistep estimators
 #' are available: \code{MAEh}, \code{TMAE}, \code{GTMAE}, \code{MACE}, \code{TMAE},
 #' \code{HAMh}, \code{THAM}, \code{GTHAM}, \code{CHAM}.
+#'
+#' A custom loss is a function of \code{actual}, \code{fitted} and \code{B}, as in
+#' \link[smooth]{adam}, for example
+#' \code{function(actual, fitted, B) return(mean(abs(actual-fitted)))}.

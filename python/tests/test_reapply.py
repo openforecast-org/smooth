@@ -434,3 +434,22 @@ def test_reapply_xreg_draws_are_the_states_of_the_regressors(model_str, initial)
         r.random_parameters["x1"].to_numpy(),
         rtol=1e-12,
     )
+
+
+def test_eigen_bounds_of_ann_are_the_forecastable_region():
+    """R: eigenBounds(adam(AirPassengers, "ANN", bounds="admissible"), ...) is
+    c(0, 2) to 1e-8: the interval around the estimate where the model is
+    forecastable (alpha=0 cancels the unit root of the level). The grid of 0.01 gave
+    (-0.01, 2)."""
+    from smooth.adam_general.core.utils.bounds import eigen_bounds
+
+    from pathlib import Path
+
+    y = pd.read_csv(
+        Path(__file__).parent / "data" / "ces_airpassengers.csv",
+        float_precision="round_trip",
+    )["y"].to_numpy(dtype=float)
+    model = ADAM(model="ANN", bounds="admissible").fit(y)
+    vec_g = np.asarray(model._adam_created["vec_g"], dtype=float).ravel()
+    bounds = eigen_bounds(vec_g, 0, **model._eigen_static_args())
+    np.testing.assert_allclose(bounds, (0, 2), atol=1e-8)

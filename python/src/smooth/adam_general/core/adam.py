@@ -20,6 +20,7 @@ from smooth.adam_general.core.estimator import (
     selector,
 )
 from smooth.adam_general.core.forecaster import forecaster, preparator
+from smooth.adam_general.core.forecaster.forecaster import _check_fitted_values
 from smooth.adam_general.core.forecaster.intervals import ensure_level_format
 from smooth.adam_general.core.forecaster.result import ForecastResult
 from smooth.adam_general.core.utils.ic import calculate_ic_weights, ic_function
@@ -1278,16 +1279,10 @@ class ADAM:
         # Prepare final results and format output data
         self._prepare_results()
 
-        # Scale the demand-sizes fitted values by the occurrence probability
-        # so the resulting ``fitted`` series is on the original (mixed) scale.
+        # The fitted values times the probability of occurrence, and zero at the zeros
+        # of a provided occurrence, as R's (and as predict() does)
+        _check_fitted_values(self._prepared, self._occurrence, self._observations)
         if self._occurrence.get("occurrence_model"):
-            p = self._occurrence["p_fitted"]
-            yf = self._prepared["y_fitted"]
-            if isinstance(yf, pd.Series):
-                yf = yf * p
-            else:
-                yf = np.asarray(yf) * np.asarray(p)
-            self._prepared["y_fitted"] = yf
             # The residuals stay as the fitter produced them. R does the same
             # (R/adam.R:2005-2015): it scales `yFitted` by the probability and
             # leaves `errors` alone, because those are the *demand-size*
@@ -2478,12 +2473,15 @@ class ADAM:
         scale parameters under likelihood), so ``s_df = s (n/df)^(1/p)`` with
         ``p`` the power of the scale in the variance:
 
-        - **dnorm**: ``(e - ē) / sqrt(s_df)``, as the scale is σ²
+        - **dnorm**: ``e / sqrt(s_df)``, as the scale is σ²
         - **dlaplace**: ``e / s_df``
-        - **ds**: ``(e - ē) / s_df²``
-        - **dgnorm**: ``(e - ē) / s_df``
-        - **dlnorm**: ``exp((log(e) + s/2 - mean(·)) / sqrt(s_df))``
+        - **ds**: ``e / s_df²``
+        - **dgnorm**: ``e / s_df``
+        - **dlnorm**: ``exp((log(e) + s/2) / sqrt(s_df))``
         - **dinvgauss / dgamma**: ``e / ē``
+
+        The errors are taken at the location the model assumes (zero, and -σ²/2
+        for the logarithms of dlnorm), not centred by their mean, as in R.
 
         For a correctly specified model the result should be approximately
         distributed as the standardised version of the fitted distribution.
@@ -2513,44 +2511,24 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        # The missing values (NaN residuals) are not observations
-        obs = self._nobs_observed()
-        errors = self.residuals.copy().astype(float)
         dist = self.distribution_
-        # The observed sizes (R's residsToGo): the zeros of an occurrence model have
-        # no size, and their residuals are not in the mean
-        sizes = np.isfinite(errors)
-        if hasattr(self, "_observations"):
-            sizes &= np.asarray(self._observations["ot_logical"], dtype=bool)
-        elif hasattr(self, "_ot"):
-            sizes &= np.asarray(self._ot, dtype=bool)
         if dist in ("dinvgauss", "dgamma"):
-            return errors / np.mean(errors[sizes])
-        # Each error as the one-step one, after the periods without an observed size
-        errors = self._gap_residuals()
-
+            errors = np.asarray(self.residuals, dtype=float)
+            return errors / np.mean(errors[self._resids_to_go()])
         # R's rstandard.adam standardises by extractScale(), de-biased in the
         # variance space. extract_scale() is a vector when a scale model is
         # attached, so each residual gets its own scale; a scale model itself
         # returns 1, because its residuals are already standardised.
-        raw_scale = self.extract_scale()
-        scale = scale_debias(raw_scale, dist, obs, self._df_scale)
-        log_dist = dist in ("dlnorm", "dllaplace", "dls", "dlgnorm")
-        if log_dist:
-            errors = np.log(errors)
-        if dist == "dlnorm":
-            errors = errors + raw_scale / 2
-        # The conventional residuals of Laplace and Logistic are not centred
-        if dist not in ("dlaplace", "dlogis"):
-            errors = errors - np.mean(errors[sizes])
+        scale = scale_debias(
+            self.extract_scale(), dist, self._nobs_observed(), self._df_scale
+        )
         # sigma for dnorm and dlnorm, s^2 for S, s for the rest
-        if dist in ("dt", "dnorm", "dlnorm"):
-            errors = errors / np.sqrt(scale)
-        elif dist in ("ds", "dls"):
-            errors = errors / scale**2
-        else:
-            errors = errors / scale
-        return np.exp(errors) if log_dist else errors
+        if dist in ("dnorm", "dlnorm"):
+            scale = np.sqrt(scale)
+        elif dist == "ds":
+            scale = scale**2
+        errors = self._rstandard_errors() / scale
+        return np.exp(errors) if dist == "dlnorm" else errors
 
     def rstudent(self) -> NDArray:
         """
@@ -2568,13 +2546,17 @@ class ADAM:
 
         Standardisation by distribution:
 
-        - **dnorm**: ``(e[i] - ē) / √(Σe[-i]² / df)``
-        - **dlaplace**: ``(e[i] - ē) / (Σ|e[-i]| / df)``
-        - **ds**: ``(e[i] - ē) / (Σ√|e[-i]| / (2 df))²``
-        - **dgnorm**: ``(e[i] - ē) / (Σ|e[-i]|^β · β/df)^(1/β)``
+        - **dnorm**: ``e[i] / √(Σe[-i]² / df)``
+        - **dlaplace**: ``e[i] / (Σ|e[-i]| / df)``
+        - **ds**: ``e[i] / (Σ√|e[-i]| / (2 df))²``
+        - **dgnorm**: ``e[i] / (Σ|e[-i]|^β · β/df)^(1/β)``
         - **dlnorm**: ``exp(log_e[i] / √(Σlog_e[-i]² / df))``,
-          where ``log_e = log(e) - mean(log e) - σ²/2``
+          where ``log_e = log(e) + σ²/2``
         - **dinvgauss / dgamma**: ``e[i] / mean(e[-i])``
+
+        The sums run over the observed sizes (the non-zero values with an
+        occurrence model), whose errors are taken at the location the model
+        assumes, as in :meth:`rstandard`; the others keep their residuals, as in R.
 
         Returns
         -------
@@ -2601,62 +2583,52 @@ class ADAM:
         True
         """
         self._check_is_fitted()
-        # The missing values (NaN residuals) are not observations
-        obs = self._nobs_observed()
-        df = obs - self.nparam - 1
-        # Each error as the one-step one, after the periods without an observed size
-        errors = self._gap_residuals()
         dist = self.distribution_
+        # The missing values are not observations
+        df = self._nobs_observed() - self.nparam - 1
+        used = self._resids_to_go()
+        rstudentised = np.asarray(self.residuals, dtype=float).copy()
+        errors = self._rstandard_errors()[used]
 
-        if dist == "dnorm":
-            errors -= np.nanmean(errors)
-            total_sq = np.nansum(errors**2)
-            denom = np.sqrt((total_sq - errors**2) / df)
-            return errors / denom
-
-        elif dist == "dlaplace":
-            errors -= np.nanmean(errors)
-            total_abs = np.nansum(np.abs(errors))
-            denom = (total_abs - np.abs(errors)) / df
-            return errors / denom
-
+        # The scale of each error, estimated without it
+        if dist == "dlaplace":
+            scale_loo = (np.sum(np.abs(errors)) - np.abs(errors)) / df
         elif dist == "ds":
-            errors -= np.nanmean(errors)
-            total_sqrt_abs = np.nansum(np.sqrt(np.abs(errors)))
-            denom = ((total_sqrt_abs - np.sqrt(np.abs(errors))) / (2 * df)) ** 2
-            return errors / denom
-
+            root = np.sqrt(np.abs(errors))
+            scale_loo = ((np.sum(root) - root) / (2 * df)) ** 2
         elif dist == "dgnorm":
             beta = self._gnorm_shape() or 2.0
-            errors -= np.nanmean(errors)
-            total_pow = np.nansum(np.abs(errors) ** beta)
-            denom = ((total_pow - np.abs(errors) ** beta) * (beta / df)) ** (1.0 / beta)
-            return errors / denom
-
+            power = np.abs(errors) ** beta
+            scale_loo = ((np.sum(power) - power) * beta / df) ** (1.0 / beta)
         elif dist in ("dinvgauss", "dgamma"):
-            # The observed values, non-zero with an occurrence model, as R's
-            # residsToGo: each leaves itself out of their mean
-            used = observed_mask(self._observations)
-            if getattr(self, "_om_model", None) is not None:
-                used = used & np.asarray(self._observations["ot_logical"], dtype=bool)
-            total = np.sum(errors[used])
-            mean_loo = (total - np.where(used, errors, 0.0)) / (
-                np.sum(used) - used.astype(float)
-            )
-            return np.where(used, errors / mean_loo, errors)
+            scale_loo = (np.sum(errors) - errors) / (len(errors) - 1)
+        else:  # dnorm, dlnorm
+            scale_loo = np.sqrt((np.sum(errors**2) - errors**2) / df)
+        rstudentised[used] = errors / scale_loo
+        if dist == "dlnorm":
+            rstudentised[used] = np.exp(rstudentised[used])
+        return rstudentised
 
-        elif dist == "dlnorm":
-            scale = self.extract_scale()
-            log_e = np.log(errors) - np.nanmean(np.log(errors)) - scale / 2
-            total_sq = np.nansum(log_e**2)
-            denom = np.sqrt((total_sq - log_e**2) / df)
-            return np.exp(log_e / denom)
+    def _resids_to_go(self) -> NDArray:
+        """The observations of the residuals of :meth:`rstandard` and
+        :meth:`rstudent` (R's ``adam_residsToGo``): the observed values, the non-zero
+        ones with an occurrence model."""
+        used = np.isfinite(np.asarray(self.residuals, dtype=float))
+        if hasattr(self, "_observations"):
+            used &= np.asarray(self._observations["ot_logical"], dtype=bool)
+        elif hasattr(self, "_ot"):
+            used &= np.asarray(self._ot, dtype=bool)
+        return used
 
-        else:  # default: treat like normal
-            errors -= np.nanmean(errors)
-            total_sq = np.nansum(errors**2)
-            denom = np.sqrt((total_sq - errors**2) / df)
-            return errors / denom
+    def _rstandard_errors(self) -> NDArray:
+        """The errors of :meth:`rstandard` and :meth:`rstudent` before their scale
+        (R's ``adam_rstandardErrors``): the one-step ones after the periods without
+        an observed size, at the location the model assumes, which is zero, and
+        -sigma^2/2 for the logarithms of dlnorm, so that the mean of 1+e is one."""
+        errors = self._gap_residuals()
+        if self.distribution_ == "dlnorm":
+            errors = np.log(errors) + self.extract_scale() / 2
+        return errors
 
     def outlierdummy(
         self,
@@ -2884,7 +2856,10 @@ class ADAM:
         when one is attached, as ``implant()`` puts them in the scale column.
         """
         n_param = float(self.nparam)
-        if (self._general or {}).get("loss") == "likelihood":
+        # A scale model (sm()) is scored by the likelihood of its location model, as
+        # R's, whose loss is "likelihood"
+        likelihood = (self._general or {}).get("loss") == "likelihood"
+        if likelihood or getattr(self, "is_scale_", False):
             if self.scale_model is not None:
                 n_param -= float(self.scale_model.nparam)
             elif getattr(self, "_n_param", None) is not None:
@@ -4064,6 +4039,7 @@ class ADAM:
                     self._observations.get("y_na_values"),
                 )
 
+        predictions._model = self
         return predictions
 
     def predict_intervals(
@@ -4163,6 +4139,7 @@ class ADAM:
             X=X,
             regressors=self.regressors,
             arma=self.arma,
+            gnorm_shape=getattr(self, "gnorm_shape", None),
         )
         if not isinstance(result, tuple):
             self._alm_model = result
@@ -4247,22 +4224,33 @@ class ADAM:
             "bounds": self.bounds,
         }
         residuals = y_in_sample - fitted
-        loglik = float(alm.loglik)
+        # Without a likelihood (a custom loss), NA, as R's logLik(alm)
+        loglik = np.nan if alm.loglik is None else float(alm.loglik)
         n_param = int(alm.nparam)
         # The occurrence model of the sizes, fitted as R's adam() does: the fitted
         # values are the sizes times the probability, the residuals at the zeros are
         # zero, and the likelihood and the parameters include the occurrence's
         self._om_model = None
         if not np.all(fitted_rows == observed):
-            self._occurrence = {"occurrence": self.occurrence}
+            # A provided occurrence is known: the probabilities, without a model
+            provided = np.ndim(self.occurrence) > 0
+            self._occurrence = {
+                "occurrence": "provided" if provided else self.occurrence
+            }
             self._lags_model = {"lags": [1]}
             self._initials = {"initial_type": "optimal"}
-            self._om_model = (
-                self.occurrence
-                if not isinstance(self.occurrence, str)
-                else self._fit_occurrence_model(y, X)
-            )
-            p_fitted = np.ravel(np.asarray(self._om_model.fitted, dtype=float))
+            if provided:
+                p_provided = np.ravel(np.asarray(self.occurrence, dtype=float))
+                p_fitted = p_provided[:n]
+                self._occurrence.update(p_fitted=p_fitted, p_forecast=p_provided[n:])
+            else:
+                self._om_model = (
+                    self.occurrence
+                    if not isinstance(self.occurrence, str)
+                    else self._fit_occurrence_model(y, X)
+                )
+                p_fitted = np.ravel(np.asarray(self._om_model.fitted, dtype=float))
+                n_param += int(self._om_model.nparam)
             residuals[observed & ~fitted_rows] = 0.0
             fitted = fitted * p_fitted
             nonzero = y_in_sample[observed] != 0
@@ -4270,7 +4258,6 @@ class ADAM:
             loglik += float(
                 np.sum(np.log(np.where(nonzero, p_observed, 1 - p_observed)))
             )
-            n_param += int(self._om_model.nparam)
         self._prepared = {
             "y_fitted": fitted,
             "residuals": residuals,
@@ -4279,6 +4266,8 @@ class ADAM:
         }
         self._adam_estimated = {
             "B": np.asarray(alm.coefficients),
+            # The value of the loss, as R's lossValue of the regression
+            "CF_value": float(alm.loss_value),
             "n_param_estimated": n_param,
             "log_lik_adam_value": {
                 "value": loglik,
@@ -4319,8 +4308,8 @@ class ADAM:
             p = np.asarray(om_model.predict(h=h, X=X).mean, dtype=float)
             result.mean = np.ravel(result.mean) * p
             if interval == "confidence":
-                result.lower = np.asarray(result.lower, dtype=float) * p[:, None]
-                result.upper = np.asarray(result.upper, dtype=float) * p[:, None]
+                result.lower = np.reshape(result.lower, (h, -1)) * p[:, None]
+                result.upper = np.reshape(result.upper, (h, -1)) * p[:, None]
             elif interval != "none":
                 # The bound of a one-sided interval that ALM leaves out stays NaN
                 mixture_lower = np.full((h, len(levels)), np.nan)
@@ -5577,49 +5566,19 @@ class ADAM:
         pandas.DataFrame
             Covariance matrix indexed/columned by :attr:`coef_names`.
         """
-        import warnings
-
-        import pandas as pd
-
         from smooth.adam_general.core.utils.var_covar import (
-            invert_fisher_information,
+            covariance_frame,
             resolve_covar_type,
         )
 
         self._check_is_fitted()
-        names = self.coef_names
-        cov_type = resolve_covar_type(type, bootstrap)
-
-        if heuristics is not None:
-            cov = np.diag(np.abs(np.asarray(self.coef, dtype=float)) * heuristics)
-            return pd.DataFrame(cov, index=names, columns=names)
-
-        if cov_type == "bootstrap":
-            return self.coefbootstrap(**boot_kwargs).vcov
-
-        if cov_type == "opg":
-            cov_opg = self._opg_covariance(step_size=step_size)
-            if cov_opg is not None:
-                return pd.DataFrame(cov_opg, index=names, columns=names)
-            warnings.warn(
-                "The OPG covariance could not be computed for this model; "
-                "falling back to the observed Fisher Information.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-
-        FI = np.asarray(self._fisher_information_matrix(step_size=step_size))
-        # R retries with a coarser step when variables look "broken".
-        broken = np.all(FI == 0, axis=1) | np.any(np.isnan(FI), axis=1)
-        if np.any(broken) and step_size is None:
-            FI = np.asarray(
-                self._fisher_information_matrix(
-                    step_size=float(np.finfo(float).eps ** (1 / 6))
-                )
-            )
-
-        cov = invert_fisher_information(FI)
-        return pd.DataFrame(cov, index=names, columns=names)
+        return covariance_frame(
+            self,
+            resolve_covar_type(type, bootstrap),
+            heuristics,
+            step_size,
+            **boot_kwargs,
+        )
 
     def _persistence_index(self, name):
         """vec_g row for a named persistence parameter (alpha/beta/gamma*/delta*)."""
@@ -5678,47 +5637,20 @@ class ADAM:
         pandas.DataFrame
             Columns ``["S.E.", "<lo>%", "<hi>%"]`` indexed by :attr:`coef_names`.
         """
-        import pandas as pd
-
-        from smooth.adam_general.core.utils.var_covar import resolve_covar_type
+        from smooth.adam_general.core.utils.var_covar import (
+            confint_frame,
+            resolve_covar_type,
+        )
 
         self._check_is_fitted()
-        cov_type = resolve_covar_type(type, bootstrap)
-        names = self.coef_names
-        params = np.asarray(self.coef, dtype=float)
-
-        if cov_type == "bootstrap":
-            from smooth.adam_general.core.utils.bootstrap import (
-                bootstrap_confint_frame,
-            )
-
-            boot = self.coefbootstrap(**boot_kwargs)
-            return bootstrap_confint_frame(boot, names, params, level, parm)
-
-        V = self.vcov(type=cov_type, step_size=step_size).to_numpy()
-        se = np.sqrt(np.abs(np.diag(V)))
-
-        nobs = self.nobs
-        nparam = self.nparam
-        # R uses asymmetric degrees of freedom for the two tails.
-        lo = scipy_stats.t.ppf((1 - level) / 2, df=nobs - nparam) * se
-        hi = scipy_stats.t.ppf((1 + level) / 2, df=nobs + nparam) * se
-
-        self._clamp_confint_offsets(names, params, lo, hi)
-
-        lo = lo + params
-        hi = hi + params
-
-        lo_name = f"{(1 - level) / 2 * 100:g}%"
-        hi_name = f"{(1 + level) / 2 * 100:g}%"
-        out = pd.DataFrame(
-            np.column_stack([se, lo, hi]),
-            index=names,
-            columns=["S.E.", lo_name, hi_name],
+        return confint_frame(
+            self,
+            parm,
+            level,
+            resolve_covar_type(type, bootstrap),
+            step_size,
+            **boot_kwargs,
         )
-        if parm is not None:
-            out = out.loc[parm if isinstance(parm, (list, tuple)) else [parm]]
-        return out
 
     def _eigen_static_args(self):
         """Static arguments forwarded to ``eigen_bounds``/``eigen_values``."""

@@ -145,6 +145,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// stabilityIntervalCpp
+arma::vec stabilityIntervalCpp(Function stable, double current, double step, double limit);
+RcppExport SEXP _smooth_stabilityIntervalCpp(SEXP stableSEXP, SEXP currentSEXP, SEXP stepSEXP, SEXP limitSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Function >::type stable(stableSEXP);
+    Rcpp::traits::input_parameter< double >::type current(currentSEXP);
+    Rcpp::traits::input_parameter< double >::type step(stepSEXP);
+    Rcpp::traits::input_parameter< double >::type limit(limitSEXP);
+    rcpp_result_gen = Rcpp::wrap(stabilityIntervalCpp(stable, current, step, limit));
+    return rcpp_result_gen;
+END_RCPP
+}
 // householderQRCpp
 List householderQRCpp(const arma::mat& X);
 RcppExport SEXP _smooth_householderQRCpp(SEXP XSEXP) {

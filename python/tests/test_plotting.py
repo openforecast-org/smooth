@@ -185,10 +185,10 @@ def test_standardised_residuals_are_actually_standardised():
     standardised = np.asarray(scale_model.rstandard(), dtype=float)
 
     assert scale_model.extract_scale() == pytest.approx(1.0)
-    # R: sd 1.0711, 8.0% outside +-1.96, range [-4.49, 3.20]
-    assert standardised.std(ddof=1) == pytest.approx(1.0711, abs=1e-3)
-    assert np.mean(np.abs(standardised) > 1.96) == pytest.approx(0.08, abs=0.005)
-    assert standardised.min() == pytest.approx(-4.49, abs=0.01)
+    # R: sd 1.0738, 8.5% outside +-1.96, minimum -4.1179
+    assert standardised.std(ddof=1) == pytest.approx(1.0738, abs=1e-4)
+    assert np.mean(np.abs(standardised) > 1.96) == pytest.approx(0.085, abs=0.001)
+    assert standardised.min() == pytest.approx(-4.1179, abs=1e-4)
 
 
 def test_qqline_uses_quartiles_not_least_squares():
@@ -291,3 +291,41 @@ def test_outlier_labels_sit_clear_of_their_points(which):
             f"which={which}: label at y={value:.3f} is on the wrong side "
             f"of the midpoint {midpoint:.3f}"
         )
+
+
+@pytest.fixture(scope="module")
+def dated_model():
+    """ETS(MAM) on AirPassengers with monthly dates and a holdout."""
+    import pandas as pd
+
+    from pathlib import Path
+
+    y = pd.read_csv(Path(__file__).parent / "data" / "ces_airpassengers.csv")["y"]
+    index = pd.date_range("1949-01-01", periods=len(y), freq="MS")
+    series = pd.Series(y.to_numpy(float), index=index)
+    return ADAM(model="MAM", lags=[12], holdout=True, h=12).fit(series)
+
+
+def test_the_states_panels_carry_the_names_of_the_states(dated_model):
+    # The trend was never labelled: it took "Seasonal 1", the seasonal "Residuals"
+    figs = dated_model.plot(which=12)
+    figs = figs if isinstance(figs, list) else [figs]
+    labels = [ax.get_ylabel() for fig in figs for ax in fig.axes]
+    assert labels == ["Actuals", "level", "trend", "seasonal", "Residuals"]
+
+
+@pytest.mark.parametrize("which", [7, 8, 12])
+def test_the_time_plots_take_the_dates_of_the_data(dated_model, which):
+    figs = dated_model.plot(which=which)
+    ax = (figs if isinstance(figs, list) else [figs])[0].axes[-1]
+    first = matplotlib.dates.num2date(ax.lines[0].get_xdata(orig=False)[0])
+    assert (first.year, first.month) == (1949, 1)
+
+
+def test_a_forecast_plots_itself_after_the_sample(dated_model):
+    forecast = dated_model.predict(h=12, interval="prediction", level=0.95)
+    ax = forecast.plot().axes[0]
+    lines = {line.get_label(): line for line in ax.lines}
+    start = matplotlib.dates.num2date(lines["Forecast"].get_xdata(orig=False)[0])
+    assert (start.year, start.month) == (1960, 1)
+    assert "Bounds" in lines and "Fitted" in lines

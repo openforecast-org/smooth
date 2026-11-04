@@ -35,8 +35,10 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     }
 
     cl <- match.call();
-    # Start a new call for the adam function
-    newCall <- as.list(cl);
+    # The arguments of adam(): the values of the provided ones, not their expressions, which do
+    # not evaluate inside adam() and are not the strings that the checks below read
+    provided <- setdiff(intersect(names(cl), names(formals())), c("object", "..."));
+    newCall <- c(mget(provided, envir=environment()), list(...));
 
     # Extract the "other" value
     if(length(object$other)>0){
@@ -49,8 +51,8 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         other <- NULL;
     }
 
-    # Extract the name of response variable
-    responseName <- as.character(formula(object)[[2]]);
+    # The column of the response variable, under the name of the user
+    responseName <- adam_responseColumn(object$data, all.vars(formula(object))[1]);
 
     # Actuals, fitted, residuals, scale from the original model
     yInSampleSM <- actuals(object);
@@ -93,15 +95,22 @@ sm.adam <- function(object, model="YYY", lags=NULL,
 
     #### The custom loss function to estimate parameters of the model ####
     lossFunction <- function(actual,fitted,B,xreg=NULL){
+        fittedValues <- fitted;
         if(logModelSM){
             fitted[] <- exp(fitted);
         }
-        return(-sum(sm_logDensities(ySM, fSM, fitted, distribution, EtypeSM, other, otSM)));
+        # A regression is fitted to the non-zero errors only (see regressionSM)
+        rows <- if(length(fitted)==length(ySM)){TRUE}else{!zeroErrors[otLogical]};
+        lossValue <- -sum(sm_logDensities(ySM[rows], fSM[rows], fitted, distribution, EtypeSM, other,
+                                          otSM[rows]));
+        # The scale at the zeros of the errors, which adam() does not return (see below): that
+        # of the lowest loss, which the estimates give
+        if(is.finite(lossValue) && lossValue < lossBest){
+            lossBest <<- lossValue;
+            fittedLoss <<- fittedValues;
+        }
+        return(lossValue);
     }
-
-    # Remove sm.adam and "object"
-    newCall[[1]] <- NULL;
-    newCall$object <- NULL;
 
     # Transform residuals for the model fit
     # These should align with how the scale is calculated
@@ -118,6 +127,18 @@ sm.adam <- function(object, model="YYY", lags=NULL,
                    "dlnorm"=log(et[otLogical])^2,
                    "dgamma"=(et[otLogical]-1)^2,
                    "dinvgauss"=(et[otLogical]-1)^2/et[otLogical]);
+
+    # The errors equal to zero, which a continuous distribution does not produce (an exact fit,
+    # or discrete data): the scale model takes them as missing values, through a provided
+    # occurrence of zeros there, so that its states are not updated on them, while the likelihood
+    # of the location model keeps them, with the scale predicted there
+    zeroErrors <- otLogical & et %in% 0;
+    if(any(zeroErrors)){
+        warning(paste0("There were ", sum(zeroErrors), " observations with zero errors. ",
+                       "sm() will treat them as missing values."), call.=FALSE);
+    }
+    fittedLoss <- NULL;
+    lossBest <- Inf;
 
     # Substitute the original data with the error term, missing where there is no size
     et[!otLogical] <- NA;
@@ -207,6 +228,20 @@ sm.adam <- function(object, model="YYY", lags=NULL,
     newCall$holdout <- holdout;
     newCall$loss <- lossFunction;
     newCall$occurrence <- "none";
+    # A regression is fitted by alm() to the non-zero errors only, and predicts the scale at the
+    # zeros itself: they are its missing values
+    regressionSM <- newCall$model=="NNN" && !is.null(formula) && newCall$regressors!="adapt" &&
+        sum(unlist(orders[c("ar","i","ma")]))==0;
+    if(any(zeroErrors) && regressionSM){
+        newCall$data[which(zeroErrors),responseName] <- NA;
+    }
+    else if(any(zeroErrors)){
+        newCall$occurrence <- c(as.numeric(!zeroErrors), rep(1, h));
+        # A placeholder for the logarithms of the zeros, which the fit does not read
+        if(logModelSM){
+            newCall$data[which(zeroErrors),responseName] <- 0;
+        }
+    }
     newCall$distribution <- object$distribution;
     newCall$outliers <- "ignore";
     newCall$silent <- TRUE;
@@ -214,14 +249,35 @@ sm.adam <- function(object, model="YYY", lags=NULL,
         newCall$shape <- other;
     }
 
-    # The zeros of an occurrence model are the missing values of the response
-    adamModel <- withCallingHandlers(do.call(adam, as.list(newCall)),
-        warning=function(w){
-            if(grepl("Data contains NAs|More than half of the in-sample data is missing",
-                     conditionMessage(w))){
-                invokeRestart("muffleWarning");
-            }
-        });
+    # The scale at the zeros of the errors comes from the call of the loss at the estimates, the
+    # lowest of the selected model: after a selection, it is fitted alone
+    for(i in 1:2){
+        # The zeros of an occurrence model are the missing values of the response
+        adamModel <- withCallingHandlers(do.call(adam, as.list(newCall)),
+            warning=function(w){
+                if(grepl("Data contains NAs|More than half of the in-sample data is missing",
+                         conditionMessage(w))){
+                    invokeRestart("muffleWarning");
+                }
+            });
+        if(!any(zeroErrors) || !grepl("[ZXYCFP]", newCall$model)){
+            break;
+        }
+        newCall$model <- modelType(adamModel);
+        lossBest <- Inf;
+    }
+
+    # adam() multiplies its fitted values at the zeros of the errors by the provided occurrence:
+    # the scale predicted there is the one the loss saw. The occurrence was only the means of
+    # the gaps
+    if(any(zeroErrors)){
+        # A regression predicts the scale there itself (see regressionSM)
+        if(!regressionSM){
+            adamModel$fitted[zeroErrors] <- fittedLoss[zeroErrors[otLogical]];
+        }
+        adamModel$occurrence <- NULL;
+        adamModel$model <- sub("^i", "", adamModel$model);
+    }
 
     nVariables <- nparam(adamModel);
     # Replace the logLik first: assigning the attribute before this line set it

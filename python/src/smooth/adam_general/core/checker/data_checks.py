@@ -227,21 +227,22 @@ def _check_lags(lags, obs_in_sample, silent=False):
 
     # Create lagsModel (matrix in R, list here)
     lags_model = sorted(set(lags))
+    # A lag above the sample size cannot be fitted: the highest is dropped, as R
+    if lags_model[-1] > obs_in_sample:
+        _warn(
+            f"The maximum lags value is {lags_model[-1]}, while the sample size is "
+            f"{obs_in_sample}. I cannot fit the seasonal model in this case. "
+            "Dropping the highest lag.",
+            silent,
+        )
+        lags_model = lags_model[:-1]
 
     # Get seasonal lags (all lags > 1)
     lags_model_seasonal = [lag for lag in lags_model if lag > 1]
-    max_lag = max(lags) if lags else 1
-
-    if max_lag >= obs_in_sample:
-        msg = (
-            f"The maximum lags value is {max_lag}, "
-            f"while sample size is {obs_in_sample}. "
-            f"I cannot guarantee that I'll be able to fit the model."
-        )
-        _warn(msg, silent)
+    max_lag = max(lags_model)
 
     return {
-        "lags": sorted(set(lags)),
+        "lags": list(lags_model),
         "lags_model": lags_model,
         "lags_model_seasonal": lags_model_seasonal,
         "lags_length": len(lags_model),

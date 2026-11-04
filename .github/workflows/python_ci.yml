@@ -146,3 +146,63 @@ jobs:
           CIBW_TEST_REQUIRES: pytest numpy
           CIBW_TEST_COMMAND: pytest {project}/python/tests -v --tb=short
 
+  # Python against R on the same machine, on Linux: with the same BLAS / LAPACK
+  # (the reference 3.12.1) and the same Armadillo (RcppArmadillo's 15.6.2), the two
+  # give the same results. Ubuntu 24.04 (gcc 13, glibc 2.39) is where that is
+  # established; on 26.04 (gcc 15) 38 CES cases still differ in their last bits,
+  # with the same libraries. The other platforms are not compared: there R and the
+  # wheels use other compilers and libraries (see the R-Python-differences page of
+  # the wiki).
+  r-parity:
+    name: R parity (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    needs: lint
+    timeout-minutes: 120
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: '"hard"'
+          cache: true
+          extra-packages: |
+            any::pkgload
+            any::jsonlite
+
+      - name: Install the reference BLAS / LAPACK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libblas-dev liblapack-dev
+          # R and Python both on the reference libraries, not on an OpenBLAS
+          # alternative of the image
+          sudo update-alternatives --set libblas.so.3-x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/blas/libblas.so.3
+          sudo update-alternatives --set liblapack.so.3-x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3
+
+      - name: The BLAS of R and the Armadillo versions
+        shell: Rscript {0}
+        run: |
+          si <- sessionInfo()
+          cat("BLAS:", si$BLAS, "\nLAPACK:", si$LAPACK, "\n")
+          cat("RcppArmadillo", as.character(packageVersion("RcppArmadillo")), "\n")
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build smooth for Python
+        env:
+          CMAKE_ARGS: -DBLA_VENDOR=Generic
+        run: python -m pip install ./python pytest
+
+      - name: R parity tests
+        working-directory: python
+        run: python -m pytest tests -m "r_parity or r_comparison" --tb=short -q

@@ -3,6 +3,7 @@
 // instead of pracma::hessian — keeps the algorithm byte-identical between
 // R and Python and lets us drop the pracma dependency.
 
+#include "headers/fpContract.h"
 #include <Rcpp.h>
 #include "headers/hessianCore.h"
 

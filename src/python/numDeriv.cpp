@@ -3,6 +3,7 @@
 // (src/hessianCpp.cpp) so R and Python compute the Hessian via byte-identical
 // code paths — given the same inputs, results are bit-identical.
 
+#include "../headers/fpContract.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/functional.h>

@@ -41,12 +41,12 @@ FetchContent_MakeAvailable(pybind11)
 # the same.
 #
 # If GitLab itself goes down the build still fails, but more cleanly and
-# with the URL in the error message.  Pinning to a tagged release
-# (``15.2.0``, etc.) is a follow-up — keep the ``15.2.x`` rolling source
-# here so behaviour matches carma's existing intent.
+# with the URL in the error message.  The version is pinned to the one of
+# RcppArmadillo (15.6.2-1 bundles Armadillo 15.6.2), so that R and Python compile
+# the same Armadillo: a rolling branch moved under the wheels between two builds.
 FetchContent_Declare(
   CarmaArmadillo
-  URL https://gitlab.com/conradsnicta/armadillo-code/-/archive/15.2.x/armadillo-code-15.2.x.tar.gz
+  URL https://gitlab.com/conradsnicta/armadillo-code/-/archive/15.6.2/armadillo-code-15.6.2.tar.gz
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
   SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src/libs/carma/extern/armadillo-code
 )

@@ -18,6 +18,8 @@ Changes:
 Bugfixes:
 * The plots over time (`which=7`, 8, 9 and 12) take the index of the data, its dates when it has them, instead of the observation numbers.
 * `plot(which=12)` labels the panels with the names of the states, as R: the trend was never labelled, so every panel after the level took the label of the next one (the trend "Seasonal 1", the seasonal "Residuals").
+* The C++ extensions turn off the contraction of `a*b+c` into fused multiply-adds, with the pragma that R's package now shares (`src/headers/fpContract.h`): a compiler that targets FMA fused `a*b+c` into one rounding wherever its optimiser saw it, so the R and the Python builds of the same C++ rounded differently (on gcc 15 for x86-64-v3, 46 of the 941 R-parity tests differed).
+* The C++ is compiled against Armadillo 15.6.2, the version of RcppArmadillo, instead of the rolling `15.2.x` branch, which moved under the wheels between two builds and differed from R's.
 * The Linux and Windows wheels link the reference (netlib) BLAS and LAPACK, as R does by default, instead of OpenBLAS, and on Linux the 3.12.1 that R bundles rather than the 3.8 of the manylinux image: the order in which a BLAS sums the matrix products moves the last bits of the fits, so Python did not match R (CES on AirPassengers stopped at another point than R, as R does when linked to OpenBLAS or to BLAS 3.9).
 * A seasonal `CES` without a seasonal lag (no `lags`, `lags=[1]`, or a lag above the sample size, which is dropped with a warning as in R) is CES(none), with a warning, as in R: it failed in the creator.
 * `ADAM("NNN")` with `X` and a provided occurrence fits the regression to the non-zero values, with the prediction times the occurrence as its fitted values, as in R: the zeros were fitted as data.

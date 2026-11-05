@@ -1,0 +1,6 @@
+backcasting predict {'cov80': 0.6812, 'cov98': 0.8775, 'q10': 0.1436, 'q50': 0.4703, 'q90': 0.8248, 'mce': 0.0402, 'pinball': 0.8991}
+backcasting reforecast {'cov80': 0.6827, 'cov98': 0.8858, 'q10': 0.1308, 'q50': 0.4604, 'q90': 0.8135, 'mce': 0.0451, 'pinball': 6.983616214609794e+191}
+backcasting diff from saved 0.0 failed 0.0
+optimal predict {'cov80': 0.6839, 'cov98': 0.8766, 'q10': 0.1414, 'q50': 0.4716, 'q90': 0.8253, 'mce': 0.039, 'pinball': 0.9009}
+optimal reforecast {'cov80': 0.7058, 'cov98': 0.8948, 'q10': 0.1309, 'q50': 0.4714, 'q90': 0.8368, 'mce': 0.0336, 'pinball': 8.17048269557647e+52}
+optimal diff from saved 0.0 failed 0.0

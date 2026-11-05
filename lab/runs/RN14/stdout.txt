@@ -1,0 +1,90 @@
+auto_back q90 against saved 0.0
+auto_opt q90 against saved 0.0
+
+dataset
+            n    hit  below10  below50  below90    mce
+dataset                                               
+M1       1001  0.631    0.171    0.478    0.803  0.053
+M3       3003  0.718    0.135    0.478    0.853  0.028
+Tourism  1311  0.634    0.143    0.447    0.777  0.062
+
+period
+           n    hit  below10  below50  below90    mce
+period                                               
+1       1518  0.611    0.150    0.437    0.762  0.073
+4       1386  0.662    0.170    0.484    0.832  0.041
+12      2411  0.736    0.124    0.483    0.861  0.022
+
+length
+                n    hit  below10  below50  below90    mce
+length                                                    
+(0, 25]      1173  0.571    0.160    0.420    0.731  0.091
+(25, 50]     1131  0.659    0.181    0.505    0.840  0.041
+(50, 75]      979  0.745    0.135    0.519    0.881  0.021
+(75, 100]     201  0.728    0.102    0.420    0.830  0.054
+(100, 150]   1466  0.726    0.119    0.453    0.845  0.039
+(150, 1000]   365  0.726    0.119    0.488    0.845  0.021
+
+family
+                       n    hit  below10  below50  below90    mce
+family                                                           
+constant level       273  0.657    0.150    0.511    0.807  0.048
+d=0 drift             97  0.711    0.121    0.512    0.831  0.034
+d=1                  813  0.738    0.094    0.482    0.832  0.031
+d=1 drift            412  0.594    0.188    0.465    0.783  0.066
+d=1 drift pure I     654  0.578    0.172    0.444    0.749  0.078
+d=1 pure I           576  0.742    0.076    0.411    0.817  0.069
+d=2                  526  0.630    0.218    0.505    0.849  0.052
+d=2 drift              8  0.396    0.500    0.641    0.896  0.195
+d=2 drift pure I       8  0.562    0.375    0.667    0.938  0.188
+d=2 pure I           110  0.616    0.286    0.578    0.902  0.086
+seasonal d=0          31  0.802    0.039    0.384    0.841  0.084
+seasonal d=0 drift   226  0.677    0.115    0.449    0.793  0.053
+seasonal d=1        1490  0.728    0.133    0.469    0.861  0.028
+seasonal d=1 drift    19  0.558    0.173    0.420    0.731  0.096
+seasonal d=2          72  0.592    0.263    0.534    0.855  0.068
+
+horizon (pooled over observations)
+             hit  below10  below90  below50   z_sd
+h                                                
+(0, 1]    0.710    0.156    0.865    0.521  1.446
+(1, 3]    0.706    0.129    0.835    0.475  1.541
+(3, 6]    0.681    0.140    0.821    0.465  1.668
+(6, 12]   0.731    0.133    0.863    0.479  1.424
+(12, 24]  0.716    0.128    0.844    0.477  1.453
+auto_back {'cov80': 0.71, 'cov80_centred_global': 0.71, 'cov80_centred_series': 0.873, 'scale_for_80': 1.265, 'z_median': 0.058, 'z_mean_trimmed': 0.071, 'z_sd_trimmed': 1.512, 'share_variance_between_series': 0.666}
+auto_opt {'cov80': 0.714, 'cov80_centred_global': 0.714, 'cov80_centred_series': 0.873, 'scale_for_80': 1.26, 'z_median': 0.046, 'z_mean_trimmed': 0.068, 'z_sd_trimmed': 1.506, 'share_variance_between_series': 0.665}
+es_back {'cov80': 0.765, 'cov80_centred_global': 0.766, 'cov80_centred_series': 0.904, 'scale_for_80': 1.102, 'z_median': 0.092, 'z_mean_trimmed': 0.147, 'z_sd_trimmed': 1.303, 'share_variance_between_series': 0.669}
+force_011 {'cov80': 0.725, 'cov80_centred_global': 0.73, 'cov80_centred_series': 0.884, 'scale_for_80': 1.212, 'z_median': 0.154, 'z_mean_trimmed': 0.304, 'z_sd_trimmed': 1.366, 'share_variance_between_series': 0.595}
+force_ann {'cov80': 0.701, 'cov80_centred_global': 0.705, 'cov80_centred_series': 0.869, 'scale_for_80': 1.292, 'z_median': 0.162, 'z_mean_trimmed': 0.336, 'z_sd_trimmed': 1.456, 'share_variance_between_series': 0.613}
+force_mnn {'cov80': 0.778, 'cov80_centred_global': 0.786, 'cov80_centred_series': 0.924, 'scale_for_80': 1.058, 'z_median': 0.151, 'z_mean_trimmed': 0.219, 'z_sd_trimmed': 1.17, 'share_variance_between_series': 0.634}
+auto_back dataset=M1 {'cov80': 0.664, 'cov80_centred_global': 0.664, 'cov80_centred_series': 0.84, 'scale_for_80': 1.454, 'z_median': -0.002, 'z_mean_trimmed': -0.023, 'z_sd_trimmed': 1.765, 'share_variance_between_series': 0.703}
+auto_back dataset=M3 {'cov80': 0.735, 'cov80_centred_global': 0.735, 'cov80_centred_series': 0.908, 'scale_for_80': 1.178, 'z_median': 0.069, 'z_mean_trimmed': 0.069, 'z_sd_trimmed': 1.375, 'share_variance_between_series': 0.706}
+auto_back dataset=Tourism {'cov80': 0.688, 'cov80_centred_global': 0.692, 'cov80_centred_series': 0.814, 'scale_for_80': 1.348, 'z_median': 0.089, 'z_mean_trimmed': 0.167, 'z_sd_trimmed': 1.579, 'share_variance_between_series': 0.539}
+auto_back family=constant level {'cov80': 0.708, 'cov80_centred_global': 0.728, 'cov80_centred_series': 0.845, 'scale_for_80': 1.206, 'z_median': -0.192, 'z_mean_trimmed': -0.05, 'z_sd_trimmed': 1.364, 'share_variance_between_series': 0.512}
+auto_back family=d=1 {'cov80': 0.756, 'cov80_centred_global': 0.756, 'cov80_centred_series': 0.911, 'scale_for_80': 1.112, 'z_median': 0.008, 'z_mean_trimmed': 0.142, 'z_sd_trimmed': 1.253, 'share_variance_between_series': 0.645}
+auto_back family=d=1 drift {'cov80': 0.626, 'cov80_centred_global': 0.634, 'cov80_centred_series': 0.836, 'scale_for_80': 1.582, 'z_median': 0.174, 'z_mean_trimmed': 0.159, 'z_sd_trimmed': 1.877, 'share_variance_between_series': 0.769}
+auto_back family=d=1 drift pure I {'cov80': 0.61, 'cov80_centred_global': 0.607, 'cov80_centred_series': 0.852, 'scale_for_80': 1.662, 'z_median': 0.169, 'z_mean_trimmed': 0.243, 'z_sd_trimmed': 1.952, 'share_variance_between_series': 0.783}
+auto_back family=d=1 pure I {'cov80': 0.762, 'cov80_centred_global': 0.759, 'cov80_centred_series': 0.94, 'scale_for_80': 1.108, 'z_median': 0.094, 'z_mean_trimmed': 0.193, 'z_sd_trimmed': 1.334, 'share_variance_between_series': 0.848}
+auto_back family=d=2 {'cov80': 0.678, 'cov80_centred_global': 0.678, 'cov80_centred_series': 0.878, 'scale_for_80': 1.395, 'z_median': 0.04, 'z_mean_trimmed': -0.171, 'z_sd_trimmed': 1.696, 'share_variance_between_series': 0.737}
+auto_back family=d=2 pure I {'cov80': 0.629, 'cov80_centred_global': 0.619, 'cov80_centred_series': 0.907, 'scale_for_80': 1.828, 'z_median': -0.09, 'z_mean_trimmed': -0.533, 'z_sd_trimmed': 2.046, 'share_variance_between_series': 0.9}
+auto_back family=seasonal d=0 drift {'cov80': 0.686, 'cov80_centred_global': 0.699, 'cov80_centred_series': 0.774, 'scale_for_80': 1.313, 'z_median': 0.147, 'z_mean_trimmed': 0.262, 'z_sd_trimmed': 1.522, 'share_variance_between_series': 0.364}
+auto_back family=seasonal d=1 {'cov80': 0.737, 'cov80_centred_global': 0.738, 'cov80_centred_series': 0.875, 'scale_for_80': 1.177, 'z_median': 0.078, 'z_mean_trimmed': 0.053, 'z_sd_trimmed': 1.349, 'share_variance_between_series': 0.544}
+
+expected cov80 of the simulation at the benchmark lengths 0.739 {50: 0.722, 100: 0.756, 300: 0.786}
+median n 53.0 share n<=50 0.4334901222953904
+backcasting pinball median [0.4959 0.5433] >2x 298 >10x 39
+optimal pinball median [0.4927 0.4996] >2x 56 >10x 32
+
+ETS over ARIMA, all series: cov80 0.749 0.681 q50 0.448 0.47 median width ratio h=1 1.059 all h 1.042
+ETS(ANN) and ARIMA(0,1,1) selected: n=205 cov80 ETS 0.711 ARIMA 0.750; q50 0.486 0.487; width ratio h=1 1.000 all 1.000
+ETS(MNN) and ARIMA(0,1,1) selected: n=317 cov80 ETS 0.793 ARIMA 0.728; q50 0.481 0.467; width ratio h=1 1.153 all 1.018
+ETS with a trend, ARIMA without drift, d=1: n=135 cov80 ETS 0.708 ARIMA 0.718; q50 0.503 0.514; width ratio h=1 1.026 all 1.132
+seasonal ETS and seasonal ARIMA: n=1887 cov80 ETS 0.795 ARIMA 0.709; q50 0.437 0.468; width ratio h=1 1.060 all 1.113
+seasonal ETS, non-seasonal ARIMA: n=142 cov80 ETS 0.720 ARIMA 0.715; q50 0.392 0.452; width ratio h=1 0.762 all 0.838
+all series: n=5315 cov80 ETS 0.749 ARIMA 0.681; q50 0.448 0.470; width ratio h=1 1.059 all 1.042
+force_011 all series cov80 0.695 q50 0.413
+force_ann all series cov80 0.668 q50 0.414
+force_mnn all series cov80 0.764 q50 0.411
+force ANN over 011: width ratio median 0.9992 p10, p90 [0.822 1.   ]
+saved q90 ES back 0.847

@@ -188,3 +188,4 @@ python/tests/notebooks/*-dist-*.npy
 # drops this in the working directory, and the package root must stay clean
 Rplots.pdf
 /claimset/
+__pycache__/

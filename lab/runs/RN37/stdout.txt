@@ -1,0 +1,2 @@
+
+{'median_width_ratio_R_over_Python': 1.0, 'p05': 1.0, 'p95': 1.0, 'median_forecast_diff': 0.0, 'share_same_auto': 1.0, 'cov80_R_auto': 0.6766, 'cov80_Python_auto': 0.6766} {'approximate': 500}

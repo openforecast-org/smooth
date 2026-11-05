@@ -1,0 +1,1 @@
+[{"quantity": "cov80 expected at the benchmark lengths", "value": 0.8011608055269777, "conditions": {"case": "T_backcasting"}}, {"quantity": "cov80 expected at the benchmark lengths", "value": 0.7249866236883841, "conditions": {"case": "E_backcasting"}}, {"quantity": "cov80 expected at the benchmark lengths", "value": 0.7168824849424157, "conditions": {"case": "S_backcasting"}}]

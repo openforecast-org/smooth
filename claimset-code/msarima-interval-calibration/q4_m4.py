@@ -13,13 +13,15 @@ from q3_multiplicative import one
 
 
 def sample(per_period, seed):
-    from fcompdata import M4
+    from fcompdata import load_m4
 
     rng = np.random.default_rng(seed)
-    keys = pd.Series(list(M4.keys()))
-    period = keys.map(lambda k: M4[k].period)
-    chosen = [k for p in (1, 4, 12) for k in rng.choice(keys[period == p].values, per_period, replace=False)]
-    return [M4[k] for k in chosen]
+    chosen = []
+    for frequency in ("yearly", "quarterly", "monthly"):
+        data = load_m4(frequency)
+        keys = list(data.keys())
+        chosen += [data[keys[k]] for k in np.sort(rng.choice(len(keys), per_period, replace=False))]
+    return chosen
 
 
 def main():

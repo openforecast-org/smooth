@@ -32,6 +32,8 @@ def model(name, x, period):
         p, d, q, constant = parse(AutoMSARIMA(lags=lags, initial="backcasting").fit(x).model_name)
         return ADAM(model="NNN", orders={"ar": p, "i": d, "ma": q}, lags=lags if len(p) > 1 else [1], constant=constant,
                     distribution="dlnorm", initial="backcasting").fit(x)
+    if name == "force_mnn":
+        return ES(model="MNN", lags=[1], initial="backcasting").fit(x)
     return ES(model="ZXZ" if period > 1 else "ZXN", lags=lags, initial="backcasting").fit(x)
 
 

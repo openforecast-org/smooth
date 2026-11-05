@@ -1,0 +1,16 @@
+backcasting A->D {'width_h1': 0.9871, 'width_all': 0.9871, 'share_width_narrower': 0.7404, 'share_width_wider': 0.0341, 'sigma': 0.9866, 'forecast_moved': 0.0, 'share_forecast_moved': 0.1358, 'dcov80': -0.0069}
+backcasting D->B {'width_h1': 1.0078, 'width_all': 1.0071, 'share_width_narrower': 0.2192, 'share_width_wider': 0.5317, 'sigma': 1.0078, 'forecast_moved': 0.0001, 'share_forecast_moved': 0.2884, 'dcov80': -0.0039}
+backcasting B->C {'width_h1': 1.0, 'width_all': 1.0, 'share_width_narrower': 0.1881, 'share_width_wider': 0.0875, 'sigma': 1.0, 'forecast_moved': 0.0, 'share_forecast_moved': 0.2785, 'dcov80': -0.0081}
+backcasting A->C {'width_h1': 0.9995, 'width_all': 1.0, 'share_width_narrower': 0.3755, 'share_width_wider': 0.1046, 'sigma': 0.9993, 'forecast_moved': 0.0021, 'share_forecast_moved': 0.4484, 'dcov80': -0.0189}
+backcasting same model A and C 0.731 cov80 there 0.6936 0.683 elsewhere 0.7179 0.6765
+backcasting A share of random walk or constant 0.313 drift share 0.309 {'ARIMA(0,1,1)': 1014, 'ARIMA(0,1,0) with drift': 731, 'ARIMA(0,1,0)': 634, 'SARIMA(0,1,1)[1](0,1,1)[12]': 610}
+backcasting C share of random walk or constant 0.282 drift share 0.248 {'SARIMA(0,1,1)[1](0,1,1)[12]': 802, 'ARIMA(0,1,0) with drift': 652, 'ARIMA(0,1,1)': 630, 'ARIMA(0,1,0)': 575}
+backcasting gained drift 80 lost 405 cov80 change where gained -0.0946 lost 0.0287
+optimal A->D {'width_h1': 0.988, 'width_all': 0.988, 'share_width_narrower': 0.7106, 'share_width_wider': 0.038, 'sigma': 0.9877, 'forecast_moved': 0.0, 'share_forecast_moved': 0.1084, 'dcov80': -0.0094}
+optimal D->B {'width_h1': 1.0078, 'width_all': 1.0078, 'share_width_narrower': 0.1795, 'share_width_wider': 0.5443, 'sigma': 1.0078, 'forecast_moved': 0.0001, 'share_forecast_moved': 0.2976, 'dcov80': 0.0052}
+optimal B->C {'width_h1': 1.0, 'width_all': 1.0, 'share_width_narrower': 0.2833, 'share_width_wider': 0.1108, 'sigma': 1.0, 'forecast_moved': 0.0, 'share_forecast_moved': 0.3891, 'dcov80': -0.0119}
+optimal A->C {'width_h1': 0.9999, 'width_all': 1.0, 'share_width_narrower': 0.3885, 'share_width_wider': 0.149, 'sigma': 0.9997, 'forecast_moved': 0.0135, 'share_forecast_moved': 0.5146, 'dcov80': -0.0161}
+optimal same model A and C 0.606 cov80 there 0.6805 0.6714 elsewhere 0.7301 0.7032
+optimal A share of random walk or constant 0.308 drift share 0.237 {'ARIMA(0,1,1)': 1082, 'ARIMA(0,1,0) with drift': 704, 'ARIMA(0,1,0)': 640, 'SARIMA(0,1,1)[1](0,1,1)[12]': 489}
+optimal C share of random walk or constant 0.271 drift share 0.247 {'SARIMA(0,1,1)[1](0,1,1)[12]': 788, 'ARIMA(0,1,1)': 630, 'ARIMA(0,1,0) with drift': 625, 'ARIMA(0,1,0)': 557}
+optimal gained drift 253 lost 200 cov80 change where gained -0.0417 lost 0.0339

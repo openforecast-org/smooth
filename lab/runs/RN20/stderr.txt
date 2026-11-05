@@ -1,0 +1,4 @@
+/home/config/Misc/Python/Libraries/openforecast-org/smooth-msarima-calibration/claimset-code/msarima-interval-calibration/q2_decompose.py:24: RuntimeWarning: invalid value encountered in subtract
+  wa, wb = qa[..., 1] - qa[..., 0], qb[..., 1] - qb[..., 0]
+/home/config/Misc/Python/Libraries/openforecast-org/smooth-msarima-calibration/claimset-code/msarima-interval-calibration/q2_decompose.py:27: RuntimeWarning: invalid value encountered in divide
+  moved = np.nanmean(np.abs(qb[..., 2] - qa[..., 2]), axis=1) / np.nanmean(wa, axis=1)

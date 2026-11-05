@@ -17,17 +17,21 @@ import numpy as np
 import pandas as pd
 
 from q1_benchmark_reforecast import load, score
+from q2_forecasts import parse
 from q1_simulate import I10, I90, TAUS, TIMEOUT, TWO, Timeout, _alarm, quantiles
 
 
 def model(name, x, period):
-    from smooth import ES, AutoMSARIMA
+    from smooth import ADAM, ES, AutoMSARIMA
 
     lags = [1, period] if period > 1 else [1]
     if name == "auto":
         return AutoMSARIMA(lags=lags, initial="backcasting").fit(x)
     if name == "auto_dlnorm":
-        return AutoMSARIMA(lags=lags, initial="backcasting", distribution="dlnorm").fit(x)
+        # The orders AutoMSARIMA selects, with the error scale following the level
+        p, d, q, constant = parse(AutoMSARIMA(lags=lags, initial="backcasting").fit(x).model_name)
+        return ADAM(model="NNN", orders={"ar": p, "i": d, "ma": q}, lags=lags if len(p) > 1 else [1], constant=constant,
+                    distribution="dlnorm", initial="backcasting").fit(x)
     return ES(model="ZXZ" if period > 1 else "ZXN", lags=lags, initial="backcasting").fit(x)
 
 
@@ -79,8 +83,11 @@ def main():
         res = pd.DataFrame(pool.map(one, tasks, chunksize=8))
     print(res[res["model"].str.match("ERROR|TIMEOUT")]["model"].str[:90].value_counts().head(4).to_dict())
     results = []
+    print(res.groupby(["kind", "name"])["pinball"].apply(lambda v: v.notna().sum()).to_dict())
     for (kind, name), g in res.groupby(["kind", "name"]):
         g = g[g["pinball"].notna()].copy()
+        if g.empty:
+            continue
         cov = np.stack(g["cov"].values)
         g["cov80"] = cov[:, I90] - cov[:, I10]
         g["t"] = pd.qcut(g["level"], 3, labels=["low", "mid", "high"])

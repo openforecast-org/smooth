@@ -1,17 +1,17 @@
 ---
 name: claimset-submit
-description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.33 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
+description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.37 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
 ---
 
 # Preparing a Claimset submission
 
 A claimset is a research paper written for LLM readers: a flat JSON file of atomic, self-contained claims plus the definitions, evidence, assumptions, limitations, warrants and artefacts that support, condition and limit them. You write every field. A human decides two things (guarantor and licence), and you ask them before you finish.
 
-The normative rules are in `references/spec-v0.34.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
+The normative rules are in `references/spec-v0.37.md`. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
 
 **Versions.** This skill, its spec and its validator are one version. If the `claimset` package is installed, check that this skill matches it before starting: `claimset skill check`. If it reports the skill out of date, or `claimset validate` says a file follows an earlier specification, update the skill with `claimset skill install` (it replaces this folder with the version matching the package) and read the new spec; never mix rules from two versions.
 
-You produce a **submission**. The platform turns it into the published file: it mints the DOI and assigns version, publication date, status, the OpenAlex classification IDs and each claim's verifiability. You never supply these, and you never ask the human for them.
+You produce a **submission**. The platform turns it into the published file: it assigns the claimset's identifier (a DOI, or until the platform registers DOIs a provisional identifier such as `entrylib:2026.000123`) and the version, publication date, status, the OpenAlex classification IDs and each claim's verifiability. You never supply these, and you never ask the human for them.
 
 This skill covers **native** papers: research you or other agents produced, including research first written up as a manuscript (LaTeX, PDF, notes) by the same team. Converting a third party's published paper is a separate process; do not use this skill for it.
 
@@ -33,14 +33,14 @@ Collect everything the research consists of: the draft or notes, results, code, 
 
 Ask the person who supervised the work, in a single message:
 
-1. **Guarantor:** who answers for this research? Name and ORCID iD for each person (or name and ROR/company number for an organisation). The guarantor must confirm on the platform before publication.
+1. **Guarantor:** who is the main author, the person who answers for this research and whom readers contact about it? One person, with their name and ORCID iD: the guarantor submits the claimset and confirms it on the platform before publication. Never an organisation, and never more than one person; co-authors are listed as supervisors or contributors.
 2. **Supervisor:** who oversaw the work and approves the final version, if not the guarantor? (Name, ORCID iD.) And who set the research question? (Recorded as the CRediT role `conceptualization`.)
-3. **Other human contributors:** anyone who collected data, ran experiments or conducted interviews, with their CRediT roles.
+3. **Other human contributors:** co-authors and anyone who collected data, ran experiments or conducted interviews, with their CRediT roles and ORCID iDs.
 4. **Licence:** which licence? Suggest `CC-BY-4.0` as the default for open research.
 5. **Confidentiality:** is any data, code or material not publicly shareable? If so, why (personal data, commercial, legal, ethics, security)?
 6. **Declarations:** who funded the work (funder and award number), and are there competing interests? If people took part: which ethics committee approved it (and its reference), and what did participants consent to, including publication of quotations? These go in `paper.declarations`; an empty funding list and "None declared." are declarations too (W29).
 
-Ask only these. Do not ask for a DOI, a publication date or a classification: the platform assigns them.
+Ask only these. Do not ask for a DOI or other identifier, a publication date or a classification: the platform assigns them.
 
 If the human cannot be asked (unattended run), stop after building and validating the file and list these questions as open items. Never fill guarantor or licence on your own.
 
@@ -272,7 +272,7 @@ data/paper.claimset.json
 data/files/fig3.png
 ```
 
-Each packaged artefact has a `uri` relative to `data/` (`"files/fig3.png"`) and `version` `sha256:<hex>` of the file, which the manifest repeats. In a repository, keep the files in `claimset/<study>/files/`. Never put an image into the JSON. Build the package with `claimset package claimset/<study>/<paper>.claimset.json -o <paper>.zip` (add `--update` to write the checksums into the claimset file too); it validates what it built.
+Each packaged artefact has a `uri` relative to `data/` (`"files/fig3.png"`) and `version` `sha256:<hex>` of the file, which the manifest repeats. In a repository, keep the files in `claimset/<study>/files/`. Never put an image into the JSON. Build the package with `claimset package claimset/<study>/<paper>.claimset.json -o <paper>.zip` (add `--update` to write the checksums into the claimset file too); it validates what it built. The platform accepts a package within limits (spec §2.5, rule 77): at most 200 files, 50 MB a file and 200 MB in all, accepted file types only (no archives or executables; a gzipped data file such as `results.csv.gz` is fine), and `claimset package` refuses one that breaks them.
 
 ### 10. Validate and fix
 
@@ -320,7 +320,7 @@ Give the human a short summary:
 2. The principal claims, in plain language, with their strength and computed verifiability.
 3. Open items needing a human: guarantor confirmation on the platform, anything you could not determine.
 
-If a Claimset submission endpoint or tool is available in your environment, submit through it once the human approves; the platform then asks the guarantor to confirm and, after confirmation, publishes the paper with its DOI. Otherwise stop at the validated file.
+If a Claimset submission endpoint or tool is available in your environment, submit through it once the human approves; the platform then asks the guarantor to confirm and, after confirmation, publishes the paper with its identifier. Otherwise stop at the validated file.
 
 ## Revisions: answering a review
 
@@ -329,8 +329,8 @@ A published claimset that has been reviewed is revised with the `claimset-revise
 ## Corrections
 
 To correct a published claimset, start from its published file and produce a complete corrected submission:
-- Keep `paper.id` set to the existing claimset's DOI and add `paper.correction_reason`: one self-contained statement of what was wrong and what changed.
+- Keep `paper.id` set to the existing claimset's identifier (its DOI or `entrylib:` identifier) and add `paper.correction_reason`: one self-contained statement of what was wrong and what changed.
 - Remove the other platform fields (`version`, `date`, `status`, `status_notice`, `changes`, `previous_version`).
 - Keep object IDs stable: a corrected claim keeps its ID; never reuse an ID for a different claim.
-- Validate as usual. The platform computes the diff, assigns the next version and marks the paper as corrected; the DOI stays the same.
+- Validate as usual. The platform computes the diff, assigns the next version and marks the paper as corrected; the identifier stays the same.
 - A correction is the author's own initiative. To answer reviews, submit a revision with a response instead (above); a revision can also carry corrections, as `other_changes`.

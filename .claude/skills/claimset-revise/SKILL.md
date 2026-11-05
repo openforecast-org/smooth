@@ -5,7 +5,7 @@ description: Answer the reviews of a published Claimset paper with a revised ver
 
 # Revising a published claimset
 
-A published claimset is reviewed by the platform's reviewer, and later by others. A review never changes the claimset; it sits beside it, public, with the claimset's versions, the author's responses and any human resolutions (`references/revision-v0.2.md`). Each **comment** names the claims it affects, its category and severity, and a **resolution test**: what evidence would settle it, written before you answer. The reviewer scores every claim's credibility from 0 to 100, and every point below 100 rests on comments, so a score rises only when comments are settled. It also assesses each claim's novelty: the closest earlier result it found, and any comment saying the label conflicts with earlier work.
+A published claimset is reviewed by the platform's reviewer, and later by others. A review never changes the claimset; it sits beside it, public, with the claimset's versions, the author's responses and any human resolutions (`references/revision-v0.5.md`). Each **comment** names the claims it affects, its category and severity, and a **resolution test**: what evidence would settle it, written before you answer. The reviewer scores every claim's credibility from 0 to 100, and every point below 100 rests on comments, so a score rises only when comments are settled. It also assesses each claim's novelty: the closest earlier result it found, and any comment saying the label conflicts with earlier work.
 
 Answering is optional: you may submit a revised version with a **response** to every unresolved comment, or leave the version as it is. Comments not answered stay visible.
 
@@ -18,7 +18,7 @@ Answering is optional: you may submit a revised version with a **response** to e
 3. **Apply the comment's test as written.** Never edit its rules, and never challenge a test because its result would go against you.
 4. **Report a test that went against you.** If the evidence meets the comment's `upheld` rule, the comment stands: change the claim, state the limitation, or decline, and say so.
 5. **Never rewrite history.** Build the revision from the current version; keep object IDs; never reuse a removed ID; keep appending to the lab record, never restart or rewrite it.
-6. **The human decides what is submitted.** Only a guarantor submits a revision; you prepare it and tell them what it says.
+6. **The human decides what is submitted.** Only the guarantor submits a revision; you prepare it and tell them what it says.
 
 ## Steps
 
@@ -80,7 +80,7 @@ Fix every error. Read every warning: a rebuttal that no planned test backs, a de
 
 ### 6. Hand over
 
-Tell the human, comment by comment: what you answered, on what evidence, and what changed; which comments you declined and why; which tests went against the claimset. Give them the three files: the revised claimset, the response and the lab record. A guarantor submits them; the platform publishes the revision as the next version, and its reviewer re-reviews and re-scores it.
+Tell the human, comment by comment: what you answered, on what evidence, and what changed; which comments you declined and why; which tests went against the claimset. Give them the three files: the revised claimset, the response and the lab record. The guarantor submits them; the platform publishes the revision as the next version, and its reviewer re-reviews and re-scores it.
 
 ## Reviews and resolutions you receive
 

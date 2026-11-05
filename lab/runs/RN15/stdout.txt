@@ -1,0 +1,33 @@
+competitors (6, 5315, 99, 2) ['AutoMSARIMA Back\tarima', 'AutoMSARIMA Opt\tarima', 'statsforecast AutoARIMA\tarima', 'pmdarima auto_arima\tarima', 'skforecast Arima\tarima', 'aeon AutoARIMA\tarima']
+auto_back level_t {'low': {'cov80': 0.786, 'scale_h1_for_80': 0.975}, 'mid': {'cov80': 0.668, 'scale_h1_for_80': 1.293}, 'high': {'cov80': 0.59, 'scale_h1_for_80': 1.57}}
+auto_back change_t {'low': {'cov80': 0.741, 'scale_h1_for_80': 1.093}, 'mid': {'cov80': 0.688, 'scale_h1_for_80': 1.234}, 'high': {'cov80': 0.615, 'scale_h1_for_80': 1.492}}
+auto_opt level_t {'low': {'cov80': 0.786, 'scale_h1_for_80': 0.983}, 'mid': {'cov80': 0.673, 'scale_h1_for_80': 1.281}, 'high': {'cov80': 0.592, 'scale_h1_for_80': 1.588}}
+auto_opt change_t {'low': {'cov80': 0.745, 'scale_h1_for_80': 1.071}, 'mid': {'cov80': 0.693, 'scale_h1_for_80': 1.233}, 'high': {'cov80': 0.613, 'scale_h1_for_80': 1.525}}
+es_back level_t {'low': {'cov80': 0.762, 'scale_h1_for_80': 1.046}, 'mid': {'cov80': 0.702, 'scale_h1_for_80': 1.155}, 'high': {'cov80': 0.783, 'scale_h1_for_80': 0.967}}
+es_back change_t {'low': {'cov80': 0.747, 'scale_h1_for_80': 1.086}, 'mid': {'cov80': 0.724, 'scale_h1_for_80': 1.095}, 'high': {'cov80': 0.777, 'scale_h1_for_80': 0.976}}
+force_011 level_t {'low': {'cov80': 0.806, 'scale_h1_for_80': 0.941}, 'mid': {'cov80': 0.675, 'scale_h1_for_80': 1.198}, 'high': {'cov80': 0.604, 'scale_h1_for_80': 1.585}}
+force_011 change_t {'low': {'cov80': 0.766, 'scale_h1_for_80': 1.024}, 'mid': {'cov80': 0.692, 'scale_h1_for_80': 1.206}, 'high': {'cov80': 0.627, 'scale_h1_for_80': 1.491}}
+force_ann level_t {'low': {'cov80': 0.777, 'scale_h1_for_80': 0.962}, 'mid': {'cov80': 0.644, 'scale_h1_for_80': 1.187}, 'high': {'cov80': 0.583, 'scale_h1_for_80': 1.463}}
+force_ann change_t {'low': {'cov80': 0.739, 'scale_h1_for_80': 1.013}, 'mid': {'cov80': 0.664, 'scale_h1_for_80': 1.199}, 'high': {'cov80': 0.601, 'scale_h1_for_80': 1.406}}
+force_mnn level_t {'low': {'cov80': 0.74, 'scale_h1_for_80': 1.056}, 'mid': {'cov80': 0.725, 'scale_h1_for_80': 0.978}, 'high': {'cov80': 0.826, 'scale_h1_for_80': 0.79}}
+force_mnn change_t {'low': {'cov80': 0.76, 'scale_h1_for_80': 0.973}, 'mid': {'cov80': 0.745, 'scale_h1_for_80': 0.966}, 'high': {'cov80': 0.786, 'scale_h1_for_80': 0.893}}
+AutoMSARIMA Back	arima level_t {'low': 0.806, 'mid': 0.687, 'high': 0.601}
+AutoMSARIMA Back	arima change_t {'low': 0.766, 'mid': 0.706, 'high': 0.622}
+AutoMSARIMA Opt	arima level_t {'low': 0.812, 'mid': 0.692, 'high': 0.594}
+AutoMSARIMA Opt	arima change_t {'low': 0.773, 'mid': 0.705, 'high': 0.619}
+statsforecast AutoARIMA	arima level_t {'low': 0.789, 'mid': 0.667, 'high': 0.589}
+statsforecast AutoARIMA	arima change_t {'low': 0.754, 'mid': 0.683, 'high': 0.608}
+pmdarima auto_arima	arima level_t {'low': 0.77, 'mid': 0.635, 'high': 0.582}
+pmdarima auto_arima	arima change_t {'low': 0.729, 'mid': 0.665, 'high': 0.594}
+skforecast Arima	arima level_t {'low': 0.781, 'mid': 0.658, 'high': 0.585}
+skforecast Arima	arima change_t {'low': 0.75, 'mid': 0.674, 'high': 0.6}
+aeon AutoARIMA	arima level_t {'low': nan, 'mid': nan, 'high': nan}
+aeon AutoARIMA	arima change_t {'low': nan, 'mid': nan, 'high': nan}
+ES Back saved level_t {'low': 0.762, 'mid': 0.703, 'high': 0.783}
+ANN & 011: same forecast and width on 114 of 205 ; cov there {'ce': 0.734, 'ca': 0.734} ; elsewhere {'ce': 0.683, 'ca': 0.771} width ratio there {0.1: 0.772, 0.5: 0.861, 0.9: 0.926}
+null rw 6 cov80 raw 0.803 centred on the series 0.982
+null rw 8 cov80 raw 0.801 centred on the series 0.978
+null rw 18 cov80 raw 0.798 centred on the series 0.972
+null ima 6 cov80 raw 0.802 centred on the series 0.955
+null ima 8 cov80 raw 0.799 centred on the series 0.95
+null ima 18 cov80 raw 0.803 centred on the series 0.953

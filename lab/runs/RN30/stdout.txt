@@ -1,0 +1,4 @@
+backcasting {'cov80': 0.7211, 'q10': 0.1177, 'q50': 0.4687, 'q90': 0.8388, 'mce': 0.0333, 'pinball': 0.9071, 'failed': 0.0}
+backcasting errors {}
+optimal {'cov80': 0.6991, 'q10': 0.1319, 'q50': 0.4758, 'q90': 0.831, 'mce': 0.034, 'pinball': 0.9195, 'failed': 0.0}
+optimal errors {}

@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory() as tmp:
     run = subprocess.run(["Rscript", "-e", R.format(root=ROOT, path=path, res=res)], capture_output=True, text=True, cwd=tmp)
     print(run.stderr[-600:])
     for e in json.load(open(res)):
-        print("R ", e["name"], e["initial"], "coef", np.round(e["coef"], 3)[:4], "sd", np.round(e["sd"], 3)[:4], "w0", np.round(e["w0"], 1), "w1", np.round(e["w1"], 1) if e["w1"] != ["NA"] else e["w1"])
+        print("R ", e["name"], e["initial"], "coef", np.round(np.atleast_1d(e["coef"]), 3)[:4], "sd", np.round(np.atleast_1d(e["sd"]), 3)[:4], "w0", np.round(e["w0"], 1), "w1", np.round(e["w1"], 1) if e["w1"] != ["NA"] else e["w1"])
         if isinstance(e["w1"], list) and e["w1"][0] != "NA":
             for h, a, b in zip((1, 6, 18), e["w0"], e["w1"]):
                 results.append(dict(quantity="reforecast over predict 80% width, one series", value=float(b) / float(a),

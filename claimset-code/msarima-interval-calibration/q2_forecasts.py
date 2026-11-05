@@ -22,8 +22,6 @@ from q1_simulate import I10, I90, TAUS, TIMEOUT, TWO, Timeout, _alarm, quantiles
 
 INITIALS = ("backcasting", "optimal")
 HMAX = 24
-SOURCE = None
-
 
 def parse(name):
     # The orders and the constant in a model's name, the seasonal part if it has one.
@@ -34,7 +32,7 @@ def parse(name):
     return p, d, q, ("drift" in name or "constant" in name)
 
 
-def fit(i, s, j, mode):
+def fit(s, j, mode, src):
     from smooth import AutoMSARIMA, MSARIMA
 
     x = np.asarray(s.x, float)
@@ -42,7 +40,6 @@ def fit(i, s, j, mode):
     lags = [1, s.period] if s.period > 1 else [1]
     if mode == "selected":
         return AutoMSARIMA(lags=lags, initial=initial).fit(x)
-    src = SOURCE[j][i]
     p, d, q, constant = parse(src["model"])
     lags = lags if len(p) > 1 else [1]
     orders = {"ar": p, "i": d, "ma": q}
@@ -57,13 +54,13 @@ def fit(i, s, j, mode):
 
 def one(args):
     warnings.filterwarnings("ignore")
-    j, i, s, mode = args
+    j, i, s, mode, src = args
     out = dict(j=j, i=i, model="", coef=[], sigma=np.nan, pinball=np.nan, cov=np.full(99, np.nan),
                q=np.full((HMAX, 3), np.nan))
     signal.signal(signal.SIGALRM, _alarm)
     signal.alarm(TIMEOUT)
     try:
-        m = fit(i, s, j, mode)
+        m = fit(s, j, mode, src)
         fc = m.predict(h=s.h, interval="prediction", level=TWO, side="both")
         mean, Q = quantiles(fc)
         out["pinball"], out["cov"] = score(s, Q)
@@ -79,7 +76,6 @@ def one(args):
 
 
 def main():
-    global SOURCE
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", required=True)
     ap.add_argument("--source")
@@ -89,9 +85,8 @@ def main():
     a = ap.parse_args()
     series = load()
     series = series[: a.limit] if a.limit else series
-    if a.source:
-        SOURCE = json.load(open(a.source))
-    tasks = [(j, i, s, a.mode) for j in range(2) for i, s in enumerate(series)]
+    source = json.load(open(a.source)) if a.source else None
+    tasks = [(j, i, s, a.mode, source[j][i] if source else None) for j in range(2) for i, s in enumerate(series)]
     with Pool(a.workers) as pool:
         res = pool.map(one, tasks, chunksize=8)
     n = len(series)

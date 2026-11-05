@@ -16,7 +16,8 @@ warnings.filterwarnings("ignore")
 ROOT = os.environ["SMOOTH_ROOT"]
 R = """
 suppressMessages(pkgload::load_all("{root}", quiet=TRUE))
-a <- jsonlite::fromJSON("{path}")
+a <- jsonlite::fromJSON("{path}", simplifyVector=FALSE)
+for(i in seq_along(a)){{a[[i]]$x <- unlist(a[[i]]$x); a[[i]]$lags <- unlist(a[[i]]$lags); for(k in c("ar","i","ma")){{a[[i]]$orders[[k]] <- unlist(a[[i]]$orders[[k]])}}}}
 out <- list()
 for(e in a){{
   m <- msarima(e$x, orders=list(ar=e$orders$ar, i=e$orders$i, ma=e$orders$ma), lags=e$lags, constant=e$constant, initial=e$initial, h=18, holdout=FALSE)
@@ -43,6 +44,10 @@ for name in ("ar1", "sar12", "airline12", "ima"):
         w0 = (f0.upper.values - f0.lower.values).ravel()[[0, 5, 17]]
         w1 = (f1.upper.values - f1.lower.values).ravel()[[0, 5, 17]]
         d1 = (f1.mean.values - f0.mean.values)[[0, 5, 17]]
+        corr = np.corrcoef(np.linalg.cholesky(v + 0 * np.eye(len(v))).T) if False else v / np.outer(np.sqrt(np.diag(v)), np.sqrt(np.diag(v)))
+        print("corr first row", np.round(corr[0], 4))
+        draws = m.reapply(nsim=300, seed=1)
+        print("reapply keys", [k for k in dir(draws) if not k.startswith("_")][:14] if not isinstance(draws, dict) else list(draws))
         print("PY", name, initial, "coef", np.round(m.coef, 3)[:4], "sd", np.round(np.sqrt(np.diag(v)), 3)[:4],
               "w0", np.round(w0, 1), "w1", np.round(w1, 1), "mean diff", np.round(d1, 2))
         for h, a, b in zip((1, 6, 18), w0, w1):

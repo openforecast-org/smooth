@@ -1,0 +1,3 @@
+{}
+auto {'cov80': 0.6889, 'q50': 0.4677, 'mce': 0.0386, 'pinball_median': 0.6752, 'pinball_mean': 1.1365, 'failed': 0.0, 'cov80_low': 0.8128, 'cov80_mid': 0.6995, 'cov80_high': 0.5544, 'fall_low_to_high': 0.2585, 'spread': 0.2585}
+force_mnn {'cov80': 0.7854, 'q50': 0.3723, 'mce': 0.0849, 'pinball_median': 0.8518, 'pinball_mean': 1.2898, 'failed': 0.0, 'cov80_low': 0.764, 'cov80_mid': 0.7779, 'cov80_high': 0.8142, 'fall_low_to_high': -0.0502, 'spread': 0.0502}

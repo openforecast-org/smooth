@@ -1,10 +1,16 @@
-# Claimset Revision — Specification v0.5 (draft)
+# Claimset Revision — Specification v0.6 (draft)
 
-Status: working draft · Date: 2026-11-04 · Supersedes v0.4 (`spec/claimset-revision-v0.4.md`) · Companion to the claimset specification (`spec/claimset-v0.37.md`) and the lab record specification (`spec/lab-record-v0.15.md`)
+Status: working draft · Date: 2026-11-05 · Supersedes v0.5 (`spec/claimset-revision-v0.5.md`) · Companion to the claimset specification (`spec/claimset-v0.37.md`) and the lab record specification (`spec/lab-record-v0.18.md`)
 
 This specification covers what happens to a claimset after its first publication: how the platform's reviewers comment on it, how the author responds, how a revised version is submitted, how disagreements are settled, and how the platform's reviewer judges each claim's credibility and novelty. It specifies the documents the author receives and sends, and the rules the platform checks. The portal itself (accounts, notifications, the website) is out of scope, and so is the scoring rubric, which the portal publishes (§7).
 
-## Changes since v0.4
+## Changes since v0.5
+
+- §2.4: the registry groups claimsets by year and by blocks of a thousand numbers, so that no folder holds more than a thousand entries: `entrylib:2026.000123` is in `2026/000/entrylib_2026.000123/`. The path follows from the identifier alone. The last folder's name, and so the tag names, are unchanged. The package computes both (`claimset.revision.record_folder`, `claimset.revision.record_name`).
+
+
+Amended on 2026-11-06, with claimset v0.38: a resolution test's frameworks, parameters and rule expressions are those of a claim's test (claimset §3.3.3), and its quantities bind a result by `variable` (was `quantity`).
+## Changes in v0.5 (since v0.4)
 
 - §2.4: the provisional identifier is renamed `entrylib:` (claimset v0.37), so registry folders are `entrylib_<year>.<number>`.
 
@@ -93,7 +99,7 @@ Anyone can check the chain from the published files alone: no document can be al
 The platform commits every document to a public registry repository when it is published, in a layout that mirrors the identifiers:
 
 ```
-<concept id>/
+<year>/<block>/<name>/
   v1/claimset.json  v1/lab.jsonl  v1/validation.json
   v1/reviews/RV1.json
   v2/claimset.json  v2/lab.jsonl  v2/validation.json  v2/response-RP1.json
@@ -101,7 +107,13 @@ The platform commits every document to a public registry repository when it is p
   v2/resolutions/RL1.json
 ```
 
-`<concept id>` is the claimset's identifier with `doi:` removed and every `:` and `/` replaced by `_`: `10.0000_claimset.2026.000789` for a DOI, `entrylib_2026.000123` for a provisional identifier, which can never coincide with a DOI's folder. Only the platform commits to the registry. Each version is tagged (`<concept id>-v2`). The branch is protected against force-pushes and deletion, so the repository's history is itself an append-only log of the record. The author's own repository, where the research is done, is not part of the record; the lab record published with each version is.
+The path of a claimset's folder, its **record path**, follows from its identifier alone (claimset §7), which ends in `<year>.<number>`:
+
+- `<year>` is the identifier's year: `2026`.
+- `<block>` is the number divided by 1000, rounded down, written with at least three digits: `000` for numbers 000000 to 000999, `001` for 001000 to 001999, `1234` for 1234000 to 1234999. No block holds more than a thousand claimsets of a year.
+- `<name>`, the claimset's **record name**, is its identifier with `doi:` removed and every `:` and `/` replaced by `_`: `10.0000_claimset.2026.000789` for a DOI, `entrylib_2026.000123` for a provisional identifier, which can never coincide with a DOI's.
+
+So `entrylib:2026.000123` is in `2026/000/entrylib_2026.000123/`, `entrylib:2026.001350` in `2026/001/entrylib_2026.001350/`, and `doi:10.0000/claimset.2026.000789` in `2026/000/10.0000_claimset.2026.000789/`. Only the platform commits to the registry. Each version is tagged with the record name and the version (`entrylib_2026.000123-v2`). The branch is protected against force-pushes and deletion, so the repository's history is itself an append-only log of the record. The author's own repository, where the research is done, is not part of the record; the lab record published with each version is.
 
 An author works on a revision from a copy of the claimset's folder of the registry, the **record folder** (a clone, or the files the platform sends). The reference tools read the record folder (§9).
 
@@ -196,22 +208,22 @@ A severity says what happens to the affected claims if the comment is right, not
 
 ### 3.4 Resolution test
 
-Every comment says, when it is written, what evidence would settle it. The test has the structure of a lab-record decision rule (lab record §5.7.1), with the two outcomes named for the comment:
+Every comment says, when it is written, what evidence would settle it. The test has the structure of a claim's test (claimset §3.3.3), as a lab-record decision rule does, with the two outcomes named for the comment:
 
 ```json
 "resolution_test": {
   "procedure": "Load smooth 4.6.0 from CRAN; for the 3042 ETS(A,N,A) and 200 GUM models of C1 (confirm.py --test perlag --seed 2026), compare the decision of smooth 4.6.0's check with the decision of per_lag_max().",
   "framework": "deterministic",
   "parameters": {},
-  "quantities": {"diff": {"quantity": "models whose admissibility decision differs, smooth 4.6.0 against per_lag_max()"}},
+  "quantities": {"diff": {"variable": "models whose admissibility decision differs, smooth 4.6.0 against per_lag_max()"}},
   "upheld": "diff > 0",
   "withdrawn": "diff == 0"
 }
 ```
 
 - `procedure`: what to run or check, on what. Concrete enough that the author, the reviewer or a third party would run the same thing.
-- `framework`, `parameters`, `quantities`: as in lab record §5.7.1, plus the framework `documentary`: the test is decided by what a cited source states (for prior-work and novelty comments: "upheld if the cited work derives the admissible region of ETS(A,N,A) from the discount polynomial; withdrawn if it does not"). A documentary test has no quantities.
-- `upheld`: the rule under which the comment stands. `withdrawn`: the rule under which it falls. Expressions over quantities when the outcome can be computed (lab record §5.7.3); text otherwise. If neither rule is met, the test did not settle the comment (§6.3).
+- `framework`, `parameters`, `quantities`: as in a claim's test (claimset §3.3.3), plus the framework `documentary`: the test is decided by what a cited source states (for prior-work and novelty comments: "upheld if the cited work derives the admissible region of ETS(A,N,A) from the discount polynomial; withdrawn if it does not"). A documentary test has no quantities.
+- `upheld`: the rule under which the comment stands. `withdrawn`: the rule under which it falls. Expressions over quantities when the outcome can be computed (claimset §3.3.3); text otherwise. If neither rule is met, the test did not settle the comment (§6.3).
 
 A resolution test is required for every comment except those of category `presentation` and `validation`, which are settled by the change they ask for. A comment whose test cannot be computed (most `prior_work` and `reasoning` comments) still states its test in text, so that whoever settles it, the reviewer in the next round or a human resolver, applies a rule written before the author answered.
 
@@ -435,7 +447,7 @@ Errors (the document or submission is refused) and warnings (accepted, recorded)
 - R1. A review has `schema: claimset-review`, an `id` `RV<n>`, and a `target` naming a published version and its hash. `kind: initial` targets version 1 and is written once per claimset by the platform; `kind: re_review` targets a revision and is written once per revision by the platform; `kind: additional` targets the current version.
 - R2. An agent reviewer lists its models and its prompt (`version`, `uri`, `hash`), and its rubric when it scores (R18); a human reviewer has `name`, `orcid` and `competing_interests`.
 - R3. Every comment has an `id` unique in the review, at least one entry in `claims`, each resolving to a claim of the target version, and `category`, `comment` and `requested_action` from §3.2–3.3, and a `severity` unless its category is `novelty`; a `novelty` comment has no severity and cites the earlier work in `references`; `targets`, if present, resolve to objects of the target version.
-- R4. Every comment not of category `presentation` or `validation` has a `resolution_test` with `procedure`, `framework`, the parameters its framework requires (lab record §5.7.1), and non-empty `upheld` and `withdrawn` rules; rules over `quantities` are valid expressions (lab record §5.7.3); a `documentary` test has text rules.
+- R4. Every comment not of category `presentation` or `validation` has a `resolution_test` with `procedure`, `framework`, the parameters its framework requires (claimset §3.3.3), and non-empty `upheld` and `withdrawn` rules; rules over `quantities` are valid expressions (claimset §3.3.3); a `documentary` test has text rules.
 - R5. A re-review has a verdict for every comment unresolved on the previous version, and verdicts only for those.
 - R6. A new comment in a re-review names a claim or target that the revision added or changed, or has severity `could_reverse`.
 - R7. A verdict of `disputed` has a `replacement_test` (as R4) that differs from the test it replaces; `withdrawn` and `upheld` name the `rule` met and cite `evidence`; `resolved` and `limited` say in `reason` what in the revision meets the comment. A resolution's verdicts are `withdrawn` or `upheld`.
@@ -507,7 +519,7 @@ From the claimset *Admissibility of lagged single-source-of-error state space mo
    "requested_action": "Report the excluded models, and state the count either with them or with the band in the statement.",
    "resolution_test": {"procedure": "Count the ETS(A,N,A) grid models of C1 whose PBH reference lies within 1e-8 of 1.",
                        "framework": "deterministic", "parameters": {},
-                       "quantities": {"edge": {"quantity": "ETS(A,N,A) grid models within 1e-8 of the unit circle"}},
+                       "quantities": {"edge": {"variable": "ETS(A,N,A) grid models within 1e-8 of the unit circle"}},
                        "upheld": "edge > 0", "withdrawn": "edge == 0"}},
   {"id": "c6", "claims": ["C13", "C1"], "targets": ["C13"],
    "category": "assumption", "severity": "could_reverse",
@@ -515,7 +527,7 @@ From the claimset *Admissibility of lagged single-source-of-error state space mo
    "requested_action": "Run the check of smooth 4.6.0 from CRAN on the models of C1 and compare its decisions with per_lag_max().",
    "resolution_test": {"procedure": "Load smooth 4.6.0 from CRAN; on the 3042 ETS(A,N,A) and 200 GUM models of C1, compare its check's decisions with those of per_lag_max().",
                        "framework": "deterministic", "parameters": {},
-                       "quantities": {"diff": {"quantity": "models whose admissibility decision differs, smooth 4.6.0 against per_lag_max()"}},
+                       "quantities": {"diff": {"variable": "models whose admissibility decision differs, smooth 4.6.0 against per_lag_max()"}},
                        "upheld": "diff > 0", "withdrawn": "diff == 0"}}
 ]
 ```

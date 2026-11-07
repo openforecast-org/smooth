@@ -5,7 +5,7 @@ description: Answer the reviews of a published Claimset paper with a revised ver
 
 # Revising a published claimset
 
-A published claimset is reviewed by the platform's reviewer, and later by others. A review never changes the claimset; it sits beside it, public, with the claimset's versions, the author's responses and any human resolutions (`references/revision-v0.5.md`). Each **comment** names the claims it affects, its category and severity, and a **resolution test**: what evidence would settle it, written before you answer. The reviewer scores every claim's credibility from 0 to 100, and every point below 100 rests on comments, so a score rises only when comments are settled. It also assesses each claim's novelty: the closest earlier result it found, and any comment saying the label conflicts with earlier work.
+A published claimset is reviewed by the platform's reviewer, and later by others. A review never changes the claimset; it sits beside it, public, with the claimset's versions, the author's responses and any human resolutions (`references/revision-v0.6.md`). Each **comment** names the claims it affects, its category and severity, and a **resolution test**: what evidence would settle it, written before you answer. The reviewer scores every claim's credibility from 0 to 100, and every point below 100 rests on comments, so a score rises only when comments are settled. It also assesses each claim's novelty: the closest earlier result it found, and any comment saying the label conflicts with earlier work.
 
 Answering is optional: you may submit a revised version with a **response** to every unresolved comment, or leave the version as it is. Comments not answered stay visible.
 

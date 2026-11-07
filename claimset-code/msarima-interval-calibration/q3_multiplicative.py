@@ -22,9 +22,14 @@ from q1_simulate import I10, I90, TAUS, TIMEOUT, TWO, Timeout, _alarm, quantiles
 
 
 def model(name, x, period):
-    from smooth import ADAM, ES, AutoMSARIMA
+    from smooth import ADAM, ES, AutoADAM, AutoMSARIMA
 
     lags = [1, period] if period > 1 else [1]
+    if name in ("adam_select", "adam_dnorm"):
+        # auto.adam(model="NNN"): the ARIMA orders selected for each distribution, then the
+        # distribution with the lowest AICc; adam_dnorm checks it reproduces AutoMSARIMA
+        dist = ["dnorm", "dlnorm"] if name == "adam_select" else "dnorm"
+        return AutoADAM(model="NNN", lags=lags, distribution=dist, initial="backcasting").fit(x)
     if name == "auto":
         return AutoMSARIMA(lags=lags, initial="backcasting").fit(x)
     if name == "auto_dlnorm":
@@ -51,6 +56,7 @@ def one(args):
         out["pinball"] = np.maximum(TAUS * diff, (TAUS - 1) * diff).mean() / scale
         out["cov"] = (y[:, None] <= Q).mean(axis=0)
         out["model"] = m.model_name
+        out["distribution"] = getattr(m, "_selected_distribution", None) or getattr(m, "distribution", "")
     except Timeout:
         out["model"] = "TIMEOUT"
     except Exception as exc:

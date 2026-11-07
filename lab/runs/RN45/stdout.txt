@@ -1,0 +1,4 @@
+
+{}
+benchmark adam_select {'n': 5315.0, 'failed': 0.0, 'cov80': 0.7291, 'q10': 0.1421, 'q50': 0.5024, 'q90': 0.8712, 'mce': 0.0187, 'pinball_mean': 0.9225, 'pinball_median': 0.5137, 'cov80_low': 0.7539, 'cov80_mid': 0.7102, 'cov80_high': 0.7233, 'spread': 0.0436, 'share_dlnorm': 0.642, 'cov80_when_dlnorm': 0.7503, 'mce_when_dlnorm': 0.0273, 'cov80_when_dnorm': 0.6912, 'mce_when_dnorm': 0.0443}
+benchmark msarima {'n': 5315.0, 'failed': 0.0, 'cov80': 0.6812, 'q10': 0.1436, 'q50': 0.4703, 'q90': 0.8248, 'mce': 0.0402, 'pinball_mean': 0.8991, 'pinball_median': 0.4959, 'cov80_low': 0.7862, 'cov80_mid': 0.6674, 'cov80_high': 0.59, 'spread': 0.1962, 'share_dlnorm': 0.0, 'cov80_when_dnorm': 0.6812, 'mce_when_dnorm': 0.0402}

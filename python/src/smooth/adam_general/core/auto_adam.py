@@ -667,10 +667,12 @@ class AutoADAM(ADAM):
                 "make sense.",
             ),
             (
-                lambda c: arima_model
-                and not ets_model
-                and len(c) == len(_ALL_DISTRIBUTIONS)
-                and set(c) <= set(_ALL_DISTRIBUTIONS),
+                lambda c: (
+                    arima_model
+                    and not ets_model
+                    and len(c) == len(_ALL_DISTRIBUTIONS)
+                    and set(c) <= set(_ALL_DISTRIBUTIONS)
+                ),
                 "Not all distributions make sense for the pure ARIMA.",
             ),
         ]

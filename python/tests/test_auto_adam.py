@@ -381,6 +381,13 @@ class TestAutoADAMDistribution:
             y[::5] = 0
         assert m._filter_distributions(y) == expected
 
+    def test_all_distributions_dropped_raises(self):
+        y = np.random.default_rng(1).normal(size=60)
+        m = AutoADAM(model="ANN", distribution=["dlnorm", "dgamma"])
+        with pytest.warns(UserWarning, match="not strictly positive"):
+            with pytest.raises(ValueError, match="distributions were dropped"):
+                m.fit(y)
+
     def test_all_ic_values_stored(self, trend_data):
         m = AutoADAM(
             model="NNN",

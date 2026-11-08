@@ -682,7 +682,12 @@ class AutoADAM(ADAM):
                 warnings.warn(f"{reason} Dropping {', '.join(to_drop)}.", stacklevel=3)
                 candidates = [d for d in candidates if d not in to_drop]
 
-        return candidates if candidates else ["dnorm"]
+        if not candidates:
+            raise ValueError(
+                "All the provided distributions were dropped, so there is nothing "
+                "to estimate. Provide at least one of dnorm, dlaplace, ds or dgnorm."
+            )
+        return candidates
 
     def __repr__(self) -> str:
         """Return string representation of fitted AutoADAM model."""

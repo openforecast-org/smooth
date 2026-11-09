@@ -3,6 +3,10 @@
   "paper": {
     "title": "The observed-data likelihood of ADAM and iETS with unobserved periods: entropy term, SSOE Kalman filter and multiplicative approximations",
     "licence": "CC-BY-4.0",
+    "declarations": {
+      "funding": [],
+      "competing_interests": "None declared."
+    },
     "classification": {
       "subfield": "openalex:subfields/2613",
       "topics": [
@@ -544,7 +548,7 @@
         ]
       },
       "type": "formal",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "iETS with a dynamic model for the scale of the demand sizes",
@@ -578,7 +582,7 @@
         ]
       },
       "type": "formal",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "refutation",
       "support": [
         {
@@ -687,7 +691,7 @@
         "conditions": []
       },
       "type": "formal",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "pure additive single source of error models",
@@ -791,7 +795,7 @@
         ]
       },
       "type": "formal",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "ETS(A,N,N)",
@@ -986,7 +990,7 @@
         ]
       },
       "type": "formal",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "support": [
         {
@@ -1092,7 +1096,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "iETS(M,N,N) with Gamma and inverse Gaussian sizes",
@@ -1188,7 +1192,7 @@
         ]
       },
       "type": "formal",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "pure multiplicative ETS in the ADAM form"
@@ -1219,7 +1223,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "ETS(M,N,N) in the ADAM form",
@@ -1271,7 +1275,7 @@
         ]
       },
       "type": "formal",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "linear single source of error models",
@@ -1310,7 +1314,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "ADAM ETS(A,N,A) with double seasonality",
@@ -1405,7 +1409,7 @@
         ]
       },
       "type": "methodological",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "setting": "smooth package for R and Python"
@@ -1450,7 +1454,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "pure additive ADAM models with Laplace, S or Generalised Normal errors"
@@ -1610,7 +1614,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "iETS(M,N,N) with Gamma, log-normal and inverse Gaussian sizes",
@@ -1668,7 +1672,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "iETS(M,N,N) with Gamma and inverse Gaussian sizes",
@@ -1718,7 +1722,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "ETS(M,N,N) in the conventional form",
@@ -1767,7 +1771,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "ADAM ETS(A,N,A) with double seasonality",
@@ -1825,7 +1829,7 @@
         ]
       },
       "type": "descriptive",
-      "role": "supporting",
+      "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
         "population": "pure additive models with Laplace or S errors",

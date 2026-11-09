@@ -55,6 +55,10 @@
    ]
   },
   "licence": "CC-BY-4.0",
+  "declarations": {
+   "funding": [],
+   "competing_interests": "None declared."
+  },
   "study": "adam-admissible-bounds"
  },
  "contributors": [

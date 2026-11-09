@@ -1,0 +1,30 @@
+name: claimset study branches
+
+# Study records live on claimset/<study> branches and are never merged (lab record spec v0.7, section 3).
+on: pull_request
+
+jobs:
+  separation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Study records stay on their branches
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          case "$HEAD_REF" in claimset/*) echo "::error::$HEAD_REF holds a study record; study branches are never merged"; exit 1;; esac
+          case "$BASE_REF" in claimset/*) echo "::error::nothing is merged into the study branch $BASE_REF"; exit 1;; esac
+          git fetch -q origin '+refs/heads/claimset/*:refs/remotes/origin/claimset/*' || true
+          if git diff --name-only "origin/$BASE_REF"...HEAD | grep -q '^claimset/'; then
+            echo "::error::this pull request changes claimset/, which lives on the study branches"; exit 1
+          fi
+          for b in $(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/claimset/*'); do
+            for root in $(git rev-list --first-parent --max-parents=0 "$b"); do
+              if git merge-base --is-ancestor "$root" HEAD; then
+                echo "::error::this pull request contains the history of the study branch $b"; exit 1
+              fi
+            done
+          done

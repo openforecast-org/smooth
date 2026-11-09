@@ -1,0 +1,450 @@
+CLAIMSET Calibration of the prediction intervals of AutoMSARIMA in smooth on M1, M3, Tourism and M4
+licence CC-BY-4.0; contributions C1, C2, C3, C4, C5, C6
+declarations funding: none | competing interests: The guarantor is the author and maintainer of the smooth package that the study evaluates.
+exploration {"lab_record": "A7", "questions": 5, "hypotheses": {"total": 11, "supported": 6, "not_supported": 3, "inconclusive": 2, "revised": 0, "abandoned": 0, "open": 0, "from_exploration": 8}, "tests": {"total": 12, "supported": 6, "not_supported": 3, "inconclusive": 3}, "runs": {"total": 49, "confirmatory": 13, "exploratory": 36, "failed": 3}}
+
+DEFINITIONS
+D1 [method] MSARIMA analytic interval: The quantiles of `predict(interval="prediction")` of a pure ARIMA in smooth 1.3.0, which dispatches to the approximate interval. The ARIMA is the state space model $y_t = w^\top v_{t-l} + \epsilon_t$, $v_t = F v_{t-l} + g\epsilon_t$, $\epsilon_t \sim N(0, \sigma^2)$. The quantile at level $\tau$ and horizon $h$ is $q_{\tau,h} = \hat y_{T+h|T} + \Phi^{-1}(\tau)\sqrt{V_h}$ with $V_h = \hat\sigma^2 \frac{T}{T-k} c_h$, where $\hat\sigma^2 = \frac{1}{T}\sum_{t=1}^{T} e_t^2$, $k$ the number of estimated parameters and $c_h$ the $h$-th diagonal element of the analytic covariance of the state space model, $c_h = 1 + \sum_{j=1}^{h-1} (w^\top F^{j-1} g)^2$ for a model with lag 1. [source B6]
+D2 [data] known-model simulation: Gaussian ARIMA series with $\sigma = 10$ generated from 11 data generating processes (white noise with a constant, random walk with and without drift, AR(1), MA(1), ARIMA(0,1,1), ARIMA(1,1,0), ARIMA(1,1,1), ARIMA(0,2,2), seasonal SARIMA(0,1,1)(0,1,1)$_{12}$ and SARIMA(1,0,0)(1,0,0)$_{12}$) plus an IMA(1,1) with Student-t errors on 4 degrees of freedom; in-sample lengths $T$ of 15, 25, 50, 100 and 300, holdout of 18; 2,000 replicates per process and length with seed 20261105 unless stated.
+D3 [design] cases T, E, S, W: What the fitted AutoMSARIMA or MSARIMA knows about the data generating process of the [[D2:known-model simulation]]: T, true orders and true AR, MA and constant parameters with initial states and scale estimated; E, true orders with estimated parameters; S, orders selected by AutoMSARIMA; W, a fixed wrong model for each process. Each with backcasting or optimal initial states.
+D4 [variable] coverage: For a quantile $q_\tau$, the share of holdout observations at or below it, $c_\tau = \frac{1}{h}\sum_{j=1}^{h} 1(y_{T+j} \le q_{\tau,j})$, averaged first within a series and then over series. cov80 is $c_{0.9} - c_{0.1}$, the coverage of the central 80% interval; q50 is $c_{0.5}$.
+D5 [data] benchmark: The 5,315 series of M1 (1,001), M3 (3,003) and Tourism (1,311) from fcompdata 0.1.4, with their own holdouts and seasonal periods; lags $(1, m)$ for seasonal series. [members D18, D19, D20]
+D6 [data] M4 sample: 1,500 series each of the yearly, quarterly and monthly M4 series, drawn with seed 20261105 without replacement, with the M4 holdouts. [source B4]
+D7 [design] level terciles: Series split into terciles of the [[D17:level ratio]] across the series of a data set; cov80 reported for each tercile, and the spread as the largest minus the smallest of the three.
+D8 [method] auto.adam error selection: R `auto.adam(y, model="NNN", lags, distribution=c("dnorm","dlnorm"), initial="backcasting")` of smooth 4.6: the ARIMA orders and constant are selected by AICc for each distribution with the maxima of auto.msarima (AR (3,3), I (2,1), MA (3,3)), then the distribution with the lower AICc is kept; with dnorm the model is the [[D10:AutoMSARIMA]] model, with dlnorm it is the [[D11:log-normal ARIMA]]. Quantiles from `forecast(interval="prediction")`. [source B6]
+D9 [data] fresh M4 sample: 1,500 series each of the yearly, quarterly and monthly M4 series, drawn with seed 20261107 from the series not in the [[D6:M4 sample]], so disjoint from it. [source B4]
+D10 [method] AutoMSARIMA: `AutoMSARIMA(lags, initial)` in Python and `auto.msarima()` in R of smooth 1.3.0 / 4.6: ARIMA orders up to AR (3,3), I (2,1), MA (3,3) and a constant selected by AICc, normal errors, the [[D1:MSARIMA analytic interval]] for the quantiles. Backcasting initial states unless stated. [source B6]
+D11 [method] log-normal ARIMA: ADAM with `model="NNN"`, an ARIMA and `distribution="dlnorm"`: the ARIMA applies to the logarithms, $\log y_t = w^\top v_{t-l} + \log(1+\epsilon_t)$, $v_t = F v_{t-l} + g \log(1+\epsilon_t)$, $1+\epsilon_t \sim \mathrm{logN}(-\sigma^2/2, \sigma^2)$, so the scale of the error is proportional to the level. In the comparisons with fixed orders, the orders and constant are those [[D10:AutoMSARIMA]] selects on the same series. [source B6]
+D12 [method] reforecast: `reforecast()` of smooth: draws the parameters 300 times from a normal distribution with the estimated covariance of the parameters, reapplies the model with each draw and simulates the predictive distribution, so that the quantiles include the uncertainty of the parameters.
+D13 [variable] MCE: Mean calibration error over the 99 quantile levels $\tau = 0.01, \dots, 0.99$: $\frac{1}{99}\sum_\tau |\bar c_\tau - \tau|$, with $\bar c_\tau$ the [[D4:coverage]] of $q_\tau$.
+D14 [variable] scaled pinball: Pinball loss averaged over the 99 quantile levels and the horizons, divided by the mean absolute first difference of the in-sample data for real series; in the simulation, by $\sigma$, and relpin is its ratio to the pinball of the true predictive distribution.
+D15 [method] ETS forced and selected: ETS of smooth with backcasting: AutoADAM-style selection among ETS models (`ES(model="ZXZ")`, or ZXN for non-seasonal series), or ETS(ANN) or ETS(MNN) fitted to every series. [source B6]
+D16 [method] other ARIMA implementations: statsforecast AutoARIMA, pmdarima auto_arima and skforecast Arima, as run in the notebook of the smooth benchmark of 2026-11-05, whose saved forecasts were read.
+D17 [variable] level ratio: Mean of the last third of the in-sample data of a series divided by the mean of all its in-sample data.
+D18 [data] M1: The 1,001 series of the M1 competition with their holdouts. [source B1]
+D19 [data] M3: The 3,003 series of the M3 competition with their holdouts. [source B2]
+D20 [data] Tourism: The 1,311 series of the tourism forecasting competition with their holdouts. [source B3]
+D21 [setting] smooth 1.0.8 and 1.3.0: Python smooth at tag v1.0.8-py (a separate worktree with its own environment) and at 1.3.0 (commit 634657d8 of openforecast-org/smooth).
+
+CLAIMS
+C1 [descriptive; principal; support: simulation E1 (E1.R89, E1.R63, E1.R59, E1.R46) artefacts A3, A8; assumes C24; uses C7, C12; strength high (author); planning confirmatory; outcome supported]
+  With the true orders and true parameters, the [[D1:MSARIMA analytic interval]] is calibrated over the 99 quantiles in the [[D2:known-model simulation]] at $T$ of 100 and 300: [[D13:MCE]] lies between 0.0007 and 0.0024 and the ratio of the interval width to the theoretical width between 0.9965 and 1.0019, with backcasting and with optimal initial states.
+  scope: data_type: simulated Gaussian ARIMA and SARIMA series | conditions: holdout of 18; smooth 1.3.0 (Python); case T of the cases T, E, S, W; T of 100 and 300
+  addresses B6: The book derives the interval; this checks the implementation of smooth 1.3.0 against it.
+  test: deterministic; sample 2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis; supported if m_b100<0.01 and x_b100<0.02 and abs(w_b100-1)<0.02 and m_o100<0.01 and x_o100<0.02 and abs(w_o100-1)<0.02 and m_b300<0.01 and x_b300<0.02 and abs(w_b300-1)<0.02 and m_o300<0.01 and x_o300<0.02 and abs(w_o300-1)<0.02; not supported if m_b100>0.02 or x_b100>0.04 or abs(w_b100-1)>0.04 or m_o100>0.02 or x_o100>0.04 or abs(w_o100-1)>0.04 or m_b300>0.02 or x_b300>0.04 or abs(w_b300-1)>0.04 or m_o300>0.02 or x_o300>0.04 or abs(w_o300-1)>0.04; verdict computed
+  plan: lab plan PL4; planned 2026-11-05T11:37:01Z; anchor git_remote
+C2 [descriptive; principal; support: empirical_quant E8 (E8.R7, E8.R8, E8.R9, E8.R18, E8.R19, E8.R20); assumes C25; uses C8; limitations L2, L3; strength moderate (author); planning confirmatory; outcome supported]
+  On the [[D6:M4 sample]], the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]] falls with the [[D17:level ratio]]: 0.813, 0.700 and 0.554 from the lowest to the highest of the [[D7:level terciles]], while ETS(MNN) of [[D15:ETS forced and selected]], whose error scale follows the level, covers 0.764, 0.778 and 0.814.
+  scope: data_type: M4 yearly, quarterly and monthly series | conditions: backcasting; smooth 1.3.0 (Python)
+  addresses B5: Chatfield discusses why intervals are too narrow in general; this locates the shortfall of one implementation on series whose level has grown.
+  test: deterministic; sample 4500 M4 series (1500 yearly, quarterly, monthly), seed 20261105, terciles of the recent level over the mean level from the first method; supported if fa >= 0.10 and fm <= 0.05; not supported if fa < 0.05; verdict computed; flags code_changed_after_plan
+  plan: lab plan PL12; planned 2026-11-05T18:40:25Z; anchor git_remote
+C3 [descriptive; principal; support: empirical_quant E9 (E9.R18, E9.R19, E9.R20, E9.R22, E9.R3, E9.R14); uses C2; limitations L2; strength moderate (author); planning confirmatory; outcome supported]
+  On the [[D6:M4 sample]], the [[D11:log-normal ARIMA]] with the orders [[D10:AutoMSARIMA]] selects removes the fall of 80% [[D4:coverage]] over the [[D7:level terciles]] (0.774, 0.783 and 0.752, a spread of 0.031) and lowers [[D13:MCE]] from 0.0386 to 0.0177.
+  scope: data_type: M4 yearly, quarterly and monthly series | conditions: backcasting; orders fixed at those AutoMSARIMA selects
+  test: deterministic; sample 4500 M4 series as in the plan of H8, same seed; supported if sd <= 0.05 and md <= 0.5*ma; not supported if sd > 0.10 or md >= ma; verdict computed; flags code_changed_after_plan
+  plan: lab plan PL13; planned 2026-11-05T18:40:25Z; anchor git_remote
+C4 [descriptive; principal; support: simulation E10 (E10.R76, E10.R441, E10.R102, E10.R467, E10.R89, E10.R454) artefacts A4, A8; uses C9; limitations L2, L4; strength high (author); planning confirmatory; outcome supported]
+  On known models, the [[D10:AutoMSARIMA]] interval of smooth 1.3.0 is calibrated no worse than that of 1.0.8 ([[D21:smooth 1.0.8 and 1.3.0]]): at $T = 100$ in the [[D2:known-model simulation]] its [[D13:MCE]] is 0.0100 against 0.0120 with estimated parameters, 0.0139 against 0.0172 with selected orders and 0.0085 against 0.0246 with optimal initial states.
+  scope: data_type: simulated Gaussian ARIMA and SARIMA series | conditions: holdout of 18; T = 100; cases E and S
+  test: deterministic; sample 2000 replicates per cell, 11 DGPs, T=50,100,300, seed 20261105 in both versions; run 1 smooth 1.0.8 (v1.0.8-py), run 2 smooth 1.3.0; supported if eb130 <= eb108+0.001 and sb130 <= sb108+0.001 and eo130 <= eo108+0.001; not supported if eb130 > eb108+0.005 or sb130 > sb108+0.005 or eo130 > eo108+0.005; verdict computed; flags code_changed_after_plan
+  plan: lab plan PL11; planned 2026-11-05T18:40:15Z; anchor git_remote
+C5 [descriptive; principal; support: empirical_quant E12 (E12.R7, E12.R25, E12.R13, E12.R31) artefacts A6; limitations L5, L6; strength moderate (author); planning confirmatory; outcome inconclusive]
+  On the [[D9:fresh M4 sample]], [[D8:auto.adam error selection]] lowers [[D13:MCE]] from 0.0352 to 0.0224 and the spread of 80% [[D4:coverage]] over the [[D7:level terciles]] from 0.272 to 0.077 against R auto.msarima ([[D10:AutoMSARIMA]]), short of the planned reduction of MCE to 0.6 times that of auto.msarima, so the planned test is inconclusive.
+  scope: data_type: M4 yearly, quarterly and monthly series | conditions: backcasting; R smooth 4.6
+  test: deterministic; sample 4500 fresh M4 series, one run; supported if ms <= 0.6*ma and ss <= 0.08; not supported if ms >= ma or ss >= sa; verdict computed
+  plan: lab plan PL15; planned 2026-11-09T17:07:13Z; anchor git_remote
+C6 [interpretive; principal; support: argument W1; uses C10, C11; strength moderate (author); planning exploratory]
+  The wider intervals of ETS than of [[D10:AutoMSARIMA]] on the [[D5:benchmark]] come from the multiplicative-error models in the ETS pool of [[D15:ETS forced and selected]], not from how either package computes the interval.
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting
+C7 [descriptive; supporting; support: simulation E3 (E3.R7, E3.R20, E3.R11, E3.R24, E3.R46, E3.R59, E3.R50, E3.R63, E3.R85, E3.R98, E3.R89, E3.R102) artefacts A8; strength high (author); planning confirmatory; outcome supported]
+  With estimated parameters in the [[D2:known-model simulation]], the [[D1:MSARIMA analytic interval]] and the simulated interval of the same fit have the same width and [[D13:MCE]] at $T$ of 50, 100 and 300 (widths 0.957 and 0.957, 0.981 and 0.980, 0.997 and 0.996; MCE 0.0196 and 0.0197, 0.0100 and 0.0100, 0.0026 and 0.0027).
+  scope: data_type: simulated Gaussian ARIMA and SARIMA series | conditions: holdout of 18; smooth 1.3.0 (Python); case E; backcasting
+  addresses B6: Checks that the analytic variance of the implementation matches simulation from the same model.
+  test: deterministic; sample 2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis; supported if abs(ws50/wa50-1)<0.01 and abs(ms50-ma50)<0.003 and abs(ws100/wa100-1)<0.01 and abs(ms100-ma100)<0.003 and abs(ws300/wa300-1)<0.01 and abs(ms300-ma300)<0.003; not supported if abs(ws50/wa50-1)>0.03 or abs(ms50-ma50)>0.01 or abs(ws100/wa100-1)>0.03 or abs(ms100-ma100)>0.01 or abs(ws300/wa300-1)>0.03 or abs(ms300-ma300)>0.01; verdict computed
+  plan: lab plan PL6; planned 2026-11-05T11:37:02Z; anchor git_remote
+C8 [descriptive; supporting; support: empirical_quant E13 (E13.R1, E13.R2, E13.R3, E13.R4, E13.R5, E13.R6, E13.R7, E13.R8, E13.R9, E13.R10, E13.R11, E13.R12); assumes C25; strength moderate (author); planning exploratory]
+  On the 5,315 [[D5:benchmark]] series, the fall of 80% [[D4:coverage]] over the [[D7:level terciles]] is shared by [[D10:AutoMSARIMA]] (0.786, 0.668, 0.590) and the [[D16:other ARIMA implementations]]: statsforecast AutoARIMA (0.789, 0.667, 0.589), pmdarima (0.770, 0.635, 0.582) and skforecast (0.781, 0.658, 0.585).
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting for smooth
+C9 [descriptive; supporting; support: empirical_quant E17 (E17.R1, E17.R2); strength moderate (author); planning exploratory]
+  The width of the [[D10:AutoMSARIMA]] interval on the [[D5:benchmark]] did not change between [[D21:smooth 1.0.8 and 1.3.0]]: the median ratio of the 80% widths of 1.3.0 over 1.0.8 is 1.000 with backcasting and with optimal initial states.
+  scope: data_type: M1, M3 and Tourism series
+C10 [descriptive; supporting; support: empirical_quant E13 (E13.R13, E13.R14, E13.R15); limitations L7; strength moderate (author); planning exploratory]
+  On the 114 [[D5:benchmark]] series where the selected ETS(ANN) of [[D15:ETS forced and selected]] and the ARIMA(0,1,1) selected by [[D10:AutoMSARIMA]] give the same forecast and width, the two have the same 80% [[D4:coverage]], 0.734.
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting
+C11 [descriptive; supporting; support: empirical_quant E14 (E14.R3, E14.R2, E14.R1); strength moderate (author); planning exploratory]
+  Forced on all 5,315 [[D5:benchmark]] series, ETS(MNN) of [[D15:ETS forced and selected]] has an 80% [[D4:coverage]] of 0.764, against 0.668 for ETS(ANN) and 0.695 for ARIMA(0,1,1).
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting
+C12 [descriptive; supporting; not_applicable; support: empirical_quant E18 (E18.R1, E18.R2, E18.R3, E18.R4); strength moderate (author); planning exploratory]
+  R and Python give the same [[D10:AutoMSARIMA]] interval on 500 [[D5:benchmark]] series: the median ratio of the 80% widths is 1.000, the same model is selected on every series and both have an 80% [[D4:coverage]] of 0.677.
+  scope: data_type: 500 M1, M3 and Tourism series | conditions: backcasting
+C24 [descriptive; supporting; assumption (methodological, unchecked)]
+  The coverage of a set of series is well summarised by first averaging the holdout observations within each series and then averaging over series, all horizons together.
+C25 [descriptive; supporting; assumption (data, unchecked)]
+  The ratio of the mean of the last third of a series to its overall mean indexes how much the scale of its errors at the forecast origin exceeds the average scale over the sample.
+C13 [descriptive; secondary; extension; support: simulation E2 (E2.R41) artefacts A8; strength moderate (author); planning confirmatory; outcome inconclusive]
+  Whether selecting the orders with [[D10:AutoMSARIMA]] loses little [[D4:coverage]] in the [[D2:known-model simulation]] at $T = 100$ was not settled: pooled cov80 with selected orders was 0.756, between the threshold for little loss (0.77) and that for a large loss (0.74).
+  scope: data_type: simulated Gaussian ARIMA and SARIMA series | conditions: holdout of 18; smooth 1.3.0 (Python); case S; T = 100; backcasting
+  extends B5: Chatfield lists model selection among the reasons intervals are too narrow; this measures it for AutoMSARIMA.
+  test: deterministic; sample 2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis; supported if s >= 0.77; not supported if s < 0.74; verdict computed
+  plan: lab plan PL5; planned 2026-11-05T11:37:02Z; anchor git_remote
+C14 [descriptive; secondary; extension; support: simulation E4 (E4.R93, E4.R67) artefacts A8; strength high (author); planning confirmatory; outcome not_supported]
+  Estimating the parameters does not cost 6 points of 80% [[D4:coverage]] of the [[D1:MSARIMA analytic interval]] at $T = 100$ in the [[D2:known-model simulation]]: with the true orders, pooled cov80 is 0.800 with true parameters and 0.770 with estimated parameters, a loss of 3 points.
+  scope: data_type: simulated Gaussian ARIMA and SARIMA series | conditions: holdout of 18; smooth 1.3.0 (Python); cases T and E; T = 100; backcasting
+  extends B5: Chatfield attributes narrow intervals partly to ignored parameter uncertainty; this sizes the effect at T = 100.
+  test: deterministic; sample 2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis; supported if t-e >= 0.06; not supported if t-e < 0.03; verdict computed
+  plan: lab plan PL7; planned 2026-11-05T11:37:02Z; anchor git_remote
+C15 [descriptive; secondary; support: simulation E5 (E5.R76, E5.R89, E5.R78, E5.R91, E5.R102, E5.R115, E5.R104, E5.R117) artefacts A8; strength high (author); planning confirmatory; outcome not_supported]
+  [[D12:reforecast]] does not improve on the [[D1:MSARIMA analytic interval]] of `predict()` in the [[D2:known-model simulation]] at $T = 100$ with estimated parameters: with backcasting its [[D13:MCE]] is 0.0265 against 0.0100 and its relative [[D14:scaled pinball]] 1.958 against 1.043; with optimal initial states its MCE is lower (0.0053 against 0.0085) but its relative pinball higher (1.396 against 1.058).
+  scope: data_type: simulated Gaussian ARIMA and SARIMA series | conditions: holdout of 18; smooth 1.3.0 (Python); case E; T = 100
+  addresses B6: The book proposes reforecasting to include parameter uncertainty; this tests the implementation for ARIMA.
+  test: deterministic; sample 2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis; supported if rb<mb and sb<=pb and ro<mo and so<=po; not supported if rb>mb+0.002 or sb>pb*1.01 or ro>mo+0.002 or so>po*1.01; verdict computed
+  plan: lab plan PL8; planned 2026-11-05T11:37:02Z; anchor git_remote
+C16 [descriptive; secondary; support: simulation E6 (E6.R41, E6.R44) artefacts A8; limitations L1; strength low (author); planning confirmatory; outcome supported]
+  A fixed wrong model alone produces under-coverage of the size seen on the [[D5:benchmark]]: over 12 wrong models in the [[D2:known-model simulation]] at $T = 100$ the pooled 80% [[D4:coverage]] of the [[D1:MSARIMA analytic interval]] is 0.676 and its q50 0.428.
+  scope: data_type: simulated Gaussian ARIMA and SARIMA series | conditions: holdout of 18; smooth 1.3.0 (Python); case W with 12 fixed wrong models; T = 100; backcasting
+  test: deterministic; sample 2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis; supported if w <= 0.72; not supported if w >= 0.76; verdict computed
+  plan: lab plan PL9; planned 2026-11-05T11:37:03Z; anchor git_remote
+C17 [descriptive; secondary; support: empirical_quant E7 (E7.R1, E7.R8, E7.R7, E7.R14); strength high (author); planning confirmatory; outcome not_supported]
+  On the 5,315 [[D5:benchmark]] series, [[D12:reforecast]] does not close the gap of the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]]: cov80 moves from 0.681 to 0.683 and its mean [[D14:scaled pinball]] is 7e191 against 0.899.
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting; smooth 1.3.0 (Python)
+  test: deterministic; sample All 5,315 series, seed per series, nsim=300; run only after the verdict of the plan testing reforecast() in simulation; supported if cr-cp >= 0.5*(0.8-cp) and pr <= 1.01*pp; not supported if cr-cp < 0.2*(0.8-cp) or pr > 1.05*pp; verdict computed
+  plan: lab plan PL10; planned 2026-11-05T11:37:03Z; anchor git_remote
+C18 [descriptive; secondary; not_applicable; support: empirical_quant E11; strength very_low (author); planning confirmatory; outcome inconclusive]
+  The planned test of [[D8:auto.adam error selection]] against auto.msarima on the [[D9:fresh M4 sample]] under plan PL14 gave no result: its only run stopped on loading the M4 data, before any model was fitted.
+  scope: data_type: M4 yearly, quarterly and monthly series
+  test: deterministic; sample 4500 fresh M4 series, one run; supported if ms <= 0.6*ma and ss <= 0.08; not supported if ms >= ma or ss >= sa; verdict computed
+  plan: lab plan PL14; planned 2026-11-07T14:02:07Z; anchor git_remote
+C19 [descriptive; secondary; support: empirical_quant E15 (E15.R1, E15.R7, E15.R2, E15.R8, E15.R3, E15.R9); strength moderate (author); planning exploratory]
+  On the 5,315 [[D5:benchmark]] series, the [[D11:log-normal ARIMA]] with the selected orders raises the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]] from 0.681 to 0.756 and lowers [[D13:MCE]] from 0.0402 to 0.0124, but raises the median [[D14:scaled pinball]] from 0.496 to 0.551.
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting; orders fixed at those AutoMSARIMA selects
+C20 [descriptive; secondary; support: empirical_quant E16 (E16.R14, E16.R21, E16.R3, E16.R25, E16.R7, E16.R27, E16.R9) artefacts A5; limitations L5, L6; strength moderate (author); planning exploratory]
+  On the 5,315 [[D5:benchmark]] series, [[D8:auto.adam error selection]] chooses dlnorm for 64% of the series, raises 80% [[D4:coverage]] from 0.681 to 0.729, lowers [[D13:MCE]] from 0.0402 to 0.0187 and raises the median [[D14:scaled pinball]] from 0.496 to 0.514 against R auto.msarima ([[D10:AutoMSARIMA]]).
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting; R smooth 4.6
+C21 [predictive; secondary; extension; support: empirical_quant E19 (E19.R3, E19.R1); limitations L8; strength low (author); planning exploratory]
+  Estimation and selection alone, as measured in the [[D2:known-model simulation]], predict an 80% [[D4:coverage]] of 0.717 for [[D10:AutoMSARIMA]] at the lengths of the [[D5:benchmark]] series, against 0.801 with the true parameters.
+  scope: data_type: simulated series at the lengths of the M1, M3 and Tourism series | conditions: backcasting; case S
+  extends B5: Sizes the effect of estimation and selection on short series for one implementation.
+C22 [descriptive; secondary; support: empirical_quant E20 (E20.R39, E20.R40, E20.R41, E20.R42, E20.R43, E20.R44) artefacts A6; strength moderate (author); planning exploratory]
+  On the [[D9:fresh M4 sample]], [[D8:auto.adam error selection]] has a higher [[D13:MCE]] than R auto.msarima ([[D10:AutoMSARIMA]]) in the lowest and highest [[D7:level terciles]] (0.041 against 0.035, and 0.105 against 0.076) and a lower one only in the middle tercile (0.020 against 0.041), so its lower overall MCE comes in part from errors of opposite sign in different series.
+  scope: data_type: M4 yearly, quarterly and monthly series | conditions: backcasting; R smooth 4.6
+C23 [descriptive; secondary; support: empirical_quant E20 (E20.R16, E20.R17) artefacts A4; strength moderate (author); planning exploratory]
+  On the 5,315 [[D5:benchmark]] series, the [[D13:MCE]] of [[D10:AutoMSARIMA]] is 0.0402 with smooth 1.3.0 against 0.0326 with 1.0.8 ([[D21:smooth 1.0.8 and 1.3.0]]) with backcasting.
+  scope: data_type: M1, M3 and Tourism series | conditions: backcasting
+
+EVIDENCE
+E1 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case T of [[D3:cases T, E, S, W]] with backcasting and optimal initial states (lab run RN6, plan PL4). Width is the ratio of the 80% interval width to the theoretical $h$-step width; maxcellmce is the largest MCE over the processes.
+  setup: studied D1; cases D2; procedure D3; lens D4, D13
+  E1.R41 pooled cov80 over the DGPs = 0.7996717171717171 {T: 100, case: T_backcasting}
+  E1.R46 pooled width over the DGPs = 1.0018975430750083 {T: 100, case: T_backcasting}
+  E1.R50 pooled mce over the DGPs = 0.002347566574839311 {T: 100, case: T_backcasting}
+  E1.R51 pooled maxcellmce over the DGPs = 0.014508136924803598 {T: 100, case: T_backcasting}
+  E1.R54 pooled cov80 over the DGPs = 0.7971944444444445 {T: 100, case: T_optimal}
+  E1.R59 pooled width over the DGPs = 0.9965079650994704 {T: 100, case: T_optimal}
+  E1.R63 pooled mce over the DGPs = 0.002378711355984074 {T: 100, case: T_optimal}
+  E1.R64 pooled maxcellmce over the DGPs = 0.014505611672278346 {T: 100, case: T_optimal}
+  E1.R85 pooled width over the DGPs = 1.000745813821255 {T: 300, case: T_backcasting}
+  E1.R89 pooled mce over the DGPs = 0.0006805683093562026 {T: 300, case: T_backcasting}
+  E1.R90 pooled maxcellmce over the DGPs = 0.0058672839506172785 {T: 300, case: T_backcasting}
+  E1.R98 pooled width over the DGPs = 0.999189350813739 {T: 300, case: T_optimal}
+  E1.R102 pooled mce over the DGPs = 0.0008571064177124785 {T: 300, case: T_optimal}
+  E1.R103 pooled maxcellmce over the DGPs = 0.0058672839506172785 {T: 300, case: T_optimal}
+  parameters: A8
+  seeds: [20261105]
+E2 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case S, orders selected by [[D10:AutoMSARIMA]] (run RN11, plan PL5).
+  setup: studied D10; cases D2; procedure D3; lens D4
+  E2.R41 pooled cov80 over the DGPs = 0.7559267676767676 {T: 100, case: S_backcasting}
+  E2.R54 pooled cov80 over the DGPs = 0.7572424242424242 {T: 100, case: S_optimal}
+  parameters: A8
+  seeds: [20261105]
+E3 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case E with the [[D1:MSARIMA analytic interval]] against the simulated interval of the same fit (`interval="simulated"`, 10,000 paths) (run RN7, plan PL6).
+  setup: studied D1; cases D2; procedure D3; lens D4, D13
+  E3.R7 pooled width over the DGPs = 0.9571865764457477 {T: 50, case: E_backcasting}
+  E3.R11 pooled mce over the DGPs = 0.019618406285072953 {T: 50, case: E_backcasting}
+  E3.R20 pooled width over the DGPs = 0.9570246020280071 {T: 50, case: E_backcasting_sim}
+  E3.R24 pooled mce over the DGPs = 0.0196577134986226 {T: 50, case: E_backcasting_sim}
+  E3.R46 pooled width over the DGPs = 0.98068173371577 {T: 100, case: E_backcasting}
+  E3.R50 pooled mce over the DGPs = 0.00999872461993675 {T: 100, case: E_backcasting}
+  E3.R59 pooled width over the DGPs = 0.9804924240470849 {T: 100, case: E_backcasting_sim}
+  E3.R63 pooled mce over the DGPs = 0.010021553923069082 {T: 100, case: E_backcasting_sim}
+  E3.R85 pooled width over the DGPs = 0.9966012447878664 {T: 300, case: E_backcasting}
+  E3.R89 pooled mce over the DGPs = 0.0026437863483317944 {T: 300, case: E_backcasting}
+  E3.R98 pooled width over the DGPs = 0.9964067752797617 {T: 300, case: E_backcasting_sim}
+  E3.R102 pooled mce over the DGPs = 0.002688526680950923 {T: 300, case: E_backcasting_sim}
+  parameters: A8
+  seeds: [20261105]
+E4 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Cases T and E (run RN8, plan PL7).
+  setup: studied D1; cases D2; procedure D3; lens D4
+  E4.R67 pooled cov80 over the DGPs = 0.7700555555555556 {T: 100, case: E_backcasting}
+  E4.R93 pooled cov80 over the DGPs = 0.7996717171717171 {T: 100, case: T_backcasting}
+  parameters: A8
+  seeds: [20261105]
+E5 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case E with `predict()` against [[D12:reforecast]] (suffix _ref) (run RN9, plan PL8).
+  setup: studied D1, D12; cases D2; procedure D3; lens D13, D14
+  E5.R76 pooled mce over the DGPs = 0.00999872461993675 {T: 100, case: E_backcasting}
+  E5.R78 pooled relpin over the DGPs = 1.043170004368166 {T: 100, case: E_backcasting}
+  E5.R89 pooled mce over the DGPs = 0.02651617181920213 {T: 100, case: E_backcasting_ref}
+  E5.R91 pooled relpin over the DGPs = 1.9575365936241682 {T: 100, case: E_backcasting_ref}
+  E5.R102 pooled mce over the DGPs = 0.00850140291806958 {T: 100, case: E_optimal}
+  E5.R104 pooled relpin over the DGPs = 1.0578011747050307 {T: 100, case: E_optimal}
+  E5.R115 pooled mce over the DGPs = 0.005329303132333438 {T: 100, case: E_optimal_ref}
+  E5.R117 pooled relpin over the DGPs = 1.3961320998657083 {T: 100, case: E_optimal_ref}
+  parameters: A8
+  seeds: [20261105]
+E6 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case W: each process fitted with one fixed wrong model (e.g. a random walk with drift fitted as ARIMA(0,1,0) without drift, an ARIMA(1,1,1) as ARIMA(0,1,1)); 12 wrong models chosen by the authors (run RN10, plan PL9).
+  setup: studied D1; cases D2; procedure D3; lens D4
+  E6.R41 pooled cov80 over the DGPs = 0.6756041666666667 {T: 100, case: W_backcasting}
+  E6.R44 pooled q50 over the DGPs = 0.42814120370370373 {T: 100, case: W_backcasting}
+  E6.R67 pooled cov80 over the DGPs = 0.803136574074074 {T: 100, case: oracle}
+  E6.R70 pooled q50 over the DGPs = 0.49877314814814816 {T: 100, case: oracle}
+  parameters: A8
+  seeds: [20261105]
+E7 [quant; design benchmark] [[D10:AutoMSARIMA]] with backcasting fitted to each of the 5,315 [[D5:benchmark]] series; `predict()` and [[D12:reforecast]] quantiles scored on the holdout, with the harness of the smooth benchmark notebook of 2026-11-05; the `predict()` coverage reproduces the saved benchmark array exactly (run RN12, plan PL10).
+  setup: studied D10, D12; cases D5; lens D4, D14
+  E7.R1 benchmark cov80 = 0.6812166823455579 {initial: backcasting, method: predict}
+  E7.R7 benchmark pinball = 0.8991160322346123 {initial: backcasting, method: predict}
+  E7.R8 benchmark cov80 = 0.6826617539458528 {initial: backcasting, method: reforecast}
+  E7.R14 benchmark pinball = 6.983616214609794e+191 {initial: backcasting, method: reforecast}
+E8 [quant; design benchmark] [[D10:AutoMSARIMA]] with backcasting and ETS(MNN) fitted to every series of the [[D6:M4 sample]]; cov80 per [[D7:level terciles]] (run RN41, plan PL12).
+  setup: studied D10, D15; cases D6; procedure D7; lens D4, D13, D17
+  E8.R1 M4 cov80 = 0.688907407407404 {method: auto}
+  E8.R3 M4 mce = 0.03864774286070695 {method: auto}
+  E8.R7 M4 cov80_low = 0.8128425925925926 {method: auto}
+  E8.R8 M4 cov80_mid = 0.6995277777777779 {method: auto}
+  E8.R9 M4 cov80_high = 0.5543518518518519 {method: auto}
+  E8.R10 M4 fall_low_to_high = 0.25849074074074074 {method: auto}
+  E8.R12 M4 cov80 = 0.7853518518518472 {method: force_mnn}
+  E8.R13 M4 q50 = 0.37229938271604845 {method: force_mnn}
+  E8.R14 M4 mce = 0.08485447063225016 {method: force_mnn}
+  E8.R18 M4 cov80_low = 0.7639907407407407 {method: force_mnn}
+  E8.R19 M4 cov80_mid = 0.7778888888888889 {method: force_mnn}
+  E8.R20 M4 cov80_high = 0.8141759259259259 {method: force_mnn}
+  E8.R21 M4 fall_low_to_high = -0.05018518518518522 {method: force_mnn}
+E9 [quant; design benchmark] [[D10:AutoMSARIMA]] and the [[D11:log-normal ARIMA]] with the same selected orders on the [[D6:M4 sample]]; MCE and cov80 per [[D7:level terciles]] (run RN42, plan PL13).
+  setup: studied D10, D11; cases D6; procedure D7; lens D4, D13, D14, D17
+  E9.R3 M4 mce = 0.03864774286070695 {method: auto}
+  E9.R4 M4 pinball_median = 0.6752090358841512 {method: auto}
+  E9.R11 M4 spread = 0.25849074074074074 {method: auto}
+  E9.R12 M4 cov80 = 0.7698179012345646 {method: auto_dlnorm}
+  E9.R14 M4 mce = 0.017709097144281392 {method: auto_dlnorm}
+  E9.R15 M4 pinball_median = 0.7678888517156283 {method: auto_dlnorm}
+  E9.R18 M4 cov80_low = 0.7741851851851852 {method: auto_dlnorm}
+  E9.R19 M4 cov80_mid = 0.783175925925926 {method: auto_dlnorm}
+  E9.R20 M4 cov80_high = 0.7520925925925926 {method: auto_dlnorm}
+  E9.R22 M4 spread = 0.03108333333333335 {method: auto_dlnorm}
+E10 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Cases T, E, S with backcasting and E with optimal initial states, run with [[D21:smooth 1.0.8 and 1.3.0]] on the same seeds (runs RN43 for 1.0.8 and RN44 for 1.3.0, plan PL11).
+  setup: studied D10; cases D2; procedure D3; lens D4, D13; context D21
+  E10.R76 pooled mce over the DGPs = 0.012016197326803405 {T: 100, case: E_backcasting, smooth version: 1.0.8}
+  E10.R85 pooled width over the DGPs = 3.3857354031747757 {T: 100, case: E_optimal, smooth version: 1.0.8}
+  E10.R89 pooled mce over the DGPs = 0.02458198143046628 {T: 100, case: E_optimal, smooth version: 1.0.8}
+  E10.R102 pooled mce over the DGPs = 0.017238598102234465 {T: 100, case: S_backcasting, smooth version: 1.0.8}
+  E10.R106 pooled cov80 over the DGPs = 0.8256464646464646 {T: 100, case: T_backcasting, smooth version: 1.0.8}
+  E10.R111 pooled width over the DGPs = 1.1104600391287058 {T: 100, case: T_backcasting, smooth version: 1.0.8}
+  E10.R441 pooled mce over the DGPs = 0.00999872461993675 {T: 100, case: E_backcasting, smooth version: 1.3.0}
+  E10.R450 pooled width over the DGPs = 1.011133324773201 {T: 100, case: E_optimal, smooth version: 1.3.0}
+  E10.R454 pooled mce over the DGPs = 0.00850140291806958 {T: 100, case: E_optimal, smooth version: 1.3.0}
+  E10.R467 pooled mce over the DGPs = 0.01387776757473727 {T: 100, case: S_backcasting, smooth version: 1.3.0}
+  E10.R471 pooled cov80 over the DGPs = 0.7996717171717171 {T: 100, case: T_backcasting, smooth version: 1.3.0}
+  E10.R476 pooled width over the DGPs = 1.0018975430750083 {T: 100, case: T_backcasting, smooth version: 1.3.0}
+  parameters: A8
+  seeds: [20261105]
+E11 [quant; design benchmark] Planned comparison of [[D8:auto.adam error selection]] with auto.msarima on the [[D9:fresh M4 sample]] (plan PL14). Its only run, RN47, failed while loading M4 because the cached M4 files had been removed; no model was fitted and no result exists.
+  setup: studied D8, D10; cases D9; procedure D7; lens D13
+E12 [quant; design benchmark] R auto.msarima ([[D10:AutoMSARIMA]]) and [[D8:auto.adam error selection]] fitted to the 4,500 series of the [[D9:fresh M4 sample]] with backcasting; 99 quantiles per series scored on the M4 holdouts; MCE, cov80 by [[D7:level terciles]], scaled pinball, and the share of series choosing dlnorm (run RN48, plan PL15, which repeats PL14 after its failed run).
+  setup: studied D8, D10; cases D9; procedure D7; lens D4, D13, D14, D17
+  E12.R3 m4 cov80 = 0.7460771604938237 {method: adam_select}
+  E12.R7 m4 mce = 0.02235705823668769 {method: adam_select}
+  E12.R9 m4 pinball_median = 0.7513877422626215 {method: adam_select}
+  E12.R10 m4 cov80_low = 0.7865370370370371 {method: adam_select}
+  E12.R11 m4 cov80_mid = 0.7424537037037038 {method: adam_select}
+  E12.R12 m4 cov80_high = 0.7092407407407407 {method: adam_select}
+  E12.R13 m4 spread = 0.07729629629629642 {method: adam_select}
+  E12.R14 m4 share_dlnorm = 0.6702222222222223 {method: adam_select}
+  E12.R21 m4 cov80 = 0.6922623456790093 {method: msarima}
+  E12.R25 m4 mce = 0.035202331961592524 {method: msarima}
+  E12.R27 m4 pinball_median = 0.6871656664671391 {method: msarima}
+  E12.R28 m4 cov80_low = 0.8192685185185186 {method: msarima}
+  E12.R29 m4 cov80_mid = 0.7097777777777778 {method: msarima}
+  E12.R30 m4 cov80_high = 0.5477407407407408 {method: msarima}
+  E12.R31 m4 spread = 0.2715277777777778 {method: msarima}
+E13 [quant; design benchmark] Coverage by [[D7:level terciles]] on the 5,315 [[D5:benchmark]] series for [[D10:AutoMSARIMA]] with backcasting (refitted) and for the [[D16:other ARIMA implementations]] (saved forecasts of the smooth benchmark of 2026-11-05); and coverage of ETS and ARIMA on the series where the selected ETS(ANN) of [[D15:ETS forced and selected]] and the selected ARIMA(0,1,1) give the same forecast and width (exploratory run RN15).
+  setup: studied D10, D16, D15; cases D5; procedure D7; lens D4, D17
+  E13.R1 cov80 by tercile = 0.7862114371708051 {method: auto_back, by: level_t, tercile: low}
+  E13.R2 cov80 by tercile = 0.6677253905514775 {method: auto_back, by: level_t, tercile: mid}
+  E13.R3 cov80 by tercile = 0.5897056057185853 {method: auto_back, by: level_t, tercile: high}
+  E13.R4 cov80 by tercile = 0.7891036493604214 {method: statsforecast AutoARIMA	arima, by: level_t, tercile: low}
+  E13.R5 cov80 by tercile = 0.6671921074094986 {method: statsforecast AutoARIMA	arima, by: level_t, tercile: mid}
+  E13.R6 cov80 by tercile = 0.5892588412340106 {method: statsforecast AutoARIMA	arima, by: level_t, tercile: high}
+  E13.R7 cov80 by tercile = 0.7701503379445391 {method: pmdarima auto_arima	arima, by: level_t, tercile: low}
+  E13.R8 cov80 by tercile = 0.6354047619047619 {method: pmdarima auto_arima	arima, by: level_t, tercile: mid}
+  E13.R9 cov80 by tercile = 0.582459372637944 {method: pmdarima auto_arima	arima, by: level_t, tercile: high}
+  E13.R10 cov80 by tercile = 0.7809364810634561 {method: skforecast Arima	arima, by: level_t, tercile: low}
+  E13.R11 cov80 by tercile = 0.6578047556308425 {method: skforecast Arima	arima, by: level_t, tercile: mid}
+  E13.R12 cov80 by tercile = 0.5854339102081766 {method: skforecast Arima	arima, by: level_t, tercile: high}
+  E13.R13 series with the same forecast and width among ETS(ANN) and ARIMA(0,1,1) selected = 114
+  E13.R14 cov80 among ETS(ANN) and ARIMA(0,1,1) selected = 0.7335526315789473 {subset: same forecast, method: ETS}
+  E13.R15 cov80 among ETS(ANN) and ARIMA(0,1,1) selected = 0.7335526315789473 {subset: same forecast, method: ARIMA}
+E14 [quant; design benchmark] [[D15:ETS forced and selected]] and ARIMA(0,1,1) forced on all 5,315 [[D5:benchmark]] series and the selected ETS and [[D10:AutoMSARIMA]] models, backcasting; cov80 per method (exploratory run RN14 on the forecasts of RN13).
+  setup: studied D15, D10; cases D5; lens D4
+  E14.R1 cov80 of the forced model on all series = 0.6951081843838194 {method: force_011}
+  E14.R2 cov80 of the forced model on all series = 0.6680986725201212 {method: force_ann}
+  E14.R3 cov80 of the forced model on all series = 0.7635413400229957 {method: force_mnn}
+  E14.R4 cov80 ETS = 0.7492447998327585 {subset: all series}
+  E14.R5 cov80 ARIMA = 0.6812166823455629 {subset: all series}
+E15 [quant; design benchmark] [[D10:AutoMSARIMA]] and the [[D11:log-normal ARIMA]] with the same selected orders on the 5,315 [[D5:benchmark]] series, backcasting; cov80, MCE, scaled pinball and cov80 per [[D7:level terciles]] (exploratory run RN38).
+  setup: studied D10, D11; cases D5; procedure D7; lens D4, D13, D14, D17
+  E15.R1 cov80 = 0.6812166823455579 {data: benchmark, method: auto}
+  E15.R2 D13 = 0.04023801303512885 {data: benchmark, method: auto}
+  E15.R3 pinball_median = 0.49587091593158816 {data: benchmark, method: auto}
+  E15.R4 cov80_low = 0.7862114371708051 {data: benchmark, method: auto}
+  E15.R5 cov80_mid = 0.6677253905514775 {data: benchmark, method: auto}
+  E15.R6 cov80_high = 0.5897056057185853 {data: benchmark, method: auto}
+  E15.R7 cov80 = 0.7563447266645736 {data: benchmark, method: auto_dlnorm}
+  E15.R8 D13 = 0.012442956796987046 {data: benchmark, method: auto_dlnorm}
+  E15.R9 pinball_median = 0.5507497802768249 {data: benchmark, method: auto_dlnorm}
+  E15.R10 cov80_low = 0.7492553925257086 {data: benchmark, method: auto_dlnorm}
+  E15.R11 cov80_mid = 0.7514430014430015 {data: benchmark, method: auto_dlnorm}
+  E15.R12 cov80_high = 0.7683330198143967 {data: benchmark, method: auto_dlnorm}
+  E15.R13 pinball_mean = 0.8991160322346123 {data: benchmark, method: auto}
+  E15.R14 pinball_mean = 1.0915965444293732 {data: benchmark, method: auto_dlnorm}
+E16 [quant; design benchmark] R auto.msarima ([[D10:AutoMSARIMA]]) and [[D8:auto.adam error selection]] on the 5,315 [[D5:benchmark]] series, backcasting; 99 quantiles per series; MCE, cov80 by [[D7:level terciles]], scaled pinball and the share choosing dlnorm (exploratory run RN45). Run in R because Python's AutoADAM removes dlnorm from the candidate distributions of a pure ARIMA whatever the user passes.
+  setup: studied D8, D10; cases D5; procedure D7; lens D4, D13, D14, D17
+  E16.R1 benchmark n = 5315 {method: adam_select}
+  E16.R2 benchmark failed = 0 {method: adam_select}
+  E16.R3 benchmark cov80 = 0.7291418417476708 {method: adam_select}
+  E16.R4 benchmark q10 = 0.14210044946169018 {method: adam_select}
+  E16.R5 benchmark q50 = 0.5023649001776945 {method: adam_select}
+  E16.R6 benchmark q90 = 0.871242291209361 {method: adam_select}
+  E16.R7 benchmark mce = 0.018661766615671767 {method: adam_select}
+  E16.R8 benchmark pinball_mean = 0.9224672365355799 {method: adam_select}
+  E16.R9 benchmark pinball_median = 0.513726114261578 {method: adam_select}
+  E16.R10 benchmark cov80_low = 0.7538641208929019 {method: adam_select}
+  E16.R11 benchmark cov80_mid = 0.7102301228994231 {method: adam_select}
+  E16.R12 benchmark cov80_high = 0.7233280005019136 {method: adam_select}
+  E16.R13 benchmark spread = 0.04363399799347878 {method: adam_select}
+  E16.R14 benchmark share_dlnorm = 0.6419567262464723 {method: adam_select}
+  E16.R15 benchmark cov80_when_dlnorm = 0.7503215774391027 {method: adam_select}
+  E16.R16 benchmark mce_when_dlnorm = 0.027252773929209377 {method: adam_select}
+  E16.R17 benchmark cov80_when_dnorm = 0.6911674548957774 {method: adam_select}
+  E16.R18 benchmark mce_when_dnorm = 0.04425148607579844 {method: adam_select}
+  E16.R19 benchmark n = 5315 {method: msarima}
+  E16.R20 benchmark failed = 0 {method: msarima}
+  E16.R21 benchmark cov80 = 0.6812166823455579 {method: msarima}
+  E16.R22 benchmark q10 = 0.14356381310755645 {method: msarima}
+  E16.R23 benchmark q50 = 0.47027281279398014 {method: msarima}
+  E16.R24 benchmark q90 = 0.8247804954531144 {method: msarima}
+  E16.R25 benchmark mce = 0.04023801303512885 {method: msarima}
+  E16.R26 benchmark pinball_mean = 0.8991160322346123 {method: msarima}
+  E16.R27 benchmark pinball_median = 0.49587091593158816 {method: msarima}
+  E16.R28 benchmark cov80_low = 0.7862114371708051 {method: msarima}
+  E16.R29 benchmark cov80_mid = 0.6674191121143718 {method: msarima}
+  E16.R30 benchmark cov80_high = 0.5899680030114812 {method: msarima}
+  E16.R31 benchmark spread = 0.19624343415932388 {method: msarima}
+  E16.R32 benchmark share_dlnorm = 0 {method: msarima}
+  E16.R33 benchmark cov80_when_dnorm = 0.6812166823455579 {method: msarima}
+  E16.R34 benchmark mce_when_dnorm = 0.04023801303512885 {method: msarima}
+E17 [quant; design benchmark] [[D10:AutoMSARIMA]] forecasts of the 5,315 [[D5:benchmark]] series with [[D21:smooth 1.0.8 and 1.3.0]] decomposed in stages: A, 1.0.8; D, 1.3.0 with the parameters of A; B, 1.3.0 with the orders of A; C, 1.3.0. Width ratios are medians over series of the 80% interval width of the later stage over the earlier one (exploratory run RN20 on runs RN16 to RN19).
+  setup: studied D10; cases D5; lens D4; context D21
+  E17.R1 width_all = 0.9999862909317017 {initial: backcasting, stage: A->C}
+  E17.R2 width_all = 0.9999997019767761 {initial: optimal, stage: A->C}
+  E17.R3 width_all = 0.9871264696121216 {initial: backcasting, stage: A->D}
+  E17.R4 dcov80 = -0.01894271976586182 {initial: backcasting, stage: A->C}
+  E17.R5 share with drift = 0.24760112888052682 {initial: backcasting, stage: C}
+  E17.R6 share with drift = 0.3087488240827846 {initial: backcasting, stage: A}
+E18 [quant; design benchmark] 500 [[D5:benchmark]] series drawn with seed 41: R msarima with the orders Python selected, and R auto.msarima against Python [[D10:AutoMSARIMA]], backcasting; ratio of the 80% interval widths and coverage (exploratory run RN37).
+  setup: studied D10; cases D5; lens D4
+  E18.R1 median_width_ratio_R_over_Python = 1.000000000863118 {sample: 500}
+  E18.R2 share_same_auto = 1 {sample: 500}
+  E18.R3 cov80_R_auto = 0.676611111111111 {sample: 500}
+  E18.R4 cov80_Python_auto = 0.676611111111111 {sample: 500}
+E19 [quant; design other] Coverage the [[D2:known-model simulation]] predicts at the lengths of the 5,315 [[D5:benchmark]] series: the pooled cov80 of each case of [[D3:cases T, E, S, W]] interpolated on log T at each series length (lengths below 15 and above 300 at the nearest size) and averaged over the series (exploratory run RN40 on runs RN8, RN11, RN39).
+  setup: studied D10; cases D2, D5; procedure D3; lens D4
+  E19.R1 cov80 expected at the benchmark lengths = 0.8011608055269777 {case: T_backcasting}
+  E19.R2 cov80 expected at the benchmark lengths = 0.7249866236883841 {case: E_backcasting}
+  E19.R3 cov80 expected at the benchmark lengths = 0.7168824849424157 {case: S_backcasting}
+E20 [quant; design benchmark] MCE of each calibration curve of the 99 quantiles drawn from recorded outputs: the [[D2:known-model simulation]] (runs RN8, RN11, RN39), [[D21:smooth 1.0.8 and 1.3.0]] (RN16, RN19, RN43, RN44), the [[D5:benchmark]] (RN45 and the saved ETS benchmark) and the [[D9:fresh M4 sample]] (RN48), overall and by [[D7:level terciles]] (exploratory run RN49).
+  setup: studied D10, D8, D15; cases D2, D5, D9; procedure D7; lens D13
+  E20.R1 mean absolute calibration error = 0.014392408937863465 {figure: calibration_simulation.png, panel: T=15, line: true parameters}
+  E20.R2 mean absolute calibration error = 0.06532843587389042 {figure: calibration_simulation.png, panel: T=15, line: estimated parameters}
+  E20.R3 mean absolute calibration error = 0.05793163962860932 {figure: calibration_simulation.png, panel: T=15, line: selected orders}
+  E20.R4 mean absolute calibration error = 0.0063609835731047865 {figure: calibration_simulation.png, panel: T=25, line: true parameters}
+  E20.R5 mean absolute calibration error = 0.034137434955616774 {figure: calibration_simulation.png, panel: T=25, line: estimated parameters}
+  E20.R6 mean absolute calibration error = 0.036593000714212835 {figure: calibration_simulation.png, panel: T=25, line: selected orders}
+  E20.R7 mean absolute calibration error = 0.001007550249974499 {figure: calibration_simulation.png, panel: T=50, line: true parameters}
+  E20.R8 mean absolute calibration error = 0.01961840628507296 {figure: calibration_simulation.png, panel: T=50, line: estimated parameters}
+  E20.R9 mean absolute calibration error = 0.023527599224568926 {figure: calibration_simulation.png, panel: T=50, line: selected orders}
+  E20.R10 mean absolute calibration error = 0.0023475665748393126 {figure: calibration_simulation.png, panel: T=100, line: true parameters}
+  E20.R11 mean absolute calibration error = 0.00999872461993675 {figure: calibration_simulation.png, panel: T=100, line: estimated parameters}
+  E20.R12 mean absolute calibration error = 0.013877767574737286 {figure: calibration_simulation.png, panel: T=100, line: selected orders}
+  E20.R13 mean absolute calibration error = 0.0006805683093562046 {figure: calibration_simulation.png, panel: T=300, line: true parameters}
+  E20.R14 mean absolute calibration error = 0.002643786348331804 {figure: calibration_simulation.png, panel: T=300, line: estimated parameters}
+  E20.R15 mean absolute calibration error = 0.0045718294051627344 {figure: calibration_simulation.png, panel: T=300, line: selected orders}
+  E20.R16 mean absolute calibration error = 0.03257809093337547 {figure: calibration_versions.png, panel: benchmark, backcasting, line: 1.0.8}
+  E20.R17 mean absolute calibration error = 0.04023801303512885 {figure: calibration_versions.png, panel: benchmark, backcasting, line: 1.3.0}
+  E20.R18 mean absolute calibration error = 0.03312218030625159 {figure: calibration_versions.png, panel: benchmark, optimal, line: 1.0.8}
+  E20.R19 mean absolute calibration error = 0.03899267579104585 {figure: calibration_versions.png, panel: benchmark, optimal, line: 1.3.0}
+  E20.R20 mean absolute calibration error = 0.01228846546270788 {figure: calibration_versions.png, panel: simulation T=100, true parameters, line: 1.0.8}
+  E20.R21 mean absolute calibration error = 0.0023475665748393126 {figure: calibration_versions.png, panel: simulation T=100, true parameters, line: 1.3.0}
+  E20.R22 mean absolute calibration error = 0.0120161973268034 {figure: calibration_versions.png, panel: simulation T=100, estimated, line: 1.0.8}
+  E20.R23 mean absolute calibration error = 0.00999872461993675 {figure: calibration_versions.png, panel: simulation T=100, estimated, line: 1.3.0}
+  E20.R24 mean absolute calibration error = 0.01723859810223446 {figure: calibration_versions.png, panel: simulation T=100, selected, line: 1.0.8}
+  E20.R25 mean absolute calibration error = 0.013877767574737286 {figure: calibration_versions.png, panel: simulation T=100, selected, line: 1.3.0}
+  E20.R26 mean absolute calibration error = 0.04023801303512885 {figure: calibration_benchmark.png, panel: all series, line: auto.msarima}
+  E20.R27 mean absolute calibration error = 0.018661766615671767 {figure: calibration_benchmark.png, panel: all series, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R28 mean absolute calibration error = 0.04423809538892765 {figure: calibration_benchmark.png, panel: all series, line: ETS (AutoADAM ZXZ, saved)}
+  E20.R29 mean absolute calibration error = 0.0280963478527434 {figure: calibration_benchmark.png, panel: low level tercile, line: auto.msarima}
+  E20.R30 mean absolute calibration error = 0.033395435417632416 {figure: calibration_benchmark.png, panel: low level tercile, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R31 mean absolute calibration error = 0.05051564364487615 {figure: calibration_benchmark.png, panel: mid level tercile, line: auto.msarima}
+  E20.R32 mean absolute calibration error = 0.03523408147185424 {figure: calibration_benchmark.png, panel: mid level tercile, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R33 mean absolute calibration error = 0.062303865558147334 {figure: calibration_benchmark.png, panel: high level tercile, line: auto.msarima}
+  E20.R34 mean absolute calibration error = 0.06547406748329032 {figure: calibration_benchmark.png, panel: high level tercile, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R35 mean absolute calibration error = 0.04425148607579844 {figure: calibration_benchmark.png, panel: auto.adam by selected distribution, line: chose dnorm}
+  E20.R36 mean absolute calibration error = 0.027252773929209377 {figure: calibration_benchmark.png, panel: auto.adam by selected distribution, line: chose dlnorm}
+  E20.R37 mean absolute calibration error = 0.035202331961592524 {figure: calibration_m4.png, panel: all series, line: auto.msarima}
+  E20.R38 mean absolute calibration error = 0.02235705823668769 {figure: calibration_m4.png, panel: all series, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R39 mean absolute calibration error = 0.03481359895248808 {figure: calibration_m4.png, panel: low level tercile, line: auto.msarima}
+  E20.R40 mean absolute calibration error = 0.04102600074822316 {figure: calibration_m4.png, panel: low level tercile, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R41 mean absolute calibration error = 0.04117994762439202 {figure: calibration_m4.png, panel: mid level tercile, line: auto.msarima}
+  E20.R42 mean absolute calibration error = 0.02004021698466151 {figure: calibration_m4.png, panel: mid level tercile, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R43 mean absolute calibration error = 0.07567891881780761 {figure: calibration_m4.png, panel: high level tercile, line: auto.msarima}
+  E20.R44 mean absolute calibration error = 0.10521389824167542 {figure: calibration_m4.png, panel: high level tercile, line: auto.adam NNN, dnorm or dlnorm}
+  E20.R45 mean absolute calibration error = 0.020925963740429147 {figure: calibration_m4.png, panel: auto.adam by selected distribution, line: chose dnorm}
+  E20.R46 mean absolute calibration error = 0.035064960316396235 {figure: calibration_m4.png, panel: auto.adam by selected distribution, line: chose dlnorm}
+
+WARRANTS
+W1 [abductive; premises C10, C11] Where ETS and ARIMA reduce to the same model, their intervals coincide and cover the same share (C17), so the interval computations agree; the additive ETS(ANN) forced on every series covers no more than ARIMA(0,1,1), while the multiplicative ETS(MNN) covers 0.07 to 0.10 more (C22). The difference between the pools is therefore the multiplicative-error models, which AutoMSARIMA does not have.
+
+LIMITATIONS
+L1 [sampling; affects C16; could_bias_magnitude; mitigation none] The 12 wrong models of case W were chosen by the authors, not drawn from the mistakes AutoMSARIMA makes, so the size of the coverage loss they produce depends on that choice.
+L2 [other; affects C2, C3, C4; reduces_precision; mitigation none] The lab record flags plans PL11, PL12 and PL13 with code changed after the plan; the only commit between those plans and their runs updated the claimset skills under .claude/skills, not the analysis scripts.
+L3 [measurement; affects C2; reduces_transferability; mitigation none] ETS(MNN), the comparator whose coverage stays flat over the level terciles on M4, is badly centred there (q50 of 0.372) and has an MCE of 0.0849, so its flat cov80 does not make it well calibrated.
+L4 [computational; affects C4; could_bias_magnitude; mitigation none] smooth 1.0.8 ran from a separate worktree at tag v1.0.8-py with its own Python environment, so the versions also differ in the environment around the package.
+L5 [computational; affects C5, C20; reduces_transferability; mitigation none] The auto.adam comparison ran in R, because Python's AutoADAM removes dlnorm from the candidate distributions of a pure ARIMA whatever the user passes, while R's auto.adam removes it only from its default list.
+L6 [analytic_flexibility; affects C5; could_bias_magnitude; mitigation none] The thresholds of plan PL15 were fixed after the exploratory benchmark run of auto.adam (RN45) was seen, on M4 series that run did not use.
+L7 [sample_size; affects C10; reduces_precision; mitigation none] The series where the selected ETS(ANN) and ARIMA(0,1,1) give the same forecast and width are 114 of 5,315.
+L8 [model_specification; affects C21; could_bias_magnitude; mitigation none] The prediction of coverage at the benchmark lengths uses Gaussian processes and interpolates the simulated coverage over log length, with lengths outside 15 to 300 at the nearest simulated size.
+
+OPEN QUESTIONS
+O1 [from C5, C22] Why do the quantiles of auto.adam with error selection lie too high, by about 0.08 to 0.13 of coverage between the 0.2 and 0.6 quantiles, on the series of the highest level tercile, and would a model of the location of grown series correct it?
+O2 [from C15, C17] Why do the parameter draws of reforecast() give explosive or several times too wide intervals for ARIMA models with a constant or AR terms, differently in R and Python?
+O3 [from C3, C19, C20] Would AutoMSARIMA calibrate better with error selection than with a fixed log-normal error once the location error of grown series is addressed, given that the fixed log-normal error costs 11% of median pinball on the benchmark?
+O4 [from C4, C23] Which of the changes between smooth 1.0.8 and 1.3.0 that alter model selection (fewer drift models chosen with backcasting) makes the benchmark calibration of AutoMSARIMA worse while its calibration on known models improves?
+
+ARTEFACTS
+A1 [manuscript] Written record of the investigation up to plan PL13 (questions Q1 to Q5), each number taken from a recorded run.
+A2 [code] Notebook reproducing the tables of the written record from the recorded run outputs.
+A3 [figure, data_plot] Calibration curves of the 99 quantiles in the known-model simulation, cases T, E and S, at T = 15, 25, 50, 100, 300: coverage of each quantile (top) and coverage minus level (bottom). shows E20.R1, E20.R2, E20.R3, E20.R4, E20.R5, E20.R6, E20.R7, E20.R8, E20.R9, E20.R10, E20.R11, E20.R12, E20.R13, E20.R14, E20.R15
+A4 [figure, data_plot] Calibration curves of the 99 quantiles of AutoMSARIMA 1.0.8 and 1.3.0 on the benchmark (backcasting, optimal) and in the simulation at T = 100. shows E20.R16, E20.R17, E20.R18, E20.R19, E20.R20, E20.R21, E20.R22, E20.R23, E20.R24, E20.R25
+A5 [figure, data_plot] Calibration curves of the 99 quantiles on the 5,315 benchmark series: auto.msarima, auto.adam with error selection and the selected ETS, overall, by level tercile and by the distribution auto.adam chose. shows E20.R26, E20.R27, E20.R28, E20.R29, E20.R30, E20.R31, E20.R32, E20.R33, E20.R34, E20.R35, E20.R36
+A6 [figure, data_plot] Calibration curves of the 99 quantiles on the fresh M4 sample: auto.msarima and auto.adam with error selection, overall, by level tercile and by the distribution auto.adam chose. shows E20.R37, E20.R38, E20.R39, E20.R40, E20.R41, E20.R42, E20.R43, E20.R44, E20.R45, E20.R46
+A7 [lab_record] Lab record of the study (branch claimset/msarima-interval-calibration): questions, hypotheses, plans, approvals, runs, results and notes as an append-only, hash-chained event log (lab record 0.20, claimset 0.39.0).
+A8 [code] Scripts of the study: simulation (q1_*), version decomposition (q2_*), benchmark analyses (q3_*), M4 (q4_m4.py), auto.adam in R and the calibration curves (q5_*).
+A9 [data] Outputs of every recorded run (per-replicate and per-series coverage, pinball and selected models; no observations of the M1, M3, Tourism or M4 series).
+
+REFERENCES
+B1 10.1002/for.3980010202 (doi)
+B2 10.1016/S0169-2070(00)00057-1 (doi)
+B3 10.1016/j.ijforecast.2010.04.009 (doi)
+B4 10.1016/j.ijforecast.2019.04.014 (doi)
+B5 10.1080/07350015.1993.10509938 (doi)
+B6 10.1201/9781003452652 (doi)

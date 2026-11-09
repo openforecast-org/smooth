@@ -3,12 +3,12 @@
  "paper": {
   "title": "Calibration of the prediction intervals of AutoMSARIMA in smooth on M1, M3, Tourism and M4",
   "contributions": [
-   "C8",
-   "C9",
-   "C12",
    "C1",
-   "C10",
-   "C17"
+   "C2",
+   "C3",
+   "C4",
+   "C5",
+   "C6"
   ],
   "autonomy": "human_supervised",
   "contribution_record": "complete",
@@ -156,7 +156,12 @@
    "id": "D5",
    "term": "benchmark",
    "kind": "data",
-   "definition": "The 5,315 series of M1 (1,001), M3 (3,003) and Tourism (1,311) from fcompdata 0.1.4, with their own holdouts and seasonal periods; lags $(1, m)$ for seasonal series."
+   "definition": "The 5,315 series of M1 (1,001), M3 (3,003) and Tourism (1,311) from fcompdata 0.1.4, with their own holdouts and seasonal periods; lags $(1, m)$ for seasonal series.",
+   "members": [
+    "D18",
+    "D19",
+    "D20"
+   ]
   },
   {
    "id": "D6",
@@ -238,6 +243,27 @@
   },
   {
    "id": "D18",
+   "term": "M1",
+   "kind": "data",
+   "source": "B1",
+   "definition": "The 1,001 series of the M1 competition with their holdouts."
+  },
+  {
+   "id": "D19",
+   "term": "M3",
+   "kind": "data",
+   "source": "B2",
+   "definition": "The 3,003 series of the M3 competition with their holdouts."
+  },
+  {
+   "id": "D20",
+   "term": "Tourism",
+   "kind": "data",
+   "source": "B3",
+   "definition": "The 1,311 series of the tourism forecasting competition with their holdouts."
+  },
+  {
+   "id": "D21",
    "term": "smooth 1.0.8 and 1.3.0",
    "kind": "setting",
    "definition": "Python smooth at tag v1.0.8-py (a separate worktree with its own environment) and at 1.3.0 (commit 634657d8 of openforecast-org/smooth)."
@@ -246,7 +272,7 @@
  "claims": [
   {
    "id": "C1",
-   "statement": "With the true orders and true parameters, the [[D1:MSARIMA analytic interval]] is calibrated over the 99 quantiles in the [[D2:known-model simulation]] at $T$ of 100 and 300: [[D13:MCE]] is at most 0.0024 and the interval width is within 0.4% of the theoretical width, with backcasting and with optimal initial states.",
+   "statement": "With the true orders and true parameters, the [[D1:MSARIMA analytic interval]] is calibrated over the 99 quantiles in the [[D2:known-model simulation]] at $T$ of 100 and 300: [[D13:MCE]] lies between 0.0007 and 0.0024 and the ratio of the interval width to the theoretical width between 0.9965 and 1.0019, with backcasting and with optimal initial states.",
    "about": {
     "subject": "D1",
     "relation": "is calibrated, given the true orders and parameters, on",
@@ -264,21 +290,14 @@
      "kind": "simulation",
      "evidence": "E1",
      "results": [
-      "E1.R50",
-      "E1.R63",
       "E1.R89",
-      "E1.R102",
-      "E1.R46",
+      "E1.R63",
       "E1.R59",
-      "E1.R85",
-      "E1.R98",
-      "E1.R51",
-      "E1.R64",
-      "E1.R90",
-      "E1.R103"
+      "E1.R46"
      ],
      "artefacts": [
-      "A3"
+      "A3",
+      "A8"
      ]
     }
    ],
@@ -387,6 +406,10 @@
     "runs": 1,
     "lab_plan": "PL4"
    },
+   "depends_on": [
+    "C7",
+    "C12"
+   ],
    "scope": {
     "data_type": "simulated Gaussian ARIMA and SARIMA series",
     "conditions": [
@@ -416,84 +439,466 @@
   },
   {
    "id": "C2",
-   "statement": "Whether selecting the orders with [[D10:AutoMSARIMA]] loses little [[D4:coverage]] in the [[D2:known-model simulation]] at $T = 100$ was not settled: pooled cov80 with selected orders was 0.756, between the threshold for little loss (0.77) and that for a large loss (0.74).",
+   "statement": "On the [[D6:M4 sample]], the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]] falls with the [[D17:level ratio]]: 0.813, 0.700 and 0.554 from the lowest to the highest of the [[D7:level terciles]], while ETS(MNN) of [[D15:ETS forced and selected]], whose error scale follows the level, covers 0.764, 0.778 and 0.814.",
    "about": {
     "subject": "D10",
-    "relation": "has a cov80 between 0.74 and 0.77, with selected orders, in",
+    "relation": "has 80% coverage falling with",
     "object": "D4",
-    "comparator": null,
+    "comparator": "D15",
     "conditions": [
-     "D2"
+     "D6",
+     "D7"
     ]
    },
    "type": "descriptive",
-   "role": "supporting",
-   "novelty": "extension",
+   "role": "principal",
+   "novelty": "no_prior_found",
    "support": [
     {
-     "kind": "simulation",
-     "evidence": "E2",
+     "kind": "empirical_quant",
+     "evidence": "E8",
      "results": [
-      "E2.R41"
+      "E8.R7",
+      "E8.R8",
+      "E8.R9",
+      "E8.R18",
+      "E8.R19",
+      "E8.R20"
      ]
     }
    ],
    "provenance": "author_stated",
    "hypothesis": {
-    "lab_event": "H2",
-    "outcome": "inconclusive"
+    "lab_event": "H8",
+    "outcome": "supported"
    },
    "planning": "confirmatory",
-   "planned_at": "2026-11-05T11:37:02Z",
+   "planned_at": "2026-11-05T18:40:25Z",
    "planned_at_anchor": "git_remote",
    "test": {
     "framework": "deterministic",
     "parameters": {
-     "sample": "2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis"
+     "sample": "4500 M4 series (1500 yearly, quarterly, monthly), seed 20261105, terciles of the recent level over the mean level from the first method"
     },
     "quantities": {
-     "s": {
-      "variable": "pooled cov80 over the DGPs",
+     "fa": {
+      "variable": "M4 fall_low_to_high",
       "conditions": {
-       "T": 100,
-       "case": "S_backcasting"
+       "method": "auto"
+      }
+     },
+     "fm": {
+      "variable": "M4 fall_low_to_high",
+      "conditions": {
+       "method": "force_mnn"
       }
      }
     },
-    "supported": "s >= 0.77",
-    "not_supported": "s < 0.74",
+    "supported": "fa >= 0.10 and fm <= 0.05",
+    "not_supported": "fa < 0.05",
     "verdict": "computed",
     "runs": 1,
-    "lab_plan": "PL5"
-   },
-   "scope": {
-    "data_type": "simulated Gaussian ARIMA and SARIMA series",
-    "conditions": [
-     "holdout of 18",
-     "smooth 1.3.0 (Python)",
-     "case S",
-     "T = 100",
-     "backcasting"
+    "lab_plan": "PL12",
+    "flags": [
+     "code_changed_after_plan"
     ]
    },
+   "depends_on": [
+    "C8"
+   ],
+   "scope": {
+    "data_type": "M4 yearly, quarterly and monthly series",
+    "conditions": [
+     "backcasting",
+     "smooth 1.3.0 (Python)"
+    ]
+   },
+   "limitations": [
+    "L2",
+    "L3"
+   ],
+   "assumptions": [
+    "C25"
+   ],
    "assessments": [
     {
      "by": "author",
      "strength": "moderate",
-     "rationale": "The estimate is precise (2,000 replicates per process) but falls between the rules fixed in plan PL5."
+     "rationale": "Confirmed on 4,500 series that did not suggest the hypothesis, with the same pattern on the benchmark (C13); the level ratio is a proxy for the growth of the scale (C25)."
     }
    ],
    "relations": [
     {
-     "type": "extends",
+     "type": "addresses",
      "reference": "B5",
-     "note": "Chatfield lists model selection among the reasons intervals are too narrow; this measures it for AutoMSARIMA."
+     "note": "Chatfield discusses why intervals are too narrow in general; this locates the shortfall of one implementation on series whose level has grown."
     }
    ]
   },
   {
    "id": "C3",
-   "statement": "With estimated parameters in the [[D2:known-model simulation]], the [[D1:MSARIMA analytic interval]] and the simulated interval of the same fit have the same width and [[D13:MCE]] at $T$ of 50, 100 and 300 (widths 0.957 and 0.957, 0.981 and 0.981, 0.997 and 0.996; MCE 0.0196 and 0.0197, 0.0100 and 0.0100, 0.0026 and 0.0027).",
+   "statement": "On the [[D6:M4 sample]], the [[D11:log-normal ARIMA]] with the orders [[D10:AutoMSARIMA]] selects removes the fall of 80% [[D4:coverage]] over the [[D7:level terciles]] (0.774, 0.783 and 0.752, a spread of 0.031) and lowers [[D13:MCE]] from 0.0386 to 0.0177.",
+   "about": {
+    "subject": "D11",
+    "relation": "removes the fall of coverage over the level terciles and lowers the MCE of",
+    "object": [
+     "D4",
+     "D13"
+    ],
+    "comparator": "D10",
+    "conditions": [
+     "D6"
+    ]
+   },
+   "type": "descriptive",
+   "role": "principal",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "empirical_quant",
+     "evidence": "E9",
+     "results": [
+      "E9.R18",
+      "E9.R19",
+      "E9.R20",
+      "E9.R22",
+      "E9.R3",
+      "E9.R14"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H9",
+    "outcome": "supported"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-11-05T18:40:25Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "sample": "4500 M4 series as in the plan of H8, same seed"
+    },
+    "quantities": {
+     "sd": {
+      "variable": "M4 spread",
+      "conditions": {
+       "method": "auto_dlnorm"
+      }
+     },
+     "md": {
+      "variable": "M4 mce",
+      "conditions": {
+       "method": "auto_dlnorm"
+      }
+     },
+     "ma": {
+      "variable": "M4 mce",
+      "conditions": {
+       "method": "auto"
+      }
+     }
+    },
+    "supported": "sd <= 0.05 and md <= 0.5*ma",
+    "not_supported": "sd > 0.10 or md >= ma",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL13",
+    "flags": [
+     "code_changed_after_plan"
+    ]
+   },
+   "scope": {
+    "data_type": "M4 yearly, quarterly and monthly series",
+    "conditions": [
+     "backcasting",
+     "orders fixed at those AutoMSARIMA selects"
+    ]
+   },
+   "limitations": [
+    "L2"
+   ],
+   "depends_on": [
+    "C2"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "Planned test on series that did not suggest it; the same sample served the test of C8, and the gain in calibration comes with a higher pinball (C14)."
+    }
+   ]
+  },
+  {
+   "id": "C4",
+   "statement": "On known models, the [[D10:AutoMSARIMA]] interval of smooth 1.3.0 is calibrated no worse than that of 1.0.8 ([[D21:smooth 1.0.8 and 1.3.0]]): at $T = 100$ in the [[D2:known-model simulation]] its [[D13:MCE]] is 0.0100 against 0.0120 with estimated parameters, 0.0139 against 0.0172 with selected orders and 0.0085 against 0.0246 with optimal initial states.",
+   "about": {
+    "subject": "D10",
+    "relation": "is calibrated no worse in 1.3.0 than in 1.0.8 on",
+    "object": "D13",
+    "comparator": "D21",
+    "conditions": [
+     "D2"
+    ]
+   },
+   "type": "descriptive",
+   "role": "principal",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E10",
+     "results": [
+      "E10.R76",
+      "E10.R441",
+      "E10.R102",
+      "E10.R467",
+      "E10.R89",
+      "E10.R454"
+     ],
+     "artefacts": [
+      "A4",
+      "A8"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H10",
+    "outcome": "supported"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-11-05T18:40:15Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "sample": "2000 replicates per cell, 11 DGPs, T=50,100,300, seed 20261105 in both versions; run 1 smooth 1.0.8 (v1.0.8-py), run 2 smooth 1.3.0"
+    },
+    "quantities": {
+     "eb108": {
+      "variable": "pooled mce over the DGPs",
+      "conditions": {
+       "T": 100,
+       "case": "E_backcasting"
+      },
+      "run": 1
+     },
+     "eb130": {
+      "variable": "pooled mce over the DGPs",
+      "conditions": {
+       "T": 100,
+       "case": "E_backcasting"
+      },
+      "run": 2
+     },
+     "sb108": {
+      "variable": "pooled mce over the DGPs",
+      "conditions": {
+       "T": 100,
+       "case": "S_backcasting"
+      },
+      "run": 1
+     },
+     "sb130": {
+      "variable": "pooled mce over the DGPs",
+      "conditions": {
+       "T": 100,
+       "case": "S_backcasting"
+      },
+      "run": 2
+     },
+     "eo108": {
+      "variable": "pooled mce over the DGPs",
+      "conditions": {
+       "T": 100,
+       "case": "E_optimal"
+      },
+      "run": 1
+     },
+     "eo130": {
+      "variable": "pooled mce over the DGPs",
+      "conditions": {
+       "T": 100,
+       "case": "E_optimal"
+      },
+      "run": 2
+     }
+    },
+    "supported": "eb130 <= eb108+0.001 and sb130 <= sb108+0.001 and eo130 <= eo108+0.001",
+    "not_supported": "eb130 > eb108+0.005 or sb130 > sb108+0.005 or eo130 > eo108+0.005",
+    "verdict": "computed",
+    "runs": 2,
+    "lab_plan": "PL11",
+    "flags": [
+     "code_changed_after_plan"
+    ]
+   },
+   "depends_on": [
+    "C9"
+   ],
+   "scope": {
+    "data_type": "simulated Gaussian ARIMA and SARIMA series",
+    "conditions": [
+     "holdout of 18",
+     "T = 100",
+     "cases E and S"
+    ]
+   },
+   "limitations": [
+    "L2",
+    "L4"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "high",
+     "rationale": "Same seeds and processes in both versions, 2,000 replicates per process; the rule of PL11 was met in all three cases."
+    }
+   ]
+  },
+  {
+   "id": "C5",
+   "statement": "On the [[D9:fresh M4 sample]], [[D8:auto.adam error selection]] lowers [[D13:MCE]] from 0.0352 to 0.0224 and the spread of 80% [[D4:coverage]] over the [[D7:level terciles]] from 0.272 to 0.077 against R auto.msarima ([[D10:AutoMSARIMA]]), short of the planned reduction of MCE to 0.6 times that of auto.msarima, so the planned test is inconclusive.",
+   "about": {
+    "subject": "D8",
+    "relation": "lowers, short of the planned threshold, the calibration error of",
+    "object": [
+     "D13",
+     "D4"
+    ],
+    "comparator": "D10",
+    "conditions": [
+     "D9"
+    ]
+   },
+   "type": "descriptive",
+   "role": "principal",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "empirical_quant",
+     "evidence": "E12",
+     "results": [
+      "E12.R7",
+      "E12.R25",
+      "E12.R13",
+      "E12.R31"
+     ],
+     "artefacts": [
+      "A6"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H11",
+    "outcome": "inconclusive"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-11-09T17:07:13Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "sample": "4500 fresh M4 series, one run"
+    },
+    "quantities": {
+     "ms": {
+      "variable": "m4 mce",
+      "conditions": {
+       "method": "adam_select"
+      }
+     },
+     "ma": {
+      "variable": "m4 mce",
+      "conditions": {
+       "method": "msarima"
+      }
+     },
+     "ss": {
+      "variable": "m4 spread",
+      "conditions": {
+       "method": "adam_select"
+      }
+     },
+     "sa": {
+      "variable": "m4 spread",
+      "conditions": {
+       "method": "msarima"
+      }
+     }
+    },
+    "supported": "ms <= 0.6*ma and ss <= 0.08",
+    "not_supported": "ms >= ma or ss >= sa",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL15"
+   },
+   "scope": {
+    "data_type": "M4 yearly, quarterly and monthly series",
+    "conditions": [
+     "backcasting",
+     "R smooth 4.6"
+    ]
+   },
+   "limitations": [
+    "L5",
+    "L6"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "Planned test on 4,500 series that did not suggest the hypothesis; the supported rule failed by 0.0013 of MCE and the refutation rule was not met."
+    }
+   ]
+  },
+  {
+   "id": "C6",
+   "type": "interpretive",
+   "role": "principal",
+   "statement": "The wider intervals of ETS than of [[D10:AutoMSARIMA]] on the [[D5:benchmark]] come from the multiplicative-error models in the ETS pool of [[D15:ETS forced and selected]], not from how either package computes the interval.",
+   "about": {
+    "subject": "D15",
+    "relation": "has wider intervals because of its multiplicative-error models than",
+    "object": "interval width",
+    "comparator": "D10",
+    "conditions": [
+     "D5"
+    ]
+   },
+   "support": [
+    {
+     "kind": "argument",
+     "warrant": "W1"
+    }
+   ],
+   "depends_on": [
+    "C10",
+    "C11"
+   ],
+   "scope": {
+    "data_type": "M1, M3 and Tourism series",
+    "conditions": [
+     "backcasting"
+    ]
+   },
+   "novelty": "no_prior_found",
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "An exploratory conclusion over two exploratory results on the benchmark, not tested on new data."
+    }
+   ],
+   "planning": "exploratory",
+   "provenance": "author_stated"
+  },
+  {
+   "id": "C7",
+   "statement": "With estimated parameters in the [[D2:known-model simulation]], the [[D1:MSARIMA analytic interval]] and the simulated interval of the same fit have the same width and [[D13:MCE]] at $T$ of 50, 100 and 300 (widths 0.957 and 0.957, 0.981 and 0.980, 0.997 and 0.996; MCE 0.0196 and 0.0197, 0.0100 and 0.0100, 0.0026 and 0.0027).",
    "about": {
     "subject": "D1",
     "relation": "has the same width and calibration as the simulated interval in",
@@ -523,6 +928,9 @@
       "E3.R98",
       "E3.R89",
       "E3.R102"
+     ],
+     "artefacts": [
+      "A8"
      ]
     }
    ],
@@ -656,7 +1064,309 @@
    ]
   },
   {
-   "id": "C4",
+   "id": "C8",
+   "type": "descriptive",
+   "role": "supporting",
+   "statement": "On the 5,315 [[D5:benchmark]] series, the fall of 80% [[D4:coverage]] over the [[D7:level terciles]] is shared by [[D10:AutoMSARIMA]] (0.786, 0.668, 0.590) and the [[D16:other ARIMA implementations]]: statsforecast AutoARIMA (0.789, 0.667, 0.589), pmdarima (0.770, 0.635, 0.582) and skforecast (0.781, 0.658, 0.585).",
+   "about": {
+    "subject": "D16",
+    "relation": "share the fall of coverage over the level terciles with",
+    "object": "D4",
+    "comparator": "D10",
+    "conditions": [
+     "D5"
+    ]
+   },
+   "support": [
+    {
+     "kind": "empirical_quant",
+     "evidence": "E13",
+     "results": [
+      "E13.R1",
+      "E13.R2",
+      "E13.R3",
+      "E13.R4",
+      "E13.R5",
+      "E13.R6",
+      "E13.R7",
+      "E13.R8",
+      "E13.R9",
+      "E13.R10",
+      "E13.R11",
+      "E13.R12"
+     ]
+    }
+   ],
+   "scope": {
+    "data_type": "M1, M3 and Tourism series",
+    "conditions": [
+     "backcasting for smooth"
+    ]
+   },
+   "novelty": "no_prior_found",
+   "assumptions": [
+    "C25"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "Exploratory, on the data that suggested the pattern; confirmed for AutoMSARIMA on M4 (C8)."
+    }
+   ],
+   "planning": "exploratory",
+   "provenance": "author_stated"
+  },
+  {
+   "id": "C9",
+   "type": "descriptive",
+   "role": "supporting",
+   "statement": "The width of the [[D10:AutoMSARIMA]] interval on the [[D5:benchmark]] did not change between [[D21:smooth 1.0.8 and 1.3.0]]: the median ratio of the 80% widths of 1.3.0 over 1.0.8 is 1.000 with backcasting and with optimal initial states.",
+   "about": {
+    "subject": "D10",
+    "relation": "has an unchanged interval width between versions on",
+    "object": "interval width",
+    "comparator": "D21",
+    "conditions": [
+     "D5"
+    ]
+   },
+   "support": [
+    {
+     "kind": "empirical_quant",
+     "evidence": "E17",
+     "results": [
+      "E17.R1",
+      "E17.R2"
+     ]
+    }
+   ],
+   "scope": {
+    "data_type": "M1, M3 and Tourism series"
+   },
+   "novelty": "no_prior_found",
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "Exploratory decomposition on all benchmark series."
+    }
+   ],
+   "planning": "exploratory",
+   "provenance": "author_stated"
+  },
+  {
+   "id": "C10",
+   "type": "descriptive",
+   "role": "supporting",
+   "statement": "On the 114 [[D5:benchmark]] series where the selected ETS(ANN) of [[D15:ETS forced and selected]] and the ARIMA(0,1,1) selected by [[D10:AutoMSARIMA]] give the same forecast and width, the two have the same 80% [[D4:coverage]], 0.734.",
+   "about": {
+    "subject": "D15",
+    "relation": "has the same coverage, where the models coincide, as",
+    "object": "D4",
+    "comparator": "D10",
+    "conditions": [
+     "D5"
+    ]
+   },
+   "support": [
+    {
+     "kind": "empirical_quant",
+     "evidence": "E13",
+     "results": [
+      "E13.R13",
+      "E13.R14",
+      "E13.R15"
+     ]
+    }
+   ],
+   "scope": {
+    "data_type": "M1, M3 and Tourism series",
+    "conditions": [
+     "backcasting"
+    ]
+   },
+   "novelty": "no_prior_found",
+   "limitations": [
+    "L7"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "An exploratory result on a small matched subset (L7)."
+    }
+   ],
+   "planning": "exploratory",
+   "provenance": "author_stated"
+  },
+  {
+   "id": "C11",
+   "type": "descriptive",
+   "role": "supporting",
+   "statement": "Forced on all 5,315 [[D5:benchmark]] series, ETS(MNN) of [[D15:ETS forced and selected]] has an 80% [[D4:coverage]] of 0.764, against 0.668 for ETS(ANN) and 0.695 for ARIMA(0,1,1).",
+   "about": {
+    "subject": "ETS(MNN)",
+    "relation": "has a higher coverage than",
+    "object": "D4",
+    "comparator": "ETS(ANN) and ARIMA(0,1,1)",
+    "conditions": [
+     "D5"
+    ]
+   },
+   "support": [
+    {
+     "kind": "empirical_quant",
+     "evidence": "E14",
+     "results": [
+      "E14.R3",
+      "E14.R2",
+      "E14.R1"
+     ]
+    }
+   ],
+   "scope": {
+    "data_type": "M1, M3 and Tourism series",
+    "conditions": [
+     "backcasting"
+    ]
+   },
+   "novelty": "no_prior_found",
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "An exploratory result on every benchmark series."
+    }
+   ],
+   "planning": "exploratory",
+   "provenance": "author_stated"
+  },
+  {
+   "id": "C12",
+   "type": "descriptive",
+   "role": "supporting",
+   "statement": "R and Python give the same [[D10:AutoMSARIMA]] interval on 500 [[D5:benchmark]] series: the median ratio of the 80% widths is 1.000, the same model is selected on every series and both have an 80% [[D4:coverage]] of 0.677.",
+   "about": {
+    "subject": "D10",
+    "relation": "gives the same interval in R and Python on",
+    "object": "D4",
+    "comparator": null,
+    "conditions": [
+     "D5"
+    ]
+   },
+   "support": [
+    {
+     "kind": "empirical_quant",
+     "evidence": "E18",
+     "results": [
+      "E18.R1",
+      "E18.R2",
+      "E18.R3",
+      "E18.R4"
+     ]
+    }
+   ],
+   "scope": {
+    "data_type": "500 M1, M3 and Tourism series",
+    "conditions": [
+     "backcasting"
+    ]
+   },
+   "novelty": "not_applicable",
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "Exploratory, a random sample of 500 series."
+    }
+   ],
+   "planning": "exploratory",
+   "provenance": "author_stated"
+  },
+  {
+   "id": "C13",
+   "statement": "Whether selecting the orders with [[D10:AutoMSARIMA]] loses little [[D4:coverage]] in the [[D2:known-model simulation]] at $T = 100$ was not settled: pooled cov80 with selected orders was 0.756, between the threshold for little loss (0.77) and that for a large loss (0.74).",
+   "about": {
+    "subject": "D10",
+    "relation": "has a cov80 between 0.74 and 0.77, with selected orders, in",
+    "object": "D4",
+    "comparator": null,
+    "conditions": [
+     "D2"
+    ]
+   },
+   "type": "descriptive",
+   "role": "secondary",
+   "novelty": "extension",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E2",
+     "results": [
+      "E2.R41"
+     ],
+     "artefacts": [
+      "A8"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H2",
+    "outcome": "inconclusive"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-11-05T11:37:02Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "sample": "2000 replicates per cell, h=1..18, fixed seed 20261105, no interim analysis"
+    },
+    "quantities": {
+     "s": {
+      "variable": "pooled cov80 over the DGPs",
+      "conditions": {
+       "T": 100,
+       "case": "S_backcasting"
+      }
+     }
+    },
+    "supported": "s >= 0.77",
+    "not_supported": "s < 0.74",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL5"
+   },
+   "scope": {
+    "data_type": "simulated Gaussian ARIMA and SARIMA series",
+    "conditions": [
+     "holdout of 18",
+     "smooth 1.3.0 (Python)",
+     "case S",
+     "T = 100",
+     "backcasting"
+    ]
+   },
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "moderate",
+     "rationale": "The estimate is precise (2,000 replicates per process) but falls between the rules fixed in plan PL5."
+    }
+   ],
+   "relations": [
+    {
+     "type": "extends",
+     "reference": "B5",
+     "note": "Chatfield lists model selection among the reasons intervals are too narrow; this measures it for AutoMSARIMA."
+    }
+   ]
+  },
+  {
+   "id": "C14",
    "statement": "Estimating the parameters does not cost 6 points of 80% [[D4:coverage]] of the [[D1:MSARIMA analytic interval]] at $T = 100$ in the [[D2:known-model simulation]]: with the true orders, pooled cov80 is 0.800 with true parameters and 0.770 with estimated parameters, a loss of 3 points.",
    "about": {
     "subject": "D1",
@@ -668,7 +1378,7 @@
     ]
    },
    "type": "descriptive",
-   "role": "supporting",
+   "role": "secondary",
    "novelty": "extension",
    "support": [
     {
@@ -677,6 +1387,9 @@
      "results": [
       "E4.R93",
       "E4.R67"
+     ],
+     "artefacts": [
+      "A8"
      ]
     }
    ],
@@ -741,8 +1454,8 @@
    ]
   },
   {
-   "id": "C5",
-   "statement": "[[D12:reforecast]] does not improve on `predict()` in the [[D2:known-model simulation]] at $T = 100$ with estimated parameters: with backcasting its [[D13:MCE]] is 0.0265 against 0.0100 and its relative [[D14:scaled pinball]] 1.958 against 1.043; with optimal initial states its MCE is lower (0.0053 against 0.0085) but its relative pinball higher (1.396 against 1.058).",
+   "id": "C15",
+   "statement": "[[D12:reforecast]] does not improve on the [[D1:MSARIMA analytic interval]] of `predict()` in the [[D2:known-model simulation]] at $T = 100$ with estimated parameters: with backcasting its [[D13:MCE]] is 0.0265 against 0.0100 and its relative [[D14:scaled pinball]] 1.958 against 1.043; with optimal initial states its MCE is lower (0.0053 against 0.0085) but its relative pinball higher (1.396 against 1.058).",
    "about": {
     "subject": "D12",
     "relation": "does not improve on predict() in",
@@ -771,6 +1484,9 @@
       "E5.R115",
       "E5.R104",
       "E5.R117"
+     ],
+     "artefacts": [
+      "A8"
      ]
     }
    ],
@@ -876,8 +1592,8 @@
    ]
   },
   {
-   "id": "C6",
-   "statement": "A fixed wrong model alone produces under-coverage of the size seen on the [[D5:benchmark]]: over 12 wrong models in the [[D2:known-model simulation]] at $T = 100$ the pooled cov80 of the [[D1:MSARIMA analytic interval]] is 0.676 and its q50 0.428.",
+   "id": "C16",
+   "statement": "A fixed wrong model alone produces under-coverage of the size seen on the [[D5:benchmark]]: over 12 wrong models in the [[D2:known-model simulation]] at $T = 100$ the pooled 80% [[D4:coverage]] of the [[D1:MSARIMA analytic interval]] is 0.676 and its q50 0.428.",
    "about": {
     "subject": "D1",
     "relation": "has a cov80 of the benchmark's size under a wrong model in",
@@ -897,6 +1613,9 @@
      "results": [
       "E6.R41",
       "E6.R44"
+     ],
+     "artefacts": [
+      "A8"
      ]
     }
    ],
@@ -933,7 +1652,7 @@
     "conditions": [
      "holdout of 18",
      "smooth 1.3.0 (Python)",
-     "case W",
+     "case W with 12 fixed wrong models",
      "T = 100",
      "backcasting"
     ]
@@ -950,8 +1669,8 @@
    ]
   },
   {
-   "id": "C7",
-   "statement": "On the 5,315 [[D5:benchmark]] series, [[D12:reforecast]] does not close the gap of the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]]: cov80 moves from 0.681 to 0.683, and its mean [[D14:scaled pinball]] is 7e191 against 0.899 because of draws that explode on some series.",
+   "id": "C17",
+   "statement": "On the 5,315 [[D5:benchmark]] series, [[D12:reforecast]] does not close the gap of the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]]: cov80 moves from 0.681 to 0.683 and its mean [[D14:scaled pinball]] is 7e191 against 0.899.",
    "about": {
     "subject": "D12",
     "relation": "does not close the coverage gap of",
@@ -1041,329 +1760,13 @@
    ]
   },
   {
-   "id": "C8",
-   "statement": "On the [[D6:M4 sample]], the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]] falls with the [[D17:level ratio]]: 0.813, 0.700 and 0.554 from the lowest to the highest of the [[D7:level terciles]], while ETS(MNN) of [[D15:ETS forced and selected]], whose error scale follows the level, covers 0.764, 0.778 and 0.814.",
-   "about": {
-    "subject": "D10",
-    "relation": "has 80% coverage falling with",
-    "object": "D4",
-    "comparator": "D15",
-    "conditions": [
-     "D6",
-     "D7"
-    ]
-   },
-   "type": "descriptive",
-   "role": "principal",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "empirical_quant",
-     "evidence": "E8",
-     "results": [
-      "E8.R7",
-      "E8.R8",
-      "E8.R9",
-      "E8.R10",
-      "E8.R18",
-      "E8.R19",
-      "E8.R20",
-      "E8.R21"
-     ]
-    }
-   ],
-   "provenance": "author_stated",
-   "hypothesis": {
-    "lab_event": "H8",
-    "outcome": "supported"
-   },
-   "planning": "confirmatory",
-   "planned_at": "2026-11-05T18:40:25Z",
-   "planned_at_anchor": "git_remote",
-   "test": {
-    "framework": "deterministic",
-    "parameters": {
-     "sample": "4500 M4 series (1500 yearly, quarterly, monthly), seed 20261105, terciles of the recent level over the mean level from the first method"
-    },
-    "quantities": {
-     "fa": {
-      "variable": "M4 fall_low_to_high",
-      "conditions": {
-       "method": "auto"
-      }
-     },
-     "fm": {
-      "variable": "M4 fall_low_to_high",
-      "conditions": {
-       "method": "force_mnn"
-      }
-     }
-    },
-    "supported": "fa >= 0.10 and fm <= 0.05",
-    "not_supported": "fa < 0.05",
-    "verdict": "computed",
-    "runs": 1,
-    "lab_plan": "PL12",
-    "flags": [
-     "code_changed_after_plan"
-    ]
-   },
-   "scope": {
-    "data_type": "M4 yearly, quarterly and monthly series",
-    "conditions": [
-     "backcasting",
-     "smooth 1.3.0 (Python)"
-    ]
-   },
-   "limitations": [
-    "L2",
-    "L3"
-   ],
-   "assumptions": [
-    "C25"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "moderate",
-     "rationale": "Confirmed on 4,500 series that did not suggest the hypothesis, with the same pattern on the benchmark (C13); the level ratio is a proxy for the growth of the scale (C25)."
-    }
-   ],
-   "relations": [
-    {
-     "type": "addresses",
-     "reference": "B5",
-     "note": "Chatfield discusses why intervals are too narrow in general; this locates the shortfall of one implementation on series whose level has grown."
-    }
-   ]
-  },
-  {
-   "id": "C9",
-   "statement": "On the [[D6:M4 sample]], the [[D11:log-normal ARIMA]] with the orders [[D10:AutoMSARIMA]] selects removes the fall of 80% [[D4:coverage]] over the [[D7:level terciles]] (0.774, 0.783 and 0.752, a spread of 0.031) and lowers [[D13:MCE]] from 0.0386 to 0.0177.",
-   "about": {
-    "subject": "D11",
-    "relation": "removes the fall of coverage over the level terciles and lowers the MCE of",
-    "object": [
-     "D4",
-     "D13"
-    ],
-    "comparator": "D10",
-    "conditions": [
-     "D6"
-    ]
-   },
-   "type": "descriptive",
-   "role": "principal",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "empirical_quant",
-     "evidence": "E9",
-     "results": [
-      "E9.R18",
-      "E9.R19",
-      "E9.R20",
-      "E9.R22",
-      "E9.R3",
-      "E9.R14"
-     ]
-    }
-   ],
-   "provenance": "author_stated",
-   "hypothesis": {
-    "lab_event": "H9",
-    "outcome": "supported"
-   },
-   "planning": "confirmatory",
-   "planned_at": "2026-11-05T18:40:25Z",
-   "planned_at_anchor": "git_remote",
-   "test": {
-    "framework": "deterministic",
-    "parameters": {
-     "sample": "4500 M4 series as in the plan of H8, same seed"
-    },
-    "quantities": {
-     "sd": {
-      "variable": "M4 spread",
-      "conditions": {
-       "method": "auto_dlnorm"
-      }
-     },
-     "md": {
-      "variable": "M4 mce",
-      "conditions": {
-       "method": "auto_dlnorm"
-      }
-     },
-     "ma": {
-      "variable": "M4 mce",
-      "conditions": {
-       "method": "auto"
-      }
-     }
-    },
-    "supported": "sd <= 0.05 and md <= 0.5*ma",
-    "not_supported": "sd > 0.10 or md >= ma",
-    "verdict": "computed",
-    "runs": 1,
-    "lab_plan": "PL13",
-    "flags": [
-     "code_changed_after_plan"
-    ]
-   },
-   "scope": {
-    "data_type": "M4 yearly, quarterly and monthly series",
-    "conditions": [
-     "backcasting",
-     "orders fixed at those AutoMSARIMA selects"
-    ]
-   },
-   "limitations": [
-    "L2"
-   ],
-   "depends_on": [
-    "C8"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "moderate",
-     "rationale": "Planned test on series that did not suggest it; the same sample served the test of C8, and the gain in calibration comes with a higher pinball (C14)."
-    }
-   ]
-  },
-  {
-   "id": "C10",
-   "statement": "On known models, the [[D10:AutoMSARIMA]] interval of smooth 1.3.0 is calibrated no worse than that of 1.0.8 ([[D18:smooth 1.0.8 and 1.3.0]]): at $T = 100$ in the [[D2:known-model simulation]] its [[D13:MCE]] is 0.0100 against 0.0120 with estimated parameters, 0.0139 against 0.0172 with selected orders and 0.0085 against 0.0246 with optimal initial states.",
-   "about": {
-    "subject": "D10",
-    "relation": "is calibrated no worse in 1.3.0 than in 1.0.8 on",
-    "object": "D13",
-    "comparator": "D18",
-    "conditions": [
-     "D2"
-    ]
-   },
-   "type": "descriptive",
-   "role": "principal",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "simulation",
-     "evidence": "E10",
-     "results": [
-      "E10.R76",
-      "E10.R441",
-      "E10.R102",
-      "E10.R467",
-      "E10.R89",
-      "E10.R454"
-     ],
-     "artefacts": [
-      "A4"
-     ]
-    }
-   ],
-   "provenance": "author_stated",
-   "hypothesis": {
-    "lab_event": "H10",
-    "outcome": "supported"
-   },
-   "planning": "confirmatory",
-   "planned_at": "2026-11-05T18:40:15Z",
-   "planned_at_anchor": "git_remote",
-   "test": {
-    "framework": "deterministic",
-    "parameters": {
-     "sample": "2000 replicates per cell, 11 DGPs, T=50,100,300, seed 20261105 in both versions; run 1 smooth 1.0.8 (v1.0.8-py), run 2 smooth 1.3.0"
-    },
-    "quantities": {
-     "eb108": {
-      "variable": "pooled mce over the DGPs",
-      "conditions": {
-       "T": 100,
-       "case": "E_backcasting"
-      },
-      "run": 1
-     },
-     "eb130": {
-      "variable": "pooled mce over the DGPs",
-      "conditions": {
-       "T": 100,
-       "case": "E_backcasting"
-      },
-      "run": 2
-     },
-     "sb108": {
-      "variable": "pooled mce over the DGPs",
-      "conditions": {
-       "T": 100,
-       "case": "S_backcasting"
-      },
-      "run": 1
-     },
-     "sb130": {
-      "variable": "pooled mce over the DGPs",
-      "conditions": {
-       "T": 100,
-       "case": "S_backcasting"
-      },
-      "run": 2
-     },
-     "eo108": {
-      "variable": "pooled mce over the DGPs",
-      "conditions": {
-       "T": 100,
-       "case": "E_optimal"
-      },
-      "run": 1
-     },
-     "eo130": {
-      "variable": "pooled mce over the DGPs",
-      "conditions": {
-       "T": 100,
-       "case": "E_optimal"
-      },
-      "run": 2
-     }
-    },
-    "supported": "eb130 <= eb108+0.001 and sb130 <= sb108+0.001 and eo130 <= eo108+0.001",
-    "not_supported": "eb130 > eb108+0.005 or sb130 > sb108+0.005 or eo130 > eo108+0.005",
-    "verdict": "computed",
-    "runs": 2,
-    "lab_plan": "PL11",
-    "flags": [
-     "code_changed_after_plan"
-    ]
-   },
-   "scope": {
-    "data_type": "simulated Gaussian ARIMA and SARIMA series",
-    "conditions": [
-     "holdout of 18",
-     "T = 100",
-     "cases E and S"
-    ]
-   },
-   "limitations": [
-    "L2",
-    "L4"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "high",
-     "rationale": "Same seeds and processes in both versions, 2,000 replicates per process; the rule of PL11 was met in all three cases."
-    }
-   ]
-  },
-  {
-   "id": "C11",
-   "statement": "The planned test of [[D8:auto.adam error selection]] against auto.msarima on the [[D9:fresh M4 sample]] under plan PL14 gave no result: its only run failed before fitting any model, because the cached M4 files were missing.",
+   "id": "C18",
+   "statement": "The planned test of [[D8:auto.adam error selection]] against auto.msarima on the [[D9:fresh M4 sample]] under plan PL14 gave no result: its only run stopped on loading the M4 data, before any model was fitted.",
    "about": {
     "subject": "D8",
     "relation": "was not compared, the run having failed, on",
-    "object": "D13",
-    "comparator": "D10",
+    "object": null,
+    "comparator": "auto.msarima",
     "conditions": [
      "D9"
     ]
@@ -1434,158 +1837,7 @@
    ]
   },
   {
-   "id": "C12",
-   "statement": "On the [[D9:fresh M4 sample]], [[D8:auto.adam error selection]] lowers [[D13:MCE]] from 0.0352 to 0.0224 and the spread of 80% [[D4:coverage]] over the [[D7:level terciles]] from 0.272 to 0.077 against R auto.msarima ([[D10:AutoMSARIMA]]), short of the planned reduction of MCE to 0.6 times that of auto.msarima, so the planned test is inconclusive.",
-   "about": {
-    "subject": "D8",
-    "relation": "lowers, short of the planned threshold, the calibration error of",
-    "object": [
-     "D13",
-     "D4"
-    ],
-    "comparator": "D10",
-    "conditions": [
-     "D9"
-    ]
-   },
-   "type": "descriptive",
-   "role": "principal",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "empirical_quant",
-     "evidence": "E12",
-     "results": [
-      "E12.R7",
-      "E12.R25",
-      "E12.R13",
-      "E12.R31"
-     ],
-     "artefacts": [
-      "A6"
-     ]
-    }
-   ],
-   "provenance": "author_stated",
-   "hypothesis": {
-    "lab_event": "H11",
-    "outcome": "inconclusive"
-   },
-   "planning": "confirmatory",
-   "planned_at": "2026-11-09T17:07:13Z",
-   "planned_at_anchor": "git_remote",
-   "test": {
-    "framework": "deterministic",
-    "parameters": {
-     "sample": "4500 fresh M4 series, one run"
-    },
-    "quantities": {
-     "ms": {
-      "variable": "m4 mce",
-      "conditions": {
-       "method": "adam_select"
-      }
-     },
-     "ma": {
-      "variable": "m4 mce",
-      "conditions": {
-       "method": "msarima"
-      }
-     },
-     "ss": {
-      "variable": "m4 spread",
-      "conditions": {
-       "method": "adam_select"
-      }
-     },
-     "sa": {
-      "variable": "m4 spread",
-      "conditions": {
-       "method": "msarima"
-      }
-     }
-    },
-    "supported": "ms <= 0.6*ma and ss <= 0.08",
-    "not_supported": "ms >= ma or ss >= sa",
-    "verdict": "computed",
-    "runs": 1,
-    "lab_plan": "PL15"
-   },
-   "scope": {
-    "data_type": "M4 yearly, quarterly and monthly series",
-    "conditions": [
-     "backcasting",
-     "R smooth 4.6"
-    ]
-   },
-   "limitations": [
-    "L5",
-    "L6"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "moderate",
-     "rationale": "Planned test on 4,500 series that did not suggest the hypothesis; the supported rule failed by 0.0013 of MCE and the refutation rule was not met."
-    }
-   ]
-  },
-  {
-   "id": "C13",
-   "type": "descriptive",
-   "role": "supporting",
-   "statement": "On the 5,315 [[D5:benchmark]] series, the fall of 80% [[D4:coverage]] over the [[D7:level terciles]] is shared by [[D10:AutoMSARIMA]] (0.786, 0.668, 0.590) and the [[D16:other ARIMA implementations]]: statsforecast AutoARIMA (0.789, 0.667, 0.589), pmdarima (0.770, 0.635, 0.583) and skforecast (0.781, 0.658, 0.585).",
-   "about": {
-    "subject": "D16",
-    "relation": "share the fall of coverage over the level terciles with",
-    "object": "D4",
-    "comparator": "D10",
-    "conditions": [
-     "D5"
-    ]
-   },
-   "support": [
-    {
-     "kind": "empirical_quant",
-     "evidence": "E13",
-     "results": [
-      "E13.R1",
-      "E13.R2",
-      "E13.R3",
-      "E13.R4",
-      "E13.R5",
-      "E13.R6",
-      "E13.R7",
-      "E13.R8",
-      "E13.R9",
-      "E13.R10",
-      "E13.R11",
-      "E13.R12"
-     ]
-    }
-   ],
-   "scope": {
-    "data_type": "M1, M3 and Tourism series",
-    "conditions": [
-     "backcasting for smooth"
-    ]
-   },
-   "novelty": "no_prior_found",
-   "assumptions": [
-    "C25"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "moderate",
-     "rationale": "Exploratory, on the data that suggested the pattern; confirmed for AutoMSARIMA on M4 (C8)."
-    }
-   ],
-   "planning": "exploratory",
-   "provenance": "author_stated"
-  },
-  {
-   "id": "C14",
+   "id": "C19",
    "type": "descriptive",
    "role": "secondary",
    "statement": "On the 5,315 [[D5:benchmark]] series, the [[D11:log-normal ARIMA]] with the selected orders raises the 80% [[D4:coverage]] of [[D10:AutoMSARIMA]] from 0.681 to 0.756 and lowers [[D13:MCE]] from 0.0402 to 0.0124, but raises the median [[D14:scaled pinball]] from 0.496 to 0.551.",
@@ -1635,7 +1887,7 @@
    "provenance": "author_stated"
   },
   {
-   "id": "C15",
+   "id": "C20",
    "type": "descriptive",
    "role": "secondary",
    "statement": "On the 5,315 [[D5:benchmark]] series, [[D8:auto.adam error selection]] chooses dlnorm for 64% of the series, raises 80% [[D4:coverage]] from 0.681 to 0.729, lowers [[D13:MCE]] from 0.0402 to 0.0187 and raises the median [[D14:scaled pinball]] from 0.496 to 0.514 against R auto.msarima ([[D10:AutoMSARIMA]]).",
@@ -1693,146 +1945,9 @@
    "provenance": "author_stated"
   },
   {
-   "id": "C16",
-   "type": "descriptive",
-   "role": "supporting",
-   "statement": "The width of the [[D10:AutoMSARIMA]] interval on the [[D5:benchmark]] did not change between [[D18:smooth 1.0.8 and 1.3.0]]: the median ratio of the 80% widths of 1.3.0 over 1.0.8 is 1.000 with backcasting and with optimal initial states, while the share of selected models with drift fell from 0.309 to 0.248 with backcasting.",
-   "about": {
-    "subject": "D10",
-    "relation": "has an unchanged interval width between versions on",
-    "object": "D4",
-    "comparator": "D18",
-    "conditions": [
-     "D5"
-    ]
-   },
-   "support": [
-    {
-     "kind": "empirical_quant",
-     "evidence": "E17",
-     "results": [
-      "E17.R1",
-      "E17.R2",
-      "E17.R6",
-      "E17.R5"
-     ]
-    }
-   ],
-   "scope": {
-    "data_type": "M1, M3 and Tourism series"
-   },
-   "novelty": "no_prior_found",
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "moderate",
-     "rationale": "Exploratory decomposition on all benchmark series."
-    }
-   ],
-   "planning": "exploratory",
-   "provenance": "author_stated"
-  },
-  {
-   "id": "C17",
-   "type": "descriptive",
-   "role": "principal",
-   "statement": "On the [[D5:benchmark]], where the selected ETS(ANN) and the selected ARIMA(0,1,1) give the same forecast and width (114 series), their 80% [[D4:coverage]] is the same, 0.734, so the wider ETS intervals come from the models in the ETS pool and not from how the interval is computed: forced on every series, ETS(MNN) covers 0.764, ETS(ANN) 0.668 and ARIMA(0,1,1) 0.695.",
-   "about": {
-    "subject": "D15",
-    "relation": "has the same coverage as ARIMA when the models coincide on",
-    "object": "D4",
-    "comparator": "D10",
-    "conditions": [
-     "D5"
-    ]
-   },
-   "support": [
-    {
-     "kind": "empirical_quant",
-     "evidence": "E13",
-     "results": [
-      "E13.R13",
-      "E13.R14",
-      "E13.R15"
-     ]
-    },
-    {
-     "kind": "empirical_quant",
-     "evidence": "E14",
-     "results": [
-      "E14.R1",
-      "E14.R2",
-      "E14.R3"
-     ]
-    }
-   ],
-   "scope": {
-    "data_type": "M1, M3 and Tourism series",
-    "conditions": [
-     "backcasting"
-    ]
-   },
-   "novelty": "no_prior_found",
-   "limitations": [
-    "L7"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "moderate",
-     "rationale": "Exploratory; the matched subset is small (114 series, L7) but the forced models cover all 5,315 series."
-    }
-   ],
-   "planning": "exploratory",
-   "provenance": "author_stated"
-  },
-  {
-   "id": "C18",
-   "type": "descriptive",
-   "role": "supporting",
-   "statement": "R and Python give the same [[D10:AutoMSARIMA]] interval on 500 [[D5:benchmark]] series: the median ratio of the 80% widths is 1.000, the same model is selected on every series and both cover 0.677.",
-   "about": {
-    "subject": "D10",
-    "relation": "gives the same interval in R and Python on",
-    "object": "D4",
-    "comparator": null,
-    "conditions": [
-     "D5"
-    ]
-   },
-   "support": [
-    {
-     "kind": "empirical_quant",
-     "evidence": "E18",
-     "results": [
-      "E18.R1",
-      "E18.R2",
-      "E18.R3",
-      "E18.R4"
-     ]
-    }
-   ],
-   "scope": {
-    "data_type": "500 M1, M3 and Tourism series",
-    "conditions": [
-     "backcasting"
-    ]
-   },
-   "novelty": "not_applicable",
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "moderate",
-     "rationale": "Exploratory, a random sample of 500 series."
-    }
-   ],
-   "planning": "exploratory",
-   "provenance": "author_stated"
-  },
-  {
-   "id": "C19",
+   "id": "C21",
    "type": "predictive",
-   "role": "supporting",
+   "role": "secondary",
    "statement": "Estimation and selection alone, as measured in the [[D2:known-model simulation]], predict an 80% [[D4:coverage]] of 0.717 for [[D10:AutoMSARIMA]] at the lengths of the [[D5:benchmark]] series, against 0.801 with the true parameters.",
    "about": {
     "subject": "D10",
@@ -1883,10 +1998,10 @@
    "provenance": "author_stated"
   },
   {
-   "id": "C20",
+   "id": "C22",
    "type": "descriptive",
    "role": "secondary",
-   "statement": "On the [[D9:fresh M4 sample]], [[D8:auto.adam error selection]] has a higher [[D13:MCE]] than auto.msarima in the lowest and highest [[D7:level terciles]] (0.041 against 0.035, and 0.105 against 0.076) and a lower one only in the middle tercile (0.020 against 0.041), so its lower overall MCE comes in part from errors of opposite sign in different series.",
+   "statement": "On the [[D9:fresh M4 sample]], [[D8:auto.adam error selection]] has a higher [[D13:MCE]] than R auto.msarima ([[D10:AutoMSARIMA]]) in the lowest and highest [[D7:level terciles]] (0.041 against 0.035, and 0.105 against 0.076) and a lower one only in the middle tercile (0.020 against 0.041), so its lower overall MCE comes in part from errors of opposite sign in different series.",
    "about": {
     "subject": "D8",
     "relation": "has a higher MCE within two of three level terciles than",
@@ -1933,15 +2048,15 @@
    "provenance": "author_stated"
   },
   {
-   "id": "C21",
+   "id": "C23",
    "type": "descriptive",
    "role": "secondary",
-   "statement": "On the 5,315 [[D5:benchmark]] series, the [[D13:MCE]] of [[D10:AutoMSARIMA]] is 0.0402 with smooth 1.3.0 against 0.0326 with 1.0.8 ([[D18:smooth 1.0.8 and 1.3.0]]) with backcasting, while on known models 1.3.0 is the better calibrated (C10).",
+   "statement": "On the 5,315 [[D5:benchmark]] series, the [[D13:MCE]] of [[D10:AutoMSARIMA]] is 0.0402 with smooth 1.3.0 against 0.0326 with 1.0.8 ([[D21:smooth 1.0.8 and 1.3.0]]) with backcasting.",
    "about": {
     "subject": "D10",
     "relation": "has a higher benchmark MCE in 1.3.0 than in",
     "object": "D13",
-    "comparator": "D18",
+    "comparator": "D21",
     "conditions": [
      "D5"
     ]
@@ -2962,7 +3077,7 @@
   {
    "id": "E10",
    "profile": "simulation",
-   "description": "Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Cases T, E, S with backcasting and E with optimal initial states, run with [[D18:smooth 1.0.8 and 1.3.0]] on the same seeds (runs RN43 for 1.0.8 and RN44 for 1.3.0, plan PL11).",
+   "description": "Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Cases T, E, S with backcasting and E with optimal initial states, run with [[D21:smooth 1.0.8 and 1.3.0]] on the same seeds (runs RN43 for 1.0.8 and RN44 for 1.3.0, plan PL11).",
    "availability": {
     "level": "public"
    },
@@ -3107,7 +3222,7 @@
      "D13"
     ],
     "context": [
-     "D18"
+     "D21"
     ]
    },
    "execution": {
@@ -3634,7 +3749,7 @@
     },
     {
      "id": "R2",
-     "variable": "mce",
+     "variable": "D13",
      "value": 0.04023801303512885,
      "conditions": {
       "data": "benchmark",
@@ -3694,7 +3809,7 @@
     },
     {
      "id": "R8",
-     "variable": "mce",
+     "variable": "D13",
      "value": 0.012442956796987046,
      "conditions": {
       "data": "benchmark",
@@ -4120,7 +4235,7 @@
    "id": "E17",
    "profile": "quant",
    "design": "benchmark",
-   "description": "[[D10:AutoMSARIMA]] forecasts of the 5,315 [[D5:benchmark]] series with [[D18:smooth 1.0.8 and 1.3.0]] decomposed in stages: A, 1.0.8; D, 1.3.0 with the parameters of A; B, 1.3.0 with the orders of A; C, 1.3.0. Width ratios are medians over series of the 80% interval width of the later stage over the earlier one (exploratory run RN20 on runs RN16 to RN19).",
+   "description": "[[D10:AutoMSARIMA]] forecasts of the 5,315 [[D5:benchmark]] series with [[D21:smooth 1.0.8 and 1.3.0]] decomposed in stages: A, 1.0.8; D, 1.3.0 with the parameters of A; B, 1.3.0 with the orders of A; C, 1.3.0. Width ratios are medians over series of the 80% interval width of the later stage over the earlier one (exploratory run RN20 on runs RN16 to RN19).",
    "availability": {
     "level": "public"
    },
@@ -4138,7 +4253,7 @@
      "D4"
     ],
     "context": [
-     "D18"
+     "D21"
     ]
    },
    "results": [
@@ -4346,7 +4461,7 @@
    "id": "E20",
    "profile": "quant",
    "design": "benchmark",
-   "description": "MCE of each calibration curve of the 99 quantiles drawn from recorded outputs: the [[D2:known-model simulation]] (runs RN8, RN11, RN39), [[D18:smooth 1.0.8 and 1.3.0]] (RN16, RN19, RN43, RN44), the [[D5:benchmark]] (RN45 and the saved ETS benchmark) and the [[D9:fresh M4 sample]] (RN48), overall and by [[D7:level terciles]] (exploratory run RN49).",
+   "description": "MCE of each calibration curve of the 99 quantiles drawn from recorded outputs: the [[D2:known-model simulation]] (runs RN8, RN11, RN39), [[D21:smooth 1.0.8 and 1.3.0]] (RN16, RN19, RN43, RN44), the [[D5:benchmark]] (RN45 and the saved ETS benchmark) and the [[D9:fresh M4 sample]] (RN48), overall and by [[D7:level terciles]] (exploratory run RN49).",
    "availability": {
     "level": "public"
    },
@@ -4888,14 +5003,24 @@
    }
   }
  ],
- "warrants": [],
+ "warrants": [
+  {
+   "id": "W1",
+   "reasoning": "abductive",
+   "premises": [
+    "C10",
+    "C11"
+   ],
+   "text": "Where ETS and ARIMA reduce to the same model, their intervals coincide and cover the same share (C17), so the interval computations agree; the additive ETS(ANN) forced on every series covers no more than ARIMA(0,1,1), while the multiplicative ETS(MNN) covers 0.07 to 0.10 more (C22). The difference between the pools is therefore the multiplicative-error models, which AutoMSARIMA does not have."
+  }
+ ],
  "limitations": [
   {
    "id": "L1",
    "category": "sampling",
    "statement": "The 12 wrong models of case W were chosen by the authors, not drawn from the mistakes AutoMSARIMA makes, so the size of the coverage loss they produce depends on that choice.",
    "affects": [
-    "C6"
+    "C16"
    ],
    "impact": "could_bias_magnitude",
    "mitigation": "none"
@@ -4905,9 +5030,9 @@
    "category": "other",
    "statement": "The lab record flags plans PL11, PL12 and PL13 with code changed after the plan; the only commit between those plans and their runs updated the claimset skills under .claude/skills, not the analysis scripts.",
    "affects": [
-    "C8",
-    "C9",
-    "C10"
+    "C2",
+    "C3",
+    "C4"
    ],
    "impact": "reduces_precision",
    "mitigation": "none"
@@ -4917,7 +5042,7 @@
    "category": "measurement",
    "statement": "ETS(MNN), the comparator whose coverage stays flat over the level terciles on M4, is badly centred there (q50 of 0.372) and has an MCE of 0.0849, so its flat cov80 does not make it well calibrated.",
    "affects": [
-    "C8"
+    "C2"
    ],
    "impact": "reduces_transferability",
    "mitigation": "none"
@@ -4927,7 +5052,7 @@
    "category": "computational",
    "statement": "smooth 1.0.8 ran from a separate worktree at tag v1.0.8-py with its own Python environment, so the versions also differ in the environment around the package.",
    "affects": [
-    "C10"
+    "C4"
    ],
    "impact": "could_bias_magnitude",
    "mitigation": "none"
@@ -4937,8 +5062,8 @@
    "category": "computational",
    "statement": "The auto.adam comparison ran in R, because Python's AutoADAM removes dlnorm from the candidate distributions of a pure ARIMA whatever the user passes, while R's auto.adam removes it only from its default list.",
    "affects": [
-    "C12",
-    "C15"
+    "C5",
+    "C20"
    ],
    "impact": "reduces_transferability",
    "mitigation": "none"
@@ -4948,7 +5073,7 @@
    "category": "analytic_flexibility",
    "statement": "The thresholds of plan PL15 were fixed after the exploratory benchmark run of auto.adam (RN45) was seen, on M4 series that run did not use.",
    "affects": [
-    "C12"
+    "C5"
    ],
    "impact": "could_bias_magnitude",
    "mitigation": "none"
@@ -4958,7 +5083,7 @@
    "category": "sample_size",
    "statement": "The series where the selected ETS(ANN) and ARIMA(0,1,1) give the same forecast and width are 114 of 5,315.",
    "affects": [
-    "C17"
+    "C10"
    ],
    "impact": "reduces_precision",
    "mitigation": "none"
@@ -4968,7 +5093,7 @@
    "category": "model_specification",
    "statement": "The prediction of coverage at the benchmark lengths uses Gaussian processes and interpolates the simulated coverage over log length, with lengths outside 15 to 300 at the nearest simulated size.",
    "affects": [
-    "C19"
+    "C21"
    ],
    "impact": "could_bias_magnitude",
    "mitigation": "none"
@@ -5138,7 +5263,7 @@
   {
    "id": "A7",
    "kind": "lab_record",
-   "uri": "https://github.com/openforecast-org/smooth/blob/eadab9ad892cea021ecb041fa2d76f5edaf2d0be/lab/lab.jsonl",
+   "uri": "https://github.com/openforecast-org/smooth/blob/619d23403fa35bfe2f51a4f16effb5d0d3833102/lab/lab.jsonl",
    "version": "sha256:9ec8a2276507e5d7662d670e016119112d54c7ef508f4a71736ecbbf5191a14c",
    "licence": "CC-BY-4.0",
    "availability": {
@@ -5160,8 +5285,8 @@
   {
    "id": "A9",
    "kind": "data",
-   "uri": "https://github.com/openforecast-org/smooth/tree/eadab9ad892cea021ecb041fa2d76f5edaf2d0be/lab/runs",
-   "version": "eadab9ad892cea021ecb041fa2d76f5edaf2d0be",
+   "uri": "https://github.com/openforecast-org/smooth/tree/619d23403fa35bfe2f51a4f16effb5d0d3833102/lab/runs",
+   "version": "619d23403fa35bfe2f51a4f16effb5d0d3833102",
    "licence": "CC-BY-4.0",
    "availability": {
     "level": "public"
@@ -5207,25 +5332,33 @@
    "id": "O1",
    "question": "Why do the quantiles of auto.adam with error selection lie too high, by about 0.08 to 0.13 of coverage between the 0.2 and 0.6 quantiles, on the series of the highest level tercile, and would a model of the location of grown series correct it?",
    "claims": [
-    "C12",
-    "C20"
+    "C5",
+    "C22"
    ]
   },
   {
    "id": "O2",
    "question": "Why do the parameter draws of reforecast() give explosive or several times too wide intervals for ARIMA models with a constant or AR terms, differently in R and Python?",
    "claims": [
-    "C5",
-    "C7"
+    "C15",
+    "C17"
    ]
   },
   {
    "id": "O3",
    "question": "Would AutoMSARIMA calibrate better with error selection than with a fixed log-normal error once the location error of grown series is addressed, given that the fixed log-normal error costs 11% of median pinball on the benchmark?",
    "claims": [
-    "C9",
-    "C14",
-    "C15"
+    "C3",
+    "C19",
+    "C20"
+   ]
+  },
+  {
+   "id": "O4",
+   "question": "Which of the changes between smooth 1.0.8 and 1.3.0 that alter model selection (fewer drift models chosen with backcasting) makes the benchmark calibration of AutoMSARIMA worse while its calibration on known models improves?",
+   "claims": [
+    "C4",
+    "C23"
    ]
   }
  ]

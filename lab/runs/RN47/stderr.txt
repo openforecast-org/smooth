@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/config/Misc/Python/Libraries/openforecast-org/smooth-msarima-calibration/claimset-code/msarima-interval-calibration/q5_autoadam.py", line 117, in <module>
+    main()
+    ~~~~^^
+  File "/home/config/Misc/Python/Libraries/openforecast-org/smooth-msarima-calibration/claimset-code/msarima-interval-calibration/q5_autoadam.py", line 80, in main
+    series = load() if a.data == "benchmark" else m4_sample(a.per_period, a.seed, a.exclude_seed)
+                                                  ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/config/Misc/Python/Libraries/openforecast-org/smooth-msarima-calibration/claimset-code/msarima-interval-calibration/q5_autoadam.py", line 44, in m4_sample
+    data = load_m4(frequency)
+  File "/home/config/Misc/Python/Libraries/openforecast-org/smooth/python/.venv/lib/python3.14/site-packages/fcompdata/fcompdata.py", line 612, in load_m4
+    raise FileNotFoundError(
+    ...<2 lines>...
+    )
+FileNotFoundError: M4 yearly data not found at /home/claude/.fcompdata/m4/m4_yearly_dataset.tsf. Please run: from fcompdata.download import download_m4; download_m4('yearly')

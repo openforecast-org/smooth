@@ -10,9 +10,9 @@ A lab record is the running log of a piece of research, kept while it happens. I
 - that every number comes from a recorded run of code, not from memory or retyping;
 - what was tried and failed, so a positive result can be weighed against the number of attempts.
 
-At the end the record is exported to a claimset (a paper for LLM readers) with the `claimset-submit` skill. The specification is `references/lab-record-v0.9.md`; read §5 (event types) and §6 (rules) when an event or a refusal is unclear.
+At the end the record is exported to a claimset (a paper for LLM readers) with the `claimset-submit` skill. The specification is `references/lab-record-v0.20.md`; read §5 (event types) and §6 (rules) when an event or a refusal is unclear.
 
-**The tool.** Use `claimset` if it is installed (`claimset --help` works); then check that this skill matches it (`claimset skill check`) and, if not, update the skills with `claimset skill install`. Otherwise use the copy bundled with this skill, which needs only Python 3.10+: `python3 <this skill>/scripts/claimset`. Below, `claimset` stands for whichever you use. Every writing command prints the new event's ID; add `--json` to see the whole event. 
+**The tool.** Use `claimset` if it is installed and at least as new as this skill: `claimset --version` against the version in `scripts/lib/claimset/__init__.py`, and the lab record version it writes (`LAB_SPEC_VERSION` there; this skill describes the one in `references/`). If the installed tool is older, use the copy bundled with this skill, which needs only Python 3.10+: `python3 <this skill>/scripts/claimset`, and tell the human the installed one is out of date; never run `claimset skill install` from an older tool, which would replace newer skills with older ones. Use `claimset skill install` only to update the skills from a newer tool (`claimset skill check` says which are out of date). Below, `claimset` stands for whichever you use. Every writing command prints the new event's ID; add `--json` to see the whole event. 
 
 **Where things live: the record and the code are kept apart.** Each study (a piece of research with its own record) lives on its own git branch, `claimset/<study>`, which holds only the record: `lab/` and the papers drawn from it (`<paper>.claimset.json`). It is checked out at `claimset/<study>/` in the code checkout, and the code branches ignore `claimset/`. A study branch is never merged into code, and code is never merged into it; never check it out, merge, rebase, cherry-pick, force-push or delete it yourself: the tool commits and pushes it after every command that changes the record. All code stays on the code branches; code only a study uses goes in `claimset-code/<study>/`. Run every command from the code checkout. Names are lower-case letters, digits and hyphens (`eigen-checker`). Commands find the lab of the only study, or of the one named by `--study NAME` (or `$CLAIMSET_STUDY`). Below, `lab/` means the study's lab folder. `claimset studies` shows every study and its state.
 
@@ -32,16 +32,22 @@ Start the record before the work does: before the first design sketch, explorato
 
 1. **Check for an existing record.** If `claimset/` has studies (`ls claimset/*/lab/lab.jsonl`), or there is an older `lab/lab.jsonl`, and this work continues one of them, this is a continuation: go to *Resuming*. New research with its own questions is a new study, even in a repository that has others.
 2. **Create the record:** `claimset setup --study <name> --title "Working title" --repository https://…` creates the branch `claimset/<name>` with the lab and checks it out at `claimset/<name>/` (the repository URI is used when the record is published). Choose a short name with the human. Setup also adds `/claimset/` to `.gitignore` and the lines that leave `claimset/` and `claimset-code/` out of the package builds the repository has; commit those on the code branch. In a fresh clone of a repository that already has studies, `claimset setup` checks them all out. Outside a git repository, `claimset lab init --study <name> --title …` makes a plain folder.
-3. **Register the actors.** Ask the human for their name (and ORCID iD, if they have one). Register them first, then yourself:
+3. **Register the actors.** Register yourself first; this is the only registration you write as yourself:
    ```
-   claimset lab actor --kind human --name "A. Researcher" --orcid 0000-0002-1825-0097      # -> AC1
    claimset lab actor --kind agent --name "Research agent" \
-       --model "Anthropic|Claude Opus|5.5|claude-opus-5-5" --record-source self_reported --by AC1   # -> AC2
+       --model "Anthropic|Claude Opus|5.5|claude-opus-5-5" --record-source self_reported      # -> AC1
    ```
    Take provider, model name, version and identifier from your system prompt or environment, and never guess them. `--record-source harness` only if the values come from the system that runs you; otherwise `self_reported`.
-4. **Use `--by AC2` (your ID) on every writing command.** Setting `CLAIMSET_ACTOR` also works, but environment variables often do not persist between separate shell calls.
+
+   Then ask the human for their name (and ORCID iD, if they have one), and register them with their reply, verbatim, as you register an approval:
+   ```
+   claimset lab actor --kind human --name "A. Researcher" --orcid 0000-0002-1825-0097 \
+       --words "I'm A. Researcher, ORCID 0000-0002-1825-0097." --given-at 2026-11-05T20:30:00Z --channel chat --by AC1   # -> AC2
+   ```
+   The event is yours (`--by AC1`), and `--words` shows what they told you (L28). The human can instead run `claimset lab actor --kind human --name …` themselves. Never use a human's ID as `--by`. If no one answers, say so and carry on alone: the record notes it has no human actor, and the person is registered later the same way. Plans that need an approval wait until then.
+4. **Use `--by AC1` (your ID) on every writing command.** Setting `CLAIMSET_ACTOR` also works, but environment variables often do not persist between separate shell calls.
 5. **Protection.** Offer the human these steps; together they make the record tamper-proof rather than only tamper-evident (spec §4.5):
-   - On a study branch the record is anchored by itself: the tool pushes the branch after every command, and a confirmatory run is refused while its plan is not pushed. It needs a git remote that you can push to. After every command that succeeds, the study checkout is clean (the receipt of each push is committed with the next one); if `git status` there shows a change, do not commit it yourself: run `claimset lab verify` and tell the human.
+   - On a study branch the record is anchored by itself: the tool pushes the branch after every command, and a confirmatory run is refused while its plan is not pushed. It needs a git remote that you can push to. A short desk study with no remote (a one-day scan of forum threads or documents) can be kept in desk mode instead: `claimset setup --study NAME --title … --desk`. Every command is still committed and the hash chain and plan-before-test still hold, but nothing is anchored, so planned tests export with `planned_at_anchor: none` and the platform rates their verifiability lowest (`audit_only`, an unanchored plan); say so to the human before choosing it, and `claimset setup --study NAME --remote origin` anchors from then on. After every command that succeeds, the study checkout is clean (the receipt of each push is committed with the next one); if `git status` there shows a change, do not commit it yourself: run `claimset lab verify` and tell the human.
    - The guard hook stops tool calls that would modify `lab/`: add the output of `claimset lab guard --print-config` to `.claude/settings.json`. Because it restricts you, let the human decide whether to install it.
    - `sudo claimset lab protect` makes the log files append-only at the operating-system level (Linux). It needs the human, because it needs an administrator.
    - On the git host, protect the `claimset/*` branches against force-pushes and deletion, and add the pull-request check that `claimset setup --ci` writes (it fails a pull request that brings a study record into the code). The guard's configuration also shows `claimset studies` at the start of every session.
@@ -52,20 +58,22 @@ Record events as the work happens, not afterwards from memory.
 
 | When | Command |
 |---|---|
-| You frame a research question | `claimset lab question "Does method M beat seasonal naive on retail sales?" --by AC2` |
-| You name a method, data set, population, design, variable, concept or theory the study uses | `claimset lab term "MASE" --kind variable --definition "Mean absolute scaled error, averaged over series and horizons." --by AC2` (TM3) |
-| You state a hypothesis before testing it | `claimset lab hypothesis "[[TM1:M]] reduces [[TM3:MASE]] against [[TM2:seasonal naive]] on [[TM4:monthly series]]." --question Q1 --subject TM1 --relation "reduces relative to" --object TM3 --comparator TM2 --condition TM4 --by AC2` |
-| A result suggests a new hypothesis | `claimset lab hypothesis "…" --question Q1 --from-exploration --prompted-by RN4 --by AC2` |
-| You rely on an assumption | `claimset lab assume "Forecast errors are independent across series." --category statistical --check unchecked --by AC2` |
-| Before a test that should count as confirmatory | `claimset lab plan --kind confirmatory --hypotheses H1 --design "…" --analysis "…" --studied TM1 TM2 --cases TM4 --procedure TM5 --lens TM3 --framework frequentist --parameter alpha=0.05 … --quantity p="…" --supported "…" --not-supported "…" --data data/sales.csv --by AC2` (see *Plans and decision rules*) |
-| The human approves a plan (you asked and they said yes) | `claimset lab approve PL1 --by AC2 --on-behalf-of AC1 --words "Yes, go ahead with PL1." --given-at 2026-10-29T11:30:00Z --channel conversation` |
-| You run any code that produces results | `claimset lab run --plan PL1 --seed 1 --param horizon=12 --data data/sales.csv --by AC2 -- python3 experiment.py` |
-| A run departs from its plan | `claimset lab deviate --plan PL1 --run RN3 --text "Used 900 of 1,200 series." --reason "Data gap after 2019." --by AC2` |
-| A planned test has run | `claimset lab verdict PL1`, then `claimset lab status H1 supported --plan PL1 --evidence RS2 RS3 --why "Rule of PL1: p = 0.003 < alpha and d > 0." --by AC2` |
-| Exploratory evidence bears on a hypothesis | `claimset lab status H4 inconclusive --evidence RS7 --why "…" --by AC2` |
-| You make a choice that shapes the work | `claimset lab decide "Dropped weekly series: too few observations per series." --affects H2 --by AC2` |
-| You observe something worth keeping | `claimset lab note "Errors grow sharply after horizon 6." --refers-to RN3 --by AC2` |
-| You produce or use a file others need | `claimset lab artefact results/table1.csv --kind table --description "…" --licence CC-BY-4.0 --by AC2` |
+| You frame a research question | `claimset lab question "Does method M beat seasonal naive on retail sales?" --by AC1` |
+| You name a method, data set, population, design, variable, concept or theory the study uses | `claimset lab term "MASE" --kind variable --definition "Mean absolute scaled error, averaged over series and horizons." --by AC1` (TM3) |
+| You state a hypothesis before testing it | `claimset lab hypothesis "[[TM1:M]] reduces [[TM3:MASE]] against [[TM2:seasonal naive]] on [[TM4:monthly series]]." --question Q1 --subject TM1 --relation "reduces relative to" --object TM3 --comparator TM2 --condition TM4 --by AC1` |
+| A result suggests a new hypothesis | `claimset lab hypothesis "…" --question Q1 --from-exploration --prompted-by RN4 --by AC1` |
+| You rely on an assumption | `claimset lab assume "Forecast errors are independent across series." --category statistical --check unchecked --by AC1` |
+| Before a test that should count as confirmatory | `claimset lab plan --kind confirmatory --hypotheses H1 --design "…" --analysis "…" --studied TM1 TM2 --cases TM4 --procedure TM5 --lens TM3 --framework frequentist --parameter alpha=0.05 … --quantity p="…" --supported "…" --not-supported "…" --data data/sales.csv --by AC1` (see *Plans and decision rules*) |
+| The human approves a plan (you asked and they said yes) | `claimset lab approve PL1 --by AC1 --on-behalf-of AC2 --words "Yes, go ahead with PL1." --given-at 2026-10-29T11:30:00Z --channel conversation` |
+| You run any code that produces results | `claimset lab run --plan PL1 --seed 1 --param horizon=12 --data data/sales.csv --by AC1 -- python3 experiment.py` |
+| A run departs from its plan | `claimset lab deviate --plan PL1 --run RN3 --text "Used 900 of 1,200 series." --reason "Data gap after 2019." --by AC1` |
+| A planned test has run | `claimset lab verdict PL1`, then `claimset lab status H1 supported --plan PL1 --evidence RS2 RS3 --why "Rule of PL1: p = 0.003 < alpha and d > 0." --by AC1` |
+| Exploratory evidence bears on a hypothesis | `claimset lab status H4 inconclusive --evidence RS7 --why "…" --by AC1` |
+| You make a choice that shapes the work | `claimset lab decide "Dropped weekly series: too few observations per series." --affects H2 --by AC1` |
+| You read outside material the study relies on (a forum thread, an issue, a web page, a transcript) | Save it, then `claimset lab capture thread.html --uri https://… --retrieved-at 2026-11-05T11:00:00Z --venue musescore.org`; `claimset lab quote SR1 "the words"` before quoting it |
+| You code a source (assign it, or a passage of it, to a theme) | Record the code once: `claimset lab term "arrange for ensemble" --kind concept --definition "…" --include "…" --exclude "…"`; then `claimset lab code SR1 --codes TM4 --excerpt "the words" --unit post --pass 1` |
+| You observe something worth keeping | `claimset lab note "Errors grow sharply after horizon 6." --refers-to RN3 --by AC1` |
+| You produce or use a file others need | `claimset lab artefact results/table1.csv --kind table --description "…" --licence CC-BY-4.0 --by AC1` |
 | Someone else checks a result | `claimset lab check RN3 --outcome confirmed --extent full --notes "…" --by AC5` (never the author of the target) |
 
 **Terms, atoms and setups.** Record a term for each part of the study as soon as you name it: the methods (yours with every defining equation), data sets or participants, the evaluation or study design, each measure or outcome with its aggregation, and the concepts or theories you use or find, each with its `--kind` (method, intervention, population, data, setting, design, variable, concept, theory). A result your script writes whose `quantity` is a term's name is exported with that term as its variable, so name the variables you record as terms. Give each hypothesis its atom (`--subject`, `--relation`, `--object`, `--comparator`, `--condition`, naming terms or giving short text) and mark the terms in its statement (`[[TM3:MASE]]`). Give each confirmatory plan its setup by role: `--studied` (what is compared or explored), `--cases` (on what or whom), `--procedure` (how), `--lens` (what is measured, or how it is read), `--context` (where and when). The tool warns when a plan does not study or measure what a hypothesis it tests is about: that is a switched outcome or comparator, so revise the hypothesis or the plan before running. The claimset's definitions, atoms and setups are exported from these.
@@ -80,12 +88,12 @@ Record events as the work happens, not afterwards from memory.
   - equivalence: `alpha`, `test`, `lower_bound`, `upper_bound` (the smallest effect that would matter), `sample`;
   - bayesian: `prior`, `threshold`, `sample`.
 - `--supported "…"` and `--not-supported "…"`: the rule for each conclusive outcome.
-- Recommended: `--quantity name="quantity text"` for each result your script will write that the decision uses (by its exact `quantity` text), so the rules can be expressions over them (`p < alpha and d > 0`, `abs(d) < 0.01`; only numbers, names, `+ - * /`, `abs()`, comparisons, `and`, `or`, `not`). The tool then computes the verdict. Add conditions or an interval bound with JSON: `--quantity 'd_up={"quantity": "mean MAE difference", "conditions": {"ratio": 1}, "field": "interval.upper"}'`. Each name must match exactly one result of the deciding runs. Without quantities the rules are text, and you state which one the evidence met: the claim then says the verdict was judged rather than computed.
+- Recommended: `--quantity name="variable text"` for each result your script will write that the decision uses (by its exact `variable` text), so the rules can be expressions over them (`p < alpha and d > 0`, `abs(d) < 0.01`; only numbers, names, `+ - * /`, `abs()`, comparisons, `and`, `or`, `not`). The tool then computes the verdict. Add conditions or an interval bound with JSON: `--quantity 'd_up={"variable": "mean MAE difference", "conditions": {"ratio": 1}, "field": "interval.upper"}'`. Each name must match exactly one result of the deciding runs. Without quantities the rules are text, and you state which one the evidence met: the claim then says the verdict was judged rather than computed.
 - `--runs N` if more than one run decides the plan (default 1); each quantity then says which run it comes from (`"run": 2`). `--decision rule.json` takes the whole rule from a file.
 - `--new-data "…"`: what this test uses that the runs which suggested its hypotheses did not. Give it for every hypothesis recorded `--from-exploration`; the tool warns when it is missing.
 - `--exclusion name="rule"` for every rule that leaves units out of the analysis (`--exclusion edge="models with max |lambda| within 1e-8 of 1"`), repeatable. Have the script report how many units each excluded, as a result whose quantity contains `excluded` or the exclusion's name (`"models excluded by edge"`); `verdict` warns when none does, and `plan` warns when a parameter looks like an exclusion (`edge_band`, `trim`, `outlier_cutoff`) and none is declared.
 
-**One plan can test several hypotheses.** When one computation decides several hypotheses, name them all in one plan (`--hypotheses H1 H2`), with quantities and rules that decide each, and run it once; record a verdict for each. Two plans running the same command on the same code record one computation twice, and `run` warns when it sees that.
+**One plan can test several hypotheses.** When one computation decides several hypotheses, name them all in one plan (`--hypotheses H1 H2`) and run it once; record a verdict for each. When they need different rules, give each its own, prefixed with its ID: `--supported "H1: s < threshold" --not-supported "H1: s >= threshold" --supported "H2: n > ui" --not-supported "H2: n <= ui"` (the quantities and parameters are shared; in a `--decision` file, `"rules": {"H1": {…}, "H2": {…}}`, where an entry may also have its own `framework` and `parameters`). Without a prefix, one pair of rules decides every hypothesis of the plan. Two plans running the same command on the same code record one computation twice, and `run` warns when it sees that.
 
 Write the **not supported** rule as carefully as the supported one. Failing to reach significance is not a negative result: it is `inconclusive`. A hypothesis is refuted only by what the plan says in advance would refute it, for example a confidence interval lying entirely below the smallest effect that would matter (an equivalence bound), or a significant effect in the opposite direction. Work out the sample size so that a conclusive outcome is likely, and say how in `sample`.
 
@@ -111,12 +119,28 @@ Never treat silence, a general instruction ("do whatever you need"), or a reply 
 
 Options that take IDs take several at once (`--hypotheses H1 H2`, `--evidence RS4 RS5`, `--refers-to`, `--prompted-by`, `--affects`). `--seed N`, `--param name=value` (the value is read as JSON when it parses, e.g. `--param grid=[0.1,0.5]`) and `--data FILE` can be repeated.
 
-**Results.** Your script writes its numbers as a JSON array to the file named by `$CLAIMSET_RESULTS`, and any other outputs into `$CLAIMSET_RUN_DIR`. Each entry: `quantity` (what was measured, self-contained), `value` (a number), and optionally `unit`, `interval` `{level, lower, upper}` and `conditions` (the settings that define this result):
+**Sources.** Outside material the research rests on is data, not a link in a note: capture it when you first read it, with `claimset lab capture FILE --uri URL`. Save the page yourself (in a browser, or with whatever fetch you used to read it) and capture the file: that records what you saw. `--fetch --uri URL` has the tool fetch a public page itself and records a different method. Pages, posts and issues written by others are private by default: their files are kept in `lab/private/`, out of git and the package, and the record holds their hashes; they are published only by their hash and short excerpts; never give them the paper's licence (`--public` needs the source's `--licence` or `--terms` that permit it). Give `--archive-uri` when a web archive copy exists; one found later is added with `claimset lab capture --supersedes SR1 --archive-uri URL` (no file). A page that cannot be archived (behind a sign-in) is still cited: its captured copy, by its hash, stands in for the archive. `lab/private/` (the private files and the pseudonym salt) exists only in the checkout that captured them: never commit it or move its files elsewhere in the record, and tell the human to back it up with their other private data. In another checkout, `verify` says which private sources it could not check, and `quote` and `capture --author` refuse until the human copies `lab/private/` in. Excerpts in codings are still in the record. Runs that read sources name their files as data (`--data lab/private/sources/SR1/text.txt`; `lab/sources/SR1/text.txt` for a public one); a source captured after the plan whose test uses it is flagged. Quote only what `claimset lab quote` finds in the source's text, with the locator it prints; never quote from a summarising tool's account of a page.
+
+**Coding.** Codes, codings and counts are the qualitative extension (`references/extensions/qualitative-v0.1.md`); the tool declares it in the record the first time you record a code. Codes are terms of kind `concept` with criteria: `--include` (what a passage must show) and `--exclude` (what does not count); `--broader TM3` puts a code under a theme. Changing a code's criteria is a correction of its term (`--supersedes`), so earlier codings keep the version they applied. Code with `claimset lab code SR1 --codes TM4 [--excerpt "the words"]`: the excerpt must be in the source's text, once; leave it out to code the whole source. Recode or withdraw with `--supersedes CD3` (`--withdraw`). Never count codes yourself or write a count in a note: a run receives the codings in force in `$CLAIMSET_CODINGS` (a JSON file with the codes, the sources coded and the codings), and its script counts them and writes the counts as results, like any other number. A second coder codes in their own agent log with `--pass 2`; agreement is computed by a run from both passes.
+
+**Testing on coded data.** When a hypothesis is decided by how much coded material there is ("at least 5 threads from different years ask for automatic arranging"), make the counts the plan's quantities and let the tool count: `--decision` with `"quantities": {"years": {"count": {"codes": ["TM4"], "unit": "source", "distinct_by": "year"}}, "threads": {"count": {"codes": ["TM4"]}}}`, `"supported": "years >= 5 and threads >= 5"`, `"not_supported": "threads < 2"` (framework `qualitative` or `deterministic`). A count includes narrower codes; `distinct_by` is `author`, `year`, `venue`, `source` or `coding`; `where` keeps a `pass`, `coder`, `unit`, `venue` or a date range. The tool records the counts in the plan's qualitative block and binds each by its result, `count: <name>`. Then `claimset lab count --plan PL1` is the deciding run, and the verdict is computed. A complete `--decision` file:
+
+```json
+{"framework": "qualitative",
+ "parameters": {"sample": "every thread a forum search for 'arrange' returns, 2010-2026, read on 2026-11-05"},
+ "quantities": {"threads": {"count": {"codes": ["TM4"], "unit": "source"}},
+                "years": {"count": {"codes": ["TM4"], "unit": "source", "distinct_by": "year"}}},
+ "supported": "threads >= 5 and years >= 5", "not_supported": "threads < 2"}
+```
+
+The order that makes the test confirmatory: fix the sampling frame (which searches, venues, dates) and what makes two units independent in the plan's `design`, then capture and code the material, then count. That order raises no flag. A flag says the order was broken: `coded_before_plan` (codings of the counted codes written before the plan), `codebook_changed_after_plan` (a counted code redefined after it), and `sources_captured_after_plan`, which only a script run raises when it reads source files captured after the plan as `--data` (the counter reads the codings, not the files). Record authors with `capture --author HANDLE` (stored as a pseudonym), so `distinct_by: author` can count them. Code every source you read: a source with no matching code gets `claimset lab code SR6 --none`, so it stays in the sample and the counts keep their denominator. `claimset lab count --codes TM4 --distinct-by year` counts for exploration. When a claim quotes a passage, give the excerpt from a coding with the structured locator the export's completion list shows (`{artefact, start, end, lab_event}`).
+
+**Results.** Your script writes its numbers as a JSON array to the file named by `$CLAIMSET_RESULTS`, and any other outputs into `$CLAIMSET_RUN_DIR`. Each entry: `variable` (what was measured, self-contained; `quantity` is read as `variable`), `value` (a number), and optionally `unit`, `interval` `{level, lower, upper}` and `conditions` (the settings that define this result):
 
 ```python
 import json, os
 
-results = [{"quantity": "mean relative MASE reduction, method M vs seasonal naive",
+results = [{"variable": "mean relative MASE reduction, method M vs seasonal naive",
             "value": 0.081, "interval": {"level": 0.95, "lower": 0.052, "upper": 0.11},
             "conditions": {"frequency": "monthly", "horizon": "1-12"}}]
 path = os.environ.get("CLAIMSET_RESULTS")
@@ -134,19 +158,19 @@ In R: `jsonlite::write_json(results, Sys.getenv("CLAIMSET_RESULTS"), auto_unbox 
 ## Example: from exploration to a confirmatory test
 
 ```
-claimset lab run --by AC2 -- python3 explore.py                 # RN1, exploratory; RS1 shows an effect at long horizons
-claimset lab hypothesis "M helps most at horizons 7-12." --question Q1 --from-exploration --prompted-by RN1 --by AC2   # H2
-claimset lab plan --kind confirmatory --hypotheses H2 --by AC2 \
+claimset lab run --by AC1 -- python3 explore.py                 # RN1, exploratory; RS1 shows an effect at long horizons
+claimset lab hypothesis "M helps most at horizons 7-12." --question Q1 --from-exploration --prompted-by RN1 --by AC1   # H2
+claimset lab plan --kind confirmatory --hypotheses H2 --by AC1 \
     --design "Held-out 2020-2024 series (400), horizons 7-12, method M vs seasonal naive" \
     --analysis "Per-series difference in MASE (naive minus M); one-sided paired t-test; 95% CI of the mean" \
     --framework frequentist --parameter alpha=0.05 --parameter test="paired t-test" --parameter sides=greater \
     --parameter correction=none --parameter sample="all 400 held-out series; no interim analysis" \
     --quantity p="p-value, paired t-test, MASE naive minus M" --quantity d="mean MASE difference, naive minus M" \
-    --quantity 'd_up={"quantity": "mean MASE difference, naive minus M", "field": "interval.upper"}' \
+    --quantity 'd_up={"variable": "mean MASE difference, naive minus M", "field": "interval.upper"}' \
     --supported "p < alpha and d > 0" --not-supported "d_up < 0.01"                          # PL1
-claimset lab run --plan PL1 --by AC2 -- python3 confirm.py --holdout   # RN2, confirmatory; RS2-RS3
+claimset lab run --plan PL1 --by AC1 -- python3 confirm.py --holdout   # RN2, confirmatory; RS2-RS3
 claimset lab verdict PL1                                                 # p = 0.004, d = 0.031 -> supported
-claimset lab status H2 supported --plan PL1 --evidence RS2 RS3 --why "Rule of PL1 met on held-out data." --by AC2
+claimset lab status H2 supported --plan PL1 --evidence RS2 RS3 --why "Rule of PL1 met on held-out data." --by AC1
 ```
 
 Citing RS1 as evidence for H2 would be refused: RS1 suggested H2.
@@ -158,28 +182,28 @@ Every writing command takes `--supersedes ID`: it writes a new event of the same
 ## Several agents at once
 
 If you orchestrate other agents that work concurrently:
-1. Register each one as an actor in the main log (`claimset lab actor --kind agent … --by AC2`), then run `claimset lab start --by AC3`. From then on, AC3's events go to `lab/agents/AC3.jsonl`, with IDs like `AC3.H1`.
+1. Register each one as an actor in the main log (`claimset lab actor --kind agent … --by AC1`), then run `claimset lab start --by AC3`. From then on, AC3's events go to `lab/agents/AC3.jsonl`, with IDs like `AC3.H1`.
 2. Tell each agent its actor ID and to follow this skill. It sees the main log as it was when it started, plus its own events, and can refer only to those.
 3. An agent's confirmatory runs are made under plans written in its own log. If it should test one of your hypotheses, it writes the plan itself.
-4. When the agents finish, run `claimset lab merge --by AC2`. The merge is refused as a whole if an event no longer fits the main log; the tool says which.
+4. When the agents finish, run `claimset lab merge --by AC1`. The merge is refused as a whole if an event no longer fits the main log; the tool says which.
 5. An agent log is used once. For new concurrent work, register a new actor.
 
 ## Independent checks
 
 A check counts as independent only when someone other than the author makes it, and it is recorded by them. When you ask another agent to check your work (to reproduce runs, re-derive a result, review a draft):
-1. Register it as its own actor, with its model: `claimset lab actor --kind agent --name "Checker" --model … --by AC2`, then `claimset lab start --by AC5` so it writes to its own log. Do this before it starts, not after: work it did outside the record is its account, not a check.
+1. Register it as its own actor, with its model: `claimset lab actor --kind agent --name "Checker" --model … --by AC1`, then `claimset lab start --by AC5` so it writes to its own log. Do this before it starts, not after: work it did outside the record is its account, not a check.
 2. Tell it its actor ID and to follow this skill. Its reproductions and sensitivity analyses (reruns with other seeds, tolerances or settings) are its own runs, `claimset lab run --by AC5 …`; every number it reports comes from one of them.
 3. It records each verdict with `claimset lab check <run, result or event> --outcome … --extent … --notes "…" --by AC5`, naming in the notes the runs and results that show it (`Reproduced in AC5.RN2: RS… equal`). A disputed check stays in the record with the correction that answers it.
-4. A sensitivity analysis that tests an assumption is that assumption's check: correct the assumption to `--check sensitivity_analysed --check-evidence <the checker's run>` (`claimset lab assume "…" --supersedes AS2 … --by AC2`), so the claimset cites it.
-5. Merge its log when it finishes (`claimset lab merge --by AC2`).
+4. A sensitivity analysis that tests an assumption is that assumption's check: correct the assumption to `--check sensitivity_analysed --check-evidence <the checker's run>` (`claimset lab assume "…" --supersedes AS2 … --by AC1`), so the claimset cites it.
+5. Merge its log when it finishes (`claimset lab merge --by AC1`).
 
 Do not summarise a check in a note of your own instead: export takes claims' `checks` from check events, and a check reported only by the author is the author's account.
 
 ## Answering a review
 
 When a published claimset is reviewed, each comment carries a resolution test: a procedure and two rules, `upheld` (the comment stands) and `withdrawn` (it falls), written before you answer. Run a computable test as a planned test, so the verdict is computed against the reviewer's rule, not one you chose:
-1. Record a hypothesis stating what the comment questions, as you hold it: `claimset lab hypothesis "Method M's forecast errors are at most weakly correlated across series." --question Q3 --by AC2`.
-2. Plan the test from the comment: `claimset lab plan --kind confirmatory --hypotheses H9 --comment doi:…@v1/RV1.c2 --review RV1.json --analysis "…" --by AC2`. The decision rule is the comment's test, unchanged (`supported` is its `withdrawn` rule, `not_supported` its `upheld` rule), the design is its procedure unless you give one, and the plan's `addresses` names the comment. If a re-review replaced the test, give that file too (`--review RV2.json`): the latest test applies. Never edit the rule.
+1. Record a hypothesis stating what the comment questions, as you hold it: `claimset lab hypothesis "Method M's forecast errors are at most weakly correlated across series." --question Q3 --by AC1`.
+2. Plan the test from the comment: `claimset lab plan --kind confirmatory --hypotheses H9 --comment doi:…@v1/RV1.c2 --review RV1.json --analysis "…" --by AC1`. The decision rule is the comment's test, unchanged (`supported` is its `withdrawn` rule, `not_supported` its `upheld` rule), the design is its procedure unless you give one, and the plan's `addresses` names the comment. If a re-review replaced the test, give that file too (`--review RV2.json`): the latest test applies. Never edit the rule.
 3. Run it (`claimset lab run --plan PL9 …`), read `claimset lab verdict PL9`, and record that verdict. A verdict against you is recorded and reported like any other: the comment then stands, and the claimset says so.
 4. Export carries the comment into the claim's `test.addresses`, and `claimset revision respond --lab` cites the plan's runs when you answer the comment (claimset-revise skill).
 
@@ -188,8 +212,8 @@ Tests decided by what a source states (`documentary`) are not run here; answer t
 ## A record in an older place
 
 A record kept on a code branch (from before study branches: in `claimset/<study>/`, `lab/` at the top, or elsewhere such as `.claude/lab`) is moved onto its own branch, with the human's agreement, by the tool, never by hand:
-1. If it is not yet in `claimset/<study>/`, move it there first: `claimset lab move --lab <old lab> --study <name> --also <old code folder>=claimset/<name>/code --by AC2`, and commit.
-2. `claimset setup --study <name> --adopt --by AC2` makes the branch `claimset/<name>` from that folder, keeps its `code/` on the code branch as `claimset-code/<name>/`, removes the folder from the code branch, checks the branch out in its place and records a `relocation`. Commit the code branch's change (the removal, the code's new place and `.gitignore`) as one commit.
+1. If it is not yet in `claimset/<study>/`, move it there first: `claimset lab move --lab <old lab> --study <name> --also <old code folder>=claimset/<name>/code --by AC1`, and commit.
+2. `claimset setup --study <name> --adopt --by AC1` makes the branch `claimset/<name>` from that folder, keeps its `code/` on the code branch as `claimset-code/<name>/`, removes the folder from the code branch, checks the branch out in its place and records a `relocation`. Commit the code branch's change (the removal, the code's new place and `.gitignore`) as one commit.
    A study folder that holds only a paper and its code, with no lab, is adopted with `--title "…"` instead of `--by`: it gets a new record begun now, and the paper must not present earlier work as recorded.
 3. Check with `claimset lab verify --remote`. Other branches that still hold a copy of the record must not be extended: tell the human which ones, so their copies are removed before they are merged.
 
@@ -198,7 +222,7 @@ A record kept on a code branch (from before study branches: in `claimset/<study>
 The record is your memory. Before doing anything else:
 
 ```
-claimset lab summary --by AC2          # questions, hypotheses and their status, plans, runs, recent decisions
+claimset lab summary --by AC1          # questions, hypotheses and their status, plans, runs, recent decisions
 claimset lab list --last 20            # the latest events
 claimset lab show H3                   # one event, with its corrections
 ```
@@ -222,12 +246,18 @@ The message names the rule. The usual cases:
 | L15 | The plan's decision rule is incomplete or not a valid expression | Add what the message names: a parameter, a quantity, a rule |
 | L16 | The plan already has its deciding runs; or, in an agent log, the plan is not that log's own | Record the verdict; to test again, write a new plan |
 | L17 | A verdict that does not match the plan's rule, does not name the plan, or does not cite its deciding runs | Run `claimset lab verdict PL…` and record that verdict with `--plan` |
+| L24 | A captured source's files were changed, removed or added to | Restore them; capture a new version as a new source |
+| L25 | The quoted words are not in the source's text | Quote the words exactly as the source has them |
+| L26 | Content written by others marked public without its licence or terms | Give `--licence` or `--terms`, or keep it private |
+| qualitative.L1 (L27 in records begun before v0.20) | A coding names something that is not a captured source, or a term without a code part | Capture the source; record the code with `--include` first |
+| L30 | A block or event of an extension the record has not declared, or that the tool does not know | `claimset lab extension NAME` in the main log; update the claimset package if the tool does not know it |
+| L28 | You registered a person without their words, or gave `--words` where no agent is quoting a person | Ask them, and pass their reply verbatim with `--words`; or let them run `claimset lab actor` themselves |
 
 Never work around a refusal by editing files or by writing as another actor.
 
 ## Finishing
 
-**Papers.** A study may give one paper or several (the method, later its implementation). Decide with the human before exporting, and record each paper with the questions it reports: `claimset lab paper eigen-checker --questions Q1 --by AC2`, `claimset lab paper eigen-checker-cpp --questions Q2 --by AC2`. A question is reported in one paper, and a paper takes whole questions, never chosen hypotheses: results are never split so that some go unreported. If a paper needs only part of a question's hypotheses, the question was too broad; record a narrower question and say so in a note. With one paper, recording it is optional. `claimset lab verify` names hypotheses with a result that no paper reports.
+**Papers.** A study may give one paper or several (the method, later its implementation). Decide with the human before exporting, and record each paper with the questions it reports: `claimset lab paper eigen-checker --questions Q1 --by AC1`, `claimset lab paper eigen-checker-cpp --questions Q2 --by AC1`. A question is reported in one paper, and a paper takes whole questions, never chosen hypotheses: results are never split so that some go unreported. If a paper needs only part of a question's hypotheses, the question was too broad; record a narrower question and say so in a note. With one paper, recording it is optional. `claimset lab verify` names hypotheses with a result that no paper reports.
 
 1. Record the verdict of every planned test that has run; export refuses while one is missing. Give hypotheses you decided something about a final status (`supported`, `not_supported`, `inconclusive`, `revised` or `abandoned`); the rest are counted as open, which is fine.
 2. Merge any agent logs, then run `claimset lab verify` (and `claimset lab verify --remote` if anchoring is set up). Fix nothing by hand. If verification fails, tell the human exactly what it reports.

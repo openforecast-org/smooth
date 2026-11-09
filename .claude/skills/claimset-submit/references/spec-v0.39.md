@@ -1,10 +1,122 @@
-# Claimset — Specification v0.34 (draft)
+# Claimset — Specification v0.39 (draft)
 
-Status: working draft · Date: 2026-10-29 · Supersedes v0.33 (`spec/claimset-v0.33.md`) · Companions: lab record specification (`spec/lab-record-v0.15.md`), revision specification (`spec/claimset-revision-v0.2.md`)
+Status: the baseline (2026-11-09) · Date: 2026-11-09 · Supersedes v0.38 (`spec/claimset-v0.38.md`) · Companions: lab record specification (`spec/lab-record-v0.20.md`), revision specification (`spec/claimset-revision-v0.6.md`), extensions (`spec/extensions/`)
 
 Claimset is the name of both the open format and the platform.
 
-## Changes since v0.33
+## Changes since v0.38
+
+Tests planned outside a Claimset lab record can be reported as planned. A study preregistered on OSF or AsPredicted, a registered report and a trial in a trial registry report their hypotheses, outcomes and confirmatory tests in the same fields as a claimset exported from a lab record.
+
+- §3.3, §3.3.3: a claim's `hypothesis` may come from a registration or from the paper itself, not only from a lab record. `hypothesis.lab_event` is given for claims exported from a lab record, and only for them.
+- §3.3.3: a test's `registration` is the ID of the registration in `references` (§3.13), so it has an identifier type: the DOI of an OSF registration, a trial registry number as a CURIE, an archived URL. A confirmatory test names the plan it was planned under, `lab_plan` or `registration`. New rule 81.
+- §3.3.3: new `planned_at_anchor` value `registry`: `planned_at` is the date a public registry records for the registration, and may be left out when it is not at hand, since the registry holds it (rule 43 revised, warning 36).
+- §3.3.3, *Tests registered outside a lab record*: how a registered test is recorded, in native and converted papers. A rule the converter reconstructs is `inferred` in `field_provenance`.
+- §3.9: new limitation category `deviation`, a departure from the plan a test was planned under. New warning 34: a claim `confirmatory_with_deviations` without a limitation of that category.
+- Rules 42, 44 and 46 (revised): only claims exported from a lab record need `hypothesis.lab_event`, `paper.exploration` and its counts.
+- `claimset migrate` turns the registration URI of a v0.38 test into a reference.
+
+Uncertainty is typed, so numbers from different papers can be compared by machine: a mean ± SD and a mean ± SE, a 95% confidence and a 95% credible interval, a measurement's statistical and systematic uncertainty are no longer told apart only in text.
+
+- §3.4, *Uncertainty* (new): a result, and the estimate of a single-estimate study, may carry `uncertainty`, a list of components `{kind, value}` (±) or `{kind, plus, minus}`: `sd`, `se`, `stat`, `sys`, `total` or `unspecified`, with a `label` naming a component's source and a `level` when it is not one standard deviation.
+- §3.4: an interval may say its `kind`: `confidence`, `credible` or `prediction`.
+- §3.4, *Tables*: the reserved condition key `uncertainty` marks a column that holds the uncertainty of another (`{"variable": "D8", "conditions": {"uncertainty": "sd"}}`).
+- §3.3.3: a test quantity may read a component's value (`field: "uncertainty.se"`).
+- §3.4: two new value forms. A **limit** `{bound, limit, level}`: the value is known only to lie below (`upper`) or above (`lower`) a number, as an upper limit on a cross-section at 95% confidence or a concentration below the detection limit. A **range** `{min, max, level}`: the value is a span, as yields of 36% to 77% across substrates or a mass region excluded at 95% confidence. Rule 66 revised; a test quantity may read `value.limit`, `value.min` or `value.max`.
+- New rule 82 (intervals and uncertainty well formed); rule 47 revised (a quantity's `field` is from the list); warning 17 counts uncertainty values; new warning 35 (a native paper's interval without a kind, or an `unspecified` uncertainty).
+
+Things the sciences study have kinds of their own. Field trials put cell lines under `population`, compounds, genes and particles under `other`, and primary sources under `data`; a search for claims about a compound or a gene then depends on text.
+
+- §3.2, *Kinds*: five new kinds: `substance` (a chemical element, compound, mixture or formulation), `organism` (a taxon, strain or breed), `biological_material` (a cell line, antibody, plasmid, tissue or specimen collection), `entity` (any other physical thing named as such: a gene or protein, a particle, a device, a celestial body, an object) and `source` (one primary source read as evidence). *Things and their roles* says how they differ from `intervention`, `population` and `data`, and which registries their `identifiers` come from.
+- Warning 28 (revised): the new kinds are parts of a study that a setup should name.
+
+Smaller gaps from the field trials:
+
+- §3.1: `paper.collaborations` names the collaborations a paper is published on behalf of (the ATLAS Collaboration). A collaboration is not a contributor: people answer for the research (v0.36). New rule 85.
+- §3.1: a funding entry may say its `kind`, `grant` or `in_kind` (vouchers, materials, services), and the funder's `role` in the work. Rule 69 revised.
+- §3.2: a `setting` may give its `location`, a list of points in decimal degrees; a `variable` may say which constructs it `measures` (a single item measuring trust). New rule 83.
+- §3.3: claim type `mechanistic` (how an effect comes about: its steps, intermediates or processes); novelty `not_applicable` for secondary and supporting claims that are not findings (a control, a routine check). New rule 84.
+- §3.7: relation `disputes_evidence`: the claim argues that the target's evidence does not establish it, without asserting the opposite. Within a paper and to other works.
+- §3.4, qual profile: analytic approach `source_criticism`.
+- §3.4, *Dimensions*: a control or baseline lies on a group's dimension without being a member, when it is of the group's kind (a mock transfection beside four knockdowns). Rule 66 revised.
+- §3.6: material in a paper's supplementary information, and material behind a subscription, is `public`; the `comment` says which.
+- Rule 6 revised: an interpretive claim's warrant may be the one on its argument support entry, not given twice.
+- §2.6: the baseline is set when the platform launches; until then only the current version is accepted (rule 79 revised), and files of v0.37 and v0.38 are brought over with `claimset migrate`.
+- New rule 86: every field has the type this specification gives it. The validator reports a value of the wrong type (a list where one ID belongs) instead of failing on it, in files of every version.
+
+From the second round of field trials:
+
+- §3.4: a result, or a table column, may say what kind of `statistic` its value is (`mean`, `difference`, `odds_ratio`, `standardised_mean_difference`, `nnt`, …), and that it is `approximate` when the source gives it only approximately ("about 1.5-fold"). New rule 87.
+- §3.2: a `variable` or `setting` may give the `unit` of its values, so that a condition keyed by it has a unit (`{"D9": 126.5}` in GeV); an `intervention` may say what it `targets` (the gene a knockdown acts on). New kind `process` (a reaction, a decay, a pathway). New rule 88.
+- §3.4: `se` covers the posterior standard deviation of a Bayesian estimate. §3.3.3: a trial registry entry's CURIE uses the prefix the Bioregistry gives the registry.
+
+Evidence that is direct observation:
+
+- §3.4, *Profile `observation`* (new), and §4: support kind `empirical_obs`, pointing to evidence of profile `observation`, for claims that rest on what an instrument or an observer recorded and the paper shows: an image (a micrograph, a blot, a telescope image), a spectrum, a determined structure, a described specimen, a recording. The evidence lists its `records`, each `{kind, artefact, description}`, and what was seen is its results. *Choosing the profile* separates it from `quant` and `qual`. New rule 89, warning 37; warnings 8, 17 and 25 apply to it as to `quant`.
+
+Reading one claim:
+
+- §2.3, *Claim bundles* (new): one claim with everything it rests on, as JSON and as a reading view (`claimset render --claim C4`), for the platform's claim pages.
+
+Amended on 2026-11-09, for statistics the list did not name (geometric means, quantiles at a given probability, expectiles, the moments of a distribution) and for tables whose rows are statistics:
+
+- §3.4: `statistic` is a name from the list or, for a family that takes parameters, an object `{name, …}`: a mean's `kind` (`arithmetic`, `geometric`, `harmonic`, `trimmed`, `winsorised`) and `trim`, the `probability` of a quantile or an expectile, the `order` of a moment and whether it is `central`, whether a kurtosis is `excess`, and a `label`. New names: `expectile`, `mode`, `min`, `max`, `sum`, `sd`, `variance`, `iqr`, `mad`, `coefficient_of_variation`, `skewness`, `kurtosis`, `moment`, and `other`, which needs a `label`. The list is grouped by what a statistic does. Rule 87 revised; new warning 38 (`other`).
+- §3.4, *Tables*: a row may carry `statistic` and `approximate` for its values, as a column does (a table whose rows are the mean and the median of each method's errors); a cell's statistic is its row's or its column's, never both. Rules 48 and 87 revised.
+- §3.4, *Tables*: an interval's bounds as columns are told apart by a condition `bound`; the example no longer used `statistic` as a condition key.
+- A file valid before stays valid: a statistic given as a name means what it meant.
+
+Amended on 2026-11-09, at the platform's launch:
+
+- §2.6: v0.39 is the baseline. Every file valid under v0.39 stays valid under it for good, and every later version keeps v0.39's rules for files that follow it. Rule 79 refuses a file following an earlier version, pointing to `claimset migrate`. From here on, v0.39 changes only by errata (§2.6).
+
+## Changes in v0.38 (since v0.37)
+
+The format becomes a core with extensions. The core holds what every field shares and what claims are compared by across fields: claims and their atoms, support, definitions, observations, assumptions, limitations, provenance and contributors. An extension adds the detail one kind of work needs (the glosses of linguistic examples, the structures of compounds, the endpoints of a trial), in blocks of its own on the objects it concerns. Extensions have their own versions, so one can be added or revised without a new version of the core, and a paper uses as many as it needs.
+
+- §2.7 (new): extensions. A file declares the extensions it uses in the top-level `extensions` (`{"linguistics": "0.1"}`); an object holds an extension's fields in its `ext` block (`"ext": {"linguistics": {...}}`). An extension adds fields; it never changes the meaning of a core field or adds values to a core list, and a file with every extension block removed is a valid core file. Extensions are specified in `spec/extensions/`.
+- New rule 80: extensions are declared, known to the validator and used only on the objects they allow. Rules of an extension are numbered within it (`linguistics.1`). New warning 33: a declared extension that no object uses.
+- §3.4, *Excerpts*: an excerpt's `gloss` (Leipzig glossing) moves to the linguistics extension, `ext.linguistics.gloss` on the result. `translation` stays in the core: any excerpt not in English may have one. `claimset migrate` moves glosses from v0.37 files.
+- §3.3.3: the test's frameworks and their required parameters are defined here (they were defined in the lab record, which now refers to this specification: the claimset specification is the vocabulary of the lab record). A quantity names the result it binds by `variable` (was `quantity`), as observations do.
+- The qualitative extension (`spec/extensions/qualitative-v0.1.md`) takes the codebook, the codings and the counts of coded material: a code's criteria are `ext.qualitative.code` on its definition; the test flags `coded_before_plan` and `codebook_changed_after_plan` and the counts a test is decided by are `ext.qualitative` on the claim. `claimset migrate` moves them.
+- §2.6: files of v0.37 stay valid, checked by the v0.37 rules (a frozen validator).
+
+## Changes in v0.37 (since v0.36)
+
+The platform is named EntryLib (entrylib.org), so its provisional identifier is renamed before any claimset is published with it.
+
+- §7, rule 76: the provisional identifier is `entrylib:<year>.<number>` (`entrylib:2026.000123@v2#C3`), formerly `liblm:`.
+- Companion revision specification v0.5: registry folders `entrylib_<year>.<number>`.
+
+Amended on 2026-11-05, for qualitative research kept in a lab record (lab record v0.16 to v0.18):
+
+- §3.3.3, `test.flags`: the lab record's flags `sources_captured_after_plan`, `coded_before_plan` and `codebook_changed_after_plan` are valid flags; a claim exported with them failed rule 47.
+- §3.4, *Excerpts*: an excerpt's `locator` can be structured, `{artefact, start, end, lab_event}`: the artefact holding the source (a captured source exported from a lab record) and the excerpt's character positions in its text, so a reader can find the passage and a validator can check it against the packaged file. New rule 78.
+- §3.13, rule 51: a `url` reference may lack `archive_uri` when an artefact naming it holds a captured copy with its hash (a page behind a sign-in cannot be archived); new warning 32.
+- §3.4, qual profile: `analytic_approach` gains `content_analysis`: coding material against a codebook and counting the codes, as a lab record's counts do.
+- Appendices A and C give `schema_version` 0.37 (they still said 0.34 and 0.17).
+
+Amended on 2026-11-05, before the platform goes live, for compatibility between versions:
+
+- §2.6 (new): what `schema_version` means, and the compatibility promise. v0.37 is the baseline: a file valid under v0.37 or any later version stays valid under that version for good, checked by that version's rules, by every later validator. Rule 79 refuses a file following a version older than v0.37 (pointing to `claimset migrate`) and, with a message of its own, a file following a version newer than the validator, so the reader knows the validator is behind, not the file.
+
+## Changes in v0.36 (since v0.35)
+
+One person answers for a claimset's research: its main author, the person to contact about it, who submits it. Accountability then rests with someone the platform can identify, ask and hold to it: a person with an ORCID iD. Several guarantors split an answer that should be one person's. Co-authors and other people who took part are listed as supervisors and contributors, with their CRediT roles and ORCID iDs. The fidelity of a conversion is a separate matter, answered for by a separate party, which may be an organisation.
+
+- §1 principle 9, §3.11: a claimset has at most one guarantor, a person (`type: human`) with an ORCID iD: the main author, named as the person to contact, who submits the claimset and confirms it on the platform. A native paper has exactly one. A converted paper has at most one, a source author who has claimed the conversion.
+- §3.11: an organisation is a contributor only as the `conversion_guarantor` of a converted paper, which answers for the conversion and may be a person or an organisation. Organisations hold no other position: a funder is recorded in `paper.declarations`, an institution in a person's `affiliation`.
+- Rules 14, 16, 17 and 32 revised. `claimset migrate` lists organisations in other positions and extra guarantors to resolve.
+- Companion revision specification v0.4: the guarantor of the current version submits a revision, and may hand the claimset over to another person, who confirms as at first publication.
+
+## Changes in v0.35 (since v0.34)
+
+The platform publishes claimsets before it has a DOI prefix of its own, so it needs an identifier it can assign today and keep forever; and a package is accepted by the platform only within limits that the tools can check before submission.
+
+- §7: the platform's provisional identifier, `liblm:<year>.<number>` (renamed `entrylib:` in v0.37), assigned at publication until the platform registers DOIs. It is permanent: a claimset first published with it keeps it in every version. Global IDs extend it as they extend a DOI (`entrylib:2026.000123@v2#C3`). §2, §2.2 and rule 27 name the claimset's identifier rather than only a DOI.
+- New rule 76: the form of a claimset identifier, in `paper.id` and in every target with `id_type: claimset`.
+- §2.5: limits on a package (number of files, size of each file and of the whole, file types, paths). New rule 77, checked by `claimset validate` on a package and by `claimset package` when it builds one.
+
+## Changes in v0.34 (since v0.33)
 
 Anyone in any field should be able to write a claimset, and search should rest on what every claimset states. So what search and verification depend on, and every field can state honestly, is required; and what wrongly excluded a field's normal practice is allowed.
 
@@ -275,7 +387,7 @@ A format for research papers whose primary reader is an LLM. Humans access conte
 6. **Provenance is recorded,** down to field level for converted papers.
 7. **File vs platform.** The paper file holds what its contributors assert. Published versions are immutable. Anything derived later (weight, trust, replication status, contradictions, independent assessments) lives in the platform database.
 8. **Automated by default.** Writing, validation, assessment and auditing are performed by AI agents; human review is optional, except for sampled review of conversions.
-9. **Written by agents, answered for by people.** Papers are written by AI agents. A human or organisation answers for every paper; authorship and accountability are recorded separately.
+9. **Written by agents, answered for by a person.** Papers are written by AI agents. One person, identified by an ORCID iD, answers for the research of every native paper and submits it; authorship and accountability are recorded separately. A converted paper's fidelity to its source is answered for by its conversion guarantor. (Revised in v0.36.)
 10. **Filled by agents, decided by people, assigned by the platform.** The agent fills the content. Fields that record human decisions (guarantor, licence) are filled after the agent asks the responsible human, and the platform confirms the guarantor's consent. Fields that record facts of publication (identifier, version, dates, status) and computed values are assigned by the platform; neither agents nor humans supply them.
 11. **Recorded where possible, labelled when recalled.** Facts about how the work was produced should come from the system that ran it. When an agent reports them from its own knowledge, the file says so.
 12. **Safe to ingest.** The file is data. It must never contain instructions addressed to the reading model.
@@ -286,7 +398,7 @@ A format for research papers whose primary reader is an LLM. Humans access conte
 - Canonical format: JSON, validated by a normative JSON Schema (the schema is the standard).
 - Alternative serialisation: JSON Lines, one object per line, each with a `type` field. Intended for retrieval and indexing.
 - Optional `@context` makes the file valid JSON-LD, enabling RDF export without changing the JSON.
-- IDs: local IDs within a paper (`C3`, `E2`, `D1`, `W1`, `A1`, `L1`, `P1`, `M1`). Global IDs append the local ID to the claimset's persistent identifier and version: `doi:10.xxxx/yyyy@v2#C3` (version optional; defaults to latest). For converted papers this is the claimset's own identifier, never the source's.
+- IDs: local IDs within a paper (`C3`, `E2`, `D1`, `W1`, `A1`, `L1`, `P1`, `M1`). Global IDs append the local ID to the claimset's persistent identifier (§7) and version: `doi:10.xxxx/yyyy@v2#C3`, or `entrylib:2026.000123@v2#C3` for a claimset with a provisional identifier (version optional; defaults to latest). For converted papers this is the claimset's own identifier, never the source's.
 
 ### 2.1 Obligation levels
 
@@ -301,13 +413,13 @@ Unknown values of non-required fields are omitted or set to `null`. `null` means
 The same format exists in two forms:
 
 - **Submission:** written by the agent and sent to the platform. It contains everything the agent and the responsible humans can state. It does not contain platform-assigned fields.
-- **Published file:** the submission after the platform has validated it, obtained guarantor consent, minted the DOI and filled the platform-assigned fields. Published files are immutable.
+- **Published file:** the submission after the platform has validated it, obtained guarantor consent, assigned the claimset's identifier (§7) and filled the platform-assigned fields. Published files are immutable.
 
 **Platform-assigned fields** (absent from submissions, required in published files unless noted):
 
 | Field | Assigned when |
 |---|---|
-| `paper.id` | At publication: the platform mints a DOI. Exception: a correction or revision submission names the existing claimset's `paper.id` (§9) |
+| `paper.id` | At publication: the platform assigns the claimset's identifier, a DOI or a provisional identifier (§7). Exception: a correction or revision submission names the existing claimset's `paper.id` (§9) |
 | `paper.version` | At publication: 1 for a new paper; incremented for corrections and revisions |
 | `paper.previous_version` | At publication of a correction or revision |
 | `paper.changes` | At publication of a correction or revision: JSON Patch computed by the platform, each operation with `reason` and, for a revision, `addresses` (the global IDs of the review comments it answers) |
@@ -325,7 +437,7 @@ Top-level layout:
 
 ```json
 {
-  "schema_version": "0.34",
+  "schema_version": "0.39",
   "@context": "optional",
   "paper": {},
   "contributors": [],
@@ -337,7 +449,8 @@ Top-level layout:
   "limitations": [],
   "artefacts": [],
   "references": [],
-  "open_questions": []
+  "open_questions": [],
+  "extensions": {}
 }
 ```
 
@@ -351,6 +464,8 @@ A claimset is stored and exchanged as JSON: the canonical file, which tools vali
 - **Order:** claims are grouped by role: principal claims, then supporting claims, then secondary claims, each group in file order. Claims that are not principal and whose support is only `argument` or `unstated` follow, under CLAIMS WITHOUT EVIDENCE, so a reader sees at once what the paper asserts or argues without evidence. Principal claims stay with the principal claims whatever their support.
 
 The reading view is made mechanically from a valid file (`claimset render`); it adds nothing and is never edited. The reading view the platform serves may append, under REVIEW STATUS, each claim's unresolved review comments with their category, severity and state; that is derived data, and `claimset render` of the file alone does not add it. Its layout is the reference rendering in Appendix D. A reader that needs a field left out (a source span to check a claim against its source, an artefact's location) reads the canonical file.
+
+**Claim bundles.** A reader that wants one claim is given its **claim bundle**: the claim, the claims it rests on (through `depends_on` and `assumptions`, its own or those of a definition or evidence it rests on), and the definitions, evidence, warrants, limitations, artefacts and references these cite, found by following their IDs. A relation to another claim of the paper names that claim without bringing it in. The bundle is JSON (`{bundle_of, schema_version, paper, claims, definitions, …}`, with the paper's ID, version, title, licence, status and date) and has a reading view made as above, headed `CLAIM C4 of <ID> <title>`. Both are made mechanically from a valid file (`claimset render --claim C4`, with `--bundle` for the JSON); a bundle is not a claimset and is not validated as one. (New in v0.39.)
 
 ### 2.4 Files in a repository
 
@@ -394,7 +509,46 @@ data/
 - A package with no files is the claimset file alone, which may be submitted as it is.
 - At publication the platform stores each packaged file by its checksum, so a correction or revision that keeps a file stores it once, and replaces its relative `uri` with the file's permanent location (§2.2). A published file names no relative paths.
 - In a repository, a paper's files live in its study folder, `claimset/<study>/files/` (§2.4), and the package is built from there (`claimset package`, which copies the files, sets each `version` and writes the manifest).
+- **Limits.** The platform accepts a package within these limits, and `claimset package` and `claimset validate` apply the same ones (rule 77):
+  - at most 200 files in `data/`, the claimset included;
+  - each file at most 50 MB, and the payload at most 200 MB in total;
+  - every path relative, inside `data/`, of letters, digits, `.`, `-`, `_` and `/`, with no `..` component; no links;
+  - every file of `data/` listed in the manifest, and every file listed present;
+  - file types by extension, from this list: data and text `csv` `tsv` `json` `jsonl` `ndjson` `txt` `md` `xml` `yaml` `yml` `toml` `parquet` `feather` `arrow` `nc` `h5` `hdf5` `rds` `rda` `rdata` `dta` `sav` `xlsx` `ods`; documents `pdf` `tex` `bib`; images `png` `jpg` `jpeg` `gif` `webp` `tif` `tiff` `svg`; audio and video `wav` `mp3` `flac` `ogg` `m4a` `mp4` `webm` `mov`; code `r` `py` `jl` `m` `ipynb` `sql` `do` `sas` `stan` `c` `cpp` `h` `hpp` `f90` `java` `js` `ts` `rs` `go` `sh`; and any of these compressed with gzip (`results.csv.gz`). Archives (`zip`, `tar`, `7z`, `rar`) and executables are refused: a package lists its files, so each is checked and archived by itself.
+  The platform serves every packaged file as a download; none is rendered or run.
 - A converted paper packages a file taken from its source (a figure, a supplementary table) only under the source's licence, which conversion already requires to permit derivatives (§3.1); the artefact names its `reference` and `locator` in the source.
+
+### 2.6 Specification versions and compatibility
+
+`schema_version` (required, top level) is the version of this specification the file follows: `"0.39"`.
+
+- **Baseline.** The baseline is the first version the platform accepts: **v0.39**, set when the platform launched on 2026-11-09. A file following an earlier version is refused (rule 79) and brought to the current version by `claimset migrate`.
+- **Every version from the baseline is accepted, for good.** A file is checked by the rules of the version it follows, never by rules added later. A validator of a later version keeps the rules of every earlier version from the baseline and applies the ones the file's version calls for. A file valid under its version when it was published is valid under it in every later validator.
+- **A later version may** add optional fields, add values to lists, loosen rules, and add rules and required fields that apply to files following that version or later. **It may not** make a file valid under an earlier version invalid under that version, or change what a field of an earlier version means.
+- **Reading.** Every tool of a later version reads and renders files of every version from the baseline.
+- **A file newer than the validator** (its `schema_version` is later than the validator's own) is refused by rule 79: the validator cannot check rules it does not know. The file may be valid; check it with a current validator.
+
+### 2.7 Extensions
+
+The core of this specification is what every field shares and what claims are compared by across fields. An **extension** adds the detail that one kind of work needs and other kinds do not: the glosses of linguistic examples, the structures of compounds, the endpoints of a trial, the coordinates of a field site. Extensions are specified one per file in `spec/extensions/` (`linguistics-v0.1.md`), each with its own version, and listed in `spec/extensions/README.md`, the registry of extensions. A paper uses as many extensions as it needs, or none.
+
+**Declaring.** The top-level `extensions` names each extension the file uses and the version of it the file follows: `"extensions": {"linguistics": "0.1"}`. A name is lower-case letters, digits and hyphens, starting with a letter; a version is `<major>.<minor>`, as for the core (§2.6). A file that uses no extension leaves `extensions` out.
+
+**Using.** An object holds an extension's fields in its `ext` block, keyed by the extension's name: `{"id": "R3", "variable": "D2", "value": {…}, "ext": {"linguistics": {"gloss": "…"}}}`. Each extension says on which objects it may appear. Objects that may carry `ext`: `paper`, and each object in `contributors`, `models`, `definitions`, `claims`, `evidence`, `warrants`, `limitations`, `artefacts`, `references` and `open_questions`, and each result entry and table of an evidence object.
+
+**What an extension may do.**
+- It adds fields, inside its own blocks only. It never changes the meaning of a core field, adds values to a core list (a kind, a support kind, a profile, an artefact kind), or makes a core field required.
+- Its fields may point to the file's objects by ID (a definition, an artefact, a result).
+- It may have rules of its own, numbered within it (`linguistics.1`) and checked on its blocks, and warnings likewise (`linguistics.w1`).
+- What every field needs is not put in an extension: when two or more extensions would define the same thing, it belongs in the core.
+
+**The core stands alone.** A file with every `ext` block and `extensions` removed is a valid file of the core, and says everything the core says: claims, their support, their atoms and their observations never depend on an extension. A reader that knows no extension reads the whole core, and may show an extension's blocks as data or leave them out.
+
+**Versions of extensions.** Each extension follows the compatibility rule of §2.6 on its own: a block valid under a version of an extension stays valid under that version for good, checked by that version's rules. An extension's specification names the core versions it works with (its first, and no last).
+
+**In the lab record.** An extension may also have a part for the lab record: blocks on lab events and event types of its own, which export carries into the claimset (lab record §2.1, §5.22). One extension covers both: what a kind of work records while it is done and what its claimset says.
+
+**Validation.** A validator checks the core, then each declared extension it knows, at the version declared. An extension it does not know, or a version later than it knows, is refused by rule 80 with a message of its own: the blocks may be valid, but this validator cannot check them; a current validator can. The core is still checked, so the report lists the core's errors too.
 
 ## 3. Object types
 
@@ -402,7 +556,7 @@ data/
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string | Platform-assigned. Persistent identifier of this claimset: a DOI minted by the platform. For converted papers, distinct from the source's identifier |
+| `id` | string | Platform-assigned. Persistent identifier of this claimset: a DOI minted by the platform, or the platform's provisional identifier (§7). For converted papers, distinct from the source's identifier |
 | `title` | string | Required |
 | `version` | integer | Platform-assigned. 1, 2, …; each published version is immutable |
 | `previous_version` | string | Platform-assigned. Global ID of the previous version; absent for version 1 |
@@ -420,6 +574,7 @@ data/
 | `exploration` | object | Required when any claim has `hypothesis`: summary of the research process (§3.1.1) |
 | `study` | string | The name of the study the paper comes from, when it is written in a repository (§2.4) |
 | `declarations` | object | Funding, competing interests, ethics and consent (below). Recommended for native papers (warning 29); in converted papers, what the source declares |
+| `collaborations` | list | The collaborations the paper is published on behalf of, each `{name, identifiers}`: `{"name": "ATLAS Collaboration", "identifiers": ["ror:…"]}`. A collaboration is not a contributor: the people who answer for the work are (§3.11). Optional (rule 85) |
 | `converted_from` | object | Required if `converted` (below) |
 
 **`converted_from`**
@@ -455,7 +610,7 @@ Disagreements with the source that are not evident errors are not corrections: t
 A claimset under a non-commercial licence may be used only for non-commercial purposes. Platforms and tools that use claimsets commercially (for example to train, tune or promote a commercial service) exclude claimsets whose `paper.licence` contains `NC`.
 
 **`declarations`.** What a reader needs to weigh the work beyond its evidence, as its responsible people declare it. Native papers: the agent asks the guarantor (principle 10), and records what they say.
-- `funding`: list of `{funder, funder_id, award}`: the funder's name, its identifier (a ROR ID such as `ror:00k4n6c32`, or a Crossref Funder Registry DOI), and the award or grant number. An empty list declares no funding.
+- `funding`: list of `{funder, funder_id, award, kind, role}`: the funder's name, its identifier (a ROR ID such as `ror:00k4n6c32`, or a Crossref Funder Registry DOI), the award or grant number, the `kind` of support, `grant` (money) or `in_kind` (materials, vouchers, services, equipment, analyses paid for), and the funder's `role` in the work as text ("no role in design, analysis or the decision to publish"). An empty list declares no funding.
 - `competing_interests`: text, self-contained; `"None declared."` when there are none.
 - `ethics`: list of `{body, reference, decision}`: the ethics committee or review board, its reference, and `decision` `approved` · `exempt` · `not_required`. An empty list when the work needs no ethics review.
 - `consent`: text, for work with human participants: how consent was obtained, and for what (participation, publication of excerpts).
@@ -508,6 +663,10 @@ Retracted papers are never deleted. All their claims inherit the retraction stat
 | `assumptions` | list of claim IDs | Assumption claims (§3.8) that the thing the term names rests on wherever the paper uses it: a model's error distribution, a design's randomisation, a data set's representativeness (below) |
 | `source` | object or string | Where a borrowed term is defined: a reference ID (`B3`, §3.13), `{target, id_type}` as for cited support (§4), or a global claim or definition ID of another claimset |
 | `identifiers` | list | Registry identifiers of the thing the term names, each a compact identifier `prefix:local` (§4): a chemical (`chebi:15377`, `inchikey:…`), an organism (`ncbitaxon:9606`), a gene or protein (`hgnc:1100`, `uniprot:P04637`), an antibody or cell line (`rrid:AB_2138153`), a data set (`doi:10.…`), a court decision (`ecli:EU:C:2014:317`), a concept (`wikidata:Q…`). `source` says where a term is defined; `identifiers` say which thing it is |
+| `location` | list | A `setting` only: where it is, as points `{latitude, longitude, label}` in decimal degrees (WGS 84): `[{"latitude": 51.43, "longitude": 6.62, "label": "trap 1"}]`. A region is named by `identifiers` (`wikidata:Q183` for Germany) (rule 83) |
+| `measures` | list | A `variable` only: the IDs of the constructs it measures, definitions of kind `concept`: a trust item `D6` with `"measures": ["D9"]`, `D9` being trust (rule 83) |
+| `unit` | string | A `variable` or `setting` only: the unit of its values, a UCUM code (`GeV`, `Cel`, `mg/L`) or text. A condition keyed by the definition has this unit: `{"D9": 126.5}` with D9 the mass in GeV (rule 88) |
+| `targets` | list | An `intervention` only: the IDs of what it acts on, definitions of kind `substance`, `organism`, `biological_material`, `entity` or `process`: a knockdown `D7` with `"targets": ["D13"]`, D13 being the gene (rule 88) |
 
 **Kinds.** The kind says what a term names, whatever role it plays in a study; the role is given by the setup (§3.4) and the claim's `about` (§3.3.5). One term has one kind.
 
@@ -522,11 +681,19 @@ Retracted papers are never deleted. All their claims inherit the retraction stat
 | `variable` | what is recorded or observed about each case, and how it is scored or aggregated: a measured quantity, score, outcome, category, judgement, or the presence of a theme | reaction time in ms; 30-day readmission; yield in %; MASE averaged over series; grammaticality judged by native speakers; appeal outcome; presence of the theme "loss of clinical identity" |
 | `concept` | a construct, property, phenomenon or theme the paper names, studies or finds | role ambiguity; forecastability; "loss of clinical identity" |
 | `theory` | a theory or theoretical framework the paper uses or proposes | role theory; the resource-based view |
+| `substance` | a chemical substance: an element, compound, mixture or formulation, named by what it is made of | benzene; the catalyst NiCl2(Py)4; product 4 of a substrate scope; 50 mM Tris buffer at pH 7.5 |
+| `organism` | a taxon, strain or breed: a kind of living thing | *Drosophila melanogaster*; *E. coli* K-12; flying insects (Insecta) |
+| `biological_material` | a material of biological origin with an identity of its own: a cell line, an antibody, a plasmid, a tissue or specimen collection | MCF7 cells; the anti-vinculin antibody V9131; a plasmid expressing LifeAct |
+| `entity` | any other physical thing the paper names as such: a gene or protein, a particle, a device, a celestial body, an object | RAC2; the Higgs boson; the ATLAS detector; NGC 1300; the Antikythera mechanism |
+| `process` | a process the paper names as such: a reaction, a decay, a pathway, a transition | the decay of a Higgs boson to two photons; a 1,5-hydrogen atom transfer; the MAPK signalling pathway |
+| `source` | a primary source read as evidence, one at a time: a document, letter, record, legal text, edition or recording | Bentley's *Monument of Matrones* (1582); the Poor Relief Act 1601; a letter of Erasmus |
 | `other` | anything else; a term often given this kind is a sign that the list needs a value | |
 
 A term the paper introduces as a finding (a theme, a typology, a newly named phenomenon) is a `concept`. The paper's own method or model is a `method`, defined in full as below. An instrument (a questionnaire, a scale, an interview guide, a coding frame) is defined as the `variable` it records, or as the `design` it is part of, and the document itself is an artefact (§3.6). (The kind `variable` was `measure` in v0.30 and v0.31.)
 
-**Dimensions.** A term by which observations are distinguished (the method, the data set, the participant group, the temperature, the year, the language) is a **dimension** of the observations that name it (§3.4). A dimension whose values are terms of the paper (the methods compared) is a group whose `members` are those terms; a dimension whose values are literals (a temperature, a year) is a `variable` or `setting` whose definition gives its unit.
+**Things and their roles.** One term has one kind; its role is the setup's. A drug is a `substance`; giving it is an `intervention` ("aspirin, 100 mg daily"). A species is an `organism`; the animals sampled are a `population` ("adult flying insects in 63 German nature reserves"). A cell line is `biological_material`, also when its cells are the study's cases. A gene is an `entity`; knocking it down is an `intervention`, which names the gene in `targets`. A reaction or a decay is a `process`; the substances or particles it involves are their own terms. A `source` is one primary source; a collection searched as a whole (a corpus, an archive's catalogue) is `data`, and a work the paper cites is a reference (§3.13), not a definition. Terms of these kinds give `identifiers` where a registry has them: ChEBI or InChIKey for substances (`chebi:16716`), NCBI Taxonomy for organisms (`ncbitaxon:7227`), RRID or Cellosaurus for biological materials (`cellosaurus:CVCL_0031`), HGNC or UniProt for genes and proteins (`hgnc:9802`), Wikidata for other entities and for sources (`wikidata:Q…`). (New in v0.39.)
+
+**Dimensions.** A term by which observations are distinguished (the method, the data set, the participant group, the temperature, the year, the language) is a **dimension** of the observations that name it (§3.4). A dimension whose values are terms of the paper (the methods compared) is a group whose `members` are those terms; a dimension whose values are literals (a temperature, a year) is a `variable` or `setting` whose definition gives its unit. A control or baseline compared with a group's members (a mock transfection beside four knockdowns, a benchmark beside the proposed methods) lies on the group's dimension without being a member, when it is of the group's kind: a table's row may be labelled with it, and a condition may name it.
 
 **Groups.** A term that names a group of things the paper also names one by one (the benchmark methods, the variants of a model, the data sets of an evaluation) is defined once as the group, with `members` listing the definitions of its members, and has the same kind as its members: `{"id": "D26", "term": "the benchmark methods", "kind": "method", "definition": "ETS, ARIMA and the Theta method, as the paper runs them", "members": ["D8", "D9", "D10"]}`. A claim's `about` names the group when the claim is about the group as a whole and a member when it is about that member; a claim may name a group as its subject and one of its members as its comparator. Membership lets a reader find the claims about a group when looking for one of its members; it does not make a claim about the group a claim about each member. "The PIC(*,S,N) variants are the most robust" says nothing of each variant alone, while "CES has the lowest error of the benchmark methods" says CES beats each: the statement says which. A group is not a member of itself, directly or through other groups.
 
@@ -556,9 +723,9 @@ A definition explains in full only a term the paper introduces or uses in its ow
 | `id` | string | `C1` … |
 | `statement` | string | Self-contained sentence (rules in §8) |
 | `about` | object | The claim's atom as fields: `subject`, `relation`, `object`, `comparator`, `conditions` (§3.3.5). Required for principal claims; recommended for supporting and secondary claims; absent on assumption claims |
-| `type` | enum | `descriptive` · `associational` · `causal` · `predictive` · `interpretive` · `formal` · `methodological` (choosing: §3.3.1) |
+| `type` | enum | `descriptive` · `associational` · `causal` · `mechanistic` · `predictive` · `interpretive` · `formal` · `methodological` (choosing: §3.3.1) |
 | `role` | enum | `principal` (a contribution) · `supporting` (one of the paper's own claims that a contribution rests on, directly or through other claims, by `depends_on` or `assumptions`) · `secondary` (a finding of the paper that no contribution rests on: a side result, a negative or null result reported in its own right) |
-| `novelty` | enum | `no_prior_found` · `replication` · `extension` · `refutation`. Not on assumption claims (§3.8) |
+| `novelty` | enum | `no_prior_found` · `replication` · `extension` · `refutation` · `not_applicable` (a secondary or supporting claim that is not a finding: a control, a routine check; rule 84). Not on assumption claims (§3.8) |
 | `scope` | object | `population`, `setting`, `geography`, `language`, `period`, `data_type`, `conditions` (list), `excludes` (list: where it explicitly does not apply). Describes this claim only (§3.3.2) |
 | `support` | list | Kinds of support (§4); at least one entry |
 | `assumptions` | list of claim IDs | Assumption claims (§3.8) this claim relies on |
@@ -571,10 +738,10 @@ A definition explains in full only a term the paper introduces or uses in its ow
 | `relations` | list | Typed links to claims or works outside this paper, and to other claims of this paper (§3.7); required for refutations and replications |
 | `verification` | enum | Formal claims proved or argued in this paper, required: `machine_checked` · `agent_checked` · `peer_checked` · `disputed` · `unchecked` (§5) |
 | `checks` | list | Independent checks of this claim and their outcomes (§5): re-derivations of formal claims, reproductions of empirical ones |
-| `hypothesis` | object | `{lab_event, outcome}`: the lab-record hypothesis this claim came from, and its outcome `supported` · `not_supported` · `inconclusive` (§3.3.3) |
+| `hypothesis` | object | `{lab_event, outcome}`: the hypothesis this claim tests, and its outcome `supported` · `not_supported` · `inconclusive`. `lab_event`, the hypothesis event of the lab record, only in claims exported from a lab record (§3.3.3) |
 | `planning` | enum | `confirmatory` · `confirmatory_with_deviations` · `exploratory` (§3.3.3) |
-| `planned_at` | datetime | When the plan that tested this claim was recorded (ISO 8601, UTC) |
-| `planned_at_anchor` | enum | Strength of `planned_at`: `platform` · `rfc3161` · `git_remote` · `none` |
+| `planned_at` | datetime | When the plan that tested this claim was recorded (ISO 8601, UTC): the lab-record plan's time, or the registration's date. May be left out for a registered test whose date is not at hand (rule 43) |
+| `planned_at_anchor` | enum | Strength of `planned_at`: `platform` · `rfc3161` · `registry` · `git_remote` · `none` |
 | `test` | object | The decision rule fixed before the test (§3.3.3); required for confirmatory claims |
 | `source_spans` | list | Locations in the source text; required for converted papers |
 | `provenance` | enum | Default for the claim: `author_stated` · `extracted` · `inferred` |
@@ -587,6 +754,7 @@ A definition explains in full only a term the paper introduces or uses in its ow
 | what something is, how often, how much, or what was measured in a computation, simulation or benchmark under stated conditions (including comparisons of methods measured there) | `descriptive` |
 | a relationship observed in data the work did not control | `associational` |
 | that X causes Y in a real-world system, from a randomised or otherwise credible causal design | `causal` |
+| how an effect comes about: the steps, intermediates or processes between a cause and its effect (a reaction mechanism, a signalling pathway) | `mechanistic` |
 | what will happen | `predictive` |
 | what something means (qualitative interpretation) | `interpretive` |
 | a mathematical or logical result | `formal` |
@@ -600,12 +768,12 @@ When `about.conditions` names a defined population, data set or setting (§3.3.5
 
 #### 3.3.3 Hypotheses, planning and negative results
 
-A claim exported from a lab record carries the hypothesis it came from (`hypothesis.lab_event`) and its outcome. A claim with outcome `not_supported` is a **negative result**: its statement says plainly what was not found ("Under conditions …, method M did not reduce …"), with scope, support and evidence like any other claim. Negative results belong in the same claimset as the positive results they qualify.
+A claim that tests a hypothesis carries it as `hypothesis`, with the test's outcome. The hypothesis comes from one of three places: a lab record (the claim is exported from the record, and `hypothesis.lab_event` is the hypothesis event); a registration outside the lab record (a preregistration on OSF or AsPredicted, the Stage 1 protocol of a registered report, a trial registry entry), which the test names in `registration`; or the paper itself, which states the hypothesis before its results without registering it. A claim with outcome `not_supported` is a **negative result**: its statement says plainly what was not found ("Under conditions …, method M did not reduce …"), with scope, support and evidence like any other claim. Negative results belong in the same claimset as the positive results they qualify.
 
 `planning` says whether the test was planned before it was run:
-- `confirmatory`: tested by a run under a plan, recorded before the run, that named the hypothesis, with no deviation.
-- `confirmatory_with_deviations`: as above, but the run deviated from the plan; the deviation is recorded as a limitation.
-- `exploratory`: every other case, including results found while exploring.
+- `confirmatory`: tested under a plan that named the hypothesis and was recorded before the data it was tested on were collected or seen, with no deviation. The plan is a lab-record plan (`test.lab_plan`) or a registration (`test.registration`).
+- `confirmatory_with_deviations`: as above, but the test deviated from the plan; each deviation is recorded as a limitation of category `deviation` (§3.9).
+- `exploratory`: every other case, including results found while exploring, and hypotheses the paper states without a lab-record plan or a registration, however early they were formed: nothing outside the paper records when.
 
 **Outcomes.** `supported` and `not_supported` are conclusive: each means that the rule stated for it in advance was met. A test that met neither rule is `inconclusive`. In particular, failing to reject a null hypothesis is `inconclusive`, not `not_supported`, unless the plan stated a rule for refutation (for example equivalence bounds).
 
@@ -618,8 +786,8 @@ A claim exported from a lab record carries the hypothesis it came from (`hypothe
   "framework": "frequentist",
   "parameters": {"alpha": 0.05, "test": "one-sided paired t-test on per-series MAE differences", "sides": "greater",
                  "correction": "none", "sample": "500 series, fixed in advance; no interim analysis"},
-  "quantities": {"p": {"quantity": "p-value, paired t-test of MAE difference"},
-                 "d_upper": {"quantity": "mean MAE difference", "field": "interval.upper"}},
+  "quantities": {"p": {"variable": "p-value, paired t-test of MAE difference"},
+                 "d_upper": {"variable": "mean MAE difference", "field": "interval.upper"}},
   "supported": "p < alpha",
   "not_supported": "d_upper < 0.01",
   "verdict": "computed",
@@ -629,16 +797,47 @@ A claim exported from a lab record carries the hypothesis it came from (`hypothe
 }
 ```
 
-- `framework`: `frequentist` · `equivalence` · `bayesian` · `deterministic` · `formal` · `qualitative`, as defined in the lab record specification §5.7.1.
-- `parameters`: required per framework: `frequentist`: `alpha`, `test`, `sides`, `correction`, `sample`; `equivalence`: `alpha`, `test`, `lower_bound`, `upper_bound`, `sample`; `bayesian`: `prior`, `threshold`, `sample`.
-- `quantities`: when the rules are expressions, the results they are evaluated on, each `{quantity, conditions, field, run}`; `quantity` is the `variable` of the results it binds (§3.4), and they correspond to results in the claim's evidence.
-- `supported`, `not_supported`: the two rules: expressions over quantities and numeric parameters (lab record §5.7.3), or text saying what observation decides.
-- `verdict`: `computed` (the rules are expressions and the outcome was computed from the recorded results by the lab tool) · `judged` (the rules are text and the outcome was stated by the writer, who said which rule the evidence met).
-- `runs`: how many runs decided the test. `lab_plan`: the plan's lab-record ID, when there is one. `registration`: the URI of an external pre-registration, when there is one.
-- `addresses`: optional list of the global IDs of review comments (`doi:…@v1/RV1.c6`) whose resolution test this test ran (revision §4.2). The test's rules are then the comment's: `supported` its `withdrawn` rule, `not_supported` its `upheld` rule.
-- `flags`: optional list of weaknesses of the test, from the lab record (lab record §5.7.5): `code_changed_after_plan` (the analysis code changed between the plan and the test) · `holdout_used_elsewhere` (data held out for the test was also used in other runs) · `reproduces_prompting_result` (a result the decision rule uses has the same quantity, conditions and value as a result of a run that suggested the hypothesis: the test may have repeated the exploration rather than tested the hypothesis on anything new).
+- `framework`: how the outcome is decided: `frequentist` (a null-hypothesis significance test) · `equivalence` (an equivalence test against stated bounds) · `bayesian` · `deterministic` (a measured quantity compared with fixed thresholds, without sampling uncertainty, e.g. a benchmark or a simulation with fixed seeds) · `formal` (proof or counterexample) · `qualitative` (a stated pattern in qualitative data).
+- `parameters`: the parameters the framework requires (below), and any others the analysis fixes in advance. Values are numbers or text; numeric parameters can be used in the rules by name.
 
-`planned_at_anchor` says how far `planned_at` can be trusted (lab record §7): from strongest, `platform` (receipt from the Claimset platform), `rfc3161` (trusted timestamp authority), `git_remote` (pushed commit), to `none`.
+| Framework | Required parameters |
+|---|---|
+| `frequentist` | `alpha` (significance level), `test`, `sides` (`two_sided` · `greater` · `less`), `correction` (for multiple tests within the plan: `none` · `bonferroni` · `holm` · `fdr_bh` or text), `sample` (planned sample size and stopping rule) |
+| `equivalence` | `alpha`, `test`, `lower_bound` and `upper_bound` (the equivalence margins: the smallest effect of interest), `sample` |
+| `bayesian` | `prior`, `threshold` (e.g. a Bayes factor or posterior probability that decides), `sample` |
+| `deterministic`, `formal`, `qualitative` | none |
+
+- `quantities`: when the rules are expressions, the results they are evaluated on: `{name: {variable, conditions, field, run}}`. Each binds exactly one result: the one whose `variable` is the given one (§3.4) and whose `conditions` include every given key with the given value, read from `field`: `value` (default), `value.limit` (the number of a limit), `value.min` or `value.max` (an end of a range), `interval.lower`, `interval.upper`, or `uncertainty.<kind>` (the `value` of the result's one symmetric uncertainty component of that kind, §3.4: `uncertainty.se`); with several deciding runs, `run` names the run (1 for the first). They correspond to results in the claim's evidence. (Files before v0.38 name the variable `quantity`.)
+- `supported`, `not_supported`: the two rules, each an expression over the quantities and numeric parameters, or text saying what observation decides. If neither rule holds, the outcome is `inconclusive`; if both hold, the rules overlap and the outcome is `inconclusive`. An **expression** is at most 1,000 characters long and uses finite numbers, names (quantities and numeric parameters), `+ - * /`, unary minus, `abs()`, comparisons (`< <= > >= == !=`, which may be chained: `0 < d < 1`), `and`, `or`, `not` and parentheses; nothing else. Every name is a quantity or a numeric parameter. A quantity that cannot be bound (no result matches, or several do) allows no conclusive outcome.
+- `verdict`: `computed` (the rules are expressions and the outcome was computed from the recorded results by the lab tool) · `judged` (the rules are text and the outcome was stated by the writer, who said which rule the evidence met).
+- `runs`: how many runs decided the test. `lab_plan`: the plan's lab-record ID, when there is one. `registration`: the ID of the registration in `references` (§3.13), when the test was registered outside the lab record: `"B7"` (in files before v0.39, the registration's URI). A confirmatory test names its plan: `lab_plan`, `registration`, or both when a lab-record plan was also registered (rule 81).
+- `addresses`: optional list of the global IDs of review comments (`doi:…@v1/RV1.c6`) whose resolution test this test ran (revision §4.2). The test's rules are then the comment's: `supported` its `withdrawn` rule, `not_supported` its `upheld` rule.
+- `flags`: optional list of weaknesses of the test, as the lab record finds them (lab record §5.7.5): `code_changed_after_plan` (the analysis code changed between the plan and the test) · `holdout_used_elsewhere` (data held out for the test was also used in other runs) · `reproduces_prompting_result` (a result the decision rule uses has the same quantity, conditions and value as a result of a run that suggested the hypothesis: the test may have repeated the exploration rather than tested the hypothesis on anything new) · `sources_captured_after_plan` (a deciding run read a captured source recorded after the plan: the plan did not fix the material tested). Flags of tests over coded material are in the qualitative extension (`ext.qualitative.test_flags`).
+
+`planned_at_anchor` says how far `planned_at` can be trusted (lab record §7): from strongest, `platform` (receipt from the Claimset platform), `rfc3161` (trusted timestamp authority), `registry` (the date a public registry records for the registration the test names: OSF, AsPredicted, a trial registry), `git_remote` (pushed commit), to `none`.
+
+**Tests registered outside a lab record.** A registered study reports each registered hypothesis it tested as a claim with `hypothesis` (without `lab_event`), `planning`, `planned_at` and `test`, and lists the registration in `references`:
+
+```json
+"hypothesis": {"outcome": "inconclusive"},
+"planning": "confirmatory_with_deviations",
+"planned_at": "2018-03-12T00:00:00Z",
+"planned_at_anchor": "registry",
+"test": {"framework": "bayesian",
+         "parameters": {"prior": "Cauchy, scale 0.707", "threshold": "BF10 > 3 or BF10 < 1/3",
+                        "sample": "1,000 participants, fixed in advance"},
+         "supported": "BF10 above 3 for the effect of the manipulation on trust",
+         "not_supported": "BF10 below 1/3 for the effect of the manipulation on trust",
+         "verdict": "judged", "runs": 1, "registration": "B4"},
+"limitations": ["L3"]
+```
+
+with `{"id": "B4", "target": "10.17605/OSF.IO/ABCDE", "id_type": "doi"}` in `references` and L3, of category `deviation`, saying how the analysis departed from the registration. A trial registry entry is a CURIE whose prefix is the one the Bioregistry (bioregistry.io) gives that registry (`{"target": "clinicaltrials:NCT01234567", "id_type": "curie"}` for ClinicalTrials.gov); a registry the Bioregistry does not list is cited by the entry's `url`, with its `archive_uri`; a registration with no persistent identifier is a `url` with its `archive_uri` (§3.13).
+
+- `planned_at` is the registration's date as the registry records it, with `planned_at_anchor: registry`. When the date is not at hand (the paper does not give it and the registry cannot be read), `planned_at` is left out: the registry the test names holds it. Never estimate it (warning 36). A Stage 1 protocol accepted in principle is the registration of a registered report.
+- The rules are the registration's: expressions when it fixes thresholds (`alpha` 0.05, a Bayes factor of 10), otherwise text with `verdict: judged`. A hypothesis the registration did not name is `exploratory`, and so is every analysis it did not plan.
+- The platform cannot check that the registration says what the test records; the registration is public, and readers and reviewers can.
+- Converted papers: the rules are taken from the registration or from the paper's account of it. A rule the converter has to reconstruct (a threshold the paper applies but never states) is marked `inferred` in `field_provenance` (`{"test.supported": "inferred"}`); the outcome is the paper's.
 
 #### 3.3.4 What belongs in a claimset
 
@@ -703,19 +902,57 @@ Common fields: `id`, `profile`, `description`, `artefacts` (list of artefact IDs
 
 **Observations.** What a study found is recorded as observations: each the value of a variable, observed on something, under conditions that tell it apart from the others. A reaction time per participant and condition, the expression of a gene per cell line and treatment, the yield of a reaction per catalyst and temperature, whether a construction is attested per language and period, the outcome of an appeal per court and year, the accuracy of a model per benchmark, whether a theme appears per participant: each is an observation, and every field's results take this one form, so that readers can query results instead of parsing prose, and compare them across papers. A single observation is a result entry (`results`); observations that the paper reports as a table are a table (`tables`), a compact form of the same thing. Results and tables appear in evidence of any profile except `formal`.
 
-**Results** (`results`): `{id, variable, value, unit, interval, n, conditions, read_from, artefact}`
+**Results** (`results`): `{id, variable, value, unit, interval, uncertainty, n, conditions, read_from, artefact}`
 - `id`: `R1`, `R2`, … unique within the evidence object; referenced from elsewhere as `<evidence id>.<result id>`, e.g. `E23.R2`.
 - `variable`: what is observed: the ID of a definition of kind `variable` (§3.2), or of a `concept` whose presence is observed (a theme in an excerpt), or text for one the paper does not define, e.g. `"D8"` or `"largest KL divergence per observation, mixture vs exact"`. (Was `quantity` until v0.31.)
 - `value`: one of
   - a number;
   - a category: the ID of a definition (an outcome the paper defines, such as `"upheld"`) or a short word or code (`"present"`, `"B"`);
   - a boolean (attested or not, significant or not);
-  - an **excerpt**, `{text, locator, language, gloss, translation}`: words from the data that are themselves the observation (an interview passage, a passage of a judgment, a linguistic example). `text` is the words as the source gives them; `locator` where they are (a transcript and line, a document and paragraph, a corpus and sentence ID); `language` a BCP 47 tag when not English; `gloss` and `translation` for linguistic examples (Leipzig glossing rules). Excerpts from people's data carry no personal data beyond what the participants consented to publish (`declarations.consent`).
-- `unit`: optional; a UCUM code (`ms`, `%`, `mg/L`, `Cel`, `1` for a dimensionless ratio) or, where UCUM has none, text. `interval`: optional `{level, lower, upper}`. `n`: optional, the number of cases the value rests on.
+  - an **excerpt**, `{text, locator, language, translation}`: words from the data that are themselves the observation (an interview passage, a passage of a judgment, a linguistic example). `text` is the words as the source gives them; `locator` where they are: text (a transcript and line, a document and paragraph, a corpus and sentence ID) or, for words from a file the claimset lists as an artefact, `{artefact, start, end, lab_event}`: the artefact (a captured source, lab record §5.20), the characters of its text the words occupy (`start` inclusive, `end` exclusive, counted in Unicode code points from 0), and optionally the lab record event that recorded the passage (a coding, `CD3`) (rule 78); `language` a BCP 47 tag when not English; `translation` an English translation of words in another language. The interlinear gloss of a linguistic example is given by the linguistics extension (`ext.linguistics.gloss` on the result, §2.7). Excerpts from people's data carry no personal data beyond what the participants consented to publish (`declarations.consent`);
+  - a **limit**, `{bound, limit, level}`: the value is not known, only that it lies below (`bound: "upper"`) or above (`bound: "lower"`) the number `limit`, in the observation's unit. `level` is the confidence of a statistical limit (`0.95`: a 95% CL upper limit on a cross-section); without it, the limit is one of measurement (a concentration below the detection limit of 0.1 mg/L is `{"bound": "upper", "limit": 0.1}`);
+  - a **range**, `{min, max, level}`: the value is a span from `min` to `max` (`min` ≤ `max`), in the observation's unit: the values observed across cases (yields of 36% to 77% across 39 products, with `n`), or a region of a parameter the variable names (a Higgs boson mass of 111.4 to 116.6 GeV excluded, with `level` 0.95). A range is not an interval: an interval is the uncertainty of one value, a range is the value.
+
+  An interval or an uncertainty is given only with a number, not with a limit or a range.
+- `unit`: optional; a UCUM code (`ms`, `%`, `mg/L`, `Cel`, `1` for a dimensionless ratio) or, where UCUM has none, text. `interval`: optional `{level, lower, upper, kind}`: `level` the coverage as a fraction (0.95), `lower` ≤ `upper`, and `kind` what the interval is: `confidence` (a frequentist confidence interval), `credible` (a Bayesian posterior interval) or `prediction` (where a new observation is expected to fall). `uncertainty`: optional, below. `n`: optional, the number of cases the value rests on.
 - `conditions`: the observation's coordinates: an object whose keys are dimensions and whose values are where the observation lies on each, e.g. `{"D26": "D9", "D5": "D14", "horizon": 12}`. A key is the ID of a definition or text. A value is the ID of a definition, a number, text or a boolean. When a key is a group (§3.2, *Groups*), its value is one of the group's members; when it is a `variable` or `setting` with a unit, its value is a literal in that unit.
 - `read_from`: optional `{artefact, precision}`, when the value was read off a figure or a recording rather than taken from data or a table: `artefact` is the figure or recording, `precision` how exactly it could be read (a number in the observation's unit, or text). Values read off a figure are recorded only with it, so a reader knows they are approximate.
 - `artefact`: optional; the artefact holding the full data this observation summarises.
-A single-estimate study may use `estimand`, `estimate`, `interval` and `n` instead: one observation whose variable is the estimand.
+- `statistic`: optional; what kind of statistic the value is, so that values from different papers can be compared by machine. A name from the list below, or an object `{name, …}` with the parameters its family takes (below); `"mean"` and `{"name": "mean"}` are the same. The variable and conditions say the rest ("Cohen's d", "from a mixed model"). The statistic says how values were summarised, not what was measured: an error measure (MASE, a relative error) is the variable, and the mean of its values over series is its statistic. A table column object or a table row may carry `statistic` for its values (*Tables*, below). The names:
+  - summaries of the values of a variable over cases: `count` · `sum` · `proportion` · `mean` · `median` · `mode` · `quantile` · `expectile` · `min` · `max`;
+  - their spread and shape: `sd` · `variance` · `iqr` (interquartile range) · `mad` (median absolute deviation from the median) · `coefficient_of_variation` · `skewness` · `kurtosis` · `moment`. A value that is itself a standard deviation (the spread of forecast errors over series, reported as a result) has statistic `sd`; the ± a paper reports with another value is that value's `uncertainty` (below);
+  - comparisons of two positions (*Contrasts*, below): `difference` · `ratio` · `odds_ratio` · `risk_ratio` · `hazard_ratio` · `standardised_mean_difference` (Cohen's d, Hedges' g) · `nnt` (number needed to treat);
+  - association and models: `correlation` · `coefficient` (of a model) · `r_squared`;
+  - tests and inference: `test_statistic` · `p_value` · `bayes_factor` · `posterior_probability`;
+  - `other`: a statistic none of these names, named in `label` (warning 38). Use it only when no name fits with its parameters: a geometric mean is a `mean` of kind `geometric`, a 90th percentile a `quantile` with probability 0.9.
+
+  The parameters, in the object form:
+  - `mean`: `kind`, one of `arithmetic` (the default) · `geometric` · `harmonic` · `trimmed` · `winsorised`; a trimmed or winsorised mean may give `trim`, the fraction cut or winsorised in each tail (`0.1`). A geometric mean is `{"name": "mean", "kind": "geometric"}`.
+  - `quantile` and `expectile`: `probability`, required, between 0 and 1: `{"name": "quantile", "probability": 0.9}`. The median is `median`, the smallest and largest values `min` and `max`.
+  - `moment`: `order`, required, a whole number of at least 1, and `central`: `true` for a moment about the mean, `false` (the default) for a raw moment. Skewness and kurtosis, the standardised third and fourth central moments, have names of their own.
+  - `kurtosis`: `excess`, `true` when the value is the kurtosis minus 3.
+  - `label`: required with `other`, the statistic's name as the source gives it; any other name may take a `label` to say more in words.
+- `approximate`: optional, `true` when the source gives the value only approximately ("about 1.5-fold", "roughly doubled", "~22 min"): the number recorded is the one the source states. A table column object may carry `approximate: true` for its values.
+
+**Uncertainty** (`uncertainty`): the ± a paper reports with a number, as a list of components, each `{kind, value}` (symmetric) or `{kind, plus, minus}` (asymmetric: `plus` above the value, `minus` below it), in the observation's unit, with optional `label` and `level`. Kinds:
+
+- `sd`: the standard deviation of the observations the value summarises; their spread, not the precision of the value.
+- `se`: the standard error of the value, the precision of an estimate; for a Bayesian estimate, its posterior standard deviation.
+- `stat`: the statistical component of a measurement's uncertainty, reported beside a systematic one.
+- `sys`: a systematic component; `label` names its source (`"luminosity"`, `"theory"`). A measurement may have several, each with its own label.
+- `total`: the combined uncertainty.
+- `unspecified`: a ± the paper does not explain. Converted papers only, in practice: a native paper says what its ± is (warning 35).
+
+`stat`, `sys` and `total` are at one standard deviation unless `level` gives their coverage (`0.95`). An uncertainty belongs to a numeric value. The Higgs boson mass of 126.0 ± 0.4 (stat) ± 0.4 (sys) GeV is
+
+```json
+{"id": "R1", "variable": "D9", "value": 126.0, "unit": "GeV",
+ "uncertainty": [{"kind": "stat", "value": 0.4}, {"kind": "sys", "value": 0.4}]}
+```
+
+and a mean of 4.2 ± 1.1 (SD) over 40 participants is `{"value": 4.2, "uncertainty": [{"kind": "sd", "value": 1.1}], "n": 40}`. An interval and an uncertainty may both be given; neither replaces the other.
+
+A single-estimate study may use `estimand`, `estimate`, `interval`, `uncertainty` and `n` instead: one observation whose variable is the estimand.
 
 **Tables** (`tables`): observations that the paper reports as a table, recorded as one. `{id, description, conditions, row_labels, columns, units, rows, artefact, source_spans}`
 - `id`: `T1`, `T2`, … unique within the evidence object; referenced from elsewhere as `<evidence id>.<table id>`, e.g. `E2.T1`.
@@ -724,26 +961,27 @@ A single-estimate study may use `estimand`, `estimate`, `interval` and `n` inste
 - `row_labels`: the dimensions that distinguish rows, each a definition ID or text, e.g. `["D26"]`; may be empty for a single row.
 - `columns`: one per value column: the column's variable (a definition ID or text), or `{variable, conditions}` when columns also differ along a dimension, e.g. `{"variable": "D8", "conditions": {"horizon": 1}}`. Columns are distinct.
 - `units`: optional list of units, one per column (`null` where none).
-- `rows`: list of `{id, label, values}`. `id`: `r1`, `r2`, … unique within the table; a row is referenced as `<evidence id>.<table id>.<row id>`, e.g. `E2.T1.r3`. `label`: the row's value on each row label, in order: a definition ID (a member of the dimension when it is a group), a number or text. `values`: one value per column, in order, of any type a result value may have; `null` where the paper reports no value.
+- `rows`: list of `{id, label, values, statistic, approximate}`. `id`: `r1`, `r2`, … unique within the table; a row is referenced as `<evidence id>.<table id>.<row id>`, e.g. `E2.T1.r3`. `label`: the row's value on each row label, in order: a definition ID (a member of the dimension when it is a group), a number or text. `values`: one value per column, in order, of any type a result value may have; `null` where the paper reports no value. `statistic` and `approximate`: optional, as on a column, for every value of the row, when the rows are statistics (the mean and the median of each method's errors). A cell's statistic is its row's or its column's: a table gives it on rows or on columns, never on both for one cell.
 - `artefact`: optional artefact ID of the source of the full table. `source_spans`: optional locations of the table in the source text (converted papers).
 
-Each cell is one observation: its variable is the column's; its conditions are the table's, the row's labels and the column's. Intervals, ranks and test statistics are columns of their own (`{"variable": "D8", "conditions": {"statistic": "95% interval, lower"}}`). A table records what the paper reports; it is not split into result entries, and result entries are not repeated in a table.
+Each cell is one observation: its variable is the column's; its conditions are the table's, the row's labels and the column's. Intervals, ranks and test statistics are columns of their own: the bounds of an interval are two columns told apart by a condition (`{"variable": "D8", "conditions": {"bound": "95% interval, lower"}}`), and a column of test statistics has statistic `test_statistic`. A column holding the uncertainty of another column's values has the reserved condition key `uncertainty`, whose value is a kind of uncertainty (above): beside a column `"D8"` of means, `{"variable": "D8", "conditions": {"uncertainty": "sd"}}` holds their standard deviations. A table records what the paper reports; it is not split into result entries, and result entries are not repeated in a table.
 
-**Contrasts.** A value that compares two positions on one dimension (a difference in means, a ratio, an odds ratio, a standardised effect size, the p-value of a comparison, a rank difference) is an observation of the pair. Its conditions name one position as usual and the other under the reserved key `comparator`; its variable says what the contrast is (a defined variable such as "difference in mean MASE", or text). `{"variable": "D11", "conditions": {"D26": "D1", "comparator": "D2", "D5": "D14"}, "value": -0.013, "interval": {"level": 0.95, "lower": -0.021, "upper": -0.005}}` is CES against ETS on the M3 monthly series. The comparator lies on the dimension whose value it replaces: a member of the same group, or a value of the same variable. A table of contrasts has `comparator` in its conditions, its row labels or its columns' conditions. The atom of a claim resting on a contrast has the same comparator (§3.3.5).
+**Contrasts.** A value that compares two positions on one dimension (a difference in means, a ratio, an odds ratio, a standardised effect size, the p-value of a comparison, a rank difference) is an observation of the pair. Its conditions name one position as usual and the other under the reserved key `comparator`; its variable says what the contrast is (a defined variable such as "difference in mean MASE", or text). `{"variable": "D11", "conditions": {"D26": "D1", "comparator": "D2", "D5": "D14"}, "value": -0.013, "interval": {"level": 0.95, "lower": -0.021, "upper": -0.005, "kind": "confidence"}}` is CES against ETS on the M3 monthly series. The comparator lies on the dimension whose value it replaces: a member of the same group, or a value of the same variable. A table of contrasts has `comparator` in its conditions, its row labels or its columns' conditions. The atom of a claim resting on a contrast has the same comparator (§3.3.5).
 
 **Tables and claims.** The table is the record of its values; a claim is the record of what the paper concludes from them. A claim resting on a table states the pattern the paper draws (which method, treatment or group is higher or lower, on which variables, under which conditions, including where the paper's own is worse) and cites the table or the rows that hold the values (`E2.T1`, `E2.T1.r3`); it repeats a value only when the conclusion turns on that value ("selected for 6 of the 11 groups", "coverage 0.947, the closest to 95%"). A claim that only retells a table's values, with no conclusion of the paper's own, is not written: the claim that uses the table cites it directly. A comparison stated this way is still one claim (§8 rule 2). A pattern that no claim, warrant or open question uses and that states no loss, limit or null result of the paper's method is not written either (§3.3, *Secondary claims in converted papers*).
 
 ```json
 "tables": [{"id": "T1", "description": "Mean MASE and MSIS of three methods on the M3 monthly series, horizons 1 to 18",
-  "conditions": {"D5": "D14"}, "row_labels": ["D26"], "columns": ["D8", "D9"], "units": ["1", "1"],
+  "conditions": {"D5": "D14"}, "row_labels": ["D26"],
+  "columns": [{"variable": "D8", "statistic": "mean"}, {"variable": "D9", "statistic": "mean"}], "units": ["1", "1"],
   "rows": [{"id": "r1", "label": ["D1"], "values": [0.861, 6.95]},
            {"id": "r2", "label": ["D2"], "values": [0.874, 6.71]},
            {"id": "r3", "label": ["D3"], "values": [0.902, null]}]}]
 ```
 
-Here D26 is the group of compared methods (members D1, D2, D3), D5 the group of data sets, D14 the M3 monthly series, and D8 and D9 the error measures, of kind `variable`. The same form holds a table of a psychology experiment (rows: condition × group; columns: mean reaction time, its standard deviation), of a chemistry paper (rows: catalyst; columns: yield at each temperature, `{"variable": "D4", "conditions": {"D6": 350}}` with D6 the temperature in `Cel`), of a linguistic survey (rows: language; columns: whether each construction is attested, boolean values) or of a legal study (rows: court × year; columns: the number of appeals by outcome). A participant or sample flow (screened, excluded for each reason, analysed) is a table of counts whose rows are the stages, so a flow diagram is a figure that shows it (§3.6).
+Here D26 is the group of compared methods (members D1, D2, D3), D5 the group of data sets, D14 the M3 monthly series, and D8 and D9 the error measures, of kind `variable`, each a mean over the series. Had the paper given the median MASE as well, it would be a third column, `{"variable": "D8", "statistic": "median"}`; had its table put the mean and the median in rows, each row would say its statistic and the columns none. The same form holds a table of a psychology experiment (rows: condition × group; columns: mean reaction time, its standard deviation), of a chemistry paper (rows: catalyst; columns: yield at each temperature, `{"variable": "D4", "conditions": {"D6": 350}}` with D6 the temperature in `Cel`), of a linguistic survey (rows: language; columns: whether each construction is attested, boolean values) or of a legal study (rows: court × year; columns: the number of appeals by outcome). A participant or sample flow (screened, excluded for each reason, analysed) is a table of counts whose rows are the stages, so a flow diagram is a figure that shows it (§3.6).
 
-**Excerpts and qualitative evidence.** A qualitative finding rests on excerpts. Each excerpt the paper gives for a theme is an observation whose variable is the theme's presence (or the theme itself), whose conditions name the participant or document, and whose value is the excerpt: `{"id": "R3", "variable": "D7", "conditions": {"participant": "P07", "D3": "D2"}, "value": {"text": "I used to be the stroke nurse. Here I'm just a nurse.", "locator": "transcript P07, lines 112-113"}}`. A linguistic example is an excerpt with its gloss and translation, a cited passage of a judgment an excerpt with its paragraph. (The `exemplars` of the `qual` profile until v0.31 are recorded this way.)
+**Excerpts and qualitative evidence.** A qualitative finding rests on excerpts. Each excerpt the paper gives for a theme is an observation whose variable is the theme's presence (or the theme itself), whose conditions name the participant or document, and whose value is the excerpt: `{"id": "R3", "variable": "D7", "conditions": {"participant": "P07", "D3": "D2"}, "value": {"text": "I used to be the stroke nurse. Here I'm just a nurse.", "locator": "transcript P07, lines 112-113"}}`. A linguistic example is an excerpt with its translation, and its gloss in the linguistics extension; a cited passage of a judgment is an excerpt with its paragraph. (The `exemplars` of the `qual` profile until v0.31 are recorded this way.)
 
 **Setup** (`setup`; recommended for evidence of every profile except `formal`): the frame of the study, its parts each recorded once as a definition (§3.2) and named here by role, so that claims, evidence objects, reviews and other papers can refer to each part on its own. `{studied, cases, procedure, lens, context}`, each a list of definition IDs; roles that do not apply are left out:
 - `studied`: what the study is about or compares: methods and models, interventions and exposures, the phenomenon of interest (in forecasting: the competing methods, each with the settings that define it; in a qualitative study: the experience or phenomenon explored).
@@ -782,10 +1020,21 @@ The keys of v0.23 to v0.29 map to these: `compared` → `studied`, `data` → `c
 - `prompts`: artefact ID of kind `prompt`.
 
 **Profile `quant`**
-`design` (`experiment` · `quasi_experiment` · `observational` · `survey` · `benchmark` · `other`), `estimand`, `estimate`, `interval` (`{level, lower, upper}`), `n`, `model`.
+`design` (`experiment` · `quasi_experiment` · `observational` · `survey` · `benchmark` · `other`), `estimand`, `estimate`, `interval` (`{level, lower, upper, kind}`), `uncertainty` (§3.4), `n`, `model`.
 
 **Profile `qual`**
-`data_sources` (list: `interview` · `focus_group` · `ethnography` · `observation` · `document` · `other`), `n_participants_or_cases`, `sampling`, `analytic_approach` (`thematic` · `grounded_theory` · `ipa` · `discourse` · `framework` · `case_study` · `other`), `reflexivity` (text). Excerpts are results (above).
+`data_sources` (list: `interview` · `focus_group` · `ethnography` · `observation` · `document` · `other`), `n_participants_or_cases`, `sampling`, `analytic_approach` (`thematic` · `grounded_theory` · `ipa` · `discourse` · `framework` · `case_study` · `content_analysis` (coding material against a codebook and counting the codes) · `source_criticism` (establishing a primary source's origin, author, date, purpose and reliability, and reading it in its context) · `other`), `reflexivity` (text). Excerpts are results (above).
+
+**Profile `observation`**
+`records` (required): what was recorded, each `{kind, artefact, description}`. `kind`: `image` (a micrograph, a photograph, a gel or blot, a telescope image) · `spectrum` (any signal over a frequency, mass or energy axis: NMR, IR, mass spectrum, X-ray diffraction pattern) · `structure` (a crystal or molecular structure determined from data) · `specimen` (a physical specimen examined and described: a type specimen, a fossil, an object) · `recording` (a signal over time: a trace, a light curve, a seismogram, an EEG) · `other`. `artefact`: the artefact holding the record, the figure that shows it and, better, the original file (an uncropped blot, a spectrum's raw data); recommended (warning 37). `description`: what the record shows, as text. `n`: optional, how many records or specimens. A figure named as a record's artefact is of function `specimen` (an image or recording that is itself evidence) or `data_plot` (a spectrum or trace drawn from data) (§3.6); results read off it name it in `read_from`. What was seen is recorded as results: a band present (`true`), a peak position (`7.26` with unit `ppm`), a ring diameter (`42` with unit `uas` and its uncertainty), a character of a specimen (a category).
+
+Field detail (instrument settings, acquisition parameters, the lanes of a blot, a specimen's catalogue number and repository) belongs to extensions (§2.7).
+
+**Choosing the profile.** The profile follows how the evidence supports the claim:
+
+- `observation`: the claim is what a record shows, and the paper presents the record: the band is there, the spectrum has these peaks, the structure is this one, the specimen has these characters, the image shows a ring. A number measured off a record (a peak position, a diameter) is a result of observation evidence.
+- `quant`: the claim rests on a statistical analysis across cases, including measurements taken from many records (band intensities quantified over replicate blots and compared by a test, a mass fitted from images with a model). Such evidence may be `derived_from` the observation evidence whose records it measures.
+- `qual`: the claim rests on interpreting words, documents or practices. A document examined as an object (its paper, hand, binding) is a `specimen` record; a document read for what it says is `qual`.
 
 **Profile `simulation`**
 `model`, `parameters` (artefact ID), `runs`, `seeds`, `outputs`.
@@ -837,7 +1086,7 @@ Warrants are for informal argument. Mathematical proofs use proof steps (§3.4).
 
 **Figures.** A figure is recorded by what it does:
 - `data_plot`: a view of observations (a chart, a forest plot, a dose–response curve, a spectrum, a flow diagram of counts). It `shows` the observations, which are recorded as results, tables or bulk data; claims cite the observations, and may cite the figure besides. Values that exist only in the plot are read off it and recorded with `read_from` (§3.4).
-- `specimen`: an image or recording that is itself evidence (a micrograph, a gel or blot, a scan, a photograph of a document or object, an audio sample). What the paper reads from it is recorded as observations whose `read_from` names it (a band present, a structure counted, a script identified).
+- `specimen`: an image or recording that is itself evidence (a micrograph, a gel or blot, a scan, a photograph of a document or object, an audio sample). What the paper reads from it is recorded as observations whose `read_from` names it (a band present, a structure counted, a script identified); the evidence that presents it is of profile `observation`, which lists it in `records` (§3.4).
 - `diagram`: shows an idea, not data (a model's structure, a mechanism, a pipeline, a conceptual framework). It is never evidence: what it shows belongs in definitions (a method, a procedure) or concepts, written out in text, and support does not cite it.
 A reading model learns little from an image; it learns from the observations. Images are files of the submission package (§2.5), never embedded in the claimset.
 
@@ -851,7 +1100,7 @@ A `uri` on a git host (GitHub, GitLab, Bitbucket, Codeberg and the like) names a
 
 Typed links from a claim to a claim or work outside this paper, or to another claim of this paper: `{type, reference, target, id_type, locator, archive_uri, self, note}`.
 
-- `type`: `supports` · `contradicts` · `extends` · `refines` · `replicates` · `fails_to_replicate` · `supersedes` · `addresses` (the claim answers a problem, gap or limitation that the target states) · `explains` (the claim explains why the target's result holds) · `qualifies` (the claim states an exception, a boundary or a condition of the target).
+- `type`: `supports` · `contradicts` · `extends` · `refines` · `replicates` · `fails_to_replicate` · `supersedes` · `addresses` (the claim answers a problem, gap or limitation that the target states) · `explains` (the claim explains why the target's result holds) · `qualifies` (the claim states an exception, a boundary or a condition of the target) · `disputes_evidence` (the claim argues that the target's evidence or reasoning does not establish it, without asserting the opposite: a re-reading of its sources, a flaw in its design).
 - `reference`: the ID of the cited work in `references` (§3.13). Either `reference`, or `target` with `id_type`, is given.
 - `target`: a global claim ID when the target is a claimset; otherwise the identifier of the work (paper, book, software release).
 - `id_type`: `claimset` · `doi` · `arxiv` · `handle` · `pmid` · `isbn` · `url` · `curie` · `physical` · `claimset_local` (a claim of a paper in the same repository not yet published, §2.4) · `local` (a claim of this paper: `target` is its ID, e.g. `"C4"`).
@@ -862,7 +1111,7 @@ Typed links from a claim to a claim or work outside this paper, or to another cl
 
 **Novelty** says what the claim is relative to earlier work, as far as the authors searched: `no_prior_found` (the authors found no earlier result stating the claim; this reports their search, not a proof that none exists), `replication` (it repeats an earlier result, on new data or by other means), `extension` (it carries an earlier result to new conditions), `refutation` (it shows an earlier result false). A `no_prior_found` claim cites the closest earlier result the authors found, when there is one, as a relation (`addresses` or `extends`) with a `note` saying how the claim differs; a reader then sees what was found and can judge the difference. For a converted paper, `no_prior_found` records that the source presents the claim as its own finding.
 
-**Relations within the paper.** `depends_on` says that a claim's argument needs another claim as a premise. Claims of one paper stand in other relations too, and these are relations with `id_type: local`: an explanation `explains` the result it accounts for ("M wins on short series because its initial states are estimated jointly" explains "M has the lowest error on series shorter than 36 observations"); an exception or boundary `qualifies` the claim it limits ("M does not improve on N for intermittent series" qualifies "M improves on N on the retail data"); and the paper's results may `support`, `contradict` or `refine` one another. An explanation does not depend on the result it explains, and a result does not depend on its explanation: neither is the other's premise. The types `replicates`, `fails_to_replicate`, `supersedes` and `addresses` are for other works only.
+**Relations within the paper.** `depends_on` says that a claim's argument needs another claim as a premise. Claims of one paper stand in other relations too, and these are relations with `id_type: local`: an explanation `explains` the result it accounts for ("M wins on short series because its initial states are estimated jointly" explains "M has the lowest error on series shorter than 36 observations"); an exception or boundary `qualifies` the claim it limits ("M does not improve on N for intermittent series" qualifies "M improves on N on the retail data"); the paper's results may `support`, `contradict` or `refine` one another; and a claim may `disputes_evidence` another that the paper reports and then questions. An explanation does not depend on the result it explains, and a result does not depend on its explanation: neither is the other's premise. The types `replicates`, `fails_to_replicate`, `supersedes` and `addresses` are for other works only.
 
 Required relations: `novelty: refutation` ⇒ at least one `contradicts` or `fails_to_replicate`; `novelty: replication` ⇒ at least one `replicates` or `fails_to_replicate`. Recommended: `novelty: extension` ⇒ an `extends` relation. A refutation with `self: true` is a self-correction; the platform records it separately from self-citation.
 
@@ -885,7 +1134,7 @@ Limitations are threats to a claim *within its stated scope*. What the work did 
 | Field | Type | Values / notes |
 |---|---|---|
 | `id` | string | `L1` … |
-| `category` | enum | `sampling` · `sample_size` · `measurement` · `confounding` · `data_quality` · `model_specification` · `analytic_flexibility` · `researcher_position` · `computational` · `other` |
+| `category` | enum | `sampling` · `sample_size` · `measurement` · `confounding` · `data_quality` · `model_specification` · `analytic_flexibility` · `researcher_position` · `computational` · `deviation` (a departure from the lab-record plan or registration a confirmatory test was planned under, §3.3.3) · `other` |
 | `statement` | string | Specific and self-contained: names the dimension and the value (e.g. "Ratings were coded by a single coder") |
 | `affects` | list of claim IDs | At least one; paper-wide limitations are not allowed |
 | `impact` | enum | `could_reverse` · `could_bias_magnitude` · `reduces_precision` · `reduces_transferability` |
@@ -898,7 +1147,7 @@ Applied to evidence and artefacts.
 
 | Field | Type | Values / notes |
 |---|---|---|
-| `level` | enum | Required. `public` · `platform` (registered users) · `audit` (accessible only to automated audit agents in a secure environment; human auditors optional) · `author_only` (never leaves the originating environment; can be audited only by an attested agent run there) · `unavailable` · `not_stated` (the paper does not say whether the material is available, or where; never a guess at another level) |
+| `level` | enum | Required. `public` (anyone can obtain it, including material in the paper's supplementary information and material behind a publisher's or database's subscription: `comment` says which) · `platform` (registered users) · `audit` (accessible only to automated audit agents in a secure environment; human auditors optional) · `author_only` (never leaves the originating environment; can be audited only by an attested agent run there) · `unavailable` · `not_stated` (the paper does not say whether the material is available, or where; never a guess at another level) |
 | `reason` | enum | Required unless `public` or `not_stated`: `personal_data` · `commercial` · `legal` · `ethics` · `security` · `other` |
 | `content_hash` | string | Required unless `public`, `unavailable` or `not_stated`: cryptographic hash committing to the exact content |
 
@@ -906,7 +1155,7 @@ Every evidence object and every artefact has an `availability` (rule 75): whethe
 
 ### 3.11 Contributors
 
-Authorship and accountability are separate. Agents write; humans or organisations answer for the work.
+Authorship and accountability are separate. Agents write; one person answers for the research: the guarantor, the main author and the person to contact, who submits the claimset and confirms it on the platform. Other people who took part are supervisors or contributors. A converted paper's conversion is answered for by its conversion guarantor, a person or an organisation.
 
 A paper may pass through several agents without its history being kept. At minimum, the agent that prepares the submission lists itself; `paper.contribution_record` states how complete the list is. Before submission, the agent asks the responsible human who the guarantor is and which licence applies.
 
@@ -915,7 +1164,7 @@ A paper may pass through several agents without its history being kept. At minim
 | Field | Obligation | Type | Values / notes |
 |---|---|---|---|
 | `id` | required | string | `P1` … |
-| `type` | required | enum | `agent` · `human` · `organisation` |
+| `type` | required | enum | `agent` · `human` · `organisation`. An organisation holds only the position `conversion_guarantor` (v0.36); a funder is a declaration, an institution a person's `affiliation` |
 | `positions` | required | list | One or more of the positions below |
 | `name` | required for humans and organisations; recommended for agents | string | For agents: a name for the agent system, if it has one |
 | `credit_roles` | recommended | list | CRediT roles (below) |
@@ -924,10 +1173,10 @@ A paper may pass through several agents without its history being kept. At minim
 
 | Field | Obligation | Type | Values / notes |
 |---|---|---|---|
-| `orcid` | required for guarantors; recommended otherwise | string | Used by the platform to confirm a guarantor's consent |
+| `orcid` | required for the guarantor and for a person who is conversion guarantor; recommended for every other person | string | The platform confirms the guarantor's consent through it |
 | `affiliation` | optional | string | |
 
-**Organisation fields**
+**Organisation fields** (a conversion guarantor only)
 
 | Field | Obligation | Type | Values / notes |
 |---|---|---|---|
@@ -950,12 +1199,12 @@ A paper may pass through several agents without its history being kept. At minim
 **Positions**
 - `author`: produced the paper's content: wrote the analysis, the claims or the text, including turning the team's own draft into a claimset. Agents only. Every agent that produced content is an author; list each one.
 - `supervisor`: oversaw the agents' work and approved the final version. Humans only. Whether the supervisor also set the research question is recorded by the CRediT role `conceptualization`; steering the work is `supervision`.
-- `guarantor`: answers for the research: whether the claims are true and the work was done properly. Responds to queries and correction requests, holds ethics approvals and data-protection responsibilities, and agrees to the licence. Humans or organisations. Native papers: the supervisor or another responsible researcher, or their institution. Converted papers: only a source author who has claimed the conversion.
-- `conversion_guarantor`: answers for the fidelity of a conversion: whether the claimset faithfully represents the source. Does not answer for the research itself. Humans or organisations; typically the organisation operating the conversion service. Converted papers only.
+- `guarantor`: the main author: answers for the research, whether the claims are true and the work was done properly, and is the person to contact about the paper. Submits the claimset and confirms it on the platform, responds to queries and correction requests, holds ethics approvals and data-protection responsibilities, and agrees to the licence. A person with an ORCID iD, never an organisation. Native papers: exactly one, the supervisor or another responsible researcher. Converted papers: at most one, a source author who has claimed the conversion. Co-authors are listed as supervisors or contributors.
+- `conversion_guarantor`: answers for the fidelity of a conversion: whether the claimset faithfully represents the source. Does not answer for the research itself, and is a party separate from the guarantor. Exactly one per converted paper: a person with an ORCID iD or an organisation, typically the organisation operating the conversion service. Converted papers only.
 - `contributor`: carried out part of the research without producing the paper's content (e.g. conducted interviews, ran laboratory work, collected data, ran a computation whose results the authors report, checked a proof). Humans or agents.
 - `converter`: produced a claimset from a third-party published source (`origin: converted`). Agents only. Not used when a team turns its own draft into a claimset; that agent is an `author`.
 
-For converted papers, research accountability stays with the source authors and the venue that published the source; they are recorded in `converted_from.source_authors`, not as guarantors, unless they claim the conversion.
+For converted papers, research accountability stays with the source authors and the venue that published the source; they are recorded in `converted_from.source_authors`, not as guarantor, unless one of them claims the conversion.
 
 **CRediT roles** (14, from the CRediT taxonomy): `conceptualization` · `data_curation` · `formal_analysis` · `funding_acquisition` · `investigation` · `methodology` · `project_administration` · `resources` · `software` · `supervision` · `validation` · `visualization` · `writing_original_draft` · `writing_review_editing`.
 
@@ -978,11 +1227,11 @@ Each model used anywhere in the paper is defined once.
 
 ### 3.13 References
 
-Each work the paper cites is listed once, in the top-level `references`, and cited by its ID from support entries, relations, definitions and artefacts. `{id, target, id_type, archive_uri}`
+Each work the paper cites is listed once, in the top-level `references`, and cited by its ID from support entries, relations, definitions, artefacts and tests (`test.registration`, §3.3.3). `{id, target, id_type, archive_uri}`
 - `id`: `B1`, `B2`, ….
 - `target` and `id_type`: as for cited support (§4): an identifier (`doi`, `arxiv`, …), a global claim ID of a claimset (`id_type: claimset`), a paper or claim of the same repository not yet published (`id_type: claimset_local`, §2.4), or the reference as printed in the paper's reference list (`id_type: reference`).
-- `archive_uri`: required for `url` targets.
-Only works that a support entry, relation, definition or artefact points to are listed.
+- `archive_uri`: required for `url` targets, unless the claimset holds a captured copy of the page: an artefact that names the entry in `reference` and whose `version` is the copy's hash (a captured source, lab record §5.20; private copies keep their hash in the record). Give one whenever the page can be archived (warning 32).
+Only works that a support entry, relation, definition, artefact or test points to are listed.
 
 ### 3.14 Open questions
 
@@ -1003,6 +1252,7 @@ Each support entry: `{kind, <required pointer>, …attributes}`.
 |---|---|---|
 | `empirical_quant` | Statistical analysis of data | `evidence` (profile `quant`) |
 | `empirical_qual` | Qualitative analysis of data | `evidence` (profile `qual`) |
+| `empirical_obs` | Direct observation or characterisation: what a record shows (an image, a spectrum, a structure, a specimen, a recording) | `evidence` (profile `observation`) |
 | `simulation` | Computational experiments on synthetic/model data | `evidence` (profile `simulation`) + an artefact |
 | `demonstration` | Existence shown by construction | `artefacts` |
 | `formal_proof` | Mathematical or logical derivation | `evidence` (profile `formal`) |
@@ -1076,7 +1326,11 @@ Reviews of a published claimset, the author's responses, human resolutions of di
 
 ## 7. Identifiers and source trust
 
-**The claimset's DOI.** The platform mints a DOI for every published claimset, at publication, and registers it with DataCite under the platform's DOI prefix.
+**The claimset's identifier.** The platform assigns every published claimset a persistent identifier at publication: a DOI once the platform registers DOIs, and until then a provisional identifier of the platform (EntryLib). Both are built by the same rule and behave alike: one identifier for all versions, extended by `@v<n>` for a version and `#<local ID>` for an object, never reused.
+
+**The provisional identifier.** `entrylib:<year>.<number>`, with `<year>` and `<number>` as for the DOI below: `entrylib:2026.000123`, `entrylib:2026.000123@v2#C3`. It is permanent: a claimset first published with it keeps it as `paper.id` in every later version, and it resolves to the claimset on the platform for as long as the platform exists. How a DOI is added to such a claimset, once the platform registers DOIs, is specified when it does; the provisional identifier stays valid either way.
+
+**The claimset's DOI.** When the platform registers DOIs, it mints a DOI for every claimset it publishes, at publication, and registers it with DataCite under the platform's DOI prefix.
 
 - **Form:** `doi:<prefix>/claimset.<year>.<number>`. `<year>` is the year of first publication; `<number>` is the claimset's sequence number among those first published that year, with at least six digits, zero-padded. Example: `doi:10.0000/claimset.2026.000123`, where `10.0000` stands for the platform's prefix throughout this specification. The suffix holds nothing else (no title, author, subject or source), so nothing in it can later become wrong.
 - **One DOI for all versions.** Corrections and revisions keep the DOI; a version is named by appending `@v<n>`, and an object by appending its local ID: `doi:10.0000/claimset.2026.000123@v2#C3` (§2, §9). The DOI resolves to the claimset's page on the platform, which shows the latest version, its status and the list of earlier versions.
@@ -1102,7 +1356,7 @@ The file records identifier type and venue facts for cited works only. Trust in 
 
 - Every published version is immutable and permanently retrievable.
 - **Order and IDs.** Claims are listed in reading order: principal claims, then supporting claims, then secondary claims and assumptions, each in the order of the paper's argument, since the reading view follows file order (§2). Before the first submission, IDs follow that order without gaps: `claimset renumber FILE` renumbers claims, warrants, definitions, limitations and open questions and rewrites every reference to them; a claimset exported from a lab record keeps its link to the record through `hypothesis.lab_event`, not through claim IDs. After publication IDs never change (revision §2, *Stable object IDs*): a revision places a new claim where it belongs in the file, with the next free number, and an ID that is dropped is not reused.
-- A correction is submitted as a complete corrected file whose `paper.id` names the existing claimset and which carries a `correction_reason`. The platform computes the JSON Patch against the latest published version, records it in `changes` with the reason, assigns the next `version` and `previous_version`, and sets `status: corrected`. The DOI does not change; versions are distinguished by `@v<n>`.
+- A correction is submitted as a complete corrected file whose `paper.id` names the existing claimset and which carries a `correction_reason`. The platform computes the JSON Patch against the latest published version, records it in `changes` with the reason, assigns the next `version` and `previous_version`, and sets `status: corrected`. The identifier (§7) does not change; versions are distinguished by `@v<n>`.
 - A revision is submitted as a complete file built from the current version, whose `paper.id` names the existing claimset and which has no `correction_reason`, together with a response to the unresolved review comments (revision §4–5). The platform records the patch as for a correction, with the comments each operation answers, sets `paper.answers`, and keeps `status: active`. Object IDs are stable across versions: an object that keeps its ID is the same object, refined, and an ID removed from the claimset is never used again.
 - Retraction, withdrawal or an expression of concern is a governance action by the platform, recorded by `status` and `status_notice`. The paper's content is retained so references still resolve, and every reader sees the status and reason.
 - Global IDs without a version resolve to the latest version and carry its status.
@@ -1117,7 +1371,7 @@ The file records identifier type and venue facts for cited works only. Trust in 
 3. `assumption` is the sole support kind of its claim; the claim carries no strength assessments and has `assumption_category` and `check`. `assumption_category: axiom` ⇒ `check: untestable`.
 4. Claims are the paper's own: `role` is `principal`, `supporting` or `secondary`, and `novelty` is not `restatement` (`background` and `restatement` removed in v0.16; prior work is cited, related, defined or an artefact, §3.3.4). (Revised in v0.16 and v0.18.)
 5. `contributions` lists only `principal` claims; every `principal` claim appears in `contributions`.
-6. `type: interpretive` ⇒ `warrant` present.
+6. `type: interpretive` ⇒ `warrant` present, or (from v0.39) a support entry of kind `argument` with its `warrant`.
 7. `formal_proof` support ⇒ `verification` present; evidence has `foundation` and either `steps` or `proof_artefact`, or, in converted papers, `source_spans` locating the derivation. (Revised in v0.14.)
 8. `depends_on` contains no cycles.
 9. `provenance` or `field_provenance` values `extracted`/`inferred` only when `paper.origin: converted`; `source_spans` required in that case.
@@ -1125,10 +1379,10 @@ The file records identifier type and venue facts for cited works only. Trust in 
 11. Every limitation affects at least one claim; every claim's `limitations` resolve.
 12. `availability.level` other than `public` and `not_stated` ⇒ `reason` present; `audit`/`author_only`/`platform` ⇒ `content_hash` present. (Revised in v0.34: `not_stated`.)
 13. `verifiability` and `verifiability_flags`, where present, match the platform's computation (§5).
-14. Every `guarantor` and `conversion_guarantor` is a human or an organisation; every human guarantor has an `orcid`.
+14. The `guarantor` is a human with an `orcid`. The `conversion_guarantor` is a human with an `orcid` or an organisation. An organisation holds no position other than `conversion_guarantor`. (Revised in v0.36.)
 15. `author` and `converter` positions are held only by agents; `supervisor` only by humans.
-16. `paper.origin: native` ⇒ at least one `author`, at least one `guarantor`, no `conversion_guarantor`, and `autonomy` present.
-17. `paper.origin: converted` ⇒ exactly one `converter`, exactly one `conversion_guarantor`, all `converted_from` fields present, no `autonomy`; any `guarantor` is a person listed in `converted_from.source_authors` (matched by ORCID).
+16. `paper.origin: native` ⇒ at least one `author`, exactly one `guarantor`, no `conversion_guarantor`, and `autonomy` present. (Revised in v0.36.)
+17. `paper.origin: converted` ⇒ exactly one `converter`, exactly one `conversion_guarantor`, all `converted_from` fields present, no `autonomy`; at most one `guarantor`, a person listed in `converted_from.source_authors` (matched by ORCID). (Revised in v0.36.)
 18. Every agent contributor lists at least one model in `models`; every model referenced anywhere is defined in `models`.
 19. All `required` fields in §3.11 and §3.12, and `paper.title`, `paper.licence`, `paper.contributions`, `paper.contribution_record` and `paper.origin` are present.
 20. Model roles, where given, are consistent: `sole` ⇒ the agent lists one model; at most one `orchestrator` per agent.
@@ -1144,12 +1398,12 @@ The file records identifier type and venue facts for cited works only. Trust in 
 
 ### 10.3 Published-file rules (errors; checked by the platform at publication)
 
-27. All platform-assigned fields in §2.2 are present; `paper.id` is a DOI minted by the platform.
+27. All platform-assigned fields in §2.2 are present; `paper.id` is an identifier assigned by the platform (§7). (Revised in v0.35.)
 28. `version` > 1 ⇒ `previous_version` and `changes` present.
 29. `status` other than `active` ⇒ `status_notice` present.
 30. `paper.id` differs from `converted_from.source_id`.
 31. `paper.origin: converted` ⇒ `converted_from.source_licence` is a licence that permits conversion, and `paper.licence` is a licence the claimset may carry under it, both as in the table in §3.1 (*Licence of a converted paper*). (Revised in v0.13: non-commercial sources are allowed, and the claimset keeps their non-commercial condition.)
-32. Every human guarantor has confirmed consent through their ORCID-linked account, and every organisation guarantor through an authorised account.
+32. The guarantor has confirmed consent through their ORCID-linked account; a conversion guarantor has confirmed through their ORCID-linked account or, for an organisation, an authorised account. (Revised in v0.36.)
 
 ### 10.5 Rules added in v0.9 (errors: file rejected)
 
@@ -1168,19 +1422,19 @@ The file records identifier type and venue facts for cited works only. Trust in 
 
 ### 10.7 Rules added in v0.11 (errors: file rejected)
 
-42. `hypothesis` present ⇒ `hypothesis.lab_event` and `hypothesis.outcome` present, and `planning` present.
-43. `planning` is `confirmatory` or `confirmatory_with_deviations` ⇒ `planned_at` and `planned_at_anchor` present.
-44. Any claim has `hypothesis` ⇒ `paper.exploration` present, and `exploration.lab_record` is an artefact of kind `lab_record`.
+42. (Revised in v0.39.) `hypothesis` present ⇒ `hypothesis.outcome` and `planning` present. (Until v0.38: `hypothesis.lab_event` present as well.)
+43. (Revised in v0.39.) `planning` is `confirmatory` or `confirmatory_with_deviations` ⇒ `planned_at_anchor` present, and `planned_at` present unless `planned_at_anchor` is `registry` and `test.registration` names the registration (the registry holds the date).
+44. (Revised in v0.39.) Any claim has `hypothesis.lab_event` ⇒ `paper.exploration` present, and `exploration.lab_record` is an artefact of kind `lab_record`.
 45. (Revised in v0.12.) `exploration` counts are non-negative integers; `hypotheses.total` equals the sum of the other hypothesis counts (`open` included, 0 if absent); `tests.total`, if `tests` is present, equals the sum of its verdict counts; `runs.total` equals `confirmatory` + `exploratory`; `failed` ≤ `total`.
-46. (Revised in v0.12.) For each outcome (`supported`, `not_supported`, `inconclusive`): the number of claims with `test` reporting it does not exceed the corresponding `exploration.tests` count, and the number of distinct `hypothesis.lab_event` values among claims without `test` reporting it does not exceed the corresponding `exploration.hypotheses` count.
+46. (Revised in v0.12 and v0.39.) Among claims with `hypothesis.lab_event` (claims exported from a lab record), for each outcome (`supported`, `not_supported`, `inconclusive`): the number of claims with `test` reporting it does not exceed the corresponding `exploration.tests` count, and the number of distinct `hypothesis.lab_event` values among claims without `test` reporting it does not exceed the corresponding `exploration.hypotheses` count.
 
 ### 10.8 Rules added in v0.12 (errors: file rejected)
 
-47. `planning` is `confirmatory` or `confirmatory_with_deviations` ⇒ `test` present, with a `framework` from the list, non-empty `supported` and `not_supported` rules, the parameters its framework requires, and `verdict` (`computed` or `judged`); `verdict: computed` ⇒ `quantities` present; `flags`, if present, are from the list in §3.3.3.
+47. `planning` is `confirmatory` or `confirmatory_with_deviations` ⇒ `test` present, with a `framework` from the list, non-empty `supported` and `not_supported` rules, the parameters its framework requires, and `verdict` (`computed` or `judged`); `verdict: computed` ⇒ `quantities` present; `flags`, if present, are from the list in §3.3.3. (Revised in v0.39: a quantity's `field`, if present, is `value`, `value.limit`, `value.min`, `value.max`, `interval.lower`, `interval.upper` or `uncertainty.<kind>`.)
 
 ### 10.9 Rules added in v0.14 (errors: file rejected)
 
-48. Tables appear in evidence of any profile except `formal`. Each has an `id` (`T1`, `T2`, …) unique within its evidence object, a `description`, `row_labels` (a list, possibly empty) and `columns` (a non-empty list of distinct entries, each a non-empty string or `{variable, conditions}`), and a non-empty list of `rows`; each row has an `id` (`r1`, `r2`, …) unique within the table, a `label` with one entry per row label, and `values` with one entry per column, each a value as in rule 66 or `null`, at least one value in the table not `null`. `units`, if present, has one entry per column; `artefact`, if present, resolves. (Revised in v0.32: values of any type; tables in any profile except formal.)
+48. Tables appear in evidence of any profile except `formal`. Each has an `id` (`T1`, `T2`, …) unique within its evidence object, a `description`, `row_labels` (a list, possibly empty) and `columns` (a non-empty list of distinct entries, each a non-empty string or `{variable, conditions}`, which may also carry `statistic` and `approximate` (§3.4, from v0.39)), and a non-empty list of `rows`; each row has an `id` (`r1`, `r2`, …) unique within the table, a `label` with one entry per row label, and `values` with one entry per column, each a value as in rule 66 or `null`, at least one value in the table not `null`, and may carry `statistic` and `approximate` (§3.4, from v0.39 as amended on 2026-11-09). `units`, if present, has one entry per column; `artefact`, if present, resolves. (Revised in v0.32: values of any type; tables in any profile except formal.)
 
 ### 10.10 Rules added in v0.15 (errors: file rejected)
 
@@ -1189,7 +1443,7 @@ The file records identifier type and venue facts for cited works only. Trust in 
 
 ### 10.11 Rules added in v0.16 (errors: file rejected)
 
-51. `references`: each entry has an `id` (`B1`, `B2`, …) unique in the file, a `target` and an `id_type` from the list for cited support, and `archive_uri` when `id_type` is `url`. Every `reference` in a support entry or relation, and every definition `source` that looks like a reference ID, resolves to an entry; every entry is pointed to at least once (by a support entry, relation, definition or artefact; artefacts since v0.18).
+51. `references`: each entry has an `id` (`B1`, `B2`, …) unique in the file, a `target` and an `id_type` from the list for cited support, and `archive_uri` when `id_type` is `url`, unless an artefact that names the entry in `reference` holds a captured copy of the page (its `version` is the copy's `sha256:` hash; warning 32). Every `reference` in a support entry or relation, and every definition `source` that looks like a reference ID, resolves to an entry; every entry is pointed to at least once (by a support entry, relation, definition or artefact; artefacts since v0.18).
 52. Each entry of `converted_from.corrections` whose `field` names a claim field corresponds to that field's provenance being `inferred` (through `field_provenance`, or the claim's `provenance`).
 
 ### 10.12 Rules added in v0.17 (errors: file rejected)
@@ -1237,13 +1491,13 @@ The file records identifier type and venue facts for cited works only. Trust in 
 
 ### 10.22 Rules added in v0.32 (errors: file rejected)
 
-66. Observations. Results appear in evidence of any profile except `formal`. Each result has an `id` and a `variable` (a non-empty string; `quantity` is not used) and a `value` that is a number, a non-empty string, a boolean, or an excerpt with a non-empty `text` and `locator` and only the fields of §3.4. Every string of the form of a definition ID in a result's or table's `variable`, `conditions` (keys and values), `row_labels`, `columns` and row labels resolves to a definition; a `variable` that names a definition names one of kind `variable` or `concept`, or a group of them; a condition or row label whose dimension is a group is one of its members; `read_from`, if present, names an artefact of kind `figure` or `recording` and has a `precision`. Evidence of profile `qual` has no `exemplars`.
+66. Observations. Results appear in evidence of any profile except `formal`. Each result has an `id` and a `variable` (a non-empty string; `quantity` is not used) and a `value` that is a number, a non-empty string, a boolean, an excerpt with a non-empty `text` and `locator` and only the fields of §3.4, or (from v0.39) a limit (`bound` `upper` or `lower`, a number `limit`, optional `level` between 0 and 1, no other fields) or a range (numbers `min` ≤ `max`, optional `level` between 0 and 1, no other fields). Every string of the form of a definition ID in a result's or table's `variable`, `conditions` (keys and values), `row_labels`, `columns` and row labels resolves to a definition; a `variable` that names a definition names one of kind `variable` or `concept`, or a group of them; a condition or row label whose dimension is a group is one of its members or (from v0.39) a definition of the group's kind, a control or baseline compared with them; `read_from`, if present, names an artefact of kind `figure` or `recording` and has a `precision`. Evidence of profile `qual` has no `exemplars`.
 67. Artefacts and figures. A `figure` has a `function`; `shows`, if present, is a list of references that resolve as in rule 38, given only for a `data_plot`; `encoding`, if present, has only the keys of §3.6; a support entry's `artefacts` names no figure of function `diagram`. `columns`, if present, is a list of `{name, variable, dimension, unit}` with a non-empty `name` and exactly one of `variable` and `dimension`, each resolving as in rule 66 when it is a definition ID.
 68. Definitions. A definition's `kind` is not `measure` (renamed `variable` in v0.32); `part_of` and `broader`, if present, are non-empty lists of IDs of other definitions, and neither link forms a cycle (no term is part of, or a kind of, itself, directly or through others); a definition with `broader` has the kind of each broader definition that has one; its `identifiers`, if present, is a list of compact identifiers `prefix:local`, the prefix of lower-case letters, digits, dots, hyphens and underscores, starting with a letter. A target with `id_type: curie` has the same form.
-69. Declarations. `paper.declarations`, if present, has only `funding`, `competing_interests`, `ethics` and `consent`; each funding entry has a non-empty `funder`; each ethics entry has a non-empty `body` and a `decision` from the list of §3.1; `competing_interests` and `consent` are non-empty text.
+69. Declarations. `paper.declarations`, if present, has only `funding`, `competing_interests`, `ethics` and `consent`; each funding entry has a non-empty `funder`; each ethics entry has a non-empty `body` and a `decision` from the list of §3.1; `competing_interests` and `consent` are non-empty text. (Revised in v0.39: a funding entry has only `funder`, `funder_id`, `award`, `kind` and `role`; `kind`, if present, is `grant` or `in_kind`; `role`, if present, is non-empty text.)
 70. Package. When the claimset is validated as part of a package (§2.5): every artefact whose `uri` is a relative path names a file of the package, its `version` is `sha256:` followed by that file's checksum, and the file is in the package's manifest with the same checksum. A published file has no relative `uri`.
 
-71. Relations within the paper. A relation with `id_type: local` has a `target` that is the ID of another claim of this paper and a `type` from `supports`, `contradicts`, `refines`, `explains` and `qualifies`; the relations `explains` among the paper's claims form no cycle; a claim does not both `explains` a claim and list it in `depends_on`.
+71. Relations within the paper. A relation with `id_type: local` has a `target` that is the ID of another claim of this paper and a `type` from `supports`, `contradicts`, `refines`, `explains`, `qualifies` and (from v0.39) `disputes_evidence`; the relations `explains` among the paper's claims form no cycle; a claim does not both `explains` a claim and list it in `depends_on`.
 72. Derived evidence. Each entry of an evidence object's `derived_from` names another evidence object of this paper and has a `how` from the list of §3.4; `derived_from` forms no cycle.
 73. Assumptions of a term. A definition's `assumptions`, if present, is a non-empty list of IDs of assumption claims (support of kind `assumption`).
 74. Contrasts. A `comparator` in an observation's conditions (of a result, a table, a row label or a column) is a definition ID or text; when it is a definition ID and another condition of the observation has a value that is a member of a group, the comparator is a member of the same group.
@@ -1251,6 +1505,40 @@ The file records identifier type and venue facts for cited works only. Trust in 
 ### 10.23 Rules added in v0.34 (errors: file rejected)
 
 75. Availability. Every evidence object and every artefact has an `availability` with a `level` from §3.10.
+
+### 10.24 Rules added in v0.35 (errors: file rejected)
+
+76. Claimset identifiers. `paper.id`, where present, is a claimset identifier: `doi:` followed by a DOI prefix (`10.` and four to nine digits) and `/claimset.<year>.<number>`, or `entrylib:<year>.<number>`; `<year>` is four digits and `<number>` at least six. A `target` with `id_type: claimset` is a claimset identifier, optionally followed by `@v<n>` (n ≥ 1) and then optionally by `#` and a local ID.
+77. Package limits. A package (§2.5) keeps within the limits of §2.5: the number of files, the size of each file and of the payload, the form of every path, the manifest listing exactly the files of `data/`, and the file types. A zip is checked before it is unpacked: its entries' sizes and paths, and that it holds no links.
+78. Excerpt locators. A structured excerpt `locator` has only `artefact`, `start`, `end` and `lab_event`; `artefact` resolves to an artefact; `start` and `end` are integers with 0 ≤ `start` < `end`; `lab_event`, if present, is a lab record event ID (`CD3`, `AC2.CD3`). When the claimset is validated as part of a package and the artefact is a packaged text file, the excerpt's `text` is that file's characters `start` to `end`.
+
+### 10.25 Rules added in v0.37 (errors: file rejected)
+
+79. Specification version. `schema_version` names a version of this specification from the baseline (v0.39) to the validator's own (§2.6). A file following an earlier version is refused, and `claimset migrate` brings it to the current one. A file following a later version is refused because its rules are not known to the validator: the file may be valid, and a current validator can check it.
+
+### 10.26 Rules added in v0.38 (errors: file rejected)
+
+80. Extensions (§2.7). `extensions`, if present, is an object whose keys are extension names (lower-case letters, digits and hyphens, starting with a letter) and whose values are versions (`<major>.<minor>`). Each declared extension, at the version declared, is known to the validator; one that is not is refused with a message saying that the validator does not know it, and that a current validator may. `ext` appears only on the objects listed in §2.7, is an object, and each of its keys is a declared extension whose specification allows it on that object; each block is an object. The rules of each extension apply to its blocks.
+
+### 10.27 Rules added in v0.39 (errors: file rejected)
+
+81. Plans of confirmatory tests. A claim with `planning` `confirmatory` or `confirmatory_with_deviations` has `hypothesis`, and its `test` names the plan: `lab_plan` or `registration`, or both. `test.registration`, if present, is the ID of an entry in `references`. `planned_at_anchor: registry` ⇒ `test.registration` present.
+
+82. Intervals and uncertainty (§3.4). An `interval` of a result or of an evidence object's estimate has only `level`, `lower`, `upper` and `kind`; `lower` and `upper` are numbers with `lower` ≤ `upper`; `level`, if present, is a number between 0 and 1; `kind`, if present, is `confidence`, `credible` or `prediction`. `uncertainty`, if present, is a non-empty list of components, each with a `kind` from §3.4 and either `value` or both `plus` and `minus`, all non-negative numbers; `level`, if present, is between 0 and 1; `label`, if present, is non-empty text; two components of the same kind have different labels; no other fields. An interval or uncertainty is given only with a numeric value. A table column's condition `uncertainty` is a kind from §3.4.
+
+83. Locations and constructs (§3.2). `location`, if present, is on a definition of kind `setting` and is a non-empty list of points with only `latitude` (a number from -90 to 90), `longitude` (a number from -180 to 180) and an optional non-empty `label`. `measures`, if present, is on a definition of kind `variable` and is a non-empty list of IDs of definitions of kind `concept`.
+
+84. `novelty: not_applicable` only on claims whose `role` is not `principal`.
+
+85. `paper.collaborations`, if present, is a non-empty list; each entry has a non-empty `name` and optionally `identifiers`, a non-empty list of compact identifiers; no other fields.
+
+86. Types. Every field has the type this specification gives it: one ID or a piece of text is a string, a list is a list, an object an object. A value of another type is an error under the rule of its field and, where no rule names that field's type, under this rule. This rule states what every version assumed, and applies to files of every version (the errata of v0.38 say so).
+
+87. Statistics (§3.4). `statistic`, if present on a result, a table column object or a table row, is a name from the list in §3.4, or an object whose `name` is one and whose other fields are only the parameters that name takes: on `mean`, `kind` (one of the list in §3.4) and, with kind `trimmed` or `winsorised`, `trim`, a number above 0 and below 0.5; on `quantile` and `expectile`, `probability`, required, a number above 0 and below 1; on `moment`, `order`, required, a whole number of at least 1, and `central`, a boolean; on `kurtosis`, `excess`, a boolean; on any name, `label`, non-empty text, required on `other`. No cell of a table has a statistic from both its row and its column. `approximate`, if present, is `true`. (Revised on 2026-11-09: names grouped and added, families with parameters, statistics on rows.)
+
+88. Units and targets (§3.2). `unit`, if present, is on a definition of kind `variable` or `setting` and is non-empty text. `targets`, if present, is on a definition of kind `intervention` and is a non-empty list of IDs of definitions of kind `substance`, `organism`, `biological_material`, `entity` or `process`.
+
+89. Observation evidence (§3.4). Evidence of profile `observation` has `records`, a non-empty list; each record has a `kind` from the list in §3.4 and only `kind`, `artefact` (the ID of an artefact) and `description` (non-empty text). Evidence of other profiles has no `records`.
 
 ### 10.4 Warnings (file accepted, warning recorded)
 
@@ -1261,36 +1549,43 @@ The file records identifier type and venue facts for cited works only. Trust in 
 5. No `paper.classification.keywords` in a submission.
 6. Three or more claims share an identical `scope` object (often a sign of scope copied by section; check each claim).
 7. `novelty: extension` without an `extends` relation.
-8. Quant or simulation evidence with neither `estimate`, `results` nor `tables`.
+8. Quant, observation (from v0.39) or simulation evidence with neither `estimate`, `results` nor `tables`.
 9. An artefact without `licence`, unless it names the cited work it is taken from (`reference`) and is not a file of the submission package (§2.5). (Revised in v0.33.)
 10. An agent contributor that is not an `author` has the AI task `writing`; agents that produced the paper's content are authors.
 11. A check was made by an agent that runs on the same model as an `author` agent.
-12. A number in a claim's statement cannot be matched to the results the claim cites, at the precision stated (heuristic; percentages are compared as fractions). Applies to cited result entries; cited tables and rows are not checked.
+12. A number in a claim's statement cannot be matched to the results the claim cites, at the precision stated (heuristic; a percentage matches a value given as a fraction, 0.767, or in percent, 76.7). Applies to cited result entries; cited tables and rows are not checked.
 13. `planning: exploratory` on a principal claim: exploratory findings can be principal, but readers should be told so in the claim's assessment rationale.
 14. `id_type: reference` in a native paper: give the cited work's identifier.
 15. A `supporting` claim that no principal claim rests on, directly or through other claims (by `depends_on` or `assumptions`, including the assumptions of the evidence a principal claim cites and the assumptions it inherits from the terms it rests on, §3.2 *Assumptions of a term*): link it to the claim that rests on it, or make it `secondary`. (Revised in v0.32 and v0.33.)
 16. A principal or supporting claim rests on a `secondary` claim (by `depends_on` or `assumptions`): a claim that a contribution rests on is `supporting`.
-17. A number in the statement of a claim with `empirical_quant` or `simulation` support matches, at the precision stated, no value in: the results (value, interval, conditions) and tables (conditions, cells, row labels) of the evidence the claim cites; that evidence's `estimate`, `interval` and `n`; the claim's `test.parameters` and `scope`; the definitions its statement references. Evidence descriptions do not count. Numbers inside LaTeX, `[[D…]]` markers and model notation (`ETS(A,N,A)`, `AR(1)`), and numbers of sections, tables, figures, equations and theorems, are ignored. The reverse of warning 12: a number a statement reports is a recorded result, or a setting in the scope.
+17. A number in the statement of a claim with `empirical_quant`, `empirical_obs` (from v0.39) or `simulation` support matches, at the precision stated, no value in: the results (value, interval, uncertainty, conditions) and tables (conditions, cells, row labels) of the evidence the claim cites; that evidence's `estimate`, `interval`, `uncertainty` and `n`; the claim's `test.parameters` and `scope`; the definitions its statement references. Evidence descriptions do not count. Numbers inside LaTeX, `[[D…]]` markers and model notation (`ETS(A,N,A)`, `AR(1)`), and numbers of sections, tables, figures, equations and theorems, are ignored. The reverse of warning 12: a number a statement reports is a recorded result, or a setting in the scope.
 18. Two evidence objects have the same `execution.code_version` and the same results (quantity, value and conditions): one computation recorded twice. Record it once and cite it from every claim it supports.
 19. `novelty: no_prior_found` on a claim whose only support is `consensus`: if established knowledge already shows the claim, the claim is known (cite it, or relate to it); if it is not, give the support that shows it. (Revised in v0.22.)
 20. In a native paper, a principal claim lists a limitation with `impact: could_reverse` and `mitigation: none`, and its author assessment neither has strength `low` or `very_low` nor names that limitation by ID in its rationale: say how the risk was weighed, or lower the strength.
 21. A public artefact's `uri` is on a git host and contains no full (40-hexadecimal-digit) commit hash: a branch or tag link can change what it shows.
 22. A statement shows a sign of holding more than one claim (§8 rule 1): a semicolon, a word of contrast, addition or explanation, a side clause with `, which`, a parenthesis holding `and`, `also` or `is`/`are`, a recommendation, or results cited from more than one evidence object. Check it: if one part could be true and another false, split it into claims, each self-contained. A comparison that states where a method is better and where it is not stays one claim.
 23. A claim that is not principal, has no warrant and is not formal, whose only support is `argument`, `consensus`, `expert_judgement` or `unstated`, and on which no claim rests (by `depends_on` or `assumptions`): the paper neither shows nor uses it (§8 rule 9). Support it and link it, record it as an open question, or leave it out; in a converted paper, check that the source's argument uses it. The message names rhetorical wording when the statement has some: importance framing ("crucial", "paramount"), promise ("promising", "paves the way"), sweeping generalisation ("always", "it is well known"), speculation ("may", "could"). The wording alone never raises the warning.
-24. The statement of a claim with `empirical_quant` or `simulation` support repeats three or more values of the result tables it cites (§3.4, *Tables and claims*): state the pattern the paper concludes and cite the table or rows, repeating a value only when the conclusion turns on it; or, if the claim only retells the table, remove it and cite the table from the claims that use it. Numbers are found as for warning 17.
-25. A `secondary` `descriptive` claim with `empirical_quant` or `simulation` support (a result, not a conclusion drawn from results) on which nothing rests: no claim depends on it or lists it in `assumptions`, no warrant names it as a premise, no open question concerns it, and it stands in no relation to another claim of the paper (it neither `explains`, `qualifies`, `supports`, `contradicts` nor `refines` one, nor is the target of such a relation, §3.7). Keep it only if it states a loss, limit or null result of the paper's own method; otherwise the result table of its evidence holds it (§3.3, *Secondary claims in converted papers*). (Revised in v0.33.)
+24. The statement of a claim with `empirical_quant`, `empirical_obs` (from v0.39) or `simulation` support repeats three or more values of the result tables it cites (§3.4, *Tables and claims*): state the pattern the paper concludes and cite the table or rows, repeating a value only when the conclusion turns on it; or, if the claim only retells the table, remove it and cite the table from the claims that use it. Numbers are found as for warning 17.
+25. A `secondary` `descriptive` claim with `empirical_quant`, `empirical_obs` (from v0.39) or `simulation` support (a result, not a conclusion drawn from results) on which nothing rests: no claim depends on it or lists it in `assumptions`, no warrant names it as a premise, no open question concerns it, and it stands in no relation to another claim of the paper (it neither `explains`, `qualifies`, `supports`, `contradicts` nor `refines` one, nor is the target of such a relation, §3.7). Keep it only if it states a loss, limit or null result of the paper's own method; otherwise the result table of its evidence holds it (§3.3, *Secondary claims in converted papers*). (Revised in v0.33.)
 26. A definition without `source` (a term of the paper's own) is named in the statement of a `formal` claim and contains no mathematics (`$…$`): if it is the paper's own method or model, give its defining equations (§3.2, *The paper's own method or model*).
 27. A supporting or secondary claim that is not an assumption has no `about` (§3.3.5). Also: a slot of `about` holds text that equals, ignoring case, the `term` of a definition in the file: give the definition's ID instead.
-28. A definition is named in a claim's `about` and in no setup of the non-formal evidence that claim's support cites, although its kind is `method`, `intervention`, `population`, `data`, `design` or `variable` (a part of the study that the setup leaves out). A definition counts as named when the setup names it, names a group it is a member of, or names every member of it (§3.2, *Groups*). (Revised in v0.31.) In v0.34 an evidence object without a setup is an error (rule 61).
+28. A definition is named in a claim's `about` and in no setup of the non-formal evidence that claim's support cites, although its kind is `method`, `intervention`, `population`, `data`, `design`, `variable`, `substance`, `organism`, `biological_material`, `entity` or `source` (a part of the study that the setup leaves out; the last five from v0.39). A definition counts as named when the setup names it, names a group it is a member of, or names every member of it (§3.2, *Groups*). (Revised in v0.31.) In v0.34 an evidence object without a setup is an error (rule 61).
 29. A native paper has no `declarations`, or its declarations leave out `funding` or `competing_interests`: ask the guarantor and record what they declare (an empty funding list and "None declared." are declarations).
 30. A `data_plot` figure without `shows` or `underlying_data`; a `specimen` from which no observation is read (`read_from`); or a result whose `variable` or a table column whose variable is text equal, ignoring case, to the `term` of a definition in the file (give the ID).
 31. A converted paper lies in a `claimset/` folder and its file is not named `<name>.claimset.json` with the name made from its source's identifier (§2.4). The message gives the name.
+32. A `url` reference has no `archive_uri`, and an artefact naming it holds a captured copy (a page behind a sign-in, or not yet archived): the copy, with its hash, stands in for the archive; give `archive_uri` if the page can be archived.
+33. An extension is declared in `extensions` and no object has a block of it (§2.7).
+34. A claim with `planning: confirmatory_with_deviations` lists no limitation of category `deviation`: record each departure from the plan (§3.3.3).
+35. In a native paper, an interval without `kind`, or an uncertainty component of kind `unspecified`: say what the interval or the ± is (§3.4).
+36. A registered test without `planned_at`: give the registration's date as the registry records it (§3.3.3).
+37. A record of observation evidence without `artefact`: name the figure that shows it and, better, the original file (§3.4).
+38. A statistic named `other`: check whether a name in the list fits with its parameters (a geometric mean is a `mean` of kind `geometric`, a percentile a `quantile`); the labels of `other` are gathered for the next version's list (§3.4).
 
 ## 11. Platform dependencies
 
 Platform functionality is specified in the platform requirements document. The file format depends on the platform for:
 
-- **Identifiers and publication facts:** minting the DOI at publication and registering it with DataCite (§7), and assigning version, dates and status (§2.2).
+- **Identifiers and publication facts:** assigning the claimset's identifier at publication, a provisional identifier until the platform registers DOIs with DataCite (§7), and assigning version, dates and status (§2.2).
 - **Guarantor consent:** a paper is not published until every human guarantor has confirmed through their ORCID-linked account, and every organisation guarantor through an authorised account.
 - **Classification:** assigning the OpenAlex subfield and topics.
 - **Derived data:** verifiability computation and recomputation, trust scores, claim weights, contradictions, replication status and assessments, stored outside the file.
@@ -1316,7 +1611,7 @@ Platform functionality is specified in the platform requirements document. The f
 - **Packages:** BagIt (RFC 8493).
 - **Identifiers of things:** compact identifiers with prefixes from the Bioregistry and identifiers.org; ROR and the Crossref Funder Registry for funders; ECLI and ELI for legal sources.
 - **Contributor roles:** CRediT.
-- **Identity:** ORCID for people, ROR for organisations; DOIs for claimsets.
+- **Identity:** ORCID for people, ROR for organisations; DOIs for claimsets, and the platform's provisional identifiers until it registers DOIs.
 - **Classification:** OpenAlex topics.
 - **Secondary mapping:** ORKG.
 - **Mechanism:** an optional JSON-LD `@context` keeps the format plain JSON while enabling RDF export.
@@ -1340,7 +1635,7 @@ What the agent submits. No identifier, version, date, status, classification IDs
 
 ```json
 {
-  "schema_version": "0.34",
+  "schema_version": "0.39",
   "paper": {
     "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
     "licence": "CC-BY-4.0",
@@ -1401,7 +1696,7 @@ What the agent submits. No identifier, version, date, status, classification IDs
     }
   ],
   "evidence": [
-    {"id": "E1", "profile": "quant", "description": "Benchmark of method M against the seasonal naive method on 1,200 monthly retail sales series, rolling origin, horizons 1 to 12.", "setup": {"studied": ["D2", "D3"], "cases": ["D4"], "procedure": ["D5"], "lens": ["D1"]}, "design": "benchmark", "estimand": "mean relative MASE reduction", "estimate": 0.08, "interval": {"level": 0.95, "lower": 0.05, "upper": 0.11}, "n": 1200, "data_origin": "secondary", "preregistered": false, "artefacts": ["A1"], "availability": {"level": "public"}}
+    {"id": "E1", "profile": "quant", "description": "Benchmark of method M against the seasonal naive method on 1,200 monthly retail sales series, rolling origin, horizons 1 to 12.", "setup": {"studied": ["D2", "D3"], "cases": ["D4"], "procedure": ["D5"], "lens": ["D1"]}, "design": "benchmark", "estimand": "mean relative MASE reduction", "estimate": 0.08, "interval": {"level": 0.95, "lower": 0.05, "upper": 0.11, "kind": "confidence"}, "n": 1200, "data_origin": "secondary", "preregistered": false, "artefacts": ["A1"], "availability": {"level": "public"}}
   ],
   "warrants": [],
   "limitations": [
@@ -1439,7 +1734,7 @@ What the agent submits. No identifier, version, date, status, classification IDs
 
 ```json
 {
-  "schema_version": "0.17",
+  "schema_version": "0.39",
   "paper": {
     "id": "doi:10.0000/claimset.2026.000456",
     "title": "Example converted paper",
@@ -1508,7 +1803,7 @@ C3 [descriptive; supporting; assumption (statistical, unchecked)]
 EVIDENCE
 E1 [quant; design benchmark; data_origin secondary; n 1200] Benchmark of method M against the seasonal naive method on 1,200 monthly retail sales series, rolling origin, horizons 1 to 12.
   setup: studied D2, D3; cases D4; procedure D5; lens D1
-  estimate: mean relative MASE reduction = 0.08 (95% interval 0.05 to 0.11)
+  estimate: mean relative MASE reduction = 0.08 (95% confidence interval 0.05 to 0.11)
 
 LIMITATIONS
 L1 [sampling; affects C2; reduces_transferability; mitigation none] All 1,200 series come from one retailer's store network.

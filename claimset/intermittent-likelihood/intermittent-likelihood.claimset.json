@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.9",
+  "schema_version": "0.39",
   "paper": {
     "title": "The observed-data likelihood of ADAM and iETS with unobserved periods: entropy term, SSOE Kalman filter and multiplicative approximations",
     "licence": "CC-BY-4.0",
@@ -209,131 +209,214 @@
     {
       "id": "D1",
       "term": "single source of error form",
-      "definition": "State space form of a time series model, also called the innovations form, in which the observation equation and the state transition share one error term $\\epsilon_t$ per period: $z_t = w(\\mathbf v_{t-\\mathbf l}) + r(\\mathbf v_{t-\\mathbf l})\\epsilon_t$, $\\mathbf v_t = f(\\mathbf v_{t-\\mathbf l}) + g(\\mathbf v_{t-\\mathbf l})\\epsilon_t$."
+      "definition": "State space form of a time series model, also called the innovations form, in which the observation equation and the state transition share one error term $\\epsilon_t$ per period: $z_t = w(\\mathbf v_{t-\\mathbf l}) + r(\\mathbf v_{t-\\mathbf l})\\epsilon_t$, $\\mathbf v_t = f(\\mathbf v_{t-\\mathbf l}) + g(\\mathbf v_{t-\\mathbf l})\\epsilon_t$.",
+      "kind": "method"
     },
     {
       "id": "D2",
       "term": "unobserved period",
-      "definition": "A period $t$ at which the potential value $z_t$ of the modelled variable is not observed ($O_t=0$): a period with zero demand in an intermittent demand model, where the demand size is not observed, or a period with a missing value."
+      "definition": "A period $t$ at which the potential value $z_t$ of the modelled variable is not observed ($O_t=0$): a period with zero demand in an intermittent demand model, where the demand size is not observed, or a period with a missing value.",
+      "kind": "concept"
     },
     {
       "id": "D3",
       "term": "observed-data likelihood",
-      "definition": "The joint density of the observed data only, obtained by integrating the complete-data likelihood over the values at the unobserved periods."
+      "definition": "The joint density of the observed data only, obtained by integrating the complete-data likelihood over the values at the unobserved periods.",
+      "kind": "concept"
     },
     {
       "id": "D4",
       "term": "entropy-augmented likelihood",
-      "definition": "The objective of the iETS estimator of Svetunkov and Boylan (2023, eq. B.6): the sum of the one-step log-densities of the observed demand sizes, minus the differential entropy $H_z(\\hat\\mu_t,\\sigma)$ of the size at each period with zero demand, plus the Bernoulli log-likelihood of the occurrence."
+      "definition": "The objective of the iETS estimator of Svetunkov and Boylan (2023, eq. B.6): the sum of the one-step log-densities of the observed demand sizes, minus the differential entropy $H_z(\\hat\\mu_t,\\sigma)$ of the size at each period with zero demand, plus the Bernoulli log-likelihood of the occurrence.",
+      "kind": "concept",
+      "source": "B4"
     },
     {
       "id": "D5",
       "term": "zero-error recursion",
-      "definition": "The estimator used in ADAM and in iETS (Svetunkov and Boylan 2023, Appendix C): the single source of error recursion run with $\\epsilon_t=0$ at the unobserved periods and with the fixed persistence vector $\\mathbf g$ at the observed ones, with the likelihood taken as the product of one-step densities at the observed periods."
+      "definition": "The estimator used in ADAM and in iETS (Svetunkov and Boylan 2023, Appendix C): the single source of error recursion run with $\\epsilon_t=0$ at the unobserved periods and with the fixed persistence vector $\\mathbf g$ at the observed ones, with the likelihood taken as the product of one-step densities at the observed periods.",
+      "kind": "method",
+      "source": "B4"
     },
     {
       "id": "D6",
       "term": "ADAM multiplicative ETS",
-      "definition": "Pure multiplicative exponential smoothing in the form of the Augmented Dynamic Adaptive Model, in which each component $k$ is updated by the factor $(1+\\epsilon_t)^{g_k}$, for instance $l_t = l_{t-1}b_{t-1}^{\\phi}(1+\\epsilon_t)^{\\alpha}$."
+      "definition": "Pure multiplicative exponential smoothing in the form of the Augmented Dynamic Adaptive Model, in which each component $k$ is updated by the factor $(1+\\epsilon_t)^{g_k}$, for instance $l_t = l_{t-1}b_{t-1}^{\\phi}(1+\\epsilon_t)^{\\alpha}$.",
+      "kind": "method"
     },
     {
       "id": "D7",
       "term": "conventional multiplicative ETS",
-      "definition": "Pure multiplicative exponential smoothing in the form of Hyndman et al. (2008), in which each component $k$ is updated by the factor $1+g_k\\epsilon_t$, for instance $l_t = l_{t-1}b_{t-1}^{\\phi}(1+\\alpha\\epsilon_t)$."
+      "definition": "Pure multiplicative exponential smoothing in the form of Hyndman et al. (2008), in which each component $k$ is updated by the factor $1+g_k\\epsilon_t$, for instance $l_t = l_{t-1}b_{t-1}^{\\phi}(1+\\alpha\\epsilon_t)$.",
+      "kind": "method"
     },
     {
       "id": "D8",
       "term": "SSOE Kalman filter",
-      "definition": "The recursion for the conditional mean $\\mathbf a_t$ and scaled covariance $\\mathbf P_t$ of the state of a linear single source of error model: at an observed period $v_t = z_t-\\mathbf w'\\mathbf a_t$, $f_t = \\mathbf w'\\mathbf P_t\\mathbf w+1$, $\\mathbf k_t=(\\mathbf F\\mathbf P_t\\mathbf w+\\mathbf g)/f_t$, $\\mathbf a_{t+1}=\\mathbf F\\mathbf a_t+\\mathbf k_t v_t$, $\\mathbf P_{t+1}=\\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'-\\mathbf k_t\\mathbf k_t'f_t$; at an unobserved period $\\mathbf a_{t+1}=\\mathbf F\\mathbf a_t$, $\\mathbf P_{t+1}=\\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'$; started from $\\mathbf a_1=\\mathbf x_0$, $\\mathbf P_1=\\mathbf 0$."
+      "definition": "The recursion for the conditional mean $\\mathbf a_t$ and scaled covariance $\\mathbf P_t$ of the state of a linear single source of error model: at an observed period $v_t = z_t-\\mathbf w'\\mathbf a_t$, $f_t = \\mathbf w'\\mathbf P_t\\mathbf w+1$, $\\mathbf k_t=(\\mathbf F\\mathbf P_t\\mathbf w+\\mathbf g)/f_t$, $\\mathbf a_{t+1}=\\mathbf F\\mathbf a_t+\\mathbf k_t v_t$, $\\mathbf P_{t+1}=\\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'-\\mathbf k_t\\mathbf k_t'f_t$; at an unobserved period $\\mathbf a_{t+1}=\\mathbf F\\mathbf a_t$, $\\mathbf P_{t+1}=\\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'$; started from $\\mathbf a_1=\\mathbf x_0$, $\\mathbf P_1=\\mathbf 0$.",
+      "kind": "method"
     },
     {
       "id": "D9",
       "term": "drift of the states",
-      "definition": "The change $d_t=\\log(\\mu_t/\\hat\\mu_t)$ of the logarithm of the location of a pure multiplicative model accumulated over the unobserved periods since the last observed period, relative to the point forecast $\\hat\\mu_t$ with zero errors."
+      "definition": "The change $d_t=\\log(\\mu_t/\\hat\\mu_t)$ of the logarithm of the location of a pure multiplicative model accumulated over the unobserved periods since the last observed period, relative to the point forecast $\\hat\\mu_t$ with zero errors.",
+      "kind": "concept"
     },
     {
       "id": "D10",
       "term": "normal-drift mixture density",
-      "definition": "Approximate predictive density of a demand size after $j_t-1$ unobserved periods: the one-step density $f_z(z_t\\mid\\hat\\mu_t e^{d})$ mixed over a normal [[D9:drift of the states]] $d\\sim\\mathcal N(m_t,w_t)$, with $m_t$, $w_t$ computed by 32-node Gauss-Legendre quadrature on the quantile function of $1+\\epsilon$ and the mixture by Gauss-Hermite quadrature."
+      "definition": "Approximate predictive density of a demand size after $j_t-1$ unobserved periods: the one-step density $f_z(z_t\\mid\\hat\\mu_t e^{d})$ mixed over a normal [[D9:drift of the states]] $d\\sim\\mathcal N(m_t,w_t)$, with $m_t$, $w_t$ computed by 32-node Gauss-Legendre quadrature on the quantile function of $1+\\epsilon$ and the mixture by Gauss-Hermite quadrature.",
+      "kind": "method"
+    },
+    {
+      "id": "D11",
+      "term": "one-step density",
+      "kind": "method",
+      "definition": "The density of a demand size after an interval taken as the one-step density $f_z(z_t\\mid\\hat\\mu_t)$ of the model, without the [[D9:drift of the states]] over the unobserved periods."
+    },
+    {
+      "id": "D12",
+      "term": "iETS(M,N,N)",
+      "kind": "data",
+      "definition": "Intermittent demand sizes $z_t=l_{t-1}(1+\\epsilon_t)$ with $\\E(1+\\epsilon_t)=1$ and $\\Var(1+\\epsilon_t)=s$, Gamma, log-normal or inverse Gaussian $1+\\epsilon_t$ (the greybox parameterisation of the package) and the level moving at every period, observed or not: $l_t=l_{t-1}(1+\\epsilon_t)^\\alpha$ in the [[D6:ADAM multiplicative ETS]] and $l_t=l_{t-1}(1+\\alpha\\epsilon_t)$ in the [[D7:conventional multiplicative ETS]]."
+    },
+    {
+      "id": "D13",
+      "term": "exact density by convolution",
+      "kind": "design",
+      "definition": "The exact density of the size after an interval, computed on a grid of step 0.001 in $\\log z$ by FFT convolution with tails cut at 1e-12, compared with an approximation by the largest Kullback-Leibler divergence per observation over $s$ from 0.05 to 1 in steps of 0.05, $\\alpha$ from 0.1 to 0.6 in steps of 0.05 and $j$ from 2 to 20 (kl_mixture.py); a refinement of 164 cells halved the step and cut the tails at 1e-14."
+    },
+    {
+      "id": "D14",
+      "term": "Kullback-Leibler divergence",
+      "kind": "variable",
+      "definition": "The divergence $\\int g\\log(g/h)$ of an approximate density $h$ from the exact density $g$, per observation; over a grid, its largest value."
+    },
+    {
+      "id": "D15",
+      "term": "fixed-point moment estimator",
+      "kind": "method",
+      "definition": "The estimator of the scale $s$ of Gamma or inverse Gaussian sizes that solves the moment equation $s=h(s)$, built from the moments of the drift factor $D_t$, by the iteration $s\\leftarrow h(s)$ from the one-step estimate, stopping at $|s_{new}-s|\\le 10^{-10}s$ or after 100 iterations; a fit fails when an iterate is not positive and finite, the iteration does not converge, or the value leaves the admissible range."
+    },
+    {
+      "id": "D16",
+      "term": "Monte Carlo study of the scale",
+      "kind": "design",
+      "definition": "480 cells of relative errors simulated with the drift ($s\\in\\{0.05,0.2,0.5,1\\}$, $\\alpha\\in\\{0.1,0.3,0.6\\}$, intervals fixed at 2, 5 or 10 or geometric with occurrence probability 0.5 or 0.2, 100 or 1000 observed sizes) and 120 cells within fitted models ($s\\in\\{0.05,0.5\\}$, 100 observed sizes), 2000 replications per cell from numpy SeedSequence(20261015) with one child stream per cell; cells grouped by the drift order $\\E(j-1)\\alpha^2s$ (scale_recovery.py)."
+    },
+    {
+      "id": "D17",
+      "term": "relative bias",
+      "kind": "variable",
+      "definition": "The relative bias of a scale estimate, (mean estimate $- s$)$/s$ over the replications of a cell; its median over cells."
+    },
+    {
+      "id": "D18",
+      "term": "failed fits",
+      "kind": "variable",
+      "definition": "The share of replications in which the scale estimator fails."
+    },
+    {
+      "id": "D19",
+      "term": "approximate prediction interval",
+      "kind": "method",
+      "definition": "The prediction interval of pure multiplicative ETS in the smooth package (generate_prediction_interval with var_anal): the point forecast with zero errors times the quantile of the distribution with mean one and variance $V_h=(1+v)(1+\\alpha^2v)^{h-1}-1$, $v=\\Var(1+\\epsilon)$; for the [[D6:ADAM multiplicative ETS]] with the log-normal distribution, exact in logarithms."
+    },
+    {
+      "id": "D20",
+      "term": "ETS(M,N,N) with s = 0.32 and alpha = 0.21",
+      "kind": "data",
+      "definition": "ETS(M,N,N) with $s=0.32$, $\\alpha=0.21$, 100 observations and initial level 10, with Gamma, inverse Gaussian or log-normal errors, in the ADAM and conventional forms; in the second case the last six of the 100 periods unobserved."
+    },
+    {
+      "id": "D21",
+      "term": "simulated paths",
+      "kind": "design",
+      "definition": "The 0.95 quantile of 1,000,000 simulated paths divided by the point forecast with zero errors, twelve steps ahead and 18 steps from the last observed period after six unobserved periods at the end of the sample (interval_bounds.py, seed 20261015)."
+    },
+    {
+      "id": "D22",
+      "term": "upper bound over the point forecast",
+      "kind": "variable",
+      "definition": "The upper bound of the 90% prediction interval (its 0.95 quantile) divided by the point forecast with zero errors."
+    },
+    {
+      "id": "D23",
+      "term": "low-rank factor form",
+      "kind": "method",
+      "definition": "The [[D8:SSOE Kalman filter]] with the scaled state covariance kept as a low-rank factor $\\mathbf P_t=\\mathbf U_t\\mathbf U_t'$, updated by rank one at each observed period, as in the C++ core of smooth (src/headers/adamCore.h).",
+      "broader": [
+        "D8"
+      ]
+    },
+    {
+      "id": "D24",
+      "term": "full covariance form",
+      "kind": "method",
+      "definition": "The [[D8:SSOE Kalman filter]] with the whole scaled state covariance matrix $\\mathbf P_t$.",
+      "broader": [
+        "D8"
+      ]
+    },
+    {
+      "id": "D25",
+      "term": "hourly series with missing values",
+      "kind": "data",
+      "definition": "1344 hourly observations, generated by ADAM ETS(A,N,A) with lags 24 and 168 or following a fixed sine pattern, with 1 to 48 nested missing values, fitted by ADAM ETS(A,N,A) with lags 24 and 168 (193 state cells), the normal distribution and backcast initial states."
+    },
+    {
+      "id": "D26",
+      "term": "interleaved timing",
+      "kind": "design",
+      "definition": "25 interleaved repetitions per case of the fits with the two forms of the filter, both built from smooth commit 53104ee9, on one cloud VM (Intel Xeon 2.80 GHz, 4 vCPUs, Linux 6.18.44, Python 3.11.15) with one thread (lowrank_timing.py)."
+    },
+    {
+      "id": "D27",
+      "term": "speed-up",
+      "kind": "variable",
+      "definition": "The median run time of the [[D24:full covariance form]] divided by that of the [[D23:low-rank factor form]]."
+    },
+    {
+      "id": "D28",
+      "term": "family-scaled error",
+      "kind": "method",
+      "definition": "The approximation of the predictive density of a pure additive model with Laplace, S or Generalised Normal errors that keeps the error in its family with scale $sf_t^{1/p}$, $p$ such that the variance is proportional to $s^p$, as in the smooth package."
+    },
+    {
+      "id": "D29",
+      "term": "Gauss-Hermite mixture",
+      "kind": "method",
+      "definition": "The mixture of the error density over the normal uncertainty of the states by a Gauss-Hermite rule with $Q$ nodes (16 in the smooth package)."
+    },
+    {
+      "id": "D30",
+      "term": "additive errors with state uncertainty",
+      "kind": "data",
+      "definition": "Laplace, S and Generalised Normal (shape 0.5 to 3) errors with scale $s=1$, convolved with normal state uncertainty of variance $(f_t-1)V(s)$, for 22 values of $f_t$ from 1.01 to 100 (kl_laplace.py)."
+    },
+    {
+      "id": "D31",
+      "term": "divergence by numerical integration",
+      "kind": "design",
+      "definition": "The Kullback-Leibler divergence in both directions between the exact convolution and each approximation, by composite 8-node Gauss-Legendre integration (kl_laplace.py)."
     }
   ],
   "claims": [
     {
-      "id": "C1",
-      "statement": "In the [[D1:single source of error form]] with every period observed, the state vector at time $t$ is a deterministic function of the initial states, the parameters and the observations up to $t$, so that the exact likelihood is the product of the one-step-ahead error densities.",
-      "type": "descriptive",
-      "role": "background",
-      "novelty": "restatement",
-      "support": [
-        {
-          "kind": "cited",
-          "target": "doi:10.1080/01621459.1997.10473684",
-          "id_type": "doi",
-          "self": false
-        },
-        {
-          "kind": "cited",
-          "target": "doi:10.1111/j.2517-6161.1985.tb01355.x",
-          "id_type": "doi",
-          "self": false
-        }
-      ],
-      "provenance": "author_stated"
-    },
-    {
-      "id": "C2",
-      "statement": "The iETS estimator of Svetunkov and Boylan (2023) for intermittent demand maximises the [[D4:entropy-augmented likelihood]], motivated by analogy with the EM algorithm.",
-      "type": "descriptive",
-      "role": "background",
-      "novelty": "restatement",
-      "support": [
-        {
-          "kind": "cited",
-          "target": "doi:10.1016/j.ijpe.2023.109013",
-          "id_type": "doi",
-          "self": true
-        }
-      ],
-      "provenance": "author_stated"
-    },
-    {
-      "id": "C3",
-      "statement": "The fixed points of the EM algorithm are stationary points of the [[D3:observed-data likelihood]].",
-      "type": "formal",
-      "role": "background",
-      "novelty": "restatement",
-      "support": [
-        {
-          "kind": "cited",
-          "target": "doi:10.1111/j.2517-6161.1977.tb01600.x",
-          "id_type": "doi",
-          "self": false
-        }
-      ],
-      "provenance": "author_stated"
-    },
-    {
-      "id": "C4",
-      "statement": "ADAM and iETS estimate models with [[D2:unobserved period]]s by the [[D5:zero-error recursion]].",
-      "type": "descriptive",
-      "role": "background",
-      "novelty": "restatement",
-      "support": [
-        {
-          "kind": "cited",
-          "target": "doi:10.1016/j.ijpe.2023.109013",
-          "id_type": "doi",
-          "self": true
-        }
-      ],
-      "provenance": "author_stated"
-    },
-    {
       "id": "C10",
       "statement": "For a model of intermittent demand $y_t=o_tz_t$ with Bernoulli occurrence $o_t\\sim\\text{Bernoulli}(p_t)$ independent of a continuous size $z_t$, the [[D3:observed-data likelihood]] is $\\sum_{O_t=1}\\log f(z_t\\mid Y_{t-1};\\theta) + \\sum_{O_t=1}\\log p_t + \\sum_{O_t=0}\\log(1-p_t)$, in which the unobserved sizes do not appear and the size and occurrence parts separate.",
+      "about": {
+        "subject": "D3",
+        "relation": "separates into a size part and an occurrence part for",
+        "object": "models of intermittent demand",
+        "comparator": null,
+        "conditions": [
+          "Bernoulli occurrence independent of a continuous size"
+        ]
+      },
       "type": "formal",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "models of intermittent demand $y_t=o_tz_t$ (iETS, ADAM with an occurrence part)",
         "data_type": "intermittent demand time series",
@@ -358,6 +441,13 @@
     {
       "id": "C11",
       "statement": "The stationary points of the [[D4:entropy-augmented likelihood]] of iETS differ in general from those of the [[D3:observed-data likelihood]], because the entropy term $-H_z(\\theta)$ has a non-zero gradient in the parameters while the cross-entropy of the EM E-step has zero gradient at the current estimate.",
+      "about": {
+        "subject": "D4",
+        "relation": "has stationary points that differ in general from those of",
+        "object": "D3",
+        "comparator": null,
+        "conditions": []
+      },
       "type": "formal",
       "role": "principal",
       "novelty": "refutation",
@@ -372,6 +462,11 @@
         {
           "kind": "formal_proof",
           "evidence": "E2"
+        },
+        {
+          "kind": "cited",
+          "reference": "B1",
+          "self": false
         }
       ],
       "assumptions": [
@@ -379,9 +474,7 @@
         "C42"
       ],
       "depends_on": [
-        "C3",
-        "C10",
-        "C2"
+        "C10"
       ],
       "verification": "unchecked",
       "provenance": "author_stated",
@@ -398,9 +491,19 @@
     {
       "id": "C12",
       "statement": "For normally distributed demand sizes with fixed location, the maximiser in the variance of the [[D4:entropy-augmented likelihood]] is $\\frac{T_1}{T}\\hat\\sigma^2$, where $\\hat\\sigma^2=\\frac{1}{T_1}\\sum_{O_t=1}e_t^2$ is the fixed point of the EM algorithm, $T$ the number of periods and $T_1$ the number of periods with observed sizes.",
+      "about": {
+        "subject": "D4",
+        "relation": "is maximised at T1/T times the EM fixed point in",
+        "object": "the variance of the sizes",
+        "comparator": null,
+        "conditions": [
+          "normal sizes",
+          "location held fixed"
+        ]
+      },
       "type": "formal",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "iETS with normally distributed demand sizes",
         "conditions": [
@@ -418,15 +521,31 @@
         "C11"
       ],
       "verification": "agent_checked",
-      "provenance": "author_stated",
-      "verified_by": "P5"
+      "checks": [
+        {
+          "by": "P5",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "The independent proof checker re-derived the proof of E3 step by step and confirmed it."
+        }
+      ],
+      "provenance": "author_stated"
     },
     {
       "id": "C13",
       "statement": "With a dynamic model for the scale, the [[D4:entropy-augmented likelihood]] of iETS is unbounded, because the entropy terms of the periods with zero demand reward a scale going to zero for the normal distribution and to infinity for the Gamma distribution.",
+      "about": {
+        "subject": "D4",
+        "relation": "is unbounded with",
+        "object": "a dynamic model for the scale",
+        "comparator": null,
+        "conditions": [
+          "normal or Gamma sizes"
+        ]
+      },
       "type": "formal",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "iETS with a dynamic model for the scale of the demand sizes",
         "conditions": [
@@ -449,6 +568,15 @@
     {
       "id": "C14",
       "statement": "With the differential entropy defined as $H=-\\E\\log f$, the sign of the entropy term in equations 29 and B.6 of Svetunkov and Boylan (2023) should be negative.",
+      "about": {
+        "subject": "the entropy term in eqs 29 and B.6 of Svetunkov and Boylan (2023)",
+        "relation": "should have the sign",
+        "object": "negative",
+        "comparator": null,
+        "conditions": [
+          "differential entropy defined as H = -E log f"
+        ]
+      },
       "type": "formal",
       "role": "supporting",
       "novelty": "refutation",
@@ -456,10 +584,13 @@
         {
           "kind": "argument",
           "warrant": "W2"
+        },
+        {
+          "kind": "cited",
+          "reference": "B4",
+          "locator": "eq. 29 and eq. B.6",
+          "self": true
         }
-      ],
-      "depends_on": [
-        "C2"
       ],
       "warrant": "W2",
       "provenance": "author_stated",
@@ -480,6 +611,15 @@
     {
       "id": "C15",
       "statement": "For a pure additive single source of error model with normal errors and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] gives $z_t\\mid Y_{t-1}\\sim\\mathcal N(\\mathbf w'\\mathbf a_t,\\sigma^2 f_t)$ at the observed periods, the exact observed-data log-likelihood $-\\frac12\\sum_{O_t=1}[\\log(2\\pi\\sigma^2f_t)+v_t^2/(\\sigma^2f_t)]$, and the concentrated variance $\\hat\\sigma^2=\\frac{1}{T_1}\\sum_{O_t=1}v_t^2/f_t$.",
+      "about": {
+        "subject": "D8",
+        "relation": "gives the exact observed-data likelihood of",
+        "object": "pure additive SSOE models with normal errors",
+        "comparator": null,
+        "conditions": [
+          "D2"
+        ]
+      },
       "type": "formal",
       "role": "principal",
       "novelty": "extension",
@@ -510,6 +650,14 @@
         "C10"
       ],
       "verification": "agent_checked",
+      "checks": [
+        {
+          "by": "P5",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "The independent proof checker re-derived the proof of E4 step by step and confirmed it."
+        }
+      ],
       "provenance": "author_stated",
       "relations": [
         {
@@ -526,15 +674,21 @@
           "locator": "Kalman filter for state space models with correlated disturbances",
           "self": false
         }
-      ],
-      "verified_by": "P5"
+      ]
     },
     {
       "id": "C16",
       "statement": "When every period is observed, the [[D8:SSOE Kalman filter]] keeps $\\mathbf P_t=\\mathbf 0$, has gain $\\mathbf k_t=\\mathbf g$ and $f_t=1$, and coincides with the single source of error recursion and the likelihood of the one-step errors.",
+      "about": {
+        "subject": "D8",
+        "relation": "coincides with the SSOE recursion when",
+        "object": "every period is observed",
+        "comparator": null,
+        "conditions": []
+      },
       "type": "formal",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "pure additive single source of error models",
         "data_type": "univariate time series",
@@ -546,19 +700,45 @@
         {
           "kind": "formal_proof",
           "evidence": "E5"
+        },
+        {
+          "kind": "cited",
+          "reference": "B2",
+          "self": false
+        },
+        {
+          "kind": "cited",
+          "reference": "B3",
+          "self": false
         }
       ],
       "depends_on": [
-        "C15",
-        "C1"
+        "C15"
       ],
       "verification": "agent_checked",
-      "provenance": "author_stated",
-      "verified_by": "P5"
+      "checks": [
+        {
+          "by": "P5",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "The independent proof checker re-derived the proof of E5 step by step and confirmed it."
+        }
+      ],
+      "provenance": "author_stated"
     },
     {
       "id": "C17",
       "statement": "For pure additive single source of error models with normal errors, [[D2:unobserved period]]s and persistence vector $\\mathbf g\\neq\\mathbf 0$, the maximiser of the [[D5:zero-error recursion]] likelihood is not the maximum likelihood estimator, because the zero-error recursion uses error variance $\\sigma^2$ instead of $\\sigma^2f_t\\geq\\sigma^2$ and gain $\\mathbf g$ instead of $\\mathbf k_t$ at the observed periods after an unobserved one.",
+      "about": {
+        "subject": "D5",
+        "relation": "is not the maximum likelihood estimator of",
+        "object": "pure additive SSOE models with normal errors",
+        "comparator": null,
+        "conditions": [
+          "D2",
+          "nonzero persistence vector"
+        ]
+      },
       "type": "formal",
       "role": "principal",
       "novelty": "refutation",
@@ -583,8 +763,7 @@
         "C45"
       ],
       "depends_on": [
-        "C15",
-        "C4"
+        "C15"
       ],
       "verification": "unchecked",
       "provenance": "author_stated",
@@ -601,9 +780,19 @@
     {
       "id": "C18",
       "statement": "For ETS(A,N,N) with smoothing parameter $\\alpha$ and zero state covariance before an interval of $j$ periods, the gain of the [[D8:SSOE Kalman filter]] at the end of the interval is $\\alpha_j=((j-1)\\alpha^2+\\alpha)/((j-1)\\alpha^2+1)$, which equals $\\alpha$ for $j=1$ and tends to one as $j$ grows.",
+      "about": {
+        "subject": "D8",
+        "relation": "has at the end of an interval of j periods the gain",
+        "object": "((j-1) alpha^2 + alpha) / ((j-1) alpha^2 + 1)",
+        "comparator": null,
+        "conditions": [
+          "ETS(A,N,N)",
+          "zero state covariance before the interval"
+        ]
+      },
       "type": "formal",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "ETS(A,N,N)",
         "conditions": [
@@ -626,9 +815,16 @@
     {
       "id": "C19",
       "statement": "In the [[D6:ADAM multiplicative ETS]], the logarithms of the observation and of the components follow a linear single source of error model with innovation $u_t=\\log(1+\\epsilon_t)$ and the measurement, transition and persistence of the corresponding additive model, whereas in the [[D7:conventional multiplicative ETS]] the innovation of component $k$ is $\\log(1+g_k\\epsilon_t)$, which is not proportional to $u_t$.",
+      "about": {
+        "subject": "D6",
+        "relation": "is a linear SSOE model in logarithms, unlike",
+        "object": null,
+        "comparator": "D7",
+        "conditions": []
+      },
       "type": "formal",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "support": [
         {
           "kind": "formal_proof",
@@ -644,9 +840,19 @@
     {
       "id": "C20",
       "statement": "For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] applied to $\\log z_t$, with the known error mean $-s/2$ added to the propagation and the prediction, gives the exact observed-data likelihood, and the maximum likelihood scale $s$ is the positive root of $(\\sum b_t^2/f_t)s^2+T_1s-\\sum(v_t^0)^2/f_t=0$, where $v_t(s)=v_t^0+sb_t$ is the filter's prediction error.",
+      "about": {
+        "subject": "D8",
+        "relation": "gives in logarithms the exact observed-data likelihood of",
+        "object": "D6",
+        "comparator": null,
+        "conditions": [
+          "log-normal distribution",
+          "D2"
+        ]
+      },
       "type": "formal",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "pure multiplicative ETS in the ADAM form",
         "data_type": "positive univariate time series with unobserved periods",
@@ -676,9 +882,19 @@
     {
       "id": "C21",
       "statement": "For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and all periods observed, the maximum likelihood estimate of the scale is $\\hat s=2(\\sqrt{1+m}-1)$ with $m=\\frac{1}{T_1}\\sum\\log^2(1+\\epsilon_t)$.",
+      "about": {
+        "subject": "D6",
+        "relation": "has the maximum likelihood scale 2(sqrt(1+m)-1)",
+        "object": null,
+        "comparator": null,
+        "conditions": [
+          "log-normal distribution",
+          "every period observed"
+        ]
+      },
       "type": "formal",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "pure multiplicative ETS in the ADAM form",
         "data_type": "positive univariate time series",
@@ -701,12 +917,26 @@
         "C20"
       ],
       "verification": "agent_checked",
-      "provenance": "author_stated",
-      "verified_by": "P5"
+      "checks": [
+        {
+          "by": "P5",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "The independent proof checker re-derived the proof of E10 step by step and confirmed it."
+        }
+      ],
+      "provenance": "author_stated"
     },
     {
       "id": "C22",
       "statement": "The log-normal scale estimator $2(1-\\sqrt{1-m})$ used in ADAM, with $m=\\frac{1}{T_1}\\sum\\log^2(1+\\epsilon_t)$, is not the maximum likelihood estimator: it overestimates the scale $s$ by about 35% at $s=0.5$ (0.677 against 0.5 when $m=s+s^2/4$) and is undefined for $m>1$.",
+      "about": {
+        "subject": "the log-normal scale estimator 2(1-sqrt(1-m)) used in ADAM",
+        "relation": "is not the maximum likelihood estimator of",
+        "object": "the scale s",
+        "comparator": null,
+        "conditions": []
+      },
       "type": "formal",
       "role": "principal",
       "novelty": "refutation",
@@ -745,9 +975,19 @@
     {
       "id": "C23",
       "statement": "For pure multiplicative models with the Gamma, log-normal or inverse Gaussian distribution, if $1+e_t=(1+\\epsilon_t)D_t$ with $D_t=e^{d_t}$ independent of $\\epsilon_t$, $\\E(1+\\epsilon_t)=1$ and $\\Var(1+\\epsilon_t)=s$, then $\\E(e_t^2)=(1+s)\\E(D_t^2)-2\\E(D_t)+1$, and for the inverse Gaussian distribution $\\E(e_t^2/(1+e_t))=\\E(D_t)-2+(1+s)\\E(D_t^{-1})$.",
+      "about": {
+        "subject": "the errors of pure multiplicative models with drift",
+        "relation": "have second moments given by the moments of",
+        "object": "the drift factor",
+        "comparator": null,
+        "conditions": [
+          "Gamma, log-normal or inverse Gaussian distribution",
+          "drift factor independent of the error"
+        ]
+      },
       "type": "formal",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "support": [
         {
           "kind": "formal_proof",
@@ -758,21 +998,40 @@
         "C19"
       ],
       "verification": "agent_checked",
+      "checks": [
+        {
+          "by": "P5",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "The independent proof checker re-derived the proof of E11 step by step and confirmed it."
+        }
+      ],
       "provenance": "author_stated",
       "scope": {
         "population": "pure multiplicative models with Gamma, log-normal or inverse Gaussian errors",
         "conditions": [
           "drift factor $D_t$ independent of $\\epsilon_t$"
         ]
-      },
-      "verified_by": "P5"
+      }
     },
     {
       "id": "C24",
-      "statement": "For iETS(M,N,N) in the [[D7:conventional multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest Kullback-Leibler divergence per observation from the exact density of 0.00115 for the Gamma, 0.00448 for the log-normal and 0.00400 for the inverse Gaussian distribution, against 2.359, 5.947 and 47.545 for the one-step density.",
+      "statement": "For [[D12:iETS(M,N,N)]] in the [[D7:conventional multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest [[D14:Kullback-Leibler divergence]] per observation from the exact density of 0.00115 for the Gamma, 0.00448 for the log-normal and 0.00400 for the inverse Gaussian distribution, against 2.359, 5.947 and 47.545 for [[D11:the one-step density]].",
+      "about": {
+        "subject": "D10",
+        "relation": "has a smaller Kullback-Leibler divergence from the exact density than",
+        "object": [
+          "D14"
+        ],
+        "comparator": "D11",
+        "conditions": [
+          "D12",
+          "D7"
+        ]
+      },
       "type": "descriptive",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "iETS(M,N,N) with Gamma, log-normal and inverse Gaussian sizes",
         "conditions": [
@@ -819,10 +1078,22 @@
     },
     {
       "id": "C25",
-      "statement": "On errors simulated with the [[D9:drift of the states]] of iETS(M,N,N) and 1000 observed sizes, the fixed-point moment estimator of the Gamma and inverse Gaussian scale had a median relative bias of +0.02% with no failed fits when the drift order $\\E(j-1)\\alpha^2s$ was at most 0.02, and failed in 18%, 52% and 71% of fits for drift orders of 0.02 to 0.1, 0.1 to 0.3 and above 0.3.",
+      "statement": "On errors simulated with the [[D9:drift of the states]] of [[D12:iETS(M,N,N)]] and 1000 observed sizes, the [[D15:fixed-point moment estimator]] of the Gamma and inverse Gaussian scale had a median [[D17:relative bias]] of +0.02% with no [[D18:failed fits]] when the drift order $\\E(j-1)\\alpha^2s$ was at most 0.02, and failed in 18%, 52% and 71% of fits for drift orders of 0.02 to 0.1, 0.1 to 0.3 and above 0.3.",
+      "about": {
+        "subject": "D15",
+        "relation": "recovers the scale without bias at small drift and fails more often at larger drift on",
+        "object": [
+          "D17",
+          "D18"
+        ],
+        "comparator": null,
+        "conditions": [
+          "D12"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "iETS(M,N,N) with Gamma and inverse Gaussian sizes",
         "conditions": [
@@ -872,9 +1143,18 @@
     {
       "id": "C26",
       "statement": "For a model with an occurrence part and occurrence probability $p_t$, a prediction interval of the demand with coverage $c$ that counts the zeros as covered is an interval of the demand sizes with coverage $(c-(1-p_t))/p_t$, centred on the size forecast $\\hat\\mu_t$ rather than on the demand forecast $p_t\\hat\\mu_t$.",
+      "about": {
+        "subject": "a prediction interval of the demand that counts zeros as covered",
+        "relation": "is an interval of the demand sizes centred on",
+        "object": "the size forecast",
+        "comparator": null,
+        "conditions": [
+          "models with an occurrence part"
+        ]
+      },
       "type": "formal",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "models with an occurrence part (iETS, ADAM)",
         "conditions": [
@@ -898,9 +1178,18 @@
     {
       "id": "C27",
       "statement": "The point forecast with zero errors of the [[D6:ADAM multiplicative ETS]] is not the conditional mean, because $\\E(1+\\epsilon_t)^{g_k}<1$ for $0<g_k<1$; for ETS(M,N,N) with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $\\hat\\mu_{T+h}[\\Gamma(1/s+\\alpha)s^{\\alpha}/\\Gamma(1/s)]^{h-1}$.",
+      "about": {
+        "subject": "D6",
+        "relation": "has a point forecast with zero errors below",
+        "object": "the conditional mean",
+        "comparator": null,
+        "conditions": [
+          "0 < g_k < 1"
+        ]
+      },
       "type": "formal",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "pure multiplicative ETS in the ADAM form"
       },
@@ -918,10 +1207,20 @@
     },
     {
       "id": "C28",
-      "statement": "For ETS(M,N,N) in the [[D6:ADAM multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\\alpha=0.21$, the approximate upper bound of the 90% prediction interval divided by the point forecast was 2.431 against 1.807 from simulated paths twelve steps ahead, and 2.616 against 1.638 after six unobserved periods at the end of the sample.",
+      "statement": "For [[D20:ETS(M,N,N)]] in the [[D6:ADAM multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\\alpha=0.21$, the [[D19:approximate upper bound of the 90% prediction interval]] divided by the point forecast was 2.431 against 1.807 from [[D21:simulated paths]] twelve steps ahead, and 2.616 against 1.638 after six unobserved periods at the end of the sample.",
+      "about": {
+        "subject": "D19",
+        "relation": "gives a higher upper bound over the point forecast than",
+        "object": null,
+        "comparator": "D21",
+        "conditions": [
+          "D20",
+          "D6"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "ETS(M,N,N) in the ADAM form",
         "conditions": [
@@ -962,9 +1261,18 @@
     {
       "id": "C29",
       "statement": "With a single source of error, the scaled state covariance $\\mathbf P_t$ of the [[D8:SSOE Kalman filter]] has rank at most the number of [[D2:unobserved period]]s since it last vanished, which allows a low-rank factor $\\mathbf P_t=\\mathbf U_t\\mathbf U_t'$ with a rank-one update at each observed period.",
+      "about": {
+        "subject": "D8",
+        "relation": "has a state covariance of rank at most the number of unobserved periods since it last vanished",
+        "object": null,
+        "comparator": null,
+        "conditions": [
+          "D2"
+        ]
+      },
       "type": "formal",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "linear single source of error models",
         "data_type": "univariate time series with unobserved periods"
@@ -979,15 +1287,31 @@
         "C15"
       ],
       "verification": "agent_checked",
-      "provenance": "author_stated",
-      "verified_by": "P5"
+      "checks": [
+        {
+          "by": "P5",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "The independent proof checker re-derived the proof of E14 step by step and confirmed it."
+        }
+      ],
+      "provenance": "author_stated"
     },
     {
       "id": "C30",
-      "statement": "For ADAM ETS(A,N,A) with lags 24 and 168 (193 state cells) on 1344 hourly observations generated by ETS(A,N,A), the low-rank factor form of the [[D8:SSOE Kalman filter]] was 10.55 times faster than the full covariance form for one missing value and 3.50 times faster for 48, with log-likelihoods equal to within 4.5e-13.",
+      "statement": "For ADAM ETS(A,N,A) with lags 24 and 168 (193 state cells) on [[D25:1344 hourly observations]] generated by ETS(A,N,A), the [[D23:low-rank factor form]] of the [[D8:SSOE Kalman filter]] was 10.55 times faster than the [[D24:full covariance form]] for one missing value and 3.50 times faster for 48, with log-likelihoods equal to within 4.5e-13.",
+      "about": {
+        "subject": "D23",
+        "relation": "is faster than",
+        "object": null,
+        "comparator": "D24",
+        "conditions": [
+          "D25"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "ADAM ETS(A,N,A) with double seasonality",
         "data_type": "hourly time series with missing values",
@@ -1032,9 +1356,16 @@
     {
       "id": "C31",
       "statement": "The smooth package for R and Python implements the [[D3:observed-data likelihood]] without the entropy term, the [[D8:SSOE Kalman filter]] for the pure additive models with the normal distribution and in logarithms for the [[D6:ADAM multiplicative ETS]] with the log-normal distribution, the [[D10:normal-drift mixture density]] with moment-equation scales for the other pure multiplicative models, and the corrected log-normal scale, in one C++ routine shared by both languages.",
+      "about": {
+        "subject": "the smooth package for R and Python",
+        "relation": "implements",
+        "object": "D3",
+        "comparator": null,
+        "conditions": []
+      },
       "type": "methodological",
       "role": "principal",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "setting": "smooth package for R and Python, master branch at commit 8a5fbbb3"
       },
@@ -1064,9 +1395,18 @@
     {
       "id": "C32",
       "statement": "In the smooth package, the [[D8:SSOE Kalman filter]] replaces the fitter only in the last forward pass after backcasting of the initial states, so that fits of series without [[D2:unobserved period]]s are unchanged.",
+      "about": {
+        "subject": "D8",
+        "relation": "replaces the fitter only in the last forward pass after backcasting in",
+        "object": "the smooth package",
+        "comparator": null,
+        "conditions": [
+          "D2"
+        ]
+      },
       "type": "methodological",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "setting": "smooth package for R and Python"
       },
@@ -1097,10 +1437,21 @@
     },
     {
       "id": "C33",
-      "statement": "For the pure additive models with the Laplace, S and Generalised Normal distributions, the smooth package keeps the error in its family with scale $sf_t^{1/p}$, and the Kullback-Leibler divergence of this approximation from the exact density is 0.0491 for the Laplace distribution and 0.260 for the S distribution at $f_t=4$.",
+      "statement": "For [[D30:the pure additive models with the Laplace, S and Generalised Normal distributions]], the smooth package keeps [[D28:the error in its family with scale $sf_t^{1/p}$]], and the [[D14:Kullback-Leibler divergence]] of this approximation from the exact density is 0.0491 for the Laplace distribution and 0.260 for the S distribution at $f_t=4$.",
+      "about": {
+        "subject": "D28",
+        "relation": "has a small Kullback-Leibler divergence from the exact density on",
+        "object": [
+          "D14"
+        ],
+        "comparator": null,
+        "conditions": [
+          "D30"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "pure additive ADAM models with Laplace, S or Generalised Normal errors"
       },
@@ -1135,7 +1486,6 @@
       "statement": "The errors $\\epsilon_t$ of the single source of error model are independent across periods.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1150,7 +1500,6 @@
       "statement": "In the intermittent demand model the occurrence $o_t$ is independent of the potential demand size $z_t$.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1165,7 +1514,6 @@
       "statement": "The potential demand size $z_t$ has a continuous distribution, so that $P(z_t=0)=0$.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1180,7 +1528,6 @@
       "statement": "Whether a period is observed carries no information about the unobserved value $z_t$ beyond the model, so that the missing values are missing at random.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1195,7 +1542,6 @@
       "statement": "The initial states of the single source of error model are fixed parameters, so that the state covariance is zero at the start of the sample.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1210,7 +1556,6 @@
       "statement": "The errors of the pure additive model are normally distributed with constant variance $\\sigma^2$.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1225,7 +1570,6 @@
       "statement": "In the log-normal ADAM multiplicative ETS, $\\log(1+\\epsilon_t)\\sim\\mathcal N(-s/2,s)$, so that $\\E(1+\\epsilon_t)=1$.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1240,7 +1584,6 @@
       "statement": "The [[D9:drift of the states]] of a pure multiplicative model over an interval is approximately normally distributed, with the states known at the previous observed period.",
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
       "support": [
         {
           "kind": "assumption"
@@ -1253,10 +1596,22 @@
     },
     {
       "id": "C34",
-      "statement": "For iETS(M,N,N) in the [[D6:ADAM multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest Kullback-Leibler divergence per observation from the exact density of 0.01452 for the Gamma and 0.00045 for the inverse Gaussian distribution, and is exact for the log-normal distribution, against 4.584, 18.635 and 630.772 for the one-step density.",
+      "statement": "For [[D12:iETS(M,N,N)]] in the [[D6:ADAM multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest [[D14:Kullback-Leibler divergence]] per observation from the exact density of 0.01452 for the Gamma and 0.00045 for the inverse Gaussian distribution, and is exact for the log-normal distribution, against 4.584, 18.635 and 630.772 for [[D11:the one-step density]].",
+      "about": {
+        "subject": "D10",
+        "relation": "has a smaller Kullback-Leibler divergence from the exact density than",
+        "object": [
+          "D14"
+        ],
+        "comparator": "D11",
+        "conditions": [
+          "D12",
+          "D6"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "iETS(M,N,N) with Gamma, log-normal and inverse Gaussian sizes",
         "conditions": [
@@ -1300,10 +1655,21 @@
     },
     {
       "id": "C35",
-      "statement": "Within iETS(M,N,N) models fitted by the [[D5:zero-error recursion]], updating the states with the persistence vector $\\mathbf g$ after an interval raised the estimate of the Gamma and inverse Gaussian scale from the moment equation solved by bisection by more than three Monte Carlo standard errors in 97 of 120 cells, with a median increase in relative bias of 12.8 percentage points.",
+      "statement": "Within [[D12:iETS(M,N,N)]] models fitted by the [[D5:zero-error recursion]], updating the states with the persistence vector $\\mathbf g$ after an interval raised the estimate of the Gamma and inverse Gaussian scale from the moment equation solved by bisection by more than three Monte Carlo standard errors in 97 of 120 cells, with a median increase in [[D17:relative bias]] of 12.8 percentage points.",
+      "about": {
+        "subject": "D5",
+        "relation": "raises the estimated scale on",
+        "object": [
+          "D17"
+        ],
+        "comparator": null,
+        "conditions": [
+          "D12"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "iETS(M,N,N) with Gamma and inverse Gaussian sizes",
         "conditions": [
@@ -1340,10 +1706,20 @@
     },
     {
       "id": "C36",
-      "statement": "For ETS(M,N,N) in the [[D7:conventional multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\\alpha=0.21$, the approximate upper bound of the 90% prediction interval divided by the point forecast was 2.431 against 2.393 from simulated paths twelve steps ahead, and 2.616 against 2.536 after six unobserved periods at the end of the sample.",
+      "statement": "For [[D20:ETS(M,N,N)]] in the [[D7:conventional multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\\alpha=0.21$, the [[D19:approximate upper bound of the 90% prediction interval]] divided by the point forecast was 2.431 against 2.393 from [[D21:simulated paths]] twelve steps ahead, and 2.616 against 2.536 after six unobserved periods at the end of the sample.",
+      "about": {
+        "subject": "D19",
+        "relation": "gives a higher upper bound over the point forecast than",
+        "object": null,
+        "comparator": "D21",
+        "conditions": [
+          "D20",
+          "D7"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "ETS(M,N,N) in the conventional form",
         "conditions": [
@@ -1380,10 +1756,19 @@
     },
     {
       "id": "C37",
-      "statement": "For ADAM ETS(A,N,A) with lags 24 and 168 on 1344 hourly observations following a fixed sine pattern, the low-rank factor form of the [[D8:SSOE Kalman filter]] was 2.96 times faster than the full covariance form for one missing value and 0.72 times as fast for 48, and slower than the full form above about 30 missing values.",
+      "statement": "For ADAM ETS(A,N,A) with lags 24 and 168 on [[D25:1344 hourly observations]] following a fixed sine pattern, the [[D23:low-rank factor form]] of the [[D8:SSOE Kalman filter]] was 2.96 times faster than the [[D24:full covariance form]] for one missing value and 0.72 times as fast for 48, and slower than the full form above about 30 missing values.",
+      "about": {
+        "subject": "D23",
+        "relation": "is faster than, up to about 30 missing values,",
+        "object": null,
+        "comparator": "D24",
+        "conditions": [
+          "D25"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "ADAM ETS(A,N,A) with double seasonality",
         "data_type": "hourly time series with missing values",
@@ -1426,10 +1811,22 @@
     },
     {
       "id": "C38",
-      "statement": "At variance ratio $f_t=4$, the 16-node Gauss-Hermite mixture of the error density over normal state uncertainty had a Kullback-Leibler divergence from the exact density of 0.0081 for the Laplace and 0.113 for the S distribution, against 0.0491 and 0.260 for the error kept in its family with scale $sf_t^{1/p}$.",
+      "statement": "At variance ratio $f_t=4$, the [[D29:16-node Gauss-Hermite mixture]] of the error density over normal state uncertainty had a [[D14:Kullback-Leibler divergence]] from the exact density of 0.0081 for the Laplace and 0.113 for the S distribution, against 0.0491 and 0.260 for [[D28:the error kept in its family with scale $sf_t^{1/p}$]].",
+      "about": {
+        "subject": "D29",
+        "relation": "has a smaller Kullback-Leibler divergence from the exact density than",
+        "object": [
+          "D14"
+        ],
+        "comparator": "D28",
+        "conditions": [
+          "f_t = 4",
+          "Laplace or S errors"
+        ]
+      },
       "type": "descriptive",
       "role": "supporting",
-      "novelty": "new",
+      "novelty": "no_prior_found",
       "scope": {
         "population": "pure additive models with Laplace or S errors",
         "conditions": [
@@ -1538,7 +1935,7 @@
           "statement": "$\\nabla Q(\\theta\\mid\\theta^{(k)})|_{\\theta^{(k)}}=\\nabla\\ell(\\theta^{(k)})$, so EM fixed points are stationary points of $\\ell$",
           "by": [
             "E2.2",
-            "C3",
+            "B1",
             "C10"
           ],
           "rule": "EM identity"
@@ -1589,7 +1986,7 @@
           "id": "E3.3",
           "statement": "EM iterates $\\sigma^2_{(k+1)}=(\\sum e_t^2+T_0\\sigma^2_{(k)})/T$ with fixed point $\\frac{1}{T_1}\\sum e_t^2$",
           "by": [
-            "C3"
+            "B1"
           ],
           "rule": "fixed point"
         }
@@ -2047,6 +2444,23 @@
       "id": "E20",
       "profile": "simulation",
       "description": "Comparison, for iETS(M,N,N) under the ADAM and conventional multiplicative ETS forms, of the normal-drift mixture density (drift moments by 32-node Gauss-Legendre, mixture by 16-node Gauss-Hermite) and of the one-step density against the exact density of the size after an interval, computed on a grid of step 0.001 in log z by FFT convolution with tails cut at 1e-12, by the largest Kullback-Leibler divergence per observation over $s$ from 0.05 to 1 in steps of 0.05, $\\alpha$ from 0.1 to 0.6 in steps of 0.05 and $j$ from 2 to 20; a 164-cell refinement run halved the step and cut tails at 1e-14. The run recorded smooth commit f9d062ee with the claimset scripts not yet committed; the scripts are archived at commit f1de3ea1.",
+      "setup": {
+        "studied": [
+          "D10",
+          "D11"
+        ],
+        "cases": [
+          "D12",
+          "D6",
+          "D7"
+        ],
+        "procedure": [
+          "D13"
+        ],
+        "lens": [
+          "D14"
+        ]
+      },
       "model": "iETS(M,N,N) with Gamma, log-normal and inverse Gaussian sizes",
       "outputs": "largest KL per observation, conventional form: mixture 0.00115 (Gamma), 0.00448 (log-normal), 0.00400 (inverse Gaussian), one-step 2.359, 5.947, 47.545; ADAM form: mixture 0.01452, 0 (closed form), 0.00045, one-step 4.584, 18.635, 630.772",
       "artefacts": [
@@ -2066,7 +2480,7 @@
       "results": [
         {
           "id": "R1",
-          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
           "value": 0.001147669555304068,
           "conditions": {
             "distribution": "dgamma",
@@ -2077,7 +2491,7 @@
         },
         {
           "id": "R2",
-          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "variable": "largest KL divergence per observation, one-step vs exact density",
           "value": 2.359344901764189,
           "conditions": {
             "distribution": "dgamma",
@@ -2088,7 +2502,7 @@
         },
         {
           "id": "R3",
-          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
           "value": 0.004478045527634884,
           "conditions": {
             "distribution": "dlnorm",
@@ -2099,7 +2513,7 @@
         },
         {
           "id": "R4",
-          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "variable": "largest KL divergence per observation, one-step vs exact density",
           "value": 5.947322649817578,
           "conditions": {
             "distribution": "dlnorm",
@@ -2110,7 +2524,7 @@
         },
         {
           "id": "R5",
-          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
           "value": 0.00399623186332274,
           "conditions": {
             "distribution": "dinvgauss",
@@ -2121,7 +2535,7 @@
         },
         {
           "id": "R6",
-          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "variable": "largest KL divergence per observation, one-step vs exact density",
           "value": 47.545190336883074,
           "conditions": {
             "distribution": "dinvgauss",
@@ -2132,7 +2546,7 @@
         },
         {
           "id": "R7",
-          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
           "value": 0.014519691145235577,
           "conditions": {
             "distribution": "dgamma",
@@ -2143,7 +2557,7 @@
         },
         {
           "id": "R8",
-          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "variable": "largest KL divergence per observation, one-step vs exact density",
           "value": 4.583576097536914,
           "conditions": {
             "distribution": "dgamma",
@@ -2154,7 +2568,7 @@
         },
         {
           "id": "R9",
-          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
           "value": 9.638705681090434e-07,
           "conditions": {
             "distribution": "dlnorm",
@@ -2165,7 +2579,7 @@
         },
         {
           "id": "R10",
-          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "variable": "largest KL divergence per observation, one-step vs exact density",
           "value": 18.635381272371507,
           "conditions": {
             "distribution": "dlnorm",
@@ -2176,7 +2590,7 @@
         },
         {
           "id": "R11",
-          "quantity": "largest KL divergence per observation, normal-drift mixture vs exact density",
+          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
           "value": 0.00044603365455395534,
           "conditions": {
             "distribution": "dinvgauss",
@@ -2187,7 +2601,7 @@
         },
         {
           "id": "R12",
-          "quantity": "largest KL divergence per observation, one-step vs exact density",
+          "variable": "largest KL divergence per observation, one-step vs exact density",
           "value": 630.7721304928126,
           "conditions": {
             "distribution": "dinvgauss",
@@ -2206,6 +2620,24 @@
       "id": "E21",
       "profile": "simulation",
       "description": "Monte Carlo study of the scale of Gamma and inverse Gaussian iETS(M,N,N) sizes under the ADAM and conventional forms. Part A: 480 cells of simulated relative errors with drift ($s\\in\\{0.05,0.2,0.5,1\\}$, $\\alpha\\in\\{0.1,0.3,0.6\\}$, intervals fixed at 2, 5 or 10 or geometric with occurrence probability 0.5 or 0.2, 100 or 1000 observed sizes), 2000 replications per cell, fixed-point iteration with tolerance 1e-10 and at most 100 iterations; a fit fails when an iterate is not positive and finite, the iteration does not converge, or the value leaves the admissible range. Part B: 120 cells within fitted models with $s\\in\\{0.05,0.5\\}$ and 100 observed sizes. Cells are grouped by the drift order $\\E(j-1)\\alpha^2s$. The run recorded smooth commit f9d062ee with the claimset scripts not yet committed; the scripts are archived at commit f1de3ea1.",
+      "setup": {
+        "studied": [
+          "D15",
+          "D5"
+        ],
+        "cases": [
+          "D12",
+          "D6",
+          "D7"
+        ],
+        "procedure": [
+          "D16"
+        ],
+        "lens": [
+          "D17",
+          "D18"
+        ]
+      },
       "model": "iETS(M,N,N) relative errors with drift",
       "artefacts": [
         "A3",
@@ -2224,7 +2656,7 @@
       "results": [
         {
           "id": "R1",
-          "quantity": "median relative bias of the scale estimate",
+          "variable": "median relative bias of the scale estimate",
           "value": 0.0001590643108680817,
           "conditions": {
             "estimator": "fixed point",
@@ -2235,7 +2667,7 @@
         },
         {
           "id": "R2",
-          "quantity": "share of failed fits",
+          "variable": "share of failed fits",
           "value": 0.0,
           "conditions": {
             "estimator": "fixed point",
@@ -2246,7 +2678,7 @@
         },
         {
           "id": "R3",
-          "quantity": "median relative bias of the scale estimate",
+          "variable": "median relative bias of the scale estimate",
           "value": -0.0005993510206586256,
           "conditions": {
             "estimator": "fixed point",
@@ -2257,7 +2689,7 @@
         },
         {
           "id": "R4",
-          "quantity": "share of failed fits",
+          "variable": "share of failed fits",
           "value": 0.17673529411764705,
           "conditions": {
             "estimator": "fixed point",
@@ -2268,7 +2700,7 @@
         },
         {
           "id": "R5",
-          "quantity": "median relative bias of the scale estimate",
+          "variable": "median relative bias of the scale estimate",
           "value": -0.0041824876680562895,
           "conditions": {
             "estimator": "fixed point",
@@ -2279,7 +2711,7 @@
         },
         {
           "id": "R6",
-          "quantity": "share of failed fits",
+          "variable": "share of failed fits",
           "value": 0.523375,
           "conditions": {
             "estimator": "fixed point",
@@ -2290,7 +2722,7 @@
         },
         {
           "id": "R7",
-          "quantity": "median relative bias of the scale estimate",
+          "variable": "median relative bias of the scale estimate",
           "value": -0.004309863992060126,
           "conditions": {
             "estimator": "fixed point",
@@ -2301,7 +2733,7 @@
         },
         {
           "id": "R8",
-          "quantity": "share of failed fits",
+          "variable": "share of failed fits",
           "value": 0.7100576923076923,
           "conditions": {
             "estimator": "fixed point",
@@ -2312,7 +2744,7 @@
         },
         {
           "id": "R9",
-          "quantity": "cells where the gain update raised the scale estimate by more than three Monte Carlo standard errors",
+          "variable": "cells where the gain update raised the scale estimate by more than three Monte Carlo standard errors",
           "value": 97,
           "conditions": {
             "estimator": "moment equation solved by bisection",
@@ -2323,7 +2755,7 @@
         },
         {
           "id": "R10",
-          "quantity": "number of cells",
+          "variable": "number of cells",
           "value": 120,
           "conditions": {
             "estimator": "moment equation solved by bisection",
@@ -2334,7 +2766,7 @@
         },
         {
           "id": "R11",
-          "quantity": "median increase in relative bias from the gain update",
+          "variable": "median increase in relative bias from the gain update",
           "value": 0.12792793852670048,
           "conditions": {
             "estimator": "moment equation solved by bisection",
@@ -2353,6 +2785,22 @@
       "id": "E22",
       "profile": "simulation",
       "description": "Comparison of the approximate upper bound of the 90% prediction interval (0.95 quantile) of ETS(M,N,N) with $s=0.32$, $\\alpha=0.21$, 100 observations and initial level 10, divided by the point forecast, with the quantile of 1,000,000 simulated paths, twelve steps ahead and 18 steps from the last observation after six unobserved periods at the end of the sample, for Gamma, inverse Gaussian and log-normal errors under the ADAM and conventional forms. The run recorded smooth commit 3eb93bb1 with the claimset scripts not yet committed; the scripts are archived at commit f1de3ea1.",
+      "setup": {
+        "studied": [
+          "D19"
+        ],
+        "cases": [
+          "D20",
+          "D6",
+          "D7"
+        ],
+        "procedure": [
+          "D21"
+        ],
+        "lens": [
+          "D22"
+        ]
+      },
       "model": "ETS(M,N,N), s=0.32, alpha=0.21",
       "outputs": "Gamma, bound over point forecast, approximate vs simulated: ADAM form 2.431 vs 1.807 (h=12), 2.616 vs 1.638 (six trailing unobserved); conventional form 2.431 vs 2.393, 2.616 vs 2.537",
       "artefacts": [
@@ -2371,7 +2819,7 @@
       "results": [
         {
           "id": "R1",
-          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "variable": "approximate upper bound of the 90% interval over the point forecast",
           "value": 2.430867663875322,
           "conditions": {
             "distribution": "Gamma",
@@ -2385,7 +2833,7 @@
         },
         {
           "id": "R2",
-          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "variable": "simulated upper bound of the 90% interval over the point forecast",
           "value": 1.8071312998210094,
           "conditions": {
             "distribution": "Gamma",
@@ -2399,7 +2847,7 @@
         },
         {
           "id": "R3",
-          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "variable": "approximate upper bound of the 90% interval over the point forecast",
           "value": 2.615866692147225,
           "conditions": {
             "distribution": "Gamma",
@@ -2413,7 +2861,7 @@
         },
         {
           "id": "R4",
-          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "variable": "simulated upper bound of the 90% interval over the point forecast",
           "value": 1.6379222812406813,
           "conditions": {
             "distribution": "Gamma",
@@ -2427,7 +2875,7 @@
         },
         {
           "id": "R5",
-          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "variable": "approximate upper bound of the 90% interval over the point forecast",
           "value": 2.430867663875322,
           "conditions": {
             "distribution": "Gamma",
@@ -2441,7 +2889,7 @@
         },
         {
           "id": "R6",
-          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "variable": "simulated upper bound of the 90% interval over the point forecast",
           "value": 2.3927301164131274,
           "conditions": {
             "distribution": "Gamma",
@@ -2455,7 +2903,7 @@
         },
         {
           "id": "R7",
-          "quantity": "approximate upper bound of the 90% interval over the point forecast",
+          "variable": "approximate upper bound of the 90% interval over the point forecast",
           "value": 2.615866692147225,
           "conditions": {
             "distribution": "Gamma",
@@ -2469,7 +2917,7 @@
         },
         {
           "id": "R8",
-          "quantity": "simulated upper bound of the 90% interval over the point forecast",
+          "variable": "simulated upper bound of the 90% interval over the point forecast",
           "value": 2.536487773418306,
           "conditions": {
             "distribution": "Gamma",
@@ -2491,6 +2939,21 @@
       "id": "E23",
       "profile": "quant",
       "description": "Timing of the SSOE Kalman filter in the smooth package with the low-rank factor against the full covariance, both built from smooth commit 53104ee9, for ADAM ETS(A,N,A) with lags 24 and 168 (193 profile cells), normal distribution and backcast initial states, on 1344 hourly observations with 1 to 48 nested missing values, for data generated by ETS(A,N,A) and by a fixed sine pattern; 25 interleaved repetitions per case on one cloud VM (Intel Xeon 2.80 GHz, 4 vCPUs, Linux 6.18.44, Python 3.11.15) with one thread.",
+      "setup": {
+        "studied": [
+          "D23",
+          "D24"
+        ],
+        "cases": [
+          "D25"
+        ],
+        "procedure": [
+          "D26"
+        ],
+        "lens": [
+          "D27"
+        ]
+      },
       "design": "benchmark",
       "estimand": "ratio of median run time, full covariance over low-rank factor",
       "n": 25,
@@ -2506,7 +2969,7 @@
       "results": [
         {
           "id": "R1",
-          "quantity": "speed-up of low-rank over full covariance filter",
+          "variable": "speed-up of low-rank over full covariance filter",
           "value": 10.55114215060036,
           "unit": "ratio",
           "conditions": {
@@ -2518,7 +2981,7 @@
         },
         {
           "id": "R2",
-          "quantity": "speed-up of low-rank over full covariance filter",
+          "variable": "speed-up of low-rank over full covariance filter",
           "value": 3.5046113453883225,
           "unit": "ratio",
           "conditions": {
@@ -2530,7 +2993,7 @@
         },
         {
           "id": "R3",
-          "quantity": "largest absolute difference in log-likelihood, low-rank vs full",
+          "variable": "largest absolute difference in log-likelihood, low-rank vs full",
           "value": 4.547473508864641e-13,
           "conditions": {
             "data": "ets"
@@ -2539,7 +3002,7 @@
         },
         {
           "id": "R4",
-          "quantity": "speed-up of low-rank over full covariance filter",
+          "variable": "speed-up of low-rank over full covariance filter",
           "value": 2.960894167501268,
           "unit": "ratio",
           "conditions": {
@@ -2551,7 +3014,7 @@
         },
         {
           "id": "R5",
-          "quantity": "speed-up of low-rank over full covariance filter",
+          "variable": "speed-up of low-rank over full covariance filter",
           "value": 0.7235443143279483,
           "unit": "ratio",
           "conditions": {
@@ -2563,7 +3026,7 @@
         },
         {
           "id": "R6",
-          "quantity": "largest absolute difference in log-likelihood, low-rank vs full",
+          "variable": "largest absolute difference in log-likelihood, low-rank vs full",
           "value": 0.0,
           "conditions": {
             "data": "sine"
@@ -2582,6 +3045,21 @@
       "id": "E24",
       "profile": "simulation",
       "description": "Kullback-Leibler divergence, in both directions, between the exact convolution of Laplace, S and Generalised Normal (shape 0.5 to 3) errors with normal state uncertainty and three approximations (the error kept in its family with scale $sf_t^{1/p}$, the one-step density, and Gauss-Hermite mixtures with 8 to 64 nodes), for 22 values of $f_t$ from 1.01 to 100, by composite 8-node Gauss-Legendre integration. The run recorded smooth commit 3eb93bb1 with the claimset scripts not yet committed; the scripts are archived at commit f1de3ea1.",
+      "setup": {
+        "studied": [
+          "D28",
+          "D29"
+        ],
+        "cases": [
+          "D30"
+        ],
+        "procedure": [
+          "D31"
+        ],
+        "lens": [
+          "D14"
+        ]
+      },
       "model": "pure additive model with Laplace errors",
       "outputs": "Laplace at f_t=4, family-scaled: 0.0491 (exact||approximation), 0.0563 (reverse); above 0.05 for f_t above about 4.5, levelling off at 0.056; S at f_t=4: 0.260; 16-node Gauss-Hermite at f_t=4: 0.0081 (Laplace), 0.113 (S)",
       "artefacts": [
@@ -2600,7 +3078,7 @@
       "results": [
         {
           "id": "R1",
-          "quantity": "KL divergence, exact density vs approximation",
+          "variable": "KL divergence, exact density vs approximation",
           "value": 0.04911403773707054,
           "conditions": {
             "distribution": "dlaplace",
@@ -2612,7 +3090,7 @@
         },
         {
           "id": "R2",
-          "quantity": "KL divergence, exact density vs approximation",
+          "variable": "KL divergence, exact density vs approximation",
           "value": 0.2598001588579059,
           "conditions": {
             "distribution": "ds",
@@ -2624,7 +3102,7 @@
         },
         {
           "id": "R3",
-          "quantity": "KL divergence, exact density vs approximation",
+          "variable": "KL divergence, exact density vs approximation",
           "value": 0.008097015561062926,
           "conditions": {
             "distribution": "dlaplace",
@@ -2636,7 +3114,7 @@
         },
         {
           "id": "R4",
-          "quantity": "KL divergence, exact density vs approximation",
+          "variable": "KL divergence, exact density vs approximation",
           "value": 0.112708849233957,
           "conditions": {
             "distribution": "ds",
@@ -2665,9 +3143,7 @@
     {
       "id": "W2",
       "reasoning": "deductive",
-      "premises": [
-        "C2"
-      ],
+      "premises": [],
       "text": "The expected log-density of an unobserved size is $\\int f_z\\log f_z\\,dz$, which equals $-H_z$ when the differential entropy is $H_z=-\\E\\log f_z$; the term added for each zero therefore enters the objective with a negative sign."
     },
     {
@@ -2801,6 +3277,28 @@
         "level": "public"
       },
       "description": "Kullback-Leibler divergence, in both directions, between the exact convolution of Laplace, S and Generalised Normal errors with normal state uncertainty and its family-scaled, one-step and Gauss-Hermite approximations, for variance ratios $f_t$ from 1.01 to 100."
+    }
+  ],
+  "references": [
+    {
+      "id": "B1",
+      "target": "10.1111/j.2517-6161.1977.tb01600.x",
+      "id_type": "doi"
+    },
+    {
+      "id": "B2",
+      "target": "10.1080/01621459.1997.10473684",
+      "id_type": "doi"
+    },
+    {
+      "id": "B3",
+      "target": "10.1111/j.2517-6161.1985.tb01355.x",
+      "id_type": "doi"
+    },
+    {
+      "id": "B4",
+      "target": "10.1016/j.ijpe.2023.109013",
+      "id_type": "doi"
     }
   ]
 }

@@ -3,20 +3,20 @@
  "paper": {
   "title": "Admissibility of lagged single-source-of-error state space models: the per-lag eigenvalue check, the cancelled ARIMA form of the whole model, the step-down test and their implementation in smooth, for ETS, GUM and ETS+ARIMA",
   "contributions": [
-   "C1",
-   "C2",
    "C3",
+   "C25",
    "C4",
-   "C5",
-   "C6",
-   "C7",
-   "C8"
+   "C16",
+   "C26",
+   "C1",
+   "C24",
+   "C22"
   ],
   "highlights": [
    "C1",
-   "C2",
-   "C5",
-   "C6",
+   "C3",
+   "C22",
+   "C24",
    "D10"
   ],
   "autonomy": "human_supervised",
@@ -579,8 +579,8 @@
     ]
    },
    "assumptions": [
-    "C25",
-    "C26"
+    "C13",
+    "C14"
    ],
    "limitations": [
     "L1",
@@ -619,6 +619,99 @@
   },
   {
    "id": "C2",
+   "statement": "The [[D4:per-lag check]] rejected 1 of [[D18:200 random GUM models with lags (1, 12)]] that have [[D3:decaying weights]].",
+   "about": {
+    "subject": "D4",
+    "relation": "rejects models with",
+    "object": "D3",
+    "comparator": null,
+    "conditions": [
+     "D18"
+    ]
+   },
+   "type": "descriptive",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E2",
+     "artefacts": [
+      "A1",
+      "A3"
+     ],
+     "results": [
+      "E2.R5"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H2",
+    "outcome": "supported"
+   },
+   "planning": "confirmatory",
+   "planned_at": "2026-10-21T15:21:33Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "seed": 2026,
+     "edge_band": 1e-08,
+     "pbh_tolerance": 1e-07,
+     "cancellation_tolerance": 1e-09,
+     "sample": "200 random GUM models, fixed; no interim analysis"
+    },
+    "quantities": {
+     "gum_rej": {
+      "variable": "models rejected by the per-lag check that forget their initial states",
+      "conditions": {
+       "family": "GUM"
+      }
+     }
+    },
+    "supported": "gum_rej > 0",
+    "not_supported": "gum_rej == 0",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL2"
+   },
+   "scope": {
+    "population": "GUM models",
+    "conditions": [
+     "GUM with lags (1, 12) and normal random F, g and w (standard deviations 0.35, 0.175, 0.175; mean of w 1)",
+     "PBH reference below 1 - 1e-8"
+    ],
+    "excludes": [
+     "models with adaptive regressors"
+    ]
+   },
+   "assumptions": [
+    "C13",
+    "C14"
+   ],
+   "limitations": [
+    "L2",
+    "L3"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "low",
+     "rationale": "One model out of 200 in one seeded sample; how far that model's reference lies from 1 was not recorded."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "1 of 200 reproduced; the cancellation-based reference gives the same model."
+    }
+   ]
+  },
+  {
+   "id": "C3",
    "statement": "On [[D19:500 random additive ETS and GUM models]], the [[D29:admissibility decision]] from [[D10:the roots of the MA polynomial after cyclotomic cancellation]] differed from the [[D5:PBH reference]] on 0 models, and on the 172 models that both found inadmissible the [[D30:largest mode modulus]] differed from the reference by at most 4.4e-13.",
    "about": {
     "subject": "D10",
@@ -700,12 +793,12 @@
     ]
    },
    "depends_on": [
-    "C9",
-    "C10",
-    "C12"
+    "C6",
+    "C8",
+    "C17"
    ],
    "assumptions": [
-    "C26"
+    "C14"
    ],
    "limitations": [
     "L2",
@@ -728,7 +821,7 @@
    ]
   },
   {
-   "id": "C3",
+   "id": "C4",
    "statement": "On [[D20:575 random additive ETS and GUM models]], including ETS models with up to two seasonal lags from {24, 168, 365} whose generator allows MA polynomial degrees up to 536, the [[D7:step-down test]] on the MA polynomial after [[D6:cyclotomic cancellation]] gave an [[D29:admissibility decision]] different from [[D15:the roots of that polynomial]] on 0 models.",
    "about": {
     "subject": "D7",
@@ -815,7 +908,7 @@
     ]
    },
    "depends_on": [
-    "C2"
+    "C3"
    ],
    "assessments": [
     {
@@ -840,11 +933,115 @@
     }
    ],
    "assumptions": [
-    "C27"
+    "C19"
    ]
   },
   {
-   "id": "C4",
+   "id": "C5",
+   "statement": "On the 198 models among [[D20:575 random additive ETS and GUM models]] whose cancelled MA polynomial $\\theta^*$ has a root inside the unit circle, [[D11:bisection on $r$ with the step-down test applied to $\\theta^*(B/r)$]] gave [[D30:$1/\\min|B|$ over the roots $B$ of $\\theta^*$]] within 5.8e-11 of the value from [[D15:numpy's roots]].",
+   "about": {
+    "subject": "D11",
+    "relation": "gives the same largest mode modulus as",
+    "object": [
+     "D30"
+    ],
+    "comparator": "D15",
+    "conditions": [
+     "D20"
+    ]
+   },
+   "type": "methodological",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E5",
+     "artefacts": [
+      "A1",
+      "A3"
+     ],
+     "results": [
+      "E5.R1"
+     ]
+    }
+   ],
+   "provenance": "author_stated",
+   "hypothesis": {
+    "lab_event": "H5",
+    "outcome": "supported"
+   },
+   "planning": "confirmatory_with_deviations",
+   "planned_at": "2026-10-21T15:21:42Z",
+   "planned_at_anchor": "git_remote",
+   "test": {
+    "framework": "deterministic",
+    "parameters": {
+     "seed": 2026,
+     "edge_band": 1e-08,
+     "pbh_tolerance": 1e-07,
+     "cancellation_tolerance": 1e-09,
+     "sample": "the inadmissible models among 575, fixed; no interim analysis"
+    },
+    "quantities": {
+     "diff": {
+      "variable": "max abs difference of max |lambda|, bisection against roots"
+     }
+    },
+    "supported": "diff < 0.00000001",
+    "not_supported": "diff >= 0.00000001",
+    "verdict": "computed",
+    "runs": 1,
+    "lab_plan": "PL5"
+   },
+   "limitations": [
+    "L3",
+    "L4",
+    "L5"
+   ],
+   "scope": {
+    "population": "inadmissible pure additive lagged SSOE models",
+    "conditions": [
+     "additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0",
+     "GUM with F = I and lags from {1, 4, 12}",
+     "GUM with random F and lags from {1, 4, 12, 24}",
+     "additive ETS with up to two seasonal lags from {24, 168, 365}",
+     "GUM with random F and lags (1, 24, 168)",
+     "bisection to a width of 1e-10",
+     "numpy prototype"
+    ],
+    "excludes": [
+     "ARIMA components",
+     "CES",
+     "adaptive regressors",
+     "multiplicative models",
+     "seasonal harmonics with non-integer periods (TBATS)"
+    ]
+   },
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "low",
+     "rationale": "The difference is bounded by the bisection width of 1e-10 once the step-down decisions on the scaled polynomials are right, so the test checks those decisions and the bisection logic rather than an independent accuracy."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "198 inadmissible models and 5.8137e-11 reproduced; the difference is bounded by the 1e-10 bisection width by construction, so the result checks the bisection logic, and the values are not compared with the PBH reference."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "partial",
+     "notes": "198 models and 5.8137e-11 reproduced and the rewording as 1/min|B| matches the bisection; the scope then omitted two of the four model families, since added."
+    }
+   ]
+  },
+  {
+   "id": "C16",
    "statement": "On [[D21:800 random additive ETS and GUM models in four families]], [[D12:the implementation of the check in smooth (smoothEigensCpp() through smoothEigensR())]] gave the same [[D29:decision]] as [[D10:the numpy prototype]] on every model, a [[D30:largest root modulus]] within the bisection tolerance of it on the models both found inadmissible, and the same modulus and MA polynomial on three consecutive calls with each model.",
    "about": {
     "subject": "D12",
@@ -990,13 +1187,13 @@
     ]
    },
    "depends_on": [
-    "C2",
     "C3",
-    "C13",
-    "C14"
+    "C4",
+    "C18",
+    "C20"
    ],
    "assumptions": [
-    "C27"
+    "C19"
    ],
    "limitations": [
     "L2",
@@ -1021,7 +1218,612 @@
    ]
   },
   {
-   "id": "C5",
+   "id": "C6",
+   "statement": "For a [[D1:lagged SSOE model]], ignoring the initial states, $\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t$, so the model has the ARIMA form with AR polynomial $\\phi(B) = \\det(I - F L(B))$ and MA polynomial $\\theta(B) = \\det(I - D L(B))$.",
+   "about": {
+    "subject": "D1",
+    "relation": "has the ARIMA form with",
+    "object": "AR polynomial det(I - F L(B)) and MA polynomial det(I - D L(B))",
+    "comparator": null,
+    "conditions": [
+     "initial states ignored"
+    ]
+   },
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "extension",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E6"
+    },
+    {
+     "kind": "consensus"
+    },
+    {
+     "kind": "simulation",
+     "evidence": "E10",
+     "artefacts": [
+      "A1",
+      "A2"
+     ]
+    }
+   ],
+   "scope": {
+    "population": "pure additive lagged SSOE models",
+    "conditions": [
+     "identity of lag-operator polynomials, initial states ignored"
+    ]
+   },
+   "relations": [
+    {
+     "type": "extends",
+     "reference": "B1",
+     "locator": "Chapter 11",
+     "self": false,
+     "note": "Hyndman, Koehler, Ord and Snyder relate the reduced forms of linear innovations state space models to ARIMA models."
+    }
+   ],
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps S1-S7 of E6 re-derived; simulated residual of the identity on 40 random GUMs at late t at most 1.7e-15 relative; the identity holds after start-up (initial states ignored), which was then in the scope only and is now in the statement."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The statement now carries the condition on initial states."
+    }
+   ]
+  },
+  {
+   "id": "C7",
+   "statement": "If the discount matrix $D$ of a [[D1:lagged SSOE model]] is block-diagonal with one block $D_{ll}$ per unique lag $l$, every eigenvalue of the [[D2:expanded discount matrix]] has modulus $|\\mu|^{1/l}$ for an eigenvalue $\\mu$ of some $D_{ll}$, so all of them lie inside the unit circle exactly when the [[D4:per-lag check]] passes.",
+   "about": {
+    "subject": "D4",
+    "relation": "passes exactly when every eigenvalue lies inside the unit circle of",
+    "object": "D2",
+    "comparator": null,
+    "conditions": [
+     "discount matrix block-diagonal across lags"
+    ]
+   },
+   "type": "formal",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E7"
+    }
+   ],
+   "scope": {
+    "population": "lagged SSOE models whose discount matrix is block-diagonal across lags"
+   },
+   "verification": "agent_checked",
+   "depends_on": [
+    "C15"
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived by a Schur complement; 50 random block-diagonal D with lags from {1, 3, 4} gave moduli |mu|^(1/l) and agreeing decisions. Noted that the RN2 example labelled block-diagonal is lower-triangular, and that the claim does not cover ETS or GUM, whose D is not block-diagonal."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "E7.S1 now rests on C15 for a general M; S2 needs the components grouped by lag, which a simultaneous permutation allows; the claim does not cover ETS or GUM, whose D is not block-diagonal."
+    }
+   ]
+  },
+  {
+   "id": "C8",
+   "statement": "An eigenvalue $\\lambda \\neq 0$ of the expanded transition matrix $\\tilde F$ with an eigenvector unobservable through $\\tilde w$ or a left eigenvector unreachable from $\\tilde g$ is an eigenvalue of the [[D2:expanded discount matrix]], and $1/\\lambda$ is a common root of $\\phi(B) = \\det(I - F L(B))$ and $\\theta(B) = \\det(I - D L(B))$.",
+   "about": {
+    "subject": "a nonzero eigenvalue of the expanded transition matrix that is unobservable or unreachable",
+    "relation": "is an eigenvalue of",
+    "object": "D2",
+    "comparator": null,
+    "conditions": []
+   },
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E8"
+    }
+   ],
+   "scope": {
+    "population": "pure additive lagged SSOE models"
+   },
+   "depends_on": [
+    "C15"
+   ],
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps re-derived and checked on 5 random GUMs with a constructed unobservable mode (residuals about 1e-14). Noted that step S3 rested on the general identity of the expansion rather than on C7; the dependency now points to C15."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "E8.S3 now cites C15 in its lambda != 0 form; S4 follows with M = F and M = D."
+    }
+   ]
+  },
+  {
+   "id": "C9",
+   "statement": "For [[D9:ETS(A,N,A)]] with any period $m$ and any $\\alpha$ and $\\gamma$, $B = 1$ is a root of both $\\theta(B) = (1 - (1-\\alpha)B)(1 - (1-\\gamma)B^m) - \\alpha\\gamma B^{m+1}$ and $\\phi(B) = (1 - B)(1 - B^m)$, so the [[D2:expanded discount matrix]] has an eigenvalue equal to 1.",
+   "about": {
+    "subject": "D9",
+    "relation": "has an eigenvalue equal to 1 in its",
+    "object": "D2",
+    "comparator": null,
+    "conditions": [
+     "any period m",
+     "any alpha and gamma"
+    ]
+   },
+   "type": "formal",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E9"
+    }
+   ],
+   "scope": {
+    "population": "ETS(A,N,A) models"
+   },
+   "depends_on": [
+    "C15"
+   ],
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "theta matches the closed form; det(I - D~) about 1e-17 for m = 1, 2, 4, 7, 12, 24; noted that step S5 needs the identity of the expansion, now cited as C15."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "E9.S5 now cites C15 at lambda = 1, giving det(I - D~) = theta(1) = 0."
+    }
+   ]
+  },
+  {
+   "id": "C10",
+   "statement": "For [[D24:ETS(A,N,A,A) with seasonal lags 24 and 168, $\\alpha = 0.3$ and $\\gamma = (0.1, 0.05)$]], [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation, just below one, equalled the [[D5:PBH reference]] to within rounding error.",
+   "about": {
+    "subject": "D6",
+    "relation": "gives the same value of",
+    "object": [
+     "D30"
+    ],
+    "comparator": "D5",
+    "conditions": [
+     "D24"
+    ]
+   },
+   "type": "descriptive",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "planning": "exploratory",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E10",
+     "artefacts": [
+      "A1",
+      "A2"
+     ],
+     "results": [
+      "E10.T1.r1"
+     ]
+    }
+   ],
+   "scope": {
+    "population": "ETS(A,N,A,A) with seasonal lags 24 and 168",
+    "conditions": [
+     "alpha = 0.3, gamma = (0.1, 0.05)",
+     "numpy prototype"
+    ]
+   },
+   "assumptions": [
+    "C14"
+   ],
+   "limitations": [
+    "L2"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "low",
+     "rationale": "Exploratory single case, chosen by the agent while designing the method."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Degree 193, shared factor 25, 0.9999965469723225 against PBH 0.9999965469723241."
+    }
+   ]
+  },
+  {
+   "id": "C11",
+   "statement": "For [[D25:the default starting point of gum() with orders (2, 2) and lags (1, 12)]] ($F = I$, $g = 0.1$, $w = 1$), [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation equalled the [[D5:PBH reference]] to within rounding error.",
+   "about": {
+    "subject": "D6",
+    "relation": "gives the same value of",
+    "object": [
+     "D30"
+    ],
+    "comparator": "D5",
+    "conditions": [
+     "D25"
+    ]
+   },
+   "type": "descriptive",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "planning": "exploratory",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E10",
+     "artefacts": [
+      "A1",
+      "A2"
+     ],
+     "results": [
+      "E10.T1.r2"
+     ]
+    }
+   ],
+   "scope": {
+    "population": "GUM with orders (2, 2) and lags (1, 12)",
+    "conditions": [
+     "F = I, g = 0.1, w = 1",
+     "numpy prototype"
+    ]
+   },
+   "assumptions": [
+    "C14"
+   ],
+   "limitations": [
+    "L2"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "low",
+     "rationale": "Exploratory single case, chosen by the agent while designing the method."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Degree 26, shared factor 14, 0.9829371631611427 against PBH 0.9829371631611421."
+    }
+   ]
+  },
+  {
+   "id": "C12",
+   "statement": "For an admissible and an inadmissible [[D40:random GUM model with lags (1, 24, 168)]] and the cancelled MA polynomial of [[D24:an ETS(A,N,A,A) model with seasonal lags 24 and 168]], the [[D7:step-down test]] was more than twenty times faster than [[D15:all roots by numpy's companion-matrix eigenvalues]].",
+   "about": {
+    "subject": "D7",
+    "relation": "takes less time than",
+    "object": null,
+    "comparator": "D15",
+    "conditions": [
+     "D40",
+     "D24"
+    ]
+   },
+   "type": "descriptive",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "planning": "exploratory",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E12",
+     "artefacts": [
+      "A1",
+      "A4"
+     ],
+     "results": [
+      "E12.T1.r1",
+      "E12.T1.r2",
+      "E12.T1.r3"
+     ]
+    }
+   ],
+   "scope": {
+    "population": "GUM with lags (1, 24, 168) and ETS(A,N,A,A) with seasonal lags 24 and 168",
+    "conditions": [
+     "numpy, Python 3.13, one x86_64 machine with 4 CPUs, mean of 50 repeats",
+     "step-down recursions of 193, 170 and 168 steps"
+    ]
+   },
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "low",
+     "rationale": "Exploratory timings on one machine for three polynomials, in Python, where the interpreter's overhead dominates the step-down recursion."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "disputed",
+     "extent": "partial",
+     "notes": "Checked an earlier statement based on run RN2 (step-down 0.007 ms, roots 22 ms, coefficients 4.7 ms): the order of magnitude and ranking reproduced, but the timed polynomial was inadmissible and the step-down stopped after 1 of 193 steps; a full recursion took about 0.5 ms.",
+     "resolution": "The claim was replaced by timings from run RN13 with full recursions (193, 170 and 168 steps), which the recheck reproduced."
+    },
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "timing.py --seed 3 --repeats 50: 193, 170 and 168 steps; step-down 0.90, 0.57 and 0.43 ms against roots 24.5, 19.7 and 17.9 ms; same order and ranking, with load noise of 30 to 40 percent in the step-down times, so the times should not be read finer than a factor of two."
+    }
+   ]
+  },
+  {
+   "id": "C13",
+   "statement": "The numpy function per_lag_max() returns the same largest eigenvalue modulus as smoothEigensCpp() of smooth 4.6.0 (replaced in commit 4a44c1c) for models with a constant measurement vector and without adaptive regressors.",
+   "type": "methodological",
+   "role": "supporting",
+   "support": [
+    {
+     "kind": "assumption"
+    }
+   ],
+   "assumption_category": "methodological",
+   "check": "unchecked"
+  },
+  {
+   "id": "C14",
+   "statement": "The [[D5:PBH reference]] with relative rank tolerance 1e-7 classifies every eigenvalue of modulus at least 1 of the [[D2:expanded discount matrix]] of the tested models correctly as both reachable and observable or not.",
+   "type": "methodological",
+   "role": "supporting",
+   "support": [
+    {
+     "kind": "assumption"
+    }
+   ],
+   "assumption_category": "methodological",
+   "check": "unchecked"
+  },
+  {
+   "id": "C15",
+   "statement": "For the lag-1 expansion $\\tilde M$ of $v_t = M v_{t-l}$ in a [[D1:lagged SSOE model]], $\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M)$, which equals $\\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda))$ for $\\lambda \\neq 0$.",
+   "about": {
+    "subject": "D1",
+    "relation": "has as characteristic polynomial of its lag-1 expansion",
+    "object": "det(Lambda(lambda) - M)",
+    "comparator": null,
+    "conditions": [
+     "any square matrix M of size k"
+    ]
+   },
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E11"
+    }
+   ],
+   "scope": {
+    "population": "pure additive lagged SSOE models",
+    "conditions": [
+     "any square matrix $M$ of size $k$"
+    ]
+   },
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps S1-S6 of E11 re-derived; on 200 random models with lags from {1, 2, 3, 5} at complex lambda the identities of S2, S3, S5 and S6 held to relative errors of at most 7.3e-15; the rule of S6 was corrected to factor Lambda on the right."
+    }
+   ]
+  },
+  {
+   "id": "C17",
+   "statement": "For a [[D1:lagged SSOE model]] with $\\theta(B) = \\det(I - D L(B))$ and $\\phi(B) = \\det(I - F L(B))$, the roots of $\\theta(B) / \\gcd(\\theta(B), \\phi(B))$ are exactly the reciprocals $1/\\lambda$ of the nonzero eigenvalues $\\lambda$ of the reachable and observable part of the [[D2:expanded discount matrix]] (its Kalman decomposition), with their multiplicities.",
+   "about": {
+    "subject": "D2",
+    "relation": "has, in its reachable and observable part, the reciprocals of the roots of",
+    "object": "theta(B) / gcd(theta(B), phi(B))",
+    "comparator": null,
+    "conditions": []
+   },
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E14"
+    },
+    {
+     "kind": "consensus"
+    }
+   ],
+   "scope": {
+    "population": "pure additive lagged SSOE models",
+    "conditions": [
+     "the definition D3 agrees with this part unless an eigenvalue is shared by the reachable and observable part and the rest"
+    ]
+   },
+   "depends_on": [
+    "C6",
+    "C15"
+   ],
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived S1-S5; exact rational arithmetic against the Kalman decomposition on 300 random lagged models (159 with an unreachable or unobservable part) agreed; noted that S5 needed the reversal, the normalisation and the coprimality under reversal spelled out, since added."
+    }
+   ]
+  },
+  {
+   "id": "C18",
+   "statement": "For a polynomial $c$ with $c(0) \\neq 0$ and $r > 0$, the [[D7:step-down test]] passes on $c(B/r)$ if and only if $1/|B| < r$ for every root $B$ of $c$.",
+   "about": {
+    "subject": "D7",
+    "relation": "passes on c(B/r) exactly when every root B of c has 1/|B| below",
+    "object": "r",
+    "comparator": null,
+    "conditions": [
+     "c(0) nonzero",
+     "r > 0"
+    ]
+   },
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E15"
+    },
+    {
+     "kind": "cited",
+     "reference": "B2"
+    }
+   ],
+   "scope": {
+    "population": "real polynomials with a nonzero constant term"
+   },
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The scaling is correct and the equivalence rests on D7 and B2; noted the missing division by c(0) and the citation of D7 for a substitution in E15, since corrected."
+    }
+   ]
+  },
+  {
+   "id": "C19",
+   "statement": "In additive ETS models, and in GUM models with an identity transition or with transition, persistence and measurement in general position, every factor shared by $\\theta(B)$ and $\\phi(B)$ with a root in $|B| \\le 1$ is a product of cyclotomic polynomials $\\Phi_n(B)$ with $n$ dividing a lag of the model.",
+   "type": "methodological",
+   "role": "supporting",
+   "support": [
+    {
+     "kind": "assumption"
+    }
+   ],
+   "assumption_category": "theoretical",
+   "check": "unchecked"
+  },
+  {
+   "id": "C20",
+   "statement": "For a square matrix $M$ of size $k$ and lags $l_1, \\dots, l_k$, $\\det(I - M L(B)) = \\sum_{S \\subseteq \\{1, \\dots, k\\}} (-1)^{|S|} \\det(M_{SS})\\, B^{\\sum_{j \\in S} l_j}$, with $\\det(M_{\\emptyset\\emptyset}) = 1$.",
+   "about": {
+    "subject": "det(I - M L(B))",
+    "relation": "is the signed sum over subsets of",
+    "object": "the principal minors of M",
+    "comparator": null,
+    "conditions": [
+     "M square of size k",
+     "positive integer lags"
+    ]
+   },
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E16"
+    },
+    {
+     "kind": "consensus"
+    }
+   ],
+   "scope": {
+    "population": "square matrices and positive integer lags"
+   },
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Steps of E16 re-derived; against the determinant at random complex B the relative error was at most 3.0e-15 for real M (200 cases) and complex M (100 cases)."
+    }
+   ]
+  },
+  {
+   "id": "C21",
+   "statement": "The per-lag discount matrices $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ of [[D16:Section 5.4 of the ADAM monograph]] have as nonzero eigenvalues those of the diagonal block of $D = F - g w'$ for the lag $m_i$ (the [[D4:per-lag check]]), and their sum is $D + \\sum_{i \\neq j} g_{m_i} w_{m_j}'$, which differs from $D$ whenever $g w'$ links components of distinct lags.",
+   "about": {
+    "subject": "D16",
+    "relation": "checks the same eigenvalues as",
+    "object": null,
+    "comparator": "D4",
+    "conditions": [
+     "more than one distinct lag"
+    ]
+   },
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E17"
+    }
+   ],
+   "scope": {
+    "population": "pure additive lagged SSOE models with more than one distinct lag",
+    "conditions": [
+     "F split by the columns, and g and w by the components, of each lag, as in Section 5.2 of the monograph, which writes g_{m_i} and w_{m_i} without defining their split; with g kept whole the first part holds and the sum equals D"
+    ]
+   },
+   "verification": "agent_checked",
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "500 random models with lags in {1, 3, 12}: the nonzero eigenvalues of each D_{m_i} equal those of the diagonal block of D, and the sum equals D plus the cross terms, never D with distinct lags. Noted the missing step for 'differs from D', the 'distinct lags' wording and the monograph's undefined split of g, since added to the evidence and the scope."
+    }
+   ]
+  },
+  {
+   "id": "C22",
    "statement": "For [[D35:ETS(A,N,A) with $m = 12$]], $\\alpha = 1.2$ and $\\gamma = 0.9$, the [[D16:stability condition of Section 5.4 of the ADAM monograph]] holds, while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow from period to period, and the largest root modulus of the cancelled MA polynomial exceeds one.",
    "about": {
     "subject": "D16",
@@ -1058,7 +1860,7 @@
     ]
    },
    "depends_on": [
-    "C15"
+    "C21"
    ],
    "limitations": [
     "L6"
@@ -1089,7 +1891,60 @@
    ]
   },
   {
-   "id": "C6",
+   "id": "C23",
+   "statement": "Over five fits with bounds=\\\"admissible\\\", the median time of a fit with [[D12:the polynomial check]] was comparable to that with [[D4:the per-lag check]], also for adam() with seasonal lags 24 and 168 on [[D38:hourly data]], with optimisation paths that differ between the checks.",
+   "about": {
+    "subject": "D12",
+    "relation": "takes about as long per fit as",
+    "object": null,
+    "comparator": "D4",
+    "conditions": [
+     "D38"
+    ]
+   },
+   "type": "descriptive",
+   "role": "secondary",
+   "novelty": "no_prior_found",
+   "planning": "exploratory",
+   "support": [
+    {
+     "kind": "simulation",
+     "evidence": "E19",
+     "artefacts": [
+      "A7"
+     ],
+     "results": [
+      "E19.T1"
+     ]
+    }
+   ],
+   "scope": {
+    "population": "fits of gum(), adam() and ces() on AirPassengers and a synthetic hourly series",
+    "conditions": [
+     "R 4.3.3, -O2, one x86_64 machine with 4 CPUs, median of seven fits"
+    ]
+   },
+   "limitations": [
+    "L7"
+   ],
+   "assessments": [
+    {
+     "by": "author",
+     "strength": "low",
+     "rationale": "Exploratory timings on one machine with a run-to-run noise of about 10%, and optimisation paths that differ between the checks."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P3",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The ratios matched the table of E19 (0.8247 to 1.1963, hourly 1.0833); noted that the earlier metric, fit time divided by the calls of one check, mixed time and call counts; the claim now reports the ratio of the fit times with both call counts in the table."
+    }
+   ]
+  },
+  {
+   "id": "C24",
    "statement": "On [[D22:1,000 new random ADAM ETS+ARIMA models]] (500 with ARIMA at lag 1, 500 with seasonal ARIMA), [[D13:checking the ETS part and the ARIMA polynomials apart]], as adam() did with bounds=\\\"admissible\\\", gave an [[D29:admissibility decision]] different from the [[D5:PBH reference]] of the whole model on about a third of the models in each family, accepting models that are not forecastable and rejecting models that are.",
    "about": {
     "subject": "D13",
@@ -1197,7 +2052,7 @@
    ]
   },
   {
-   "id": "C7",
+   "id": "C25",
    "statement": "On the same [[D22:1,000 random ETS+ARIMA models]], [[D10:the check of the whole model]], the criterion of [[C3]] applied to the whole model (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary), gave the same [[D29:admissibility decision]] as the [[D5:PBH reference]] on every model, and the same [[D30:largest modulus]] to within rounding error on the models both found inadmissible.",
    "about": {
     "subject": "D10",
@@ -1320,7 +2175,7 @@
    ]
   },
   {
-   "id": "C8",
+   "id": "C26",
    "statement": "On [[D22:1,000 further random ETS+ARIMA models]], [[D14:the bounds checker of adam() in R and of ADAM in Python]] with bounds=\\\"admissible\\\", which run smoothEigensCpp() on the whole model, gave the same [[D29:admissibility decision]] as [[D10:the prototype check of the whole model]] on every model, and a penalty slope ([[D30:the largest root modulus]]) within the bisection tolerance of it in both families.",
    "about": {
     "subject": "D14",
@@ -1477,823 +2332,7 @@
    ]
   },
   {
-   "id": "C9",
-   "statement": "For a [[D1:lagged SSOE model]], ignoring the initial states, $\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t$, so the model has the ARIMA form with AR polynomial $\\phi(B) = \\det(I - F L(B))$ and MA polynomial $\\theta(B) = \\det(I - D L(B))$.",
-   "about": {
-    "subject": "D1",
-    "relation": "has the ARIMA form with",
-    "object": "AR polynomial det(I - F L(B)) and MA polynomial det(I - D L(B))",
-    "comparator": null,
-    "conditions": [
-     "initial states ignored"
-    ]
-   },
-   "type": "formal",
-   "role": "supporting",
-   "novelty": "extension",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E6"
-    },
-    {
-     "kind": "consensus"
-    },
-    {
-     "kind": "simulation",
-     "evidence": "E10",
-     "artefacts": [
-      "A1",
-      "A2"
-     ]
-    }
-   ],
-   "scope": {
-    "population": "pure additive lagged SSOE models",
-    "conditions": [
-     "identity of lag-operator polynomials, initial states ignored"
-    ]
-   },
-   "relations": [
-    {
-     "type": "extends",
-     "reference": "B1",
-     "locator": "Chapter 11",
-     "self": false,
-     "note": "Hyndman, Koehler, Ord and Snyder relate the reduced forms of linear innovations state space models to ARIMA models."
-    }
-   ],
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Steps S1-S7 of E6 re-derived; simulated residual of the identity on 40 random GUMs at late t at most 1.7e-15 relative; the identity holds after start-up (initial states ignored), which was then in the scope only and is now in the statement."
-    },
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "The statement now carries the condition on initial states."
-    }
-   ]
-  },
-  {
-   "id": "C10",
-   "statement": "An eigenvalue $\\lambda \\neq 0$ of the expanded transition matrix $\\tilde F$ with an eigenvector unobservable through $\\tilde w$ or a left eigenvector unreachable from $\\tilde g$ is an eigenvalue of the [[D2:expanded discount matrix]], and $1/\\lambda$ is a common root of $\\phi(B) = \\det(I - F L(B))$ and $\\theta(B) = \\det(I - D L(B))$.",
-   "about": {
-    "subject": "a nonzero eigenvalue of the expanded transition matrix that is unobservable or unreachable",
-    "relation": "is an eigenvalue of",
-    "object": "D2",
-    "comparator": null,
-    "conditions": []
-   },
-   "type": "formal",
-   "role": "supporting",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E8"
-    }
-   ],
-   "scope": {
-    "population": "pure additive lagged SSOE models"
-   },
-   "depends_on": [
-    "C11"
-   ],
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Steps re-derived and checked on 5 random GUMs with a constructed unobservable mode (residuals about 1e-14). Noted that step S3 rested on the general identity of the expansion rather than on C7; the dependency now points to C15."
-    },
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "E8.S3 now cites C15 in its lambda != 0 form; S4 follows with M = F and M = D."
-    }
-   ]
-  },
-  {
-   "id": "C11",
-   "statement": "For the lag-1 expansion $\\tilde M$ of $v_t = M v_{t-l}$ in a [[D1:lagged SSOE model]], $\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M)$, which equals $\\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda))$ for $\\lambda \\neq 0$.",
-   "about": {
-    "subject": "D1",
-    "relation": "has as characteristic polynomial of its lag-1 expansion",
-    "object": "det(Lambda(lambda) - M)",
-    "comparator": null,
-    "conditions": [
-     "any square matrix M of size k"
-    ]
-   },
-   "type": "formal",
-   "role": "supporting",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E11"
-    }
-   ],
-   "scope": {
-    "population": "pure additive lagged SSOE models",
-    "conditions": [
-     "any square matrix $M$ of size $k$"
-    ]
-   },
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Steps S1-S6 of E11 re-derived; on 200 random models with lags from {1, 2, 3, 5} at complex lambda the identities of S2, S3, S5 and S6 held to relative errors of at most 7.3e-15; the rule of S6 was corrected to factor Lambda on the right."
-    }
-   ]
-  },
-  {
-   "id": "C12",
-   "statement": "For a [[D1:lagged SSOE model]] with $\\theta(B) = \\det(I - D L(B))$ and $\\phi(B) = \\det(I - F L(B))$, the roots of $\\theta(B) / \\gcd(\\theta(B), \\phi(B))$ are exactly the reciprocals $1/\\lambda$ of the nonzero eigenvalues $\\lambda$ of the reachable and observable part of the [[D2:expanded discount matrix]] (its Kalman decomposition), with their multiplicities.",
-   "about": {
-    "subject": "D2",
-    "relation": "has, in its reachable and observable part, the reciprocals of the roots of",
-    "object": "theta(B) / gcd(theta(B), phi(B))",
-    "comparator": null,
-    "conditions": []
-   },
-   "type": "formal",
-   "role": "supporting",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E14"
-    },
-    {
-     "kind": "consensus"
-    }
-   ],
-   "scope": {
-    "population": "pure additive lagged SSOE models",
-    "conditions": [
-     "the definition D3 agrees with this part unless an eigenvalue is shared by the reachable and observable part and the rest"
-    ]
-   },
-   "depends_on": [
-    "C9",
-    "C11"
-   ],
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Re-derived S1-S5; exact rational arithmetic against the Kalman decomposition on 300 random lagged models (159 with an unreachable or unobservable part) agreed; noted that S5 needed the reversal, the normalisation and the coprimality under reversal spelled out, since added."
-    }
-   ]
-  },
-  {
-   "id": "C13",
-   "statement": "For a polynomial $c$ with $c(0) \\neq 0$ and $r > 0$, the [[D7:step-down test]] passes on $c(B/r)$ if and only if $1/|B| < r$ for every root $B$ of $c$.",
-   "about": {
-    "subject": "D7",
-    "relation": "passes on c(B/r) exactly when every root B of c has 1/|B| below",
-    "object": "r",
-    "comparator": null,
-    "conditions": [
-     "c(0) nonzero",
-     "r > 0"
-    ]
-   },
-   "type": "formal",
-   "role": "supporting",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E15"
-    },
-    {
-     "kind": "cited",
-     "reference": "B2"
-    }
-   ],
-   "scope": {
-    "population": "real polynomials with a nonzero constant term"
-   },
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "The scaling is correct and the equivalence rests on D7 and B2; noted the missing division by c(0) and the citation of D7 for a substitution in E15, since corrected."
-    }
-   ]
-  },
-  {
-   "id": "C14",
-   "statement": "For a square matrix $M$ of size $k$ and lags $l_1, \\dots, l_k$, $\\det(I - M L(B)) = \\sum_{S \\subseteq \\{1, \\dots, k\\}} (-1)^{|S|} \\det(M_{SS})\\, B^{\\sum_{j \\in S} l_j}$, with $\\det(M_{\\emptyset\\emptyset}) = 1$.",
-   "about": {
-    "subject": "det(I - M L(B))",
-    "relation": "is the signed sum over subsets of",
-    "object": "the principal minors of M",
-    "comparator": null,
-    "conditions": [
-     "M square of size k",
-     "positive integer lags"
-    ]
-   },
-   "type": "formal",
-   "role": "supporting",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E16"
-    },
-    {
-     "kind": "consensus"
-    }
-   ],
-   "scope": {
-    "population": "square matrices and positive integer lags"
-   },
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Steps of E16 re-derived; against the determinant at random complex B the relative error was at most 3.0e-15 for real M (200 cases) and complex M (100 cases)."
-    }
-   ]
-  },
-  {
-   "id": "C15",
-   "statement": "The per-lag discount matrices $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ of [[D16:Section 5.4 of the ADAM monograph]] have as nonzero eigenvalues those of the diagonal block of $D = F - g w'$ for the lag $m_i$ (the [[D4:per-lag check]]), and their sum is $D + \\sum_{i \\neq j} g_{m_i} w_{m_j}'$, which differs from $D$ whenever $g w'$ links components of distinct lags.",
-   "about": {
-    "subject": "D16",
-    "relation": "checks the same eigenvalues as",
-    "object": null,
-    "comparator": "D4",
-    "conditions": [
-     "more than one distinct lag"
-    ]
-   },
-   "type": "formal",
-   "role": "supporting",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E17"
-    }
-   ],
-   "scope": {
-    "population": "pure additive lagged SSOE models with more than one distinct lag",
-    "conditions": [
-     "F split by the columns, and g and w by the components, of each lag, as in Section 5.2 of the monograph, which writes g_{m_i} and w_{m_i} without defining their split; with g kept whole the first part holds and the sum equals D"
-    ]
-   },
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "500 random models with lags in {1, 3, 12}: the nonzero eigenvalues of each D_{m_i} equal those of the diagonal block of D, and the sum equals D plus the cross terms, never D with distinct lags. Noted the missing step for 'differs from D', the 'distinct lags' wording and the monograph's undefined split of g, since added to the evidence and the scope."
-    }
-   ]
-  },
-  {
-   "id": "C16",
-   "statement": "The [[D4:per-lag check]] rejected 1 of [[D18:200 random GUM models with lags (1, 12)]] that have [[D3:decaying weights]].",
-   "about": {
-    "subject": "D4",
-    "relation": "rejects models with",
-    "object": "D3",
-    "comparator": null,
-    "conditions": [
-     "D18"
-    ]
-   },
-   "type": "descriptive",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "simulation",
-     "evidence": "E2",
-     "artefacts": [
-      "A1",
-      "A3"
-     ],
-     "results": [
-      "E2.R5"
-     ]
-    }
-   ],
-   "provenance": "author_stated",
-   "hypothesis": {
-    "lab_event": "H2",
-    "outcome": "supported"
-   },
-   "planning": "confirmatory",
-   "planned_at": "2026-10-21T15:21:33Z",
-   "planned_at_anchor": "git_remote",
-   "test": {
-    "framework": "deterministic",
-    "parameters": {
-     "seed": 2026,
-     "edge_band": 1e-08,
-     "pbh_tolerance": 1e-07,
-     "cancellation_tolerance": 1e-09,
-     "sample": "200 random GUM models, fixed; no interim analysis"
-    },
-    "quantities": {
-     "gum_rej": {
-      "variable": "models rejected by the per-lag check that forget their initial states",
-      "conditions": {
-       "family": "GUM"
-      }
-     }
-    },
-    "supported": "gum_rej > 0",
-    "not_supported": "gum_rej == 0",
-    "verdict": "computed",
-    "runs": 1,
-    "lab_plan": "PL2"
-   },
-   "scope": {
-    "population": "GUM models",
-    "conditions": [
-     "GUM with lags (1, 12) and normal random F, g and w (standard deviations 0.35, 0.175, 0.175; mean of w 1)",
-     "PBH reference below 1 - 1e-8"
-    ],
-    "excludes": [
-     "models with adaptive regressors"
-    ]
-   },
-   "assumptions": [
-    "C25",
-    "C26"
-   ],
-   "limitations": [
-    "L2",
-    "L3"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "low",
-     "rationale": "One model out of 200 in one seeded sample; how far that model's reference lies from 1 was not recorded."
-    }
-   ],
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "1 of 200 reproduced; the cancellation-based reference gives the same model."
-    }
-   ]
-  },
-  {
-   "id": "C17",
-   "statement": "On the 198 models among [[D20:575 random additive ETS and GUM models]] whose cancelled MA polynomial $\\theta^*$ has a root inside the unit circle, [[D11:bisection on $r$ with the step-down test applied to $\\theta^*(B/r)$]] gave [[D30:$1/\\min|B|$ over the roots $B$ of $\\theta^*$]] within 5.8e-11 of the value from [[D15:numpy's roots]].",
-   "about": {
-    "subject": "D11",
-    "relation": "gives the same largest mode modulus as",
-    "object": [
-     "D30"
-    ],
-    "comparator": "D15",
-    "conditions": [
-     "D20"
-    ]
-   },
-   "type": "methodological",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "simulation",
-     "evidence": "E5",
-     "artefacts": [
-      "A1",
-      "A3"
-     ],
-     "results": [
-      "E5.R1"
-     ]
-    }
-   ],
-   "provenance": "author_stated",
-   "hypothesis": {
-    "lab_event": "H5",
-    "outcome": "supported"
-   },
-   "planning": "confirmatory_with_deviations",
-   "planned_at": "2026-10-21T15:21:42Z",
-   "planned_at_anchor": "git_remote",
-   "test": {
-    "framework": "deterministic",
-    "parameters": {
-     "seed": 2026,
-     "edge_band": 1e-08,
-     "pbh_tolerance": 1e-07,
-     "cancellation_tolerance": 1e-09,
-     "sample": "the inadmissible models among 575, fixed; no interim analysis"
-    },
-    "quantities": {
-     "diff": {
-      "variable": "max abs difference of max |lambda|, bisection against roots"
-     }
-    },
-    "supported": "diff < 0.00000001",
-    "not_supported": "diff >= 0.00000001",
-    "verdict": "computed",
-    "runs": 1,
-    "lab_plan": "PL5"
-   },
-   "limitations": [
-    "L3",
-    "L4",
-    "L5"
-   ],
-   "scope": {
-    "population": "inadmissible pure additive lagged SSOE models",
-    "conditions": [
-     "additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0",
-     "GUM with F = I and lags from {1, 4, 12}",
-     "GUM with random F and lags from {1, 4, 12, 24}",
-     "additive ETS with up to two seasonal lags from {24, 168, 365}",
-     "GUM with random F and lags (1, 24, 168)",
-     "bisection to a width of 1e-10",
-     "numpy prototype"
-    ],
-    "excludes": [
-     "ARIMA components",
-     "CES",
-     "adaptive regressors",
-     "multiplicative models",
-     "seasonal harmonics with non-integer periods (TBATS)"
-    ]
-   },
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "low",
-     "rationale": "The difference is bounded by the bisection width of 1e-10 once the step-down decisions on the scaled polynomials are right, so the test checks those decisions and the bisection logic rather than an independent accuracy."
-    }
-   ],
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "198 inadmissible models and 5.8137e-11 reproduced; the difference is bounded by the 1e-10 bisection width by construction, so the result checks the bisection logic, and the values are not compared with the PBH reference."
-    },
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "partial",
-     "notes": "198 models and 5.8137e-11 reproduced and the rewording as 1/min|B| matches the bisection; the scope then omitted two of the four model families, since added."
-    }
-   ]
-  },
-  {
-   "id": "C18",
-   "statement": "If the discount matrix $D$ of a [[D1:lagged SSOE model]] is block-diagonal with one block $D_{ll}$ per unique lag $l$, every eigenvalue of the [[D2:expanded discount matrix]] has modulus $|\\mu|^{1/l}$ for an eigenvalue $\\mu$ of some $D_{ll}$, so all of them lie inside the unit circle exactly when the [[D4:per-lag check]] passes.",
-   "about": {
-    "subject": "D4",
-    "relation": "passes exactly when every eigenvalue lies inside the unit circle of",
-    "object": "D2",
-    "comparator": null,
-    "conditions": [
-     "discount matrix block-diagonal across lags"
-    ]
-   },
-   "type": "formal",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E7"
-    }
-   ],
-   "scope": {
-    "population": "lagged SSOE models whose discount matrix is block-diagonal across lags"
-   },
-   "verification": "agent_checked",
-   "depends_on": [
-    "C11"
-   ],
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Re-derived by a Schur complement; 50 random block-diagonal D with lags from {1, 3, 4} gave moduli |mu|^(1/l) and agreeing decisions. Noted that the RN2 example labelled block-diagonal is lower-triangular, and that the claim does not cover ETS or GUM, whose D is not block-diagonal."
-    },
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "E7.S1 now rests on C15 for a general M; S2 needs the components grouped by lag, which a simultaneous permutation allows; the claim does not cover ETS or GUM, whose D is not block-diagonal."
-    }
-   ]
-  },
-  {
-   "id": "C19",
-   "statement": "For [[D9:ETS(A,N,A)]] with any period $m$ and any $\\alpha$ and $\\gamma$, $B = 1$ is a root of both $\\theta(B) = (1 - (1-\\alpha)B)(1 - (1-\\gamma)B^m) - \\alpha\\gamma B^{m+1}$ and $\\phi(B) = (1 - B)(1 - B^m)$, so the [[D2:expanded discount matrix]] has an eigenvalue equal to 1.",
-   "about": {
-    "subject": "D9",
-    "relation": "has an eigenvalue equal to 1 in its",
-    "object": "D2",
-    "comparator": null,
-    "conditions": [
-     "any period m",
-     "any alpha and gamma"
-    ]
-   },
-   "type": "formal",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "support": [
-    {
-     "kind": "formal_proof",
-     "evidence": "E9"
-    }
-   ],
-   "scope": {
-    "population": "ETS(A,N,A) models"
-   },
-   "depends_on": [
-    "C11"
-   ],
-   "verification": "agent_checked",
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "theta matches the closed form; det(I - D~) about 1e-17 for m = 1, 2, 4, 7, 12, 24; noted that step S5 needs the identity of the expansion, now cited as C15."
-    },
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "E9.S5 now cites C15 at lambda = 1, giving det(I - D~) = theta(1) = 0."
-    }
-   ]
-  },
-  {
-   "id": "C20",
-   "statement": "For [[D24:ETS(A,N,A,A) with seasonal lags 24 and 168, $\\alpha = 0.3$ and $\\gamma = (0.1, 0.05)$]], [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation, just below one, equalled the [[D5:PBH reference]] to within rounding error.",
-   "about": {
-    "subject": "D6",
-    "relation": "gives the same value of",
-    "object": [
-     "D30"
-    ],
-    "comparator": "D5",
-    "conditions": [
-     "D24"
-    ]
-   },
-   "type": "descriptive",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "planning": "exploratory",
-   "support": [
-    {
-     "kind": "simulation",
-     "evidence": "E10",
-     "artefacts": [
-      "A1",
-      "A2"
-     ],
-     "results": [
-      "E10.T1.r1"
-     ]
-    }
-   ],
-   "scope": {
-    "population": "ETS(A,N,A,A) with seasonal lags 24 and 168",
-    "conditions": [
-     "alpha = 0.3, gamma = (0.1, 0.05)",
-     "numpy prototype"
-    ]
-   },
-   "assumptions": [
-    "C26"
-   ],
-   "limitations": [
-    "L2"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "low",
-     "rationale": "Exploratory single case, chosen by the agent while designing the method."
-    }
-   ],
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Degree 193, shared factor 25, 0.9999965469723225 against PBH 0.9999965469723241."
-    }
-   ]
-  },
-  {
-   "id": "C21",
-   "statement": "For [[D25:the default starting point of gum() with orders (2, 2) and lags (1, 12)]] ($F = I$, $g = 0.1$, $w = 1$), [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation equalled the [[D5:PBH reference]] to within rounding error.",
-   "about": {
-    "subject": "D6",
-    "relation": "gives the same value of",
-    "object": [
-     "D30"
-    ],
-    "comparator": "D5",
-    "conditions": [
-     "D25"
-    ]
-   },
-   "type": "descriptive",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "planning": "exploratory",
-   "support": [
-    {
-     "kind": "simulation",
-     "evidence": "E10",
-     "artefacts": [
-      "A1",
-      "A2"
-     ],
-     "results": [
-      "E10.T1.r2"
-     ]
-    }
-   ],
-   "scope": {
-    "population": "GUM with orders (2, 2) and lags (1, 12)",
-    "conditions": [
-     "F = I, g = 0.1, w = 1",
-     "numpy prototype"
-    ]
-   },
-   "assumptions": [
-    "C26"
-   ],
-   "limitations": [
-    "L2"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "low",
-     "rationale": "Exploratory single case, chosen by the agent while designing the method."
-    }
-   ],
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "Degree 26, shared factor 14, 0.9829371631611427 against PBH 0.9829371631611421."
-    }
-   ]
-  },
-  {
-   "id": "C22",
-   "statement": "For an admissible and an inadmissible [[D40:random GUM model with lags (1, 24, 168)]] and the cancelled MA polynomial of [[D24:an ETS(A,N,A,A) model with seasonal lags 24 and 168]], the [[D7:step-down test]] was more than twenty times faster than [[D15:all roots by numpy's companion-matrix eigenvalues]].",
-   "about": {
-    "subject": "D7",
-    "relation": "takes less time than",
-    "object": null,
-    "comparator": "D15",
-    "conditions": [
-     "D40",
-     "D24"
-    ]
-   },
-   "type": "descriptive",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "planning": "exploratory",
-   "support": [
-    {
-     "kind": "simulation",
-     "evidence": "E12",
-     "artefacts": [
-      "A1",
-      "A4"
-     ],
-     "results": [
-      "E12.T1.r1",
-      "E12.T1.r2",
-      "E12.T1.r3"
-     ]
-    }
-   ],
-   "scope": {
-    "population": "GUM with lags (1, 24, 168) and ETS(A,N,A,A) with seasonal lags 24 and 168",
-    "conditions": [
-     "numpy, Python 3.13, one x86_64 machine with 4 CPUs, mean of 50 repeats",
-     "step-down recursions of 193, 170 and 168 steps"
-    ]
-   },
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "low",
-     "rationale": "Exploratory timings on one machine for three polynomials, in Python, where the interpreter's overhead dominates the step-down recursion."
-    }
-   ],
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "disputed",
-     "extent": "partial",
-     "notes": "Checked an earlier statement based on run RN2 (step-down 0.007 ms, roots 22 ms, coefficients 4.7 ms): the order of magnitude and ranking reproduced, but the timed polynomial was inadmissible and the step-down stopped after 1 of 193 steps; a full recursion took about 0.5 ms.",
-     "resolution": "The claim was replaced by timings from run RN13 with full recursions (193, 170 and 168 steps), which the recheck reproduced."
-    },
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "timing.py --seed 3 --repeats 50: 193, 170 and 168 steps; step-down 0.90, 0.57 and 0.43 ms against roots 24.5, 19.7 and 17.9 ms; same order and ranking, with load noise of 30 to 40 percent in the step-down times, so the times should not be read finer than a factor of two."
-    }
-   ]
-  },
-  {
-   "id": "C23",
-   "statement": "Over five fits with bounds=\\\"admissible\\\", the median time of a fit with [[D12:the polynomial check]] was comparable to that with [[D4:the per-lag check]], also for adam() with seasonal lags 24 and 168 on [[D38:hourly data]], with optimisation paths that differ between the checks.",
-   "about": {
-    "subject": "D12",
-    "relation": "takes about as long per fit as",
-    "object": null,
-    "comparator": "D4",
-    "conditions": [
-     "D38"
-    ]
-   },
-   "type": "descriptive",
-   "role": "secondary",
-   "novelty": "no_prior_found",
-   "planning": "exploratory",
-   "support": [
-    {
-     "kind": "simulation",
-     "evidence": "E19",
-     "artefacts": [
-      "A7"
-     ],
-     "results": [
-      "E19.T1"
-     ]
-    }
-   ],
-   "scope": {
-    "population": "fits of gum(), adam() and ces() on AirPassengers and a synthetic hourly series",
-    "conditions": [
-     "R 4.3.3, -O2, one x86_64 machine with 4 CPUs, median of seven fits"
-    ]
-   },
-   "limitations": [
-    "L7"
-   ],
-   "assessments": [
-    {
-     "by": "author",
-     "strength": "low",
-     "rationale": "Exploratory timings on one machine with a run-to-run noise of about 10%, and optimisation paths that differ between the checks."
-    }
-   ],
-   "checks": [
-    {
-     "by": "P3",
-     "outcome": "confirmed",
-     "extent": "full",
-     "notes": "The ratios matched the table of E19 (0.8247 to 1.1963, hourly 1.0833); noted that the earlier metric, fit time divided by the calls of one check, mixed time and call counts; the claim now reports the ratio of the fit times with both call counts in the table."
-    }
-   ]
-  },
-  {
-   "id": "C24",
+   "id": "C27",
    "statement": "With [[D14:the check of the whole model and its shortcut for pure ARIMA]], the median time of five fits with bounds=\\\"admissible\\\" of two ARIMA and two ETS+ARIMA models was close to that with [[D13:the check of the parts apart]]; the log-likelihood of SARIMA(1,1,1)(1,1,1)[12] on [[D36:AirPassengers]] rose slightly, and that of ETS(A,N,A)+ARIMA(1,0,1) fell, to another local optimum.",
    "about": {
     "subject": "D14",
@@ -2344,45 +2383,6 @@
      "notes": "The shortcut is exact. Derivation: a constant or static regressor has F row e_x, g_x = 0, so row x of D is also e_x and expanding det(I - D L) along it gives theta_whole = theta_ARIMA (1 - B) and phi_whole = phi_ARIMA (1 - B) (checked on adam() matrices of plain, constant and static-regressor ARIMA, 295 models in total, max gap 1.4e-14, AC3.RN3, AC3.RN11). With every MA factor invertible theta_ARIMA has no root on or inside the circle, the (1 - B) factors cancel with phi, so theta* has all roots outside; this holds whether or not the AR is stationary. Code: in R (adam_bounds_checker in R/utils-adam.R and ssarima in R/adam-ssarima.R) and Python (cost_functions.py) the whole check is skipped only when no ETS, no adaptive regressors, arima_model true and ma_reflection < 1, otherwise it runs, so an MA root that cancels with a difference is still accepted (reflection >= 1 goes to the whole check). maReflection is the factor-by-factor Schur-Cohn value, below 1 exactly when every factor is invertible. Tests (mine, the author has no recorded run of the shortcut: RN53 only used ets_model=True and predates b4a10cc6; RN55/RN56 are timing): on 238 adam()-built pure ARIMA models (plain 80, constant 80, static regressor 78; AC3.RN11) 136 have all MA roots outside the circle and smooth_eigens rejects 0 of them; the real R adam_bounds_checker() with etsModel FALSE (AC3.RN12) gives a penalty on 0 of the 136 and its decision equals the forced whole-model check on all 102 non-invertible ones (20 of them are accepted, the cancelling roots). RN55 and RN56 give identical log-likelihoods for the SARIMA (-541.382357389734 both) as the author's NT24 says. Minor: in floating point the shortcut is if anything more robust than the whole check (no cancellation tolerance involved); DC6's text 'the whole model is checked only otherwise' is right but reads as if non-invertible models were rejected, which they are not."
     }
    ]
-  },
-  {
-   "id": "C25",
-   "statement": "The numpy function per_lag_max() returns the same largest eigenvalue modulus as smoothEigensCpp() of smooth 4.6.0 (replaced in commit 4a44c1c) for models with a constant measurement vector and without adaptive regressors.",
-   "type": "methodological",
-   "role": "supporting",
-   "support": [
-    {
-     "kind": "assumption"
-    }
-   ],
-   "assumption_category": "methodological",
-   "check": "unchecked"
-  },
-  {
-   "id": "C26",
-   "statement": "The [[D5:PBH reference]] with relative rank tolerance 1e-7 classifies every eigenvalue of modulus at least 1 of the [[D2:expanded discount matrix]] of the tested models correctly as both reachable and observable or not.",
-   "type": "methodological",
-   "role": "supporting",
-   "support": [
-    {
-     "kind": "assumption"
-    }
-   ],
-   "assumption_category": "methodological",
-   "check": "unchecked"
-  },
-  {
-   "id": "C27",
-   "statement": "In additive ETS models, and in GUM models with an identity transition or with transition, persistence and measurement in general position, every factor shared by $\\theta(B)$ and $\\phi(B)$ with a root in $|B| \\le 1$ is a product of cyclotomic polynomials $\\Phi_n(B)$ with $n$ dividing a lag of the model.",
-   "type": "methodological",
-   "role": "supporting",
-   "support": [
-    {
-     "kind": "assumption"
-    }
-   ],
-   "assumption_category": "theoretical",
-   "check": "unchecked"
   },
   {
    "id": "C28",
@@ -3150,7 +3150,7 @@
      "id": "S1",
      "statement": "\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M) \\text{ for the lag-1 expansion } \\tilde M \\text{ of } v_t = M v_{t-l}",
      "by": [
-      "C11"
+      "C15"
      ],
      "rule": "identity of the lag-1 expansion"
     },
@@ -3210,7 +3210,7 @@
      "id": "S3",
      "statement": "\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda)),\\ \\lambda \\neq 0",
      "by": [
-      "C11"
+      "C15"
      ],
      "rule": "identity of the lag-1 expansion"
     },
@@ -3274,7 +3274,7 @@
      "statement": "\\det(I - \\tilde D) = 1^{m+1} \\theta(1) = 0",
      "by": [
       "S3",
-      "C11"
+      "C15"
      ],
      "rule": "identity of the lag-1 expansion at $\\lambda = 1$"
     }
@@ -3487,7 +3487,7 @@
      "id": "S4",
      "statement": "1 + \\tilde w'(zI - \\tilde F)^{-1}\\tilde g = \\frac{\\det(zI - \\tilde D)}{\\det(zI - \\tilde F)} = \\frac{\\theta(1/z)}{\\phi(1/z)}",
      "by": [
-      "C11",
+      "C15",
       "D1"
      ],
      "rule": "matrix determinant lemma and the identity of the lag-1 expansion"
@@ -4712,11 +4712,11 @@
    "statement": "The PBH reference and the cyclotomic cancellation were written by the same agent and share the lag-1 expansion code and numpy's LAPACK eigenvalue routines; no independent implementation was compared.",
    "affects": [
     "C1",
-    "C16",
     "C2",
-    "C20",
-    "C21",
-    "C4"
+    "C3",
+    "C10",
+    "C11",
+    "C16"
    ],
    "impact": "could_reverse",
    "mitigation": "none"
@@ -4726,11 +4726,11 @@
    "category": "sampling",
    "statement": "The random model sets (persistence ranges, the probabilities of zero persistence and of a constant, the standard deviations of the GUM matrices) were chosen by the agent and not drawn from models estimated on data.",
    "affects": [
-    "C16",
     "C2",
     "C3",
-    "C17",
-    "C4"
+    "C4",
+    "C5",
+    "C16"
    ],
    "impact": "reduces_transferability",
    "mitigation": "none"
@@ -4740,9 +4740,9 @@
    "category": "measurement",
    "statement": "The reference decisions use numpy's polynomial roots (companion-matrix eigenvalues) for polynomials of degree up to 535 before cancellation with many roots near the unit circle, whose accuracy there was not checked by a second method.",
    "affects": [
-    "C3",
-    "C17",
-    "C4"
+    "C4",
+    "C5",
+    "C16"
    ],
    "impact": "could_reverse",
    "mitigation": "none"
@@ -4752,8 +4752,8 @@
    "category": "deviation",
    "statement": "The plans of the tests behind the step-down and bisection claims stated MA polynomial degrees up to 366; the generator code named in the plans, run unchanged, produced degrees up to 535 before cancellation.",
    "affects": [
-    "C3",
-    "C17"
+    "C4",
+    "C5"
    ],
    "impact": "reduces_transferability",
    "mitigation": "none"
@@ -4763,7 +4763,7 @@
    "category": "other",
    "statement": "The recursion of the counterexample to the monograph's condition was run for one parameter pair, with the initial states set to one and no data.",
    "affects": [
-    "C5"
+    "C22"
    ],
    "impact": "reduces_transferability",
    "mitigation": "partial",
@@ -4784,8 +4784,8 @@
    "category": "model_specification",
    "statement": "For GUM models with structured parameters, such as a state with |F_ii| > 1 and zero persistence, theta and phi can share a factor with a root in |B| <= 1 that is not cyclotomic; the check keeps it and rejects the model although its observation weights decay, because the initial state of that mode has a growing effect.",
    "affects": [
-    "C3",
-    "C4"
+    "C4",
+    "C16"
    ],
    "impact": "reduces_transferability",
    "mitigation": "none"
@@ -4795,7 +4795,7 @@
    "category": "measurement",
    "statement": "Estimates with bounds=\"admissible\" change for ETS+ARIMA models, whose admissible region changes, and the likelihood of such models can have several local optima: on ETS(A,N,A)+ARIMA(1,0,1) on AirPassengers the fit with the check of the whole model reached a lower log-likelihood than the fit with the check of the parts apart.",
    "affects": [
-    "C24"
+    "C27"
    ],
    "impact": "reduces_precision",
    "mitigation": "none"
@@ -4805,8 +4805,8 @@
    "category": "computational",
    "statement": "Two defects found while testing were fixed before the planned runs: adam() with provided MA parameters added the MA coefficient of a lag without AR or differences twice to the persistence vector (and reapply() did so with the drawn ones, in R and Python), found by the structure check of the exploratory runs RN46 and RN47; and the Python build of smooth crashed at exit after checking a model whose MA polynomial has degree 16 or more (runs RN51 and RN52), because the caches of the check were freed through numpy after it had shut down. The second affected the implementation tested by C16 in Python, not its results. After the fixes the matrices built by the study matched those of adam() within 4.4e-15 (E21), and the planned run of the checkers (E22) exited normally.",
    "affects": [
-    "C4",
-    "C8"
+    "C16",
+    "C26"
    ],
    "impact": "could_bias_magnitude",
    "mitigation": "addressed",
@@ -4817,8 +4817,8 @@
    "category": "computational",
    "statement": "For an MA root exactly on the unit circle that does not cancel, the decision of the check is set by rounding: the checker P4 found three models of a wider generator, with values of the check between 0.99999999999 and 1, that the package accepted and the prototype rejected. Since this finding the bounds checkers admit a model only when the value is at most 1 - 1e-10 (decision DC8 of the lab record), which rejects these three; the planned tests ran before the margin, and their random models have no such root.",
    "affects": [
-    "C4",
-    "C8"
+    "C16",
+    "C26"
    ],
    "impact": "reduces_transferability",
    "mitigation": "addressed",
@@ -4829,8 +4829,8 @@
    "category": "measurement",
    "statement": "The PBH reference is not exact for a repeated unit root: the checker P4 found a model whose cancelled MA polynomial keeps a double root at -1, which the reference accepted and the cancellation and an exact gcd rejected. The random models of the planned tests have no such root.",
    "affects": [
-    "C6",
-    "C7"
+    "C24",
+    "C25"
    ],
    "impact": "reduces_transferability",
    "mitigation": "none"

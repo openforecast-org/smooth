@@ -1,5 +1,5 @@
 {
- "schema_version": "0.39",
+ "schema_version": "0.40",
  "paper": {
   "title": "Admissibility of lagged single-source-of-error state space models: the per-lag eigenvalue check, the cancelled ARIMA form of the whole model, the step-down test and their implementation in smooth, for ETS, GUM and ETS+ARIMA",
   "contributions": [
@@ -1054,14 +1054,10 @@
       "A8"
      ],
      "results": [
-      "E13.R1",
-      "E13.R5",
-      "E13.R9",
-      "E13.R13",
-      "E13.R2",
-      "E13.R6",
-      "E13.R10",
-      "E13.R14"
+      "E13.T1.r1",
+      "E13.T1.r2",
+      "E13.T1.r3",
+      "E13.T1.r4"
      ]
     }
    ],
@@ -1426,10 +1422,7 @@
       "A2"
      ],
      "results": [
-      "E10.R1",
-      "E10.R2",
-      "E10.R4",
-      "E10.R5"
+      "E10.T1.r1"
      ]
     }
    ],
@@ -1489,10 +1482,7 @@
       "A2"
      ],
      "results": [
-      "E10.R6",
-      "E10.R7",
-      "E10.R9",
-      "E10.R10"
+      "E10.T1.r2"
      ]
     }
    ],
@@ -1551,12 +1541,9 @@
       "A4"
      ],
      "results": [
-      "E12.R1",
-      "E12.R2",
-      "E12.R4",
-      "E12.R5",
-      "E12.R7",
-      "E12.R8"
+      "E12.T1.r1",
+      "E12.T1.r2",
+      "E12.T1.r3"
      ]
     }
    ],
@@ -1848,10 +1835,7 @@
       "A6"
      ],
      "results": [
-      "E18.R6",
-      "E18.R8",
-      "E18.R9",
-      "E18.R10"
+      "E18.T1.r2"
      ]
     }
    ],
@@ -1968,12 +1952,8 @@
      "kind": "simulation",
      "evidence": "E20",
      "results": [
-      "E20.R1",
-      "E20.R2",
-      "E20.R3",
-      "E20.R9",
-      "E20.R10",
-      "E20.R11"
+      "E20.T1.r1",
+      "E20.T1.r3"
      ],
      "artefacts": [
       "A10",
@@ -2081,10 +2061,10 @@
      "kind": "simulation",
      "evidence": "E21",
      "results": [
-      "E21.R4",
-      "E21.R12",
-      "E21.R7",
-      "E21.R15"
+      "E21.T1.r2",
+      "E21.T1.r4",
+      "E21.T2.r1",
+      "E21.T2.r2"
      ],
      "artefacts": [
       "A10",
@@ -2204,14 +2184,10 @@
      "kind": "simulation",
      "evidence": "E22",
      "results": [
-      "E22.R18",
-      "E22.R20",
-      "E22.R22",
-      "E22.R24",
-      "E22.R19",
-      "E22.R21",
-      "E22.R23",
-      "E22.R25"
+      "E22.T3.r1",
+      "E22.T3.r2",
+      "E22.T3.r3",
+      "E22.T3.r4"
      ],
      "artefacts": [
       "A10",
@@ -2837,156 +2813,6 @@
    "lab_runs": [
     "RN43"
    ],
-   "results": [
-    {
-     "id": "R1",
-     "variable": "admissibility decisions of the C++ core that differ from the prototype",
-     "value": 0,
-     "conditions": {
-      "family": "ETS",
-      "models": 200
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
-     "value": 9.48848823512094e-07,
-     "conditions": {
-      "family": "ETS",
-      "models": 200,
-      "inadmissible": 86
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "models whose cancelled polynomials differ in degree, C++ core against prototype",
-     "value": 0,
-     "conditions": {
-      "family": "ETS",
-      "models": 200
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "max abs difference between three calls of the C++ core on the same model",
-     "value": 0.0,
-     "conditions": {
-      "family": "ETS",
-      "models": 200
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "admissibility decisions of the C++ core that differ from the prototype",
-     "value": 0,
-     "conditions": {
-      "family": "ETS high degree",
-      "models": 200
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
-     "value": 9.526633371059745e-07,
-     "conditions": {
-      "family": "ETS high degree",
-      "models": 200,
-      "inadmissible": 95
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "models whose cancelled polynomials differ in degree, C++ core against prototype",
-     "value": 0,
-     "conditions": {
-      "family": "ETS high degree",
-      "models": 200
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "max abs difference between three calls of the C++ core on the same model",
-     "value": 0.0,
-     "conditions": {
-      "family": "ETS high degree",
-      "models": 200
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "admissibility decisions of the C++ core that differ from the prototype",
-     "value": 0,
-     "conditions": {
-      "family": "GUM identity",
-      "models": 200
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
-     "value": 9.405809149320987e-07,
-     "conditions": {
-      "family": "GUM identity",
-      "models": 200,
-      "inadmissible": 84
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "models whose cancelled polynomials differ in degree, C++ core against prototype",
-     "value": 0,
-     "conditions": {
-      "family": "GUM identity",
-      "models": 200
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "max abs difference between three calls of the C++ core on the same model",
-     "value": 0.0,
-     "conditions": {
-      "family": "GUM identity",
-      "models": 200
-     }
-    },
-    {
-     "id": "R13",
-     "variable": "admissibility decisions of the C++ core that differ from the prototype",
-     "value": 0,
-     "conditions": {
-      "family": "GUM random",
-      "models": 200
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
-     "value": 9.485389538266276e-07,
-     "conditions": {
-      "family": "GUM random",
-      "models": 200,
-      "inadmissible": 27
-     }
-    },
-    {
-     "id": "R15",
-     "variable": "models whose cancelled polynomials differ in degree, C++ core against prototype",
-     "value": 0,
-     "conditions": {
-      "family": "GUM random",
-      "models": 200
-     }
-    },
-    {
-     "id": "R16",
-     "variable": "max abs difference between three calls of the C++ core on the same model",
-     "value": 0.0,
-     "conditions": {
-      "family": "GUM random",
-      "models": 200
-     }
-    }
-   ],
    "execution": {
     "code_version": "0630dbeab5173c2a72c7828fca3f71573fa1ea85",
     "software": {
@@ -3004,6 +2830,79 @@
    "runs": 1,
    "seeds": [
     2027
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Comparison of the C++ core (smoothEigensR()) with the numpy prototype on 200 models in each of four families: admissibility decisions that differ, largest absolute difference of the root modulus on the models found inadmissible, models whose cancelled polynomials differ in degree, largest absolute difference between three calls on the same model, and the number of models found inadmissible",
+     "conditions": {
+      "models": 200
+     },
+     "row_labels": [
+      "family"
+     ],
+     "columns": [
+      "admissibility decisions of the C++ core that differ from the prototype",
+      "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
+      "models whose cancelled polynomials differ in degree, C++ core against prototype",
+      "max abs difference between three calls of the C++ core on the same model",
+      "inadmissible"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS"
+       ],
+       "values": [
+        0,
+        9.48848823512094e-07,
+        0,
+        0.0,
+        86
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS high degree"
+       ],
+       "values": [
+        0,
+        9.526633371059745e-07,
+        0,
+        0.0,
+        95
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "GUM identity"
+       ],
+       "values": [
+        0,
+        9.405809149320987e-07,
+        0,
+        0.0,
+        84
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "GUM random"
+       ],
+       "values": [
+        0,
+        9.485389538266276e-07,
+        0,
+        0.0,
+        27
+       ]
+      }
+     ]
+    }
    ]
   },
   {
@@ -3045,86 +2944,6 @@
     "RN2"
    ],
    "results": [
-    {
-     "id": "R1",
-     "variable": "degree of theta",
-     "value": 193.0,
-     "conditions": {
-      "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "degree of the shared cyclotomic factor",
-     "value": 25.0,
-     "conditions": {
-      "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "max |lambda|, roots of theta before cancellation",
-     "value": 1.0000000000000038,
-     "conditions": {
-      "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "max |lambda|, roots of theta after cancellation",
-     "value": 0.9999965469723225,
-     "conditions": {
-      "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "max |lambda|, controllable and observable modes (PBH)",
-     "value": 0.9999965469723241,
-     "conditions": {
-      "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "degree of theta",
-     "value": 26.0,
-     "conditions": {
-      "model": "GUM start, orders (2,2), lags (1,12)"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "degree of the shared cyclotomic factor",
-     "value": 14.0,
-     "conditions": {
-      "model": "GUM start, orders (2,2), lags (1,12)"
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "max |lambda|, roots of theta before cancellation",
-     "value": 1.0000014857614217,
-     "conditions": {
-      "model": "GUM start, orders (2,2), lags (1,12)"
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "max |lambda|, roots of theta after cancellation",
-     "value": 0.9829371631611427,
-     "conditions": {
-      "model": "GUM start, orders (2,2), lags (1,12)"
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "max |lambda|, controllable and observable modes (PBH)",
-     "value": 0.9829371631611421,
-     "conditions": {
-      "model": "GUM start, orders (2,2), lags (1,12)"
-     }
-    },
     {
      "id": "R11",
      "variable": "max relative error of the determinant identity",
@@ -3187,7 +3006,51 @@
      "machine": "x86_64",
      "cpus": 4
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Degree of the MA polynomial theta and of its shared cyclotomic factor, and the largest mode modulus from the roots of theta before and after cancellation and from the PBH reference, for ETS(A,N,A,A) with seasonal lags 24 and 168 and for the default starting point of gum() with orders (2, 2) and lags (1, 12)",
+     "row_labels": [
+      "model"
+     ],
+     "columns": [
+      "degree of theta",
+      "degree of the shared cyclotomic factor",
+      "max |lambda|, roots of theta before cancellation",
+      "max |lambda|, roots of theta after cancellation",
+      "max |lambda|, controllable and observable modes (PBH)"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+       ],
+       "values": [
+        193.0,
+        25.0,
+        1.0000000000000038,
+        0.9999965469723225,
+        0.9999965469723241
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "GUM start, orders (2,2), lags (1,12)"
+       ],
+       "values": [
+        26.0,
+        14.0,
+        1.0000014857614217,
+        0.9829371631611427,
+        0.9829371631611421
+       ]
+      }
+     ]
+    }
+   ]
   },
   {
    "id": "E6",
@@ -3501,98 +3364,6 @@
    "lab_runs": [
     "RN13"
    ],
-   "results": [
-    {
-     "id": "R1",
-     "variable": "mean time of the step-down test, ms",
-     "value": 0.7429920399954426,
-     "conditions": {
-      "model": "random GUM, lags (1, 24, 168), admissible",
-      "degree": 193,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "mean time of all roots by numpy companion eigenvalues, ms",
-     "value": 23.75985405999927,
-     "conditions": {
-      "model": "random GUM, lags (1, 24, 168), admissible",
-      "degree": 193,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "recursion steps run by the step-down test",
-     "value": 193,
-     "conditions": {
-      "model": "random GUM, lags (1, 24, 168), admissible",
-      "degree": 193,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "mean time of the step-down test, ms",
-     "value": 0.8138564999990194,
-     "conditions": {
-      "model": "random GUM, lags (1, 24, 168), inadmissible",
-      "degree": 193,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "mean time of all roots by numpy companion eigenvalues, ms",
-     "value": 20.8541055600017,
-     "conditions": {
-      "model": "random GUM, lags (1, 24, 168), inadmissible",
-      "degree": 193,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "recursion steps run by the step-down test",
-     "value": 170,
-     "conditions": {
-      "model": "random GUM, lags (1, 24, 168), inadmissible",
-      "degree": 193,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "mean time of the step-down test, ms",
-     "value": 0.4172366199964017,
-     "conditions": {
-      "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
-      "degree": 168,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "mean time of all roots by numpy companion eigenvalues, ms",
-     "value": 17.457083500003137,
-     "conditions": {
-      "model": "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
-      "degree": 168,
-      "repeats": 50
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "mean time of the coefficients of theta and phi by inverse DFT, ms",
-     "value": 6.57281667999996,
-     "conditions": {
-      "model": "random GUM, lags (1, 24, 168), admissible",
-      "degree": 193,
-      "repeats": 50
-     }
-    }
-   ],
    "execution": {
     "code_version": "de2f5a7b2ffa38e84f9081ed272efc887eb07555",
     "software": {
@@ -3603,7 +3374,67 @@
      "machine": "x86_64",
      "cpus": 4
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Recursion steps and mean times over 50 repeats of the step-down test, of all roots by numpy's companion-matrix eigenvalues and of the coefficients of theta and phi by inverse DFT, for an admissible and an inadmissible random GUM with lags (1, 24, 168) and for the cancelled MA polynomial of ETS(A,N,A,A) with seasonal lags 24 and 168",
+     "conditions": {
+      "repeats": 50
+     },
+     "row_labels": [
+      "model",
+      "degree"
+     ],
+     "columns": [
+      "mean time of the step-down test, ms",
+      "mean time of all roots by numpy companion eigenvalues, ms",
+      "recursion steps run by the step-down test",
+      "mean time of the coefficients of theta and phi by inverse DFT, ms"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "random GUM, lags (1, 24, 168), admissible",
+        193
+       ],
+       "values": [
+        0.7429920399954426,
+        23.75985405999927,
+        193,
+        6.57281667999996
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "random GUM, lags (1, 24, 168), inadmissible",
+        193
+       ],
+       "values": [
+        0.8138564999990194,
+        20.8541055600017,
+        170,
+        null
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ETS(A,N,A,A), lags 24 and 168, cancelled theta",
+        168
+       ],
+       "values": [
+        0.4172366199964017,
+        17.457083500003137,
+        null,
+        null
+       ]
+      }
+     ]
+    }
+   ]
   },
   {
    "id": "E14",
@@ -3821,127 +3652,69 @@
      "D34"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "largest nonzero eigenvalue modulus of the book's per-lag discount matrices",
-     "value": 0.9,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 0.1,
-      "gamma": 0.1
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "effect of the initial states on the fitted value at the last period",
-     "value": 1.1870393556989711e-11,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 0.1,
-      "gamma": 0.1,
-      "period": 2400
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "growth of the effect of the initial states per period over the second half",
-     "value": 0.9895781239569994,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 0.1,
-      "gamma": 0.1
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "growth of the weight of an observation per period over the second half",
-     "value": 0.9909168445987553,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 0.1,
-      "gamma": 0.1
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "largest root modulus of the cancelled MA polynomial",
-     "value": 0.9911267448787717,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 0.1,
-      "gamma": 0.1
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "largest nonzero eigenvalue modulus of the book's per-lag discount matrices",
-     "value": 0.19999999999999996,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 1.2,
-      "gamma": 0.9
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "effect of the initial states on the fitted value at the last period",
-     "value": 5.968778912343606e+16,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 1.2,
-      "gamma": 0.9,
-      "period": 2400
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "growth of the effect of the initial states per period over the second half",
-     "value": 1.0163934504137493,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 1.2,
-      "gamma": 0.9
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "growth of the weight of an observation per period over the second half",
-     "value": 1.0163629094999396,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 1.2,
-      "gamma": 0.9
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "largest root modulus of the cancelled MA polynomial",
-     "value": 1.0164568117563233,
-     "conditions": {
-      "model": "ETS(A,N,A)",
-      "m": 12,
-      "alpha": 1.2,
-      "gamma": 0.9
-     }
-    }
-   ],
    "execution": {
     "code_version": "5d5611bcdcce26a3c363352fdd738c14f18c96f4",
     "software": {
      "python": "3.13.16",
      "platform": "Linux-6.18.44-fc-v140-x86_64-with-glibc2.39"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "For ETS(A,N,A) with m = 12 at two parameter pairs: the largest nonzero eigenvalue modulus of the monograph's per-lag discount matrices, the effect of the initial states on the fitted value at period 2400 and its growth per period over the second half, the growth of the weight of an observation, and the largest root modulus of the cancelled MA polynomial",
+     "conditions": {
+      "model": "ETS(A,N,A)",
+      "m": 12
+     },
+     "row_labels": [
+      "alpha",
+      "gamma"
+     ],
+     "columns": [
+      "largest nonzero eigenvalue modulus of the book's per-lag discount matrices",
+      {
+       "variable": "effect of the initial states on the fitted value at the last period",
+       "conditions": {
+        "period": 2400
+       }
+      },
+      "growth of the effect of the initial states per period over the second half",
+      "growth of the weight of an observation per period over the second half",
+      "largest root modulus of the cancelled MA polynomial"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        0.1,
+        0.1
+       ],
+       "values": [
+        0.9,
+        1.1870393556989711e-11,
+        0.9895781239569994,
+        0.9909168445987553,
+        0.9911267448787717
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        1.2,
+        0.9
+       ],
+       "values": [
+        0.19999999999999996,
+        5.968778912343606e+16,
+        1.0163934504137493,
+        1.0163629094999396,
+        1.0164568117563233
+       ]
+      }
+     ]
+    }
+   ]
   },
   {
    "id": "E19",
@@ -4108,162 +3881,6 @@
    ],
    "results": [
     {
-     "id": "R1",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 166,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 104,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 62,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
-     "value": 4.3076653355456074e-13,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "inadmissible": 341
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "models found admissible by the PBH reference",
-     "value": 159,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 159,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 128,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 31,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R13",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R15",
-     "variable": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
-     "value": 1.6268764113647194e-11,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "inadmissible": 413
-     }
-    },
-    {
-     "id": "R16",
-     "variable": "models found admissible by the PBH reference",
-     "value": 87,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500
-     }
-    },
-    {
      "id": "R17",
      "variable": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
      "value": 2.8171909249863347e-15,
@@ -4298,6 +3915,115 @@
    "artefacts": [
     "A10",
     "A1"
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Admissibility decisions of the check of the parts apart ('split') and of the check of the whole model ('joint') against the PBH reference on 500 models of each family: models whose decision differs, models accepted by the check and rejected by the reference, and models rejected by the check and accepted by the reference",
+     "conditions": {
+      "models": 500
+     },
+     "row_labels": [
+      "family",
+      "check"
+     ],
+     "columns": [
+      "models whose admissibility decision differs from the PBH reference",
+      "models accepted by the check and rejected by the PBH reference",
+      "models rejected by the check and accepted by the PBH reference"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS+ARIMA",
+        "split"
+       ],
+       "values": [
+        166,
+        104,
+        62
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS+ARIMA",
+        "joint"
+       ],
+       "values": [
+        0,
+        0,
+        0
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ETS+SARIMA",
+        "split"
+       ],
+       "values": [
+        159,
+        128,
+        31
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "ETS+SARIMA",
+        "joint"
+       ],
+       "values": [
+        0,
+        0,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "id": "T2",
+     "description": "Per family of 500 models: models found admissible by the PBH reference, and the largest absolute difference of the largest modulus between the check of the whole model and the PBH reference on the models both find inadmissible, with their number",
+     "row_labels": [
+      "family"
+     ],
+     "columns": [
+      "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+      {
+       "variable": "models found admissible by the PBH reference",
+       "conditions": {
+        "models": 500
+       }
+      },
+      "inadmissible"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS+ARIMA"
+       ],
+       "values": [
+        4.3076653355456074e-13,
+        159,
+        341
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS+SARIMA"
+       ],
+       "values": [
+        1.6268764113647194e-11,
+        87,
+        413
+       ]
+      }
+     ]
+    }
    ]
   },
   {
@@ -4329,162 +4055,6 @@
    ],
    "results": [
     {
-     "id": "R1",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 166,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 104,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 62,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
-     "value": 4.3076653355456074e-13,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "inadmissible": 341
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "models found admissible by the PBH reference",
-     "value": 159,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 159,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 128,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 31,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R13",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R15",
-     "variable": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
-     "value": 1.6268764113647194e-11,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "inadmissible": 413
-     }
-    },
-    {
-     "id": "R16",
-     "variable": "models found admissible by the PBH reference",
-     "value": 87,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500
-     }
-    },
-    {
      "id": "R17",
      "variable": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
      "value": 2.8171909249863347e-15,
@@ -4519,6 +4089,115 @@
    "artefacts": [
     "A10",
     "A1"
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Admissibility decisions of the check of the parts apart ('split') and of the check of the whole model ('joint') against the PBH reference on 500 models of each family: models whose decision differs, models accepted by the check and rejected by the reference, and models rejected by the check and accepted by the reference",
+     "conditions": {
+      "models": 500
+     },
+     "row_labels": [
+      "family",
+      "check"
+     ],
+     "columns": [
+      "models whose admissibility decision differs from the PBH reference",
+      "models accepted by the check and rejected by the PBH reference",
+      "models rejected by the check and accepted by the PBH reference"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS+ARIMA",
+        "split"
+       ],
+       "values": [
+        166,
+        104,
+        62
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS+ARIMA",
+        "joint"
+       ],
+       "values": [
+        0,
+        0,
+        0
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ETS+SARIMA",
+        "split"
+       ],
+       "values": [
+        159,
+        128,
+        31
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "ETS+SARIMA",
+        "joint"
+       ],
+       "values": [
+        0,
+        0,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "id": "T2",
+     "description": "Per family of 500 models: models found admissible by the PBH reference, and the largest absolute difference of the largest modulus between the check of the whole model and the PBH reference on the models both find inadmissible, with their number",
+     "row_labels": [
+      "family"
+     ],
+     "columns": [
+      "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+      {
+       "variable": "models found admissible by the PBH reference",
+       "conditions": {
+        "models": 500
+       }
+      },
+      "inadmissible"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS+ARIMA"
+       ],
+       "values": [
+        4.3076653355456074e-13,
+        159,
+        341
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS+SARIMA"
+       ],
+       "values": [
+        1.6268764113647194e-11,
+        87,
+        413
+       ]
+      }
+     ]
+    }
    ]
   },
   {
@@ -4550,251 +4229,11 @@
    ],
    "results": [
     {
-     "id": "R1",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 171,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 115,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 56,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
-     "value": 1.3655743202889425e-13,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "inadmissible": 341
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "models found admissible by the PBH reference",
-     "value": 159,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 150,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 129,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 21,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "split"
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "models whose admissibility decision differs from the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R13",
-     "variable": "models accepted by the check and rejected by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "models rejected by the check and accepted by the PBH reference",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "check": "joint"
-     }
-    },
-    {
-     "id": "R15",
-     "variable": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
-     "value": 6.726019741165601e-11,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "inadmissible": 424
-     }
-    },
-    {
-     "id": "R16",
-     "variable": "models found admissible by the PBH reference",
-     "value": 76,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500
-     }
-    },
-    {
      "id": "R17",
      "variable": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
      "value": 2.6922908347160046e-15,
      "conditions": {
       "models": 1000
-     }
-    },
-    {
-     "id": "R18",
-     "variable": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "language": "R"
-     }
-    },
-    {
-     "id": "R19",
-     "variable": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
-     "value": 9.53674319736919e-07,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "language": "R",
-      "inadmissible": 341
-     }
-    },
-    {
-     "id": "R20",
-     "variable": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "language": "Python"
-     }
-    },
-    {
-     "id": "R21",
-     "variable": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
-     "value": 9.536743161842054e-07,
-     "conditions": {
-      "family": "ETS+ARIMA",
-      "models": 500,
-      "language": "Python",
-      "inadmissible": 341
-     }
-    },
-    {
-     "id": "R22",
-     "variable": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "language": "R"
-     }
-    },
-    {
-     "id": "R23",
-     "variable": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
-     "value": 9.484902201428724e-07,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "language": "R",
-      "inadmissible": 424
-     }
-    },
-    {
-     "id": "R24",
-     "variable": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
-     "value": 0,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "language": "Python"
-     }
-    },
-    {
-     "id": "R25",
-     "variable": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
-     "value": 9.484902243617199e-07,
-     "conditions": {
-      "family": "ETS+SARIMA",
-      "models": 500,
-      "language": "Python",
-      "inadmissible": 424
      }
     }
    ],
@@ -4808,6 +4247,181 @@
    "artefacts": [
     "A10",
     "A1"
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Admissibility decisions of the check of the parts apart ('split') and of the check of the whole model ('joint') against the PBH reference on 500 models of each family: models whose decision differs, models accepted by the check and rejected by the reference, and models rejected by the check and accepted by the reference",
+     "conditions": {
+      "models": 500
+     },
+     "row_labels": [
+      "family",
+      "check"
+     ],
+     "columns": [
+      "models whose admissibility decision differs from the PBH reference",
+      "models accepted by the check and rejected by the PBH reference",
+      "models rejected by the check and accepted by the PBH reference"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS+ARIMA",
+        "split"
+       ],
+       "values": [
+        171,
+        115,
+        56
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS+ARIMA",
+        "joint"
+       ],
+       "values": [
+        0,
+        0,
+        0
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ETS+SARIMA",
+        "split"
+       ],
+       "values": [
+        150,
+        129,
+        21
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "ETS+SARIMA",
+        "joint"
+       ],
+       "values": [
+        0,
+        0,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "id": "T2",
+     "description": "Per family of 500 models: models found admissible by the PBH reference, and the largest absolute difference of the largest modulus between the check of the whole model and the PBH reference on the models both find inadmissible, with their number",
+     "row_labels": [
+      "family"
+     ],
+     "columns": [
+      "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+      {
+       "variable": "models found admissible by the PBH reference",
+       "conditions": {
+        "models": 500
+       }
+      },
+      "inadmissible"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS+ARIMA"
+       ],
+       "values": [
+        1.3655743202889425e-13,
+        159,
+        341
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS+SARIMA"
+       ],
+       "values": [
+        6.726019741165601e-11,
+        76,
+        424
+       ]
+      }
+     ]
+    },
+    {
+     "id": "T3",
+     "description": "The bounds checker of adam() in R and of ADAM in Python against the prototype check of the whole model on 500 models of each family: admissibility decisions that differ, and the largest absolute difference of the largest root modulus on the models found inadmissible, with their number",
+     "conditions": {
+      "models": 500
+     },
+     "row_labels": [
+      "family",
+      "language"
+     ],
+     "columns": [
+      "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+      "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+      "inadmissible"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ETS+ARIMA",
+        "R"
+       ],
+       "values": [
+        0,
+        9.53674319736919e-07,
+        341
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS+ARIMA",
+        "Python"
+       ],
+       "values": [
+        0,
+        9.536743161842054e-07,
+        341
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ETS+SARIMA",
+        "R"
+       ],
+       "values": [
+        0,
+        9.484902201428724e-07,
+        424
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "ETS+SARIMA",
+        "Python"
+       ],
+       "values": [
+        0,
+        9.484902243617199e-07,
+        424
+       ]
+      }
+     ]
+    }
    ]
   },
   {
@@ -4953,216 +4567,115 @@
      "D29"
     ]
    },
-   "results": [
+   "tables": [
     {
-     "id": "R1",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
+     "id": "T1",
+     "description": "Models, of 250 per seed, whose admissibility decision differs from the exact gcd oracle, for the cancellation of cyclotomic factors ('author'), the PBH reference ('pbh') and the package ('pkg'), seeds 21 to 23 and 31 to 34",
      "conditions": {
-      "models": 250,
-      "seed": 21,
-      "check": "author"
-     }
-    },
-    {
-     "id": "R2",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 21,
-      "check": "pbh"
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 1.0,
-     "conditions": {
-      "models": 250,
-      "seed": 21,
-      "check": "pkg"
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 22,
-      "check": "author"
-     }
-    },
-    {
-     "id": "R5",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 22,
-      "check": "pbh"
-     }
-    },
-    {
-     "id": "R6",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 22,
-      "check": "pkg"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 23,
-      "check": "author"
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 23,
-      "check": "pbh"
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 23,
-      "check": "pkg"
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 31,
-      "check": "author"
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 31,
-      "check": "pbh"
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 31,
-      "check": "pkg"
-     }
-    },
-    {
-     "id": "R13",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 32,
-      "check": "author"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 32,
-      "check": "pbh"
-     }
-    },
-    {
-     "id": "R15",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 32,
-      "check": "pkg"
-     }
-    },
-    {
-     "id": "R16",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 33,
-      "check": "author"
-     }
-    },
-    {
-     "id": "R17",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 1.0,
-     "conditions": {
-      "models": 250,
-      "seed": 33,
-      "check": "pbh"
-     }
-    },
-    {
-     "id": "R18",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 1.0,
-     "conditions": {
-      "models": 250,
-      "seed": 33,
-      "check": "pkg"
-     }
-    },
-    {
-     "id": "R19",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 34,
-      "check": "author"
-     }
-    },
-    {
-     "id": "R20",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 0.0,
-     "conditions": {
-      "models": 250,
-      "seed": 34,
-      "check": "pbh"
-     }
-    },
-    {
-     "id": "R21",
-     "variable": "models whose admissibility decision differs from the exact gcd oracle",
-     "value": 1.0,
-     "conditions": {
-      "models": 250,
-      "seed": 34,
-      "check": "pkg"
-     }
+      "models": 250
+     },
+     "row_labels": [
+      "seed"
+     ],
+     "columns": [
+      {
+       "variable": "models whose admissibility decision differs from the exact gcd oracle",
+       "conditions": {
+        "check": "author"
+       }
+      },
+      {
+       "variable": "models whose admissibility decision differs from the exact gcd oracle",
+       "conditions": {
+        "check": "pbh"
+       }
+      },
+      {
+       "variable": "models whose admissibility decision differs from the exact gcd oracle",
+       "conditions": {
+        "check": "pkg"
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        21
+       ],
+       "values": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        22
+       ],
+       "values": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        23
+       ],
+       "values": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        31
+       ],
+       "values": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        32
+       ],
+       "values": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      {
+       "id": "r6",
+       "label": [
+        33
+       ],
+       "values": [
+        0.0,
+        1.0,
+        1.0
+       ]
+      },
+      {
+       "id": "r7",
+       "label": [
+        34
+       ],
+       "values": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
     }
    ]
   }

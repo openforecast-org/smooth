@@ -62,26 +62,26 @@ C4 [methodological; principal; support: simulation E4 (E4.R1, E4.R3) artefacts A
   scope: population: pure additive lagged SSOE models | conditions: additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0; GUM with F = I and lags from {1, 4, 12}; GUM with random F and lags from {1, 4, 12, 24}; additive ETS with up to two seasonal lags from {24, 168, 365}; GUM with random F and lags (1, 24, 168); numpy prototype | excludes: ARIMA components; CES; adaptive regressors; multiplicative models; seasonal harmonics with non-integer periods (TBATS)
   test: deterministic; seed 2026; edge_band 1e-08; pbh_tolerance 1e-07; cancellation_tolerance 1e-09; sample 575 models, fixed; no interim analysis; supported if mism == 0; not supported if mism > 0; verdict computed
   plan: lab plan PL4; planned 2026-10-21T15:21:39Z; anchor git_remote
-C16 [methodological; principal; support: simulation E13 (E13.R1, E13.R5, E13.R9, E13.R13, E13.R2, E13.R6, E13.R10, E13.R14) artefacts A5, A8; assumes C19; uses C3, C4, C18, C20; limitations L2, L3, L4, L8; strength moderate (author); planning confirmatory; outcome supported]
+C16 [methodological; principal; support: simulation E13 (E13.T1.r1, E13.T1.r2, E13.T1.r3, E13.T1.r4) artefacts A5, A8; assumes C19; uses C3, C4, C18, C20; limitations L2, L3, L4, L8; strength moderate (author); planning confirmatory; outcome supported]
   On [[D21:800 random additive ETS and GUM models in four families]], [[D12:the implementation of the check in smooth (smoothEigensCpp() through smoothEigensR())]] gave a [[D29:decision]] different from [[D10:the numpy prototype]] on 0 models, a [[D30:largest root modulus]] within 9.53e-7 of it (the bisection tolerance is 1e-6) on the models both found inadmissible, and the same modulus and MA polynomial on three consecutive calls with each model.
   scope: population: pure additive lagged SSOE models | conditions: additive ETS: level; no, additive or damped trend; 0 to 2 seasonal lags from {4, 7, 12, 24, 52}; optional constant; some persistence fixed at 0; additive ETS with 0 to 2 seasonal lags from {24, 168, 365}; GUM with F = I and lags from {1, 4, 12}; GUM with random F and lags from {1, 4, 12, 24}; R 4.3.3, -O0 build of pkgload | excludes: ARIMA components; CES; adaptive regressors; multiplicative models; seasonal harmonics with non-integer periods (TBATS)
   test: deterministic; seed 2027; tolerance 1.1e-06; sample 800 models, fixed; no interim analysis; supported if m1 == 0 and d1 < 0.0000011 and r1 == 0 and m2 == 0 and d2 < 0.0000011 and r2 == 0 and m3 == 0 and d3 < 0.0000011 and r3 == 0 and m4 == 0 and d4 < 0.0000011 and r4 == 0; not supported if m1 > 0 or d1 >= 0.0000011 or r1 > 0 or m2 > 0 or d2 >= 0.0000011 or r2 > 0 or m3 > 0 or d3 >= 0.0000011 or r3 > 0 or m4 > 0 or d4 >= 0.0000011 or r4 > 0; verdict computed
   plan: lab plan PL6; planned 2026-10-22T10:03:01Z; anchor git_remote
-C22 [descriptive; principal; refutation; support: simulation E18 (E18.R6, E18.R8, E18.R9, E18.R10) artefacts A1, A6; uses C21; limitations L6; strength moderate (author); planning exploratory]
+C22 [descriptive; principal; refutation; support: simulation E18 (E18.T1.r2) artefacts A1, A6; uses C21; limitations L6; strength moderate (author); planning exploratory]
   For [[D35:ETS(A,N,A) with $m = 12$]], $\alpha = 1.2$ and $\gamma = 0.9$, the [[D16:stability condition of Section 5.4 of the ADAM monograph]] holds (largest nonzero eigenvalue modulus of its per-lag discount matrices 0.2), while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow by 1.0164 per period, and the largest root modulus of the cancelled MA polynomial is 1.0165.
   scope: population: ETS(A,N,A) with m = 12 | conditions: alpha = 1.2, gamma = 0.9; initial states set to one or one unit observation, 2400 periods
   contradicts B4, at Section 5.4, equations 5.20 to 5.22, own earlier work: The monograph states that the model is stable when all the nonzero eigenvalues of the per-lag discount matrices D_{m_i} are below one in absolute value, and forecastable when the effect of the initial states through each D_{m_i} tends to a constant (eq. 5.22).
-C24 [descriptive; principal; support: simulation E20 (E20.R1, E20.R2, E20.R3, E20.R9, E20.R10, E20.R11) artefacts A10, A1; assumes C28; limitations L12; strength high (author); planning confirmatory; outcome supported]
+C24 [descriptive; principal; support: simulation E20 (E20.T1.r1, E20.T1.r3) artefacts A10, A1; assumes C28; limitations L12; strength high (author); planning confirmatory; outcome supported]
   On [[D22:1,000 new random ADAM ETS+ARIMA models]] (500 with ARIMA at lag 1, 500 with seasonal ARIMA), [[D13:checking the ETS part and the ARIMA polynomials apart]], as adam() did with bounds="admissible", gave an [[D29:admissibility decision]] different from the [[D5:PBH reference]] of the whole model on 166 and 159 models, accepting 104 and 128 models that are not forecastable and rejecting 62 and 31 that are.
   scope: population: random ADAM models that combine additive ETS with ARIMA | conditions: ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0; ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag); ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models | excludes: regressors; constant; multiplicative models; several seasonal lags; CES; GUM
   test: deterministic; sample 500 models per family, one run, no stopping rule; threshold 25; supported if s1 > threshold and s2 > threshold; not supported if s1 <= 5 and s2 <= 5; verdict computed; flags code_changed_after_plan
   plan: lab plan PL7; planned 2026-10-22T15:55:32Z; anchor git_remote
-C25 [methodological; principal; support: simulation E21 (E21.R4, E21.R12, E21.R7, E21.R15) artefacts A10, A1; assumes C28; limitations L12; strength high (author); planning confirmatory; outcome supported]
+C25 [methodological; principal; support: simulation E21 (E21.T1.r2, E21.T1.r4, E21.T2.r1, E21.T2.r2) artefacts A10, A1; assumes C28; limitations L12; strength high (author); planning confirmatory; outcome supported]
   On the same [[D22:1,000 random ETS+ARIMA models]], [[D10:the check of the whole model]], the criterion of [[C3]] applied to the whole model (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary), gave the same [[D29:admissibility decision]] as the [[D5:PBH reference]] on every model, and the same [[D30:largest modulus]] within 4.3e-13 and 1.6e-11 on the 341 and 413 models both found inadmissible.
   scope: population: random ADAM models that combine additive ETS with ARIMA | conditions: ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0; ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag); ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models | excludes: regressors; constant; multiplicative models; several seasonal lags; CES; GUM
   test: deterministic; sample 500 models per family, one run, no stopping rule; threshold 1e-06; supported if j1 == 0 and j2 == 0 and d1 <= threshold and d2 <= threshold; not supported if j1 > 0 or j2 > 0 or d1 > threshold or d2 > threshold; verdict computed; flags code_changed_after_plan
   plan: lab plan PL8; planned 2026-10-22T15:55:35Z; anchor git_remote
-C26 [methodological; principal; support: simulation E22 (E22.R18, E22.R20, E22.R22, E22.R24, E22.R19, E22.R21, E22.R23, E22.R25) artefacts A10, A1, A12, A13, A14; assumes C28; limitations L11; strength high (author); planning confirmatory; outcome supported]
+C26 [methodological; principal; support: simulation E22 (E22.T3.r1, E22.T3.r2, E22.T3.r3, E22.T3.r4) artefacts A10, A1, A12, A13, A14; assumes C28; limitations L11; strength high (author); planning confirmatory; outcome supported]
   On [[D22:1,000 further random ETS+ARIMA models]], [[D14:the bounds checker of adam() in R and of ADAM in Python]] with bounds="admissible", which run smoothEigensCpp() on the whole model, gave the same [[D29:admissibility decision]] as [[D10:the prototype check of the whole model]] on every model, and a penalty slope ([[D30:the largest root modulus]]) within 9.54e-7 and 9.48e-7 of it in the two families (the bisection tolerance is 1e-6).
   scope: population: random ADAM models that combine additive ETS with ARIMA | conditions: ETS: level; no, additive or damped trend; no or one seasonal lag m in {4, 12}; smoothing parameters drawn from wide ranges, some fixed at 0; ARIMA: AR stationary, differences and MA up to order 2 at lag 1 and 1 at lag m, 15% over-differenced (an MA root at one on the unit circle of a differenced lag); ADAM's state space form of ARIMA (one state per lag of the ARI and MA polynomials), checked against the matrices of adam() on 20 of the models; the checkers called on the matrices of each model, R through pkgload::load_all of the repository | excludes: regressors; constant; multiplicative models; several seasonal lags; CES; GUM
   test: deterministic; sample 500 models per family, one run, no stopping rule; threshold 1.1e-06; supported if r1 + r2 + p1 + p2 == 0 and dr1 <= threshold and dr2 <= threshold and dp1 <= threshold and dp2 <= threshold; not supported if r1 + r2 + p1 + p2 > 0 or dr1 > threshold or dr2 > threshold or dp1 > threshold or dp2 > threshold; verdict computed; flags code_changed_after_plan
@@ -132,13 +132,13 @@ C7 [formal; secondary; support: formal_proof E7; uses C15; verification agent_ch
 C9 [formal; secondary; support: formal_proof E9; uses C15; verification agent_checked]
   For [[D9:ETS(A,N,A)]] with any period $m$ and any $\alpha$ and $\gamma$, $B = 1$ is a root of both $\theta(B) = (1 - (1-\alpha)B)(1 - (1-\gamma)B^m) - \alpha\gamma B^{m+1}$ and $\phi(B) = (1 - B)(1 - B^m)$, so the [[D2:expanded discount matrix]] has an eigenvalue equal to 1.
   scope: population: ETS(A,N,A) models
-C10 [descriptive; secondary; support: simulation E10 (E10.R1, E10.R2, E10.R4, E10.R5) artefacts A1, A2; assumes C14; limitations L2; strength low (author); planning exploratory]
+C10 [descriptive; secondary; support: simulation E10 (E10.T1.r1) artefacts A1, A2; assumes C14; limitations L2; strength low (author); planning exploratory]
   For [[D24:ETS(A,N,A,A) with seasonal lags 24 and 168, $\alpha = 0.3$ and $\gamma = (0.1, 0.05)$]], [[D6:cyclotomic cancellation]] removed a common factor of degree 25 from the MA polynomial of degree 193, and the [[D30:largest mode modulus]] after cancellation, 0.9999965, equalled the [[D5:PBH reference]] to 1e-14.
   scope: population: ETS(A,N,A,A) with seasonal lags 24 and 168 | conditions: alpha = 0.3, gamma = (0.1, 0.05); numpy prototype
-C11 [descriptive; secondary; support: simulation E10 (E10.R6, E10.R7, E10.R9, E10.R10) artefacts A1, A2; assumes C14; limitations L2; strength low (author); planning exploratory]
+C11 [descriptive; secondary; support: simulation E10 (E10.T1.r2) artefacts A1, A2; assumes C14; limitations L2; strength low (author); planning exploratory]
   For [[D25:the default starting point of gum() with orders (2, 2) and lags (1, 12)]] ($F = I$, $g = 0.1$, $w = 1$), [[D6:cyclotomic cancellation]] removed a common factor of degree 14 from the MA polynomial of degree 26, and the [[D30:largest mode modulus]] after cancellation, 0.98294, equalled the [[D5:PBH reference]] to 1e-14.
   scope: population: GUM with orders (2, 2) and lags (1, 12) | conditions: F = I, g = 0.1, w = 1; numpy prototype
-C12 [descriptive; secondary; support: simulation E12 (E12.R1, E12.R2, E12.R4, E12.R5, E12.R7, E12.R8) artefacts A1, A4; strength low (author); planning exploratory]
+C12 [descriptive; secondary; support: simulation E12 (E12.T1.r1, E12.T1.r2, E12.T1.r3) artefacts A1, A4; strength low (author); planning exploratory]
   For an admissible and an inadmissible [[D40:random GUM model with lags (1, 24, 168)]] (MA polynomials of degree 193) and the cancelled MA polynomial of degree 168 of [[D24:an ETS(A,N,A,A) model with seasonal lags 24 and 168]], the [[D7:step-down test]] took 0.74, 0.81 and 0.42 ms against 23.8, 20.9 and 17.5 ms for [[D15:all roots by numpy's companion-matrix eigenvalues]].
   scope: population: GUM with lags (1, 24, 168) and ETS(A,N,A,A) with seasonal lags 24 and 168 | conditions: numpy, Python 3.13, one x86_64 machine with 4 CPUs, mean of 50 repeats; step-down recursions of 193, 170 and 168 steps
 C23 [descriptive; secondary; support: simulation E19 (E19.T1) artefacts A7; limitations L7; strength low (author); planning exploratory]
@@ -193,42 +193,26 @@ E5 [simulation; runs 1] Planned test of the bisection (lab plan PL5, run RN11): 
   seeds: [2026]
 E13 [simulation; runs 1] Planned test of the implementation in smooth (lab plan PL6, run RN43): cpp_check.py --seed 2027 --n 200 generated 200 models in each of four families (additive ETS with 0-2 seasonal lags from {4, 7, 12, 24, 52}; additive ETS with 0-2 seasonal lags from {24, 168, 365}; GUM with F = I and lags from {1, 4, 12}; GUM with normal F, standard deviation 0.35, and lags from {1, 4, 12, 24}), called smoothEigensR() of the repository (through pkgload::load_all) three times on each, and compared its decision and modulus with the numpy prototype (roots of the cancelled MA polynomial).
   setup: studied D12; cases D21; procedure D26, D10; lens D29, D30
-  E13.R1 admissibility decisions of the C++ core that differ from the prototype = 0 {family: ETS, models: 200}
-  E13.R2 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.48848823512094e-07 {family: ETS, models: 200, inadmissible: 86}
-  E13.R3 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: ETS, models: 200}
-  E13.R4 max abs difference between three calls of the C++ core on the same model = 0 {family: ETS, models: 200}
-  E13.R5 admissibility decisions of the C++ core that differ from the prototype = 0 {family: ETS high degree, models: 200}
-  E13.R6 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.526633371059745e-07 {family: ETS high degree, models: 200, inadmissible: 95}
-  E13.R7 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: ETS high degree, models: 200}
-  E13.R8 max abs difference between three calls of the C++ core on the same model = 0 {family: ETS high degree, models: 200}
-  E13.R9 admissibility decisions of the C++ core that differ from the prototype = 0 {family: GUM identity, models: 200}
-  E13.R10 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.405809149320987e-07 {family: GUM identity, models: 200, inadmissible: 84}
-  E13.R11 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: GUM identity, models: 200}
-  E13.R12 max abs difference between three calls of the C++ core on the same model = 0 {family: GUM identity, models: 200}
-  E13.R13 admissibility decisions of the C++ core that differ from the prototype = 0 {family: GUM random, models: 200}
-  E13.R14 max abs difference of the largest root modulus on inadmissible models, C++ core against prototype = 9.485389538266276e-07 {family: GUM random, models: 200, inadmissible: 27}
-  E13.R15 models whose cancelled polynomials differ in degree, C++ core against prototype = 0 {family: GUM random, models: 200}
-  E13.R16 max abs difference between three calls of the C++ core on the same model = 0 {family: GUM random, models: 200}
+  E13.T1 Comparison of the C++ core (smoothEigensR()) with the numpy prototype on 200 models in each of four families: admissibility decisions that differ, largest absolute difference of the root modulus on the models found inadmissible, models whose cancelled polynomials differ in degree, largest absolute difference between three calls on the same model, and the number of models found inadmissible {models: 200}
+  | row | family | admissibility decisions of the C++ core that differ from the prototype | max abs difference of the largest root modulus on inadmissible models, C++ core against prototype | models whose cancelled polynomials differ in degree, C++ core against prototype | max abs difference between three calls of the C++ core on the same model | inadmissible |
+  | r1 | ETS | 0 | 9.48848823512094e-07 | 0 | 0 | 86 |
+  | r2 | ETS high degree | 0 | 9.526633371059745e-07 | 0 | 0 | 95 |
+  | r3 | GUM identity | 0 | 9.405809149320987e-07 | 0 | 0 | 84 |
+  | r4 | GUM random | 0 | 9.485389538266276e-07 | 0 | 0 | 27 |
   parameters: A5
   seeds: [2027]
 E10 [simulation; runs 1] Exploratory run RN2 of explore.py --seed 0: the ARIMA-form polynomials, their cyclotomic cancellation and the PBH reference for ETS(A,N,A,A) with seasonal lags 24 and 168 (alpha = 0.3, gamma = (0.1, 0.05)) and for GUM with orders (2, 2), lags (1, 12), F = I, g = 0.1 and w = 1 (the default starting point of gum()); the determinant identity at random complex B on 100 random GUM models; the expanded discount matrix of a block-diagonal D; and mean times over 50 repeats of three computations for a random GUM with lags (1, 24, 168). The result labelled 'block-diagonal D, lags (1,12)' comes from D = [[0.7, 0], [-0.1, 0.3]], which is lower-triangular rather than block-diagonal.
   setup: studied D1, D6, D10; cases D24, D25; procedure D26, D5; lens D30
-  E10.R1 degree of theta = 193 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
-  E10.R2 degree of the shared cyclotomic factor = 25 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
-  E10.R3 max |lambda|, roots of theta before cancellation = 1.0000000000000038 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
-  E10.R4 max |lambda|, roots of theta after cancellation = 0.9999965469723225 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
-  E10.R5 max |lambda|, controllable and observable modes (PBH) = 0.9999965469723241 {model: ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)}
-  E10.R6 degree of theta = 26 {model: GUM start, orders (2,2), lags (1,12)}
-  E10.R7 degree of the shared cyclotomic factor = 14 {model: GUM start, orders (2,2), lags (1,12)}
-  E10.R8 max |lambda|, roots of theta before cancellation = 1.0000014857614217 {model: GUM start, orders (2,2), lags (1,12)}
-  E10.R9 max |lambda|, roots of theta after cancellation = 0.9829371631611427 {model: GUM start, orders (2,2), lags (1,12)}
-  E10.R10 max |lambda|, controllable and observable modes (PBH) = 0.9829371631611421 {model: GUM start, orders (2,2), lags (1,12)}
   E10.R11 max relative error of the determinant identity = 9.171563565208779e-15 {models: 100}
   E10.R12 max |lambda|, per-lag check = 0.7 {model: block-diagonal D, lags (1,12)}
   E10.R13 max |lambda|, all modes of the expanded discount matrix = 0.9045379057839597 {model: block-diagonal D, lags (1,12)}
   E10.R14 mean time, ms = 4.6963541200011605 {task: coefficients by DFT, degree: 193}
   E10.R15 mean time, ms = 0.006939219999821944 {task: step-down test, degree: 193}
   E10.R16 mean time, ms = 22.225657179999416 {task: all roots, numpy companion eigenvalues, degree: 193}
+  E10.T1 Degree of the MA polynomial theta and of its shared cyclotomic factor, and the largest mode modulus from the roots of theta before and after cancellation and from the PBH reference, for ETS(A,N,A,A) with seasonal lags 24 and 168 and for the default starting point of gum() with orders (2, 2) and lags (1, 12)
+  | row | model | degree of theta | degree of the shared cyclotomic factor | max |lambda|, roots of theta before cancellation | max |lambda|, roots of theta after cancellation | max |lambda|, controllable and observable modes (PBH) |
+  | r1 | ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05) | 193 | 25 | 1.0000000000000038 | 0.9999965469723225 | 0.9999965469723241 |
+  | r2 | GUM start, orders (2,2), lags (1,12) | 26 | 14 | 1.0000014857614217 | 0.9829371631611427 | 0.9829371631611421 |
   parameters: A2
   seeds: [0]
 E6 [formal; foundation linear algebra over the field of rational functions in $B$] Derivation of the ARIMA form of a lagged SSOE model by the matrix determinant lemma.
@@ -264,15 +248,11 @@ E11 [formal; foundation linear algebra over the complex numbers] Schur-complemen
   S6 \det(\lambda I - \tilde M) = \lambda^{\sum_j l_j} \det(I - M L(1/\lambda)),\ \lambda \neq 0 (by S5, D1; factoring $\Lambda(\lambda)$ out on the right: $\Lambda(\lambda) - M = (I - M \Lambda(\lambda)^{-1}) \Lambda(\lambda)$)
 E12 [simulation; runs 1] Exploratory run RN13 of timing.py --seed 3 --repeats 50: for the first admissible and the first inadmissible random GUM with lags (1, 24, 168) (normal F with standard deviation 0.3) and for the cancelled MA polynomial of ETS(A,N,A,A) with seasonal lags 24 and 168 (alpha = 0.3, gamma = (0.1, 0.05)), the number of recursion steps of the step-down test and the mean times over 50 repeats of the step-down test, of all roots by numpy's companion-matrix eigenvalues and of the coefficients by inverse discrete Fourier transform.
   setup: studied D7, D15; cases D40, D24; procedure D27; lens D31
-  E12.R1 mean time of the step-down test, ms = 0.7429920399954426 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
-  E12.R2 mean time of all roots by numpy companion eigenvalues, ms = 23.75985405999927 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
-  E12.R3 recursion steps run by the step-down test = 193 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
-  E12.R4 mean time of the step-down test, ms = 0.8138564999990194 {model: random GUM, lags (1, 24, 168), inadmissible, degree: 193, repeats: 50}
-  E12.R5 mean time of all roots by numpy companion eigenvalues, ms = 20.8541055600017 {model: random GUM, lags (1, 24, 168), inadmissible, degree: 193, repeats: 50}
-  E12.R6 recursion steps run by the step-down test = 170 {model: random GUM, lags (1, 24, 168), inadmissible, degree: 193, repeats: 50}
-  E12.R7 mean time of the step-down test, ms = 0.4172366199964017 {model: ETS(A,N,A,A), lags 24 and 168, cancelled theta, degree: 168, repeats: 50}
-  E12.R8 mean time of all roots by numpy companion eigenvalues, ms = 17.457083500003137 {model: ETS(A,N,A,A), lags 24 and 168, cancelled theta, degree: 168, repeats: 50}
-  E12.R9 mean time of the coefficients of theta and phi by inverse DFT, ms = 6.57281667999996 {model: random GUM, lags (1, 24, 168), admissible, degree: 193, repeats: 50}
+  E12.T1 Recursion steps and mean times over 50 repeats of the step-down test, of all roots by numpy's companion-matrix eigenvalues and of the coefficients of theta and phi by inverse DFT, for an admissible and an inadmissible random GUM with lags (1, 24, 168) and for the cancelled MA polynomial of ETS(A,N,A,A) with seasonal lags 24 and 168 {repeats: 50}
+  | row | model | degree | mean time of the step-down test, ms | mean time of all roots by numpy companion eigenvalues, ms | recursion steps run by the step-down test | mean time of the coefficients of theta and phi by inverse DFT, ms |
+  | r1 | random GUM, lags (1, 24, 168), admissible | 193 | 0.7429920399954426 | 23.75985405999927 | 193 | 6.57281667999996 |
+  | r2 | random GUM, lags (1, 24, 168), inadmissible | 193 | 0.8138564999990194 | 20.8541055600017 | 170 |  |
+  | r3 | ETS(A,N,A,A), lags 24 and 168, cancelled theta | 168 | 0.4172366199964017 | 17.457083500003137 |  |  |
   parameters: A4
   seeds: [3]
 E14 [formal; foundation linear systems theory over the complex numbers] The reduced form of the ARIMA polynomials through the Kalman decomposition of the expanded system.
@@ -298,16 +278,10 @@ E17 [formal; foundation linear algebra over the complex numbers] The per-lag dis
   S5 (a, b) \text{ with lags } m_i \neq m_j: \left(\sum_{i \neq j} g_{m_i} w_{m_j}'\right)_{ab} = g_a w_b (by S4; a single term, so the sum differs from D exactly where g w' links components of different lags)
 E18 [simulation; runs 1] Exploratory run RN44 of book_check.py --periods 2400: for ETS(A,N,A) with m = 12 and (alpha, gamma) = (0.1, 0.1) and (1.2, 0.9), the largest nonzero eigenvalue modulus of the per-lag discount matrices of the monograph, the effect |w' v_{t-l}| of initial states set to one in the full recursion v_t = D v_{t-l} (y = 0) over 2400 periods and its growth per period over the second half, the growth of the weight of an observation (the same recursion from zero states with one unit observation), and the largest root modulus of the cancelled MA polynomial.
   setup: studied D16; cases D35; procedure D28; lens D30, D34
-  E18.R1 largest nonzero eigenvalue modulus of the book's per-lag discount matrices = 0.9 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
-  E18.R2 effect of the initial states on the fitted value at the last period = 1.1870393556989711e-11 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1, period: 2400}
-  E18.R3 growth of the effect of the initial states per period over the second half = 0.9895781239569994 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
-  E18.R4 growth of the weight of an observation per period over the second half = 0.9909168445987553 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
-  E18.R5 largest root modulus of the cancelled MA polynomial = 0.9911267448787717 {model: ETS(A,N,A), m: 12, alpha: 0.1, gamma: 0.1}
-  E18.R6 largest nonzero eigenvalue modulus of the book's per-lag discount matrices = 0.19999999999999996 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
-  E18.R7 effect of the initial states on the fitted value at the last period = 5.968778912343606e+16 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9, period: 2400}
-  E18.R8 growth of the effect of the initial states per period over the second half = 1.0163934504137493 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
-  E18.R9 growth of the weight of an observation per period over the second half = 1.0163629094999396 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
-  E18.R10 largest root modulus of the cancelled MA polynomial = 1.0164568117563233 {model: ETS(A,N,A), m: 12, alpha: 1.2, gamma: 0.9}
+  E18.T1 For ETS(A,N,A) with m = 12 at two parameter pairs: the largest nonzero eigenvalue modulus of the monograph's per-lag discount matrices, the effect of the initial states on the fitted value at period 2400 and its growth per period over the second half, the growth of the weight of an observation, and the largest root modulus of the cancelled MA polynomial {model: ETS(A,N,A), m: 12}
+  | row | alpha | gamma | largest nonzero eigenvalue modulus of the book's per-lag discount matrices | effect of the initial states on the fitted value at the last period {period: 2400} | growth of the effect of the initial states per period over the second half | growth of the weight of an observation per period over the second half | largest root modulus of the cancelled MA polynomial |
+  | r1 | 0.1 | 0.1 | 0.9 | 1.1870393556989711e-11 | 0.9895781239569994 | 0.9909168445987553 | 0.9911267448787717 |
+  | r2 | 1.2 | 0.9 | 0.19999999999999996 | 5.968778912343606e+16 | 1.0163934504137493 | 1.0163629094999396 | 1.0164568117563233 |
   parameters: A6
 E19 [simulation; runs 1] Exploratory run RN40 of bench_eigens.R: the package installed at -O2 from a worktree at commit b963693 (the polynomial check with the step-down multiplying by 1 / (1 - k^2), the algorithm kept in the final code), each fit run seven times with smoothEigens() switched in the namespace between the per-lag and the polynomial check; the median time of a fit and its calls of smoothEigens(). The optimisation paths differ between the two checks, whose admissible regions differ.
   setup: studied D4, D12; cases D36, D38; procedure D27; lens D32
@@ -322,73 +296,53 @@ E19 [simulation; runs 1] Exploratory run RN40 of bench_eigens.R: the package ins
   seeds: [41]
 E20 [simulation; design other] Planned tests (lab plans PL7 and PL8, runs RN49 and RN50, the same command): ets_arima.py --seed 2 --n 500 --adam 20 generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 2, new against the exploratory runs RN46-RN48, seed 1), built each in ADAM's form, compared the matrices of 20 of them with adam() (0 lags differed, matrices within 4.4e-15), and decided admissibility by the check of the parts apart, the check of the whole model and the PBH reference.
   setup: studied D13; cases D22; procedure D26, D5; lens D29
-  E20.R1 models whose admissibility decision differs from the PBH reference = 166 {family: ETS+ARIMA, models: 500, check: split}
-  E20.R2 models accepted by the check and rejected by the PBH reference = 104 {family: ETS+ARIMA, models: 500, check: split}
-  E20.R3 models rejected by the check and accepted by the PBH reference = 62 {family: ETS+ARIMA, models: 500, check: split}
-  E20.R4 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E20.R5 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E20.R6 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E20.R7 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 4.3076653355456074e-13 {family: ETS+ARIMA, inadmissible: 341}
-  E20.R8 models found admissible by the PBH reference = 159 {family: ETS+ARIMA, models: 500}
-  E20.R9 models whose admissibility decision differs from the PBH reference = 159 {family: ETS+SARIMA, models: 500, check: split}
-  E20.R10 models accepted by the check and rejected by the PBH reference = 128 {family: ETS+SARIMA, models: 500, check: split}
-  E20.R11 models rejected by the check and accepted by the PBH reference = 31 {family: ETS+SARIMA, models: 500, check: split}
-  E20.R12 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E20.R13 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E20.R14 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E20.R15 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 1.6268764113647194e-11 {family: ETS+SARIMA, inadmissible: 413}
-  E20.R16 models found admissible by the PBH reference = 87 {family: ETS+SARIMA, models: 500}
   E20.R17 max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials = 2.8171909249863347e-15 {models: 1000}
   E20.R18 models whose component lags differ from those of adam() = 0 {models: 20}
   E20.R19 max abs difference between the matrices built here and those of adam() = 4.440892098500626e-15 {models: 20}
+  E20.T1 Admissibility decisions of the check of the parts apart ('split') and of the check of the whole model ('joint') against the PBH reference on 500 models of each family: models whose decision differs, models accepted by the check and rejected by the reference, and models rejected by the check and accepted by the reference {models: 500}
+  | row | family | check | models whose admissibility decision differs from the PBH reference | models accepted by the check and rejected by the PBH reference | models rejected by the check and accepted by the PBH reference |
+  | r1 | ETS+ARIMA | split | 166 | 104 | 62 |
+  | r2 | ETS+ARIMA | joint | 0 | 0 | 0 |
+  | r3 | ETS+SARIMA | split | 159 | 128 | 31 |
+  | r4 | ETS+SARIMA | joint | 0 | 0 | 0 |
+  E20.T2 Per family of 500 models: models found admissible by the PBH reference, and the largest absolute difference of the largest modulus between the check of the whole model and the PBH reference on the models both find inadmissible, with their number
+  | row | family | max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible | models found admissible by the PBH reference {models: 500} | inadmissible |
+  | r1 | ETS+ARIMA | 4.3076653355456074e-13 | 159 | 341 |
+  | r2 | ETS+SARIMA | 1.6268764113647194e-11 | 87 | 413 |
 E21 [simulation; design other] Planned tests (lab plans PL7 and PL8, runs RN49 and RN50, the same command): ets_arima.py --seed 2 --n 500 --adam 20 generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 2, new against the exploratory runs RN46-RN48, seed 1), built each in ADAM's form, compared the matrices of 20 of them with adam() (0 lags differed, matrices within 4.4e-15), and decided admissibility by the check of the parts apart, the check of the whole model and the PBH reference.
   setup: studied D10; cases D22; procedure D26, D5; lens D29, D30
-  E21.R1 models whose admissibility decision differs from the PBH reference = 166 {family: ETS+ARIMA, models: 500, check: split}
-  E21.R2 models accepted by the check and rejected by the PBH reference = 104 {family: ETS+ARIMA, models: 500, check: split}
-  E21.R3 models rejected by the check and accepted by the PBH reference = 62 {family: ETS+ARIMA, models: 500, check: split}
-  E21.R4 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E21.R5 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E21.R6 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E21.R7 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 4.3076653355456074e-13 {family: ETS+ARIMA, inadmissible: 341}
-  E21.R8 models found admissible by the PBH reference = 159 {family: ETS+ARIMA, models: 500}
-  E21.R9 models whose admissibility decision differs from the PBH reference = 159 {family: ETS+SARIMA, models: 500, check: split}
-  E21.R10 models accepted by the check and rejected by the PBH reference = 128 {family: ETS+SARIMA, models: 500, check: split}
-  E21.R11 models rejected by the check and accepted by the PBH reference = 31 {family: ETS+SARIMA, models: 500, check: split}
-  E21.R12 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E21.R13 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E21.R14 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E21.R15 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 1.6268764113647194e-11 {family: ETS+SARIMA, inadmissible: 413}
-  E21.R16 models found admissible by the PBH reference = 87 {family: ETS+SARIMA, models: 500}
   E21.R17 max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials = 2.8171909249863347e-15 {models: 1000}
   E21.R18 models whose component lags differ from those of adam() = 0 {models: 20}
   E21.R19 max abs difference between the matrices built here and those of adam() = 4.440892098500626e-15 {models: 20}
+  E21.T1 Admissibility decisions of the check of the parts apart ('split') and of the check of the whole model ('joint') against the PBH reference on 500 models of each family: models whose decision differs, models accepted by the check and rejected by the reference, and models rejected by the check and accepted by the reference {models: 500}
+  | row | family | check | models whose admissibility decision differs from the PBH reference | models accepted by the check and rejected by the PBH reference | models rejected by the check and accepted by the PBH reference |
+  | r1 | ETS+ARIMA | split | 166 | 104 | 62 |
+  | r2 | ETS+ARIMA | joint | 0 | 0 | 0 |
+  | r3 | ETS+SARIMA | split | 159 | 128 | 31 |
+  | r4 | ETS+SARIMA | joint | 0 | 0 | 0 |
+  E21.T2 Per family of 500 models: models found admissible by the PBH reference, and the largest absolute difference of the largest modulus between the check of the whole model and the PBH reference on the models both find inadmissible, with their number
+  | row | family | max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible | models found admissible by the PBH reference {models: 500} | inadmissible |
+  | r1 | ETS+ARIMA | 4.3076653355456074e-13 | 159 | 341 |
+  | r2 | ETS+SARIMA | 1.6268764113647194e-11 | 87 | 413 |
 E22 [simulation; design other] Planned test (lab plan PL9, run RN53): ets_arima.py --seed 3 --n 500 --impl generated 500 ETS+ARIMA and 500 ETS+SARIMA models (seed 3) and passed the matrices of each to adam_bounds_checker() of R (through pkgload::load_all of the repository) and of Python, with the AR reflection of its factors, comparing the penalty (zero, or 1e100 times the largest root modulus) with the prototype check of the whole model.
   setup: studied D14; cases D22; procedure D26, D10; lens D29, D30
-  E22.R1 models whose admissibility decision differs from the PBH reference = 171 {family: ETS+ARIMA, models: 500, check: split}
-  E22.R2 models accepted by the check and rejected by the PBH reference = 115 {family: ETS+ARIMA, models: 500, check: split}
-  E22.R3 models rejected by the check and accepted by the PBH reference = 56 {family: ETS+ARIMA, models: 500, check: split}
-  E22.R4 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E22.R5 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E22.R6 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+ARIMA, models: 500, check: joint}
-  E22.R7 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 1.3655743202889425e-13 {family: ETS+ARIMA, inadmissible: 341}
-  E22.R8 models found admissible by the PBH reference = 159 {family: ETS+ARIMA, models: 500}
-  E22.R9 models whose admissibility decision differs from the PBH reference = 150 {family: ETS+SARIMA, models: 500, check: split}
-  E22.R10 models accepted by the check and rejected by the PBH reference = 129 {family: ETS+SARIMA, models: 500, check: split}
-  E22.R11 models rejected by the check and accepted by the PBH reference = 21 {family: ETS+SARIMA, models: 500, check: split}
-  E22.R12 models whose admissibility decision differs from the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E22.R13 models accepted by the check and rejected by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E22.R14 models rejected by the check and accepted by the PBH reference = 0 {family: ETS+SARIMA, models: 500, check: joint}
-  E22.R15 max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible = 6.726019741165601e-11 {family: ETS+SARIMA, inadmissible: 424}
-  E22.R16 models found admissible by the PBH reference = 76 {family: ETS+SARIMA, models: 500}
   E22.R17 max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials = 2.6922908347160046e-15 {models: 1000}
-  E22.R18 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+ARIMA, models: 500, language: R}
-  E22.R19 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.53674319736919e-07 {family: ETS+ARIMA, models: 500, language: R, inadmissible: 341}
-  E22.R20 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+ARIMA, models: 500, language: Python}
-  E22.R21 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.536743161842054e-07 {family: ETS+ARIMA, models: 500, language: Python, inadmissible: 341}
-  E22.R22 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+SARIMA, models: 500, language: R}
-  E22.R23 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.484902201428724e-07 {family: ETS+SARIMA, models: 500, language: R, inadmissible: 424}
-  E22.R24 admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model = 0 {family: ETS+SARIMA, models: 500, language: Python}
-  E22.R25 max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible = 9.484902243617199e-07 {family: ETS+SARIMA, models: 500, language: Python, inadmissible: 424}
+  E22.T1 Admissibility decisions of the check of the parts apart ('split') and of the check of the whole model ('joint') against the PBH reference on 500 models of each family: models whose decision differs, models accepted by the check and rejected by the reference, and models rejected by the check and accepted by the reference {models: 500}
+  | row | family | check | models whose admissibility decision differs from the PBH reference | models accepted by the check and rejected by the PBH reference | models rejected by the check and accepted by the PBH reference |
+  | r1 | ETS+ARIMA | split | 171 | 115 | 56 |
+  | r2 | ETS+ARIMA | joint | 0 | 0 | 0 |
+  | r3 | ETS+SARIMA | split | 150 | 129 | 21 |
+  | r4 | ETS+SARIMA | joint | 0 | 0 | 0 |
+  E22.T2 Per family of 500 models: models found admissible by the PBH reference, and the largest absolute difference of the largest modulus between the check of the whole model and the PBH reference on the models both find inadmissible, with their number
+  | row | family | max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible | models found admissible by the PBH reference {models: 500} | inadmissible |
+  | r1 | ETS+ARIMA | 1.3655743202889425e-13 | 159 | 341 |
+  | r2 | ETS+SARIMA | 6.726019741165601e-11 | 76 | 424 |
+  E22.T3 The bounds checker of adam() in R and of ADAM in Python against the prototype check of the whole model on 500 models of each family: admissibility decisions that differ, and the largest absolute difference of the largest root modulus on the models found inadmissible, with their number {models: 500}
+  | row | family | language | admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model | max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible | inadmissible |
+  | r1 | ETS+ARIMA | R | 0 | 9.53674319736919e-07 | 341 |
+  | r2 | ETS+ARIMA | Python | 0 | 9.536743161842054e-07 | 341 |
+  | r3 | ETS+SARIMA | R | 0 | 9.484902201428724e-07 | 424 |
+  | r4 | ETS+SARIMA | Python | 0 | 9.484902243617199e-07 | 424 |
 E23 [simulation; runs 2] Exploratory runs of timing_ets_arima.R: the package installed at -O2 from two worktrees, the check of the parts apart (commit 397f255f) and of the whole model, each fit run five times. RN55 (commit af998d26) ran the check of the whole model on every call: pure ARIMA fits took 1.5 and 1.8 times as long. RN56 (commit b4a10cc6) adds the shortcut that, without ETS and adaptive regressors, accepts invertible MA factors without the check of the whole model; its times and log-likelihoods are in the table.
   setup: studied D13, D14; cases D36, D37; procedure D27; lens D32, D33
   E23.T1 Median time of a fit over five runs and its log-likelihood, check of the parts apart against the whole model (RN56) {build: R 4.3.3, -O2, repeats: 5}
@@ -400,27 +354,15 @@ E23 [simulation; runs 2] Exploratory runs of timing_ets_arima.R: the package ins
   parameters: A11
 E24 [simulation; runs 7] Exploratory runs of the checker P4 (exact_oracle.py, seeds 21-23 and 31-34, 250 models each): admissibility by an exact oracle (rational determinants and the exact greatest common divisor of theta and phi, which cancels any shared factor) against the cancellation of cyclotomic factors ('author'), the PBH reference ('pbh') and the package ('pkg'); the number of models whose decision differs from the oracle.
   setup: studied D10, D5, D14; cases D23; procedure D26, D39; lens D29
-  E24.R1 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 21, check: author}
-  E24.R2 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 21, check: pbh}
-  E24.R3 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 21, check: pkg}
-  E24.R4 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 22, check: author}
-  E24.R5 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 22, check: pbh}
-  E24.R6 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 22, check: pkg}
-  E24.R7 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 23, check: author}
-  E24.R8 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 23, check: pbh}
-  E24.R9 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 23, check: pkg}
-  E24.R10 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 31, check: author}
-  E24.R11 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 31, check: pbh}
-  E24.R12 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 31, check: pkg}
-  E24.R13 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 32, check: author}
-  E24.R14 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 32, check: pbh}
-  E24.R15 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 32, check: pkg}
-  E24.R16 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 33, check: author}
-  E24.R17 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 33, check: pbh}
-  E24.R18 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 33, check: pkg}
-  E24.R19 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 34, check: author}
-  E24.R20 models whose admissibility decision differs from the exact gcd oracle = 0 {models: 250, seed: 34, check: pbh}
-  E24.R21 models whose admissibility decision differs from the exact gcd oracle = 1 {models: 250, seed: 34, check: pkg}
+  E24.T1 Models, of 250 per seed, whose admissibility decision differs from the exact gcd oracle, for the cancellation of cyclotomic factors ('author'), the PBH reference ('pbh') and the package ('pkg'), seeds 21 to 23 and 31 to 34 {models: 250}
+  | row | seed | models whose admissibility decision differs from the exact gcd oracle {check: author} | models whose admissibility decision differs from the exact gcd oracle {check: pbh} | models whose admissibility decision differs from the exact gcd oracle {check: pkg} |
+  | r1 | 21 | 0 | 0 | 1 |
+  | r2 | 22 | 0 | 0 | 0 |
+  | r3 | 23 | 0 | 0 | 0 |
+  | r4 | 31 | 0 | 0 | 0 |
+  | r5 | 32 | 0 | 0 | 0 |
+  | r6 | 33 | 0 | 1 | 1 |
+  | r7 | 34 | 0 | 0 | 1 |
   parameters: A15
 
 LIMITATIONS

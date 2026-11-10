@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.39",
+  "schema_version": "0.40",
   "paper": {
     "title": "The observed-data likelihood of ADAM and iETS with unobserved periods: entropy term, SSOE Kalman filter and multiplicative approximations",
     "licence": "CC-BY-4.0",
@@ -129,7 +129,10 @@
           "task": "writing",
           "extent": "substantial"
         }
-      ]
+      ],
+      "system": {
+        "name": "Claude Code"
+      }
     },
     {
       "type": "agent",
@@ -163,7 +166,10 @@
           "task": "code",
           "extent": "full"
         }
-      ]
+      ],
+      "system": {
+        "name": "Claude Code"
+      }
     },
     {
       "id": "P5",
@@ -195,6 +201,9 @@
       "run_period": {
         "start": "2026-10-15",
         "end": "2026-10-15"
+      },
+      "system": {
+        "name": "Claude Code"
       }
     }
   ],
@@ -1059,12 +1068,9 @@
             "A5"
           ],
           "results": [
-            "E20.R1",
-            "E20.R2",
-            "E20.R3",
-            "E20.R4",
-            "E20.R5",
-            "E20.R6"
+            "E20.T1.r1",
+            "E20.T1.r2",
+            "E20.T1.r3"
           ]
         }
       ],
@@ -1115,14 +1121,10 @@
             "A6"
           ],
           "results": [
-            "E21.R1",
-            "E21.R2",
-            "E21.R3",
-            "E21.R4",
-            "E21.R5",
-            "E21.R6",
-            "E21.R7",
-            "E21.R8"
+            "E21.T1.r1",
+            "E21.T1.r2",
+            "E21.T1.r3",
+            "E21.T1.r4"
           ]
         }
       ],
@@ -1639,12 +1641,9 @@
             "A5"
           ],
           "results": [
-            "E20.R7",
-            "E20.R8",
-            "E20.R9",
-            "E20.R10",
-            "E20.R11",
-            "E20.R12"
+            "E20.T1.r4",
+            "E20.T1.r5",
+            "E20.T1.r6"
           ]
         }
       ],
@@ -2481,144 +2480,96 @@
       "seeds": [
         20261015
       ],
-      "results": [
-        {
-          "id": "R1",
-          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
-          "value": 0.001147669555304068,
-          "conditions": {
-            "distribution": "dgamma",
-            "ets_form": "conventional",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R2",
-          "variable": "largest KL divergence per observation, one-step vs exact density",
-          "value": 2.359344901764189,
-          "conditions": {
-            "distribution": "dgamma",
-            "ets_form": "conventional",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R3",
-          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
-          "value": 0.004478045527634884,
-          "conditions": {
-            "distribution": "dlnorm",
-            "ets_form": "conventional",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R4",
-          "variable": "largest KL divergence per observation, one-step vs exact density",
-          "value": 5.947322649817578,
-          "conditions": {
-            "distribution": "dlnorm",
-            "ets_form": "conventional",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R5",
-          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
-          "value": 0.00399623186332274,
-          "conditions": {
-            "distribution": "dinvgauss",
-            "ets_form": "conventional",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R6",
-          "variable": "largest KL divergence per observation, one-step vs exact density",
-          "value": 47.545190336883074,
-          "conditions": {
-            "distribution": "dinvgauss",
-            "ets_form": "conventional",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R7",
-          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
-          "value": 0.014519691145235577,
-          "conditions": {
-            "distribution": "dgamma",
-            "ets_form": "adam",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R8",
-          "variable": "largest KL divergence per observation, one-step vs exact density",
-          "value": 4.583576097536914,
-          "conditions": {
-            "distribution": "dgamma",
-            "ets_form": "adam",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R9",
-          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
-          "value": 9.638705681090434e-07,
-          "conditions": {
-            "distribution": "dlnorm",
-            "ets_form": "adam",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R10",
-          "variable": "largest KL divergence per observation, one-step vs exact density",
-          "value": 18.635381272371507,
-          "conditions": {
-            "distribution": "dlnorm",
-            "ets_form": "adam",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R11",
-          "variable": "largest KL divergence per observation, normal-drift mixture vs exact density",
-          "value": 0.00044603365455395534,
-          "conditions": {
-            "distribution": "dinvgauss",
-            "ets_form": "adam",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        },
-        {
-          "id": "R12",
-          "variable": "largest KL divergence per observation, one-step vs exact density",
-          "value": 630.7721304928126,
-          "conditions": {
-            "distribution": "dinvgauss",
-            "ets_form": "adam",
-            "model": "iETS(M,N,N)"
-          },
-          "artefact": "A4"
-        }
-      ],
       "execution": {
         "code_version": "f9d062ee850675acc2160d851a34093d035a474e",
         "notes": "Run with the claimset scripts not yet committed; the scripts are archived at f1de3ea1 and the package code is identical at both commits (user-reported)."
-      }
+      },
+      "tables": [
+        {
+          "id": "T1",
+          "description": "Largest Kullback-Leibler divergence per observation from the exact density of the size after an interval, of the normal-drift mixture density and of the one-step density, for iETS(M,N,N) with Gamma, log-normal and inverse Gaussian sizes in the conventional and the ADAM form",
+          "conditions": {
+            "model": "iETS(M,N,N)"
+          },
+          "row_labels": [
+            "distribution",
+            "ets_form"
+          ],
+          "columns": [
+            "largest KL divergence per observation, normal-drift mixture vs exact density",
+            "largest KL divergence per observation, one-step vs exact density"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [
+                "dgamma",
+                "conventional"
+              ],
+              "values": [
+                0.001147669555304068,
+                2.359344901764189
+              ]
+            },
+            {
+              "id": "r2",
+              "label": [
+                "dlnorm",
+                "conventional"
+              ],
+              "values": [
+                0.004478045527634884,
+                5.947322649817578
+              ]
+            },
+            {
+              "id": "r3",
+              "label": [
+                "dinvgauss",
+                "conventional"
+              ],
+              "values": [
+                0.00399623186332274,
+                47.545190336883074
+              ]
+            },
+            {
+              "id": "r4",
+              "label": [
+                "dgamma",
+                "adam"
+              ],
+              "values": [
+                0.014519691145235577,
+                4.583576097536914
+              ]
+            },
+            {
+              "id": "r5",
+              "label": [
+                "dlnorm",
+                "adam"
+              ],
+              "values": [
+                9.638705681090434e-07,
+                18.635381272371507
+              ]
+            },
+            {
+              "id": "r6",
+              "label": [
+                "dinvgauss",
+                "adam"
+              ],
+              "values": [
+                0.00044603365455395534,
+                630.7721304928126
+              ]
+            }
+          ],
+          "artefact": "A4"
+        }
+      ]
     },
     {
       "id": "E21",
@@ -2659,94 +2610,6 @@
       "outputs": "fixed-point estimator, 1000 observed sizes, by drift order: <=0.02 median relative bias +0.02%, 0% failed; 0.02-0.1 -0.06%, 18%; 0.1-0.3 -0.42%, 52%; >0.3 -0.43%, 71%. Within fitted models the gain update raised the relative bias in 97 of 120 cells by a median of 12.8 percentage points",
       "results": [
         {
-          "id": "R1",
-          "variable": "median relative bias of the scale estimate",
-          "value": 0.0001590643108680817,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": "<=0.02"
-          },
-          "artefact": "A6"
-        },
-        {
-          "id": "R2",
-          "variable": "share of failed fits",
-          "value": 0.0,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": "<=0.02"
-          },
-          "artefact": "A6"
-        },
-        {
-          "id": "R3",
-          "variable": "median relative bias of the scale estimate",
-          "value": -0.0005993510206586256,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": "0.02-0.1"
-          },
-          "artefact": "A6"
-        },
-        {
-          "id": "R4",
-          "variable": "share of failed fits",
-          "value": 0.17673529411764705,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": "0.02-0.1"
-          },
-          "artefact": "A6"
-        },
-        {
-          "id": "R5",
-          "variable": "median relative bias of the scale estimate",
-          "value": -0.0041824876680562895,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": "0.1-0.3"
-          },
-          "artefact": "A6"
-        },
-        {
-          "id": "R6",
-          "variable": "share of failed fits",
-          "value": 0.523375,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": "0.1-0.3"
-          },
-          "artefact": "A6"
-        },
-        {
-          "id": "R7",
-          "variable": "median relative bias of the scale estimate",
-          "value": -0.004309863992060126,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": ">0.3"
-          },
-          "artefact": "A6"
-        },
-        {
-          "id": "R8",
-          "variable": "share of failed fits",
-          "value": 0.7100576923076923,
-          "conditions": {
-            "estimator": "fixed point",
-            "observed_sizes": 1000,
-            "drift_order": ">0.3"
-          },
-          "artefact": "A6"
-        },
-        {
           "id": "R9",
           "variable": "cells where the gain update raised the scale estimate by more than three Monte Carlo standard errors",
           "value": 97,
@@ -2783,7 +2646,67 @@
       "execution": {
         "code_version": "f9d062ee850675acc2160d851a34093d035a474e",
         "notes": "Run with the claimset scripts not yet committed; the scripts are archived at f1de3ea1 and the package code is identical at both commits (user-reported)."
-      }
+      },
+      "tables": [
+        {
+          "id": "T1",
+          "description": "Median relative bias and share of failed fits of the fixed-point estimator of the Gamma and inverse Gaussian scale on 1000 observed sizes simulated with the drift, by drift order",
+          "conditions": {
+            "estimator": "fixed point",
+            "observed_sizes": 1000
+          },
+          "row_labels": [
+            "drift_order"
+          ],
+          "columns": [
+            "median relative bias of the scale estimate",
+            "share of failed fits"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [
+                "<=0.02"
+              ],
+              "values": [
+                0.0001590643108680817,
+                0.0
+              ]
+            },
+            {
+              "id": "r2",
+              "label": [
+                "0.02-0.1"
+              ],
+              "values": [
+                -0.0005993510206586256,
+                0.17673529411764705
+              ]
+            },
+            {
+              "id": "r3",
+              "label": [
+                "0.1-0.3"
+              ],
+              "values": [
+                -0.0041824876680562895,
+                0.523375
+              ]
+            },
+            {
+              "id": "r4",
+              "label": [
+                ">0.3"
+              ],
+              "values": [
+                -0.004309863992060126,
+                0.7100576923076923
+              ]
+            }
+          ],
+          "artefact": "A6"
+        }
+      ]
     },
     {
       "id": "E22",

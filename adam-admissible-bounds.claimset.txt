@@ -1,4 +1,4 @@
-CLAIMSET Admissibility of lagged single-source-of-error state space models: the per-lag eigenvalue check, the cancelled ARIMA form of the whole model, the step-down test and their implementation in smooth, for ETS, GUM and ETS+ARIMA
+CLAIMSET Admissibility of lagged state space models through the ARIMA form of the whole model
 licence CC-BY-4.0; contributions C3, C25, C4, C16, C26, C1, C24, C22; highlights C1, C3, C22, C24, D10
 declarations funding: none | competing interests: None declared.
 exploration {"lab_record": "A9", "questions": 2, "hypotheses": {"total": 9, "supported": 9, "not_supported": 0, "inconclusive": 0, "revised": 0, "abandoned": 0, "open": 0}, "tests": {"total": 9, "supported": 9, "not_supported": 0, "inconclusive": 0}, "runs": {"total": 69, "confirmatory": 9, "exploratory": 60, "failed": 8}}

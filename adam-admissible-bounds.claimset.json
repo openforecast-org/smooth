@@ -1,7 +1,9 @@
 {
  "schema_version": "0.40",
  "paper": {
-  "title": "Admissibility of lagged single-source-of-error state space models: the per-lag eigenvalue check, the cancelled ARIMA form of the whole model, the step-down test and their implementation in smooth, for ETS, GUM and ETS+ARIMA",
+  "id": "entrylib:2026.000002",
+  "correction_reason": "The title is shortened to say what the paper is about in fewer words; nothing else changed.",
+  "title": "Admissibility of lagged state space models through the ARIMA form of the whole model",
   "contributions": [
    "C3",
    "C25",

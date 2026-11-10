@@ -1,10 +1,19 @@
-# Claimset — Specification v0.39 (draft)
+# Claimset — Specification v0.40 (draft)
 
-Status: the baseline (2026-11-09) · Date: 2026-11-09 · Supersedes v0.38 (`spec/claimset-v0.38.md`) · Companions: lab record specification (`spec/lab-record-v0.20.md`), revision specification (`spec/claimset-revision-v0.6.md`), extensions (`spec/extensions/`)
+Status: working draft · Date: 2026-11-10 · Supersedes v0.39, the baseline (`spec/claimset-v0.39.md`) · Companions: lab record specification (`spec/lab-record-v0.21.md`), revision specification (`spec/claimset-revision-v0.6.md`), extensions (`spec/extensions/`)
 
 Claimset is the name of both the open format and the platform.
 
-## Changes since v0.38
+## Changes since v0.39
+
+The guarantor can say which of the paper's findings and terms a reader should take first. The platform shows them at the top of the paper's page, and the reading view lists them.
+
+- §3.1: new optional `paper.highlights`: up to five IDs, in order of priority, of principal claims (each in `contributions`) and of terms the paper introduces (definitions without `source`). The guarantor chooses them; the agent proposes and asks. New rule 90; new warning 39 (a native submission without highlights).
+- §2.3, Appendix D: the reading view lists the highlights after the contributions.
+- §3.11: an agent's `system` names the harness the agent ran in (Claude Code, Codex CLI, Gemini CLI, opencode and the like), as it names any agent scaffold. The lab record records it for each agent (lab record v0.21), and export carries it here. A clarification: the field is unchanged.
+- `claimset migrate` brings a v0.39 file to v0.40 by its version alone; highlights are left for the guarantor to choose.
+
+## Changes in v0.39 (since v0.38)
 
 Tests planned outside a Claimset lab record can be reported as planned. A study preregistered on OSF or AsPredicted, a registered report and a trial in a trial registry report their hypotheses, outcomes and confirmatory tests in the same fields as a claimset exported from a lab record.
 
@@ -437,7 +446,7 @@ Top-level layout:
 
 ```json
 {
-  "schema_version": "0.39",
+  "schema_version": "0.40",
   "@context": "optional",
   "paper": {},
   "contributors": [],
@@ -458,7 +467,7 @@ Top-level layout:
 
 A claimset is stored and exchanged as JSON: the canonical file, which tools validate, the platform publishes and corrections patch. A model that reads the paper is given its **reading view**: a plain-text rendering of the same claimset. JSON field names, quotation marks and the fields that serve tools, audit and publication take a large share of a file and carry nothing a reader needs; the reading view leaves them out.
 
-- **Kept:** the title, licence, source of a converted paper, declarations, contributions and exploration counts; definitions with their kind, members, the wholes they are part of, their broader terms, assumptions and identifiers; claims with their type, role, novelty (when not `no_prior_found`), support with its pointers and locators, assumptions, `depends_on`, limitations, warrant, strength, verification, verifiability, planning, outcome, scope, relations with their notes (relations within the paper as well), assumptions inherited from the terms they rest on (§3.2, *Assumptions of a term*), and test; evidence with its description, design fields, setup, what it is derived from, estimate, observations (results and tables, with their values, units, conditions and where a value was read from) and proof steps; warrants; limitations; open questions; artefact descriptions, figure functions and the observations a figure shows; references.
+- **Kept:** the title, licence, source of a converted paper, declarations, contributions, highlights and exploration counts; definitions with their kind, members, the wholes they are part of, their broader terms, assumptions and identifiers; claims with their type, role, novelty (when not `no_prior_found`), support with its pointers and locators, assumptions, `depends_on`, limitations, warrant, strength, verification, verifiability, planning, outcome, scope, relations with their notes (relations within the paper as well), assumptions inherited from the terms they rest on (§3.2, *Assumptions of a term*), and test; evidence with its description, design fields, setup, what it is derived from, estimate, observations (results and tables, with their values, units, conditions and where a value was read from) and proof steps; warrants; limitations; open questions; artefact descriptions, figure functions and the observations a figure shows; references.
 - **Left out:** `about` (the statement says the same in words; `about` serves search), `provenance`, `field_provenance`, `source_spans`, `corrections`, availability, artefact locations, versions and licences, contributors, models, execution records, lab-record identifiers, `schema_version` and the platform's publication fields.
 
 - **Order:** claims are grouped by role: principal claims, then supporting claims, then secondary claims, each group in file order. Claims that are not principal and whose support is only `argument` or `unstated` follow, under CLAIMS WITHOUT EVIDENCE, so a reader sees at once what the paper asserts or argues without evidence. Principal claims stay with the principal claims whatever their support.
@@ -520,7 +529,7 @@ data/
 
 ### 2.6 Specification versions and compatibility
 
-`schema_version` (required, top level) is the version of this specification the file follows: `"0.39"`.
+`schema_version` (required, top level) is the version of this specification the file follows: `"0.40"`.
 
 - **Baseline.** The baseline is the first version the platform accepts: **v0.39**, set when the platform launched on 2026-11-09. A file following an earlier version is refused (rule 79) and brought to the current version by `claimset migrate`.
 - **Every version from the baseline is accepted, for good.** A file is checked by the rules of the version it follows, never by rules added later. A validator of a later version keeps the rules of every earlier version from the baseline and applies the ones the file's version calls for. A file valid under its version when it was published is valid under it in every later validator.
@@ -568,6 +577,7 @@ The core of this specification is what every field shares and what claims are co
 | `licence` | string | Required. SPDX identifier, e.g. `CC-BY-4.0`. Native papers: chosen by the supervisor or guarantor. Converted papers: see *Licence of a converted paper* below and rule 31 |
 | `classification` | object | `subfield` (one OpenAlex subfield ID) and `topics` (1–3 OpenAlex topic IDs): platform-assigned; the agent may propose values. `keywords` (free text, for specifics the taxonomy does not reach): supplied by the agent, recommended |
 | `contributions` | list of claim IDs | Required. Ordered by priority; principal claims only |
+| `highlights` | list of IDs | Optional. One to five IDs, ordered by priority: principal claims (each in `contributions`) and terms the paper introduces (definitions without `source`), chosen by the guarantor (below; rule 90) |
 | `autonomy` | enum | Native papers only, required: `autonomous` (agents ran the work end to end) · `human_supervised` (humans oversaw the agents' work and approved it) · `human_assisted` (humans carried out substantial parts of the research) · `unknown` |
 | `contribution_record` | enum | Required. `complete` · `partial` · `unknown`. For converted papers, refers to the conversion |
 | `origin` | enum | Required. `native` · `converted` |
@@ -608,6 +618,13 @@ Disagreements with the source that are not evident errors are not corrections: t
 | Any licence with NoDerivatives (`ND`), all rights reserved, or no licence | not allowed | — |
 
 A claimset under a non-commercial licence may be used only for non-commercial purposes. Platforms and tools that use claimsets commercially (for example to train, tune or promote a commercial service) exclude claimsets whose `paper.licence` contains `NC`.
+
+**`highlights`.** What a reader should take from the paper first: at most five of its principal claims and of the terms it introduces, in order of priority. The platform shows them at the top of the paper's page, and the reading view lists them after the contributions. A highlight selects; it adds nothing: it is an ID, never new text, and the claim or definition it names says what it is.
+- A claim is highlighted only if it is principal: it is listed in `contributions`. A claim the guarantor wants to highlight that is not principal is a contribution, and its `role` says so.
+- A definition is highlighted only if the paper introduces it (it has no `source`, §3.2): a new measure, method, concept or data set can be what a paper contributes. A borrowed term is not this paper's.
+- Native papers: the guarantor chooses them (principle 10), as they choose the licence. The agent proposes up to five, in order of priority, with a line on why each, and records what the guarantor decides. If the guarantor prefers none, the field is left out, and the platform shows the contributions in their order.
+- Converted papers: the claims and terms the source itself puts first (its highlights, or without them its abstract), when they are principal claims or the paper's own terms; otherwise the field is left out.
+- A correction or revision may change them, like any field.
 
 **`declarations`.** What a reader needs to weigh the work beyond its evidence, as its responsible people declare it. Native papers: the agent asks the guarantor (principle 10), and records what they say.
 - `funding`: list of `{funder, funder_id, award, kind, role}`: the funder's name, its identifier (a ROR ID such as `ror:00k4n6c32`, or a Crossref Funder Registry DOI), the award or grant number, the `kind` of support, `grant` (money) or `in_kind` (materials, vouchers, services, equipment, analyses paid for), and the funder's `role` in the work as text ("no role in design, analysis or the decision to publish"). An empty list declares no funding.
@@ -1191,7 +1208,7 @@ A paper may pass through several agents without its history being kept. At minim
 | `ai_tasks` | recommended | list | `{task, extent}` (below) |
 | `tools` | recommended | list | `web_search` · `code_execution` · `file_access` · `retrieval` · `other` · `none` |
 | `record_source` | recommended | enum | Where the agent's models, settings and tools were taken from: `harness` (recorded by the system that made the calls) · `user_reported` (entered from the interface) · `self_reported` (stated by the agent from its own knowledge). Absent ⇒ treated as `self_reported` |
-| `system` | optional | object | `{name, version, uri}` of the agent scaffold or harness |
+| `system` | optional | object | `{name, version, uri}` of the agent scaffold or harness the agent ran in: a coding agent such as Claude Code, Codex CLI, Gemini CLI or opencode, or the team's own scaffold. The model is in `models`; the same model in two harnesses is two different systems |
 | `run_period` | optional | object | `{start, end}` as ISO dates |
 | `settings` | optional | object | e.g. `{effort, temperature, top_p, max_tokens}`; individual values may be `null` |
 | `trace` | optional | artefact ID | Artefact of kind `trace` |
@@ -1540,6 +1557,10 @@ The file records identifier type and venue facts for cited works only. Trust in 
 
 89. Observation evidence (§3.4). Evidence of profile `observation` has `records`, a non-empty list; each record has a `kind` from the list in §3.4 and only `kind`, `artefact` (the ID of an artefact) and `description` (non-empty text). Evidence of other profiles has no `records`.
 
+### 10.28 Rules added in v0.40 (errors: file rejected)
+
+90. Highlights (§3.1). `paper.highlights`, if present, is a list of one to five distinct IDs, each the ID of a claim listed in `paper.contributions` or of a definition without `source`.
+
 ### 10.4 Warnings (file accepted, warning recorded)
 
 1. A `recommended` field in §3.11 or §3.12 is missing.
@@ -1580,6 +1601,7 @@ The file records identifier type and venue facts for cited works only. Trust in 
 36. A registered test without `planned_at`: give the registration's date as the registry records it (§3.3.3).
 37. A record of observation evidence without `artefact`: name the figure that shows it and, better, the original file (§3.4).
 38. A statistic named `other`: check whether a name in the list fits with its parameters (a geometric mean is a `mean` of kind `geometric`, a percentile a `quantile`); the labels of `other` are gathered for the next version's list (§3.4).
+39. A native submission without `paper.highlights`: ask the guarantor which principal claims and which of the paper's own terms a reader should take first, at most five (§3.1). Leave the field out only if the guarantor prefers none. (New in v0.40.)
 
 ## 11. Platform dependencies
 
@@ -1635,13 +1657,14 @@ What the agent submits. No identifier, version, date, status, classification IDs
 
 ```json
 {
-  "schema_version": "0.39",
+  "schema_version": "0.40",
   "paper": {
     "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
     "licence": "CC-BY-4.0",
     "classification": {"keywords": ["retail demand forecasting"]},
     "declarations": {"funding": [], "competing_interests": "None declared."},
     "contributions": ["C2"],
+    "highlights": ["C2", "D2"],
     "autonomy": "human_supervised",
     "contribution_record": "complete",
     "origin": "native"
@@ -1734,7 +1757,7 @@ What the agent submits. No identifier, version, date, status, classification IDs
 
 ```json
 {
-  "schema_version": "0.39",
+  "schema_version": "0.40",
   "paper": {
     "id": "doi:10.0000/claimset.2026.000456",
     "title": "Example converted paper",
@@ -1781,7 +1804,7 @@ The output of `claimset render` for the submission in Appendix A. Statements kee
 
 ```text
 CLAIMSET Method M against the seasonal naive benchmark on UK monthly retail sales
-licence CC-BY-4.0; contributions C2
+licence CC-BY-4.0; contributions C2; highlights C2, D2
 declarations funding: none | competing interests: None declared.
 
 DEFINITIONS

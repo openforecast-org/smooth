@@ -23,7 +23,7 @@ import math
 import re
 import sys
 
-SCHEMA_VERSION = "0.39"
+SCHEMA_VERSION = "0.40"
 #: The first specification version accepted (spec §2.6), set when the platform launches. Files of every version from
 #: it to SCHEMA_VERSION are then valid for good, each checked by its own version's rules (a frozen validator in
 #: claimset.versions). None until then: only SCHEMA_VERSION is accepted, and earlier files are migrated.
@@ -2379,6 +2379,50 @@ def check_v032(r, paper, coll, claims, by_id, ids, converted, published):
     if not converted and (not isinstance(decl, dict) or "funding" not in decl or "competing_interests" not in decl):
         r.warn("W29", "paper.declarations", "declare funding and competing interests, as the guarantor states them "
                                             "(an empty funding list and \"None declared.\" are declarations)")
+
+    # ----- highlights (rule 90, warning 39; §3.1) -----
+    check_highlights(r, paper, claims, coll["definitions"])
+    if not converted and not published and "highlights" not in paper:
+        r.warn("W39", "paper.highlights", "ask the guarantor which principal claims and which of the paper's own "
+                                          "terms a reader should take first, at most five, in order of priority "
+                                          "(§3.1); leave the field out only if the guarantor prefers none")
+
+
+#: Rule 90 (§3.1): the most highlights a paper has.
+MAX_HIGHLIGHTS = 5
+
+
+def check_highlights(r, paper, claims, definitions):
+    """Rule 90: `paper.highlights` is a list of one to five distinct IDs, each a claim listed in
+    `paper.contributions` or a definition the paper introduces (no `source`)."""
+    if "highlights" not in paper:
+        return
+    hl = paper["highlights"]
+    if not isinstance(hl, list) or not hl or len(hl) > MAX_HIGHLIGHTS:
+        r.err("90", "paper.highlights", f"a list of 1 to {MAX_HIGHLIGHTS} IDs of principal claims and of the "
+                                        f"paper's own terms, in order of priority")
+        return
+    contributions = as_list(paper.get("contributions"))
+    defs = {_h(as_dict(d).get("id")): as_dict(d) for d in definitions}
+    seen = set()
+    for i, x in enumerate(hl):
+        where = f"paper.highlights[{i}]"
+        if not isinstance(x, str) or not x:
+            r.err("90", where, "the ID of a principal claim or of a definition")
+            continue
+        if x in seen:
+            r.err("90", where, f"{x} is highlighted twice")
+        seen.add(x)
+        if x in claims:
+            if x not in contributions:
+                r.err("90", where, f"{x} is not a contribution: only principal claims are highlighted (make it "
+                                   f"principal and list it in paper.contributions, or highlight another claim)")
+        elif x in defs:
+            if defs[x].get("source") is not None:
+                r.err("90", where, f"{x} is a borrowed term (it has a source): only terms the paper introduces "
+                                   f"are highlighted")
+        else:
+            r.err("90", where, f"{x} is neither a claim nor a definition of this claimset")
 
 
 #: Rule 77: the limits on a submission package (§2.5), applied alike by the platform, `claimset validate` and

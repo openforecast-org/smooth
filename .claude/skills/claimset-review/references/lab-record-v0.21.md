@@ -1,8 +1,16 @@
-# Claimset Lab Record — Specification v0.20 (draft)
+# Claimset Lab Record — Specification v0.21 (draft)
 
-Status: working draft · Date: 2026-11-06 · Supersedes v0.19 · Companion to the claimset specification (`spec/claimset-v0.39.md`), its extensions (`spec/extensions/`) and the revision specification (`spec/claimset-revision-v0.6.md`)
+Status: working draft · Date: 2026-11-10 · Supersedes v0.20 · Companion to the claimset specification (`spec/claimset-v0.40.md`), its extensions (`spec/extensions/`) and the revision specification (`spec/claimset-revision-v0.6.md`)
 
-## Changes since v0.19
+## Changes since v0.20
+
+A record said which model an agent was, but not which harness ran it: the same model in Claude Code, Codex CLI, Gemini CLI or opencode, with different tools and instructions, is a different agent. And the protections assumed one harness.
+
+- §5.2: an agent actor may record its `system`, the harness it runs in, as for agent contributors (claimset §3.11). `claimset lab actor` fills it in when the harness identifies itself in the environment (§4.6) and none is given, and takes the model from `$CLAIMSET_MODEL`, set by the human, when the agent gives none (`record_source: user_reported`). Export carries `system` into the contributor (§9).
+- §4.5, §4.6 (new), §10: the guard works in every harness that can run a command before a tool call, from one configuration that `claimset init` writes for each harness; harnesses without such hooks rely on the other layers.
+- Records begun before v0.21 are read as they were written; `system` is optional in every record.
+
+## Changes in v0.20 (since v0.19)
 
 The claimset specification is this record's vocabulary. Lists this specification used to repeat (the kinds of terms, the kinds of artefacts, actors, assumption categories, check outcomes, reasons for withholding, the frameworks of a decision rule and their parameters, the grammar of rule expressions, the test flags, the form of an observation) are now only in the claimset specification, which this one names; the tool takes them from the claimset package, so the two cannot drift apart.
 
@@ -230,7 +238,7 @@ A lab record is distilled into a claimset, so it speaks the claimset's language.
 | In the record | Defined in the claimset specification |
 |---|---|
 | a term's `kind` | the kinds of definitions (§3.2) |
-| an actor's `kind`, `models`, `record_source` | contributors and models (§3.11, §3.12) |
+| an actor's `kind`, `models`, `system`, `record_source` | contributors and models (§3.11, §3.12) |
 | an assumption's `category` and `check` | assumptions (§3.8) |
 | a check's `outcome` and `extent` | checks (§5) |
 | an artefact's `kind` | artefacts (§3.6) |
@@ -367,7 +375,7 @@ An agent that can run commands as the researcher can, in principle, do anything 
 | Level | How | Effect |
 |---|---|---|
 | Tamper-evident | the hash chain (§4.1) and `verify` | edits, deletions and reordering are detected, unless the whole chain is rewritten |
-| Guarded | the tool's guard, installed as a hook in the agent's harness, refuses tool calls that would modify the lab directory other than through `claimset lab` | accidental or casual modification is prevented; a determined agent can work around it |
+| Guarded | the tool's guard, installed as a hook in the agent's harness (§4.6), refuses tool calls that would modify the lab directory other than through `claimset lab` | accidental or casual modification is prevented; a determined agent can work around it. Only in harnesses that run a command before a tool call |
 | Append-only file | the operating system's append-only attribute on the log files (on Linux, `chattr +a`, set by an administrator) | the operating system refuses any change except appending, as long as the agent cannot act as an administrator |
 | Anchored | the head of the chain is regularly recorded outside the agent's reach (§7) | any rewriting before an anchor is detected, including a full recomputation of the chain |
 | Remote append-only | the authoritative copy is held by a service that accepts only appends (the Claimset platform; or a git branch protected against force-pushes and deletion, pushed to with credentials that cannot change the protection) | rewriting is prevented, not just detected |
@@ -379,6 +387,15 @@ Locally, the log is tamper-evident. With anchoring, tampering is always detected
 - the guard refuses git commands that would merge, rebase or cherry-pick between study branches and code, check a study branch out in the code checkout, force-add `claimset/` to a code branch, or force-push, delete or rename a study branch;
 - on the host, protect `claimset/*` against force-pushes and deletion, and add the check that `claimset setup --ci` writes: a pull request fails if it changes `claimset/`, comes from or goes to a study branch, or contains a study branch's own history;
 - the guard's configuration also shows the state of every study (`claimset studies`) at the start of each agent session, so that work, implementation included, begins inside the record.
+
+### 4.6 Agent harnesses
+
+Agents run in harnesses (Claude Code, Codex CLI, Gemini CLI, Qwen Code, opencode, GitHub Copilot, Cursor, Cline and others), which differ in where they read skills and instructions, in how they let a command inspect a tool call before it runs, and in what their shells may reach. The record and its rules are the same in all of them; only the setup differs, and `claimset init --agent NAME` makes it (`claimset init --list` shows what it knows of each harness):
+
+- **Skills and instructions.** The skills are installed once in each folder the chosen harnesses read: `.agents/skills/` reaches most of them; Claude Code, among others, reads only its own. The instructions are one block in `AGENTS.md`; a harness that reads another file and can import (Claude Code's `CLAUDE.md`, Gemini CLI's `GEMINI.md`) gets a line importing `AGENTS.md`, never a copy. The block names the skills by path, so an agent whose harness does not load skills reads them as files.
+- **The guard** (§4.5) reads a proposed tool call in the shape any of these harnesses sends it, as files the call would write (a patch's files included) and commands it would run, and refuses it by exit code 2 with the reason on standard error (Cline: its JSON answer). `claimset init --guard` registers it in each harness's own hook configuration; a harness without such hooks has no guard, and its record relies on the other layers. Some harnesses run project hooks only once the human has trusted them: the guard is in place only from then.
+- **The harness** that identifies itself in the environment is recorded as the agent's `system` (§5.2).
+- **The network.** A harness may run commands in a sandbox without network. Anchoring (§7.1) and submission then fail; the tool says so, and how that harness lets the git host and the platform through. A study whose agent cannot reach the remote is anchored from a shell that can, or kept in desk mode (§3).
 
 ## 5. Event types
 
@@ -392,7 +409,7 @@ Locally, the log is tamper-evident. With anchoring, tampering is always detected
 
 Registers a person or agent who will write events. Mirrors claimset contributors.
 
-`{kind, name, orcid, models: [{provider, name, version, identifier}], record_source, words, given_at, channel}`: `kind` is a contributor type, and `models` and `record_source` are as for agent contributors (claimset §3.11, §3.12).
+`{kind, name, orcid, models: [{provider, name, version, identifier}], system, record_source, words, given_at, channel}`: `kind` is a contributor type, and `models`, `system` and `record_source` are as for agent contributors (claimset §3.11, §3.12). `system` (`{name, version, uri}`, agents only) is the harness the agent runs in; `claimset lab actor` records the harness that identifies itself in the environment (§4.6) unless `--system` names one. An agent that does not know its model from its system prompt or environment is given it by the human in `$CLAIMSET_MODEL` (`provider|name|version|identifier`), recorded with `record_source: user_reported`.
 
 **Registration.** An actor is registered by itself (the event's `by` is its own ID) or by an actor already registered (L8). Every event's `by` is the actor who wrote it, so:
 
@@ -804,7 +821,7 @@ Hypotheses without a final status are counted as open; they are not forced close
 | Lab record | Claimset |
 |---|---|
 | `init` | `paper.title` (the working title), `paper.origin: native` |
-| `actor`, agent | contributor of type `agent` with its models (each model defined once in `models`, `accessed` the date of the earliest event by an agent using it), `name`, `record_source`, `run_period` (dates of its first and last events) and `tools: [code_execution]` if it ran commands. Position `author` if it wrote any event other than `actor` and `check`; otherwise `contributor`, with AI task `review` |
+| `actor`, agent | contributor of type `agent` with its models (each model defined once in `models`, `accessed` the date of the earliest event by an agent using it), `name`, `system`, `record_source`, `run_period` (dates of its first and last events) and `tools: [code_execution]` if it ran commands. Position `author` if it wrote any event other than `actor` and `check`; otherwise `contributor`, with AI task `review` |
 | `actor`, human or organisation | contributor with `name` and `orcid`, position `contributor`. Who is supervisor and guarantor is decided by people (completion list) |
 | a verdict on a planned test (§5.7.4) | a claim per decided plan and hypothesis it names, in the order of the hypotheses and then the plans: `statement` and `about` from the hypothesis as it stood when the plan was written, `hypothesis: {lab_event, outcome}` (`lab_event` is that version's ID, `outcome` the verdict), defaults `type: descriptive`, `role: supporting`, `novelty: no_prior_found`, `provenance: author_stated` |
 | `term` | a definition (`D1`, `D2`, … in record order, each correction chain once, its latest version) with `term`, `kind`, `definition`, `source` (as text: the completion list asks for it to become an entry of `references`) and `broader`. Term marks and term IDs in statements, `about` and `setup` are replaced by the definition IDs |
@@ -872,7 +889,7 @@ The reference tool is part of the `claimset` package. Indicative commands:
 | `claimset lab verify` | checks the main and agent chains, the rules and the run files |
 | `claimset lab anchor [--git] [--remote origin] [--branch claimset-lab] [--every plan\|event]` | anchors the head of the chain; the first use with `--git` records the configuration (§7.1) |
 | `claimset lab verify --remote` | also checks the log against the anchor branch on the remote |
-| `claimset lab guard` | the guard for agent harnesses: reads a proposed tool call as JSON on standard input and exits with code 2 if it would modify the lab directory (§4.5); `--print-config` prints the Claude Code hook configuration |
+| `claimset lab guard` | the guard for agent harnesses: reads a proposed tool call as JSON on standard input and exits with code 2 if it would modify the lab directory (§4.5); `--print-config [--agent NAME]` prints the hook configuration for a harness (Claude Code by default); `claimset init --guard` writes it (§4.6) |
 | `claimset lab protect` | sets the operating system's append-only attribute on the log files, or explains how an administrator can (§4.5) |
 | `claimset lab publish --withhold RN7 --reason personal_data --comment "…"` | prepares the publishable record |
 | `claimset lab export [--paper NAME] [-o FILE]` | writes the draft claimset submission of one paper (default `claimset/<study>/<paper>.claimset.json`) and prints the completion list (§9) |

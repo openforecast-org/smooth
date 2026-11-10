@@ -1,13 +1,13 @@
 ---
 name: claimset-submit
-description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.39 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
+description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.40 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
 ---
 
 # Preparing a Claimset submission
 
 A claimset is a research paper written for LLM readers: a flat JSON file of atomic, self-contained claims plus the definitions, evidence, assumptions, limitations, warrants and artefacts that support, condition and limit them. You write every field. A human decides two things (guarantor and licence), and you ask them before you finish.
 
-The normative rules are in `references/spec-v0.39.md`. Extensions of the format, for detail that one kind of work needs (spec §2.7), are in `references/extensions/`: the registry `README.md` lists them. Use an extension only when the work has what it records (a glossed linguistic example: `linguistics`), declare it in the top-level `extensions`, and put its fields in `ext` blocks on the objects it names. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
+The normative rules are in `references/spec-v0.40.md`. Extensions of the format, for detail that one kind of work needs (spec §2.7), are in `references/extensions/`: the registry `README.md` lists them. Use an extension only when the work has what it records (a glossed linguistic example: `linguistics`), declare it in the top-level `extensions`, and put its fields in `ext` blocks on the objects it names. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
 
 **Versions.** This skill, its spec and its validator are one version. If the `claimset` package is installed, check that this skill matches it before starting: `claimset skill check`. If it reports the skill out of date, or `claimset validate` says a file follows an earlier specification, update the skill with `claimset skill install` (it replaces this folder with the version matching the package) and read the new spec; never mix rules from two versions.
 
@@ -40,13 +40,13 @@ Ask the person who supervised the work, in a single message:
 5. **Confidentiality:** is any data, code or material not publicly shareable? If so, why (personal data, commercial, legal, ethics, security)?
 6. **Declarations:** who funded the work (funder and award number), and are there competing interests? If people took part: which ethics committee approved it (and its reference), and what did participants consent to, including publication of quotations? These go in `paper.declarations`; an empty funding list and "None declared." are declarations too (W29). Support in kind (materials, vouchers, services) is a funding entry with `"kind": "in_kind"`; say the funder's `role` in the work when the paper does. A paper published on behalf of a collaboration names it in `paper.collaborations`; the people who answer for it are still the contributors.
 
-Ask only these. Do not ask for a DOI or other identifier, a publication date or a classification: the platform assigns them.
+Ask only these now. The highlights are asked at the hand-over (step 12), once the claims exist. Do not ask for a DOI or other identifier, a publication date or a classification: the platform assigns them.
 
-If the human cannot be asked (unattended run), stop after building and validating the file and list these questions as open items. Never fill guarantor or licence on your own.
+If the human cannot be asked (unattended run), stop after building and validating the file and list these questions as open items. Never fill guarantor, licence or highlights on your own.
 
 ### 2a. If the research has a lab record
 
-If the work was done with a lab record (`claimset/<study>/lab/lab.jsonl`, or an older `lab/lab.jsonl`; specified in `references/lab-record-v0.20.md`), start from it rather than from a manuscript:
+If the work was done with a lab record (`claimset/<study>/lab/lab.jsonl`, or an older `lab/lab.jsonl`; specified in `references/lab-record-v0.21.md`), start from it rather than from a manuscript:
 - Run `claimset lab export [--paper NAME]` if the tool is available (with several papers recorded, one paper at a time). It writes a draft that holds everything the record states and prints a **completion list**: the decisions and wording still needed (licence, guarantor, principal claims, claim types, scopes, evidence profiles and descriptions, statements of negative results). Work through that list; do not change what the record states, such as `hypothesis`, `planning`, `planned_at`, `lab_runs` or the exploration counts. If export refuses (an open hypothesis, an unmerged agent log, a record that does not verify), fix the record with `claimset lab` commands, never by editing it.
 - Without the tool, build the claims from the record by hand, following the mapping in lab record §9.
 - Every hypothesis that reached `supported`, `not_supported` or `inconclusive` becomes a claim with `hypothesis: {lab_event, outcome}`, `planning`, and for planned tests `planned_at`, `planned_at_anchor` and `test` (the decision rule) copied from the record. Never upgrade `exploratory` to `confirmatory`, and never change a `test`: it is what the plan fixed before the data were seen.
@@ -263,7 +263,7 @@ A formal result you cite and apply is `cited` support of your claim, not a claim
 - **Models**: provider, name, version required; identifier, weights, accessed recommended.
 - **Artefacts**: give each of the work's own artefacts and each packaged file a `licence` (SPDX identifier); an artefact taken from a cited work (it names its `reference`) carries none, since its licence belongs with that work. Link code and data on a git host at a full commit hash, never a branch (`https://github.com/org/repo/tree/<40-hex commit>/path`): a branch moves (W21). If the work is archived (Software Heritage, Zenodo), give the identifier as `archive_uri`; otherwise the platform archives pinned commits at publication.
 - **Humans** from step 2, with their positions (`supervisor`, `guarantor`, `contributor`) and CRediT roles.
-- **Paper**: title (descriptive, no rhetoric), licence, contributions, `autonomy`, contribution_record, `origin: "native"`. Nothing else at paper level.
+- **Paper**: title (descriptive, no rhetoric), licence, contributions, highlights (step 12, chosen by the guarantor), `autonomy`, contribution_record, `origin: "native"`. Nothing else at paper level.
 - **Classification**: give 3–8 precise `keywords` (e.g. `"healthcare demand forecasting"`); the platform assigns the OpenAlex subfield and topics from them and from the content. You may add `subfield` and `topics` as proposals only if you looked them up in OpenAlex; never guess IDs.
 
 ### 9a. Package the files
@@ -323,7 +323,8 @@ Write the file where it belongs (spec §2.4): `claimset/<study>/<paper>.claimset
 Give the human a short summary:
 1. Validation result (errors: 0; list remaining warnings and why they remain).
 2. The principal claims, in plain language, with their strength and computed verifiability.
-3. Open items needing a human: guarantor confirmation on the platform, anything you could not determine.
+3. **Highlights, for the guarantor to choose** (spec §3.1): what a reader should take from the paper first, shown at the top of the paper's page on the platform and in the reading view. Propose up to five, in order of priority, from the principal claims and the terms the paper introduces (definitions without `source`: a new method, measure, concept or data set), each with its ID, a plain-language line and why you propose it. Ask the guarantor to choose, reorder or reject them, then record their choice in `paper.highlights` (`["C2", "D4"]`) and validate again. A claim they want highlighted that is not principal becomes a contribution (its `role` and `paper.contributions`). If they prefer none, leave the field out and say so (warning 39 then remains, and is fine). Never choose them yourself.
+4. Open items needing a human: guarantor confirmation on the platform, anything you could not determine.
 
 Submit only once the human approves, by whichever route your environment has:
 - **A terminal with the `claimset` package:** `claimset submit <paper>.zip` (a package from `claimset package`), or `claimset submit <paper>.claimset.json` for a claimset with no packaged files (its artefacts linked by https URLs, such as Zenodo or a commit on GitHub). For a package deposited elsewhere, `claimset submit https://…/paper.zip`. It validates the file first and sends nothing if it has errors.

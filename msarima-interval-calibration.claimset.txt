@@ -1,5 +1,5 @@
 CLAIMSET Calibration of the prediction intervals of AutoMSARIMA in smooth on M1, M3, Tourism and M4
-licence CC-BY-4.0; contributions C1, C2, C3, C4, C5, C6
+licence CC-BY-4.0; contributions C1, C2, C3, C4, C5, C6; highlights C1, C2, C3, C5
 declarations funding: none | competing interests: The guarantor is the author and maintainer of the smooth package that the study evaluates.
 exploration {"lab_record": "A7", "questions": 5, "hypotheses": {"total": 11, "supported": 6, "not_supported": 3, "inconclusive": 2, "revised": 0, "abandoned": 0, "open": 0, "from_exploration": 8}, "tests": {"total": 12, "supported": 6, "not_supported": 3, "inconclusive": 3}, "runs": {"total": 49, "confirmatory": 13, "exploratory": 36, "failed": 3}}
 

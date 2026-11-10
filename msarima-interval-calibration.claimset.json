@@ -1,5 +1,5 @@
 {
- "schema_version": "0.39",
+ "schema_version": "0.40",
  "paper": {
   "title": "Calibration of the prediction intervals of AutoMSARIMA in smooth on M1, M3, Tourism and M4",
   "contributions": [
@@ -9,6 +9,12 @@
    "C4",
    "C5",
    "C6"
+  ],
+  "highlights": [
+   "C1",
+   "C2",
+   "C3",
+   "C5"
   ],
   "autonomy": "human_supervised",
   "contribution_record": "complete",
@@ -113,7 +119,10 @@
      "task": "json_preparation",
      "extent": "full"
     }
-   ]
+   ],
+   "system": {
+    "name": "Claude Code"
+   }
   }
  ],
  "models": [

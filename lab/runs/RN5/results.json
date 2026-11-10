@@ -1,0 +1,17 @@
+[
+ {
+  "quantity": "step-down decisions that differ from the decision by the roots",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "models within 1e-8 of the unit circle, excluded",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "models compared",
+  "value": 115.0,
+  "conditions": {}
+ }
+]

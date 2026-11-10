@@ -1,0 +1,40 @@
+{'ets': {'trend': 'Ad', 'seasonal': [12], 'alpha': 1.8842869104673383, 'beta': 0.019270694741924776, 'gamma': [0.0], 'phi': 0.938020681453282}, 'm': 12, 'ar': [(1, [-0.8559808091902386])], 'i': [], 'ma': [(1, [0.642395848046047, -0.18019056169198278])]} lags [1, 1, 12, 1, 2]
+  F here [[1.0, 0.938, 0.0, 0.0, 0.0], [0.0, 0.938, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, -0.856, -0.856], [0.0, 0.0, 0.0, -0.0, -0.0]] 
+  F adam [[1.0, 0.938, 0.0, 0.0, 0.0], [0.0, 0.938, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, -0.856, -0.856], [0.0, 0.0, 0.0, 0.0, 0.0]]
+  g here [1.8843, 0.0193, 0.0, -0.2136, -0.1802] 
+  g adam [1.8843, 0.0193, 0.0, -0.2136, -0.3604]
+  w here [1.0, 0.938, 1.0, 1.0, 1.0] 
+  w adam [1.0, 0.938, 1.0, 1.0, 1.0]
+{'ets': {'trend': 'Ad', 'seasonal': [], 'alpha': 1.3575970760798404, 'beta': 0.35378004510065075, 'gamma': [], 'phi': 0.9097733655649974}, 'm': 12, 'ar': [], 'i': [], 'ma': [(12, [1.2272533144619913])]} lags [1, 1, 12]
+  F here [[1.0, 0.9098, 0.0], [0.0, 0.9098, 0.0], [0.0, 0.0, -0.0]] 
+  F adam [[1.0, 0.9098, 0.0], [0.0, 0.9098, 0.0], [0.0, 0.0, 0.0]]
+  g here [1.3576, 0.3538, 1.2273] 
+  g adam [1.3576, 0.3538, 2.4545]
+  w here [1.0, 0.9098, 1.0] 
+  w adam [1.0, 0.9098, 1.0]
+{'ets': {'trend': 'A', 'seasonal': [4], 'alpha': 0.0, 'beta': 0.013886585927035067, 'gamma': [0.0], 'phi': 1.0}, 'm': 4, 'ar': [], 'i': [], 'ma': [(1, [-1.2373498816542121]), (4, [-0.3661641310744599])]} lags [1, 1, 4, 1, 4, 5]
+  F here [[1.0, 1.0, 0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, -0.0, -0.0, -0.0], [0.0, 0.0, 0.0, -0.0, -0.0, -0.0], [0.0, 0.0, 0.0, -0.0, -0.0, -0.0]] 
+  F adam [[1.0, 1.0, 0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+  g here [0.0, 0.0139, 0.0, -1.2373, -0.3662, 0.4531] 
+  g adam [0.0, 0.0139, 0.0, -2.4747, -0.7323, 0.9061]
+  w here [1.0, 1.0, 1.0, 1.0, 1.0, 1.0] 
+  w adam [1, 1, 1, 1, 1, 1]
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+ARIMA', 'models': 300, 'check': 'split'} 103
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+ARIMA', 'models': 300, 'check': 'split'} 63
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+ARIMA', 'models': 300, 'check': 'split'} 40
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+ARIMA', 'models': 300, 'check': 'joint'} 0
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+ARIMA', 'models': 300, 'check': 'joint'} 0
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+ARIMA', 'models': 300, 'check': 'joint'} 0
+max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible {'family': 'ETS+ARIMA', 'inadmissible': 201} 1.787459069646502e-13
+models found admissible by the PBH reference {'family': 'ETS+ARIMA', 'models': 300} 99
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+SARIMA', 'models': 300, 'check': 'split'} 96
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+SARIMA', 'models': 300, 'check': 'split'} 80
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+SARIMA', 'models': 300, 'check': 'split'} 16
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+SARIMA', 'models': 300, 'check': 'joint'} 0
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+SARIMA', 'models': 300, 'check': 'joint'} 0
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+SARIMA', 'models': 300, 'check': 'joint'} 0
+max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible {'family': 'ETS+SARIMA', 'inadmissible': 254} 2.2861712523081223e-11
+models found admissible by the PBH reference {'family': 'ETS+SARIMA', 'models': 300} 46
+max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials {'models': 600} 2.645948669922877e-15
+models whose component lags differ from those of adam() {'models': 8} 0
+max abs difference between the matrices built here and those of adam() {'models': 8} 1.2373498816542077

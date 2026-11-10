@@ -1,0 +1,154 @@
+using C++ compiler: ‘g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0’
+using C++11
+g++ -std=gnu++11 -I"/usr/share/R/include" -DNDEBUG -I../inst/include -fopenmp  -I"/usr/local/lib/R/site-library/Rcpp/include" -I"/usr/lib/R/site-library/RcppArmadillo/include" -I"/tmp/RtmpXKVDUQ/sourceCpp-x86_64-pc-linux-gnu-1.1.2.6"    -I/home/user/smooth/src -fpic  -g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build/r-base-FPSnzf/r-base-4.3.3=. -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -fdebug-prefix-map=/build/r-base-FPSnzf/r-base-4.3.3=/usr/src/r-base-4.3.3-2build2 -Wdate-time -D_FORTIFY_SOURCE=3  -c file27537497c372.cpp -o file27537497c372.o
+file27537497c372.cpp: In function ‘Rcpp::NumericVector profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)’:
+file27537497c372.cpp:10:22: error: use of ‘auto’ in lambda parameter declaration only available with ‘-std=c++14’ or ‘-std=gnu++14’
+   10 |     auto micro = [&](auto start) {
+      |                      ^~~~
+file27537497c372.cpp: In lambda function:
+file27537497c372.cpp:11:64: error: no match for ‘operator-’ (operand types are ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ and ‘int’)
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                          ~~~~~ ^ ~~~~~
+      |                                                             |    |
+      |                                                             |    int
+      |                                                             std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >
+In file included from /usr/local/lib/R/site-library/Rcpp/include/Rcpp/sugar/operators/operators.h:38,
+                 from /usr/local/lib/R/site-library/Rcpp/include/Rcpp/sugar/sugar.h:32,
+                 from /usr/local/lib/R/site-library/Rcpp/include/Rcpp.h:79,
+                 from /usr/lib/R/site-library/RcppArmadillo/include/RcppArmadillo.h:32,
+                 from file27537497c372.cpp:3:
+/usr/local/lib/R/site-library/Rcpp/include/Rcpp/sugar/operators/unary_minus.h:114:1: note: candidate: ‘template<int RTYPE, bool NA, class T> Rcpp::sugar::UnaryMinus_Vector<RTYPE, NA, T> operator-(const Rcpp::VectorBase<RTYPE, NA, T>&)’
+  114 | operator-(
+      | ^~~~~~~~
+/usr/local/lib/R/site-library/Rcpp/include/Rcpp/sugar/operators/unary_minus.h:114:1: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ is not derived from ‘const Rcpp::VectorBase<RTYPE, NA, T>’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+In file included from /usr/include/c++/13/bits/stl_algobase.h:67,
+                 from /usr/include/c++/13/bits/hashtable_policy.h:36,
+                 from /usr/include/c++/13/bits/hashtable.h:35,
+                 from /usr/include/c++/13/bits/unordered_map.h:33,
+                 from /usr/include/c++/13/unordered_map:41,
+                 from /usr/local/lib/R/site-library/Rcpp/include/Rcpp/platform/compiler.h:39,
+                 from /usr/local/lib/R/site-library/Rcpp/include/Rcpp/r/headers.h:67,
+                 from /usr/local/lib/R/site-library/Rcpp/include/RcppCommon.h:30,
+                 from /usr/lib/R/site-library/RcppArmadillo/include/RcppArmadillo/interface/RcppArmadilloForward.h:25,
+                 from /usr/lib/R/site-library/RcppArmadillo/include/RcppArmadillo.h:29:
+/usr/include/c++/13/bits/stl_iterator.h:625:5: note: candidate: ‘template<class _IteratorL, class _IteratorR> decltype ((__y.base() - __x.base())) std::operator-(const reverse_iterator<_Iterator>&, const reverse_iterator<_IteratorR>&)’
+  625 |     operator-(const reverse_iterator<_IteratorL>& __x,
+      |     ^~~~~~~~
+/usr/include/c++/13/bits/stl_iterator.h:625:5: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ is not derived from ‘const std::reverse_iterator<_Iterator>’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+/usr/include/c++/13/bits/stl_iterator.h:1800:5: note: candidate: ‘template<class _IteratorL, class _IteratorR> decltype ((__x.base() - __y.base())) std::operator-(const move_iterator<_IteratorL>&, const move_iterator<_IteratorR>&)’
+ 1800 |     operator-(const move_iterator<_IteratorL>& __x,
+      |     ^~~~~~~~
+/usr/include/c++/13/bits/stl_iterator.h:1800:5: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ is not derived from ‘const std::move_iterator<_IteratorL>’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+In file included from /usr/local/lib/R/site-library/Rcpp/include/RcppCommon.h:69:
+/usr/include/c++/13/complex:365:5: note: candidate: ‘template<class _Tp> std::complex<_Tp> std::operator-(const complex<_Tp>&, const complex<_Tp>&)’
+  365 |     operator-(const complex<_Tp>& __x, const complex<_Tp>& __y)
+      |     ^~~~~~~~
+/usr/include/c++/13/complex:365:5: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ is not derived from ‘const std::complex<_Tp>’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+/usr/include/c++/13/complex:374:5: note: candidate: ‘template<class _Tp> std::complex<_Tp> std::operator-(const complex<_Tp>&, const _Tp&)’
+  374 |     operator-(const complex<_Tp>& __x, const _Tp& __y)
+      |     ^~~~~~~~
+/usr/include/c++/13/complex:374:5: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ is not derived from ‘const std::complex<_Tp>’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+/usr/include/c++/13/complex:383:5: note: candidate: ‘template<class _Tp> std::complex<_Tp> std::operator-(const _Tp&, const complex<_Tp>&)’
+  383 |     operator-(const _Tp& __x, const complex<_Tp>& __y)
+      |     ^~~~~~~~
+/usr/include/c++/13/complex:383:5: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   mismatched types ‘const std::complex<_Tp>’ and ‘int’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+/usr/include/c++/13/complex:460:5: note: candidate: ‘template<class _Tp> std::complex<_Tp> std::operator-(const complex<_Tp>&)’
+  460 |     operator-(const complex<_Tp>& __x)
+      |     ^~~~~~~~
+/usr/include/c++/13/complex:460:5: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ is not derived from ‘const std::complex<_Tp>’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+In file included from /usr/include/c++/13/chrono:41,
+                 from /usr/lib/R/site-library/RcppArmadillo/include/armadillo:52,
+                 from /usr/lib/R/site-library/RcppArmadillo/include/RcppArmadillo/interface/RcppArmadilloForward.h:57:
+/usr/include/c++/13/bits/chrono.h:710:7: note: candidate: ‘template<class _Rep1, class _Period1, class _Rep2, class _Period2> constexpr typename std::common_type<std::chrono::duration<_Rep1, _Period1>, std::chrono::duration<_Rep2, _Period2> >::type std::chrono::operator-(const duration<_Rep1, _Period1>&, const duration<_Rep2, _Period2>&)’
+  710 |       operator-(const duration<_Rep1, _Period1>& __lhs,
+      |       ^~~~~~~~
+/usr/include/c++/13/bits/chrono.h:710:7: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ is not derived from ‘const std::chrono::duration<_Rep1, _Period1>’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+/usr/include/c++/13/bits/chrono.h:1129:7: note: candidate: ‘template<class _Clock, class _Dur1, class _Rep2, class _Period2> constexpr std::chrono::time_point<_Clock, typename std::common_type<_Dur1, std::chrono::duration<_Rep2, _Period2> >::type> std::chrono::operator-(const time_point<_Clock, _Duration1>&, const duration<_Rep2, _Period2>&)’
+ 1129 |       operator-(const time_point<_Clock, _Dur1>& __lhs,
+      |       ^~~~~~~~
+/usr/include/c++/13/bits/chrono.h:1129:7: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   mismatched types ‘const std::chrono::duration<_Rep2, _Period2>’ and ‘int’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+/usr/include/c++/13/bits/chrono.h:1141:7: note: candidate: ‘template<class _Clock, class _Dur1, class _Dur2> constexpr typename std::common_type<_Duration1, _Duration2>::type std::chrono::operator-(const time_point<_Clock, _Duration1>&, const time_point<_Clock, _Duration2>&)’
+ 1141 |       operator-(const time_point<_Clock, _Dur1>& __lhs,
+      |       ^~~~~~~~
+/usr/include/c++/13/bits/chrono.h:1141:7: note:   template argument deduction/substitution failed:
+file27537497c372.cpp:11:66: note:   mismatched types ‘const std::chrono::time_point<_Clock, _Duration2>’ and ‘int’
+   11 |         return std::chrono::duration<double, std::micro>(now() - start).count() / repeats;
+      |                                                                  ^~~~~
+In file included from /usr/local/lib/R/site-library/Rcpp/include/RcppCommon.h:137:
+/usr/local/lib/R/site-library/Rcpp/include/Rcpp/complex.h:39:17: note: candidate: ‘Rcomplex operator-(const Rcomplex&, const Rcomplex&)’
+   39 | inline Rcomplex operator-( const Rcomplex& lhs, const Rcomplex& rhs) {
+      |                 ^~~~~~~~
+/usr/local/lib/R/site-library/Rcpp/include/Rcpp/complex.h:39:44: note:   no known conversion for argument 1 from ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ to ‘const Rcomplex&’
+   39 | inline Rcomplex operator-( const Rcomplex& lhs, const Rcomplex& rhs) {
+      |                            ~~~~~~~~~~~~~~~~^~~
+file27537497c372.cpp: In function ‘Rcpp::NumericVector profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)’:
+file27537497c372.cpp:17:31: error: no match for call to ‘(profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>) (std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >&)’
+   17 |     double polynomials = micro(t);
+      |                          ~~~~~^~~
+file27537497c372.cpp:10:18: note: candidate: ‘profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>’
+   10 |     auto micro = [&](auto start) {
+      |                  ^
+file27537497c372.cpp:10:18: note:   no known conversion for argument 1 from ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ to ‘int’
+file27537497c372.cpp:20:32: error: no match for call to ‘(profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>) (std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >&)’
+   20 |     double cancellation = micro(t);
+      |                           ~~~~~^~~
+file27537497c372.cpp:10:18: note: candidate: ‘profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>’
+   10 |     auto micro = [&](auto start) {
+      |                  ^
+file27537497c372.cpp:10:18: note:   no known conversion for argument 1 from ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ to ‘int’
+file27537497c372.cpp:24:29: error: no match for call to ‘(profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>) (std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >&)’
+   24 |     double bisection = micro(t);
+      |                        ~~~~~^~~
+file27537497c372.cpp:10:18: note: candidate: ‘profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>’
+   10 |     auto micro = [&](auto start) {
+      |                  ^
+file27537497c372.cpp:10:18: note:   no known conversion for argument 1 from ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ to ‘int’
+file27537497c372.cpp:28:28: error: no match for call to ‘(profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>) (std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >&)’
+   28 |     double stepDown = micro(t);
+      |                       ~~~~~^~~
+file27537497c372.cpp:10:18: note: candidate: ‘profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>’
+   10 |     auto micro = [&](auto start) {
+      |                  ^
+file27537497c372.cpp:10:18: note:   no known conversion for argument 1 from ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ to ‘int’
+file27537497c372.cpp:33:25: error: no match for call to ‘(profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>) (std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >&)’
+   33 |     double total = micro(t);
+      |                    ~~~~~^~~
+file27537497c372.cpp:10:18: note: candidate: ‘profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>’
+   10 |     auto micro = [&](auto start) {
+      |                  ^
+file27537497c372.cpp:10:18: note:   no known conversion for argument 1 from ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ to ‘int’
+file27537497c372.cpp:36:26: error: no match for call to ‘(profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>) (std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >&)’
+   36 |     double perLag = micro(t);
+      |                     ~~~~~^~~
+file27537497c372.cpp:10:18: note: candidate: ‘profileCore(arma::mat, arma::mat, arma::mat, arma::ivec, int)::<lambda(int)>’
+   10 |     auto micro = [&](auto start) {
+      |                  ^
+file27537497c372.cpp:10:18: note:   no known conversion for argument 1 from ‘std::chrono::time_point<std::chrono::_V2::steady_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’ to ‘int’
+make: *** [/usr/lib/R/etc/Makeconf:200: file27537497c372.o] Error 1

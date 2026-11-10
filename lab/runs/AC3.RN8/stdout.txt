@@ -1,0 +1,18 @@
+models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded) {'models': 250, 'seed': 32} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 32, 'check': 'author'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 32, 'check': 'author'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 32, 'check': 'pbh'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 32, 'check': 'pbh'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 32, 'check': 'pkg'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 32, 'check': 'pkg'} 0.0
+models whose reduced theta still has a cyclotomic factor, i.e. a root exactly on the unit circle (inadmissible) {'models': 250, 'seed': 32} 0.0
+of those, accepted by the check {'models': 250, 'seed': 32, 'check': 'author'} 0.0
+of those, accepted by the check {'models': 250, 'seed': 32, 'check': 'pbh'} 0.0
+of those, accepted by the check {'models': 250, 'seed': 32, 'check': 'pkg'} 0.0
+models admissible by the exact oracle {'models': 250, 'seed': 32} 61.0
+models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal) {'models': 250, 'seed': 32} 79.0
+of those, admissible by the exact oracle (the root cancelled) {'models': 250, 'seed': 32} 6.0
+max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models {'models': 250, 'seed': 32, 'inadmissible': 189} 8.526375161466149e-10
+max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models {'models': 250, 'seed': 32, 'inadmissible': 189} 9.407007159900616e-07
+largest number of components in a model {'models': 250, 'seed': 32} 12.0
+seconds {'models': 250, 'seed': 32} 26.585955142974854

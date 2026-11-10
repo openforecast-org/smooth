@@ -1,0 +1,225 @@
+[
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 18,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 11,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 7,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+  "value": 4.773959005888173e-14,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "inadmissible": 32
+  }
+ },
+ {
+  "quantity": "models found admissible by the PBH reference",
+  "value": 18,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 15,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 14,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 1,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+  "value": 6.18620044079421e-10,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "inadmissible": 45
+  }
+ },
+ {
+  "quantity": "models found admissible by the PBH reference",
+  "value": 5,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50
+  }
+ },
+ {
+  "quantity": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
+  "value": 2.2824350017362026e-15,
+  "conditions": {
+   "models": 100
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "language": "R"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+  "value": 9.288192708289955e-07,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "language": "R",
+   "inadmissible": 32
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "language": "Python"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+  "value": 9.288192690526387e-07,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 50,
+   "language": "Python",
+   "inadmissible": 32
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "language": "R"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+  "value": 9.417483404217109e-07,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "language": "R",
+   "inadmissible": 45
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "language": "Python"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible",
+  "value": 9.417483419760231e-07,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 50,
+   "language": "Python",
+   "inadmissible": 45
+  }
+ }
+]

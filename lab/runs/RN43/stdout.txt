@@ -1,0 +1,16 @@
+admissibility decisions of the C++ core that differ from the prototype {'family': 'ETS', 'models': 200} 0
+max abs difference of the largest root modulus on inadmissible models, C++ core against prototype {'family': 'ETS', 'models': 200, 'inadmissible': 86} 9.48848823512094e-07
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'ETS', 'models': 200} 0
+max abs difference between three calls of the C++ core on the same model {'family': 'ETS', 'models': 200} 0.0
+admissibility decisions of the C++ core that differ from the prototype {'family': 'ETS high degree', 'models': 200} 0
+max abs difference of the largest root modulus on inadmissible models, C++ core against prototype {'family': 'ETS high degree', 'models': 200, 'inadmissible': 95} 9.526633371059745e-07
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'ETS high degree', 'models': 200} 0
+max abs difference between three calls of the C++ core on the same model {'family': 'ETS high degree', 'models': 200} 0.0
+admissibility decisions of the C++ core that differ from the prototype {'family': 'GUM identity', 'models': 200} 0
+max abs difference of the largest root modulus on inadmissible models, C++ core against prototype {'family': 'GUM identity', 'models': 200, 'inadmissible': 84} 9.405809149320987e-07
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'GUM identity', 'models': 200} 0
+max abs difference between three calls of the C++ core on the same model {'family': 'GUM identity', 'models': 200} 0.0
+admissibility decisions of the C++ core that differ from the prototype {'family': 'GUM random', 'models': 200} 0
+max abs difference of the largest root modulus on inadmissible models, C++ core against prototype {'family': 'GUM random', 'models': 200, 'inadmissible': 27} 9.485389538266276e-07
+models whose cancelled polynomials differ in degree, C++ core against prototype {'family': 'GUM random', 'models': 200} 0
+max abs difference between three calls of the C++ core on the same model {'family': 'GUM random', 'models': 200} 0.0

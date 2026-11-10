@@ -1,0 +1,17 @@
+Error: 
+! in callr subprocess.
+Caused by error in `FUN(X[[i]], ...)`:
+! object 'model' not found
+---
+Backtrace:
+1. callr::r(function(library, fits, repeats) {
+2. callr:::get_result(output = out, options)
+3. callr:::throw(callr_remote_error(remerr, output), parent = fix_msg(remerr[[3]]))
+---
+Subprocess backtrace:
+1. base::lapply(fits, function(fit) {
+2. global FUN(X[[i]], ...)
+3. stats::logLik(model)
+4. base::.handleSimpleError(function (e)
+5. global h(simpleError(msg, call))
+Execution halted

@@ -1,0 +1,19 @@
+DISAGREE {'oracle': False, 'author': np.False_, 'pbh': np.False_, 'pkg': True, 'border': False, 'cyc': 4, 'unitrootcancelled': True, 'oracleMod': 1.0, 'authorMod': np.float64(0.9999999999999767), 'pbhMod': np.float64(1.0000000000000016), 'pkgMod': 0.9999999999970864, 'k': 11, 'deg': 82, 'spec': {'ets_lags': [1, 1], 'g': ['0', '0'], 'F_ets': [['1', '0'], ['0', '1']], 'ar': [(1, ['4/5']), (1, ['2/5'])], 'i': [(1, 1)], 'ma': [(1, ['0', '1']), (1, ['-1']), (1, ['-4/5']), (12, ['1/2'])], 'red': ['4/5', '0', '4/5', '0', '0', '0', '0', '0', '0', '0', '0', '0', '2/5', '0', '2/5']}}
+models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded) {'models': 250, 'seed': 34} 1.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 34, 'check': 'author'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 34, 'check': 'author'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 34, 'check': 'pbh'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 34, 'check': 'pbh'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 34, 'check': 'pkg'} 1.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 34, 'check': 'pkg'} 1.0
+models whose reduced theta still has a cyclotomic factor, i.e. a root exactly on the unit circle (inadmissible) {'models': 250, 'seed': 34} 2.0
+of those, accepted by the check {'models': 250, 'seed': 34, 'check': 'author'} 0.0
+of those, accepted by the check {'models': 250, 'seed': 34, 'check': 'pbh'} 0.0
+of those, accepted by the check {'models': 250, 'seed': 34, 'check': 'pkg'} 1.0
+models admissible by the exact oracle {'models': 250, 'seed': 34} 47.0
+models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal) {'models': 250, 'seed': 34} 83.0
+of those, admissible by the exact oracle (the root cancelled) {'models': 250, 'seed': 34} 5.0
+max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models {'models': 250, 'seed': 34, 'inadmissible': 202} 1.4945856996462226e-08
+max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models {'models': 250, 'seed': 34, 'inadmissible': 202} 9.536743168503392e-07
+largest number of components in a model {'models': 250, 'seed': 34} 12.0
+seconds {'models': 250, 'seed': 34} 70.18880081176758

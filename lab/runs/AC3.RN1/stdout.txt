@@ -1,0 +1,19 @@
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+ARIMA', 'models': 200, 'check': 'split'} 65
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+ARIMA', 'models': 200, 'check': 'split'} 42
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+ARIMA', 'models': 200, 'check': 'split'} 23
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+ARIMA', 'models': 200, 'check': 'joint'} 0
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+ARIMA', 'models': 200, 'check': 'joint'} 0
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+ARIMA', 'models': 200, 'check': 'joint'} 0
+max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible {'family': 'ETS+ARIMA', 'inadmissible': 133} 2.899902540320909e-13
+models found admissible by the PBH reference {'family': 'ETS+ARIMA', 'models': 200} 67
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+SARIMA', 'models': 200, 'check': 'split'} 71
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+SARIMA', 'models': 200, 'check': 'split'} 64
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+SARIMA', 'models': 200, 'check': 'split'} 7
+models whose admissibility decision differs from the PBH reference {'family': 'ETS+SARIMA', 'models': 200, 'check': 'joint'} 0
+models accepted by the check and rejected by the PBH reference {'family': 'ETS+SARIMA', 'models': 200, 'check': 'joint'} 0
+models rejected by the check and accepted by the PBH reference {'family': 'ETS+SARIMA', 'models': 200, 'check': 'joint'} 0
+max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible {'family': 'ETS+SARIMA', 'inadmissible': 173} 1.5218937221561646e-12
+models found admissible by the PBH reference {'family': 'ETS+SARIMA', 'models': 200} 27
+max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials {'models': 400} 2.192690473634684e-15
+models whose component lags differ from those of adam() {'models': 30} 0
+max abs difference between the matrices built here and those of adam() {'models': 30} 4.884981308350689e-15

@@ -1,0 +1,14 @@
+models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded) {'models': 250, 'seed': 23} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 23, 'check': 'author'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 23, 'check': 'author'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 23, 'check': 'pbh'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 23, 'check': 'pbh'} 0.0
+models whose admissibility decision differs from the exact gcd oracle {'models': 250, 'seed': 23, 'check': 'pkg'} 0.0
+of those, accepted by the check and rejected by the oracle {'models': 250, 'seed': 23, 'check': 'pkg'} 0.0
+models admissible by the exact oracle {'models': 250, 'seed': 23} 38.0
+models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal) {'models': 250, 'seed': 23} 77.0
+of those, admissible by the exact oracle (the root cancelled) {'models': 250, 'seed': 23} 6.0
+max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models {'models': 250, 'seed': 23, 'inadmissible': 212} 5.389599877503315e-11
+max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models {'models': 250, 'seed': 23, 'inadmissible': 212} 9.536743172944284e-07
+largest number of components in a model {'models': 250, 'seed': 23} 12.0
+seconds {'models': 250, 'seed': 23} 22.13084840774536

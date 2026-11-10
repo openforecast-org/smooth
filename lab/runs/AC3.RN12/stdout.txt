@@ -1,0 +1,3 @@
+models with all MA roots outside the unit circle, real R adam_bounds_checker with etsModel FALSE 136 
+of those, models with a penalty from the shortcut path or from a forced whole-model smoothEigens() 0 
+models with an MA root on or inside the circle; their penalty differs from the forced whole-model check 0 

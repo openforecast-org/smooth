@@ -1,0 +1,291 @@
+[
+ {
+  "quantity": "max |lambda|, per-lag check",
+  "value": 0.9,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1
+  }
+ },
+ {
+  "quantity": "max |lambda|, all modes of the expanded discount matrix",
+  "value": 1.0000000000000009,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1
+  }
+ },
+ {
+  "quantity": "max |lambda|, controllable and observable modes (PBH)",
+  "value": 0.991126744878771,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta after cyclotomic cancellation",
+  "value": 0.9911267448787717,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.1,
+   "gamma": 0.1
+  }
+ },
+ {
+  "quantity": "max |lambda|, per-lag check",
+  "value": 0.5,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.5,
+   "gamma": 1.4
+  }
+ },
+ {
+  "quantity": "max |lambda|, all modes of the expanded discount matrix",
+  "value": 0.9999999999999998,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.5,
+   "gamma": 1.4
+  }
+ },
+ {
+  "quantity": "max |lambda|, controllable and observable modes (PBH)",
+  "value": 0.997236071335398,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.5,
+   "gamma": 1.4
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta after cyclotomic cancellation",
+  "value": 0.9972360713353955,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 0.5,
+   "gamma": 1.4
+  }
+ },
+ {
+  "quantity": "max |lambda|, per-lag check",
+  "value": 0.19999999999999996,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9
+  }
+ },
+ {
+  "quantity": "max |lambda|, all modes of the expanded discount matrix",
+  "value": 1.0164568117563206,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9
+  }
+ },
+ {
+  "quantity": "max |lambda|, controllable and observable modes (PBH)",
+  "value": 1.0164568117563204,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta after cyclotomic cancellation",
+  "value": 1.0164568117563233,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.2,
+   "gamma": 0.9
+  }
+ },
+ {
+  "quantity": "max |lambda|, per-lag check",
+  "value": 0.95,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.9,
+   "gamma": 0.05
+  }
+ },
+ {
+  "quantity": "max |lambda|, all modes of the expanded discount matrix",
+  "value": 0.999999999999999,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.9,
+   "gamma": 0.05
+  }
+ },
+ {
+  "quantity": "max |lambda|, controllable and observable modes (PBH)",
+  "value": 0.9999917721962772,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.9,
+   "gamma": 0.05
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta after cyclotomic cancellation",
+  "value": 0.9999917721962791,
+  "conditions": {
+   "model": "ETS(A,N,A)",
+   "m": 12,
+   "alpha": 1.9,
+   "gamma": 0.05
+  }
+ },
+ {
+  "quantity": "degree of theta",
+  "value": 193.0,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "quantity": "degree of the shared cyclotomic factor",
+  "value": 25.0,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta before cancellation",
+  "value": 1.0000000000000038,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta after cancellation",
+  "value": 0.9999965469723225,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, controllable and observable modes (PBH)",
+  "value": 0.9999965469723241,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "quantity": "degree of theta",
+  "value": 26.0,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "quantity": "degree of the shared cyclotomic factor",
+  "value": 14.0,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta before cancellation",
+  "value": 1.0000014857614217,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, roots of theta after cancellation",
+  "value": 0.9829371631611427,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, controllable and observable modes (PBH)",
+  "value": 0.9829371631611421,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, per-lag check",
+  "value": 0.7,
+  "conditions": {
+   "model": "block-diagonal D, lags (1,12)"
+  }
+ },
+ {
+  "quantity": "max |lambda|, all modes of the expanded discount matrix",
+  "value": 0.9045379057839597,
+  "conditions": {
+   "model": "block-diagonal D, lags (1,12)"
+  }
+ },
+ {
+  "quantity": "max relative error of the determinant identity",
+  "value": 9.171563565208779e-15,
+  "conditions": {
+   "models": 100
+  }
+ },
+ {
+  "quantity": "step-down decisions equal to root decisions",
+  "value": 300.0,
+  "conditions": {
+   "models": 300
+  }
+ },
+ {
+  "quantity": "max abs difference, bisection against roots",
+  "value": 5.796585433870405e-11,
+  "conditions": {
+   "inadmissible_models": 243
+  }
+ },
+ {
+  "quantity": "mean time, ms",
+  "value": 4.6963541200011605,
+  "conditions": {
+   "task": "coefficients by DFT",
+   "degree": 193
+  }
+ },
+ {
+  "quantity": "mean time, ms",
+  "value": 0.006939219999821944,
+  "conditions": {
+   "task": "step-down test",
+   "degree": 193
+  }
+ },
+ {
+  "quantity": "mean time, ms",
+  "value": 22.225657179999416,
+  "conditions": {
+   "task": "all roots, numpy companion eigenvalues",
+   "degree": 193
+  }
+ }
+]

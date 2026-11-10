@@ -1,0 +1,8 @@
+split ARIMA(1,1,1)(1,1,1)[12] 0.07 -541.8444 
+split ETS(A,N,A)+ARIMA(1,0,1) 0.067 -569.6492 
+split ETS(A,Ad,N)+ARIMA(0,1,2) 0.078 -255.2644 
+split ssarima (1,1,1)(1,1,1)[12] 0.08 -556.9904 
+whole ARIMA(1,1,1)(1,1,1)[12] 0.074 -541.3824 
+whole ETS(A,N,A)+ARIMA(1,0,1) 0.064 -572.2142 
+whole ETS(A,Ad,N)+ARIMA(0,1,2) 0.078 -255.2644 
+whole ssarima (1,1,1)(1,1,1)[12] 0.083 -556.9904 

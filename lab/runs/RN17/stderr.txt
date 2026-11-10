@@ -1,0 +1,4 @@
+Error in `[<-`(`*tmp*`, 2, 2, value = w[2] <- phi) : 
+  subscript out of bounds
+Calls: etsMatrices
+Execution halted

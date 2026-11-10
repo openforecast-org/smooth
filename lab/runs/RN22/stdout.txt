@@ -1,0 +1,18 @@
+ETS(A,N,A), m=12 polynomials 3.462437 
+ETS(A,N,A), m=12 cancellation 0.8567745 
+ETS(A,N,A), m=12 bisection 7.019464 
+ETS(A,N,A), m=12 one step-down 0.1176635 
+ETS(A,N,A), m=12 total 11.67372 
+ETS(A,N,A), m=12 per-lag check 5.574049 
+ETS(A,N,A,A), m=24 and 168 polynomials 110.0744 
+ETS(A,N,A,A), m=24 and 168 cancellation 69.19168 
+ETS(A,N,A,A), m=24 and 168 bisection 456.2031 
+ETS(A,N,A,A), m=24 and 168 one step-down 22.4113 
+ETS(A,N,A,A), m=24 and 168 total 659.6678 
+ETS(A,N,A,A), m=24 and 168 per-lag check 7.276058 
+GUM, orders (1,1,1), lags (1,24,168) polynomials 108.9241 
+GUM, orders (1,1,1), lags (1,24,168) cancellation 12.25913 
+GUM, orders (1,1,1), lags (1,24,168) bisection 761.2496 
+GUM, orders (1,1,1), lags (1,24,168) one step-down 27.54599 
+GUM, orders (1,1,1), lags (1,24,168) total 906.6137 
+GUM, orders (1,1,1), lags (1,24,168) per-lag check 6.621135 

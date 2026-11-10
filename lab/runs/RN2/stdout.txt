@@ -1,0 +1,34 @@
+max |lambda|, per-lag check {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.1, 'gamma': 0.1} 0.9
+max |lambda|, all modes of the expanded discount matrix {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.1, 'gamma': 0.1} 1.0000000000000009
+max |lambda|, controllable and observable modes (PBH) {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.1, 'gamma': 0.1} 0.991126744878771
+max |lambda|, roots of theta after cyclotomic cancellation {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.1, 'gamma': 0.1} 0.9911267448787717
+max |lambda|, per-lag check {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.5, 'gamma': 1.4} 0.5
+max |lambda|, all modes of the expanded discount matrix {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.5, 'gamma': 1.4} 0.9999999999999998
+max |lambda|, controllable and observable modes (PBH) {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.5, 'gamma': 1.4} 0.997236071335398
+max |lambda|, roots of theta after cyclotomic cancellation {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 0.5, 'gamma': 1.4} 0.9972360713353955
+max |lambda|, per-lag check {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.2, 'gamma': 0.9} 0.19999999999999996
+max |lambda|, all modes of the expanded discount matrix {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.2, 'gamma': 0.9} 1.0164568117563206
+max |lambda|, controllable and observable modes (PBH) {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.2, 'gamma': 0.9} 1.0164568117563204
+max |lambda|, roots of theta after cyclotomic cancellation {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.2, 'gamma': 0.9} 1.0164568117563233
+max |lambda|, per-lag check {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.9, 'gamma': 0.05} 0.95
+max |lambda|, all modes of the expanded discount matrix {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.9, 'gamma': 0.05} 0.999999999999999
+max |lambda|, controllable and observable modes (PBH) {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.9, 'gamma': 0.05} 0.9999917721962772
+max |lambda|, roots of theta after cyclotomic cancellation {'model': 'ETS(A,N,A)', 'm': 12, 'alpha': 1.9, 'gamma': 0.05} 0.9999917721962791
+degree of theta {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 193.0
+degree of the shared cyclotomic factor {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 25.0
+max |lambda|, roots of theta before cancellation {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 1.0000000000000038
+max |lambda|, roots of theta after cancellation {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 0.9999965469723225
+max |lambda|, controllable and observable modes (PBH) {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 0.9999965469723241
+degree of theta {'model': 'GUM start, orders (2,2), lags (1,12)'} 26.0
+degree of the shared cyclotomic factor {'model': 'GUM start, orders (2,2), lags (1,12)'} 14.0
+max |lambda|, roots of theta before cancellation {'model': 'GUM start, orders (2,2), lags (1,12)'} 1.0000014857614217
+max |lambda|, roots of theta after cancellation {'model': 'GUM start, orders (2,2), lags (1,12)'} 0.9829371631611427
+max |lambda|, controllable and observable modes (PBH) {'model': 'GUM start, orders (2,2), lags (1,12)'} 0.9829371631611421
+max |lambda|, per-lag check {'model': 'block-diagonal D, lags (1,12)'} 0.7
+max |lambda|, all modes of the expanded discount matrix {'model': 'block-diagonal D, lags (1,12)'} 0.9045379057839597
+max relative error of the determinant identity {'models': 100} 9.171563565208779e-15
+step-down decisions equal to root decisions {'models': 300} 300.0
+max abs difference, bisection against roots {'inadmissible_models': 243} 5.796585433870405e-11
+mean time, ms {'task': 'coefficients by DFT', 'degree': 193} 4.6963541200011605
+mean time, ms {'task': 'step-down test', 'degree': 193} 0.006939219999821944
+mean time, ms {'task': 'all roots, numpy companion eigenvalues', 'degree': 193} 22.225657179999416

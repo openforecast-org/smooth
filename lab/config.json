@@ -1,0 +1,8 @@
+{
+  "anchor": {
+    "service": "git_remote",
+    "remote": "origin",
+    "branch": "claimset-lab-eigenChecker",
+    "every": "plan"
+  }
+}

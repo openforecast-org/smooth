@@ -1,0 +1,15 @@
+largest root modulus 1/min|B| of the polynomial {'model': 'random GUM, lags (1, 24, 168), admissible', 'degree': 193, 'repeats': 50} 0.9962080481334653
+recursion steps run by the step-down test {'model': 'random GUM, lags (1, 24, 168), admissible', 'degree': 193, 'repeats': 50} 0
+mean time of the step-down test, ms {'model': 'random GUM, lags (1, 24, 168), admissible', 'degree': 193, 'repeats': 50} 0.5346515200017166
+mean time of all roots by numpy companion eigenvalues, ms {'model': 'random GUM, lags (1, 24, 168), admissible', 'degree': 193, 'repeats': 50} 21.366792959997838
+mean time of the coefficients of theta and phi by inverse DFT, ms {'model': 'random GUM, lags (1, 24, 168), admissible', 'degree': 193, 'repeats': 50} 5.783309199996438
+largest root modulus 1/min|B| of the polynomial {'model': 'random GUM, lags (1, 24, 168), inadmissible', 'degree': 193, 'repeats': 50} 1.0002974785198857
+recursion steps run by the step-down test {'model': 'random GUM, lags (1, 24, 168), inadmissible', 'degree': 193, 'repeats': 50} 170
+mean time of the step-down test, ms {'model': 'random GUM, lags (1, 24, 168), inadmissible', 'degree': 193, 'repeats': 50} 0.789602200002264
+mean time of all roots by numpy companion eigenvalues, ms {'model': 'random GUM, lags (1, 24, 168), inadmissible', 'degree': 193, 'repeats': 50} 21.239734540004065
+mean time of the coefficients of theta and phi by inverse DFT, ms {'model': 'random GUM, lags (1, 24, 168), inadmissible', 'degree': 193, 'repeats': 50} 4.433176579996143
+largest root modulus 1/min|B| of the polynomial {'model': 'ETS(A,N,A,A), lags 24 and 168, cancelled theta', 'degree': 168, 'repeats': 50} 0.9999965469723225
+recursion steps run by the step-down test {'model': 'ETS(A,N,A,A), lags 24 and 168, cancelled theta', 'degree': 168, 'repeats': 50} 0
+mean time of the step-down test, ms {'model': 'ETS(A,N,A,A), lags 24 and 168, cancelled theta', 'degree': 168, 'repeats': 50} 0.46620877999885124
+mean time of all roots by numpy companion eigenvalues, ms {'model': 'ETS(A,N,A,A), lags 24 and 168, cancelled theta', 'degree': 168, 'repeats': 50} 17.3032644200066
+mean time of the coefficients of theta and phi by inverse DFT, ms {'model': 'ETS(A,N,A,A), lags 24 and 168, cancelled theta', 'degree': 168, 'repeats': 50} 3.6505330199997843

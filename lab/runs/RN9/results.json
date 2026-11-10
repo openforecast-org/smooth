@@ -1,0 +1,24 @@
+[
+ {
+  "quantity": "admissibility decisions that differ from the PBH reference",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "max abs difference of max |lambda| from the PBH reference, inadmissible models",
+  "value": 4.39648317751562e-13,
+  "conditions": {
+   "inadmissible_models": 172
+  }
+ },
+ {
+  "quantity": "models within 1e-8 of the unit circle, excluded",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "models compared",
+  "value": 500.0,
+  "conditions": {}
+ }
+]

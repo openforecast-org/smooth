@@ -1,0 +1,217 @@
+[
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 103,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 300,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 63,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 300,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 40,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 300,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 300,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 300,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 300,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+  "value": 1.787459069646502e-13,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "inadmissible": 201
+  }
+ },
+ {
+  "quantity": "models found admissible by the PBH reference",
+  "value": 99,
+  "conditions": {
+   "family": "ETS+ARIMA",
+   "models": 300
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 96,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 300,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 80,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 300,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 16,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 300,
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models whose admissibility decision differs from the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 300,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 300,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 300,
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible",
+  "value": 2.2861712523081223e-11,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "inadmissible": 254
+  }
+ },
+ {
+  "quantity": "models found admissible by the PBH reference",
+  "value": 46,
+  "conditions": {
+   "family": "ETS+SARIMA",
+   "models": 300
+  }
+ },
+ {
+  "quantity": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
+  "value": 2.645948669922877e-15,
+  "conditions": {
+   "models": 600
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 190,
+  "conditions": {
+   "family": "ETS(A,N,N)+MA(1) grid",
+   "models": 1599,
+   "alpha": "-1 to 3 by 0.1",
+   "theta": "-0.95 to 0.95 by 0.05",
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 154,
+  "conditions": {
+   "family": "ETS(A,N,N)+MA(1) grid",
+   "models": 1599,
+   "alpha": "-1 to 3 by 0.1",
+   "theta": "-0.95 to 0.95 by 0.05",
+   "check": "split"
+  }
+ },
+ {
+  "quantity": "models accepted by the check and rejected by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS(A,N,N)+MA(1) grid",
+   "models": 1599,
+   "alpha": "-1 to 3 by 0.1",
+   "theta": "-0.95 to 0.95 by 0.05",
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "models rejected by the check and accepted by the PBH reference",
+  "value": 0,
+  "conditions": {
+   "family": "ETS(A,N,N)+MA(1) grid",
+   "models": 1599,
+   "alpha": "-1 to 3 by 0.1",
+   "theta": "-0.95 to 0.95 by 0.05",
+   "check": "joint"
+  }
+ },
+ {
+  "quantity": "largest modulus of the whole model, PBH reference",
+  "value": 1.0916079783099617,
+  "conditions": {
+   "model": "ETS(A,N,N)+MA(1)",
+   "alpha": 1.9,
+   "theta": 0.1,
+   "split check": "admissible"
+  }
+ },
+ {
+  "quantity": "models whose component lags differ from those of adam()",
+  "value": 0,
+  "conditions": {
+   "models": 8
+  }
+ },
+ {
+  "quantity": "max abs difference between the matrices built here and those of adam()",
+  "value": 1.2373498816542077,
+  "conditions": {
+   "models": 8
+  }
+ }
+]

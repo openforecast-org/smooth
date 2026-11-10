@@ -1,0 +1,3 @@
+max abs difference of max |lambda|, bisection against roots {'inadmissible_models': 44} 5.600986341391945e-11
+models within 1e-8 of the unit circle, excluded {} 0.0
+models compared {} 115.0

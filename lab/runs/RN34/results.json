@@ -1,0 +1,134 @@
+[
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "ETS",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
+  "value": 6.044072018429603e-07,
+  "conditions": {
+   "family": "ETS",
+   "models": 100,
+   "inadmissible": 41
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 0,
+  "conditions": {
+   "family": "ETS",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference between three calls of the C++ core on the same model",
+  "value": 0.0,
+  "conditions": {
+   "family": "ETS",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "ETS high degree",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
+  "value": 9.293846006119821e-07,
+  "conditions": {
+   "family": "ETS high degree",
+   "models": 100,
+   "inadmissible": 49
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 0,
+  "conditions": {
+   "family": "ETS high degree",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference between three calls of the C++ core on the same model",
+  "value": 0.0,
+  "conditions": {
+   "family": "ETS high degree",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM identity",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
+  "value": 2.4980361312820776e-07,
+  "conditions": {
+   "family": "GUM identity",
+   "models": 100,
+   "inadmissible": 42
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM identity",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference between three calls of the C++ core on the same model",
+  "value": 0.0,
+  "conditions": {
+   "family": "GUM identity",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "admissibility decisions of the C++ core that differ from the prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM random",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference of the largest root modulus on inadmissible models, C++ core against prototype",
+  "value": 5.099142781350707e-07,
+  "conditions": {
+   "family": "GUM random",
+   "models": 100,
+   "inadmissible": 17
+  }
+ },
+ {
+  "quantity": "models whose cancelled polynomials differ in degree, C++ core against prototype",
+  "value": 0,
+  "conditions": {
+   "family": "GUM random",
+   "models": 100
+  }
+ },
+ {
+  "quantity": "max abs difference between three calls of the C++ core on the same model",
+  "value": 0.0,
+  "conditions": {
+   "family": "GUM random",
+   "models": 100
+  }
+ }
+]

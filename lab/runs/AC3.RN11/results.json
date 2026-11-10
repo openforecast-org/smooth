@@ -1,0 +1,163 @@
+[
+ {
+  "quantity": "coefficient of B^0 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)",
+  "value": 1.0,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "coefficient of B^1 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)",
+  "value": 1.0,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "coefficient of B^2 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)",
+  "value": -0.1,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "coefficient of B^0 in the product of the parts' MA polynomials",
+  "value": 1.0,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "coefficient of B^1 in the product of the parts' MA polynomials",
+  "value": 1.0,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "coefficient of B^2 in the product of the parts' MA polynomials",
+  "value": 0.09,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "coefficient of B^1 in phi of the whole model",
+  "value": -1.0,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "smallest root modulus of theta of the whole model",
+  "value": 0.9160797830996159,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "smallest root modulus of the product of the parts' MA polynomials",
+  "value": 1.1111111111111112,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus of the whole model",
+  "value": 1.0916080474853516,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "package smooth_eigens modulus of the ETS part alone",
+  "value": 0.8999999999999999,
+  "conditions": {
+   "alpha": 1.9
+  }
+ },
+ {
+  "quantity": "max |eigenvalue| of D of the whole model (lag 1, so the expanded D)",
+  "value": 1.0916079783099617,
+  "conditions": {
+   "alpha": 1.9,
+   "theta": 0.1
+  }
+ },
+ {
+  "quantity": "max abs difference between det(I - F L) of the adam() matrices and ari polynomial times (1 - B) per constant/regressor",
+  "value": 7.549516567451064e-15,
+  "conditions": {
+   "models": 238
+  }
+ },
+ {
+  "quantity": "max abs difference between det(I - D L) of the adam() matrices and MA polynomial times (1 - B) per constant/regressor",
+  "value": 1.4432899320127035e-14,
+  "conditions": {
+   "models": 238
+  }
+ },
+ {
+  "quantity": "pure ARIMA models (plain, constant, static regressor) from adam() with all MA roots outside the unit circle",
+  "value": 136.0,
+  "conditions": {
+   "models": 238
+  }
+ },
+ {
+  "quantity": "of those, models the whole-model check smooth_eigens rejects (shortcut would be wrong)",
+  "value": 0.0,
+  "conditions": {
+   "models": 136
+  }
+ },
+ {
+  "quantity": "models from adam() with an MA root on or inside the unit circle (shortcut runs the whole check)",
+  "value": 102.0,
+  "conditions": {
+   "models": 238
+  }
+ },
+ {
+  "quantity": "of those, models the whole-model check accepts (root cancels)",
+  "value": 20.0,
+  "conditions": {
+   "models": 102
+  }
+ },
+ {
+  "quantity": "models of the kind",
+  "value": 80.0,
+  "conditions": {
+   "kind": "plain",
+   "invertible": 46
+  }
+ },
+ {
+  "quantity": "models of the kind",
+  "value": 80.0,
+  "conditions": {
+   "kind": "constant",
+   "invertible": 46
+  }
+ },
+ {
+  "quantity": "models of the kind",
+  "value": 78.0,
+  "conditions": {
+   "kind": "xreg",
+   "invertible": 44
+  }
+ }
+]

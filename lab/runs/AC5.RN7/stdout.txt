@@ -1,0 +1,36 @@
+python-flint 0.9.0; enclosures (128, 512, 2048) bits; edge 1e-08
+models given to the oracle {'set': 'perlag'} 200.0
+models on which the oracle failed {'set': 'perlag'} 0.0
+models excluded by undecided {'set': 'perlag'} 0.0
+models excluded by edge {'set': 'perlag'} 0.0
+models compared {'set': 'perlag'} 200.0
+max degree of theta, exact {'set': 'perlag'} 13.0
+max degree of the cancelled MA polynomial, exact {'set': 'perlag'} 13.0
+max precision of the root enclosures, bits {'set': 'perlag'} 128.0
+roots proved on the unit circle {'set': 'perlag'} 0.0
+admissibility decisions of the PBH reference that differ from the exact oracle {'set': 'perlag'} 0.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible {'set': 'perlag'} 3.3306690738754696e-15
+models both find inadmissible, PBH reference and exact oracle {'set': 'perlag'} 11.0
+models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1 {'set': 'perlag'} 0.0
+models whose shared non-cyclotomic factor could not be located {'set': 'perlag'} 0.0
+models with a shared non-cyclotomic factor, all roots in |B| > 1 {'set': 'perlag'} 0.0
+models accepted by the per-lag check that do not forget their initial states, exact oracle {'set': 'perlag', 'family': 'GUM'} 5.0
+models rejected by the per-lag check that forget their initial states, exact oracle {'set': 'perlag', 'family': 'GUM'} 0.0
+models accepted by the per-lag check {'set': 'perlag', 'family': 'GUM'} 194.0
+models of the family {'set': 'perlag', 'family': 'GUM'} 200.0
+time of the oracle on the set, s {'set': 'perlag'} 0.10808968544006348
+models given to the oracle {'set': 'all'} 200.0
+models on which the oracle failed {'set': 'all'} 0.0
+models excluded by undecided {'set': 'all'} 0.0
+models excluded by edge {'set': 'all'} 0.0
+models compared {'set': 'all'} 200.0
+max degree of theta, exact {'set': 'all'} 13.0
+max degree of the cancelled MA polynomial, exact {'set': 'all'} 13.0
+max precision of the root enclosures, bits {'set': 'all'} 128.0
+roots proved on the unit circle {'set': 'all'} 0.0
+admissibility decisions of the PBH reference that differ from the exact oracle {'set': 'all'} 0.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible {'set': 'all'} 3.3306690738754696e-15
+models both find inadmissible, PBH reference and exact oracle {'set': 'all'} 11.0
+models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1 {'set': 'all'} 0.0
+models whose shared non-cyclotomic factor could not be located {'set': 'all'} 0.0
+models with a shared non-cyclotomic factor, all roots in |B| > 1 {'set': 'all'} 0.0

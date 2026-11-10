@@ -48,6 +48,7 @@
   "study": "msarima-interval-calibration",
   "licence": "CC-BY-4.0",
   "classification": {
+   "subfield": "openalex:subfields/1803",
    "keywords": [
     "prediction intervals",
     "probabilistic forecast calibration",
@@ -60,7 +61,9 @@
   "declarations": {
    "funding": [],
    "competing_interests": "The guarantor is the author and maintainer of the smooth package that the study evaluates."
-  }
+  },
+  "id": "entrylib:2026.000001",
+  "correction_reason": "The results of the evidence objects were listed one number per entry with the analysis scripts' internal names; they are now result tables with defined variables and labelled rows, the claims cite table rows, every recorded lab result is in a CSV artefact (A10), and the subfield is set to openalex:subfields/1803."
  },
  "contributors": [
   {
@@ -299,10 +302,9 @@
      "kind": "simulation",
      "evidence": "E1",
      "results": [
-      "E1.R89",
-      "E1.R63",
-      "E1.R59",
-      "E1.R46"
+      "E1.T1.r3",
+      "E1.T1.r2",
+      "E1.T1.r1"
      ],
      "artefacts": [
       "A3",
@@ -467,12 +469,8 @@
      "kind": "empirical_quant",
      "evidence": "E8",
      "results": [
-      "E8.R7",
-      "E8.R8",
-      "E8.R9",
-      "E8.R18",
-      "E8.R19",
-      "E8.R20"
+      "E8.T1.r1",
+      "E8.T1.r2"
      ]
     }
    ],
@@ -567,12 +565,8 @@
      "kind": "empirical_quant",
      "evidence": "E9",
      "results": [
-      "E9.R18",
-      "E9.R19",
-      "E9.R20",
-      "E9.R22",
-      "E9.R3",
-      "E9.R14"
+      "E9.T1.r2",
+      "E9.T1.r1"
      ]
     }
    ],
@@ -659,12 +653,12 @@
      "kind": "simulation",
      "evidence": "E10",
      "results": [
-      "E10.R76",
-      "E10.R441",
-      "E10.R102",
-      "E10.R467",
-      "E10.R89",
-      "E10.R454"
+      "E10.T1.r1",
+      "E10.T1.r5",
+      "E10.T1.r3",
+      "E10.T1.r7",
+      "E10.T1.r2",
+      "E10.T1.r6"
      ],
      "artefacts": [
       "A4",
@@ -790,10 +784,8 @@
      "kind": "empirical_quant",
      "evidence": "E12",
      "results": [
-      "E12.R7",
-      "E12.R25",
-      "E12.R13",
-      "E12.R31"
+      "E12.T1.r1",
+      "E12.T1.r2"
      ],
      "artefacts": [
       "A6"
@@ -925,18 +917,12 @@
      "kind": "simulation",
      "evidence": "E3",
      "results": [
-      "E3.R7",
-      "E3.R20",
-      "E3.R11",
-      "E3.R24",
-      "E3.R46",
-      "E3.R59",
-      "E3.R50",
-      "E3.R63",
-      "E3.R85",
-      "E3.R98",
-      "E3.R89",
-      "E3.R102"
+      "E3.T1.r1",
+      "E3.T1.r2",
+      "E3.T1.r3",
+      "E3.T1.r4",
+      "E3.T1.r5",
+      "E3.T1.r6"
      ],
      "artefacts": [
       "A8"
@@ -1091,18 +1077,10 @@
      "kind": "empirical_quant",
      "evidence": "E13",
      "results": [
-      "E13.R1",
-      "E13.R2",
-      "E13.R3",
-      "E13.R4",
-      "E13.R5",
-      "E13.R6",
-      "E13.R7",
-      "E13.R8",
-      "E13.R9",
-      "E13.R10",
-      "E13.R11",
-      "E13.R12"
+      "E13.T1.r1",
+      "E13.T1.r2",
+      "E13.T1.r3",
+      "E13.T1.r4"
      ]
     }
    ],
@@ -1145,8 +1123,8 @@
      "kind": "empirical_quant",
      "evidence": "E17",
      "results": [
-      "E17.R1",
-      "E17.R2"
+      "E17.T1.r1",
+      "E17.T1.r2"
      ]
     }
    ],
@@ -1183,9 +1161,9 @@
      "kind": "empirical_quant",
      "evidence": "E13",
      "results": [
-      "E13.R13",
-      "E13.R14",
-      "E13.R15"
+      "E13.T2.r1",
+      "E13.T2.r2",
+      "E13.T2.r3"
      ]
     }
    ],
@@ -1228,9 +1206,9 @@
      "kind": "empirical_quant",
      "evidence": "E14",
      "results": [
-      "E14.R3",
-      "E14.R2",
-      "E14.R1"
+      "E14.T1.r3",
+      "E14.T1.r2",
+      "E14.T1.r1"
      ]
     }
    ],
@@ -1270,10 +1248,7 @@
      "kind": "empirical_quant",
      "evidence": "E18",
      "results": [
-      "E18.R1",
-      "E18.R2",
-      "E18.R3",
-      "E18.R4"
+      "E18.T1.r1"
      ]
     }
    ],
@@ -1314,7 +1289,7 @@
      "kind": "simulation",
      "evidence": "E2",
      "results": [
-      "E2.R41"
+      "E2.T1.r1"
      ],
      "artefacts": [
       "A8"
@@ -1394,8 +1369,8 @@
      "kind": "simulation",
      "evidence": "E4",
      "results": [
-      "E4.R93",
-      "E4.R67"
+      "E4.T1.r2",
+      "E4.T1.r1"
      ],
      "artefacts": [
       "A8"
@@ -1485,14 +1460,10 @@
      "kind": "simulation",
      "evidence": "E5",
      "results": [
-      "E5.R76",
-      "E5.R89",
-      "E5.R78",
-      "E5.R91",
-      "E5.R102",
-      "E5.R115",
-      "E5.R104",
-      "E5.R117"
+      "E5.T1.r1",
+      "E5.T1.r2",
+      "E5.T1.r3",
+      "E5.T1.r4"
      ],
      "artefacts": [
       "A8"
@@ -1620,8 +1591,7 @@
      "kind": "simulation",
      "evidence": "E6",
      "results": [
-      "E6.R41",
-      "E6.R44"
+      "E6.T1.r1"
      ],
      "artefacts": [
       "A8"
@@ -1697,10 +1667,8 @@
      "kind": "empirical_quant",
      "evidence": "E7",
      "results": [
-      "E7.R1",
-      "E7.R8",
-      "E7.R7",
-      "E7.R14"
+      "E7.T1.r1",
+      "E7.T1.r2"
      ]
     }
    ],
@@ -1868,12 +1836,8 @@
      "kind": "empirical_quant",
      "evidence": "E15",
      "results": [
-      "E15.R1",
-      "E15.R7",
-      "E15.R2",
-      "E15.R8",
-      "E15.R3",
-      "E15.R9"
+      "E15.T1.r1",
+      "E15.T1.r2"
      ]
     }
    ],
@@ -1918,13 +1882,8 @@
      "kind": "empirical_quant",
      "evidence": "E16",
      "results": [
-      "E16.R14",
-      "E16.R21",
-      "E16.R3",
-      "E16.R25",
-      "E16.R7",
-      "E16.R27",
-      "E16.R9"
+      "E16.T1.r1",
+      "E16.T1.r2"
      ],
      "artefacts": [
       "A5"
@@ -1973,8 +1932,8 @@
      "kind": "empirical_quant",
      "evidence": "E19",
      "results": [
-      "E19.R3",
-      "E19.R1"
+      "E19.T1.r3",
+      "E19.T1.r1"
      ]
     }
    ],
@@ -2026,12 +1985,12 @@
      "kind": "empirical_quant",
      "evidence": "E20",
      "results": [
-      "E20.R39",
-      "E20.R40",
-      "E20.R41",
-      "E20.R42",
-      "E20.R43",
-      "E20.R44"
+      "E20.T4.r3",
+      "E20.T4.r4",
+      "E20.T4.r5",
+      "E20.T4.r6",
+      "E20.T4.r7",
+      "E20.T4.r8"
      ],
      "artefacts": [
       "A6"
@@ -2075,8 +2034,8 @@
      "kind": "empirical_quant",
      "evidence": "E20",
      "results": [
-      "E20.R16",
-      "E20.R17"
+      "E20.T2.r1",
+      "E20.T2.r2"
      ],
      "artefacts": [
       "A4"
@@ -2140,134 +2099,6 @@
    "lab_runs": [
     "RN6"
    ],
-   "results": [
-    {
-     "id": "R41",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.7996717171717171,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting"
-     }
-    },
-    {
-     "id": "R46",
-     "variable": "pooled width over the DGPs",
-     "value": 1.0018975430750083,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting"
-     }
-    },
-    {
-     "id": "R50",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.002347566574839311,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting"
-     }
-    },
-    {
-     "id": "R51",
-     "variable": "pooled maxcellmce over the DGPs",
-     "value": 0.014508136924803598,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting"
-     }
-    },
-    {
-     "id": "R54",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.7971944444444445,
-     "conditions": {
-      "T": 100,
-      "case": "T_optimal"
-     }
-    },
-    {
-     "id": "R59",
-     "variable": "pooled width over the DGPs",
-     "value": 0.9965079650994704,
-     "conditions": {
-      "T": 100,
-      "case": "T_optimal"
-     }
-    },
-    {
-     "id": "R63",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.002378711355984074,
-     "conditions": {
-      "T": 100,
-      "case": "T_optimal"
-     }
-    },
-    {
-     "id": "R64",
-     "variable": "pooled maxcellmce over the DGPs",
-     "value": 0.014505611672278346,
-     "conditions": {
-      "T": 100,
-      "case": "T_optimal"
-     }
-    },
-    {
-     "id": "R85",
-     "variable": "pooled width over the DGPs",
-     "value": 1.000745813821255,
-     "conditions": {
-      "T": 300,
-      "case": "T_backcasting"
-     }
-    },
-    {
-     "id": "R89",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.0006805683093562026,
-     "conditions": {
-      "T": 300,
-      "case": "T_backcasting"
-     }
-    },
-    {
-     "id": "R90",
-     "variable": "pooled maxcellmce over the DGPs",
-     "value": 0.0058672839506172785,
-     "conditions": {
-      "T": 300,
-      "case": "T_backcasting"
-     }
-    },
-    {
-     "id": "R98",
-     "variable": "pooled width over the DGPs",
-     "value": 0.999189350813739,
-     "conditions": {
-      "T": 300,
-      "case": "T_optimal"
-     }
-    },
-    {
-     "id": "R102",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.0008571064177124785,
-     "conditions": {
-      "T": 300,
-      "case": "T_optimal"
-     }
-    },
-    {
-     "id": "R103",
-     "variable": "pooled maxcellmce over the DGPs",
-     "value": 0.0058672839506172785,
-     "conditions": {
-      "T": 300,
-      "case": "T_optimal"
-     }
-    }
-   ],
    "setup": {
     "studied": [
      "D1"
@@ -2295,6 +2126,92 @@
    "runs": 2000,
    "seeds": [
     20261105
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Case T: the true orders with the true parameters, pooled over the 11 Gaussian processes",
+     "row_labels": [
+      "T",
+      "D3",
+      "initial states"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      "ratio of the 80% interval width to the theoretical width",
+      "D13",
+      {
+       "variable": "D13",
+       "statistic": "max"
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        100,
+        "T",
+        "backcasting"
+       ],
+       "values": [
+        0.7997,
+        1.0019,
+        0.002348,
+        0.01451
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        100,
+        "T",
+        "optimal"
+       ],
+       "values": [
+        0.7972,
+        0.9965,
+        0.002379,
+        0.01451
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        300,
+        "T",
+        "backcasting"
+       ],
+       "values": [
+        null,
+        1.0007,
+        0.0006806,
+        0.005867
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        300,
+        "T",
+        "optimal"
+       ],
+       "values": [
+        null,
+        0.9992,
+        0.0008571,
+        0.005867
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
    ]
   },
   {
@@ -2306,26 +2223,6 @@
    },
    "lab_runs": [
     "RN11"
-   ],
-   "results": [
-    {
-     "id": "R41",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.7559267676767676,
-     "conditions": {
-      "T": 100,
-      "case": "S_backcasting"
-     }
-    },
-    {
-     "id": "R54",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.7572424242424242,
-     "conditions": {
-      "T": 100,
-      "case": "S_optimal"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -2353,6 +2250,52 @@
    "runs": 2000,
    "seeds": [
     20261105
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Case S: orders selected by AutoMSARIMA, pooled over the 11 Gaussian processes",
+     "row_labels": [
+      "T",
+      "D3",
+      "initial states"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        100,
+        "S",
+        "backcasting"
+       ],
+       "values": [
+        0.7559
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        100,
+        "S",
+        "optimal"
+       ],
+       "values": [
+        0.7572
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
    ]
   },
   {
@@ -2364,116 +2307,6 @@
    },
    "lab_runs": [
     "RN7"
-   ],
-   "results": [
-    {
-     "id": "R7",
-     "variable": "pooled width over the DGPs",
-     "value": 0.9571865764457477,
-     "conditions": {
-      "T": 50,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.019618406285072953,
-     "conditions": {
-      "T": 50,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R20",
-     "variable": "pooled width over the DGPs",
-     "value": 0.9570246020280071,
-     "conditions": {
-      "T": 50,
-      "case": "E_backcasting_sim"
-     }
-    },
-    {
-     "id": "R24",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.0196577134986226,
-     "conditions": {
-      "T": 50,
-      "case": "E_backcasting_sim"
-     }
-    },
-    {
-     "id": "R46",
-     "variable": "pooled width over the DGPs",
-     "value": 0.98068173371577,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R50",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.00999872461993675,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R59",
-     "variable": "pooled width over the DGPs",
-     "value": 0.9804924240470849,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting_sim"
-     }
-    },
-    {
-     "id": "R63",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.010021553923069082,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting_sim"
-     }
-    },
-    {
-     "id": "R85",
-     "variable": "pooled width over the DGPs",
-     "value": 0.9966012447878664,
-     "conditions": {
-      "T": 300,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R89",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.0026437863483317944,
-     "conditions": {
-      "T": 300,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R98",
-     "variable": "pooled width over the DGPs",
-     "value": 0.9964067752797617,
-     "conditions": {
-      "T": 300,
-      "case": "E_backcasting_sim"
-     }
-    },
-    {
-     "id": "R102",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.002688526680950923,
-     "conditions": {
-      "T": 300,
-      "case": "E_backcasting_sim"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -2502,6 +2335,105 @@
    "runs": 2000,
    "seeds": [
     20261105
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Case E: the analytic interval against the simulated interval of the same fit, pooled over the 11 Gaussian processes",
+     "row_labels": [
+      "T",
+      "D3",
+      "initial states",
+      "interval"
+     ],
+     "columns": [
+      "ratio of the 80% interval width to the theoretical width",
+      "D13"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        50,
+        "E",
+        "backcasting",
+        "analytic"
+       ],
+       "values": [
+        0.9572,
+        0.01962
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        50,
+        "E",
+        "backcasting",
+        "simulated interval"
+       ],
+       "values": [
+        0.957,
+        0.01966
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        100,
+        "E",
+        "backcasting",
+        "analytic"
+       ],
+       "values": [
+        0.9807,
+        0.009999
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        100,
+        "E",
+        "backcasting",
+        "simulated interval"
+       ],
+       "values": [
+        0.9805,
+        0.01002
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        300,
+        "E",
+        "backcasting",
+        "analytic"
+       ],
+       "values": [
+        0.9966,
+        0.002644
+       ]
+      },
+      {
+       "id": "r6",
+       "label": [
+        300,
+        "E",
+        "backcasting",
+        "simulated interval"
+       ],
+       "values": [
+        0.9964,
+        0.002689
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
    ]
   },
   {
@@ -2513,26 +2445,6 @@
    },
    "lab_runs": [
     "RN8"
-   ],
-   "results": [
-    {
-     "id": "R67",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.7700555555555556,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R93",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.7996717171717171,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -2560,6 +2472,52 @@
    "runs": 2000,
    "seeds": [
     20261105
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Cases T and E, pooled over the 11 Gaussian processes",
+     "row_labels": [
+      "T",
+      "D3",
+      "initial states"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        100,
+        "E",
+        "backcasting"
+       ],
+       "values": [
+        0.7701
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        100,
+        "T",
+        "backcasting"
+       ],
+       "values": [
+        0.7997
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
    ]
   },
   {
@@ -2571,80 +2529,6 @@
    },
    "lab_runs": [
     "RN9"
-   ],
-   "results": [
-    {
-     "id": "R76",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.00999872461993675,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R78",
-     "variable": "pooled relpin over the DGPs",
-     "value": 1.043170004368166,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting"
-     }
-    },
-    {
-     "id": "R89",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.02651617181920213,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting_ref"
-     }
-    },
-    {
-     "id": "R91",
-     "variable": "pooled relpin over the DGPs",
-     "value": 1.9575365936241682,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting_ref"
-     }
-    },
-    {
-     "id": "R102",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.00850140291806958,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal"
-     }
-    },
-    {
-     "id": "R104",
-     "variable": "pooled relpin over the DGPs",
-     "value": 1.0578011747050307,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal"
-     }
-    },
-    {
-     "id": "R115",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.005329303132333438,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal_ref"
-     }
-    },
-    {
-     "id": "R117",
-     "variable": "pooled relpin over the DGPs",
-     "value": 1.3961320998657083,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal_ref"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -2674,6 +2558,79 @@
    "runs": 2000,
    "seeds": [
     20261105
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Case E with predict() and with reforecast, pooled over the 11 Gaussian processes",
+     "row_labels": [
+      "T",
+      "D3",
+      "initial states",
+      "forecast"
+     ],
+     "columns": [
+      "D13",
+      "scaled pinball relative to the true model with true parameters"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        100,
+        "E",
+        "backcasting",
+        "predict()"
+       ],
+       "values": [
+        0.009999,
+        1.0432
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        100,
+        "E",
+        "backcasting",
+        "reforecast"
+       ],
+       "values": [
+        0.02652,
+        1.9575
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        100,
+        "E",
+        "optimal",
+        "predict()"
+       ],
+       "values": [
+        0.008501,
+        1.0578
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        100,
+        "E",
+        "optimal",
+        "reforecast"
+       ],
+       "values": [
+        0.005329,
+        1.3961
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
    ]
   },
   {
@@ -2685,44 +2642,6 @@
    },
    "lab_runs": [
     "RN10"
-   ],
-   "results": [
-    {
-     "id": "R41",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.6756041666666667,
-     "conditions": {
-      "T": 100,
-      "case": "W_backcasting"
-     }
-    },
-    {
-     "id": "R44",
-     "variable": "pooled q50 over the DGPs",
-     "value": 0.42814120370370373,
-     "conditions": {
-      "T": 100,
-      "case": "W_backcasting"
-     }
-    },
-    {
-     "id": "R67",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.803136574074074,
-     "conditions": {
-      "T": 100,
-      "case": "oracle"
-     }
-    },
-    {
-     "id": "R70",
-     "variable": "pooled q50 over the DGPs",
-     "value": 0.49877314814814816,
-     "conditions": {
-      "T": 100,
-      "case": "oracle"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -2750,6 +2669,52 @@
    "runs": 2000,
    "seeds": [
     20261105
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Case W (fixed wrong models) and the true model with true parameters, pooled over the 11 Gaussian processes",
+     "row_labels": [
+      "T",
+      "D3"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      "share of holdout observations at or below the 0.5 quantile"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        100,
+        "W"
+       ],
+       "values": [
+        0.6756,
+        0.4281
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        100,
+        "true model, true parameters"
+       ],
+       "values": [
+        0.8031,
+        0.4988
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
    ]
   },
   {
@@ -2762,44 +2727,6 @@
    },
    "lab_runs": [
     "RN12"
-   ],
-   "results": [
-    {
-     "id": "R1",
-     "variable": "benchmark cov80",
-     "value": 0.6812166823455579,
-     "conditions": {
-      "initial": "backcasting",
-      "method": "predict"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "benchmark pinball",
-     "value": 0.8991160322346123,
-     "conditions": {
-      "initial": "backcasting",
-      "method": "predict"
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "benchmark cov80",
-     "value": 0.6826617539458528,
-     "conditions": {
-      "initial": "backcasting",
-      "method": "reforecast"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "benchmark pinball",
-     "value": 6.983616214609794e+191,
-     "conditions": {
-      "initial": "backcasting",
-      "method": "reforecast"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -2820,7 +2747,57 @@
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "AutoMSARIMA with backcasting on the 5,315 benchmark series: predict() against reforecast",
+     "conditions": {
+      "data": "D5",
+      "initial states": "backcasting"
+     },
+     "row_labels": [
+      "forecast"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      {
+       "variable": "D14",
+       "statistic": "mean"
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "predict()"
+       ],
+       "values": [
+        0.6812,
+        0.8991
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "D12"
+       ],
+       "values": [
+        0.6827,
+        6.984e+191
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E8",
@@ -2832,112 +2809,6 @@
    },
    "lab_runs": [
     "RN41"
-   ],
-   "results": [
-    {
-     "id": "R1",
-     "variable": "M4 cov80",
-     "value": 0.688907407407404,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R3",
-     "variable": "M4 mce",
-     "value": 0.03864774286070695,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "M4 cov80_low",
-     "value": 0.8128425925925926,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R8",
-     "variable": "M4 cov80_mid",
-     "value": 0.6995277777777779,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "M4 cov80_high",
-     "value": 0.5543518518518519,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "M4 fall_low_to_high",
-     "value": 0.25849074074074074,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "M4 cov80",
-     "value": 0.7853518518518472,
-     "conditions": {
-      "method": "force_mnn"
-     }
-    },
-    {
-     "id": "R13",
-     "variable": "M4 q50",
-     "value": 0.37229938271604845,
-     "conditions": {
-      "method": "force_mnn"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "M4 mce",
-     "value": 0.08485447063225016,
-     "conditions": {
-      "method": "force_mnn"
-     }
-    },
-    {
-     "id": "R18",
-     "variable": "M4 cov80_low",
-     "value": 0.7639907407407407,
-     "conditions": {
-      "method": "force_mnn"
-     }
-    },
-    {
-     "id": "R19",
-     "variable": "M4 cov80_mid",
-     "value": 0.7778888888888889,
-     "conditions": {
-      "method": "force_mnn"
-     }
-    },
-    {
-     "id": "R20",
-     "variable": "M4 cov80_high",
-     "value": 0.8141759259259259,
-     "conditions": {
-      "method": "force_mnn"
-     }
-    },
-    {
-     "id": "R21",
-     "variable": "M4 fall_low_to_high",
-     "value": -0.05018518518518522,
-     "conditions": {
-      "method": "force_mnn"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -2962,7 +2833,86 @@
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "AutoMSARIMA and ETS(MNN) on the M4 sample",
+     "conditions": {
+      "data": "D6"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      "D13",
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "low"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "mid"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "high"
+       }
+      },
+      "80% coverage in the low tercile minus that in the high tercile",
+      "share of holdout observations at or below the 0.5 quantile"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "D10"
+       ],
+       "values": [
+        0.6889,
+        0.03865,
+        0.8128,
+        0.6995,
+        0.5544,
+        0.2585,
+        null
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS(MNN)"
+       ],
+       "values": [
+        0.7854,
+        0.08485,
+        0.764,
+        0.7779,
+        0.8142,
+        -0.05019,
+        0.3723
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E9",
@@ -2974,88 +2924,6 @@
    },
    "lab_runs": [
     "RN42"
-   ],
-   "results": [
-    {
-     "id": "R3",
-     "variable": "M4 mce",
-     "value": 0.03864774286070695,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R4",
-     "variable": "M4 pinball_median",
-     "value": 0.6752090358841512,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "M4 spread",
-     "value": 0.25849074074074074,
-     "conditions": {
-      "method": "auto"
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "M4 cov80",
-     "value": 0.7698179012345646,
-     "conditions": {
-      "method": "auto_dlnorm"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "M4 mce",
-     "value": 0.017709097144281392,
-     "conditions": {
-      "method": "auto_dlnorm"
-     }
-    },
-    {
-     "id": "R15",
-     "variable": "M4 pinball_median",
-     "value": 0.7678888517156283,
-     "conditions": {
-      "method": "auto_dlnorm"
-     }
-    },
-    {
-     "id": "R18",
-     "variable": "M4 cov80_low",
-     "value": 0.7741851851851852,
-     "conditions": {
-      "method": "auto_dlnorm"
-     }
-    },
-    {
-     "id": "R19",
-     "variable": "M4 cov80_mid",
-     "value": 0.783175925925926,
-     "conditions": {
-      "method": "auto_dlnorm"
-     }
-    },
-    {
-     "id": "R20",
-     "variable": "M4 cov80_high",
-     "value": 0.7520925925925926,
-     "conditions": {
-      "method": "auto_dlnorm"
-     }
-    },
-    {
-     "id": "R22",
-     "variable": "M4 spread",
-     "value": 0.03108333333333335,
-     "conditions": {
-      "method": "auto_dlnorm"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -3081,7 +2949,89 @@
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "AutoMSARIMA and the log-normal ARIMA with the same orders on the M4 sample",
+     "conditions": {
+      "data": "D6"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      "D13",
+      {
+       "variable": "D14",
+       "statistic": "median"
+      },
+      "range of the 80% coverage over the level terciles",
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "low"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "mid"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "high"
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "D10"
+       ],
+       "values": [
+        0.03865,
+        0.6752,
+        0.2585,
+        null,
+        null,
+        null,
+        null
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "D11"
+       ],
+       "values": [
+        0.01771,
+        0.7679,
+        0.03108,
+        0.7698,
+        0.7742,
+        0.7832,
+        0.7521
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E10",
@@ -3093,128 +3043,6 @@
    "lab_runs": [
     "RN43",
     "RN44"
-   ],
-   "results": [
-    {
-     "id": "R76",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.012016197326803405,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting",
-      "smooth version": "1.0.8"
-     }
-    },
-    {
-     "id": "R85",
-     "variable": "pooled width over the DGPs",
-     "value": 3.3857354031747757,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal",
-      "smooth version": "1.0.8"
-     }
-    },
-    {
-     "id": "R89",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.02458198143046628,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal",
-      "smooth version": "1.0.8"
-     }
-    },
-    {
-     "id": "R102",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.017238598102234465,
-     "conditions": {
-      "T": 100,
-      "case": "S_backcasting",
-      "smooth version": "1.0.8"
-     }
-    },
-    {
-     "id": "R106",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.8256464646464646,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting",
-      "smooth version": "1.0.8"
-     }
-    },
-    {
-     "id": "R111",
-     "variable": "pooled width over the DGPs",
-     "value": 1.1104600391287058,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting",
-      "smooth version": "1.0.8"
-     }
-    },
-    {
-     "id": "R441",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.00999872461993675,
-     "conditions": {
-      "T": 100,
-      "case": "E_backcasting",
-      "smooth version": "1.3.0"
-     }
-    },
-    {
-     "id": "R450",
-     "variable": "pooled width over the DGPs",
-     "value": 1.011133324773201,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal",
-      "smooth version": "1.3.0"
-     }
-    },
-    {
-     "id": "R454",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.00850140291806958,
-     "conditions": {
-      "T": 100,
-      "case": "E_optimal",
-      "smooth version": "1.3.0"
-     }
-    },
-    {
-     "id": "R467",
-     "variable": "pooled mce over the DGPs",
-     "value": 0.01387776757473727,
-     "conditions": {
-      "T": 100,
-      "case": "S_backcasting",
-      "smooth version": "1.3.0"
-     }
-    },
-    {
-     "id": "R471",
-     "variable": "pooled cov80 over the DGPs",
-     "value": 0.7996717171717171,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting",
-      "smooth version": "1.3.0"
-     }
-    },
-    {
-     "id": "R476",
-     "variable": "pooled width over the DGPs",
-     "value": 1.0018975430750083,
-     "conditions": {
-      "T": 100,
-      "case": "T_backcasting",
-      "smooth version": "1.3.0"
-     }
-    }
    ],
    "setup": {
     "studied": [
@@ -3246,6 +3074,145 @@
    "runs": 2000,
    "seeds": [
     20261105
+   ],
+   "tables": [
+    {
+     "id": "T1",
+     "description": "smooth 1.0.8 against 1.3.0 on the same seeds, pooled over the 11 Gaussian processes",
+     "row_labels": [
+      "T",
+      "D3",
+      "initial states",
+      "D21"
+     ],
+     "columns": [
+      "D13",
+      "ratio of the 80% interval width to the theoretical width",
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        100,
+        "E",
+        "backcasting",
+        "1.0.8"
+       ],
+       "values": [
+        0.01202,
+        null,
+        null
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        100,
+        "E",
+        "optimal",
+        "1.0.8"
+       ],
+       "values": [
+        0.02458,
+        3.3857,
+        null
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        100,
+        "S",
+        "backcasting",
+        "1.0.8"
+       ],
+       "values": [
+        0.01724,
+        null,
+        null
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        100,
+        "T",
+        "backcasting",
+        "1.0.8"
+       ],
+       "values": [
+        null,
+        1.1105,
+        0.8256
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        100,
+        "E",
+        "backcasting",
+        "1.3.0"
+       ],
+       "values": [
+        0.009999,
+        null,
+        null
+       ]
+      },
+      {
+       "id": "r6",
+       "label": [
+        100,
+        "E",
+        "optimal",
+        "1.3.0"
+       ],
+       "values": [
+        0.008501,
+        1.0111,
+        null
+       ]
+      },
+      {
+       "id": "r7",
+       "label": [
+        100,
+        "S",
+        "backcasting",
+        "1.3.0"
+       ],
+       "values": [
+        0.01388,
+        null,
+        null
+       ]
+      },
+      {
+       "id": "r8",
+       "label": [
+        100,
+        "T",
+        "backcasting",
+        "1.3.0"
+       ],
+       "values": [
+        null,
+        1.0019,
+        0.7997
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
    ]
   },
   {
@@ -3293,128 +3260,6 @@
    "lab_runs": [
     "RN48"
    ],
-   "results": [
-    {
-     "id": "R3",
-     "variable": "m4 cov80",
-     "value": 0.7460771604938237,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R7",
-     "variable": "m4 mce",
-     "value": 0.02235705823668769,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R9",
-     "variable": "m4 pinball_median",
-     "value": 0.7513877422626215,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R10",
-     "variable": "m4 cov80_low",
-     "value": 0.7865370370370371,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R11",
-     "variable": "m4 cov80_mid",
-     "value": 0.7424537037037038,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R12",
-     "variable": "m4 cov80_high",
-     "value": 0.7092407407407407,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R13",
-     "variable": "m4 spread",
-     "value": 0.07729629629629642,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R14",
-     "variable": "m4 share_dlnorm",
-     "value": 0.6702222222222223,
-     "conditions": {
-      "method": "adam_select"
-     }
-    },
-    {
-     "id": "R21",
-     "variable": "m4 cov80",
-     "value": 0.6922623456790093,
-     "conditions": {
-      "method": "msarima"
-     }
-    },
-    {
-     "id": "R25",
-     "variable": "m4 mce",
-     "value": 0.035202331961592524,
-     "conditions": {
-      "method": "msarima"
-     }
-    },
-    {
-     "id": "R27",
-     "variable": "m4 pinball_median",
-     "value": 0.6871656664671391,
-     "conditions": {
-      "method": "msarima"
-     }
-    },
-    {
-     "id": "R28",
-     "variable": "m4 cov80_low",
-     "value": 0.8192685185185186,
-     "conditions": {
-      "method": "msarima"
-     }
-    },
-    {
-     "id": "R29",
-     "variable": "m4 cov80_mid",
-     "value": 0.7097777777777778,
-     "conditions": {
-      "method": "msarima"
-     }
-    },
-    {
-     "id": "R30",
-     "variable": "m4 cov80_high",
-     "value": 0.5477407407407408,
-     "conditions": {
-      "method": "msarima"
-     }
-    },
-    {
-     "id": "R31",
-     "variable": "m4 spread",
-     "value": 0.2715277777777778,
-     "conditions": {
-      "method": "msarima"
-     }
-    }
-   ],
    "setup": {
     "studied": [
      "D8",
@@ -3439,7 +3284,93 @@
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "R auto.msarima and auto.adam error selection on the fresh M4 sample, backcasting",
+     "conditions": {
+      "data": "D9",
+      "initial states": "backcasting"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      "D13",
+      {
+       "variable": "D14",
+       "statistic": "median"
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "low"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "mid"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "high"
+       }
+      },
+      "range of the 80% coverage over the level terciles",
+      "share of series for which dlnorm is selected"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "D8"
+       ],
+       "values": [
+        0.7461,
+        0.02236,
+        0.7514,
+        0.7865,
+        0.7425,
+        0.7092,
+        0.0773,
+        0.6702
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "D10"
+       ],
+       "values": [
+        0.6923,
+        0.0352,
+        0.6872,
+        0.8193,
+        0.7098,
+        0.5477,
+        0.2715,
+        null
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E13",
@@ -3469,174 +3400,148 @@
      "D17"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "cov80 by tercile",
-     "value": 0.7862114371708051,
-     "conditions": {
-      "method": "auto_back",
-      "by": "level_t",
-      "tercile": "low"
-     },
-     "lab_result": "RS2383"
-    },
-    {
-     "id": "R2",
-     "variable": "cov80 by tercile",
-     "value": 0.6677253905514775,
-     "conditions": {
-      "method": "auto_back",
-      "by": "level_t",
-      "tercile": "mid"
-     },
-     "lab_result": "RS2385"
-    },
-    {
-     "id": "R3",
-     "variable": "cov80 by tercile",
-     "value": 0.5897056057185853,
-     "conditions": {
-      "method": "auto_back",
-      "by": "level_t",
-      "tercile": "high"
-     },
-     "lab_result": "RS2387"
-    },
-    {
-     "id": "R4",
-     "variable": "cov80 by tercile",
-     "value": 0.7891036493604214,
-     "conditions": {
-      "method": "statsforecast AutoARIMA\tarima",
-      "by": "level_t",
-      "tercile": "low"
-     },
-     "lab_result": "RS2467"
-    },
-    {
-     "id": "R5",
-     "variable": "cov80 by tercile",
-     "value": 0.6671921074094986,
-     "conditions": {
-      "method": "statsforecast AutoARIMA\tarima",
-      "by": "level_t",
-      "tercile": "mid"
-     },
-     "lab_result": "RS2468"
-    },
-    {
-     "id": "R6",
-     "variable": "cov80 by tercile",
-     "value": 0.5892588412340106,
-     "conditions": {
-      "method": "statsforecast AutoARIMA\tarima",
-      "by": "level_t",
-      "tercile": "high"
-     },
-     "lab_result": "RS2469"
-    },
-    {
-     "id": "R7",
-     "variable": "cov80 by tercile",
-     "value": 0.7701503379445391,
-     "conditions": {
-      "method": "pmdarima auto_arima\tarima",
-      "by": "level_t",
-      "tercile": "low"
-     },
-     "lab_result": "RS2473"
-    },
-    {
-     "id": "R8",
-     "variable": "cov80 by tercile",
-     "value": 0.6354047619047619,
-     "conditions": {
-      "method": "pmdarima auto_arima\tarima",
-      "by": "level_t",
-      "tercile": "mid"
-     },
-     "lab_result": "RS2474"
-    },
-    {
-     "id": "R9",
-     "variable": "cov80 by tercile",
-     "value": 0.582459372637944,
-     "conditions": {
-      "method": "pmdarima auto_arima\tarima",
-      "by": "level_t",
-      "tercile": "high"
-     },
-     "lab_result": "RS2475"
-    },
-    {
-     "id": "R10",
-     "variable": "cov80 by tercile",
-     "value": 0.7809364810634561,
-     "conditions": {
-      "method": "skforecast Arima\tarima",
-      "by": "level_t",
-      "tercile": "low"
-     },
-     "lab_result": "RS2479"
-    },
-    {
-     "id": "R11",
-     "variable": "cov80 by tercile",
-     "value": 0.6578047556308425,
-     "conditions": {
-      "method": "skforecast Arima\tarima",
-      "by": "level_t",
-      "tercile": "mid"
-     },
-     "lab_result": "RS2480"
-    },
-    {
-     "id": "R12",
-     "variable": "cov80 by tercile",
-     "value": 0.5854339102081766,
-     "conditions": {
-      "method": "skforecast Arima\tarima",
-      "by": "level_t",
-      "tercile": "high"
-     },
-     "lab_result": "RS2481"
-    },
-    {
-     "id": "R13",
-     "variable": "series with the same forecast and width among ETS(ANN) and ARIMA(0,1,1) selected",
-     "value": 114.0,
-     "conditions": {},
-     "lab_result": "RS2485"
-    },
-    {
-     "id": "R14",
-     "variable": "cov80 among ETS(ANN) and ARIMA(0,1,1) selected",
-     "value": 0.7335526315789473,
-     "conditions": {
-      "subset": "same forecast",
-      "method": "ETS"
-     },
-     "lab_result": "RS2486"
-    },
-    {
-     "id": "R15",
-     "variable": "cov80 among ETS(ANN) and ARIMA(0,1,1) selected",
-     "value": 0.7335526315789473,
-     "conditions": {
-      "subset": "same forecast",
-      "method": "ARIMA"
-     },
-     "lab_result": "RS2488"
-    }
-   ],
    "execution": {
     "code_version": "dadd6a147c1e7f36070270bc6e200975b8f73be4",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "80% coverage by level tercile of AutoMSARIMA and the other ARIMA implementations on the benchmark",
+     "conditions": {
+      "data": "D5"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "low"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "mid"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "high"
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "D10"
+       ],
+       "values": [
+        0.7862,
+        0.6677,
+        0.5897
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "statsforecast AutoARIMA"
+       ],
+       "values": [
+        0.7891,
+        0.6672,
+        0.5893
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "pmdarima auto_arima"
+       ],
+       "values": [
+        0.7702,
+        0.6354,
+        0.5825
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "skforecast Arima"
+       ],
+       "values": [
+        0.7809,
+        0.6578,
+        0.5854
+       ]
+      }
+     ]
+    },
+    {
+     "id": "T2",
+     "description": "Series of the benchmark where the selected ETS(ANN) and the selected ARIMA(0,1,1) give the same forecast and width",
+     "conditions": {
+      "data": "D5"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      "series",
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "both"
+       ],
+       "values": [
+        114.0,
+        null
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS"
+       ],
+       "values": [
+        null,
+        0.7336
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ARIMA"
+       ],
+       "values": [
+        null,
+        0.7336
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E14",
@@ -3661,60 +3566,83 @@
      "D4"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "cov80 of the forced model on all series",
-     "value": 0.6951081843838194,
-     "conditions": {
-      "method": "force_011"
-     },
-     "lab_result": "RS2376"
-    },
-    {
-     "id": "R2",
-     "variable": "cov80 of the forced model on all series",
-     "value": 0.6680986725201212,
-     "conditions": {
-      "method": "force_ann"
-     },
-     "lab_result": "RS2378"
-    },
-    {
-     "id": "R3",
-     "variable": "cov80 of the forced model on all series",
-     "value": 0.7635413400229957,
-     "conditions": {
-      "method": "force_mnn"
-     },
-     "lab_result": "RS2380"
-    },
-    {
-     "id": "R4",
-     "variable": "cov80 ETS",
-     "value": 0.7492447998327585,
-     "conditions": {
-      "subset": "all series"
-     },
-     "lab_result": "RS2372"
-    },
-    {
-     "id": "R5",
-     "variable": "cov80 ARIMA",
-     "value": 0.6812166823455629,
-     "conditions": {
-      "subset": "all series"
-     },
-     "lab_result": "RS2373"
-    }
-   ],
    "execution": {
     "code_version": "411ecd8005f5d95c840f8743b16301162af13897",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "80% coverage of forced and selected models on all 5,315 benchmark series, backcasting",
+     "conditions": {
+      "data": "D5"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "ARIMA(0,1,1)"
+       ],
+       "values": [
+        0.6951
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "ETS(ANN)"
+       ],
+       "values": [
+        0.6681
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "ETS(MNN)"
+       ],
+       "values": [
+        0.7635
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "ETS, selected"
+       ],
+       "values": [
+        0.7492
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        "ARIMA, selected"
+       ],
+       "values": [
+        0.6812
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E15",
@@ -3745,155 +3673,99 @@
      "D17"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "cov80",
-     "value": 0.6812166823455579,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto"
-     },
-     "lab_result": "RS2874"
-    },
-    {
-     "id": "R2",
-     "variable": "D13",
-     "value": 0.04023801303512885,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto"
-     },
-     "lab_result": "RS2878"
-    },
-    {
-     "id": "R3",
-     "variable": "pinball_median",
-     "value": 0.49587091593158816,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto"
-     },
-     "lab_result": "RS2880"
-    },
-    {
-     "id": "R4",
-     "variable": "cov80_low",
-     "value": 0.7862114371708051,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto"
-     },
-     "lab_result": "RS2881"
-    },
-    {
-     "id": "R5",
-     "variable": "cov80_mid",
-     "value": 0.6677253905514775,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto"
-     },
-     "lab_result": "RS2882"
-    },
-    {
-     "id": "R6",
-     "variable": "cov80_high",
-     "value": 0.5897056057185853,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto"
-     },
-     "lab_result": "RS2883"
-    },
-    {
-     "id": "R7",
-     "variable": "cov80",
-     "value": 0.7563447266645736,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto_dlnorm"
-     },
-     "lab_result": "RS2885"
-    },
-    {
-     "id": "R8",
-     "variable": "D13",
-     "value": 0.012442956796987046,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto_dlnorm"
-     },
-     "lab_result": "RS2889"
-    },
-    {
-     "id": "R9",
-     "variable": "pinball_median",
-     "value": 0.5507497802768249,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto_dlnorm"
-     },
-     "lab_result": "RS2891"
-    },
-    {
-     "id": "R10",
-     "variable": "cov80_low",
-     "value": 0.7492553925257086,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto_dlnorm"
-     },
-     "lab_result": "RS2892"
-    },
-    {
-     "id": "R11",
-     "variable": "cov80_mid",
-     "value": 0.7514430014430015,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto_dlnorm"
-     },
-     "lab_result": "RS2893"
-    },
-    {
-     "id": "R12",
-     "variable": "cov80_high",
-     "value": 0.7683330198143967,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto_dlnorm"
-     },
-     "lab_result": "RS2894"
-    },
-    {
-     "id": "R13",
-     "variable": "pinball_mean",
-     "value": 0.8991160322346123,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto"
-     },
-     "lab_result": "RS2879"
-    },
-    {
-     "id": "R14",
-     "variable": "pinball_mean",
-     "value": 1.0915965444293732,
-     "conditions": {
-      "data": "benchmark",
-      "method": "auto_dlnorm"
-     },
-     "lab_result": "RS2890"
-    }
-   ],
    "execution": {
     "code_version": "90d726121ac928d8cfc9ad77a0b60d99fa28334b",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "AutoMSARIMA and the log-normal ARIMA with the same orders on the benchmark, backcasting",
+     "conditions": {
+      "data": "D5",
+      "initial states": "backcasting"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      "D13",
+      {
+       "variable": "D14",
+       "statistic": "median"
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "low"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "mid"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "high"
+       }
+      },
+      {
+       "variable": "D14",
+       "statistic": "mean"
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "D10"
+       ],
+       "values": [
+        0.6812,
+        0.04024,
+        0.4959,
+        0.7862,
+        0.6677,
+        0.5897,
+        0.8991
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "D11"
+       ],
+       "values": [
+        0.7563,
+        0.01244,
+        0.5507,
+        0.7493,
+        0.7514,
+        0.7683,
+        1.0916
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E16",
@@ -3924,321 +3796,176 @@
      "D17"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "benchmark n",
-     "value": 5315.0,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3813"
-    },
-    {
-     "id": "R2",
-     "variable": "benchmark failed",
-     "value": 0.0,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3814"
-    },
-    {
-     "id": "R3",
-     "variable": "benchmark cov80",
-     "value": 0.7291418417476708,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3815"
-    },
-    {
-     "id": "R4",
-     "variable": "benchmark q10",
-     "value": 0.14210044946169018,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3816"
-    },
-    {
-     "id": "R5",
-     "variable": "benchmark q50",
-     "value": 0.5023649001776945,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3817"
-    },
-    {
-     "id": "R6",
-     "variable": "benchmark q90",
-     "value": 0.871242291209361,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3818"
-    },
-    {
-     "id": "R7",
-     "variable": "benchmark mce",
-     "value": 0.018661766615671767,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3819"
-    },
-    {
-     "id": "R8",
-     "variable": "benchmark pinball_mean",
-     "value": 0.9224672365355799,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3820"
-    },
-    {
-     "id": "R9",
-     "variable": "benchmark pinball_median",
-     "value": 0.513726114261578,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3821"
-    },
-    {
-     "id": "R10",
-     "variable": "benchmark cov80_low",
-     "value": 0.7538641208929019,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3822"
-    },
-    {
-     "id": "R11",
-     "variable": "benchmark cov80_mid",
-     "value": 0.7102301228994231,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3823"
-    },
-    {
-     "id": "R12",
-     "variable": "benchmark cov80_high",
-     "value": 0.7233280005019136,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3824"
-    },
-    {
-     "id": "R13",
-     "variable": "benchmark spread",
-     "value": 0.04363399799347878,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3825"
-    },
-    {
-     "id": "R14",
-     "variable": "benchmark share_dlnorm",
-     "value": 0.6419567262464723,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3826"
-    },
-    {
-     "id": "R15",
-     "variable": "benchmark cov80_when_dlnorm",
-     "value": 0.7503215774391027,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3827"
-    },
-    {
-     "id": "R16",
-     "variable": "benchmark mce_when_dlnorm",
-     "value": 0.027252773929209377,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3828"
-    },
-    {
-     "id": "R17",
-     "variable": "benchmark cov80_when_dnorm",
-     "value": 0.6911674548957774,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3829"
-    },
-    {
-     "id": "R18",
-     "variable": "benchmark mce_when_dnorm",
-     "value": 0.04425148607579844,
-     "conditions": {
-      "method": "adam_select"
-     },
-     "lab_result": "RS3830"
-    },
-    {
-     "id": "R19",
-     "variable": "benchmark n",
-     "value": 5315.0,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3831"
-    },
-    {
-     "id": "R20",
-     "variable": "benchmark failed",
-     "value": 0.0,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3832"
-    },
-    {
-     "id": "R21",
-     "variable": "benchmark cov80",
-     "value": 0.6812166823455579,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3833"
-    },
-    {
-     "id": "R22",
-     "variable": "benchmark q10",
-     "value": 0.14356381310755645,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3834"
-    },
-    {
-     "id": "R23",
-     "variable": "benchmark q50",
-     "value": 0.47027281279398014,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3835"
-    },
-    {
-     "id": "R24",
-     "variable": "benchmark q90",
-     "value": 0.8247804954531144,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3836"
-    },
-    {
-     "id": "R25",
-     "variable": "benchmark mce",
-     "value": 0.04023801303512885,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3837"
-    },
-    {
-     "id": "R26",
-     "variable": "benchmark pinball_mean",
-     "value": 0.8991160322346123,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3838"
-    },
-    {
-     "id": "R27",
-     "variable": "benchmark pinball_median",
-     "value": 0.49587091593158816,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3839"
-    },
-    {
-     "id": "R28",
-     "variable": "benchmark cov80_low",
-     "value": 0.7862114371708051,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3840"
-    },
-    {
-     "id": "R29",
-     "variable": "benchmark cov80_mid",
-     "value": 0.6674191121143718,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3841"
-    },
-    {
-     "id": "R30",
-     "variable": "benchmark cov80_high",
-     "value": 0.5899680030114812,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3842"
-    },
-    {
-     "id": "R31",
-     "variable": "benchmark spread",
-     "value": 0.19624343415932388,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3843"
-    },
-    {
-     "id": "R32",
-     "variable": "benchmark share_dlnorm",
-     "value": 0.0,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3844"
-    },
-    {
-     "id": "R33",
-     "variable": "benchmark cov80_when_dnorm",
-     "value": 0.6812166823455579,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3845"
-    },
-    {
-     "id": "R34",
-     "variable": "benchmark mce_when_dnorm",
-     "value": 0.04023801303512885,
-     "conditions": {
-      "method": "msarima"
-     },
-     "lab_result": "RS3846"
-    }
-   ],
    "execution": {
     "code_version": "5ca96a0fb806fcabad975937952e4a1330c3759d",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "R auto.msarima and auto.adam error selection on the benchmark, backcasting",
+     "conditions": {
+      "data": "D5",
+      "initial states": "backcasting"
+     },
+     "row_labels": [
+      "method"
+     ],
+     "columns": [
+      "series fitted",
+      "series that failed",
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      "share of holdout observations at or below the 0.1 quantile",
+      "share of holdout observations at or below the 0.5 quantile",
+      "share of holdout observations at or below the 0.9 quantile",
+      "D13",
+      {
+       "variable": "D14",
+       "statistic": "mean"
+      },
+      {
+       "variable": "D14",
+       "statistic": "median"
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "low"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "mid"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "D7": "high"
+       }
+      },
+      "range of the 80% coverage over the level terciles",
+      "share of series for which dlnorm is selected"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "D8"
+       ],
+       "values": [
+        5315.0,
+        0.0,
+        0.7291,
+        0.1421,
+        0.5024,
+        0.8712,
+        0.01866,
+        0.9225,
+        0.5137,
+        0.7539,
+        0.7102,
+        0.7233,
+        0.04363,
+        0.642
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "D10"
+       ],
+       "values": [
+        5315.0,
+        0.0,
+        0.6812,
+        0.1436,
+        0.4703,
+        0.8248,
+        0.04024,
+        0.8991,
+        0.4959,
+        0.7862,
+        0.6674,
+        0.59,
+        0.1962,
+        0.0
+       ]
+      }
+     ]
+    },
+    {
+     "id": "T2",
+     "description": "The same by the error distribution selected",
+     "conditions": {
+      "data": "D5",
+      "initial states": "backcasting"
+     },
+     "row_labels": [
+      "method",
+      "selected distribution"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      },
+      "D13"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "D8",
+        "dlnorm"
+       ],
+       "values": [
+        0.7503,
+        0.02725
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "D8",
+        "dnorm"
+       ],
+       "values": [
+        0.6912,
+        0.04425
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "D10",
+        "dnorm"
+       ],
+       "values": [
+        0.6812,
+        0.04024
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E17",
@@ -4265,75 +3992,96 @@
      "D21"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "width_all",
-     "value": 0.9999862909317017,
-     "conditions": {
-      "initial": "backcasting",
-      "stage": "A->C"
-     },
-     "lab_result": "RS2581"
-    },
-    {
-     "id": "R2",
-     "variable": "width_all",
-     "value": 0.9999997019767761,
-     "conditions": {
-      "initial": "optimal",
-      "stage": "A->C"
-     },
-     "lab_result": "RS2624"
-    },
-    {
-     "id": "R3",
-     "variable": "width_all",
-     "value": 0.9871264696121216,
-     "conditions": {
-      "initial": "backcasting",
-      "stage": "A->D"
-     },
-     "lab_result": "RS2557"
-    },
-    {
-     "id": "R4",
-     "variable": "dcov80",
-     "value": -0.01894271976586182,
-     "conditions": {
-      "initial": "backcasting",
-      "stage": "A->C"
-     },
-     "lab_result": "RS2587"
-    },
-    {
-     "id": "R5",
-     "variable": "share with drift",
-     "value": 0.24760112888052682,
-     "conditions": {
-      "initial": "backcasting",
-      "stage": "C"
-     },
-     "lab_result": "RS2596"
-    },
-    {
-     "id": "R6",
-     "variable": "share with drift",
-     "value": 0.3087488240827846,
-     "conditions": {
-      "initial": "backcasting",
-      "stage": "A"
-     },
-     "lab_result": "RS2592"
-    }
-   ],
    "execution": {
     "code_version": "dfc53621aff77ab213ff5e6ea548255bfd1faa51",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "Stages of the change from smooth 1.0.8 to 1.3.0 on the benchmark",
+     "conditions": {
+      "data": "D5"
+     },
+     "row_labels": [
+      "initial states",
+      "stage"
+     ],
+     "columns": [
+      "median ratio of the 80% interval width of the later stage to the earlier",
+      "change of 80% coverage",
+      "share of selected models with drift"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "backcasting",
+        "A->C"
+       ],
+       "values": [
+        1.0,
+        -0.01894,
+        null
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "optimal",
+        "A->C"
+       ],
+       "values": [
+        1.0,
+        null,
+        null
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "backcasting",
+        "A->D"
+       ],
+       "values": [
+        0.9871,
+        null,
+        null
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "backcasting",
+        "C"
+       ],
+       "values": [
+        null,
+        null,
+        0.2476
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        "backcasting",
+        "A"
+       ],
+       "values": [
+        null,
+        null,
+        0.3087
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E18",
@@ -4357,51 +4105,53 @@
      "D4"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "median_width_ratio_R_over_Python",
-     "value": 1.000000000863118,
-     "conditions": {
-      "sample": 500
-     },
-     "lab_result": "RS2866"
-    },
-    {
-     "id": "R2",
-     "variable": "share_same_auto",
-     "value": 1.0,
-     "conditions": {
-      "sample": 500
-     },
-     "lab_result": "RS2870"
-    },
-    {
-     "id": "R3",
-     "variable": "cov80_R_auto",
-     "value": 0.676611111111111,
-     "conditions": {
-      "sample": 500
-     },
-     "lab_result": "RS2871"
-    },
-    {
-     "id": "R4",
-     "variable": "cov80_Python_auto",
-     "value": 0.676611111111111,
-     "conditions": {
-      "sample": 500
-     },
-     "lab_result": "RS2872"
-    }
-   ],
    "execution": {
     "code_version": "90d726121ac928d8cfc9ad77a0b60d99fa28334b",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "R against Python AutoMSARIMA on 500 benchmark series drawn with seed 41, backcasting",
+     "row_labels": [],
+     "columns": [
+      "median ratio of the R to the Python 80% interval width",
+      "share of series where R and Python select the same model",
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "implementation": "R"
+       }
+      },
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8,
+        "implementation": "Python"
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [],
+       "values": [
+        1.0,
+        1.0,
+        0.6766,
+        0.6766
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E19",
@@ -4429,42 +4179,65 @@
      "D4"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "cov80 expected at the benchmark lengths",
-     "value": 0.8011608055269777,
-     "conditions": {
-      "case": "T_backcasting"
-     },
-     "lab_result": "RS3036"
-    },
-    {
-     "id": "R2",
-     "variable": "cov80 expected at the benchmark lengths",
-     "value": 0.7249866236883841,
-     "conditions": {
-      "case": "E_backcasting"
-     },
-     "lab_result": "RS3037"
-    },
-    {
-     "id": "R3",
-     "variable": "cov80 expected at the benchmark lengths",
-     "value": 0.7168824849424157,
-     "conditions": {
-      "case": "S_backcasting"
-     },
-     "lab_result": "RS3038"
-    }
-   ],
    "execution": {
     "code_version": "7780f6f0f709897fdb9fa41608d4497cad9cf21a",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "80% coverage the known-model simulation predicts at the lengths of the benchmark series",
+     "conditions": {
+      "data": "D5"
+     },
+     "row_labels": [
+      "D3"
+     ],
+     "columns": [
+      {
+       "variable": "D4",
+       "conditions": {
+        "nominal level": 0.8
+       }
+      }
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "T"
+       ],
+       "values": [
+        0.8012
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "E"
+       ],
+       "values": [
+        0.725
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "S"
+       ],
+       "values": [
+        0.7169
+       ]
+      }
+     ]
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   },
   {
    "id": "E20",
@@ -4495,521 +4268,534 @@
      "D13"
     ]
    },
-   "results": [
-    {
-     "id": "R1",
-     "variable": "mean absolute calibration error",
-     "value": 0.014392408937863465,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=15",
-      "line": "true parameters"
-     },
-     "lab_result": "RS3917"
-    },
-    {
-     "id": "R2",
-     "variable": "mean absolute calibration error",
-     "value": 0.06532843587389042,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=15",
-      "line": "estimated parameters"
-     },
-     "lab_result": "RS3918"
-    },
-    {
-     "id": "R3",
-     "variable": "mean absolute calibration error",
-     "value": 0.05793163962860932,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=15",
-      "line": "selected orders"
-     },
-     "lab_result": "RS3919"
-    },
-    {
-     "id": "R4",
-     "variable": "mean absolute calibration error",
-     "value": 0.0063609835731047865,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=25",
-      "line": "true parameters"
-     },
-     "lab_result": "RS3920"
-    },
-    {
-     "id": "R5",
-     "variable": "mean absolute calibration error",
-     "value": 0.034137434955616774,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=25",
-      "line": "estimated parameters"
-     },
-     "lab_result": "RS3921"
-    },
-    {
-     "id": "R6",
-     "variable": "mean absolute calibration error",
-     "value": 0.036593000714212835,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=25",
-      "line": "selected orders"
-     },
-     "lab_result": "RS3922"
-    },
-    {
-     "id": "R7",
-     "variable": "mean absolute calibration error",
-     "value": 0.001007550249974499,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=50",
-      "line": "true parameters"
-     },
-     "lab_result": "RS3923"
-    },
-    {
-     "id": "R8",
-     "variable": "mean absolute calibration error",
-     "value": 0.01961840628507296,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=50",
-      "line": "estimated parameters"
-     },
-     "lab_result": "RS3924"
-    },
-    {
-     "id": "R9",
-     "variable": "mean absolute calibration error",
-     "value": 0.023527599224568926,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=50",
-      "line": "selected orders"
-     },
-     "lab_result": "RS3925"
-    },
-    {
-     "id": "R10",
-     "variable": "mean absolute calibration error",
-     "value": 0.0023475665748393126,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=100",
-      "line": "true parameters"
-     },
-     "lab_result": "RS3926"
-    },
-    {
-     "id": "R11",
-     "variable": "mean absolute calibration error",
-     "value": 0.00999872461993675,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=100",
-      "line": "estimated parameters"
-     },
-     "lab_result": "RS3927"
-    },
-    {
-     "id": "R12",
-     "variable": "mean absolute calibration error",
-     "value": 0.013877767574737286,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=100",
-      "line": "selected orders"
-     },
-     "lab_result": "RS3928"
-    },
-    {
-     "id": "R13",
-     "variable": "mean absolute calibration error",
-     "value": 0.0006805683093562046,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=300",
-      "line": "true parameters"
-     },
-     "lab_result": "RS3929"
-    },
-    {
-     "id": "R14",
-     "variable": "mean absolute calibration error",
-     "value": 0.002643786348331804,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=300",
-      "line": "estimated parameters"
-     },
-     "lab_result": "RS3930"
-    },
-    {
-     "id": "R15",
-     "variable": "mean absolute calibration error",
-     "value": 0.0045718294051627344,
-     "conditions": {
-      "figure": "calibration_simulation.png",
-      "panel": "T=300",
-      "line": "selected orders"
-     },
-     "lab_result": "RS3931"
-    },
-    {
-     "id": "R16",
-     "variable": "mean absolute calibration error",
-     "value": 0.03257809093337547,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "benchmark, backcasting",
-      "line": "1.0.8"
-     },
-     "lab_result": "RS3932"
-    },
-    {
-     "id": "R17",
-     "variable": "mean absolute calibration error",
-     "value": 0.04023801303512885,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "benchmark, backcasting",
-      "line": "1.3.0"
-     },
-     "lab_result": "RS3933"
-    },
-    {
-     "id": "R18",
-     "variable": "mean absolute calibration error",
-     "value": 0.03312218030625159,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "benchmark, optimal",
-      "line": "1.0.8"
-     },
-     "lab_result": "RS3934"
-    },
-    {
-     "id": "R19",
-     "variable": "mean absolute calibration error",
-     "value": 0.03899267579104585,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "benchmark, optimal",
-      "line": "1.3.0"
-     },
-     "lab_result": "RS3935"
-    },
-    {
-     "id": "R20",
-     "variable": "mean absolute calibration error",
-     "value": 0.01228846546270788,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "simulation T=100, true parameters",
-      "line": "1.0.8"
-     },
-     "lab_result": "RS3936"
-    },
-    {
-     "id": "R21",
-     "variable": "mean absolute calibration error",
-     "value": 0.0023475665748393126,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "simulation T=100, true parameters",
-      "line": "1.3.0"
-     },
-     "lab_result": "RS3937"
-    },
-    {
-     "id": "R22",
-     "variable": "mean absolute calibration error",
-     "value": 0.0120161973268034,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "simulation T=100, estimated",
-      "line": "1.0.8"
-     },
-     "lab_result": "RS3938"
-    },
-    {
-     "id": "R23",
-     "variable": "mean absolute calibration error",
-     "value": 0.00999872461993675,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "simulation T=100, estimated",
-      "line": "1.3.0"
-     },
-     "lab_result": "RS3939"
-    },
-    {
-     "id": "R24",
-     "variable": "mean absolute calibration error",
-     "value": 0.01723859810223446,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "simulation T=100, selected",
-      "line": "1.0.8"
-     },
-     "lab_result": "RS3940"
-    },
-    {
-     "id": "R25",
-     "variable": "mean absolute calibration error",
-     "value": 0.013877767574737286,
-     "conditions": {
-      "figure": "calibration_versions.png",
-      "panel": "simulation T=100, selected",
-      "line": "1.3.0"
-     },
-     "lab_result": "RS3941"
-    },
-    {
-     "id": "R26",
-     "variable": "mean absolute calibration error",
-     "value": 0.04023801303512885,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "all series",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3942"
-    },
-    {
-     "id": "R27",
-     "variable": "mean absolute calibration error",
-     "value": 0.018661766615671767,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "all series",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3943"
-    },
-    {
-     "id": "R28",
-     "variable": "mean absolute calibration error",
-     "value": 0.04423809538892765,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "all series",
-      "line": "ETS (AutoADAM ZXZ, saved)"
-     },
-     "lab_result": "RS3944"
-    },
-    {
-     "id": "R29",
-     "variable": "mean absolute calibration error",
-     "value": 0.0280963478527434,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "low level tercile",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3945"
-    },
-    {
-     "id": "R30",
-     "variable": "mean absolute calibration error",
-     "value": 0.033395435417632416,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "low level tercile",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3946"
-    },
-    {
-     "id": "R31",
-     "variable": "mean absolute calibration error",
-     "value": 0.05051564364487615,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "mid level tercile",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3947"
-    },
-    {
-     "id": "R32",
-     "variable": "mean absolute calibration error",
-     "value": 0.03523408147185424,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "mid level tercile",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3948"
-    },
-    {
-     "id": "R33",
-     "variable": "mean absolute calibration error",
-     "value": 0.062303865558147334,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "high level tercile",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3949"
-    },
-    {
-     "id": "R34",
-     "variable": "mean absolute calibration error",
-     "value": 0.06547406748329032,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "high level tercile",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3950"
-    },
-    {
-     "id": "R35",
-     "variable": "mean absolute calibration error",
-     "value": 0.04425148607579844,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "auto.adam by selected distribution",
-      "line": "chose dnorm"
-     },
-     "lab_result": "RS3951"
-    },
-    {
-     "id": "R36",
-     "variable": "mean absolute calibration error",
-     "value": 0.027252773929209377,
-     "conditions": {
-      "figure": "calibration_benchmark.png",
-      "panel": "auto.adam by selected distribution",
-      "line": "chose dlnorm"
-     },
-     "lab_result": "RS3952"
-    },
-    {
-     "id": "R37",
-     "variable": "mean absolute calibration error",
-     "value": 0.035202331961592524,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "all series",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3953"
-    },
-    {
-     "id": "R38",
-     "variable": "mean absolute calibration error",
-     "value": 0.02235705823668769,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "all series",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3954"
-    },
-    {
-     "id": "R39",
-     "variable": "mean absolute calibration error",
-     "value": 0.03481359895248808,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "low level tercile",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3955"
-    },
-    {
-     "id": "R40",
-     "variable": "mean absolute calibration error",
-     "value": 0.04102600074822316,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "low level tercile",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3956"
-    },
-    {
-     "id": "R41",
-     "variable": "mean absolute calibration error",
-     "value": 0.04117994762439202,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "mid level tercile",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3957"
-    },
-    {
-     "id": "R42",
-     "variable": "mean absolute calibration error",
-     "value": 0.02004021698466151,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "mid level tercile",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3958"
-    },
-    {
-     "id": "R43",
-     "variable": "mean absolute calibration error",
-     "value": 0.07567891881780761,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "high level tercile",
-      "line": "auto.msarima"
-     },
-     "lab_result": "RS3959"
-    },
-    {
-     "id": "R44",
-     "variable": "mean absolute calibration error",
-     "value": 0.10521389824167542,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "high level tercile",
-      "line": "auto.adam NNN, dnorm or dlnorm"
-     },
-     "lab_result": "RS3960"
-    },
-    {
-     "id": "R45",
-     "variable": "mean absolute calibration error",
-     "value": 0.020925963740429147,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "auto.adam by selected distribution",
-      "line": "chose dnorm"
-     },
-     "lab_result": "RS3961"
-    },
-    {
-     "id": "R46",
-     "variable": "mean absolute calibration error",
-     "value": 0.035064960316396235,
-     "conditions": {
-      "figure": "calibration_m4.png",
-      "panel": "auto.adam by selected distribution",
-      "line": "chose dlnorm"
-     },
-     "lab_result": "RS3962"
-    }
-   ],
    "execution": {
     "code_version": "5ca96a0fb806fcabad975937952e4a1330c3759d",
     "software": {
      "python": "3.14.4",
      "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
     }
-   }
+   },
+   "tables": [
+    {
+     "id": "T1",
+     "description": "MCE of each curve of figure A3",
+     "row_labels": [
+      "panel",
+      "line"
+     ],
+     "columns": [
+      "D13"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "T=15",
+        "true parameters"
+       ],
+       "values": [
+        0.01439
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "T=15",
+        "estimated parameters"
+       ],
+       "values": [
+        0.06533
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "T=15",
+        "selected orders"
+       ],
+       "values": [
+        0.05793
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "T=25",
+        "true parameters"
+       ],
+       "values": [
+        0.006361
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        "T=25",
+        "estimated parameters"
+       ],
+       "values": [
+        0.03414
+       ]
+      },
+      {
+       "id": "r6",
+       "label": [
+        "T=25",
+        "selected orders"
+       ],
+       "values": [
+        0.03659
+       ]
+      },
+      {
+       "id": "r7",
+       "label": [
+        "T=50",
+        "true parameters"
+       ],
+       "values": [
+        0.001008
+       ]
+      },
+      {
+       "id": "r8",
+       "label": [
+        "T=50",
+        "estimated parameters"
+       ],
+       "values": [
+        0.01962
+       ]
+      },
+      {
+       "id": "r9",
+       "label": [
+        "T=50",
+        "selected orders"
+       ],
+       "values": [
+        0.02353
+       ]
+      },
+      {
+       "id": "r10",
+       "label": [
+        "T=100",
+        "true parameters"
+       ],
+       "values": [
+        0.002348
+       ]
+      },
+      {
+       "id": "r11",
+       "label": [
+        "T=100",
+        "estimated parameters"
+       ],
+       "values": [
+        0.009999
+       ]
+      },
+      {
+       "id": "r12",
+       "label": [
+        "T=100",
+        "selected orders"
+       ],
+       "values": [
+        0.01388
+       ]
+      },
+      {
+       "id": "r13",
+       "label": [
+        "T=300",
+        "true parameters"
+       ],
+       "values": [
+        0.0006806
+       ]
+      },
+      {
+       "id": "r14",
+       "label": [
+        "T=300",
+        "estimated parameters"
+       ],
+       "values": [
+        0.002644
+       ]
+      },
+      {
+       "id": "r15",
+       "label": [
+        "T=300",
+        "selected orders"
+       ],
+       "values": [
+        0.004572
+       ]
+      }
+     ],
+     "artefact": "A3"
+    },
+    {
+     "id": "T2",
+     "description": "MCE of each curve of figure A4",
+     "row_labels": [
+      "panel",
+      "line"
+     ],
+     "columns": [
+      "D13"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "benchmark, backcasting",
+        "1.0.8"
+       ],
+       "values": [
+        0.03258
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "benchmark, backcasting",
+        "1.3.0"
+       ],
+       "values": [
+        0.04024
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "benchmark, optimal",
+        "1.0.8"
+       ],
+       "values": [
+        0.03312
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "benchmark, optimal",
+        "1.3.0"
+       ],
+       "values": [
+        0.03899
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        "simulation T=100, true parameters",
+        "1.0.8"
+       ],
+       "values": [
+        0.01229
+       ]
+      },
+      {
+       "id": "r6",
+       "label": [
+        "simulation T=100, true parameters",
+        "1.3.0"
+       ],
+       "values": [
+        0.002348
+       ]
+      },
+      {
+       "id": "r7",
+       "label": [
+        "simulation T=100, estimated",
+        "1.0.8"
+       ],
+       "values": [
+        0.01202
+       ]
+      },
+      {
+       "id": "r8",
+       "label": [
+        "simulation T=100, estimated",
+        "1.3.0"
+       ],
+       "values": [
+        0.009999
+       ]
+      },
+      {
+       "id": "r9",
+       "label": [
+        "simulation T=100, selected",
+        "1.0.8"
+       ],
+       "values": [
+        0.01724
+       ]
+      },
+      {
+       "id": "r10",
+       "label": [
+        "simulation T=100, selected",
+        "1.3.0"
+       ],
+       "values": [
+        0.01388
+       ]
+      }
+     ],
+     "artefact": "A4"
+    },
+    {
+     "id": "T3",
+     "description": "MCE of each curve of figure A5",
+     "row_labels": [
+      "panel",
+      "line"
+     ],
+     "columns": [
+      "D13"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "all series",
+        "D10"
+       ],
+       "values": [
+        0.04024
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "all series",
+        "D8"
+       ],
+       "values": [
+        0.01866
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "all series",
+        "ETS (AutoADAM ZXZ, saved)"
+       ],
+       "values": [
+        0.04424
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "low level tercile",
+        "D10"
+       ],
+       "values": [
+        0.0281
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        "low level tercile",
+        "D8"
+       ],
+       "values": [
+        0.0334
+       ]
+      },
+      {
+       "id": "r6",
+       "label": [
+        "mid level tercile",
+        "D10"
+       ],
+       "values": [
+        0.05052
+       ]
+      },
+      {
+       "id": "r7",
+       "label": [
+        "mid level tercile",
+        "D8"
+       ],
+       "values": [
+        0.03523
+       ]
+      },
+      {
+       "id": "r8",
+       "label": [
+        "high level tercile",
+        "D10"
+       ],
+       "values": [
+        0.0623
+       ]
+      },
+      {
+       "id": "r9",
+       "label": [
+        "high level tercile",
+        "D8"
+       ],
+       "values": [
+        0.06547
+       ]
+      },
+      {
+       "id": "r10",
+       "label": [
+        "auto.adam by selected distribution",
+        "chose dnorm"
+       ],
+       "values": [
+        0.04425
+       ]
+      },
+      {
+       "id": "r11",
+       "label": [
+        "auto.adam by selected distribution",
+        "chose dlnorm"
+       ],
+       "values": [
+        0.02725
+       ]
+      }
+     ],
+     "artefact": "A5"
+    },
+    {
+     "id": "T4",
+     "description": "MCE of each curve of figure A6",
+     "row_labels": [
+      "panel",
+      "line"
+     ],
+     "columns": [
+      "D13"
+     ],
+     "rows": [
+      {
+       "id": "r1",
+       "label": [
+        "all series",
+        "D10"
+       ],
+       "values": [
+        0.0352
+       ]
+      },
+      {
+       "id": "r2",
+       "label": [
+        "all series",
+        "D8"
+       ],
+       "values": [
+        0.02236
+       ]
+      },
+      {
+       "id": "r3",
+       "label": [
+        "low level tercile",
+        "D10"
+       ],
+       "values": [
+        0.03481
+       ]
+      },
+      {
+       "id": "r4",
+       "label": [
+        "low level tercile",
+        "D8"
+       ],
+       "values": [
+        0.04103
+       ]
+      },
+      {
+       "id": "r5",
+       "label": [
+        "mid level tercile",
+        "D10"
+       ],
+       "values": [
+        0.04118
+       ]
+      },
+      {
+       "id": "r6",
+       "label": [
+        "mid level tercile",
+        "D8"
+       ],
+       "values": [
+        0.02004
+       ]
+      },
+      {
+       "id": "r7",
+       "label": [
+        "high level tercile",
+        "D10"
+       ],
+       "values": [
+        0.07568
+       ]
+      },
+      {
+       "id": "r8",
+       "label": [
+        "high level tercile",
+        "D8"
+       ],
+       "values": [
+        0.1052
+       ]
+      },
+      {
+       "id": "r9",
+       "label": [
+        "auto.adam by selected distribution",
+        "chose dnorm"
+       ],
+       "values": [
+        0.02093
+       ]
+      },
+      {
+       "id": "r10",
+       "label": [
+        "auto.adam by selected distribution",
+        "chose dlnorm"
+       ],
+       "values": [
+        0.03506
+       ]
+      }
+     ],
+     "artefact": "A6"
+    }
+   ],
+   "artefacts": [
+    "A10"
+   ]
   }
  ],
  "warrants": [
@@ -5135,7 +4921,7 @@
    "id": "A3",
    "kind": "figure",
    "function": "data_plot",
-   "uri": "files/calibration_simulation.png",
+   "uri": "https://entrylib.org/files/dd72a6d8d5df9b4d37007ce3543a8615bf419ca2f4e0f164b189da0d50b2754c",
    "version": "sha256:dd72a6d8d5df9b4d37007ce3543a8615bf419ca2f4e0f164b189da0d50b2754c",
    "licence": "CC-BY-4.0",
    "availability": {
@@ -5145,21 +4931,21 @@
     "RN49"
    ],
    "shows": [
-    "E20.R1",
-    "E20.R2",
-    "E20.R3",
-    "E20.R4",
-    "E20.R5",
-    "E20.R6",
-    "E20.R7",
-    "E20.R8",
-    "E20.R9",
-    "E20.R10",
-    "E20.R11",
-    "E20.R12",
-    "E20.R13",
-    "E20.R14",
-    "E20.R15"
+    "E20.T1.r1",
+    "E20.T1.r2",
+    "E20.T1.r3",
+    "E20.T1.r4",
+    "E20.T1.r5",
+    "E20.T1.r6",
+    "E20.T1.r7",
+    "E20.T1.r8",
+    "E20.T1.r9",
+    "E20.T1.r10",
+    "E20.T1.r11",
+    "E20.T1.r12",
+    "E20.T1.r13",
+    "E20.T1.r14",
+    "E20.T1.r15"
    ],
    "encoding": {
     "x": "quantile level tau",
@@ -5173,7 +4959,7 @@
    "id": "A4",
    "kind": "figure",
    "function": "data_plot",
-   "uri": "files/calibration_versions.png",
+   "uri": "https://entrylib.org/files/3eaf8ce7e065846578307cb0613c5aa18d9e4221afce5668046a829596051cc0",
    "version": "sha256:3eaf8ce7e065846578307cb0613c5aa18d9e4221afce5668046a829596051cc0",
    "licence": "CC-BY-4.0",
    "availability": {
@@ -5183,16 +4969,16 @@
     "RN49"
    ],
    "shows": [
-    "E20.R16",
-    "E20.R17",
-    "E20.R18",
-    "E20.R19",
-    "E20.R20",
-    "E20.R21",
-    "E20.R22",
-    "E20.R23",
-    "E20.R24",
-    "E20.R25"
+    "E20.T2.r1",
+    "E20.T2.r2",
+    "E20.T2.r3",
+    "E20.T2.r4",
+    "E20.T2.r5",
+    "E20.T2.r6",
+    "E20.T2.r7",
+    "E20.T2.r8",
+    "E20.T2.r9",
+    "E20.T2.r10"
    ],
    "encoding": {
     "x": "quantile level tau",
@@ -5206,7 +4992,7 @@
    "id": "A5",
    "kind": "figure",
    "function": "data_plot",
-   "uri": "files/calibration_benchmark.png",
+   "uri": "https://entrylib.org/files/c401a330502b3600edab7be2fd2c2ddb67ef81e9b8e5a67ae98bad17af12b698",
    "version": "sha256:c401a330502b3600edab7be2fd2c2ddb67ef81e9b8e5a67ae98bad17af12b698",
    "licence": "CC-BY-4.0",
    "availability": {
@@ -5216,17 +5002,17 @@
     "RN49"
    ],
    "shows": [
-    "E20.R26",
-    "E20.R27",
-    "E20.R28",
-    "E20.R29",
-    "E20.R30",
-    "E20.R31",
-    "E20.R32",
-    "E20.R33",
-    "E20.R34",
-    "E20.R35",
-    "E20.R36"
+    "E20.T3.r1",
+    "E20.T3.r2",
+    "E20.T3.r3",
+    "E20.T3.r4",
+    "E20.T3.r5",
+    "E20.T3.r6",
+    "E20.T3.r7",
+    "E20.T3.r8",
+    "E20.T3.r9",
+    "E20.T3.r10",
+    "E20.T3.r11"
    ],
    "encoding": {
     "x": "quantile level tau",
@@ -5240,7 +5026,7 @@
    "id": "A6",
    "kind": "figure",
    "function": "data_plot",
-   "uri": "files/calibration_m4.png",
+   "uri": "https://entrylib.org/files/b45b8fcf0b27a2e0f13303cd57a7ba226c9ab84fa8f4fa08604e7ee048a24f2c",
    "version": "sha256:b45b8fcf0b27a2e0f13303cd57a7ba226c9ab84fa8f4fa08604e7ee048a24f2c",
    "licence": "CC-BY-4.0",
    "availability": {
@@ -5250,16 +5036,16 @@
     "RN49"
    ],
    "shows": [
-    "E20.R37",
-    "E20.R38",
-    "E20.R39",
-    "E20.R40",
-    "E20.R41",
-    "E20.R42",
-    "E20.R43",
-    "E20.R44",
-    "E20.R45",
-    "E20.R46"
+    "E20.T4.r1",
+    "E20.T4.r2",
+    "E20.T4.r3",
+    "E20.T4.r4",
+    "E20.T4.r5",
+    "E20.T4.r6",
+    "E20.T4.r7",
+    "E20.T4.r8",
+    "E20.T4.r9",
+    "E20.T4.r10"
    ],
    "encoding": {
     "x": "quantile level tau",
@@ -5301,6 +5087,16 @@
     "level": "public"
    },
    "description": "Outputs of every recorded run (per-replicate and per-series coverage, pinball and selected models; no observations of the M1, M3, Tourism or M4 series)."
+  },
+  {
+   "id": "A10",
+   "kind": "data",
+   "uri": "files/lab-results.csv",
+   "licence": "CC-BY-4.0",
+   "availability": {
+    "level": "public"
+   },
+   "description": "Every result recorded in the lab record (A7), one row per result: the lab result ID, the run that produced it, the quantity as the analysis script names it, its conditions as JSON and its full-precision value. The tables of the evidence objects hold these values rounded to four significant digits and at least four decimals."
   }
  ],
  "references": [

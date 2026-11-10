@@ -18,7 +18,7 @@ jobs:
           case "$HEAD_REF" in claimset/*) echo "::error::$HEAD_REF holds a study record; study branches are never merged"; exit 1;; esac
           case "$BASE_REF" in claimset/*) echo "::error::nothing is merged into the study branch $BASE_REF"; exit 1;; esac
           git fetch -q origin '+refs/heads/claimset/*:refs/remotes/origin/claimset/*' || true
-          if git diff --name-only "origin/$BASE_REF"...HEAD | grep -q '^claimset/'; then
+          if git diff --name-only --diff-filter=d "origin/$BASE_REF"...HEAD | grep -q '^claimset/'; then
             echo "::error::this pull request changes claimset/, which lives on the study branches"; exit 1
           fi
           for b in $(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/claimset/*'); do

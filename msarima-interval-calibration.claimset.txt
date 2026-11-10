@@ -4,19 +4,31 @@ declarations funding: none | competing interests: The guarantor is the author an
 exploration {"lab_record": "A7", "questions": 5, "hypotheses": {"total": 11, "supported": 6, "not_supported": 3, "inconclusive": 2, "revised": 0, "abandoned": 0, "open": 0, "from_exploration": 8}, "tests": {"total": 12, "supported": 6, "not_supported": 3, "inconclusive": 3}, "runs": {"total": 49, "confirmatory": 13, "exploratory": 36, "failed": 3}}
 
 DEFINITIONS
-D1 [method] MSARIMA analytic interval: The quantiles of `predict(interval="prediction")` of a pure ARIMA in smooth 1.3.0, which dispatches to the approximate interval. The ARIMA is the state space model $y_t = w^\top v_{t-l} + \epsilon_t$, $v_t = F v_{t-l} + g\epsilon_t$, $\epsilon_t \sim N(0, \sigma^2)$. The quantile at level $\tau$ and horizon $h$ is $q_{\tau,h} = \hat y_{T+h|T} + \Phi^{-1}(\tau)\sqrt{V_h}$ with $V_h = \hat\sigma^2 \frac{T}{T-k} c_h$, where $\hat\sigma^2 = \frac{1}{T}\sum_{t=1}^{T} e_t^2$, $k$ the number of estimated parameters and $c_h$ the $h$-th diagonal element of the analytic covariance of the state space model, $c_h = 1 + \sum_{j=1}^{h-1} (w^\top F^{j-1} g)^2$ for a model with lag 1. [source B6]
+D1 [method] MSARIMA analytic interval: The quantiles of `predict(interval="prediction")` of a pure ARIMA in smooth 1.3.0, which dispatches to the approximate interval. The ARIMA is the state space model
+$$\begin{aligned} y_t &= w^\top v_{t-l} + \epsilon_t, \\ v_t &= F v_{t-l} + g \epsilon_t, \\ \epsilon_t &\sim N(0, \sigma^2). \end{aligned}$$
+The quantile at level $\tau$ and horizon $h$ is
+$$q_{\tau,h} = \hat y_{T+h|T} + \Phi^{-1}(\tau) \sqrt{V_h}, \qquad V_h = \hat\sigma^2 \frac{T}{T-k} c_h,$$
+with
+$$\hat\sigma^2 = \frac{1}{T} \sum_{t=1}^{T} e_t^2, \qquad c_h = 1 + \sum_{j=1}^{h-1} \left(w^\top F^{j-1} g\right)^2,$$
+where $k$ is the number of estimated parameters and $c_h$ the $h$-th diagonal element of the analytic covariance of the state space model, written here for a model with lag 1. [source B6]
 D2 [data] known-model simulation: Gaussian ARIMA series with $\sigma = 10$ generated from 11 data generating processes (white noise with a constant, random walk with and without drift, AR(1), MA(1), ARIMA(0,1,1), ARIMA(1,1,0), ARIMA(1,1,1), ARIMA(0,2,2), seasonal SARIMA(0,1,1)(0,1,1)$_{12}$ and SARIMA(1,0,0)(1,0,0)$_{12}$) plus an IMA(1,1) with Student-t errors on 4 degrees of freedom; in-sample lengths $T$ of 15, 25, 50, 100 and 300, holdout of 18; 2,000 replicates per process and length with seed 20261105 unless stated.
 D3 [design] cases T, E, S, W: What the fitted AutoMSARIMA or MSARIMA knows about the data generating process of the [[D2:known-model simulation]]: T, true orders and true AR, MA and constant parameters with initial states and scale estimated; E, true orders with estimated parameters; S, orders selected by AutoMSARIMA; W, a fixed wrong model for each process. Each with backcasting or optimal initial states.
-D4 [variable] coverage: For a quantile $q_\tau$, the share of holdout observations at or below it, $c_\tau = \frac{1}{h}\sum_{j=1}^{h} 1(y_{T+j} \le q_{\tau,j})$, averaged first within a series and then over series. cov80 is $c_{0.9} - c_{0.1}$, the coverage of the central 80% interval; q50 is $c_{0.5}$.
+D4 [variable] coverage: For the quantile $q_{\tau,j}$ at level $\tau$ and horizon $j$, the share of holdout observations at or below it,
+$$c_\tau = \frac{1}{h} \sum_{j=1}^{h} 1\left(y_{T+j} \le q_{\tau,j}\right),$$
+averaged first within a series and then over series. cov80 is $c_{0.9} - c_{0.1}$, the coverage of the central 80% interval; q50 is $c_{0.5}$.
 D5 [data] benchmark: The 5,315 series of M1 (1,001), M3 (3,003) and Tourism (1,311) from fcompdata 0.1.4, with their own holdouts and seasonal periods; lags $(1, m)$ for seasonal series. [members D18, D19, D20]
 D6 [data] M4 sample: 1,500 series each of the yearly, quarterly and monthly M4 series, drawn with seed 20261105 without replacement, with the M4 holdouts. [source B4]
 D7 [design] level terciles: Series split into terciles of the [[D17:level ratio]] across the series of a data set; cov80 reported for each tercile, and the spread as the largest minus the smallest of the three.
 D8 [method] auto.adam error selection: R `auto.adam(y, model="NNN", lags, distribution=c("dnorm","dlnorm"), initial="backcasting")` of smooth 4.6: the ARIMA orders and constant are selected by AICc for each distribution with the maxima of auto.msarima (AR (3,3), I (2,1), MA (3,3)), then the distribution with the lower AICc is kept; with dnorm the model is the [[D10:AutoMSARIMA]] model, with dlnorm it is the [[D11:log-normal ARIMA]]. Quantiles from `forecast(interval="prediction")`. [source B6]
 D9 [data] fresh M4 sample: 1,500 series each of the yearly, quarterly and monthly M4 series, drawn with seed 20261107 from the series not in the [[D6:M4 sample]], so disjoint from it. [source B4]
 D10 [method] AutoMSARIMA: `AutoMSARIMA(lags, initial)` in Python and `auto.msarima()` in R of smooth 1.3.0 / 4.6: ARIMA orders up to AR (3,3), I (2,1), MA (3,3) and a constant selected by AICc, normal errors, the [[D1:MSARIMA analytic interval]] for the quantiles. Backcasting initial states unless stated. [source B6]
-D11 [method] log-normal ARIMA: ADAM with `model="NNN"`, an ARIMA and `distribution="dlnorm"`: the ARIMA applies to the logarithms, $\log y_t = w^\top v_{t-l} + \log(1+\epsilon_t)$, $v_t = F v_{t-l} + g \log(1+\epsilon_t)$, $1+\epsilon_t \sim \mathrm{logN}(-\sigma^2/2, \sigma^2)$, so the scale of the error is proportional to the level. In the comparisons with fixed orders, the orders and constant are those [[D10:AutoMSARIMA]] selects on the same series. [source B6]
+D11 [method] log-normal ARIMA: ADAM with `model="NNN"`, an ARIMA and `distribution="dlnorm"`: the ARIMA applies to the logarithms,
+$$\begin{aligned} \log y_t &= w^\top v_{t-l} + \log(1+\epsilon_t), \\ v_t &= F v_{t-l} + g \log(1+\epsilon_t), \\ 1+\epsilon_t &\sim \mathrm{logN}(-\sigma^2/2, \sigma^2), \end{aligned}$$
+so the scale of the error is proportional to the level. In the comparisons with fixed orders, the orders and constant are those [[D10:AutoMSARIMA]] selects on the same series. [source B6]
 D12 [method] reforecast: `reforecast()` of smooth: draws the parameters 300 times from a normal distribution with the estimated covariance of the parameters, reapplies the model with each draw and simulates the predictive distribution, so that the quantiles include the uncertainty of the parameters.
-D13 [variable] MCE: Mean calibration error over the 99 quantile levels $\tau = 0.01, \dots, 0.99$: $\frac{1}{99}\sum_\tau |\bar c_\tau - \tau|$, with $\bar c_\tau$ the [[D4:coverage]] of $q_\tau$.
+D13 [variable] MCE: Mean calibration error over the 99 quantile levels $\tau = 0.01, \dots, 0.99$:
+$$\mathrm{MCE} = \frac{1}{99} \sum_{\tau} \left|\bar c_\tau - \tau\right|,$$
+with $\bar c_\tau$ the [[D4:coverage]] of $q_\tau$.
 D14 [variable] scaled pinball: Pinball loss averaged over the 99 quantile levels and the horizons, divided by the mean absolute first difference of the in-sample data for real series; in the simulation, by $\sigma$, and relpin is its ratio to the pinball of the true predictive distribution.
 D15 [method] ETS forced and selected: ETS of smooth with backcasting: AutoADAM-style selection among ETS models (`ES(model="ZXZ")`, or ZXN for non-seasonal series), or ETS(ANN) or ETS(MNN) fitted to every series. [source B6]
 D16 [method] other ARIMA implementations: statsforecast AutoARIMA, pmdarima auto_arima and skforecast Arima, as run in the notebook of the smooth benchmark of 2026-11-05, whose saved forecasts were read.
@@ -136,18 +148,18 @@ EVIDENCE
 E1 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case T of [[D3:cases T, E, S, W]] with backcasting and optimal initial states (lab run RN6, plan PL4). Width is the ratio of the 80% interval width to the theoretical $h$-step width; maxcellmce is the largest MCE over the processes.
   setup: studied D1; cases D2; procedure D3; lens D4, D13
   E1.T1 Case T: the true orders with the true parameters, pooled over the 11 Gaussian processes
-  | row | T | D3 | initial states | D4 {nominal level: 0.8} | ratio of the 80% interval width to the theoretical width | D13 | D13 (max) |
-  | r1 | 100 | T | backcasting | 0.7997 | 1.0019 | 0.002348 | 0.01451 |
-  | r2 | 100 | T | optimal | 0.7972 | 0.9965 | 0.002379 | 0.01451 |
-  | r3 | 300 | T | backcasting |  | 1.0007 | 0.0006806 | 0.005867 |
-  | r4 | 300 | T | optimal |  | 0.9992 | 0.0008571 | 0.005867 |
+  | row | T | D3 | initial states | D4 {nominal level: 0.8} | ratio of the 80% interval width to the theoretical width | D13 | largest MCE over the 11 processes |
+  | r1 | 100 | T | backcasting | 0.7997 | 1.0018975430750083 | 0.002347566574839311 | 0.014508136924803598 |
+  | r2 | 100 | T | optimal | 0.7972 | 0.9965079650994704 | 0.002378711355984074 | 0.014505611672278346 |
+  | r3 | 300 | T | backcasting |  | 1.000745813821255 | 0.0006805683093562026 | 0.0058672839506172785 |
+  | r4 | 300 | T | optimal |  | 0.999189350813739 | 0.0008571064177124785 | 0.0058672839506172785 |
   parameters: A8
   seeds: [20261105]
 E2 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case S, orders selected by [[D10:AutoMSARIMA]] (run RN11, plan PL5).
   setup: studied D10; cases D2; procedure D3; lens D4
   E2.T1 Case S: orders selected by AutoMSARIMA, pooled over the 11 Gaussian processes
   | row | T | D3 | initial states | D4 {nominal level: 0.8} |
-  | r1 | 100 | S | backcasting | 0.7559 |
+  | r1 | 100 | S | backcasting | 0.7559267676767676 |
   | r2 | 100 | S | optimal | 0.7572 |
   parameters: A8
   seeds: [20261105]
@@ -155,37 +167,37 @@ E3 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in e
   setup: studied D1; cases D2; procedure D3; lens D4, D13
   E3.T1 Case E: the analytic interval against the simulated interval of the same fit, pooled over the 11 Gaussian processes
   | row | T | D3 | initial states | interval | ratio of the 80% interval width to the theoretical width | D13 |
-  | r1 | 50 | E | backcasting | analytic | 0.9572 | 0.01962 |
-  | r2 | 50 | E | backcasting | simulated interval | 0.957 | 0.01966 |
-  | r3 | 100 | E | backcasting | analytic | 0.9807 | 0.009999 |
-  | r4 | 100 | E | backcasting | simulated interval | 0.9805 | 0.01002 |
-  | r5 | 300 | E | backcasting | analytic | 0.9966 | 0.002644 |
-  | r6 | 300 | E | backcasting | simulated interval | 0.9964 | 0.002689 |
+  | r1 | 50 | E | backcasting | analytic | 0.9571865764457477 | 0.019618406285072953 |
+  | r2 | 50 | E | backcasting | simulated interval | 0.9570246020280071 | 0.0196577134986226 |
+  | r3 | 100 | E | backcasting | analytic | 0.98068173371577 | 0.00999872461993675 |
+  | r4 | 100 | E | backcasting | simulated interval | 0.9804924240470849 | 0.010021553923069082 |
+  | r5 | 300 | E | backcasting | analytic | 0.9966012447878664 | 0.0026437863483317944 |
+  | r6 | 300 | E | backcasting | simulated interval | 0.9964067752797617 | 0.002688526680950923 |
   parameters: A8
   seeds: [20261105]
 E4 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Cases T and E (run RN8, plan PL7).
   setup: studied D1; cases D2; procedure D3; lens D4
   E4.T1 Cases T and E, pooled over the 11 Gaussian processes
   | row | T | D3 | initial states | D4 {nominal level: 0.8} |
-  | r1 | 100 | E | backcasting | 0.7701 |
-  | r2 | 100 | T | backcasting | 0.7997 |
+  | r1 | 100 | E | backcasting | 0.7700555555555556 |
+  | r2 | 100 | T | backcasting | 0.7996717171717171 |
   parameters: A8
   seeds: [20261105]
 E5 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case E with `predict()` against [[D12:reforecast]] (suffix _ref) (run RN9, plan PL8).
   setup: studied D1, D12; cases D2; procedure D3; lens D13, D14
   E5.T1 Case E with predict() and with reforecast, pooled over the 11 Gaussian processes
   | row | T | D3 | initial states | forecast | D13 | scaled pinball relative to the true model with true parameters |
-  | r1 | 100 | E | backcasting | predict() | 0.009999 | 1.0432 |
-  | r2 | 100 | E | backcasting | reforecast | 0.02652 | 1.9575 |
-  | r3 | 100 | E | optimal | predict() | 0.008501 | 1.0578 |
-  | r4 | 100 | E | optimal | reforecast | 0.005329 | 1.3961 |
+  | r1 | 100 | E | backcasting | predict() | 0.00999872461993675 | 1.043170004368166 |
+  | r2 | 100 | E | backcasting | reforecast | 0.02651617181920213 | 1.9575365936241682 |
+  | r3 | 100 | E | optimal | predict() | 0.00850140291806958 | 1.0578011747050307 |
+  | r4 | 100 | E | optimal | reforecast | 0.005329303132333438 | 1.3961320998657083 |
   parameters: A8
   seeds: [20261105]
 E6 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Case W: each process fitted with one fixed wrong model (e.g. a random walk with drift fitted as ARIMA(0,1,0) without drift, an ARIMA(1,1,1) as ARIMA(0,1,1)); 12 wrong models chosen by the authors (run RN10, plan PL9).
   setup: studied D1; cases D2; procedure D3; lens D4
   E6.T1 Case W (fixed wrong models) and the true model with true parameters, pooled over the 11 Gaussian processes
   | row | T | D3 | D4 {nominal level: 0.8} | share of holdout observations at or below the 0.5 quantile |
-  | r1 | 100 | W | 0.6756 | 0.4281 |
+  | r1 | 100 | W | 0.6756041666666667 | 0.4281 |
   | r2 | 100 | true model, true parameters | 0.8031 | 0.4988 |
   parameters: A8
   seeds: [20261105]
@@ -193,31 +205,31 @@ E7 [quant; design benchmark] [[D10:AutoMSARIMA]] with backcasting fitted to each
   setup: studied D10, D12; cases D5; lens D4, D14
   E7.T1 AutoMSARIMA with backcasting on the 5,315 benchmark series: predict() against reforecast {data: D5, initial states: backcasting}
   | row | forecast | D4 {nominal level: 0.8} | D14 (mean) |
-  | r1 | predict() | 0.6812 | 0.8991 |
-  | r2 | D12 | 0.6827 | 6.984e+191 |
+  | r1 | predict() | 0.6812166823455579 | 0.8991160322346123 |
+  | r2 | D12 | 0.6826617539458528 | 6.983616214609794e+191 |
 E8 [quant; design benchmark] [[D10:AutoMSARIMA]] with backcasting and ETS(MNN) fitted to every series of the [[D6:M4 sample]]; cov80 per [[D7:level terciles]] (run RN41, plan PL12).
   setup: studied D10, D15; cases D6; procedure D7; lens D4, D13, D17
   E8.T1 AutoMSARIMA and ETS(MNN) on the M4 sample {data: D6}
   | row | method | D4 {nominal level: 0.8} | D13 | D4 {nominal level: 0.8, D7: low} | D4 {nominal level: 0.8, D7: mid} | D4 {nominal level: 0.8, D7: high} | 80% coverage in the low tercile minus that in the high tercile | share of holdout observations at or below the 0.5 quantile |
-  | r1 | D10 | 0.6889 | 0.03865 | 0.8128 | 0.6995 | 0.5544 | 0.2585 |  |
-  | r2 | ETS(MNN) | 0.7854 | 0.08485 | 0.764 | 0.7779 | 0.8142 | -0.05019 | 0.3723 |
+  | r1 | D10 | 0.6889 | 0.03865 | 0.8128 | 0.6995 | 0.5544 | 0.25849074074074074 |  |
+  | r2 | ETS(MNN) | 0.7854 | 0.08485 | 0.764 | 0.7779 | 0.8142 | -0.05018518518518522 | 0.3723 |
 E9 [quant; design benchmark] [[D10:AutoMSARIMA]] and the [[D11:log-normal ARIMA]] with the same selected orders on the [[D6:M4 sample]]; MCE and cov80 per [[D7:level terciles]] (run RN42, plan PL13).
   setup: studied D10, D11; cases D6; procedure D7; lens D4, D13, D14, D17
   E9.T1 AutoMSARIMA and the log-normal ARIMA with the same orders on the M4 sample {data: D6}
   | row | method | D13 | D14 (median) | range of the 80% coverage over the level terciles | D4 {nominal level: 0.8} | D4 {nominal level: 0.8, D7: low} | D4 {nominal level: 0.8, D7: mid} | D4 {nominal level: 0.8, D7: high} |
-  | r1 | D10 | 0.03865 | 0.6752 | 0.2585 |  |  |  |  |
-  | r2 | D11 | 0.01771 | 0.7679 | 0.03108 | 0.7698 | 0.7742 | 0.7832 | 0.7521 |
+  | r1 | D10 | 0.03864774286070695 | 0.6752 | 0.2585 |  |  |  |  |
+  | r2 | D11 | 0.017709097144281392 | 0.7679 | 0.03108333333333335 | 0.7698 | 0.7742 | 0.7832 | 0.7521 |
 E10 [simulation; runs 2000] Simulation of the [[D2:known-model simulation]]: in each replicate the model is fitted to the first T observations and its 99 quantiles (0.01 to 0.99) are scored on the 18 holdout observations; results are pooled over the 11 Gaussian processes (mean over the processes of the mean over replicates). Cases T, E, S with backcasting and E with optimal initial states, run with [[D21:smooth 1.0.8 and 1.3.0]] on the same seeds (runs RN43 for 1.0.8 and RN44 for 1.3.0, plan PL11).
   setup: studied D10; cases D2; procedure D3; lens D4, D13; context D21
   E10.T1 smooth 1.0.8 against 1.3.0 on the same seeds, pooled over the 11 Gaussian processes
   | row | T | D3 | initial states | D21 | D13 | ratio of the 80% interval width to the theoretical width | D4 {nominal level: 0.8} |
-  | r1 | 100 | E | backcasting | 1.0.8 | 0.01202 |  |  |
-  | r2 | 100 | E | optimal | 1.0.8 | 0.02458 | 3.3857 |  |
-  | r3 | 100 | S | backcasting | 1.0.8 | 0.01724 |  |  |
+  | r1 | 100 | E | backcasting | 1.0.8 | 0.012016197326803405 |  |  |
+  | r2 | 100 | E | optimal | 1.0.8 | 0.02458198143046628 | 3.3857 |  |
+  | r3 | 100 | S | backcasting | 1.0.8 | 0.017238598102234465 |  |  |
   | r4 | 100 | T | backcasting | 1.0.8 |  | 1.1105 | 0.8256 |
-  | r5 | 100 | E | backcasting | 1.3.0 | 0.009999 |  |  |
-  | r6 | 100 | E | optimal | 1.3.0 | 0.008501 | 1.0111 |  |
-  | r7 | 100 | S | backcasting | 1.3.0 | 0.01388 |  |  |
+  | r5 | 100 | E | backcasting | 1.3.0 | 0.00999872461993675 |  |  |
+  | r6 | 100 | E | optimal | 1.3.0 | 0.00850140291806958 | 1.0111 |  |
+  | r7 | 100 | S | backcasting | 1.3.0 | 0.01387776757473727 |  |  |
   | r8 | 100 | T | backcasting | 1.3.0 |  | 1.0019 | 0.7997 |
   parameters: A8
   seeds: [20261105]
@@ -227,8 +239,8 @@ E12 [quant; design benchmark] R auto.msarima ([[D10:AutoMSARIMA]]) and [[D8:auto
   setup: studied D8, D10; cases D9; procedure D7; lens D4, D13, D14, D17
   E12.T1 R auto.msarima and auto.adam error selection on the fresh M4 sample, backcasting {data: D9, initial states: backcasting}
   | row | method | D4 {nominal level: 0.8} | D13 | D14 (median) | D4 {nominal level: 0.8, D7: low} | D4 {nominal level: 0.8, D7: mid} | D4 {nominal level: 0.8, D7: high} | range of the 80% coverage over the level terciles | share of series for which dlnorm is selected |
-  | r1 | D8 | 0.7461 | 0.02236 | 0.7514 | 0.7865 | 0.7425 | 0.7092 | 0.0773 | 0.6702 |
-  | r2 | D10 | 0.6923 | 0.0352 | 0.6872 | 0.8193 | 0.7098 | 0.5477 | 0.2715 |  |
+  | r1 | D8 | 0.7461 | 0.02235705823668769 | 0.7514 | 0.7865 | 0.7425 | 0.7092 | 0.07729629629629642 | 0.6702 |
+  | r2 | D10 | 0.6923 | 0.035202331961592524 | 0.6872 | 0.8193 | 0.7098 | 0.5477 | 0.2715277777777778 |  |
 E13 [quant; design benchmark] Coverage by [[D7:level terciles]] on the 5,315 [[D5:benchmark]] series for [[D10:AutoMSARIMA]] with backcasting (refitted) and for the [[D16:other ARIMA implementations]] (saved forecasts of the smooth benchmark of 2026-11-05); and coverage of ETS and ARIMA on the series where the selected ETS(ANN) of [[D15:ETS forced and selected]] and the selected ARIMA(0,1,1) give the same forecast and width (exploratory run RN15).
   setup: studied D10, D16, D15; cases D5; procedure D7; lens D4, D17
   E13.T1 80% coverage by level tercile of AutoMSARIMA and the other ARIMA implementations on the benchmark {data: D5}

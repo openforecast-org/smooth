@@ -56,6 +56,11 @@
     "state space models",
     "forecasting software",
     "M competitions"
+   ],
+   "topics": [
+    "openalex:T10282",
+    "openalex:T10243",
+    "openalex:T11918"
    ]
   },
   "declarations": {
@@ -63,7 +68,7 @@
    "competing_interests": "The guarantor is the author and maintainer of the smooth package that the study evaluates."
   },
   "id": "entrylib:2026.000001",
-  "correction_reason": "The results of the evidence objects were listed one number per entry with the analysis scripts' internal names; they are now result tables with defined variables and labelled rows, the claims cite table rows, every recorded lab result is in a CSV artefact (A10), and the subfield is set to openalex:subfields/1803."
+  "correction_reason": "The test quantities of the claims bound result entries that version 2 had turned into table cells; they now bind the cells, which keep the full precision the verdicts were computed at, and each table names the CSV of the lab results (A10) as its source. The defining equations of D1, D4, D11 and D13 are set as displayed equations."
  },
  "contributors": [
   {
@@ -144,7 +149,7 @@
    "term": "MSARIMA analytic interval",
    "kind": "method",
    "source": "B6",
-   "definition": "The quantiles of `predict(interval=\"prediction\")` of a pure ARIMA in smooth 1.3.0, which dispatches to the approximate interval. The ARIMA is the state space model $y_t = w^\\top v_{t-l} + \\epsilon_t$, $v_t = F v_{t-l} + g\\epsilon_t$, $\\epsilon_t \\sim N(0, \\sigma^2)$. The quantile at level $\\tau$ and horizon $h$ is $q_{\\tau,h} = \\hat y_{T+h|T} + \\Phi^{-1}(\\tau)\\sqrt{V_h}$ with $V_h = \\hat\\sigma^2 \\frac{T}{T-k} c_h$, where $\\hat\\sigma^2 = \\frac{1}{T}\\sum_{t=1}^{T} e_t^2$, $k$ the number of estimated parameters and $c_h$ the $h$-th diagonal element of the analytic covariance of the state space model, $c_h = 1 + \\sum_{j=1}^{h-1} (w^\\top F^{j-1} g)^2$ for a model with lag 1."
+   "definition": "The quantiles of `predict(interval=\"prediction\")` of a pure ARIMA in smooth 1.3.0, which dispatches to the approximate interval. The ARIMA is the state space model\n$$\\begin{aligned} y_t &= w^\\top v_{t-l} + \\epsilon_t, \\\\ v_t &= F v_{t-l} + g \\epsilon_t, \\\\ \\epsilon_t &\\sim N(0, \\sigma^2). \\end{aligned}$$\nThe quantile at level $\\tau$ and horizon $h$ is\n$$q_{\\tau,h} = \\hat y_{T+h|T} + \\Phi^{-1}(\\tau) \\sqrt{V_h}, \\qquad V_h = \\hat\\sigma^2 \\frac{T}{T-k} c_h,$$\nwith\n$$\\hat\\sigma^2 = \\frac{1}{T} \\sum_{t=1}^{T} e_t^2, \\qquad c_h = 1 + \\sum_{j=1}^{h-1} \\left(w^\\top F^{j-1} g\\right)^2,$$\nwhere $k$ is the number of estimated parameters and $c_h$ the $h$-th diagonal element of the analytic covariance of the state space model, written here for a model with lag 1."
   },
   {
    "id": "D2",
@@ -162,7 +167,7 @@
    "id": "D4",
    "term": "coverage",
    "kind": "variable",
-   "definition": "For a quantile $q_\\tau$, the share of holdout observations at or below it, $c_\\tau = \\frac{1}{h}\\sum_{j=1}^{h} 1(y_{T+j} \\le q_{\\tau,j})$, averaged first within a series and then over series. cov80 is $c_{0.9} - c_{0.1}$, the coverage of the central 80% interval; q50 is $c_{0.5}$."
+   "definition": "For the quantile $q_{\\tau,j}$ at level $\\tau$ and horizon $j$, the share of holdout observations at or below it,\n$$c_\\tau = \\frac{1}{h} \\sum_{j=1}^{h} 1\\left(y_{T+j} \\le q_{\\tau,j}\\right),$$\naveraged first within a series and then over series. cov80 is $c_{0.9} - c_{0.1}$, the coverage of the central 80% interval; q50 is $c_{0.5}$."
   },
   {
    "id": "D5",
@@ -214,7 +219,7 @@
    "term": "log-normal ARIMA",
    "kind": "method",
    "source": "B6",
-   "definition": "ADAM with `model=\"NNN\"`, an ARIMA and `distribution=\"dlnorm\"`: the ARIMA applies to the logarithms, $\\log y_t = w^\\top v_{t-l} + \\log(1+\\epsilon_t)$, $v_t = F v_{t-l} + g \\log(1+\\epsilon_t)$, $1+\\epsilon_t \\sim \\mathrm{logN}(-\\sigma^2/2, \\sigma^2)$, so the scale of the error is proportional to the level. In the comparisons with fixed orders, the orders and constant are those [[D10:AutoMSARIMA]] selects on the same series."
+   "definition": "ADAM with `model=\"NNN\"`, an ARIMA and `distribution=\"dlnorm\"`: the ARIMA applies to the logarithms,\n$$\\begin{aligned} \\log y_t &= w^\\top v_{t-l} + \\log(1+\\epsilon_t), \\\\ v_t &= F v_{t-l} + g \\log(1+\\epsilon_t), \\\\ 1+\\epsilon_t &\\sim \\mathrm{logN}(-\\sigma^2/2, \\sigma^2), \\end{aligned}$$\nso the scale of the error is proportional to the level. In the comparisons with fixed orders, the orders and constant are those [[D10:AutoMSARIMA]] selects on the same series."
   },
   {
    "id": "D12",
@@ -226,7 +231,7 @@
    "id": "D13",
    "term": "MCE",
    "kind": "variable",
-   "definition": "Mean calibration error over the 99 quantile levels $\\tau = 0.01, \\dots, 0.99$: $\\frac{1}{99}\\sum_\\tau |\\bar c_\\tau - \\tau|$, with $\\bar c_\\tau$ the [[D4:coverage]] of $q_\\tau$."
+   "definition": "Mean calibration error over the 99 quantile levels $\\tau = 0.01, \\dots, 0.99$:\n$$\\mathrm{MCE} = \\frac{1}{99} \\sum_{\\tau} \\left|\\bar c_\\tau - \\tau\\right|,$$\nwith $\\bar c_\\tau$ the [[D4:coverage]] of $q_\\tau$."
   },
   {
    "id": "D14",
@@ -327,87 +332,99 @@
     },
     "quantities": {
      "m_b100": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "T_backcasting"
+       "D3": "T",
+       "initial states": "backcasting"
       }
      },
      "x_b100": {
-      "variable": "pooled maxcellmce over the DGPs",
+      "variable": "largest MCE over the 11 processes",
       "conditions": {
        "T": 100,
-       "case": "T_backcasting"
+       "D3": "T",
+       "initial states": "backcasting"
       }
      },
      "w_b100": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 100,
-       "case": "T_backcasting"
+       "D3": "T",
+       "initial states": "backcasting"
       }
      },
      "m_o100": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "T_optimal"
+       "D3": "T",
+       "initial states": "optimal"
       }
      },
      "x_o100": {
-      "variable": "pooled maxcellmce over the DGPs",
+      "variable": "largest MCE over the 11 processes",
       "conditions": {
        "T": 100,
-       "case": "T_optimal"
+       "D3": "T",
+       "initial states": "optimal"
       }
      },
      "w_o100": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 100,
-       "case": "T_optimal"
+       "D3": "T",
+       "initial states": "optimal"
       }
      },
      "m_b300": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 300,
-       "case": "T_backcasting"
+       "D3": "T",
+       "initial states": "backcasting"
       }
      },
      "x_b300": {
-      "variable": "pooled maxcellmce over the DGPs",
+      "variable": "largest MCE over the 11 processes",
       "conditions": {
        "T": 300,
-       "case": "T_backcasting"
+       "D3": "T",
+       "initial states": "backcasting"
       }
      },
      "w_b300": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 300,
-       "case": "T_backcasting"
+       "D3": "T",
+       "initial states": "backcasting"
       }
      },
      "m_o300": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 300,
-       "case": "T_optimal"
+       "D3": "T",
+       "initial states": "optimal"
       }
      },
      "x_o300": {
-      "variable": "pooled maxcellmce over the DGPs",
+      "variable": "largest MCE over the 11 processes",
       "conditions": {
        "T": 300,
-       "case": "T_optimal"
+       "D3": "T",
+       "initial states": "optimal"
       }
      },
      "w_o300": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 300,
-       "case": "T_optimal"
+       "D3": "T",
+       "initial states": "optimal"
       }
      }
     },
@@ -489,15 +506,17 @@
     },
     "quantities": {
      "fa": {
-      "variable": "M4 fall_low_to_high",
+      "variable": "80% coverage in the low tercile minus that in the high tercile",
       "conditions": {
-       "method": "auto"
+       "data": "D6",
+       "method": "D10"
       }
      },
      "fm": {
-      "variable": "M4 fall_low_to_high",
+      "variable": "80% coverage in the low tercile minus that in the high tercile",
       "conditions": {
-       "method": "force_mnn"
+       "data": "D6",
+       "method": "ETS(MNN)"
       }
      }
     },
@@ -585,21 +604,24 @@
     },
     "quantities": {
      "sd": {
-      "variable": "M4 spread",
+      "variable": "range of the 80% coverage over the level terciles",
       "conditions": {
-       "method": "auto_dlnorm"
+       "data": "D6",
+       "method": "D11"
       }
      },
      "md": {
-      "variable": "M4 mce",
+      "variable": "D13",
       "conditions": {
-       "method": "auto_dlnorm"
+       "data": "D6",
+       "method": "D11"
       }
      },
      "ma": {
-      "variable": "M4 mce",
+      "variable": "D13",
       "conditions": {
-       "method": "auto"
+       "data": "D6",
+       "method": "D10"
       }
      }
     },
@@ -681,50 +703,62 @@
     },
     "quantities": {
      "eb108": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "D21": "1.0.8"
       },
       "run": 1
      },
      "eb130": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "D21": "1.3.0"
       },
       "run": 2
      },
      "sb108": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "S_backcasting"
+       "D3": "S",
+       "initial states": "backcasting",
+       "D21": "1.0.8"
       },
       "run": 1
      },
      "sb130": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "S_backcasting"
+       "D3": "S",
+       "initial states": "backcasting",
+       "D21": "1.3.0"
       },
       "run": 2
      },
      "eo108": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_optimal"
+       "D3": "E",
+       "initial states": "optimal",
+       "D21": "1.0.8"
       },
       "run": 1
      },
      "eo130": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_optimal"
+       "D3": "E",
+       "initial states": "optimal",
+       "D21": "1.3.0"
       },
       "run": 2
      }
@@ -807,27 +841,35 @@
     },
     "quantities": {
      "ms": {
-      "variable": "m4 mce",
+      "variable": "D13",
       "conditions": {
-       "method": "adam_select"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D8"
       }
      },
      "ma": {
-      "variable": "m4 mce",
+      "variable": "D13",
       "conditions": {
-       "method": "msarima"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D10"
       }
      },
      "ss": {
-      "variable": "m4 spread",
+      "variable": "range of the 80% coverage over the level terciles",
       "conditions": {
-       "method": "adam_select"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D8"
       }
      },
      "sa": {
-      "variable": "m4 spread",
+      "variable": "range of the 80% coverage over the level terciles",
       "conditions": {
-       "method": "msarima"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D10"
       }
      }
     },
@@ -944,87 +986,111 @@
     },
     "quantities": {
      "wa50": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 50,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "analytic"
       }
      },
      "ws50": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 50,
-       "case": "E_backcasting_sim"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "simulated interval"
       }
      },
      "ma50": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 50,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "analytic"
       }
      },
      "ms50": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 50,
-       "case": "E_backcasting_sim"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "simulated interval"
       }
      },
      "wa100": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "analytic"
       }
      },
      "ws100": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting_sim"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "simulated interval"
       }
      },
      "ma100": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "analytic"
       }
      },
      "ms100": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting_sim"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "simulated interval"
       }
      },
      "wa300": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 300,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "analytic"
       }
      },
      "ws300": {
-      "variable": "pooled width over the DGPs",
+      "variable": "ratio of the 80% interval width to the theoretical width",
       "conditions": {
        "T": 300,
-       "case": "E_backcasting_sim"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "simulated interval"
       }
      },
      "ma300": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 300,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "analytic"
       }
      },
      "ms300": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 300,
-       "case": "E_backcasting_sim"
+       "D3": "E",
+       "initial states": "backcasting",
+       "interval": "simulated interval"
       }
      }
     },
@@ -1311,10 +1377,12 @@
     },
     "quantities": {
      "s": {
-      "variable": "pooled cov80 over the DGPs",
+      "variable": "D4",
       "conditions": {
        "T": 100,
-       "case": "S_backcasting"
+       "D3": "S",
+       "initial states": "backcasting",
+       "nominal level": 0.8
       }
      }
     },
@@ -1392,17 +1460,21 @@
     },
     "quantities": {
      "t": {
-      "variable": "pooled cov80 over the DGPs",
+      "variable": "D4",
       "conditions": {
        "T": 100,
-       "case": "T_backcasting"
+       "D3": "T",
+       "initial states": "backcasting",
+       "nominal level": 0.8
       }
      },
      "e": {
-      "variable": "pooled cov80 over the DGPs",
+      "variable": "D4",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "nominal level": 0.8
       }
      }
     },
@@ -1485,59 +1557,75 @@
     },
     "quantities": {
      "mb": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "forecast": "predict()"
       }
      },
      "rb": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting_ref"
+       "D3": "E",
+       "initial states": "backcasting",
+       "forecast": "reforecast"
       }
      },
      "pb": {
-      "variable": "pooled relpin over the DGPs",
+      "variable": "scaled pinball relative to the true model with true parameters",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting"
+       "D3": "E",
+       "initial states": "backcasting",
+       "forecast": "predict()"
       }
      },
      "sb": {
-      "variable": "pooled relpin over the DGPs",
+      "variable": "scaled pinball relative to the true model with true parameters",
       "conditions": {
        "T": 100,
-       "case": "E_backcasting_ref"
+       "D3": "E",
+       "initial states": "backcasting",
+       "forecast": "reforecast"
       }
      },
      "mo": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_optimal"
+       "D3": "E",
+       "initial states": "optimal",
+       "forecast": "predict()"
       }
      },
      "ro": {
-      "variable": "pooled mce over the DGPs",
+      "variable": "D13",
       "conditions": {
        "T": 100,
-       "case": "E_optimal_ref"
+       "D3": "E",
+       "initial states": "optimal",
+       "forecast": "reforecast"
       }
      },
      "po": {
-      "variable": "pooled relpin over the DGPs",
+      "variable": "scaled pinball relative to the true model with true parameters",
       "conditions": {
        "T": 100,
-       "case": "E_optimal"
+       "D3": "E",
+       "initial states": "optimal",
+       "forecast": "predict()"
       }
      },
      "so": {
-      "variable": "pooled relpin over the DGPs",
+      "variable": "scaled pinball relative to the true model with true parameters",
       "conditions": {
        "T": 100,
-       "case": "E_optimal_ref"
+       "D3": "E",
+       "initial states": "optimal",
+       "forecast": "reforecast"
       }
      }
     },
@@ -1613,10 +1701,11 @@
     },
     "quantities": {
      "w": {
-      "variable": "pooled cov80 over the DGPs",
+      "variable": "D4",
       "conditions": {
        "T": 100,
-       "case": "W_backcasting"
+       "D3": "W",
+       "nominal level": 0.8
       }
      }
     },
@@ -1687,31 +1776,37 @@
     },
     "quantities": {
      "cp": {
-      "variable": "benchmark cov80",
+      "variable": "D4",
       "conditions": {
-       "initial": "backcasting",
-       "method": "predict"
+       "data": "D5",
+       "initial states": "backcasting",
+       "forecast": "predict()",
+       "nominal level": 0.8
       }
      },
      "cr": {
-      "variable": "benchmark cov80",
+      "variable": "D4",
       "conditions": {
-       "initial": "backcasting",
-       "method": "reforecast"
+       "data": "D5",
+       "initial states": "backcasting",
+       "forecast": "D12",
+       "nominal level": 0.8
       }
      },
      "pp": {
-      "variable": "benchmark pinball",
+      "variable": "D14",
       "conditions": {
-       "initial": "backcasting",
-       "method": "predict"
+       "data": "D5",
+       "initial states": "backcasting",
+       "forecast": "predict()"
       }
      },
      "pr": {
-      "variable": "benchmark pinball",
+      "variable": "D14",
       "conditions": {
-       "initial": "backcasting",
-       "method": "reforecast"
+       "data": "D5",
+       "initial states": "backcasting",
+       "forecast": "D12"
       }
      }
     },
@@ -1772,27 +1867,35 @@
     },
     "quantities": {
      "ms": {
-      "variable": "m4 mce",
+      "variable": "D13",
       "conditions": {
-       "method": "adam_select"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D8"
       }
      },
      "ma": {
-      "variable": "m4 mce",
+      "variable": "D13",
       "conditions": {
-       "method": "msarima"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D10"
       }
      },
      "ss": {
-      "variable": "m4 spread",
+      "variable": "range of the 80% coverage over the level terciles",
       "conditions": {
-       "method": "adam_select"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D8"
       }
      },
      "sa": {
-      "variable": "m4 spread",
+      "variable": "range of the 80% coverage over the level terciles",
       "conditions": {
-       "method": "msarima"
+       "data": "D9",
+       "initial states": "backcasting",
+       "method": "D10"
       }
      }
     },
@@ -2145,10 +2248,7 @@
       },
       "ratio of the 80% interval width to the theoretical width",
       "D13",
-      {
-       "variable": "D13",
-       "statistic": "max"
-      }
+      "largest MCE over the 11 processes"
      ],
      "rows": [
       {
@@ -2160,9 +2260,9 @@
        ],
        "values": [
         0.7997,
-        1.0019,
-        0.002348,
-        0.01451
+        1.0018975430750083,
+        0.002347566574839311,
+        0.014508136924803598
        ]
       },
       {
@@ -2174,9 +2274,9 @@
        ],
        "values": [
         0.7972,
-        0.9965,
-        0.002379,
-        0.01451
+        0.9965079650994704,
+        0.002378711355984074,
+        0.014505611672278346
        ]
       },
       {
@@ -2188,9 +2288,9 @@
        ],
        "values": [
         null,
-        1.0007,
-        0.0006806,
-        0.005867
+        1.000745813821255,
+        0.0006805683093562026,
+        0.0058672839506172785
        ]
       },
       {
@@ -2202,12 +2302,13 @@
        ],
        "values": [
         null,
-        0.9992,
-        0.0008571,
-        0.005867
+        0.999189350813739,
+        0.0008571064177124785,
+        0.0058672839506172785
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -2277,7 +2378,7 @@
         "backcasting"
        ],
        "values": [
-        0.7559
+        0.7559267676767676
        ]
       },
       {
@@ -2291,7 +2392,8 @@
         0.7572
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -2360,8 +2462,8 @@
         "analytic"
        ],
        "values": [
-        0.9572,
-        0.01962
+        0.9571865764457477,
+        0.019618406285072953
        ]
       },
       {
@@ -2373,8 +2475,8 @@
         "simulated interval"
        ],
        "values": [
-        0.957,
-        0.01966
+        0.9570246020280071,
+        0.0196577134986226
        ]
       },
       {
@@ -2386,8 +2488,8 @@
         "analytic"
        ],
        "values": [
-        0.9807,
-        0.009999
+        0.98068173371577,
+        0.00999872461993675
        ]
       },
       {
@@ -2399,8 +2501,8 @@
         "simulated interval"
        ],
        "values": [
-        0.9805,
-        0.01002
+        0.9804924240470849,
+        0.010021553923069082
        ]
       },
       {
@@ -2412,8 +2514,8 @@
         "analytic"
        ],
        "values": [
-        0.9966,
-        0.002644
+        0.9966012447878664,
+        0.0026437863483317944
        ]
       },
       {
@@ -2425,11 +2527,12 @@
         "simulated interval"
        ],
        "values": [
-        0.9964,
-        0.002689
+        0.9964067752797617,
+        0.002688526680950923
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -2499,7 +2602,7 @@
         "backcasting"
        ],
        "values": [
-        0.7701
+        0.7700555555555556
        ]
       },
       {
@@ -2510,10 +2613,11 @@
         "backcasting"
        ],
        "values": [
-        0.7997
+        0.7996717171717171
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -2583,8 +2687,8 @@
         "predict()"
        ],
        "values": [
-        0.009999,
-        1.0432
+        0.00999872461993675,
+        1.043170004368166
        ]
       },
       {
@@ -2596,8 +2700,8 @@
         "reforecast"
        ],
        "values": [
-        0.02652,
-        1.9575
+        0.02651617181920213,
+        1.9575365936241682
        ]
       },
       {
@@ -2609,8 +2713,8 @@
         "predict()"
        ],
        "values": [
-        0.008501,
-        1.0578
+        0.00850140291806958,
+        1.0578011747050307
        ]
       },
       {
@@ -2622,11 +2726,12 @@
         "reforecast"
        ],
        "values": [
-        0.005329,
-        1.3961
+        0.005329303132333438,
+        1.3961320998657083
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -2695,7 +2800,7 @@
         "W"
        ],
        "values": [
-        0.6756,
+        0.6756041666666667,
         0.4281
        ]
       },
@@ -2710,7 +2815,8 @@
         0.4988
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -2778,8 +2884,8 @@
         "predict()"
        ],
        "values": [
-        0.6812,
-        0.8991
+        0.6812166823455579,
+        0.8991160322346123
        ]
       },
       {
@@ -2788,11 +2894,12 @@
         "D12"
        ],
        "values": [
-        0.6827,
-        6.984e+191
+        0.6826617539458528,
+        6.983616214609794e+191
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -2888,7 +2995,7 @@
         0.8128,
         0.6995,
         0.5544,
-        0.2585,
+        0.25849074074074074,
         null
        ]
       },
@@ -2903,11 +3010,12 @@
         0.764,
         0.7779,
         0.8142,
-        -0.05019,
+        -0.05018518518518522,
         0.3723
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -3002,7 +3110,7 @@
         "D10"
        ],
        "values": [
-        0.03865,
+        0.03864774286070695,
         0.6752,
         0.2585,
         null,
@@ -3017,16 +3125,17 @@
         "D11"
        ],
        "values": [
-        0.01771,
+        0.017709097144281392,
         0.7679,
-        0.03108,
+        0.03108333333333335,
         0.7698,
         0.7742,
         0.7832,
         0.7521
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -3105,7 +3214,7 @@
         "1.0.8"
        ],
        "values": [
-        0.01202,
+        0.012016197326803405,
         null,
         null
        ]
@@ -3119,7 +3228,7 @@
         "1.0.8"
        ],
        "values": [
-        0.02458,
+        0.02458198143046628,
         3.3857,
         null
        ]
@@ -3133,7 +3242,7 @@
         "1.0.8"
        ],
        "values": [
-        0.01724,
+        0.017238598102234465,
         null,
         null
        ]
@@ -3161,7 +3270,7 @@
         "1.3.0"
        ],
        "values": [
-        0.009999,
+        0.00999872461993675,
         null,
         null
        ]
@@ -3175,7 +3284,7 @@
         "1.3.0"
        ],
        "values": [
-        0.008501,
+        0.00850140291806958,
         1.0111,
         null
        ]
@@ -3189,7 +3298,7 @@
         "1.3.0"
        ],
        "values": [
-        0.01388,
+        0.01387776757473727,
         null,
         null
        ]
@@ -3208,7 +3317,8 @@
         0.7997
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -3340,12 +3450,12 @@
        ],
        "values": [
         0.7461,
-        0.02236,
+        0.02235705823668769,
         0.7514,
         0.7865,
         0.7425,
         0.7092,
-        0.0773,
+        0.07729629629629642,
         0.6702
        ]
       },
@@ -3356,16 +3466,17 @@
        ],
        "values": [
         0.6923,
-        0.0352,
+        0.035202331961592524,
         0.6872,
         0.8193,
         0.7098,
         0.5477,
-        0.2715,
+        0.2715277777777778,
         null
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -3485,7 +3596,8 @@
         0.5854
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     },
     {
      "id": "T2",
@@ -3536,7 +3648,8 @@
         0.7336
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -3637,7 +3750,8 @@
         0.6812
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -3760,7 +3874,8 @@
         1.0916
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -3904,7 +4019,8 @@
         0.0
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     },
     {
      "id": "T2",
@@ -3960,7 +4076,8 @@
         0.04024
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -4076,7 +4193,8 @@
         0.3087
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -4146,7 +4264,8 @@
         0.6766
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -4232,7 +4351,8 @@
         0.7169
        ]
       }
-     ]
+     ],
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -4438,7 +4558,7 @@
        ]
       }
      ],
-     "artefact": "A3"
+     "artefact": "A10"
     },
     {
      "id": "T2",
@@ -4552,7 +4672,7 @@
        ]
       }
      ],
-     "artefact": "A4"
+     "artefact": "A10"
     },
     {
      "id": "T3",
@@ -4676,7 +4796,7 @@
        ]
       }
      ],
-     "artefact": "A5"
+     "artefact": "A10"
     },
     {
      "id": "T4",
@@ -4790,7 +4910,7 @@
        ]
       }
      ],
-     "artefact": "A6"
+     "artefact": "A10"
     }
    ],
    "artefacts": [
@@ -5091,12 +5211,13 @@
   {
    "id": "A10",
    "kind": "data",
-   "uri": "files/lab-results.csv",
+   "uri": "https://entrylib.org/p/2026.000001/v2/files/files/lab-results.csv",
    "licence": "CC-BY-4.0",
    "availability": {
     "level": "public"
    },
-   "description": "Every result recorded in the lab record (A7), one row per result: the lab result ID, the run that produced it, the quantity as the analysis script names it, its conditions as JSON and its full-precision value. The tables of the evidence objects hold these values rounded to four significant digits and at least four decimals."
+   "description": "Every result recorded in the lab record (A7), one row per result: the lab result ID, the run that produced it, the quantity as the analysis script names it, its conditions as JSON and its full-precision value. The tables of the evidence objects hold these values rounded to four significant digits and at least four decimals.",
+   "version": "sha256:0e97428c7dc3643e413d3651fe832c8e4696d6ce12177d84bd2a062219f8539b"
   }
  ],
  "references": [

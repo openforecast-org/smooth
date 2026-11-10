@@ -1216,3 +1216,330 @@ AC3.RS211,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled ro
 AC3.RS212,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: ETS(A,N,N)+I(1), MA(2) 1 - B + B^2","{""admissible"": false}",1.0000009536743164
 AC3.RS213,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(2) with MA(2) 1 + 2B + B^2 (double unit root, cancels twice)","{""admissible"": false}",1.0000019073486328
 AC3.RS214,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(1) with MA(2) 1 + 2B + B^2 (double root at -1, one factor of Phi_2 left, no cancel with lag 1)","{""admissible"": false}",1.0000019073486328
+RS1004,RN57,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",1482.0
+RS1005,RN57,models rejected by the per-lag check that forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",0.0
+RS1006,RN57,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""GUM"", ""models"": 200}",10.0
+RS1007,RN57,models rejected by the per-lag check that forget their initial states,"{""family"": ""GUM"", ""models"": 200}",1.0
+RS1008,RN57,models exported,{},3242.0
+RS1009,RN58,admissibility decisions that differ from the PBH reference,{},0.0
+RS1010,RN58,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS1011,RN58,models exported,{},500.0
+RS1012,RN59,step-down decisions that differ from the decision by the roots,{},0.0
+RS1013,RN59,"max abs difference of max |lambda|, bisection against roots",{},5.813682868449632e-11
+RS1014,RN59,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS1015,RN59,max degree of theta before cancellation,{},535.0
+RS1016,RN59,models exported,{},575.0
+RS1017,RN60,prototype modulus below 1,{},508.0
+RS1018,RN60,models exported,{},800.0
+RS1019,RN61,admissibility decisions that differ from the PBH reference,{},0.0
+RS1020,RN61,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS1021,RN61,models exported,{},2.0
+AC5.RS1,AC5.RN1,step-down decisions that differ from the decision by the roots,{},0.0
+AC5.RS2,AC5.RN1,"max abs difference of max |lambda|, bisection against roots",{},5.5451865321742844e-11
+AC5.RS3,AC5.RN1,"models within 1e-8 of the unit circle, excluded",{},0.0
+AC5.RS4,AC5.RN1,max degree of theta before cancellation,{},536.0
+AC5.RS5,AC5.RN1,models exported,{},57.0
+AC5.RS6,AC5.RN2,models given to the oracle,"{""set"": ""stepdown""}",57.0
+AC5.RS7,AC5.RN2,models on which the oracle failed,"{""set"": ""stepdown""}",0.0
+AC5.RS8,AC5.RN2,models excluded by undecided,"{""set"": ""stepdown""}",0.0
+AC5.RS9,AC5.RN2,models excluded by edge,"{""set"": ""stepdown""}",0.0
+AC5.RS10,AC5.RN2,models compared,"{""set"": ""stepdown""}",57.0
+AC5.RS11,AC5.RN2,"max degree of theta, exact","{""set"": ""stepdown""}",536.0
+AC5.RS12,AC5.RN2,"max degree of the cancelled MA polynomial, exact","{""set"": ""stepdown""}",366.0
+AC5.RS13,AC5.RN2,"max precision of the root enclosures, bits","{""set"": ""stepdown""}",128.0
+AC5.RS14,AC5.RN2,roots proved on the unit circle,"{""set"": ""stepdown""}",0.0
+AC5.RS15,AC5.RN2,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""stepdown""}",0.0
+AC5.RS16,AC5.RN2,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""stepdown""}",1.2434497875801753e-14
+AC5.RS17,AC5.RN2,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""stepdown""}",10.0
+AC5.RS18,AC5.RN2,models whose cancelled MA degree differs from the prototype's,"{""set"": ""stepdown""}",0.0
+AC5.RS19,AC5.RN2,step-down decisions of the prototype that differ from the exact oracle,"{""set"": ""stepdown""}",0.0
+AC5.RS20,AC5.RN2,"max abs difference of the largest mode modulus, prototype's bisection against the exact oracle","{""set"": ""stepdown""}",5.545208736634777e-11
+AC5.RS21,AC5.RN2,models with a bisection value,"{""set"": ""stepdown""}",10.0
+AC5.RS22,AC5.RN2,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""stepdown""}",0.0
+AC5.RS23,AC5.RN2,models whose shared non-cyclotomic factor could not be located,"{""set"": ""stepdown""}",0.0
+AC5.RS24,AC5.RN2,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""stepdown""}",2.0
+AC5.RS25,AC5.RN2,"time of the oracle on the set, s","{""set"": ""stepdown""}",1.066136121749878
+AC5.RS26,AC5.RN2,models given to the oracle,"{""set"": ""all""}",57.0
+AC5.RS27,AC5.RN2,models on which the oracle failed,"{""set"": ""all""}",0.0
+AC5.RS28,AC5.RN2,models excluded by undecided,"{""set"": ""all""}",0.0
+AC5.RS29,AC5.RN2,models excluded by edge,"{""set"": ""all""}",0.0
+AC5.RS30,AC5.RN2,models compared,"{""set"": ""all""}",57.0
+AC5.RS31,AC5.RN2,"max degree of theta, exact","{""set"": ""all""}",536.0
+AC5.RS32,AC5.RN2,"max degree of the cancelled MA polynomial, exact","{""set"": ""all""}",366.0
+AC5.RS33,AC5.RN2,"max precision of the root enclosures, bits","{""set"": ""all""}",128.0
+AC5.RS34,AC5.RN2,roots proved on the unit circle,"{""set"": ""all""}",0.0
+AC5.RS35,AC5.RN2,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS36,AC5.RN2,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""all""}",1.2434497875801753e-14
+AC5.RS37,AC5.RN2,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""all""}",10.0
+AC5.RS38,AC5.RN2,models whose cancelled MA degree differs from the prototype's,"{""set"": ""all""}",0.0
+AC5.RS39,AC5.RN2,step-down decisions of the prototype that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS40,AC5.RN2,"max abs difference of the largest mode modulus, prototype's bisection against the exact oracle","{""set"": ""all""}",5.545208736634777e-11
+AC5.RS41,AC5.RN2,models with a bisection value,"{""set"": ""all""}",10.0
+AC5.RS42,AC5.RN2,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""all""}",0.0
+AC5.RS43,AC5.RN2,models whose shared non-cyclotomic factor could not be located,"{""set"": ""all""}",0.0
+AC5.RS44,AC5.RN2,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""all""}",2.0
+AC5.RS45,AC5.RN2,"time of the oracle, s","{""set"": ""all""}",1.0711045265197754
+AC5.RS46,AC5.RN3,admissibility decisions that differ from the PBH reference,{},0.0
+AC5.RS47,AC5.RN3,"models within 1e-8 of the unit circle, excluded",{},0.0
+AC5.RS48,AC5.RN3,models exported,{},100.0
+AC5.RS49,AC5.RN4,prototype modulus below 1,{},114.0
+AC5.RS50,AC5.RN4,models exported,{},160.0
+AC5.RS51,AC5.RN5,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",1482.0
+AC5.RS52,AC5.RN5,models rejected by the per-lag check that forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",0.0
+AC5.RS53,AC5.RN5,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""GUM"", ""models"": 200}",5.0
+AC5.RS54,AC5.RN5,models rejected by the per-lag check that forget their initial states,"{""family"": ""GUM"", ""models"": 200}",0.0
+AC5.RS55,AC5.RN5,models exported,{},3242.0
+AC5.RS56,AC5.RN6,models given to the oracle,"{""set"": ""cancel""}",100.0
+AC5.RS57,AC5.RN6,models on which the oracle failed,"{""set"": ""cancel""}",0.0
+AC5.RS58,AC5.RN6,models excluded by undecided,"{""set"": ""cancel""}",0.0
+AC5.RS59,AC5.RN6,models excluded by edge,"{""set"": ""cancel""}",0.0
+AC5.RS60,AC5.RN6,models compared,"{""set"": ""cancel""}",100.0
+AC5.RS61,AC5.RN6,"max degree of theta, exact","{""set"": ""cancel""}",79.0
+AC5.RS62,AC5.RN6,"max degree of the cancelled MA polynomial, exact","{""set"": ""cancel""}",64.0
+AC5.RS63,AC5.RN6,"max precision of the root enclosures, bits","{""set"": ""cancel""}",128.0
+AC5.RS64,AC5.RN6,roots proved on the unit circle,"{""set"": ""cancel""}",0.0
+AC5.RS65,AC5.RN6,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""cancel""}",0.0
+AC5.RS66,AC5.RN6,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""cancel""}",5.773159728050814e-15
+AC5.RS67,AC5.RN6,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""cancel""}",32.0
+AC5.RS68,AC5.RN6,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""cancel""}",0.0
+AC5.RS69,AC5.RN6,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""cancel""}",3.863576125695545e-14
+AC5.RS70,AC5.RN6,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""cancel""}",32.0
+AC5.RS71,AC5.RN6,models whose cancelled MA degree differs from the prototype's,"{""set"": ""cancel""}",0.0
+AC5.RS72,AC5.RN6,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""cancel""}",0.0
+AC5.RS73,AC5.RN6,models whose shared non-cyclotomic factor could not be located,"{""set"": ""cancel""}",0.0
+AC5.RS74,AC5.RN6,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""cancel""}",0.0
+AC5.RS75,AC5.RN6,"time of the oracle on the set, s","{""set"": ""cancel""}",0.14734458923339844
+AC5.RS76,AC5.RN6,models given to the oracle,"{""set"": ""cpp""}",160.0
+AC5.RS77,AC5.RN6,models on which the oracle failed,"{""set"": ""cpp""}",0.0
+AC5.RS78,AC5.RN6,models excluded by undecided,"{""set"": ""cpp""}",0.0
+AC5.RS79,AC5.RN6,models excluded by edge,"{""set"": ""cpp""}",0.0
+AC5.RS80,AC5.RN6,models compared,"{""set"": ""cpp""}",160.0
+AC5.RS81,AC5.RN6,"max degree of theta, exact","{""set"": ""cpp""}",535.0
+AC5.RS82,AC5.RN6,"max degree of the cancelled MA polynomial, exact","{""set"": ""cpp""}",532.0
+AC5.RS83,AC5.RN6,"max precision of the root enclosures, bits","{""set"": ""cpp""}",128.0
+AC5.RS84,AC5.RN6,roots proved on the unit circle,"{""set"": ""cpp""}",0.0
+AC5.RS85,AC5.RN6,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""cpp""}",0.0
+AC5.RS86,AC5.RN6,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""cpp""}",1.2648548874949483e-11
+AC5.RS87,AC5.RN6,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""cpp""}",46.0
+AC5.RS88,AC5.RN6,models whose cancelled MA degree differs from the prototype's,"{""set"": ""cpp""}",0.0
+AC5.RS89,AC5.RN6,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""cpp""}",0.0
+AC5.RS90,AC5.RN6,models whose shared non-cyclotomic factor could not be located,"{""set"": ""cpp""}",0.0
+AC5.RS91,AC5.RN6,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""cpp""}",2.0
+AC5.RS92,AC5.RN6,"time of the oracle on the set, s","{""set"": ""cpp""}",3.8245115280151367
+AC5.RS93,AC5.RN6,models given to the oracle,"{""set"": ""all""}",260.0
+AC5.RS94,AC5.RN6,models on which the oracle failed,"{""set"": ""all""}",0.0
+AC5.RS95,AC5.RN6,models excluded by undecided,"{""set"": ""all""}",0.0
+AC5.RS96,AC5.RN6,models excluded by edge,"{""set"": ""all""}",0.0
+AC5.RS97,AC5.RN6,models compared,"{""set"": ""all""}",260.0
+AC5.RS98,AC5.RN6,"max degree of theta, exact","{""set"": ""all""}",535.0
+AC5.RS99,AC5.RN6,"max degree of the cancelled MA polynomial, exact","{""set"": ""all""}",532.0
+AC5.RS100,AC5.RN6,"max precision of the root enclosures, bits","{""set"": ""all""}",128.0
+AC5.RS101,AC5.RN6,roots proved on the unit circle,"{""set"": ""all""}",0.0
+AC5.RS102,AC5.RN6,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS103,AC5.RN6,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""all""}",5.773159728050814e-15
+AC5.RS104,AC5.RN6,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""all""}",32.0
+AC5.RS105,AC5.RN6,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS106,AC5.RN6,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""all""}",1.2648548874949483e-11
+AC5.RS107,AC5.RN6,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""all""}",78.0
+AC5.RS108,AC5.RN6,models whose cancelled MA degree differs from the prototype's,"{""set"": ""all""}",0.0
+AC5.RS109,AC5.RN6,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""all""}",0.0
+AC5.RS110,AC5.RN6,models whose shared non-cyclotomic factor could not be located,"{""set"": ""all""}",0.0
+AC5.RS111,AC5.RN6,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""all""}",2.0
+AC5.RS112,AC5.RN6,"time of the oracle, s","{""set"": ""all""}",3.977086067199707
+AC5.RS113,AC5.RN7,models given to the oracle,"{""set"": ""perlag""}",200.0
+AC5.RS114,AC5.RN7,models on which the oracle failed,"{""set"": ""perlag""}",0.0
+AC5.RS115,AC5.RN7,models excluded by undecided,"{""set"": ""perlag""}",0.0
+AC5.RS116,AC5.RN7,models excluded by edge,"{""set"": ""perlag""}",0.0
+AC5.RS117,AC5.RN7,models compared,"{""set"": ""perlag""}",200.0
+AC5.RS118,AC5.RN7,"max degree of theta, exact","{""set"": ""perlag""}",13.0
+AC5.RS119,AC5.RN7,"max degree of the cancelled MA polynomial, exact","{""set"": ""perlag""}",13.0
+AC5.RS120,AC5.RN7,"max precision of the root enclosures, bits","{""set"": ""perlag""}",128.0
+AC5.RS121,AC5.RN7,roots proved on the unit circle,"{""set"": ""perlag""}",0.0
+AC5.RS122,AC5.RN7,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""perlag""}",0.0
+AC5.RS123,AC5.RN7,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""perlag""}",3.3306690738754696e-15
+AC5.RS124,AC5.RN7,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""perlag""}",11.0
+AC5.RS125,AC5.RN7,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""perlag""}",0.0
+AC5.RS126,AC5.RN7,models whose shared non-cyclotomic factor could not be located,"{""set"": ""perlag""}",0.0
+AC5.RS127,AC5.RN7,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""perlag""}",0.0
+AC5.RS128,AC5.RN7,"models accepted by the per-lag check that do not forget their initial states, exact oracle","{""family"": ""GUM"", ""set"": ""perlag""}",5.0
+AC5.RS129,AC5.RN7,"models rejected by the per-lag check that forget their initial states, exact oracle","{""family"": ""GUM"", ""set"": ""perlag""}",0.0
+AC5.RS130,AC5.RN7,models accepted by the per-lag check,"{""family"": ""GUM"", ""set"": ""perlag""}",194.0
+AC5.RS131,AC5.RN7,models of the family,"{""family"": ""GUM"", ""set"": ""perlag""}",200.0
+AC5.RS132,AC5.RN7,"time of the oracle on the set, s","{""set"": ""perlag""}",0.10808968544006348
+AC5.RS133,AC5.RN7,models given to the oracle,"{""set"": ""all""}",200.0
+AC5.RS134,AC5.RN7,models on which the oracle failed,"{""set"": ""all""}",0.0
+AC5.RS135,AC5.RN7,models excluded by undecided,"{""set"": ""all""}",0.0
+AC5.RS136,AC5.RN7,models excluded by edge,"{""set"": ""all""}",0.0
+AC5.RS137,AC5.RN7,models compared,"{""set"": ""all""}",200.0
+AC5.RS138,AC5.RN7,"max degree of theta, exact","{""set"": ""all""}",13.0
+AC5.RS139,AC5.RN7,"max degree of the cancelled MA polynomial, exact","{""set"": ""all""}",13.0
+AC5.RS140,AC5.RN7,"max precision of the root enclosures, bits","{""set"": ""all""}",128.0
+AC5.RS141,AC5.RN7,roots proved on the unit circle,"{""set"": ""all""}",0.0
+AC5.RS142,AC5.RN7,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS143,AC5.RN7,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""all""}",3.3306690738754696e-15
+AC5.RS144,AC5.RN7,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""all""}",11.0
+AC5.RS145,AC5.RN7,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""all""}",0.0
+AC5.RS146,AC5.RN7,models whose shared non-cyclotomic factor could not be located,"{""set"": ""all""}",0.0
+AC5.RS147,AC5.RN7,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""all""}",0.0
+AC5.RS148,AC5.RN7,"time of the oracle, s","{""set"": ""all""}",0.1215202808380127
+AC5.RS149,AC5.RN8,models given to the oracle,"{""set"": ""perlag""}",3242.0
+AC5.RS150,AC5.RN8,models on which the oracle failed,"{""set"": ""perlag""}",0.0
+AC5.RS151,AC5.RN8,models excluded by undecided,"{""set"": ""perlag""}",0.0
+AC5.RS152,AC5.RN8,models excluded by edge,"{""set"": ""perlag""}",78.0
+AC5.RS153,AC5.RN8,models compared,"{""set"": ""perlag""}",3164.0
+AC5.RS154,AC5.RN8,"max degree of theta, exact","{""set"": ""perlag""}",13.0
+AC5.RS155,AC5.RN8,"max degree of the cancelled MA polynomial, exact","{""set"": ""perlag""}",13.0
+AC5.RS156,AC5.RN8,"max precision of the root enclosures, bits","{""set"": ""perlag""}",2048.0
+AC5.RS157,AC5.RN8,roots proved on the unit circle,"{""set"": ""perlag""}",32.0
+AC5.RS158,AC5.RN8,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""perlag""}",0.0
+AC5.RS159,AC5.RN8,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""perlag""}",4.218847493575595e-15
+AC5.RS160,AC5.RN8,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""perlag""}",1498.0
+AC5.RS161,AC5.RN8,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""perlag""}",0.0
+AC5.RS162,AC5.RN8,models whose shared non-cyclotomic factor could not be located,"{""set"": ""perlag""}",0.0
+AC5.RS163,AC5.RN8,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""perlag""}",0.0
+AC5.RS164,AC5.RN8,"models accepted by the per-lag check that do not forget their initial states, exact oracle","{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",1482.0
+AC5.RS165,AC5.RN8,"models rejected by the per-lag check that forget their initial states, exact oracle","{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",0.0
+AC5.RS166,AC5.RN8,models accepted by the per-lag check,"{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",3042.0
+AC5.RS167,AC5.RN8,models of the family,"{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",3042.0
+AC5.RS168,AC5.RN8,"models accepted by the per-lag check that do not forget their initial states, exact oracle","{""family"": ""GUM"", ""set"": ""perlag""}",10.0
+AC5.RS169,AC5.RN8,"models rejected by the per-lag check that forget their initial states, exact oracle","{""family"": ""GUM"", ""set"": ""perlag""}",1.0
+AC5.RS170,AC5.RN8,models accepted by the per-lag check,"{""family"": ""GUM"", ""set"": ""perlag""}",193.0
+AC5.RS171,AC5.RN8,models of the family,"{""family"": ""GUM"", ""set"": ""perlag""}",200.0
+AC5.RS172,AC5.RN8,"time of the oracle on the set, s","{""set"": ""perlag""}",1.123488187789917
+AC5.RS173,AC5.RN8,models given to the oracle,"{""set"": ""cancel""}",500.0
+AC5.RS174,AC5.RN8,models on which the oracle failed,"{""set"": ""cancel""}",0.0
+AC5.RS175,AC5.RN8,models excluded by undecided,"{""set"": ""cancel""}",0.0
+AC5.RS176,AC5.RN8,models excluded by edge,"{""set"": ""cancel""}",0.0
+AC5.RS177,AC5.RN8,models compared,"{""set"": ""cancel""}",500.0
+AC5.RS178,AC5.RN8,"max degree of theta, exact","{""set"": ""cancel""}",84.0
+AC5.RS179,AC5.RN8,"max degree of the cancelled MA polynomial, exact","{""set"": ""cancel""}",84.0
+AC5.RS180,AC5.RN8,"max precision of the root enclosures, bits","{""set"": ""cancel""}",128.0
+AC5.RS181,AC5.RN8,roots proved on the unit circle,"{""set"": ""cancel""}",0.0
+AC5.RS182,AC5.RN8,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""cancel""}",0.0
+AC5.RS183,AC5.RN8,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""cancel""}",4.6629367034256575e-15
+AC5.RS184,AC5.RN8,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""cancel""}",172.0
+AC5.RS185,AC5.RN8,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""cancel""}",0.0
+AC5.RS186,AC5.RN8,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""cancel""}",4.3942627314663696e-13
+AC5.RS187,AC5.RN8,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""cancel""}",172.0
+AC5.RS188,AC5.RN8,models whose cancelled MA degree differs from the prototype's,"{""set"": ""cancel""}",0.0
+AC5.RS189,AC5.RN8,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""cancel""}",0.0
+AC5.RS190,AC5.RN8,models whose shared non-cyclotomic factor could not be located,"{""set"": ""cancel""}",0.0
+AC5.RS191,AC5.RN8,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""cancel""}",8.0
+AC5.RS192,AC5.RN8,"time of the oracle on the set, s","{""set"": ""cancel""}",0.48577117919921875
+AC5.RS193,AC5.RN8,models given to the oracle,"{""set"": ""stepdown""}",575.0
+AC5.RS194,AC5.RN8,models on which the oracle failed,"{""set"": ""stepdown""}",0.0
+AC5.RS195,AC5.RN8,models excluded by undecided,"{""set"": ""stepdown""}",0.0
+AC5.RS196,AC5.RN8,models excluded by edge,"{""set"": ""stepdown""}",0.0
+AC5.RS197,AC5.RN8,models compared,"{""set"": ""stepdown""}",575.0
+AC5.RS198,AC5.RN8,"max degree of theta, exact","{""set"": ""stepdown""}",535.0
+AC5.RS199,AC5.RN8,"max degree of the cancelled MA polynomial, exact","{""set"": ""stepdown""}",533.0
+AC5.RS200,AC5.RN8,"max precision of the root enclosures, bits","{""set"": ""stepdown""}",128.0
+AC5.RS201,AC5.RN8,roots proved on the unit circle,"{""set"": ""stepdown""}",0.0
+AC5.RS202,AC5.RN8,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""stepdown""}",0.0
+AC5.RS203,AC5.RN8,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""stepdown""}",6.5851768482616535e-12
+AC5.RS204,AC5.RN8,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""stepdown""}",198.0
+AC5.RS205,AC5.RN8,models whose cancelled MA degree differs from the prototype's,"{""set"": ""stepdown""}",0.0
+AC5.RS206,AC5.RN8,step-down decisions of the prototype that differ from the exact oracle,"{""set"": ""stepdown""}",0.0
+AC5.RS207,AC5.RN8,"max abs difference of the largest mode modulus, prototype's bisection against the exact oracle","{""set"": ""stepdown""}",5.738698405366449e-11
+AC5.RS208,AC5.RN8,models with a bisection value,"{""set"": ""stepdown""}",198.0
+AC5.RS209,AC5.RN8,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""stepdown""}",0.0
+AC5.RS210,AC5.RN8,models whose shared non-cyclotomic factor could not be located,"{""set"": ""stepdown""}",0.0
+AC5.RS211,AC5.RN8,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""stepdown""}",8.0
+AC5.RS212,AC5.RN8,"time of the oracle on the set, s","{""set"": ""stepdown""}",5.206682205200195
+AC5.RS213,AC5.RN8,models given to the oracle,"{""set"": ""cpp""}",800.0
+AC5.RS214,AC5.RN8,models on which the oracle failed,"{""set"": ""cpp""}",0.0
+AC5.RS215,AC5.RN8,models excluded by undecided,"{""set"": ""cpp""}",0.0
+AC5.RS216,AC5.RN8,models excluded by edge,"{""set"": ""cpp""}",3.0
+AC5.RS217,AC5.RN8,models compared,"{""set"": ""cpp""}",797.0
+AC5.RS218,AC5.RN8,"max degree of theta, exact","{""set"": ""cpp""}",536.0
+AC5.RS219,AC5.RN8,"max degree of the cancelled MA polynomial, exact","{""set"": ""cpp""}",533.0
+AC5.RS220,AC5.RN8,"max precision of the root enclosures, bits","{""set"": ""cpp""}",128.0
+AC5.RS221,AC5.RN8,roots proved on the unit circle,"{""set"": ""cpp""}",0.0
+AC5.RS222,AC5.RN8,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""cpp""}",0.0
+AC5.RS223,AC5.RN8,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""cpp""}",5.204883191112231e-10
+AC5.RS224,AC5.RN8,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""cpp""}",292.0
+AC5.RS225,AC5.RN8,models whose cancelled MA degree differs from the prototype's,"{""set"": ""cpp""}",0.0
+AC5.RS226,AC5.RN8,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""cpp""}",0.0
+AC5.RS227,AC5.RN8,models whose shared non-cyclotomic factor could not be located,"{""set"": ""cpp""}",0.0
+AC5.RS228,AC5.RN8,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""cpp""}",8.0
+AC5.RS229,AC5.RN8,"time of the oracle on the set, s","{""set"": ""cpp""}",22.854673385620117
+AC5.RS230,AC5.RN8,models given to the oracle,"{""set"": ""examples""}",2.0
+AC5.RS231,AC5.RN8,models on which the oracle failed,"{""set"": ""examples""}",0.0
+AC5.RS232,AC5.RN8,models excluded by undecided,"{""set"": ""examples""}",0.0
+AC5.RS233,AC5.RN8,models excluded by edge,"{""set"": ""examples""}",0.0
+AC5.RS234,AC5.RN8,models compared,"{""set"": ""examples""}",2.0
+AC5.RS235,AC5.RN8,"max degree of theta, exact","{""set"": ""examples""}",193.0
+AC5.RS236,AC5.RN8,"max degree of the cancelled MA polynomial, exact","{""set"": ""examples""}",168.0
+AC5.RS237,AC5.RN8,"max precision of the root enclosures, bits","{""set"": ""examples""}",128.0
+AC5.RS238,AC5.RN8,roots proved on the unit circle,"{""set"": ""examples""}",0.0
+AC5.RS239,AC5.RN8,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""examples""}",0.0
+AC5.RS240,AC5.RN8,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""examples""}",0.0
+AC5.RS241,AC5.RN8,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""examples""}",0.0
+AC5.RS242,AC5.RN8,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""examples""}",0.0
+AC5.RS243,AC5.RN8,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""examples""}",0.0
+AC5.RS244,AC5.RN8,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""examples""}",0.0
+AC5.RS245,AC5.RN8,models whose cancelled MA degree differs from the prototype's,"{""set"": ""examples""}",0.0
+AC5.RS246,AC5.RN8,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""examples""}",0.0
+AC5.RS247,AC5.RN8,models whose shared non-cyclotomic factor could not be located,"{""set"": ""examples""}",0.0
+AC5.RS248,AC5.RN8,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""examples""}",0.0
+AC5.RS249,AC5.RN8,"time of the oracle on the set, s","{""set"": ""examples""}",0.15340566635131836
+AC5.RS250,AC5.RN8,models given to the oracle,"{""set"": ""all""}",5119.0
+AC5.RS251,AC5.RN8,models on which the oracle failed,"{""set"": ""all""}",0.0
+AC5.RS252,AC5.RN8,models excluded by undecided,"{""set"": ""all""}",0.0
+AC5.RS253,AC5.RN8,models excluded by edge,"{""set"": ""all""}",81.0
+AC5.RS254,AC5.RN8,models compared,"{""set"": ""all""}",5038.0
+AC5.RS255,AC5.RN8,"max degree of theta, exact","{""set"": ""all""}",536.0
+AC5.RS256,AC5.RN8,"max degree of the cancelled MA polynomial, exact","{""set"": ""all""}",533.0
+AC5.RS257,AC5.RN8,"max precision of the root enclosures, bits","{""set"": ""all""}",2048.0
+AC5.RS258,AC5.RN8,roots proved on the unit circle,"{""set"": ""all""}",32.0
+AC5.RS259,AC5.RN8,admissibility decisions of the PBH reference that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS260,AC5.RN8,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible","{""set"": ""all""}",4.6629367034256575e-15
+AC5.RS261,AC5.RN8,"models both find inadmissible, PBH reference and exact oracle","{""set"": ""all""}",1670.0
+AC5.RS262,AC5.RN8,"models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1","{""set"": ""all""}",0.0
+AC5.RS263,AC5.RN8,models whose shared non-cyclotomic factor could not be located,"{""set"": ""all""}",0.0
+AC5.RS264,AC5.RN8,"models with a shared non-cyclotomic factor, all roots in |B| > 1","{""set"": ""all""}",24.0
+AC5.RS265,AC5.RN8,admissibility decisions of the prototype's cancellation that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS266,AC5.RN8,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible","{""set"": ""all""}",5.204883191112231e-10
+AC5.RS267,AC5.RN8,"models both find inadmissible, prototype's cancellation and exact oracle","{""set"": ""all""}",662.0
+AC5.RS268,AC5.RN8,models whose cancelled MA degree differs from the prototype's,"{""set"": ""all""}",0.0
+AC5.RS269,AC5.RN8,step-down decisions of the prototype that differ from the exact oracle,"{""set"": ""all""}",0.0
+AC5.RS270,AC5.RN8,"max abs difference of the largest mode modulus, prototype's bisection against the exact oracle","{""set"": ""all""}",5.738698405366449e-11
+AC5.RS271,AC5.RN8,models with a bisection value,"{""set"": ""all""}",198.0
+AC5.RS272,AC5.RN8,"time of the oracle, s","{""set"": ""all""}",29.86014413833618
+AC5.RS273,AC5.RN9,models in the edge band,"{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",78.0
+AC5.RS274,AC5.RN9,"max distance of the certified largest mode modulus from 1, edge models","{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",4.440892098500626e-16
+AC5.RS275,AC5.RN9,edge models with roots proved on the unit circle,"{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",2.0
+AC5.RS276,AC5.RN9,edge models whose decision by the PBH reference differs from the exact oracle,"{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",6.0
+AC5.RS277,AC5.RN9,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, edge models","{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",2.4424906541753444e-15
+AC5.RS278,AC5.RN9,edge models with alpha + gamma = 2 within 1e-12,"{""family"": ""ETS(A,N,A)"", ""set"": ""perlag""}",78.0
+AC5.RS279,AC5.RN9,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models","{""set"": ""perlag""}",2.886579864025407e-15
+AC5.RS280,AC5.RN9,admissible models compared,"{""reference"": ""PBH reference"", ""set"": ""perlag""}",1666.0
+AC5.RS281,AC5.RN9,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models","{""set"": ""cancel""}",7.216449660063518e-15
+AC5.RS282,AC5.RN9,admissible models compared,"{""reference"": ""PBH reference"", ""set"": ""cancel""}",328.0
+AC5.RS283,AC5.RN9,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models","{""set"": ""cancel""}",1.5909495942878493e-13
+AC5.RS284,AC5.RN9,admissible models compared,"{""reference"": ""prototype's roots after cancellation"", ""set"": ""cancel""}",328.0
+AC5.RS285,AC5.RN9,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models","{""set"": ""stepdown""}",1.5909495942878493e-13
+AC5.RS286,AC5.RN9,admissible models compared,"{""reference"": ""prototype's roots after cancellation"", ""set"": ""stepdown""}",377.0
+AC5.RS287,AC5.RN9,models in the edge band,"{""family"": ""ETS high degree"", ""set"": ""cpp""}",3.0
+AC5.RS288,AC5.RN9,"max distance of the certified largest mode modulus from 1, edge models","{""family"": ""ETS high degree"", ""set"": ""cpp""}",6.894689374981056e-09
+AC5.RS289,AC5.RN9,edge models with roots proved on the unit circle,"{""family"": ""ETS high degree"", ""set"": ""cpp""}",0.0
+AC5.RS290,AC5.RN9,edge models whose decision by the prototype's cancellation differs from the exact oracle,"{""family"": ""ETS high degree"", ""set"": ""cpp""}",0.0
+AC5.RS291,AC5.RN9,"max abs difference of the largest mode modulus, prototype's cancellation against the exact oracle, edge models","{""family"": ""ETS high degree"", ""set"": ""cpp""}",3.708144902248023e-14
+AC5.RS292,AC5.RN9,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models","{""set"": ""cpp""}",3.7969627442180354e-14
+AC5.RS293,AC5.RN9,admissible models compared,"{""reference"": ""prototype's roots after cancellation"", ""set"": ""cpp""}",505.0
+AC5.RS294,AC5.RN9,"max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models","{""set"": ""examples""}",1.6653345369377348e-15
+AC5.RS295,AC5.RN9,admissible models compared,"{""reference"": ""PBH reference"", ""set"": ""examples""}",2.0
+AC5.RS296,AC5.RN9,"max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models","{""set"": ""examples""}",2.220446049250313e-16
+AC5.RS297,AC5.RN9,admissible models compared,"{""reference"": ""prototype's roots after cancellation"", ""set"": ""examples""}",2.0
+AC5.RS298,AC5.RN9,"largest mode modulus, exact oracle (theta_G)","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",0.9999965469723224
+AC5.RS299,AC5.RN9,"abs difference of the largest mode modulus, PBH reference against the exact oracle","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",1.6653345369377348e-15
+AC5.RS300,AC5.RN9,"abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",1.1102230246251565e-16
+AC5.RS301,AC5.RN9,"degree of theta, exact","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",193.0
+AC5.RS302,AC5.RN9,"degree of the shared cyclotomic factor, exact","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",25.0
+AC5.RS303,AC5.RN9,degree of the exact gcd of theta and phi,"{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",25.0
+AC5.RS304,AC5.RN9,"largest mode modulus, exact oracle (theta_G)","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",0.9829371631611429
+AC5.RS305,AC5.RN9,"abs difference of the largest mode modulus, PBH reference against the exact oracle","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",7.771561172376096e-16
+AC5.RS306,AC5.RN9,"abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",2.220446049250313e-16
+AC5.RS307,AC5.RN9,"degree of theta, exact","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",26.0
+AC5.RS308,AC5.RN9,"degree of the shared cyclotomic factor, exact","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",14.0
+AC5.RS309,AC5.RN9,degree of the exact gcd of theta and phi,"{""model"": ""GUM start, orders (2,2), lags (1,12)""}",14.0

@@ -242,7 +242,7 @@
   {
    "id": "D1",
    "term": "lagged SSOE model",
-   "definition": "A pure additive single-source-of-error state space model $y_t = w' v_{t-l} + \\epsilon_t$, $v_t = F v_{t-l} + g \\epsilon_t$ with $k$ components, in which component $j$ of $v_{t-l}$ enters with its own lag $l_j$; its discount matrix is $D = F - g w'$ and its lag matrix is $L(B) = \\mathrm{diag}(B^{l_1}, \\dots, B^{l_k})$ for the backshift operator $B$; $\\Lambda(\\lambda) = \\mathrm{diag}(\\lambda^{l_1}, \\dots, \\lambda^{l_k})$ for a complex number $\\lambda$.",
+   "definition": "A pure additive single-source-of-error state space model with $k$ components, $$\\begin{aligned} y_t &= w' v_{t-l} + \\epsilon_t \\\\ v_t &= F v_{t-l} + g \\epsilon_t, \\end{aligned}$$ in which component $j$ of $v_{t-l}$ enters with its own lag $l_j$; its discount matrix is $D = F - g w'$ and its lag matrix is $L(B) = \\mathrm{diag}(B^{l_1}, \\dots, B^{l_k})$ for the backshift operator $B$; $\\Lambda(\\lambda) = \\mathrm{diag}(\\lambda^{l_1}, \\dots, \\lambda^{l_k})$ for a complex number $\\lambda$.",
    "kind": "method"
   },
   {
@@ -272,13 +272,13 @@
   {
    "id": "D6",
    "term": "cyclotomic cancellation",
-   "definition": "The procedure that computes the coefficients of $\\theta(B) = \\det(I - D L(B))$ and $\\phi(B) = \\det(I - F L(B))$ by an inverse discrete Fourier transform of their values at the $N$-th roots of unity ($N$ the smallest power of 2 above $\\sum_j l_j$), and divides both by every cyclotomic polynomial $\\Phi_n(B)$, $n$ dividing one of the lags, for as long as it divides both with a remainder at most $10^{-9}$ times the sum of absolute coefficients; the quotient of $\\theta$ is the cancelled MA polynomial $\\theta^*(B)$.",
+   "definition": "The procedure that computes the coefficients of $$\\begin{aligned} \\theta(B) &= \\det(I - D L(B)) \\\\ \\phi(B) &= \\det(I - F L(B)) \\end{aligned}$$ by an inverse discrete Fourier transform of their values at the $N$-th roots of unity ($N$ the smallest power of 2 above $\\sum_j l_j$), and divides both by every cyclotomic polynomial $\\Phi_n(B)$, $n$ dividing one of the lags, for as long as it divides both with a remainder at most $10^{-9}$ times the sum of absolute coefficients; the quotient of $\\theta$ is the cancelled MA polynomial $\\theta^*(B)$.",
    "kind": "method"
   },
   {
    "id": "D7",
    "term": "step-down test",
-   "definition": "The Levinson-Durbin step-down (Schur-Cohn) recursion on $1 + c_1 B + \\dots + c_n B^n$: for $j = n, \\dots, 1$, $\\kappa_j = c_j$ and $c_i \\leftarrow (c_i - \\kappa_j c_{j-i}) / (1 - \\kappa_j^2)$; the test passes when every $|\\kappa_j| < 1$, which holds if and only if all roots lie outside the unit circle (the $\\kappa_j$ are the partial autocorrelations of the autoregression with this polynomial).",
+   "definition": "The Levinson-Durbin step-down (Schur-Cohn) recursion on $1 + c_1 B + \\dots + c_n B^n$: for $j = n, \\dots, 1$, $$\\kappa_j = c_j, \\qquad c_i \\leftarrow \\frac{c_i - \\kappa_j c_{j-i}}{1 - \\kappa_j^2};$$ the test passes when every $|\\kappa_j| < 1$, which holds if and only if all roots lie outside the unit circle (the $\\kappa_j$ are the partial autocorrelations of the autoregression with this polynomial).",
    "source": "B2",
    "kind": "method"
   },
@@ -300,7 +300,7 @@
    "id": "D10",
    "term": "check of the whole model",
    "kind": "method",
-   "definition": "Admissibility of a lagged SSOE model from the MA polynomial $\\theta(B) = \\det(I - D L(B))$ of its ARIMA form: $\\theta$ is divided by its common factors with $\\phi(B) = \\det(I - F L(B))$ by [[D6:cyclotomic cancellation]], and the model is accepted when the cancelled polynomial $\\theta^*$ has no root in $|B| \\le 1$ and, for a model with ARIMA components, the AR polynomial of its ARIMA part is stationary; its largest mode modulus is $1/\\min|B|$ over the roots of $\\theta^*$. In the numpy prototype (admissibility.py, confirm.py, ets_arima.py) the roots come from numpy; in smooth the [[D7:step-down test]] decides and bisection gives the modulus."
+   "definition": "Admissibility of a lagged SSOE model from the MA polynomial $$\\theta(B) = \\det(I - D L(B))$$ of its ARIMA form: $\\theta$ is divided by its common factors with $\\phi(B) = \\det(I - F L(B))$ by [[D6:cyclotomic cancellation]], and the model is accepted when the cancelled polynomial $\\theta^*$ has no root in $|B| \\le 1$ and, for a model with ARIMA components, the AR polynomial of its ARIMA part is stationary; its largest mode modulus is $1/\\min|B|$ over the roots of $\\theta^*$. In the numpy prototype (admissibility.py, confirm.py, ets_arima.py) the roots come from numpy; in smooth the [[D7:step-down test]] decides and bisection gives the modulus."
   },
   {
    "id": "D11",
@@ -345,7 +345,7 @@
    "id": "D16",
    "term": "stability condition of the ADAM monograph",
    "kind": "method",
-   "definition": "The condition of Section 5.4 of the ADAM monograph (eqs 5.20-5.22): every nonzero eigenvalue of each per-lag discount matrix $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ has modulus below 1.",
+   "definition": "The condition of Section 5.4 of the ADAM monograph (eqs 5.20-5.22): every nonzero eigenvalue of each per-lag discount matrix $$D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$$ has modulus below 1.",
    "source": "B4"
   },
   {
@@ -1221,7 +1221,7 @@
   },
   {
    "id": "C6",
-   "statement": "For a [[D1:lagged SSOE model]], ignoring the initial states, $\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t$, so the model has the ARIMA form with AR polynomial $\\phi(B) = \\det(I - F L(B))$ and MA polynomial $\\theta(B) = \\det(I - D L(B))$.",
+   "statement": "For a [[D1:lagged SSOE model]], ignoring the initial states, $$\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t,$$ so the model has the ARIMA form with AR polynomial $\\phi(B) = \\det(I - F L(B))$ and MA polynomial $\\theta(B) = \\det(I - D L(B))$.",
    "about": {
     "subject": "D1",
     "relation": "has the ARIMA form with",
@@ -1368,7 +1368,7 @@
   },
   {
    "id": "C9",
-   "statement": "For [[D9:ETS(A,N,A)]] with any period $m$ and any $\\alpha$ and $\\gamma$, $B = 1$ is a root of both $\\theta(B) = (1 - (1-\\alpha)B)(1 - (1-\\gamma)B^m) - \\alpha\\gamma B^{m+1}$ and $\\phi(B) = (1 - B)(1 - B^m)$, so the [[D2:expanded discount matrix]] has an eigenvalue equal to 1.",
+   "statement": "For [[D9:ETS(A,N,A)]] with any period $m$ and any $\\alpha$ and $\\gamma$, $B = 1$ is a root of both $$\\begin{aligned} \\theta(B) &= (1 - (1-\\alpha)B)(1 - (1-\\gamma)B^m) - \\alpha\\gamma B^{m+1} \\\\ \\phi(B) &= (1 - B)(1 - B^m), \\end{aligned}$$ so the [[D2:expanded discount matrix]] has an eigenvalue equal to 1.",
    "about": {
     "subject": "D9",
     "relation": "has an eigenvalue equal to 1 in its",
@@ -1620,7 +1620,7 @@
   },
   {
    "id": "C15",
-   "statement": "For the lag-1 expansion $\\tilde M$ of $v_t = M v_{t-l}$ in a [[D1:lagged SSOE model]], $\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M)$, which equals $\\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda))$ for $\\lambda \\neq 0$.",
+   "statement": "For the lag-1 expansion $\\tilde M$ of $v_t = M v_{t-l}$ in a [[D1:lagged SSOE model]], $$\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M),$$ which equals $$\\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda))$$ for $\\lambda \\neq 0$.",
    "about": {
     "subject": "D1",
     "relation": "has as characteristic polynomial of its lag-1 expansion",
@@ -1751,7 +1751,7 @@
   },
   {
    "id": "C20",
-   "statement": "For a square matrix $M$ of size $k$ and lags $l_1, \\dots, l_k$, $\\det(I - M L(B)) = \\sum_{S \\subseteq \\{1, \\dots, k\\}} (-1)^{|S|} \\det(M_{SS})\\, B^{\\sum_{j \\in S} l_j}$, with $\\det(M_{\\emptyset\\emptyset}) = 1$.",
+   "statement": "For a square matrix $M$ of size $k$ and lags $l_1, \\dots, l_k$, $$\\det(I - M L(B)) = \\sum_{S \\subseteq \\{1, \\dots, k\\}} (-1)^{|S|} \\det(M_{SS})\\, B^{\\sum_{j \\in S} l_j},$$ with $\\det(M_{\\emptyset\\emptyset}) = 1$.",
    "about": {
     "subject": "det(I - M L(B))",
     "relation": "is the signed sum over subsets of",
@@ -1789,7 +1789,7 @@
   },
   {
    "id": "C21",
-   "statement": "The per-lag discount matrices $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ of [[D16:Section 5.4 of the ADAM monograph]] have as nonzero eigenvalues those of the diagonal block of $D = F - g w'$ for the lag $m_i$ (the [[D4:per-lag check]]), and their sum is $D + \\sum_{i \\neq j} g_{m_i} w_{m_j}'$, which differs from $D$ whenever $g w'$ links components of distinct lags.",
+   "statement": "The per-lag discount matrices $D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}'$ of [[D16:Section 5.4 of the ADAM monograph]] have as nonzero eigenvalues those of the diagonal block of $D = F - g w'$ for the lag $m_i$ (the [[D4:per-lag check]]), and their sum is $$D + \\sum_{i \\neq j} g_{m_i} w_{m_j}',$$ which differs from $D$ whenever $g w'$ links components of distinct lags.",
    "about": {
     "subject": "D16",
     "relation": "checks the same eigenvalues as",

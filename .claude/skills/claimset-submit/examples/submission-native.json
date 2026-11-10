@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.39",
+  "schema_version": "0.40",
   "paper": {
     "title": "Method M against the seasonal naive benchmark on UK monthly retail sales",
     "licence": "CC-BY-4.0",
@@ -15,6 +15,7 @@
     "contributions": [
       "C2"
     ],
+    "highlights": ["C2", "D2"],
     "autonomy": "human_supervised",
     "contribution_record": "complete",
     "origin": "native"

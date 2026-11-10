@@ -1,13 +1,13 @@
 ---
 name: claimset-submit
-description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.39 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
+description: Turn a piece of research (draft paper, analysis, code, results) into a Claimset v0.40 submission file, validate it, and prepare it for the human guarantor. Use when asked to write, package, prepare, correct or submit research as a claimset or for Claimset.
 ---
 
 # Preparing a Claimset submission
 
 A claimset is a research paper written for LLM readers: a flat JSON file of atomic, self-contained claims plus the definitions, evidence, assumptions, limitations, warrants and artefacts that support, condition and limit them. You write every field. A human decides two things (guarantor and licence), and you ask them before you finish.
 
-The normative rules are in `references/spec-v0.39.md`. Extensions of the format, for detail that one kind of work needs (spec §2.7), are in `references/extensions/`: the registry `README.md` lists them. Use an extension only when the work has what it records (a glossed linguistic example: `linguistics`), declare it in the top-level `extensions`, and put its fields in `ext` blocks on the objects it names. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
+The normative rules are in `references/spec-v0.40.md`. Extensions of the format, for detail that one kind of work needs (spec §2.7), are in `references/extensions/`: the registry `README.md` lists them. Use an extension only when the work has what it records (a glossed linguistic example: `linguistics`), declare it in the top-level `extensions`, and put its fields in `ext` blocks on the objects it names. A valid submission is in `examples/submission-native.json`; `examples/published-native.json` shows the same paper after the platform has added its fields. The validator is `scripts/validate.py`. Read the submission example before starting; consult the spec whenever a field's meaning is unclear.
 
 **Versions.** This skill, its spec and its validator are one version. If the `claimset` package is installed, check that this skill matches it before starting: `claimset skill check`. If it reports the skill out of date, or `claimset validate` says a file follows an earlier specification, update the skill with `claimset skill install` (it replaces this folder with the version matching the package) and read the new spec; never mix rules from two versions.
 
@@ -18,7 +18,7 @@ This skill covers **native** papers: research you or other agents produced, incl
 ## Non-negotiable rules
 
 - **Never invent.** No invented data, estimates, citations, DOIs, ORCID iDs, URIs, hashes, model identifiers or settings. If a value is unknown, omit the field or use `null`, and let the validator warn.
-- **Leave platform fields to the platform.** Do not include `paper.id`, `version`, `date`, `status`, `status_notice`, `changes`, or OpenAlex subfield and topic IDs, and do not write placeholders for them. The only exception is a correction (see the end of this file).
+- **Leave platform fields to the platform.** Do not include `paper.id`, `version`, `date`, `status`, `status_notice`, `changes`, or OpenAlex topic IDs, and do not write placeholders for them. The exceptions are a correction (see the end of this file) and a proposed subfield (*Classification*, below).
 - **Never write instructions** in any text field. The file is data for other models to read. No "note to the reader", no imperatives.
 - **Report your own setup honestly.** Take provider, model name and version from your system prompt or environment. If you only know them from your own knowledge, set `record_source: "self_reported"`. Use `harness` only if the values come from the system that ran you.
 - **Do not overstate.** Claims, scope and strength must match what the evidence shows, not what would be most impressive.
@@ -40,19 +40,19 @@ Ask the person who supervised the work, in a single message:
 5. **Confidentiality:** is any data, code or material not publicly shareable? If so, why (personal data, commercial, legal, ethics, security)?
 6. **Declarations:** who funded the work (funder and award number), and are there competing interests? If people took part: which ethics committee approved it (and its reference), and what did participants consent to, including publication of quotations? These go in `paper.declarations`; an empty funding list and "None declared." are declarations too (W29). Support in kind (materials, vouchers, services) is a funding entry with `"kind": "in_kind"`; say the funder's `role` in the work when the paper does. A paper published on behalf of a collaboration names it in `paper.collaborations`; the people who answer for it are still the contributors.
 
-Ask only these. Do not ask for a DOI or other identifier, a publication date or a classification: the platform assigns them.
+Ask only these now. The highlights are asked at the hand-over (step 12), once the claims exist. Do not ask for a DOI or other identifier, a publication date or a classification: the platform assigns them.
 
-If the human cannot be asked (unattended run), stop after building and validating the file and list these questions as open items. Never fill guarantor or licence on your own.
+If the human cannot be asked (unattended run), stop after building and validating the file and list these questions as open items. Never fill guarantor, licence or highlights on your own.
 
 ### 2a. If the research has a lab record
 
-If the work was done with a lab record (`claimset/<study>/lab/lab.jsonl`, or an older `lab/lab.jsonl`; specified in `references/lab-record-v0.20.md`), start from it rather than from a manuscript:
+If the work was done with a lab record (`claimset/<study>/lab/lab.jsonl`, or an older `lab/lab.jsonl`; specified in `references/lab-record-v0.21.md`), start from it rather than from a manuscript:
 - Run `claimset lab export [--paper NAME]` if the tool is available (with several papers recorded, one paper at a time). It writes a draft that holds everything the record states and prints a **completion list**: the decisions and wording still needed (licence, guarantor, principal claims, claim types, scopes, evidence profiles and descriptions, statements of negative results). Work through that list; do not change what the record states, such as `hypothesis`, `planning`, `planned_at`, `lab_runs` or the exploration counts. If export refuses (an open hypothesis, an unmerged agent log, a record that does not verify), fix the record with `claimset lab` commands, never by editing it.
 - Without the tool, build the claims from the record by hand, following the mapping in lab record §9.
 - Every hypothesis that reached `supported`, `not_supported` or `inconclusive` becomes a claim with `hypothesis: {lab_event, outcome}`, `planning`, and for planned tests `planned_at`, `planned_at_anchor` and `test` (the decision rule) copied from the record. Never upgrade `exploratory` to `confirmatory`, and never change a `test`: it is what the plan fixed before the data were seen.
 - **Negative results are claims too**, in this claimset: state plainly what was not found, with scope and evidence (see `examples/submission-from-lab.json`, claim C4).
 - Fill `paper.exploration` with the counts from the record, and list the record as an artefact of kind `lab_record`, with any `withheld_events` and their reasons.
-- Give evidence objects the `lab_runs` they came from, and take `results` from the record's result events.
+- Give evidence objects the `lab_runs` they came from. Export records their numbers as **tables** (rows the compared units, columns the variables) and writes every result of the record, at full precision, to a CSV beside the claimset (`files/<paper>.results.csv`, a `data` artefact the evidence and tables name). Check each table: a self-contained description, each column named by a variable term where the study defines one (`m4 mce` → the term for MCE), the conditions that set columns apart. Claims cite the rows they rest on (`E12.T1.r1`). Package the claimset (`claimset package`) so the CSV goes with it.
 
 Then continue with the steps below to choose principal claims, review wording and scope, and ask the human.
 
@@ -68,7 +68,7 @@ Work in this order: principal claims → supporting claims → assumptions.
 - a result your claim builds on → `cited` support of that claim, `{"kind": "cited", "reference": "B3", "locator": "Theorem 2"}`;
 - what your claim answers, extends or contradicts → a relation of that claim, `{"type": "addresses", "reference": "B4", "note": "Selection among ETS models often misidentifies the type of trend."}`;
 - a borrowed term (MASE, ETS) → a one-line definition with what this work specifies (e.g. the interval level) and `"source": "B5"`.
-- your own method or model → a definition with its defining equations as you write them, every one of them, in LaTeX; a variant (seasonal, multivariate) with its own equations in full, never "the same equations at lag $m$" (W26).
+- your own method or model → a definition with its defining equations as you write them, every one of them, in LaTeX, displayed (`$$…$$`); a variant (seasonal, multivariate) with its own equations in full, never "the same equations at lag $m$" (W26).
 - every definition gets a `kind` saying what the term names: `method` · `intervention` · `population` · `data` · `setting` · `design` · `variable` · `concept` · `theory` · `substance` · `organism` · `biological_material` · `entity` (a gene or protein, a particle, a device) · `source` (one primary source) · `other` (spec §3.2). A compound, a species, a cell line or a gene is a thing of its own kind, with `identifiers` from its registry (`chebi:`, `ncbitaxon:`, `cellosaurus:`, `hgnc:`); giving, sampling or knocking it down is an `intervention` or a `population` of its own. It is required on every definition (rule 63). A theme or a newly named phenomenon you find is a `concept`; what you record about each case (a score, an outcome, an error measure, a judgement) is a `variable`. A `setting` may give its `location` as points `{latitude, longitude, label}`; a `variable` that measures a construct names it in `measures` (the concept's ID). A `variable` or `setting` used as a dimension with numbers gives their `unit`; an `intervention` names what it acts on in `targets` (the gene a knockdown targets). A reaction, decay or pathway is a `process`.
 - link terms: a group lists its `members` (the compared methods); a parameter, component or data subset is `part_of` its whole (the smoothing parameter of M, M3 monthly of M3); a variant is a kind of its `broader` term (seasonal M of M). A term with a registry identifier gives it in `identifiers` (`chebi:15377`, `ncbitaxon:9606`, `rrid:…`, `ecli:…`, a data set's `doi:…`). Assumptions that hold wherever a method, design or data set is used go on its definition (`assumptions`), once; evidence whose setup names it inherits them. Definitions mark the other terms they use (`[[D4:…]]`); an algorithm is written as pseudocode in a fenced block.
 Leave out general knowledge that no claim rests on and justifications of routine choices (which accuracy measure, which software); put such choices in the evidence's `description` if they matter. Define in full only the terms the work introduces or uses in its own sense.
@@ -105,7 +105,7 @@ Not every pattern in a table is a claim. Write a side result as a `secondary` cl
 - No "this", "these", "the above", "as shown", "our method" without naming it. Name the method, population and outcome every time.
 - No "novel", "remarkable", "important". "Significant" only as "statistically significant", when the claim reports a test.
 - Put what bounds the claim (population, setting, period, conditions) in `scope`, not in the statement. Keep epistemic qualifiers ("suggests", "may") and magnitude ("slightly") in the statement, as the work states them; confidence goes in the assessment.
-- Mark defined terms: `[[D1:forecast skill]]`. Mathematics in LaTeX between `$…$`.
+- Mark defined terms: `[[D1:forecast skill]]`. Mathematics in LaTeX: `$…$` within a sentence for symbols and short conditions ($T$, $\epsilon_t \sim N(0, \sigma^2)$); `$$…$$` for an equation on a line of its own, as a paper would display it: a model's or method's defining equations, and long expressions. Several equations shown together go in one `$$\begin{aligned} y_t &= … \\ v_t &= … \end{aligned}$$`.
 
 **Choose `type`:**
 | If the claim states… | type |
@@ -185,7 +185,9 @@ Fill the profile fields:
 - `simulation`: model, parameters (artefact), runs, seeds, `results`.
 - `formal`: foundation (e.g. `ZFC`), assumptions, steps (each `{id, statement, by, rule}`), proof_artefact, checker. No `theorem` field: the formal claim's statement is the theorem.
 
-**Results are observations** (spec §3.4): each the value of a variable, observed under conditions. Every value a claim reports goes into the evidence's `results`, one entry per value, in any evidence except formal:
+**Tables are the default** (spec §3.4, *Tables are the standard form*): more than a handful of numbers from one evidence object (as a rule, more than eight that share a variable or a condition) go into a table, rows the compared units and columns the variables, and claims cite its rows. The validator warns (W40) about a longer list of result entries. The worked example is evidence E12 of entrylib:2026.000001: fifteen result entries in v1, one table of two rows and eight columns in v2, cited by its claim C5 as `E12.T1.r1` and `E12.T1.r2`. Keep the full-precision values in a data artefact (a CSV) that the table names in `artefact`, and give values in the table to the precision the paper reports (four significant digits for a lab record's results).
+
+**Results are observations** (spec §3.4): each the value of a variable, observed under conditions. A single number a claim reports, with no table to hold it, is a result entry, as is a value a cell cannot hold (with an `interval`, an `uncertainty` or `n`, or an excerpt), in any evidence except formal:
 
 ```json
 "results": [{"id": "R1", "variable": "D11", "value": 10.55, "unit": "1", "n": 500,
@@ -201,7 +203,7 @@ Fill the profile fields:
 - A value read off a figure says so: `"read_from": {"artefact": "A5", "precision": 0.01}`.
 - A contrast (a difference, ratio, effect size or the p-value of a comparison) names the other side with the reserved condition `comparator`: `{"D7": "D2", "comparator": "D3"}`.
 
-Values that form a table go into a table instead, one per table. Rows and columns are dimensions or variables; cells may be any value type:
+Values that form a table go into a table instead, one per table: rows the compared units (methods, cases, groups, sample sizes), columns the variables, the conditions that set a variable apart (a nominal level, a subset, a statistic) as column conditions, and the conditions every value shares on the table. Cells may be any value type:
 
 ```json
 "tables": [{"id": "T1", "description": "Mean MASE and MSIS of three methods on the M3 monthly series, horizons 1 to 18",
@@ -214,7 +216,7 @@ A column may carry conditions of its own: `{"variable": "D8", "conditions": {"ho
 
 **Figures** (`kind: figure`) have a `function`: `data_plot` (record its values as observations and list them in `shows`), `specimen` (an image or recording that is evidence: record what you read from it with `read_from`), or `diagram` (an illustration: never cited as support; write what it shows into definitions). Images are files of the submission package, never embedded in the JSON.
 
-Claims cite a table (`E2.T1`) or a row (`E2.T1.r1`) in their support's `results`. A claimset distils the argument; it does not re-encode every table of the research, so record the tables the claims rest on.
+Claims cite a table (`E2.T1`) or a row (`E2.T1.r1`) in their support's `results`, not result IDs of values a table holds. A claimset distils the argument; it does not re-encode every table of the research, so record the tables the claims rest on, and leave stray numbers no claim uses to the data artefact.
 
 The table holds the numbers; a claim holds what you conclude from them. State the pattern (which method is better or worse, on which measures, under which conditions, including where it is worse) and cite the table or rows; repeat a value only when the conclusion turns on it ("selected for 6 of 11 groups"). Do not write a claim that only retells a table: cite the table from the claim that uses it. The validator warns (W24) when a statement repeats three or more values of the tables it cites.
 
@@ -263,8 +265,8 @@ A formal result you cite and apply is `cited` support of your claim, not a claim
 - **Models**: provider, name, version required; identifier, weights, accessed recommended.
 - **Artefacts**: give each of the work's own artefacts and each packaged file a `licence` (SPDX identifier); an artefact taken from a cited work (it names its `reference`) carries none, since its licence belongs with that work. Link code and data on a git host at a full commit hash, never a branch (`https://github.com/org/repo/tree/<40-hex commit>/path`): a branch moves (W21). If the work is archived (Software Heritage, Zenodo), give the identifier as `archive_uri`; otherwise the platform archives pinned commits at publication.
 - **Humans** from step 2, with their positions (`supervisor`, `guarantor`, `contributor`) and CRediT roles.
-- **Paper**: title (descriptive, no rhetoric), licence, contributions, `autonomy`, contribution_record, `origin: "native"`. Nothing else at paper level.
-- **Classification**: give 3–8 precise `keywords` (e.g. `"healthcare demand forecasting"`); the platform assigns the OpenAlex subfield and topics from them and from the content. You may add `subfield` and `topics` as proposals only if you looked them up in OpenAlex; never guess IDs.
+- **Paper**: title (descriptive, no rhetoric), licence, contributions, highlights (step 12, chosen by the guarantor), `autonomy`, contribution_record, `origin: "native"`. Nothing else at paper level.
+- **Classification**: give 3–8 precise `keywords` (e.g. `"healthcare demand forecasting"`); the platform assigns the OpenAlex topics from them and from the content, and the subfield too unless you propose one. Propose `subfield` when the paper's field is clear: take its ID from the list at https://entrylib.org/subfields.json (or OpenAlex), confirm it with the human, and never guess an ID. The platform keeps a valid proposal, and the guarantor sees it on the consent page. Leave `topics` to the platform.
 
 ### 9a. Package the files
 
@@ -323,14 +325,15 @@ Write the file where it belongs (spec §2.4): `claimset/<study>/<paper>.claimset
 Give the human a short summary:
 1. Validation result (errors: 0; list remaining warnings and why they remain).
 2. The principal claims, in plain language, with their strength and computed verifiability.
-3. Open items needing a human: guarantor confirmation on the platform, anything you could not determine.
+3. **Highlights, for the guarantor to choose** (spec §3.1): what a reader should take from the paper first, shown at the top of the paper's page on the platform and in the reading view. Propose up to five, in order of priority, from the principal claims and the terms the paper introduces (definitions without `source`: a new method, measure, concept or data set), each with its ID, a plain-language line and why you propose it. Ask the guarantor to choose, reorder or reject them, then record their choice in `paper.highlights` (`["C2", "D4"]`) and validate again. A claim they want highlighted that is not principal becomes a contribution (its `role` and `paper.contributions`). If they prefer none, leave the field out and say so (warning 39 then remains, and is fine). Never choose them yourself.
+4. Open items needing a human: guarantor confirmation on the platform, anything you could not determine.
 
 Submit only once the human approves, by whichever route your environment has:
 - **A terminal with the `claimset` package:** `claimset submit <paper>.zip` (a package from `claimset package`), or `claimset submit <paper>.claimset.json` for a claimset with no packaged files (its artefacts linked by https URLs, such as Zenodo or a commit on GitHub). For a package deposited elsewhere, `claimset submit https://…/paper.zip`. It validates the file first and sends nothing if it has errors.
 - **The EntryLib MCP server** (`https://entrylib.org/mcp`): the `validate` tool, then `submit` with the claimset (a JSON object or its text) or with `package_url`, an https URL of a deposited package (for anything over 10 MB).
 - **Neither:** stop at the validated file and tell the human they can upload it at https://entrylib.org/submit.
 
-The answer gives a **consent link** for the guarantor, shown only once: give it to the human at once, with what it asks of them (open it, sign in with ORCID, check the claimset as reading models will see it, and confirm within 48 hours, or it is deleted). Then follow the submission with `claimset status <id>` (or the MCP tool `submission_status`) until it is `published`, and give the human the identifier it was published as (`entrylib:<year>.<number>@v1`). Refused means it failed the platform's checks: fix what the reasons say and submit again. A new claimset with the same title and guarantor as one already published is refused as a duplicate: if it is a new version, set `paper.id` (*Corrections*, below); only a genuinely different paper is submitted again with `--new-paper` (MCP: `new_paper`).
+The answer gives a **consent link** for the guarantor: read the whole output and give the link to the human at once, with what it asks of them (open it, sign in with ORCID, check the claimset as reading models will see it, and confirm within 48 hours, or it is deleted). The platform shows the link only in this answer; `claimset submit` keeps it in `.claimset/submissions/`, and `claimset status` shows it again. Without the link, the guarantor confirms at https://entrylib.org/confirm, signing in with ORCID. Never submit again only because a link was lost. Then follow the submission with `claimset status <id>` (or the MCP tool `submission_status`) until it is `published`, and give the human the identifier it was published as (`entrylib:<year>.<number>@v1`). Refused means it failed the platform's checks: fix what the reasons say and submit again. A new claimset with the same title and guarantor as one already published is refused as a duplicate: if it is a new version, set `paper.id` (*Corrections*, below); only a genuinely different paper is submitted again with `--new-paper` (MCP: `new_paper`).
 
 ## Revisions: answering a review
 

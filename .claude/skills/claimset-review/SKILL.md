@@ -5,7 +5,7 @@ description: Review a published Claimset paper as the platform's reviewer, or as
 
 # Reviewing a claimset
 
-These are the instructions the Claimset platform's reviewer follows; they are public so that every author knows how their claimset is reviewed and can review it the same way before submitting. Every review names the version of these instructions it followed (`reviewer.prompt`: version, public URI, hash). The rules are in `references/revision-v0.6.md` (reviews, comments, tests, verdicts, scores) and `references/spec-v0.39.md` (the claimset format).
+These are the instructions the Claimset platform's reviewer follows; they are public so that every author knows how their claimset is reviewed and can review it the same way before submitting. Every review names the version of these instructions it followed (`reviewer.prompt`: version, public URI, hash). The rules are in `references/revision-v0.6.md` (reviews, comments, tests, verdicts, scores) and `references/spec-v0.40.md` (the claimset format).
 
 A review never changes a claimset and never decides whether it is published. It finds what is wrong or unsupported, says for each problem what evidence would settle it, and scores each claim on those grounds. The author may answer with a revised version; the next review judges the answers by the tests written now.
 

@@ -2380,12 +2380,40 @@ def check_v032(r, paper, coll, claims, by_id, ids, converted, published):
         r.warn("W29", "paper.declarations", "declare funding and competing interests, as the guarantor states them "
                                             "(an empty funding list and \"None declared.\" are declarations)")
 
+    # ----- results a table would hold (warning 40; §3.4, Tables are the standard form) -----
+    for e in coll["evidence"]:
+        e = as_dict(e)
+        check_result_lists(r, f"evidence:{e.get('id')}", as_list(e.get("results")))
+
     # ----- highlights (rule 90, warning 39; §3.1) -----
     check_highlights(r, paper, claims, coll["definitions"])
     if not converted and not published and "highlights" not in paper:
         r.warn("W39", "paper.highlights", "ask the guarantor which principal claims and which of the paper's own "
                                           "terms a reader should take first, at most five, in order of priority "
                                           "(§3.1); leave the field out only if the guarantor prefers none")
+
+
+#: Warning 40 (§3.4): more result entries than this sharing a variable or a condition key are a table.
+MAX_LISTED_RESULTS = 8
+
+
+def check_result_lists(r, where, results):
+    """Warning 40: one evidence object lists more than MAX_LISTED_RESULTS result entries that share a variable, or
+    that share a condition key: numbers a table would hold (§3.4, Tables are the standard form)."""
+    by_var, by_key = {}, {}
+    for x in results:
+        x = as_dict(x)
+        v = x.get("variable")
+        if isinstance(v, str):
+            by_var[v] = by_var.get(v, 0) + 1
+        for k in as_dict(x.get("conditions")):
+            by_key[k] = by_key.get(k, 0) + 1
+    worst = max([(n, f"the variable {v}") for v, n in by_var.items()] +
+                [(n, f"the condition {k}") for k, n in by_key.items()], default=(0, ""))
+    if worst[0] > MAX_LISTED_RESULTS:
+        r.warn("W40", f"{where}.results", f"{worst[0]} result entries share {worst[1]}: record them as a table, rows "
+                                         f"the compared units and columns the variables, and cite its rows "
+                                         f"(§3.4, Tables are the standard form)")
 
 
 #: Rule 90 (§3.1): the most highlights a paper has.

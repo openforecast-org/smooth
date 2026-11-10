@@ -229,7 +229,7 @@
     {
       "id": "D1",
       "term": "single source of error form",
-      "definition": "State space form of a time series model, also called the innovations form, in which the observation equation and the state transition share one error term $\\epsilon_t$ per period: $z_t = w(\\mathbf v_{t-\\mathbf l}) + r(\\mathbf v_{t-\\mathbf l})\\epsilon_t$, $\\mathbf v_t = f(\\mathbf v_{t-\\mathbf l}) + g(\\mathbf v_{t-\\mathbf l})\\epsilon_t$.",
+      "definition": "State space form of a time series model, also called the innovations form, in which the observation equation and the state transition share one error term $\\epsilon_t$ per period: $$\\begin{aligned} z_t &= w(\\mathbf v_{t-\\mathbf l}) + r(\\mathbf v_{t-\\mathbf l})\\epsilon_t \\\\ \\mathbf v_t &= f(\\mathbf v_{t-\\mathbf l}) + g(\\mathbf v_{t-\\mathbf l})\\epsilon_t. \\end{aligned}$$",
       "kind": "method"
     },
     {
@@ -261,19 +261,19 @@
     {
       "id": "D6",
       "term": "ADAM multiplicative ETS",
-      "definition": "Pure multiplicative exponential smoothing in the form of the Augmented Dynamic Adaptive Model, in which each component $k$ is updated by the factor $(1+\\epsilon_t)^{g_k}$, for instance $l_t = l_{t-1}b_{t-1}^{\\phi}(1+\\epsilon_t)^{\\alpha}$.",
+      "definition": "Pure multiplicative exponential smoothing in the form of the Augmented Dynamic Adaptive Model, in which each component $k$ is updated by the factor $(1+\\epsilon_t)^{g_k}$; for ETS(M,Md,M) with seasonal period $m$, $$\\begin{aligned} z_t &= l_{t-1}b_{t-1}^{\\phi}s_{t-m}(1+\\epsilon_t) \\\\ l_t &= l_{t-1}b_{t-1}^{\\phi}(1+\\epsilon_t)^{\\alpha} \\\\ b_t &= b_{t-1}^{\\phi}(1+\\epsilon_t)^{\\beta} \\\\ s_t &= s_{t-m}(1+\\epsilon_t)^{\\gamma}. \\end{aligned}$$",
       "kind": "method"
     },
     {
       "id": "D7",
       "term": "conventional multiplicative ETS",
-      "definition": "Pure multiplicative exponential smoothing in the form of Hyndman et al. (2008), in which each component $k$ is updated by the factor $1+g_k\\epsilon_t$, for instance $l_t = l_{t-1}b_{t-1}^{\\phi}(1+\\alpha\\epsilon_t)$.",
+      "definition": "Pure multiplicative exponential smoothing in the form of Hyndman et al. (2008), in which each component $k$ is updated by the factor $1+g_k\\epsilon_t$; for ETS(M,Md,M) with seasonal period $m$, $$\\begin{aligned} z_t &= l_{t-1}b_{t-1}^{\\phi}s_{t-m}(1+\\epsilon_t) \\\\ l_t &= l_{t-1}b_{t-1}^{\\phi}(1+\\alpha\\epsilon_t) \\\\ b_t &= b_{t-1}^{\\phi}(1+\\beta\\epsilon_t) \\\\ s_t &= s_{t-m}(1+\\gamma\\epsilon_t). \\end{aligned}$$",
       "kind": "method"
     },
     {
       "id": "D8",
       "term": "SSOE Kalman filter",
-      "definition": "The recursion for the conditional mean $\\mathbf a_t$ and scaled covariance $\\mathbf P_t$ of the state of a linear single source of error model: at an observed period $v_t = z_t-\\mathbf w'\\mathbf a_t$, $f_t = \\mathbf w'\\mathbf P_t\\mathbf w+1$, $\\mathbf k_t=(\\mathbf F\\mathbf P_t\\mathbf w+\\mathbf g)/f_t$, $\\mathbf a_{t+1}=\\mathbf F\\mathbf a_t+\\mathbf k_t v_t$, $\\mathbf P_{t+1}=\\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'-\\mathbf k_t\\mathbf k_t'f_t$; at an unobserved period $\\mathbf a_{t+1}=\\mathbf F\\mathbf a_t$, $\\mathbf P_{t+1}=\\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'$; started from $\\mathbf a_1=\\mathbf x_0$, $\\mathbf P_1=\\mathbf 0$.",
+      "definition": "The recursion for the conditional mean $\\mathbf a_t$ and scaled covariance $\\mathbf P_t$ of the state of a linear single source of error model: at an observed period $$\\begin{aligned} v_t &= z_t-\\mathbf w'\\mathbf a_t \\\\ f_t &= \\mathbf w'\\mathbf P_t\\mathbf w+1 \\\\ \\mathbf k_t &= (\\mathbf F\\mathbf P_t\\mathbf w+\\mathbf g)/f_t \\\\ \\mathbf a_{t+1} &= \\mathbf F\\mathbf a_t+\\mathbf k_t v_t \\\\ \\mathbf P_{t+1} &= \\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'-\\mathbf k_t\\mathbf k_t'f_t; \\end{aligned}$$ at an unobserved period $$\\begin{aligned} \\mathbf a_{t+1} &= \\mathbf F\\mathbf a_t \\\\ \\mathbf P_{t+1} &= \\mathbf F\\mathbf P_t\\mathbf F'+\\mathbf g\\mathbf g'; \\end{aligned}$$ started from $\\mathbf a_1=\\mathbf x_0$, $\\mathbf P_1=\\mathbf 0$.",
       "kind": "method"
     },
     {
@@ -298,7 +298,7 @@
       "id": "D12",
       "term": "iETS(M,N,N)",
       "kind": "data",
-      "definition": "Intermittent demand sizes $z_t=l_{t-1}(1+\\epsilon_t)$ with $\\E(1+\\epsilon_t)=1$ and $\\Var(1+\\epsilon_t)=s$, Gamma, log-normal or inverse Gaussian $1+\\epsilon_t$ (the greybox parameterisation of the package) and the level moving at every period, observed or not: $l_t=l_{t-1}(1+\\epsilon_t)^\\alpha$ in the [[D6:ADAM multiplicative ETS]] and $l_t=l_{t-1}(1+\\alpha\\epsilon_t)$ in the [[D7:conventional multiplicative ETS]]."
+      "definition": "Intermittent demand sizes $$z_t=l_{t-1}(1+\\epsilon_t)$$ with $\\E(1+\\epsilon_t)=1$ and $\\Var(1+\\epsilon_t)=s$, Gamma, log-normal or inverse Gaussian $1+\\epsilon_t$ (the greybox parameterisation of the package) and the level moving at every period, observed or not: $$l_t=l_{t-1}(1+\\epsilon_t)^\\alpha$$ in the [[D6:ADAM multiplicative ETS]] and $$l_t=l_{t-1}(1+\\alpha\\epsilon_t)$$ in the [[D7:conventional multiplicative ETS]]."
     },
     {
       "id": "D13",
@@ -340,7 +340,7 @@
       "id": "D19",
       "term": "approximate prediction interval",
       "kind": "method",
-      "definition": "The prediction interval of pure multiplicative ETS in the smooth package (generate_prediction_interval with var_anal): the point forecast with zero errors times the quantile of the distribution with mean one and variance $V_h=(1+v)(1+\\alpha^2v)^{h-1}-1$, $v=\\Var(1+\\epsilon)$; for the [[D6:ADAM multiplicative ETS]] with the log-normal distribution, exact in logarithms."
+      "definition": "The prediction interval of pure multiplicative ETS in the smooth package (generate_prediction_interval with var_anal): the point forecast with zero errors times the quantile of the distribution with mean one and variance $$V_h=(1+v)(1+\\alpha^2v)^{h-1}-1,$$ $v=\\Var(1+\\epsilon)$; for the [[D6:ADAM multiplicative ETS]] with the log-normal distribution, exact in logarithms."
     },
     {
       "id": "D20",
@@ -424,7 +424,7 @@
   "claims": [
     {
       "id": "C1",
-      "statement": "For a model of intermittent demand $y_t=o_tz_t$ with Bernoulli occurrence $o_t\\sim\\text{Bernoulli}(p_t)$ independent of a continuous size $z_t$, the [[D3:observed-data likelihood]] is $\\sum_{O_t=1}\\log f(z_t\\mid Y_{t-1};\\theta) + \\sum_{O_t=1}\\log p_t + \\sum_{O_t=0}\\log(1-p_t)$, in which the unobserved sizes do not appear and the size and occurrence parts separate.",
+      "statement": "For a model of intermittent demand $y_t=o_tz_t$ with Bernoulli occurrence $o_t\\sim\\text{Bernoulli}(p_t)$ independent of a continuous size $z_t$, the [[D3:observed-data likelihood]] is $$\\sum_{O_t=1}\\log f(z_t\\mid Y_{t-1};\\theta) + \\sum_{O_t=1}\\log p_t + \\sum_{O_t=0}\\log(1-p_t),$$ in which the unobserved sizes do not appear and the size and occurrence parts separate.",
       "about": {
         "subject": "D3",
         "relation": "separates into a size part and an occurrence part for",
@@ -553,7 +553,7 @@
     },
     {
       "id": "C4",
-      "statement": "For a pure additive single source of error model with normal errors and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] gives $z_t\\mid Y_{t-1}\\sim\\mathcal N(\\mathbf w'\\mathbf a_t,\\sigma^2 f_t)$ at the observed periods, the exact observed-data log-likelihood $-\\frac12\\sum_{O_t=1}[\\log(2\\pi\\sigma^2f_t)+v_t^2/(\\sigma^2f_t)]$, and the concentrated variance $\\hat\\sigma^2=\\frac{1}{T_1}\\sum_{O_t=1}v_t^2/f_t$.",
+      "statement": "For a pure additive single source of error model with normal errors and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] gives $z_t\\mid Y_{t-1}\\sim\\mathcal N(\\mathbf w'\\mathbf a_t,\\sigma^2 f_t)$ at the observed periods, the exact observed-data log-likelihood $$-\\frac12\\sum_{O_t=1}\\left[\\log(2\\pi\\sigma^2f_t)+\\frac{v_t^2}{\\sigma^2f_t}\\right],$$ and the concentrated variance $$\\hat\\sigma^2=\\frac{1}{T_1}\\sum_{O_t=1}\\frac{v_t^2}{f_t}.$$",
       "about": {
         "subject": "D8",
         "relation": "gives the exact observed-data likelihood of",
@@ -672,7 +672,7 @@
     },
     {
       "id": "C6",
-      "statement": "For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] applied to $\\log z_t$, with the known error mean $-s/2$ added to the propagation and the prediction, gives the exact observed-data likelihood, and the maximum likelihood scale $s$ is the positive root of $(\\sum b_t^2/f_t)s^2+T_1s-\\sum(v_t^0)^2/f_t=0$, where $v_t(s)=v_t^0+sb_t$ is the filter's prediction error.",
+      "statement": "For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] applied to $\\log z_t$, with the known error mean $-s/2$ added to the propagation and the prediction, gives the exact observed-data likelihood, and the maximum likelihood scale $s$ is the positive root of $$\\Big(\\sum \\frac{b_t^2}{f_t}\\Big)s^2+T_1s-\\sum\\frac{(v_t^0)^2}{f_t}=0,$$ where $v_t(s)=v_t^0+sb_t$ is the filter's prediction error.",
       "about": {
         "subject": "D8",
         "relation": "gives in logarithms the exact observed-data likelihood of",
@@ -1092,7 +1092,7 @@
     },
     {
       "id": "C16",
-      "statement": "For ETS(A,N,N) with smoothing parameter $\\alpha$ and zero state covariance before an interval of $j$ periods, the gain of the [[D8:SSOE Kalman filter]] at the end of the interval is $\\alpha_j=((j-1)\\alpha^2+\\alpha)/((j-1)\\alpha^2+1)$, which equals $\\alpha$ for $j=1$ and tends to one as $j$ grows.",
+      "statement": "For ETS(A,N,N) with smoothing parameter $\\alpha$ and zero state covariance before an interval of $j$ periods, the gain of the [[D8:SSOE Kalman filter]] at the end of the interval is $$\\alpha_j=\\frac{(j-1)\\alpha^2+\\alpha}{(j-1)\\alpha^2+1},$$ which equals $\\alpha$ for $j=1$ and tends to one as $j$ grows.",
       "about": {
         "subject": "D8",
         "relation": "has at the end of an interval of j periods the gain",
@@ -1127,7 +1127,7 @@
     },
     {
       "id": "C17",
-      "statement": "For pure multiplicative models with the Gamma, log-normal or inverse Gaussian distribution, if $1+e_t=(1+\\epsilon_t)D_t$ with $D_t=e^{d_t}$ independent of $\\epsilon_t$, $\\E(1+\\epsilon_t)=1$ and $\\Var(1+\\epsilon_t)=s$, then $\\E(e_t^2)=(1+s)\\E(D_t^2)-2\\E(D_t)+1$, and for the inverse Gaussian distribution $\\E(e_t^2/(1+e_t))=\\E(D_t)-2+(1+s)\\E(D_t^{-1})$.",
+      "statement": "For pure multiplicative models with the Gamma, log-normal or inverse Gaussian distribution, if $1+e_t=(1+\\epsilon_t)D_t$ with $D_t=e^{d_t}$ independent of $\\epsilon_t$, $\\E(1+\\epsilon_t)=1$ and $\\Var(1+\\epsilon_t)=s$, then $$\\E(e_t^2)=(1+s)\\E(D_t^2)-2\\E(D_t)+1,$$ and for the inverse Gaussian distribution $$\\E\\big(e_t^2/(1+e_t)\\big)=\\E(D_t)-2+(1+s)\\E(D_t^{-1}).$$",
       "about": {
         "subject": "the errors of pure multiplicative models with drift",
         "relation": "have second moments given by the moments of",
@@ -1229,7 +1229,7 @@
     },
     {
       "id": "C19",
-      "statement": "The point forecast with zero errors of the [[D6:ADAM multiplicative ETS]] is not the conditional mean, because $\\E(1+\\epsilon_t)^{g_k}<1$ for $0<g_k<1$; for ETS(M,N,N) with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $\\hat\\mu_{T+h}[\\Gamma(1/s+\\alpha)s^{\\alpha}/\\Gamma(1/s)]^{h-1}$.",
+      "statement": "The point forecast with zero errors of the [[D6:ADAM multiplicative ETS]] is not the conditional mean, because $\\E(1+\\epsilon_t)^{g_k}<1$ for $0<g_k<1$; for ETS(M,N,N) with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $$\\hat\\mu_{T+h}\\left[\\frac{\\Gamma(1/s+\\alpha)s^{\\alpha}}{\\Gamma(1/s)}\\right]^{h-1}.$$",
       "about": {
         "subject": "D6",
         "relation": "has a point forecast with zero errors below",
@@ -1450,7 +1450,7 @@
     },
     {
       "id": "C24",
-      "statement": "For [[D30:the pure additive models with the Laplace, S and Generalised Normal distributions]], the smooth package keeps [[D28:the error in its family with scale $sf_t^{1/p}$]], and the [[D14:Kullback-Leibler divergence]] of this approximation from the exact density is 0.0491 for the Laplace distribution and 0.260 for the S distribution at $f_t=4$.",
+      "statement": "For [[D30:the pure additive models with the Laplace, S and Generalised Normal distributions]], the smooth package keeps [[D28:the error in its family]] with scale $sf_t^{1/p}$, and the [[D14:Kullback-Leibler divergence]] of this approximation from the exact density is 0.0491 for the Laplace distribution and 0.260 for the S distribution at $f_t=4$.",
       "about": {
         "subject": "D28",
         "relation": "has a small Kullback-Leibler divergence from the exact density on",
@@ -1708,7 +1708,7 @@
     },
     {
       "id": "C29",
-      "statement": "At variance ratio $f_t=4$, the [[D29:16-node Gauss-Hermite mixture]] of the error density over normal state uncertainty had a [[D14:Kullback-Leibler divergence]] from the exact density of 0.0081 for the Laplace and 0.113 for the S distribution, against 0.0491 and 0.260 for [[D28:the error kept in its family with scale $sf_t^{1/p}$]].",
+      "statement": "At variance ratio $f_t=4$, the [[D29:16-node Gauss-Hermite mixture]] of the error density over normal state uncertainty had a [[D14:Kullback-Leibler divergence]] from the exact density of 0.0081 for the Laplace and 0.113 for the S distribution, against 0.0491 and 0.260 for [[D28:the error kept in its family]] with scale $sf_t^{1/p}$.",
       "about": {
         "subject": "D29",
         "relation": "has a smaller Kullback-Leibler divergence from the exact density than",
@@ -1934,7 +1934,7 @@
         },
         {
           "id": "E2.2",
-          "statement": "$\\partial_\\theta\\int f_z\\log f_z^{\\theta}dz|_{\\theta=\\theta^{(k)}}=\\partial_\\theta\\int f_z\\,dz=0$",
+          "statement": "$$\\partial_\\theta\\int f_z\\log f_z^{\\theta}dz\\Big|_{\\theta=\\theta^{(k)}}=\\partial_\\theta\\int f_z\\,dz=0$$",
           "by": [
             "E2.1"
           ],
@@ -1986,7 +1986,7 @@
         },
         {
           "id": "E3.2",
-          "statement": "$\\partial\\ell_H/\\partial\\sigma^2=-\\frac{T_1}{2\\sigma^2}+\\frac{\\sum e_t^2}{2\\sigma^4}-\\frac{T_0}{2\\sigma^2}$, zero at $\\sigma^2=\\sum e_t^2/T$",
+          "statement": "$$\\frac{\\partial\\ell_H}{\\partial\\sigma^2}=-\\frac{T_1}{2\\sigma^2}+\\frac{\\sum e_t^2}{2\\sigma^4}-\\frac{T_0}{2\\sigma^2},$$ zero at $\\sigma^2=\\sum e_t^2/T$",
           "by": [
             "E3.1"
           ],
@@ -2025,7 +2025,7 @@
         },
         {
           "id": "E4.2",
-          "statement": "$\\E(z_t\\mid Y_{t-1})=\\mathbf w'\\mathbf a_t$, $\\Var(z_t\\mid Y_{t-1})=\\sigma^2f_t$, $\\Cov(\\mathbf x_t,z_t\\mid Y_{t-1})=\\sigma^2(\\mathbf F\\mathbf P_t\\mathbf w+\\mathbf g)$",
+          "statement": "$$\\begin{aligned} \\E(z_t\\mid Y_{t-1}) &= \\mathbf w'\\mathbf a_t \\\\ \\Var(z_t\\mid Y_{t-1}) &= \\sigma^2f_t \\\\ \\Cov(\\mathbf x_t,z_t\\mid Y_{t-1}) &= \\sigma^2(\\mathbf F\\mathbf P_t\\mathbf w+\\mathbf g) \\end{aligned}$$",
           "by": [
             "E4.1"
           ],
@@ -2436,7 +2436,7 @@
         },
         {
           "id": "E14.3",
-          "statement": "With $\\mathbf M=[\\mathbf U_t^F,\\mathbf g]$ and $\\mathbf M(\\mathbf a,1)'=f_t\\mathbf k_t$, a Householder reflection gives $\\mathbf U_{t+1}=\\mathbf U_t^F-(f_t\\mathbf k_t+\\sqrt{f_t}\\mathbf g)\\mathbf a'/(f_t+\\sqrt{f_t})$",
+          "statement": "With $\\mathbf M=[\\mathbf U_t^F,\\mathbf g]$ and $\\mathbf M(\\mathbf a,1)'=f_t\\mathbf k_t$, a Householder reflection gives $$\\mathbf U_{t+1}=\\mathbf U_t^F-\\frac{(f_t\\mathbf k_t+\\sqrt{f_t}\\mathbf g)\\mathbf a'}{f_t+\\sqrt{f_t}}$$",
           "by": [
             "E14.2"
           ],
@@ -2514,8 +2514,8 @@
                 "conventional"
               ],
               "values": [
-                0.001147669555304068,
-                2.359344901764189
+                0.00114767,
+                2.35934
               ]
             },
             {
@@ -2525,8 +2525,8 @@
                 "conventional"
               ],
               "values": [
-                0.004478045527634884,
-                5.947322649817578
+                0.00447805,
+                5.94732
               ]
             },
             {
@@ -2536,8 +2536,8 @@
                 "conventional"
               ],
               "values": [
-                0.00399623186332274,
-                47.545190336883074
+                0.00399623,
+                47.5452
               ]
             },
             {
@@ -2547,8 +2547,8 @@
                 "adam"
               ],
               "values": [
-                0.014519691145235577,
-                4.583576097536914
+                0.0145197,
+                4.58358
               ]
             },
             {
@@ -2558,8 +2558,8 @@
                 "adam"
               ],
               "values": [
-                9.638705681090434e-07,
-                18.635381272371507
+                9.63871e-07,
+                18.6354
               ]
             },
             {
@@ -2569,8 +2569,8 @@
                 "adam"
               ],
               "values": [
-                0.00044603365455395534,
-                630.7721304928126
+                0.000446034,
+                630.772
               ]
             }
           ],
@@ -2641,7 +2641,7 @@
         {
           "id": "R11",
           "variable": "median increase in relative bias from the gain update",
-          "value": 0.12792793852670048,
+          "value": 0.127928,
           "conditions": {
             "estimator": "moment equation solved by bisection",
             "observed_sizes": 100,
@@ -2676,7 +2676,7 @@
                 "<=0.02"
               ],
               "values": [
-                0.0001590643108680817,
+                0.000159064,
                 0.0
               ]
             },
@@ -2686,8 +2686,8 @@
                 "0.02-0.1"
               ],
               "values": [
-                -0.0005993510206586256,
-                0.17673529411764705
+                -0.000599351,
+                0.176735
               ]
             },
             {
@@ -2696,7 +2696,7 @@
                 "0.1-0.3"
               ],
               "values": [
-                -0.0041824876680562895,
+                -0.00418249,
                 0.523375
               ]
             },
@@ -2706,8 +2706,8 @@
                 ">0.3"
               ],
               "values": [
-                -0.004309863992060126,
-                0.7100576923076923
+                -0.00430986,
+                0.710058
               ]
             }
           ],
@@ -2754,7 +2754,7 @@
         {
           "id": "R1",
           "variable": "approximate upper bound of the 90% interval over the point forecast",
-          "value": 2.430867663875322,
+          "value": 2.43087,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "adam",
@@ -2768,7 +2768,7 @@
         {
           "id": "R2",
           "variable": "simulated upper bound of the 90% interval over the point forecast",
-          "value": 1.8071312998210094,
+          "value": 1.80713,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "adam",
@@ -2782,7 +2782,7 @@
         {
           "id": "R3",
           "variable": "approximate upper bound of the 90% interval over the point forecast",
-          "value": 2.615866692147225,
+          "value": 2.61587,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "adam",
@@ -2796,7 +2796,7 @@
         {
           "id": "R4",
           "variable": "simulated upper bound of the 90% interval over the point forecast",
-          "value": 1.6379222812406813,
+          "value": 1.63792,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "adam",
@@ -2810,7 +2810,7 @@
         {
           "id": "R5",
           "variable": "approximate upper bound of the 90% interval over the point forecast",
-          "value": 2.430867663875322,
+          "value": 2.43087,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "conventional",
@@ -2824,7 +2824,7 @@
         {
           "id": "R6",
           "variable": "simulated upper bound of the 90% interval over the point forecast",
-          "value": 2.3927301164131274,
+          "value": 2.39273,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "conventional",
@@ -2838,7 +2838,7 @@
         {
           "id": "R7",
           "variable": "approximate upper bound of the 90% interval over the point forecast",
-          "value": 2.615866692147225,
+          "value": 2.61587,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "conventional",
@@ -2852,7 +2852,7 @@
         {
           "id": "R8",
           "variable": "simulated upper bound of the 90% interval over the point forecast",
-          "value": 2.536487773418306,
+          "value": 2.53649,
           "conditions": {
             "distribution": "Gamma",
             "ets_form": "conventional",
@@ -2904,7 +2904,7 @@
         {
           "id": "R1",
           "variable": "speed-up of low-rank over full covariance filter",
-          "value": 10.55114215060036,
+          "value": 10.5511,
           "unit": "ratio",
           "conditions": {
             "data": "ets",
@@ -2916,7 +2916,7 @@
         {
           "id": "R2",
           "variable": "speed-up of low-rank over full covariance filter",
-          "value": 3.5046113453883225,
+          "value": 3.50461,
           "unit": "ratio",
           "conditions": {
             "data": "ets",
@@ -2928,7 +2928,7 @@
         {
           "id": "R3",
           "variable": "largest absolute difference in log-likelihood, low-rank vs full",
-          "value": 4.547473508864641e-13,
+          "value": 4.54747e-13,
           "conditions": {
             "data": "ets"
           },
@@ -2937,7 +2937,7 @@
         {
           "id": "R4",
           "variable": "speed-up of low-rank over full covariance filter",
-          "value": 2.960894167501268,
+          "value": 2.96089,
           "unit": "ratio",
           "conditions": {
             "data": "sine",
@@ -2949,7 +2949,7 @@
         {
           "id": "R5",
           "variable": "speed-up of low-rank over full covariance filter",
-          "value": 0.7235443143279483,
+          "value": 0.723544,
           "unit": "ratio",
           "conditions": {
             "data": "sine",
@@ -3013,7 +3013,7 @@
         {
           "id": "R1",
           "variable": "KL divergence, exact density vs approximation",
-          "value": 0.04911403773707054,
+          "value": 0.049114,
           "conditions": {
             "distribution": "dlaplace",
             "approximation": "family_scaled",
@@ -3025,7 +3025,7 @@
         {
           "id": "R2",
           "variable": "KL divergence, exact density vs approximation",
-          "value": 0.2598001588579059,
+          "value": 0.2598,
           "conditions": {
             "distribution": "ds",
             "approximation": "family_scaled",
@@ -3037,7 +3037,7 @@
         {
           "id": "R3",
           "variable": "KL divergence, exact density vs approximation",
-          "value": 0.008097015561062926,
+          "value": 0.00809702,
           "conditions": {
             "distribution": "dlaplace",
             "approximation": "gauss_hermite 16 nodes",
@@ -3049,7 +3049,7 @@
         {
           "id": "R4",
           "variable": "KL divergence, exact density vs approximation",
-          "value": 0.112708849233957,
+          "value": 0.112709,
           "conditions": {
             "distribution": "ds",
             "approximation": "gauss_hermite 16 nodes",

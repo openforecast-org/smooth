@@ -1,0 +1,5 @@
+step-down decisions that differ from the decision by the roots {} 0.0
+max abs difference of max |lambda|, bisection against roots {} 5.5451865321742844e-11
+models within 1e-8 of the unit circle, excluded {} 0.0
+max degree of theta before cancellation {} 536.0
+models exported {} 57.0

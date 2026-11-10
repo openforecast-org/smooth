@@ -1,0 +1,27 @@
+[
+ {
+  "quantity": "step-down decisions that differ from the decision by the roots",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "max abs difference of max |lambda|, bisection against roots",
+  "value": 5.5451865321742844e-11,
+  "conditions": {}
+ },
+ {
+  "quantity": "models within 1e-8 of the unit circle, excluded",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "max degree of theta before cancellation",
+  "value": 536.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "models exported",
+  "value": 57.0,
+  "conditions": {}
+ }
+]

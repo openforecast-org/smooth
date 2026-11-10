@@ -1,0 +1,57 @@
+python-flint 0.9.0; enclosures (128, 512, 2048) bits; edge 1e-08
+models given to the oracle {'set': 'cancel'} 100.0
+models on which the oracle failed {'set': 'cancel'} 0.0
+models excluded by undecided {'set': 'cancel'} 0.0
+models excluded by edge {'set': 'cancel'} 0.0
+models compared {'set': 'cancel'} 100.0
+max degree of theta, exact {'set': 'cancel'} 79.0
+max degree of the cancelled MA polynomial, exact {'set': 'cancel'} 64.0
+max precision of the root enclosures, bits {'set': 'cancel'} 128.0
+roots proved on the unit circle {'set': 'cancel'} 0.0
+admissibility decisions of the PBH reference that differ from the exact oracle {'set': 'cancel'} 0.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible {'set': 'cancel'} 5.773159728050814e-15
+models both find inadmissible, PBH reference and exact oracle {'set': 'cancel'} 32.0
+admissibility decisions of the prototype's cancellation that differ from the exact oracle {'set': 'cancel'} 0.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible {'set': 'cancel'} 3.863576125695545e-14
+models both find inadmissible, prototype's cancellation and exact oracle {'set': 'cancel'} 32.0
+models whose cancelled MA degree differs from the prototype's {'set': 'cancel'} 0.0
+models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1 {'set': 'cancel'} 0.0
+models whose shared non-cyclotomic factor could not be located {'set': 'cancel'} 0.0
+models with a shared non-cyclotomic factor, all roots in |B| > 1 {'set': 'cancel'} 0.0
+time of the oracle on the set, s {'set': 'cancel'} 0.14734458923339844
+models given to the oracle {'set': 'cpp'} 160.0
+models on which the oracle failed {'set': 'cpp'} 0.0
+models excluded by undecided {'set': 'cpp'} 0.0
+models excluded by edge {'set': 'cpp'} 0.0
+models compared {'set': 'cpp'} 160.0
+max degree of theta, exact {'set': 'cpp'} 535.0
+max degree of the cancelled MA polynomial, exact {'set': 'cpp'} 532.0
+max precision of the root enclosures, bits {'set': 'cpp'} 128.0
+roots proved on the unit circle {'set': 'cpp'} 0.0
+admissibility decisions of the prototype's cancellation that differ from the exact oracle {'set': 'cpp'} 0.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible {'set': 'cpp'} 1.2648548874949483e-11
+models both find inadmissible, prototype's cancellation and exact oracle {'set': 'cpp'} 46.0
+models whose cancelled MA degree differs from the prototype's {'set': 'cpp'} 0.0
+models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1 {'set': 'cpp'} 0.0
+models whose shared non-cyclotomic factor could not be located {'set': 'cpp'} 0.0
+models with a shared non-cyclotomic factor, all roots in |B| > 1 {'set': 'cpp'} 2.0
+time of the oracle on the set, s {'set': 'cpp'} 3.8245115280151367
+models given to the oracle {'set': 'all'} 260.0
+models on which the oracle failed {'set': 'all'} 0.0
+models excluded by undecided {'set': 'all'} 0.0
+models excluded by edge {'set': 'all'} 0.0
+models compared {'set': 'all'} 260.0
+max degree of theta, exact {'set': 'all'} 535.0
+max degree of the cancelled MA polynomial, exact {'set': 'all'} 532.0
+max precision of the root enclosures, bits {'set': 'all'} 128.0
+roots proved on the unit circle {'set': 'all'} 0.0
+admissibility decisions of the PBH reference that differ from the exact oracle {'set': 'all'} 0.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, models both find inadmissible {'set': 'all'} 5.773159728050814e-15
+models both find inadmissible, PBH reference and exact oracle {'set': 'all'} 32.0
+admissibility decisions of the prototype's cancellation that differ from the exact oracle {'set': 'all'} 0.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible {'set': 'all'} 1.2648548874949483e-11
+models both find inadmissible, prototype's cancellation and exact oracle {'set': 'all'} 78.0
+models whose cancelled MA degree differs from the prototype's {'set': 'all'} 0.0
+models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1 {'set': 'all'} 0.0
+models whose shared non-cyclotomic factor could not be located {'set': 'all'} 0.0
+models with a shared non-cyclotomic factor, all roots in |B| > 1 {'set': 'all'} 2.0

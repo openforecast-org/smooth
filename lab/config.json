@@ -1,8 +1,6 @@
 {
-  "anchor": {
-    "service": "git_remote",
+  "record": {
     "remote": "origin",
-    "branch": "claimset-lab-eigenChecker",
-    "every": "plan"
+    "branch": "claimset/adam-admissible-bounds"
   }
 }

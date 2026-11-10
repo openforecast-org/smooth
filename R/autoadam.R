@@ -166,7 +166,6 @@ auto.adam <- function(data, model="ZXZ", lags=c(frequency(data)),
                 call.=FALSE);
         distribution <- distribution[!(distribution %in% distributionToDrop)];
     }
-    nModels <- length(distribution);
 
     # Amend the default list of distributions for the pure ARIMA
     if(arimaModel && !etsModel && length(distribution) == 7 &&
@@ -178,6 +177,12 @@ auto.adam <- function(data, model="ZXZ", lags=c(frequency(data)),
                 call.=FALSE);
         distribution <- distribution[!(distribution %in% distributionToDrop)];
     }
+    if(length(distribution)==0){
+        stop(paste0("All the provided distributions were dropped, so there is nothing to estimate. ",
+                    "Provide at least one of dnorm, dlaplace, ds or dgnorm."),
+             call.=FALSE);
+    }
+    nModels <- length(distribution);
 
     #### Checks of provided parameters for ARIMA selection ####
     if(arimaModel){

@@ -15,6 +15,13 @@ test_that("auto.adam() ETS distribution selection on AirPassengers", {
     expect_equal(length(m$persistence), 3)
 })
 
+# The positive distributions on non-positive data leave nothing to estimate
+test_that("auto.adam() stops when all the distributions are dropped", {
+    expect_error(suppressWarnings(auto.adam(BJsales - 250, "ANN",
+                                            distribution=c("dlnorm","dgamma"))),
+                 "All the provided distributions were dropped")
+})
+
 # 2. ARIMA order selection on BJsales
 test_that("auto.adam() ARIMA selection (NNN) on BJsales", {
     skip_on_cran()

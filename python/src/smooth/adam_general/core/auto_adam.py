@@ -11,6 +11,7 @@ a warning is issued when it is requested.
 """
 
 import time
+import warnings
 from typing import Any, Dict, List, Literal, Optional, Union
 
 import numpy as np
@@ -642,18 +643,51 @@ class AutoADAM(ADAM):
     # ------------------------------------------------------------------
 
     def _filter_distributions(self, y: NDArray) -> List[str]:
-        """Return candidate distributions appropriate for the data."""
+        """Return candidate distributions appropriate for the data.
+
+        Mirrors R/autoadam.R:159-180: the positive-only distributions are
+        dropped for non-positive in-sample data without an occurrence model,
+        and from the default set of seven for the pure ARIMA.
+        """
         candidates = list(self._auto_distribution_spec)
+        obs_in_sample = len(y) - ((self.h or 0) if self.holdout else 0)
+        occurrence = self.occurrence if self.occurrence is not None else "none"
+        no_occurrence = isinstance(occurrence, str) and occurrence == "none"
+        models = [self.model] if isinstance(self.model, str) else list(self.model)
+        ets_model = all(m != "NNN" for m in models)
+        arima_model = any(
+            o > 0 for o in [*self._auto_max_ar, *self._auto_max_i, *self._auto_max_ma]
+        )
 
-        if np.any(y <= 0):
-            candidates = [d for d in candidates if d not in _POSITIVE_ONLY_DISTS]
+        # The second check sees the candidates left by the first, as in R
+        checks = [
+            (
+                lambda c: bool(np.any(y[:obs_in_sample] <= 0)) and no_occurrence,
+                "The data is not strictly positive, so not all distributions "
+                "make sense.",
+            ),
+            (
+                lambda c: (
+                    arima_model
+                    and not ets_model
+                    and len(c) == len(_ALL_DISTRIBUTIONS)
+                    and set(c) <= set(_ALL_DISTRIBUTIONS)
+                ),
+                "Not all distributions make sense for the pure ARIMA.",
+            ),
+        ]
+        for applies, reason in checks:
+            to_drop = [d for d in candidates if d in _POSITIVE_ONLY_DISTS]
+            if to_drop and applies(candidates):
+                warnings.warn(f"{reason} Dropping {', '.join(to_drop)}.", stacklevel=3)
+                candidates = [d for d in candidates if d not in to_drop]
 
-        # Remove positive-only distributions for pure ARIMA (NNN)
-        ets_model = self.model if isinstance(self.model, str) else self.model[0]
-        if ets_model == "NNN":
-            candidates = [d for d in candidates if d not in _POSITIVE_ONLY_DISTS]
-
-        return candidates if candidates else ["dnorm"]
+        if not candidates:
+            raise ValueError(
+                "All the provided distributions were dropped, so there is nothing "
+                "to estimate. Provide at least one of dnorm, dlaplace, ds or dgnorm."
+            )
+        return candidates
 
     def __repr__(self) -> str:
         """Return string representation of fitted AutoADAM model."""

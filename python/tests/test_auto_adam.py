@@ -343,15 +343,50 @@ class TestAutoADAMDistribution:
         assert m._selected_distribution not in {"dlnorm", "dinvgauss", "dgamma"}
 
     def test_distribution_filtered_pure_arima(self, positive_data):
+        with pytest.warns(UserWarning, match="pure ARIMA. Dropping dlnorm"):
+            m = AutoADAM(
+                model="NNN",
+                lags=[1],
+                arima_select=False,
+                ar_order=1,
+                i_order=1,
+                ma_order=1,
+            ).fit(positive_data)
+        assert m._selected_distribution not in {"dlnorm", "dinvgauss", "dgamma"}
+
+    @pytest.mark.parametrize(
+        "distribution, occurrence, expected",
+        [
+            # R drops them for the pure ARIMA only from the default set
+            (["dnorm", "dgamma"], "none", ["dnorm", "dgamma"]),
+            ("dlnorm", "none", ["dlnorm"]),
+            # and for non-positive data only without an occurrence model
+            (None, "fixed", ["dnorm", "dlaplace", "ds", "dgnorm"]),
+        ],
+    )
+    def test_distribution_filter_as_r(
+        self, positive_data, distribution, occurrence, expected
+    ):
         m = AutoADAM(
             model="NNN",
-            lags=[1],
-            arima_select=False,
+            distribution=distribution,
+            occurrence=occurrence,
             ar_order=1,
             i_order=1,
             ma_order=1,
-        ).fit(positive_data)
-        assert m._selected_distribution not in {"dlnorm", "dinvgauss", "dgamma"}
+            arima_select=False,
+        )
+        y = positive_data.copy()
+        if occurrence != "none":
+            y[::5] = 0
+        assert m._filter_distributions(y) == expected
+
+    def test_all_distributions_dropped_raises(self):
+        y = np.random.default_rng(1).normal(size=60)
+        m = AutoADAM(model="ANN", distribution=["dlnorm", "dgamma"])
+        with pytest.warns(UserWarning, match="not strictly positive"):
+            with pytest.raises(ValueError, match="distributions were dropped"):
+                m.fit(y)
 
     def test_all_ic_values_stored(self, trend_data):
         m = AutoADAM(

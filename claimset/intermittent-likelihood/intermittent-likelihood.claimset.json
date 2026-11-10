@@ -1029,7 +1029,7 @@
     },
     {
       "id": "C24",
-      "statement": "For [[D12:iETS(M,N,N)]] in the [[D7:conventional multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest [[D14:Kullback-Leibler divergence]] per observation from the exact density of 0.00115 for the Gamma, 0.00448 for the log-normal and 0.00400 for the inverse Gaussian distribution, against 2.359, 5.947 and 47.545 for [[D11:the one-step density]].",
+      "statement": "For [[D12:iETS(M,N,N)]] in the [[D7:conventional multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest [[D14:Kullback-Leibler divergence]] per observation from the exact density at least three orders of magnitude smaller than that of [[D11:the one-step density]], for the Gamma, the log-normal and the inverse Gaussian distribution.",
       "about": {
         "subject": "D10",
         "relation": "has a smaller Kullback-Leibler divergence from the exact density than",
@@ -1602,7 +1602,7 @@
     },
     {
       "id": "C34",
-      "statement": "For [[D12:iETS(M,N,N)]] in the [[D6:ADAM multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest [[D14:Kullback-Leibler divergence]] per observation from the exact density of 0.01452 for the Gamma and 0.00045 for the inverse Gaussian distribution, and is exact for the log-normal distribution, against 4.584, 18.635 and 630.772 for [[D11:the one-step density]].",
+      "statement": "For [[D12:iETS(M,N,N)]] in the [[D6:ADAM multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest [[D14:Kullback-Leibler divergence]] per observation from the exact density at least two orders of magnitude smaller than that of [[D11:the one-step density]] for the Gamma and the inverse Gaussian distribution, and is exact for the log-normal distribution.",
       "about": {
         "subject": "D10",
         "relation": "has a smaller Kullback-Leibler divergence from the exact density than",

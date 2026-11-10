@@ -168,6 +168,9 @@
    "run_period": {
     "start": "2026-10-21",
     "end": "2026-10-21"
+   },
+   "system": {
+    "name": "Claude Code"
    }
   },
   {
@@ -200,7 +203,10 @@
      "task": "review",
      "extent": "full"
     }
-   ]
+   ],
+   "system": {
+    "name": "Claude Code"
+   }
   }
  ],
  "models": [
@@ -1029,7 +1035,7 @@
   },
   {
    "id": "C16",
-   "statement": "On [[D21:800 random additive ETS and GUM models in four families]], [[D12:the implementation of the check in smooth (smoothEigensCpp() through smoothEigensR())]] gave a [[D29:decision]] different from [[D10:the numpy prototype]] on 0 models, a [[D30:largest root modulus]] within 9.53e-7 of it (the bisection tolerance is 1e-6) on the models both found inadmissible, and the same modulus and MA polynomial on three consecutive calls with each model.",
+   "statement": "On [[D21:800 random additive ETS and GUM models in four families]], [[D12:the implementation of the check in smooth (smoothEigensCpp() through smoothEigensR())]] gave the same [[D29:decision]] as [[D10:the numpy prototype]] on every model, a [[D30:largest root modulus]] within the bisection tolerance of it on the models both found inadmissible, and the same modulus and MA polynomial on three consecutive calls with each model.",
    "about": {
     "subject": "D12",
     "relation": "gives the same admissibility decision and largest mode modulus as",
@@ -1397,7 +1403,7 @@
   },
   {
    "id": "C10",
-   "statement": "For [[D24:ETS(A,N,A,A) with seasonal lags 24 and 168, $\\alpha = 0.3$ and $\\gamma = (0.1, 0.05)$]], [[D6:cyclotomic cancellation]] removed a common factor of degree 25 from the MA polynomial of degree 193, and the [[D30:largest mode modulus]] after cancellation, 0.9999965, equalled the [[D5:PBH reference]] to 1e-14.",
+   "statement": "For [[D24:ETS(A,N,A,A) with seasonal lags 24 and 168, $\\alpha = 0.3$ and $\\gamma = (0.1, 0.05)$]], [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation, just below one, equalled the [[D5:PBH reference]] to within rounding error.",
    "about": {
     "subject": "D6",
     "relation": "gives the same value of",
@@ -1457,7 +1463,7 @@
   },
   {
    "id": "C11",
-   "statement": "For [[D25:the default starting point of gum() with orders (2, 2) and lags (1, 12)]] ($F = I$, $g = 0.1$, $w = 1$), [[D6:cyclotomic cancellation]] removed a common factor of degree 14 from the MA polynomial of degree 26, and the [[D30:largest mode modulus]] after cancellation, 0.98294, equalled the [[D5:PBH reference]] to 1e-14.",
+   "statement": "For [[D25:the default starting point of gum() with orders (2, 2) and lags (1, 12)]] ($F = I$, $g = 0.1$, $w = 1$), [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation equalled the [[D5:PBH reference]] to within rounding error.",
    "about": {
     "subject": "D6",
     "relation": "gives the same value of",
@@ -1517,7 +1523,7 @@
   },
   {
    "id": "C12",
-   "statement": "For an admissible and an inadmissible [[D40:random GUM model with lags (1, 24, 168)]] (MA polynomials of degree 193) and the cancelled MA polynomial of degree 168 of [[D24:an ETS(A,N,A,A) model with seasonal lags 24 and 168]], the [[D7:step-down test]] took 0.74, 0.81 and 0.42 ms against 23.8, 20.9 and 17.5 ms for [[D15:all roots by numpy's companion-matrix eigenvalues]].",
+   "statement": "For an admissible and an inadmissible [[D40:random GUM model with lags (1, 24, 168)]] and the cancelled MA polynomial of [[D24:an ETS(A,N,A,A) model with seasonal lags 24 and 168]], the [[D7:step-down test]] was more than twenty times faster than [[D15:all roots by numpy's companion-matrix eigenvalues]].",
    "about": {
     "subject": "D7",
     "relation": "takes less time than",
@@ -1811,7 +1817,7 @@
   },
   {
    "id": "C22",
-   "statement": "For [[D35:ETS(A,N,A) with $m = 12$]], $\\alpha = 1.2$ and $\\gamma = 0.9$, the [[D16:stability condition of Section 5.4 of the ADAM monograph]] holds (largest nonzero eigenvalue modulus of its per-lag discount matrices 0.2), while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow by 1.0164 per period, and the largest root modulus of the cancelled MA polynomial is 1.0165.",
+   "statement": "For [[D35:ETS(A,N,A) with $m = 12$]], $\\alpha = 1.2$ and $\\gamma = 0.9$, the [[D16:stability condition of Section 5.4 of the ADAM monograph]] holds, while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow from period to period, and the largest root modulus of the cancelled MA polynomial exceeds one.",
    "about": {
     "subject": "D16",
     "relation": "holds for a model that is not admissible",
@@ -1879,7 +1885,7 @@
   },
   {
    "id": "C23",
-   "statement": "Over five fits with bounds=\"admissible\", the median time of a fit with [[D12:the polynomial check]] was between 0.82 and 1.2 times that with [[D4:the per-lag check]], and 1.08 times for adam() with seasonal lags 24 and 168 on [[D38:hourly data]], with optimisation paths that differ between the checks.",
+   "statement": "Over five fits with bounds=\\\"admissible\\\", the median time of a fit with [[D12:the polynomial check]] was comparable to that with [[D4:the per-lag check]], also for adam() with seasonal lags 24 and 168 on [[D38:hourly data]], with optimisation paths that differ between the checks.",
    "about": {
     "subject": "D12",
     "relation": "takes about as long per fit as",
@@ -1932,7 +1938,7 @@
   },
   {
    "id": "C24",
-   "statement": "On [[D22:1,000 new random ADAM ETS+ARIMA models]] (500 with ARIMA at lag 1, 500 with seasonal ARIMA), [[D13:checking the ETS part and the ARIMA polynomials apart]], as adam() did with bounds=\"admissible\", gave an [[D29:admissibility decision]] different from the [[D5:PBH reference]] of the whole model on 166 and 159 models, accepting 104 and 128 models that are not forecastable and rejecting 62 and 31 that are.",
+   "statement": "On [[D22:1,000 new random ADAM ETS+ARIMA models]] (500 with ARIMA at lag 1, 500 with seasonal ARIMA), [[D13:checking the ETS part and the ARIMA polynomials apart]], as adam() did with bounds=\\\"admissible\\\", gave an [[D29:admissibility decision]] different from the [[D5:PBH reference]] of the whole model on about a third of the models in each family, accepting models that are not forecastable and rejecting models that are.",
    "about": {
     "subject": "D13",
     "relation": "gives admissibility decisions different from",
@@ -2040,7 +2046,7 @@
   },
   {
    "id": "C25",
-   "statement": "On the same [[D22:1,000 random ETS+ARIMA models]], [[D10:the check of the whole model]], the criterion of [[C3]] applied to the whole model (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary), gave the same [[D29:admissibility decision]] as the [[D5:PBH reference]] on every model, and the same [[D30:largest modulus]] within 4.3e-13 and 1.6e-11 on the 341 and 413 models both found inadmissible.",
+   "statement": "On the same [[D22:1,000 random ETS+ARIMA models]], [[D10:the check of the whole model]], the criterion of [[C3]] applied to the whole model (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary), gave the same [[D29:admissibility decision]] as the [[D5:PBH reference]] on every model, and the same [[D30:largest modulus]] to within rounding error on the models both found inadmissible.",
    "about": {
     "subject": "D10",
     "relation": "gives the same admissibility decision and largest mode modulus as",
@@ -2163,7 +2169,7 @@
   },
   {
    "id": "C26",
-   "statement": "On [[D22:1,000 further random ETS+ARIMA models]], [[D14:the bounds checker of adam() in R and of ADAM in Python]] with bounds=\"admissible\", which run smoothEigensCpp() on the whole model, gave the same [[D29:admissibility decision]] as [[D10:the prototype check of the whole model]] on every model, and a penalty slope ([[D30:the largest root modulus]]) within 9.54e-7 and 9.48e-7 of it in the two families (the bisection tolerance is 1e-6).",
+   "statement": "On [[D22:1,000 further random ETS+ARIMA models]], [[D14:the bounds checker of adam() in R and of ADAM in Python]] with bounds=\\\"admissible\\\", which run smoothEigensCpp() on the whole model, gave the same [[D29:admissibility decision]] as [[D10:the prototype check of the whole model]] on every model, and a penalty slope ([[D30:the largest root modulus]]) within the bisection tolerance of it in both families.",
    "about": {
     "subject": "D14",
     "relation": "gives the same admissibility decision and largest mode modulus as",
@@ -2320,7 +2326,7 @@
   },
   {
    "id": "C27",
-   "statement": "With [[D14:the check of the whole model and its shortcut for pure ARIMA]], the median time of five fits with bounds=\"admissible\" of two ARIMA and two ETS+ARIMA models was within 6% of that with [[D13:the check of the parts apart]]; the log-likelihood of SARIMA(1,1,1)(1,1,1)[12] on [[D36:AirPassengers]] rose from -541.84 to -541.38 and that of ETS(A,N,A)+ARIMA(1,0,1) fell from -569.65 to -572.21, another local optimum.",
+   "statement": "With [[D14:the check of the whole model and its shortcut for pure ARIMA]], the median time of five fits with bounds=\\\"admissible\\\" of two ARIMA and two ETS+ARIMA models was close to that with [[D13:the check of the parts apart]]; the log-likelihood of SARIMA(1,1,1)(1,1,1)[12] on [[D36:AirPassengers]] rose slightly, and that of ETS(A,N,A)+ARIMA(1,0,1) fell, to another local optimum.",
    "about": {
     "subject": "D14",
     "relation": "takes about as long per fit as",

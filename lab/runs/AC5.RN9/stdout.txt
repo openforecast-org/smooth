@@ -1,0 +1,37 @@
+models in the edge band {'set': 'perlag', 'family': 'ETS(A,N,A)'} 78.0
+max distance of the certified largest mode modulus from 1, edge models {'set': 'perlag', 'family': 'ETS(A,N,A)'} 4.440892098500626e-16
+edge models with roots proved on the unit circle {'set': 'perlag', 'family': 'ETS(A,N,A)'} 2.0
+edge models whose decision by the PBH reference differs from the exact oracle {'set': 'perlag', 'family': 'ETS(A,N,A)'} 6.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, edge models {'set': 'perlag', 'family': 'ETS(A,N,A)'} 2.4424906541753444e-15
+edge models with alpha + gamma = 2 within 1e-12 {'set': 'perlag', 'family': 'ETS(A,N,A)'} 78.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models {'set': 'perlag'} 2.886579864025407e-15
+admissible models compared {'set': 'perlag', 'reference': 'PBH reference'} 1666.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models {'set': 'cancel'} 7.216449660063518e-15
+admissible models compared {'set': 'cancel', 'reference': 'PBH reference'} 328.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models {'set': 'cancel'} 1.5909495942878493e-13
+admissible models compared {'set': 'cancel', 'reference': "prototype's roots after cancellation"} 328.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models {'set': 'stepdown'} 1.5909495942878493e-13
+admissible models compared {'set': 'stepdown', 'reference': "prototype's roots after cancellation"} 377.0
+models in the edge band {'set': 'cpp', 'family': 'ETS high degree'} 3.0
+max distance of the certified largest mode modulus from 1, edge models {'set': 'cpp', 'family': 'ETS high degree'} 6.894689374981056e-09
+edge models with roots proved on the unit circle {'set': 'cpp', 'family': 'ETS high degree'} 0.0
+edge models whose decision by the prototype's cancellation differs from the exact oracle {'set': 'cpp', 'family': 'ETS high degree'} 0.0
+max abs difference of the largest mode modulus, prototype's cancellation against the exact oracle, edge models {'set': 'cpp', 'family': 'ETS high degree'} 3.708144902248023e-14
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models {'set': 'cpp'} 3.7969627442180354e-14
+admissible models compared {'set': 'cpp', 'reference': "prototype's roots after cancellation"} 505.0
+max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models {'set': 'examples'} 1.6653345369377348e-15
+admissible models compared {'set': 'examples', 'reference': 'PBH reference'} 2.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models {'set': 'examples'} 2.220446049250313e-16
+admissible models compared {'set': 'examples', 'reference': "prototype's roots after cancellation"} 2.0
+largest mode modulus, exact oracle (theta_G) {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 0.9999965469723224
+abs difference of the largest mode modulus, PBH reference against the exact oracle {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 1.6653345369377348e-15
+abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 1.1102230246251565e-16
+degree of theta, exact {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 193.0
+degree of the shared cyclotomic factor, exact {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 25.0
+degree of the exact gcd of theta and phi {'model': 'ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)'} 25.0
+largest mode modulus, exact oracle (theta_G) {'model': 'GUM start, orders (2,2), lags (1,12)'} 0.9829371631611429
+abs difference of the largest mode modulus, PBH reference against the exact oracle {'model': 'GUM start, orders (2,2), lags (1,12)'} 7.771561172376096e-16
+abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle {'model': 'GUM start, orders (2,2), lags (1,12)'} 2.220446049250313e-16
+degree of theta, exact {'model': 'GUM start, orders (2,2), lags (1,12)'} 26.0
+degree of the shared cyclotomic factor, exact {'model': 'GUM start, orders (2,2), lags (1,12)'} 14.0
+degree of the exact gcd of theta and phi {'model': 'GUM start, orders (2,2), lags (1,12)'} 14.0

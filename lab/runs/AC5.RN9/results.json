@@ -1,0 +1,279 @@
+[
+ {
+  "variable": "models in the edge band",
+  "value": 78.0,
+  "conditions": {
+   "set": "perlag",
+   "family": "ETS(A,N,A)"
+  }
+ },
+ {
+  "variable": "max distance of the certified largest mode modulus from 1, edge models",
+  "value": 4.440892098500626e-16,
+  "conditions": {
+   "set": "perlag",
+   "family": "ETS(A,N,A)"
+  }
+ },
+ {
+  "variable": "edge models with roots proved on the unit circle",
+  "value": 2.0,
+  "conditions": {
+   "set": "perlag",
+   "family": "ETS(A,N,A)"
+  }
+ },
+ {
+  "variable": "edge models whose decision by the PBH reference differs from the exact oracle",
+  "value": 6.0,
+  "conditions": {
+   "set": "perlag",
+   "family": "ETS(A,N,A)"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, PBH reference against the exact oracle, edge models",
+  "value": 2.4424906541753444e-15,
+  "conditions": {
+   "set": "perlag",
+   "family": "ETS(A,N,A)"
+  }
+ },
+ {
+  "variable": "edge models with alpha + gamma = 2 within 1e-12",
+  "value": 78.0,
+  "conditions": {
+   "set": "perlag",
+   "family": "ETS(A,N,A)"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models",
+  "value": 2.886579864025407e-15,
+  "conditions": {
+   "set": "perlag"
+  }
+ },
+ {
+  "variable": "admissible models compared",
+  "value": 1666.0,
+  "conditions": {
+   "set": "perlag",
+   "reference": "PBH reference"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models",
+  "value": 7.216449660063518e-15,
+  "conditions": {
+   "set": "cancel"
+  }
+ },
+ {
+  "variable": "admissible models compared",
+  "value": 328.0,
+  "conditions": {
+   "set": "cancel",
+   "reference": "PBH reference"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models",
+  "value": 1.5909495942878493e-13,
+  "conditions": {
+   "set": "cancel"
+  }
+ },
+ {
+  "variable": "admissible models compared",
+  "value": 328.0,
+  "conditions": {
+   "set": "cancel",
+   "reference": "prototype's roots after cancellation"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models",
+  "value": 1.5909495942878493e-13,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "admissible models compared",
+  "value": 377.0,
+  "conditions": {
+   "set": "stepdown",
+   "reference": "prototype's roots after cancellation"
+  }
+ },
+ {
+  "variable": "models in the edge band",
+  "value": 3.0,
+  "conditions": {
+   "set": "cpp",
+   "family": "ETS high degree"
+  }
+ },
+ {
+  "variable": "max distance of the certified largest mode modulus from 1, edge models",
+  "value": 6.894689374981056e-09,
+  "conditions": {
+   "set": "cpp",
+   "family": "ETS high degree"
+  }
+ },
+ {
+  "variable": "edge models with roots proved on the unit circle",
+  "value": 0.0,
+  "conditions": {
+   "set": "cpp",
+   "family": "ETS high degree"
+  }
+ },
+ {
+  "variable": "edge models whose decision by the prototype's cancellation differs from the exact oracle",
+  "value": 0.0,
+  "conditions": {
+   "set": "cpp",
+   "family": "ETS high degree"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's cancellation against the exact oracle, edge models",
+  "value": 3.708144902248023e-14,
+  "conditions": {
+   "set": "cpp",
+   "family": "ETS high degree"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models",
+  "value": 3.7969627442180354e-14,
+  "conditions": {
+   "set": "cpp"
+  }
+ },
+ {
+  "variable": "admissible models compared",
+  "value": 505.0,
+  "conditions": {
+   "set": "cpp",
+   "reference": "prototype's roots after cancellation"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, PBH reference against the exact oracle, admissible models",
+  "value": 1.6653345369377348e-15,
+  "conditions": {
+   "set": "examples"
+  }
+ },
+ {
+  "variable": "admissible models compared",
+  "value": 2.0,
+  "conditions": {
+   "set": "examples",
+   "reference": "PBH reference"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, admissible models",
+  "value": 2.220446049250313e-16,
+  "conditions": {
+   "set": "examples"
+  }
+ },
+ {
+  "variable": "admissible models compared",
+  "value": 2.0,
+  "conditions": {
+   "set": "examples",
+   "reference": "prototype's roots after cancellation"
+  }
+ },
+ {
+  "variable": "largest mode modulus, exact oracle (theta_G)",
+  "value": 0.9999965469723224,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "variable": "abs difference of the largest mode modulus, PBH reference against the exact oracle",
+  "value": 1.6653345369377348e-15,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "variable": "abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle",
+  "value": 1.1102230246251565e-16,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "variable": "degree of theta, exact",
+  "value": 193.0,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "variable": "degree of the shared cyclotomic factor, exact",
+  "value": 25.0,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "variable": "degree of the exact gcd of theta and phi",
+  "value": 25.0,
+  "conditions": {
+   "model": "ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)"
+  }
+ },
+ {
+  "variable": "largest mode modulus, exact oracle (theta_G)",
+  "value": 0.9829371631611429,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "variable": "abs difference of the largest mode modulus, PBH reference against the exact oracle",
+  "value": 7.771561172376096e-16,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "variable": "abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle",
+  "value": 2.220446049250313e-16,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "variable": "degree of theta, exact",
+  "value": 26.0,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "variable": "degree of the shared cyclotomic factor, exact",
+  "value": 14.0,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ },
+ {
+  "variable": "degree of the exact gcd of theta and phi",
+  "value": 14.0,
+  "conditions": {
+   "model": "GUM start, orders (2,2), lags (1,12)"
+  }
+ }
+]

@@ -12,6 +12,13 @@
    "C24",
    "C22"
   ],
+  "highlights": [
+   "C1",
+   "C3",
+   "C22",
+   "C24",
+   "D10"
+  ],
   "autonomy": "human_supervised",
   "contribution_record": "complete",
   "origin": "native",

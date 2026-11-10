@@ -1,7 +1,7 @@
 {
   "schema_version": "0.40",
   "paper": {
-    "title": "The observed-data likelihood of ADAM and iETS with unobserved periods: entropy term, SSOE Kalman filter and multiplicative approximations",
+    "title": "The observed-data likelihood of ADAM and iETS with unobserved periods",
     "licence": "CC-BY-4.0",
     "declarations": {
       "funding": [],
